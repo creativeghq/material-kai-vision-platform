@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (133)
+## 1. Supabase Edge Functions (134)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -102,6 +102,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `finance-inbound-sync` | JWT / cron | Pull inbound documents from myDATA (RequestDocs) for configured workspaces |
 | `finance-invoice-pdf` | JWT | Render a legal invoice, credit note, or delivery note as a PDF |
 | `finance-issue-invoice` | JWT | Issue, transmit, or POS-complete a fiscal invoice/credit note/delivery note |
+| `finance-mydata-book` | JWT / cron | Mirror the AADE myDATA aggregate book (Συνοπτικό Βιβλίο) for configured workspaces |
 | `finance-pay-invoice` | JWT / token / public | Create a Stripe Checkout session or pay-link for an invoice |
 | `finance-send-invoice-email` | JWT | Email an invoice to its customer with optional PDF attachment |
 | `finance-send-statement` | JWT / cron | Render and email a party account-statement PDF (ledger / Καρτέλα) |

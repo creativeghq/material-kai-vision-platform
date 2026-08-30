@@ -209,7 +209,28 @@ RPC `finance_vat_report(p_workspace_id, p_from, p_to)` → rows of `{vat_rate, v
 | 4 | 17 | Island reduced | | 8 | 0 | Exempt (needs `vatExemptionCategory`) |
 
 ### myDATA reconciliation
-RPC `finance_mydata_reconciliation(...)` — every issued legal document bucketed by AADE state: `accepted` / `offline_pending` / `rejected` / `failed` / `not_transmitted`.
+RPC `finance_mydata_reconciliation(...)` — every issued legal document bucketed by AADE state: `accepted` / `offline_pending` / `rejected` / `failed` / `not_transmitted`. Note what this does **not** answer: it reads `invoices`/`credit_notes`/`delivery_notes`, so it reports whether **our** paperwork was transmitted. It cannot see a supplier document at all, and it never asks AADE what AADE holds. That question is the myDATA book below.
+
+## 5a. myDATA book (ΑΑΔΕ) — a read-only mirror
+
+Finance → **myDATA Book (ΑΑΔΕ)**, the platform's copy of the taxpayer's own Συνοπτικό Βιβλίο at
+`www1.aade.gr/saadeapps2/bookkeeper-web/bookkeeper/#!/bookAggregate`: month × direction × AADE's nine
+money columns, plus the monthly income-less-expense balance.
+
+**It is deliberately not merged with anything.** Every other figure in Finance is derived from our
+tables; this one is derived from theirs, which is the only reason putting them side by side is a
+check at all. Nothing joins it into `invoices`/`supplier_bills`/`inbound_documents`, no platform
+report reads it, and no platform figure falls back to it — a number that reads the mirror can no
+longer disagree with it. Held that way by
+[tests/unit/mydataBookMirror.test.ts](../tests/unit/mydataBookMirror.test.ts).
+
+- **Reader**: `get_mydata_book_aggregate(p_workspace_id, p_from, p_to)`, gated on `is_workspace_finance_viewer`. SQL derives the figures **and the verdict on them**; the client only formats. A month returns `ok` / `no_data` (AADE answered, genuinely nothing) / `collector_failed` (unknown — **not** zero) / `not_collected` / `not_connected`, with NULL money whenever the status is not one of the first two. `balance` is income net less expense net, on the income row, and only when both directions are known.
+- **Collector**: `finance-mydata-book` (finance JWT or `x-cron-secret`), writing `mydata_book_months` + `mydata_book_sync_state`. Two tables on purpose — a failed refresh updates only the sync state, so the last good figures stay on screen and merely become stale. Overwriting them with zeros would be indistinguishable from a real empty month.
+- **Three calls, not two.** `RequestMyIncome` / `RequestMyExpenses` return the book pre-aggregated as `<bookInfo>` rows — but a bookInfo row is keyed on `counterVatNumber`, so families that have no counterparty are absent: `11.x` (retail we issued) on income, `13.x` (retail we self-report) on expenses. Measured on this workspace for 01/01–30/08/2026, the book feed alone reports **EUR 42.658,42** of income where AADE's page says **EUR 54.329,85** — short by 21%, and nothing errors. The missing half is read off `RequestTransmittedDocs` and signed here.
+- **Signs.** The book feed signs its own credit notes; the document feeds report them **positive**, so the supplement negates exactly `11.4` and `13.31`. `11.5` ("on behalf of third parties") and `13.30` ("as recorded by the entity itself") sit next to those codes and are **additions** — negating either halves the month it lands in, and the total stays a perfectly valid number. With the supplement, all eight months and every column tie to myAADE to the cent.
+- **AADE rate-limits hard**, answering 429 with a retry-after around 150s — longer than an edge request may live. So a 429 is never slept through: it is recorded as `collector_failed` with `retry_after_s`, and the UI says when to try again. It also parses as valid XML with **zero rows**, which is exactly how a throttle becomes a confident "no income in March" — every response is status-checked before it is counted.
+- **No cron.** Refresh is the button, deliberately: a nightly sweep would spend the same per-workspace quota the operator needs for an interactive refresh. The freshness banner names when the mirror was last confirmed, so staleness is visible rather than assumed away.
+- **Not a reconciliation, and should not become one.** Differencing the mirror against our own reports would be useful; folding either into the other would not. If a diff column is ever added it stays a *comparison* of two independently derived numbers, never a merge that picks a winner.
 
 ### Customer/Supplier ledger (Καρτέλα)
 - **In-app**: `finance_party_ledger(...)` + `finance_party_opening_balance(...)` RPCs (`financeService.getPartyLedger` / `getPartyOpeningBalance`).
@@ -334,6 +355,8 @@ All workspace-scoped; RLS enforces `is_workspace_member` for read and `is_worksp
 
 **Inbound:** `inbound_documents`, `workspace_inbound_credentials`.
 
+**AADE mirror (read-only, never joined to the above):** `mydata_book_months` (workspace x month x direction, AADE's nine money columns + `doc_count` + `status`), `mydata_book_sync_state` (last attempt/success, covered window, `retry_after_s`). Written only by `finance-mydata-book` under the service role — there is deliberately no client write policy, so nothing in the app can edit what AADE said.
+
 **Config:** `finance_settings` (~80 cols — business identity incl. EN variants, invoice numbering, banking, myDATA defaults, statement/digest schedules, template paths, FX), `finance_branches`, `finance_categories`.
 
 **Views:** `vw_ar_aging`, `vw_ap_aging`, `vw_cash_flow_forecast`, `vw_monthly_pnl`, `vw_finance_parties`, `vw_customer_account_summary`, `vw_supplier_account_summary`, `vw_quote_followup_queue`.
@@ -345,8 +368,8 @@ All workspace-scoped; RLS enforces `is_workspace_member` for read and `is_worksp
 Module root `src/modules/finance/` (manifest slug `sales-finance`). Route `/finance` is double-gated: `CapabilityGuard capability="finance.manage"` then `EntitlementGuard moduleSlug="sales-finance"`.
 
 - **Pages**: `DocumentsPage` (Invoices / Credit Notes / Delivery Notes / Supplier Bills / Inbound / Parties / Planning / Reports / Settings), `PosPage` (see [POS doc](pos-retail-system.md)).
-- **Tabs**: `ReportsTab` (18 report kinds + `AccountingExportCard`), `PartiesTab` (ledgers + send statement), `SettingsTab` (identity, numbering, banking, myDATA defaults, digest/statement schedules, inbound creds, branches, POS terminals, storefront), `PlanningTab` (cash-flow/aging/planned payments), `TimeBillingTab` (see [billing doc](warehouse-and-billing.md)).
-- **Services**: `financeService` (single merged service, ~1700 lines — all document CRUD, fiscal, payments, reports, statement, pay, digest, canonical VAT constants), `accountingExportService`, `inboundService`, `posSessionService`, `timeTrackingService`, `warehouseService`, `deliveryNotesService`.
+- **Tabs**: `ReportsTab` (18 report kinds + `AccountingExportCard`), `MydataBookTab` (the read-only AADE book mirror — its own rail entry on purpose, since everything in Reports is derived from *our* tables and this one is AADE's answer), `PartiesTab` (ledgers + send statement), `SettingsTab` (identity, numbering, banking, myDATA defaults, digest/statement schedules, inbound creds, branches, POS terminals, storefront), `PlanningTab` (cash-flow/aging/planned payments), `TimeBillingTab` (see [billing doc](warehouse-and-billing.md)).
+- **Services**: `financeService` (single merged service, ~1700 lines — all document CRUD, fiscal, payments, reports, statement, pay, digest, canonical VAT constants), `accountingExportService`, `inboundService`, `mydataBookService`, `posSessionService`, `timeTrackingService`, `warehouseService`, `deliveryNotesService`.
 
 ---
 

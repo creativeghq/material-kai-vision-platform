@@ -24,6 +24,7 @@ import {
   Boxes,
   Landmark,
   Send as SendIcon,
+  BookOpen,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
@@ -76,6 +77,7 @@ import { ExpensePaymentsDialog } from '@/modules/finance/components/ExpensePayme
 import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog';
 import { PlanningTab } from '@/modules/finance/tabs/PlanningTab';
 import { ReportsTab } from '@/modules/finance/tabs/ReportsTab';
+import { MydataBookTab } from '@/modules/finance/tabs/MydataBookTab';
 import { TimeBillingTab } from '@/modules/finance/tabs/TimeBillingTab';
 import { PartiesTab } from '@/modules/finance/tabs/PartiesTab';
 import { SettingsTab } from '@/modules/finance/tabs/SettingsTab';
@@ -593,6 +595,12 @@ const FinancePage: React.FC = () => {
               )}
               <TabsTrigger value="reports" className="w-full justify-start">
                 <BarChart3 className="h-4 w-4 mr-2" /> Reports
+              </TabsTrigger>
+              {/* Deliberately its own section and not a 25th entry in Reports: everything in
+                  that dropdown is derived from OUR tables, and this one is AADE's answer.
+                  Filing it beside them invites exactly the confusion it exists to prevent. */}
+              <TabsTrigger value="mydata_book" className="w-full justify-start">
+                <BookOpen className="h-4 w-4 mr-2" /> myDATA Book (ΑΑΔΕ)
               </TabsTrigger>
               <TabsTrigger value="parties" className="w-full justify-start">
                 <Users className="h-4 w-4 mr-2" /> Customers &amp; Suppliers
@@ -1270,6 +1278,11 @@ const FinancePage: React.FC = () => {
           {/* ─────────── REPORTS ─────────── */}
           <TabsContent value="reports" className="space-y-4">
             <ReportsTab workspaceId={workspaceId} />
+          </TabsContent>
+
+          {/* ─────────── myDATA BOOK (read-only AADE mirror) ─────────── */}
+          <TabsContent value="mydata_book" className="space-y-4">
+            {workspaceId && <MydataBookTab workspaceId={workspaceId} />}
           </TabsContent>
 
           {/* ─────────── PARTIES ─────────── */}

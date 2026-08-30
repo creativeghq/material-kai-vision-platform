@@ -68,6 +68,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'finance-fiscal-offline-recovery', label: 'finance-fiscal-offline-recovery', sublabel: 'Re-query connector for pending MARK on offline-accepted fiscal documents' },
   { id: 'finance-inbound-sync', label: 'finance-inbound-sync', sublabel: 'Pull inbound documents from myDATA (RequestDocs) for configured workspaces' },
   { id: 'finance-invoice-pdf', label: 'finance-invoice-pdf', sublabel: 'Render a legal invoice, credit note, or delivery note as a PDF' },
+  { id: 'finance-mydata-book', label: 'finance-mydata-book', sublabel: 'Mirror the AADE myDATA aggregate book (Συνοπτικό Βιβλίο) for configured workspaces' },
   { id: 'finance-issue-invoice', label: 'finance-issue-invoice', sublabel: 'Issue, transmit, or POS-complete a fiscal invoice/credit note/delivery note' },
   { id: 'finance-pay-invoice', label: 'finance-pay-invoice', sublabel: 'Create a Stripe Checkout session or pay-link for an invoice' },
   { id: 'finance-send-invoice-email', label: 'finance-send-invoice-email', sublabel: 'Email an invoice to its customer with optional PDF attachment' },

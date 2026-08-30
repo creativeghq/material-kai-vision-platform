@@ -2953,6 +2953,96 @@
         }
       }
     },
+    "/finance-mydata-book": {
+      "post": {
+        "tags": [
+          "Finance"
+        ],
+        "summary": "Mirror the AADE myDATA aggregate book (Συνοπτικό Βιβλίο) for configured workspaces",
+        "operationId": "post_finance_mydata_book",
+        "description": "Reads the taxpayer's own myDATA book from AADE and stores it in mydata_book_months as a READ-ONLY MIRROR — never merged with, and never written back into, invoices / supplier_bills / inbound_documents. It exists to CONFIRM the platform's own figures against the tax authority's. Combines RequestMyIncome + RequestMyExpenses (the book feed, which omits the counterparty-less 11.x/13.x families) with the 11.x/13.x half of RequestTransmittedDocs, signing credit subtypes 11.4 and 13.31 negative; with that supplement every month and column ties to the myAADE bookAggregate page to the cent. AADE rate-limits these endpoints with a retry-after longer than an edge request may live, so a 429 is recorded as collector_failed with retry_after_s and the last good figures are left untouched rather than zeroed.\n\n**Response:** `{ok, from, to, workspaces: [{workspaceId, months, rows, unknown_subtypes} | {workspaceId, skipped} | {workspaceId, error, retry_after_s}]}`",
+        "security": [
+          {
+            "supabaseJwt": []
+          },
+          {
+            "cronSecret": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "date_from": {
+                    "type": "string",
+                    "description": "Start of the issue-date window to mirror. Defaults to 1 January of the current year; sent to AADE as dateFrom in dd/MM/yyyy. (string (yyyy-mm-dd))"
+                  },
+                  "date_to": {
+                    "type": "string",
+                    "description": "End of the issue-date window. Defaults to today. Must not be earlier than date_from. (string (yyyy-mm-dd))"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/finance-invoice-pdf": {
       "post": {
         "tags": [

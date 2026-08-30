@@ -45,6 +45,9 @@ export const FINANCE_TAB = {
   cheques: 'doc_cheques',
   parties: 'parties',
   reports: 'reports',
+  /** AADE's own aggregate book — a read-only mirror, deliberately not a Reports entry. */
+  mydataBook: 'mydata_book',
+  settings: 'settings',
 } as const;
 
 /** `?<key>=` params the finance lists read their filter bag out of (see `filterUrl`). */
