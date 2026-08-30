@@ -66,7 +66,10 @@ type Reservation =
  *  the credits back if the submit fails or the document is not accepted. Operator root
  *  transmits free. */
 async function reserveTransmission(
-  supabase: any, workspaceId: string, userId: string | undefined, description: string,
+  // `string | null`, because that is what `auth.userId` IS at every call site — null at
+  // 'secret'/'anon' level. The `!userId` check below treats null and undefined identically, so
+  // this widening is the signature catching up with the callers, not a behaviour change.
+  supabase: any, workspaceId: string, userId: string | null | undefined, description: string,
   /** Which document this debit is for. Stamped onto the credit_transactions row so
    *  finance-fiscal-offline-recovery can find and reverse it when a document that went
    *  OFFLINE (credits kept) is later refused by AADE (#193). Without it the cron would have
