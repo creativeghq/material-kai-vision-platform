@@ -456,6 +456,21 @@ export interface DealForecastRow {
   won_value: number;
   lost_count: number;
   avg_probability: number;
+  /**
+   * What the deals in this set actually BILLED, ex-VAT (#378 C3).
+   *
+   * NET on purpose, because `crm_deals.value` is a pipeline figure — what the work is worth, not
+   * what the customer hands over including tax. Summing `invoices.total` here would make every
+   * accuracy reading 24% high at the Greek standard rate, which is the worst kind of wrong: the
+   * right order of magnitude, moving the right way, and flattering.
+   *
+   * This became answerable only once the chain carried `deal_id` onto the order and the invoice;
+   * before that a won deal's paper trail stopped at the quote.
+   */
+  invoiced_net: number;
+  /** The accuracy pair: `won_value` is what we said, this is what it billed. */
+  won_invoiced_net: number;
+  deals_with_invoices: number;
 }
 
 /**
