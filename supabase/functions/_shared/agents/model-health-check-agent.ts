@@ -28,6 +28,12 @@
  *   providers     string[]  Optional subset of providers (default: replicate only — see below)
  *   timeout_ms    number    Per-model HTTP timeout in ms (default 20000)
  *   test_prompt   string    Override probe prompt
+ *   max_models    number    Models probed per run, least-recently-probed first (default 6)
+ *   deadline_ms   number    Stop starting new waits past this (default 120000, under the edge ceiling)
+ *
+ * A RUN DOES NOT COVER THE WHOLE ROSTER, ON PURPOSE. The provider rate-limits creates hard enough
+ * that probing every model in one pass reports most of them broken; see the note on `max_models`
+ * in run() for the measurements. Read a run as "these N were checked", never as a full sweep.
  */
 
 import type { AgentRunner, AgentRunContext, AgentRunResult } from './types.ts';
@@ -106,6 +112,24 @@ export class ModelHealthCheckAgent implements AgentRunner {
     const testPrompt = String(cfg.test_prompt ?? 'modern minimalist living room');
     const providers  = (cfg.providers as string[] | undefined) ?? PROBEABLE_PROVIDERS;
 
+    /**
+     * A run probes a SLICE of the roster, least-recently-checked first, and stops at a deadline.
+     *
+     * Measured 2026-08-30: Replicate throttles prediction creates to 6 per minute with a burst of
+     * ONE. It is per model and the first create on a given model consumes that model's burst, so
+     * probing 17 models back to back returns 201 for the first and 429 for the other sixteen —
+     * which this agent then recorded as sixteen broken models. It also does not matter how the
+     * calls are spaced or whether each prediction is cancelled first; both were tested and neither
+     * changes the outcome. (`black-forest-labs/flux-schnell` is exempt and answers 15/15, which is
+     * exactly why an eyeball test against it "proves" there is no throttle. Do not use it to check.)
+     *
+     * So the whole roster cannot be probed in one pass, and pacing alone cannot fix that either:
+     * 17 models at ~10s a piece is past the edge function ceiling. Rotating means each run covers
+     * a few models honestly and successive scheduled runs cover the rest.
+     */
+    const maxModels  = Number(cfg.max_models ?? 6);
+    const deadlineAt = Date.now() + Number(cfg.deadline_ms ?? 120_000);
+
     // The registry is the roster. The hardcoded ALL_MODELS list this used to carry drifted from the
     // real roster in both directions and still named two models that had been deleted upstream.
     let query = supabase
@@ -118,6 +142,10 @@ export class ModelHealthCheckAgent implements AgentRunner {
     if (Array.isArray(cfg.models) && cfg.models.length > 0) {
       query = query.in('id', cfg.models as string[]);
     }
+
+    // Least-recently-probed first, so a model skipped by the throttle is at the FRONT next run.
+    // `nullsFirst` puts a never-probed model ahead of everything, which is the right priority.
+    query = query.order('last_probe_at', { ascending: true, nullsFirst: true }).limit(maxModels);
 
     const { data: models, error: loadErr } = await query;
     if (loadErr) {
@@ -164,6 +192,8 @@ export class ModelHealthCheckAgent implements AgentRunner {
 
     const results: ModelProbeResult[] = [];
     const counts: Record<string, number> = {};
+    /** Models the throttle would not let us measure. NOT a verdict — see the write below. */
+    const throttled: string[] = [];
 
     for (const model of modelList) {
       await heartbeat();
@@ -181,18 +211,41 @@ export class ModelHealthCheckAgent implements AgentRunner {
           url = `https://api.replicate.com/v1/models/${model.slug}/predictions`;
         }
 
-        const ac = new AbortController();
-        const timer = setTimeout(() => ac.abort(), timeoutMs);
         let res: Response;
-        try {
-          res = await fetch(url, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${replicateApiKey}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-            signal: ac.signal,
-          });
-        } finally {
-          clearTimeout(timer);
+        let gaveUpToThrottle = false;
+        for (;;) {
+          const ac = new AbortController();
+          const timer = setTimeout(() => ac.abort(), timeoutMs);
+          try {
+            res = await fetch(url, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${replicateApiKey}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify(body),
+              signal: ac.signal,
+            });
+          } finally {
+            clearTimeout(timer);
+          }
+          if (res.status !== 429) break;
+
+          // The provider states its own window in `retry-after`; that number is the only honest
+          // wait. MIVAA had to learn the same thing (commit 3880f53) — its 1s/2s/4s backoff was
+          // shorter than the ~10s window, so every retry spent a slot it could not use.
+          await res.body?.cancel();
+          const waitMs = Math.min(Number(res.headers.get('retry-after') ?? 10) * 1000, 20_000);
+          if (Date.now() + waitMs > deadlineAt) { gaveUpToThrottle = true; break; }
+          await heartbeat();
+          await new Promise((r) => setTimeout(r, waitMs));
+        }
+
+        // A model the throttle hid from us has NOT been measured, and saying anything about it
+        // would be the same lie as the auth_failed one: a status that reads as a verdict when no
+        // verdict exists. Leave last_probe_at untouched so the ordering above puts it first next
+        // run, and say plainly that it was skipped.
+        if (gaveUpToThrottle) {
+          throttled.push(model.id);
+          await log('info', `${model.id}: skipped — provider throttled and the run is out of budget`);
+          continue;
         }
 
         const durationMs = Date.now() - start;
@@ -254,6 +307,13 @@ export class ModelHealthCheckAgent implements AgentRunner {
       } else if (result.probeStatus !== 'ok') {
         await log('warn', `${model.id}: ${result.probeStatus}`, { httpStatus: result.httpStatus, error: result.error });
       }
+    }
+
+    if (throttled.length > 0) {
+      await log('warn',
+        `${throttled.length} model(s) not measured this run — the provider throttled us. They are ` +
+        `unchanged in the registry and are first in line next run.`,
+        { models: throttled });
     }
 
     const creditExhausted = results.filter((r) => r.probeStatus === 'credit_exhausted');
