@@ -2670,6 +2670,23 @@ export const TOOLKITS: ToolkitDefinition[] = [
         prompt: 'Design a modern living room from scratch with warm minimal styling.',
       },
       {
+        // The inverse of every other entry here, and the one that unblocks them: staging and
+        // redesign both want a bare room, while the photo an agent or a customer actually
+        // has is furnished. Without this the only route between the two was painting a mask
+        // over every object by hand in RegionEditCanvas.
+        label: 'Empty a room',
+        description: 'Remove all furniture and decor from a room photo, keeping the architecture',
+        icon: 'Eraser',
+        imageRequired: true,
+        prompt: 'Remove all the furniture and decor from this room photo.',
+        promptTemplate: 'Remove every movable item from this room photo — furniture, rugs, art, lamps, plants, and personal clutter — and leave the architecture exactly as it is. Keep in place: {{keep}}',
+        generation: { imageKeys: ['photo'], mode: 'unstage' },
+        form: [
+          { key: 'photo', label: 'Room photo', kind: 'image', required: true, help: 'Upload the furnished room you want emptied.' },
+          { key: 'keep', label: 'Anything that should stay? (optional)', kind: 'textarea', placeholder: 'e.g. the built-in wardrobe, the curtains, the ceiling pendant' },
+        ],
+      },
+      {
         label: 'Stage a room',
         description: 'Furnish an empty room photo with furniture and decor',
         icon: 'LayoutTemplate',
@@ -2679,7 +2696,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         // Photo captured here, then the staging wizard collects style + furniture.
         generation: { imageKeys: ['photo'], opensModal: 'virtual-staging' },
         form: [
-          { key: 'photo', label: 'Empty room photo', kind: 'image', required: true, help: 'Upload a photo of the empty room to furnish.' },
+          { key: 'photo', label: 'Empty room photo', kind: 'image', required: true, help: 'Upload a photo of the empty room to furnish. If yours is furnished, run "Empty a room" first.' },
         ],
       },
       {

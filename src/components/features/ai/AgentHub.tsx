@@ -27,6 +27,7 @@ import {
   GripVertical,
   ArrowLeftRight,
   Pencil,
+  Eraser,
   FileText,
   Loader2,
   ChevronDown,
@@ -6469,6 +6470,18 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   >
                     <Pencil className="w-3 h-3" />
                     Edit Image
+                  </button>
+
+                  {/* Empty a Room — the step BEFORE staging. Sits immediately left of Stage
+                      Room because that is the order the two are used in: the photo people
+                      actually have is furnished, and the stager needs it bare. */}
+                  <button
+                    onClick={() => launchInteriorQuickStart('Empty a room')}
+                    className={`flex items-center gap-1 px-2.5 py-1 border text-xs font-medium transition-colors ${selectedGenerationMode === 'unstage' ? 'bg-slate-600 border-slate-600 text-white' : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'}`}
+                    title="Remove all furniture and decor, keeping the room's architecture — do this before staging a furnished photo"
+                  >
+                    <Eraser className="w-3 h-3" />
+                    Empty Room
                   </button>
 
                   {/* Virtual Staging — guided capture (photo-first), then the staging wizard */}

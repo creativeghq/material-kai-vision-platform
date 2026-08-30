@@ -70,6 +70,11 @@ const GROK_UNSUPPORTED_MODES = new Set([
   'floor-plan-render',
   'floor-plan-text',
   'materials-selection-board',
+  // `unstage` removes every movable object and must inpaint the floor and wall that were
+  // behind it while the architecture, camera and lighting stay pixel-stable. The branch in
+  // generate-interior-gemini calls Gemini unconditionally for exactly that reason, so
+  // listing it here is what stops `tier: 'grok'` billing grok-aurora for a Gemini run.
+  'unstage',
 ]);
 
 export interface GenerationRoutingOptions {

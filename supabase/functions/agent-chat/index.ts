@@ -2833,9 +2833,13 @@ async function executeAgent(
     // stabledesign, the stable-interiors forks...). Point one at "this chair on seamless
     // white" and it renders a room, confidently and off-brief. A product studio needs a
     // product-capable roster — seedream-4, flux-2-pro and the like — not this one.
+    // `unstage` is here for the sharpest version of the reason above: every model in the
+    // Replicate grid is a room-FURNISHING specialist, so "empty this room" is not merely
+    // off-brief for them, it is the exact inverse of what they were trained to do. They
+    // would return a confidently furnished room beside the one tile that emptied it.
     const GEMINI_ONLY_MODES = [
       'floor-plan-render', 'copy-style', 'floor-plan-text', 'image-edit',
-      'product-shot', 'product-lifestyle', 'material-texture',
+      'product-shot', 'product-lifestyle', 'material-texture', 'unstage',
     ];
     if (!generationMode || !GEMINI_ONLY_MODES.includes(generationMode)) {
       tools.push(create3DGenerationTool(userId, workspaceId, onChunk, toolImages, conversationImages));

@@ -348,13 +348,16 @@ export const createGeminiGenerationTool = (
           return candidate;
         };
 
-        // image-edit: images[0] = the image to edit (Gemini targeted edit)
+        // image-edit / unstage: images[0] = the image to edit (Gemini, single source photo).
+        // Both take one supplied photo and return an altered version of that same photo, so
+        // they resolve their source identically; only the prompt differs downstream.
+        const SINGLE_SOURCE_MODES = ['image-edit', 'unstage'];
         let resolvedReferenceUrl: string | undefined = referenceImageUrl;
-        if (!resolvedReferenceUrl && resolvedMode === 'image-edit') {
+        if (!resolvedReferenceUrl && SINGLE_SOURCE_MODES.includes(resolvedMode)) {
           const candidate = images[0] ?? conversationImages[conversationImages.length - 1];
           if (candidate) resolvedReferenceUrl = await ensurePublicUrl(candidate);
         }
-        if (resolvedMode === 'image-edit' && !resolvedReferenceUrl) {
+        if (SINGLE_SOURCE_MODES.includes(resolvedMode) && !resolvedReferenceUrl) {
           return JSON.stringify({ success: false, error: 'No reference image available for editing. Please attach an image or generate one first.' });
         }
 
@@ -426,7 +429,14 @@ export const createGeminiGenerationTool = (
           room_type: roomType,
           style,
           sqm,
-          model_tier: resolvedMode === 'materials-selection-board' ? 'pro' : (modelTier ?? 'fast') as 'fast' | 'pro' | 'grok',
+          // `unstage` joins materials-board on the forced-pro rail. Deleting an object is the
+          // easy half; what the model then has to invent is the floor and skirting that were
+          // behind it, continuing a tile course or a board direction across the gap. Flash
+          // smears that, and a smeared floor is the one artefact that makes a listing photo
+          // unusable — so the mode is not offered at a tier that cannot do it.
+          model_tier: (resolvedMode === 'materials-selection-board' || resolvedMode === 'unstage')
+            ? 'pro'
+            : (modelTier ?? 'fast') as 'fast' | 'pro' | 'grok',
           user_id: userId,
           workspace_id: workspaceId,
           conversation_id: conversationId,
@@ -465,8 +475,10 @@ export const createGeminiGenerationTool = (
             : {}),
           // Style reference (legacy: floor-plan-render / image-edit with 2 images)
           ...(styleReferenceUrl ? { style_reference_url: styleReferenceUrl } : {}),
-          // For image-edit mode, the prompt IS the edit instruction
-          ...(resolvedMode === 'image-edit' ? { edit_instruction: prompt } : {}),
+          // For image-edit mode, the prompt IS the edit instruction. `unstage` carries it too,
+          // where it holds the caller's carve-outs ("keep the built-in wardrobe") rather than
+          // the change to make — the edge function renders it under ADDITIONAL INSTRUCTIONS.
+          ...(resolvedMode === 'image-edit' || resolvedMode === 'unstage' ? { edit_instruction: prompt } : {}),
           ...((() => {
             const merged = [...(materialImages || []), ...pinnedMaterialImages].slice(0, 14);
             return merged.length > 0 ? { material_images: merged } : {};
@@ -532,6 +544,7 @@ export const createGeminiGenerationTool = (
           'floor-plan-render': 'rendered your floor plan',
           'floor-plan-text': 'created your floor plan',
           'materials-selection-board': 'created your materials board',
+          'unstage': 'emptied the room',
         };
 
         return JSON.stringify({
@@ -575,6 +588,7 @@ Mode routing (auto-detected if not set explicitly):
 - redesign (1 image uploaded, "redesign"/"update style") → Flux Depth Pro locks room structure, applies new style. Positions NEVER change.
 - copy-style (2 images: Image 1=inspiration, Image 2=your room) → Gemini Vision extracts full design spec from inspiration → Flux Depth Pro applies it to the room. Zero spatial bleed.
 - image-edit (targeted change: "change floor to marble", "add a plant", "warmer lighting") → Gemini image editing on the uploaded or most recently generated image
+- unstage ("empty this room", "remove the furniture", "declutter", "clear it out", "show it unfurnished") → returns the SAME room with every movable object removed and the revealed floor/walls filled in. Architecture, camera and lighting are unchanged. This is the step that turns a FURNISHED photo into an input the staging and redesign flows can use — if the user wants a furnished room staged or redesigned in a different style, unstage first, then run the staging/redesign on the result.
 - floor-plan-render (floor plan image uploaded) → photorealistic eye-level perspective render
 - floor-plan-text (no image, user describes layout or provides sqm) → 2D floor plan diagram
 - text-to-image (no images, pure text description) → new room generation
@@ -599,7 +613,7 @@ a call that will be refused.`,
         prompt: z.string().describe('Design description or edit instruction (e.g. "change the floor to marble and make walls warmer")'),
         roomType: z.string().optional().describe('ALWAYS extract from user message when present. Room type: bedroom, living_room, kitchen, bathroom, dining_room, home_office, hallway, studio, outdoor, kids_room, basement'),
         style: z.string().optional().describe('ALWAYS extract from user message when present. Design style: modern, minimalist, scandinavian, industrial, luxury, bohemian, traditional, mediterranean, japandi, art_deco, rustic, coastal'),
-        mode: z.enum(['text-to-image', 'image-edit', 'redesign', 'copy-style', 'floor-plan-render', 'floor-plan-text', 'materials-selection-board', 'product-shot', 'product-lifestyle', 'material-texture']).optional().describe('Generation mode. redesign=Flux Depth Pro full redesign (1 image). copy-style=Flux Depth Pro copy aesthetic from inspiration (2 images). image-edit=Gemini targeted change. product-shot=one product on seamless white. product-lifestyle=product staged in a room. material-texture=seamless tileable swatch. Omit to auto-detect.'),
+        mode: z.enum(['text-to-image', 'image-edit', 'redesign', 'copy-style', 'floor-plan-render', 'floor-plan-text', 'materials-selection-board', 'product-shot', 'product-lifestyle', 'material-texture', 'unstage']).optional().describe('Generation mode. redesign=Flux Depth Pro full redesign (1 image). copy-style=Flux Depth Pro copy aesthetic from inspiration (2 images). image-edit=Gemini targeted change. unstage=REMOVE all furniture and decor, returning the same room empty (use before staging or redesigning a furnished photo). product-shot=one product on seamless white. product-lifestyle=product staged in a room. material-texture=seamless tileable swatch. Omit to auto-detect.'),
         referenceImageUrl: z.string().optional().describe('URL of image to edit, floor plan to render, or the product/swatch photo for the product modes. Leave empty when user has uploaded an image — it is used automatically.'),
         productName: z.string().optional().describe('Name of the single item being rendered, for product-shot / product-lifestyle / material-texture (e.g. "Fenwick lounge chair", "olive green boucle").'),
         modelTier: z.enum(['fast', 'pro', 'grok']).optional().describe('fast=Gemini Flash (6 credits), pro=Gemini Pro (15 credits), grok=Aurora best spatial accuracy (15 credits). Use pro or grok when user requests maximum quality. materials-selection-board always uses pro. If the user names a model ("use Grok", "try Gemini Pro"), honour it; if they ask to compare, call once per tier so they can pick.'),
@@ -711,7 +725,9 @@ export const createVirtualStagingTool = (
 - See how an empty room would look with furniture
 - Stage a property for real estate
 - Visualize a room layout before buying furniture
-Requires a room photo URL (from a previous generation or uploaded image). Ask the user for the room type and style preference if not specified.`,
+Requires a room photo URL (from a previous generation or uploaded image). Ask the user for the room type and style preference if not specified.
+
+The source room must be EMPTY — this model furnishes bare space and will fight anything already in the photo. If the user's photo is FURNISHED, first call generate_gemini with mode='unstage' to strip it back to bare architecture, then stage the image that returns.`,
       schema: z.object({
         sourceImageUrl: z.string().optional().describe('Public URL of the empty room image. If omitted, uses the most recently generated image.'),
         room: z.enum(['Living Room', 'Bedroom', 'Balcony', 'Dining Room', 'Office', 'Kitchen', 'Bathroom', 'Garden', 'Swimming Pool']).describe('Room type to stage'),

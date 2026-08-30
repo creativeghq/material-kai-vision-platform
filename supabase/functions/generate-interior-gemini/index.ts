@@ -8,6 +8,13 @@
  *   3. floor-plan-render — floor plan image + style → photorealistic perspective interior render
  *   4. floor-plan-text   — text description → 2D floor plan diagram
  *
+ * ...plus `unstage`, which is the inverse of every other mode here: it REMOVES rather than
+ * adds. Every restyling model this platform runs — the Replicate interior grid, and
+ * `generate-virtual-staging` most explicitly ("Stage an EMPTY room") — assumes the room
+ * arrives empty, while the photo a customer or an agent actually has is furnished. Without
+ * this the only route from one to the other was RegionEditCanvas, i.e. hand-painting a mask
+ * over every object.
+ *
  * Models:
  *   - gemini-3.1-flash-image (fast, 6 credits)
  *   - gemini-3-pro-image     (4K quality, 15 credits)
@@ -261,7 +268,7 @@ async function callFluxDepthPro(
 // Credit costs and provider routing now live in _shared/generation-routing.ts so the
 // billed model and the invoked model come from one derivation.
 
-type GenerationMode = 'text-to-image' | 'image-edit' | 'redesign' | 'copy-style' | 'floor-plan-render' | 'floor-plan-text' | 'materials-selection-board' | 'product-shot' | 'product-lifestyle' | 'material-texture';
+type GenerationMode = 'text-to-image' | 'image-edit' | 'redesign' | 'copy-style' | 'floor-plan-render' | 'floor-plan-text' | 'materials-selection-board' | 'product-shot' | 'product-lifestyle' | 'material-texture' | 'unstage';
 type BoardMode = 'presentation-board' | 'selection-board' | 'photorealistic-render';
 
 interface GenerateInteriorRequest {
@@ -533,7 +540,12 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
   //
   // Only the modes that transform a SUPPLIED image. text-to-image and floor-plan-text invent
   // an image from words and have no source to classify.
-  const EDIT_MODES: GenerationMode[] = ['image-edit', 'redesign', 'copy-style', 'floor-plan-render'];
+  // `unstage` belongs here for the same reason as the rest: it takes a photo somebody
+  // supplied and returns an altered version of it. That the alteration is a deletion
+  // changes nothing — the gate is on the SOURCE ARTEFACT, never on the instruction
+  // (invariant 9b), and "empty this room" is a perfectly ordinary way to ask for the
+  // contents of a document to be wiped out.
+  const EDIT_MODES: GenerationMode[] = ['image-edit', 'redesign', 'copy-style', 'floor-plan-render', 'unstage'];
   if (EDIT_MODES.includes(mode) && body.reference_image_url) {
     // An image this platform generated is exempt — we made it, and re-classifying every
     // "warmer lighting" on our own render would tax the normal design loop for nothing.
@@ -764,6 +776,36 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
         );
         imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
       }
+    }
+
+    // ── Mode 2b: unstage — strip the room back to its architecture ─────────
+    // Deliberately NOT folded into image-edit. That mode's prompt is built to preserve
+    // "every fixed element ... sink, vanity, toilet, shower, bath" AND the furniture, and
+    // only restyle surfaces — the exact opposite instruction. Reusing it and hoping the
+    // free-text overrode it is how a mode ends up quietly doing something else.
+    //
+    // Routing keeps this on Gemini whatever tier is asked for (GROK_UNSUPPORTED_MODES), so
+    // there is one branch here and no provider fork to keep in sync.
+    else if (mode === 'unstage') {
+      if (!body.reference_image_url) {
+        return jsonResponse({ success: false, error: 'reference_image_url required for unstage mode' }, 400);
+      }
+
+      const sourceBuffer = await fetchImageBuffer(body.reference_image_url);
+      // The caller's own carve-outs ("leave the built-in wardrobe", "keep the curtains").
+      // Rendered into the template rather than concatenated, so an empty value is a stated
+      // "none" instead of a dangling placeholder the model has to interpret.
+      const keepInstruction = (body.edit_instruction ?? '').trim();
+      const unstagePrompt = renderPromptTemplate(
+        await getGenerationPrompt(supabase, 'interior_unstage'),
+        { instruction: keepInstruction || 'None — remove every movable item.' },
+      );
+
+      const result = await generateImageWithGemini(
+        { text: unstagePrompt, images: [sourceBuffer] },
+        { model, aspectRatio },
+      );
+      imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
     }
 
     // ── Mode 3: redesign — Flux Depth Pro, single image ───────────────────
@@ -1026,6 +1068,7 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
       'text-to-image': 'text_to_image',
       'floor-plan-text': 'text_to_image',
       'image-edit': 'image_to_image',
+      'unstage': 'image_to_image',
       'redesign': 'image_to_image',
       'copy-style': 'image_to_image',
       'floor-plan-render': 'image_to_image',
