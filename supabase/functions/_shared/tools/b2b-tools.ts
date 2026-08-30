@@ -39,7 +39,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 type B2BChunkSink = ((chunk: any) => void) | undefined;
 
-import { debitExternalServiceCredits, debitOrRefuse, preflightOrRefuse } from '../credit-utils.ts';
+import { debitExternalServiceCredits, debitOrRefuse, preflightOrRefuse, debitOrRefuseTracked, recordExternalServiceOutcome } from '../credit-utils.ts';
 import { describeAnthropicFailure } from './anthropic-failure.ts';
 
 /** Transient upstream, not a bad request: wait and retry rather than change anything. */
@@ -770,10 +770,13 @@ export const createCompanyWebsiteScrapeTool = (
         // workspace scraped for free at our expense. Moving it changes nothing about WHAT is
         // billed -- this scrape is charged whether or not it returns content -- only about
         // whether we find out we cannot bill for it before or after we pay. (audit #312)
-        {
-          const refusal = await debitOrRefuse(supabase, userId, 'firecrawl-scrape', 'company_website_scrape', 1, { url });
-          if (refusal) return refusal;
-        }
+        // Tracked, so the row this debit writes can learn whether the scrape actually worked.
+        // The debit runs first (invariant 10), which means the row is born not knowing — and
+        // `ops.silent_zero` skips a row with no `metadata.success`, so without this a Firecrawl
+        // outage is invisible to the probe that exists to catch exactly that.
+        const { refusal: scrapeRefusal, usageLogId: scrapeUsageLogId } =
+          await debitOrRefuseTracked(supabase, userId, 'firecrawl-scrape', 'company_website_scrape', 1, { url });
+        if (scrapeRefusal) return scrapeRefusal;
 
         // Scrape the website using Firecrawl with timeout (30 seconds)
         const TIMEOUT_MS = 30000;
@@ -812,6 +815,8 @@ export const createCompanyWebsiteScrapeTool = (
           clearTimeout(timeoutId);
         } catch (fetchError) {
           clearTimeout(timeoutId);
+          const why = fetchError instanceof Error ? fetchError.message : String(fetchError);
+          await recordExternalServiceOutcome(supabase, scrapeUsageLogId, false, why);
           if (fetchError instanceof Error && fetchError.name === 'AbortError') {
             return JSON.stringify({
               success: false,
@@ -824,11 +829,15 @@ export const createCompanyWebsiteScrapeTool = (
         if (!response.ok) {
           const errorText = await response.text();
           console.error(`❌ Firecrawl API error: ${response.status} - ${errorText}`);
+          await recordExternalServiceOutcome(
+            supabase, scrapeUsageLogId, false, `Firecrawl ${response.status}: ${errorText.slice(0, 160)}`,
+          );
           return JSON.stringify({
             success: false,
             error: `Firecrawl API error: ${response.status}`,
           });
         }
+        await recordExternalServiceOutcome(supabase, scrapeUsageLogId, true);
 
         const data = await response.json();
         const scrapeElapsed = Date.now() - startTime;

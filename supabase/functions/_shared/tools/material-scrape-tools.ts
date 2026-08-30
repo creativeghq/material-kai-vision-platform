@@ -22,7 +22,7 @@
  */
 import { createClient } from '@supabase/supabase-js';
 
-import { debitOrRefuse } from '../credit-utils.ts';
+import { debitOrRefuse, debitOrRefuseTracked, recordExternalServiceOutcome } from '../credit-utils.ts';
 import { reserveCredits, refundCredits, settleCredits } from '../credit-reserve.ts';
 import { resolveTokenPrice } from '../ai-logger.ts';
 import { getToolPrompt } from '../prompt-utils.ts';
@@ -97,7 +97,11 @@ async function scrapeToMarkdown(
   }
 
   // Invariant 10: debit before the paid call, never after.
-  const refusal = await debitOrRefuse(supabase, userId, 'firecrawl-scrape', opType, 1, { url }, workspaceId);
+  // Tracked: the debit runs before the scrape (invariant 10), so the usage row is written not
+  // knowing the outcome — and `ops.silent_zero` skips a row with no `metadata.success`. Without
+  // the stamp below, a Firecrawl outage is invisible to the probe meant to catch it.
+  const { refusal, usageLogId } =
+    await debitOrRefuseTracked(supabase, userId, 'firecrawl-scrape', opType, 1, { url }, workspaceId);
   if (refusal) return { error: refusal };
 
   const controller = new AbortController();
@@ -112,15 +116,20 @@ async function scrapeToMarkdown(
     clearTimeout(timeoutId);
 
     if (!response.ok) {
+      await recordExternalServiceOutcome(supabase, usageLogId, false, `Firecrawl ${response.status}`);
       return { error: JSON.stringify({ success: false, error: `Firecrawl error ${response.status}` }) };
     }
     const data = await response.json();
+    await recordExternalServiceOutcome(supabase, usageLogId, true);
     return {
       markdown: data.data?.markdown || '',
       title: data.data?.metadata?.title || '',
     };
   } catch (err) {
     clearTimeout(timeoutId);
+    await recordExternalServiceOutcome(
+      supabase, usageLogId, false, err instanceof Error ? err.message : String(err),
+    );
     if (err instanceof Error && err.name === 'AbortError') {
       return { error: JSON.stringify({ success: false, error: `Scrape timed out after ${SCRAPE_TIMEOUT_MS / 1000}s.` }) };
     }

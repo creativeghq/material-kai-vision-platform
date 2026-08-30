@@ -72,6 +72,25 @@ describe('an external-service call can record whether it worked', () => {
     ).toBeLessThan(earlyReturn);
   });
 
+  it.each([
+    ['_shared/tools/b2b-tools.ts', 'company_website_scrape'],
+    ['_shared/tools/material-scrape-tools.ts', 'opType'],
+  ])('the Firecrawl scrape in %s records its outcome on every path', (file) => {
+    const src = read(file);
+    expect(src, 'the untracked debit hands back no id, so the stamp would be a silent no-op')
+      .toMatch(/debitOrRefuseTracked\(/);
+
+    // Success AND failure, or the probe learns only about the calls that worked — which reports
+    // a provider failing on every attempt as a provider nobody used.
+    const stamps = src.match(/recordExternalServiceOutcome\(/g) ?? [];
+    expect(stamps.length, 'expected at least a success path and a failure path')
+      .toBeGreaterThanOrEqual(2);
+    // Both verdicts must be reachable. If only the success path stamps, a provider failing
+    // on every attempt reports as a provider nobody used.
+    expect(src, 'no success stamp').toMatch(/recordExternalServiceOutcome\([^)]*true\)/);
+    expect(src, 'no failure stamp').toMatch(/recordExternalServiceOutcome\([\s\S]{0,120}?false/);
+  });
+
   it('the gate no longer uses the untracked debit', () => {
     // `debitOrRefuse` discards the result, so reverting to it silently removes the id and the
     // stamp becomes a no-op — the failure would look exactly like success.
