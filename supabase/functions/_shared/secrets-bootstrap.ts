@@ -16,13 +16,24 @@ let warnedEnvSetUnsupported = false;
 export function bootstrapSecretsFromDb(supabase: { from: (t: string) => any }): Promise<void> {
   // Memoised — every call after the first is a no-op in the same worker.
   if (bootstrapped) return bootstrapped;
-  bootstrapped = (async () => {
+  // A FAILED bootstrap must not be memoised as a successful one. `if (error || !rows) return;`
+  // resolved the promise normally, so the barrier stayed set and the worker never tried again
+  // for the rest of its life — one unlucky query at cold boot and every DB-only secret read
+  // through `Deno.env.get()` is undefined until that worker is recycled. `ok` is cleared on any
+  // failure and the barrier is released, so the next caller re-attempts.
+  let ok = true;
+  const attempt = (async () => {
     try {
       const { data: rows, error } = await supabase
         .from('platform_secrets')
         .select('key, value')
         .not('value', 'is', null);
-      if (error || !rows) return;
+      if (error) {
+        ok = false;
+        console.warn('[secrets-bootstrap] platform_secrets read failed:', error.message || error);
+        return;
+      }
+      if (!rows) return; // a genuine empty result is a complete bootstrap, not a failure
 
       for (const row of rows) {
         if (!row.value) continue;
@@ -60,9 +71,13 @@ export function bootstrapSecretsFromDb(supabase: { from: (t: string) => any }): 
       }
     } catch (err) {
       // Bootstrap failure must never break the function. Log and continue with env-only.
+      ok = false;
       console.warn('[secrets-bootstrap] failed:', err);
     }
   })();
+  bootstrapped = attempt.finally(() => {
+    if (!ok) bootstrapped = null; // release the barrier so a later request retries
+  });
   return bootstrapped;
 }
 

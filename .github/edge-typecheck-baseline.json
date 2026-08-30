@@ -1,7 +1,7 @@
 {
   "_comment": "Per-file deno-check error counts. The gate fails when a count rises or a new file appears. Lower these as you fix things; regenerate with: node scripts/check-edge-functions.mjs --write-baseline",
   "entrypoints": 187,
-  "total": 24,
+  "total": 23,
   "uncheckable": {},
   "files": {
     "xml-import-orchestrator/index.ts": 4,
@@ -12,7 +12,6 @@
     "stripe-api/handlers/checkout.ts": 2,
     "stripe-api/handlers/customer-portal.ts": 2,
     "_shared/fonts/open-sans.ts": 1,
-    "_shared/react-email-renderer.ts": 1,
     "_shared/shipping/searates.ts": 1,
     "finance-send-statement/index.ts": 1,
     "flow-engine/index.ts": 1,

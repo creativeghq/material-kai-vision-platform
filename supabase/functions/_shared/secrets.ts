@@ -37,17 +37,26 @@ async function loadRow(supabase: SupabaseLike, key: string): Promise<PlatformSec
   if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.row;
 
   try {
-    const { data } = await supabase
+    // `error` was DISCARDED here. A PostgREST failure — RLS denial, network blip, the table
+    // briefly unreachable — leaves `data` null, which is indistinguishable from "no such key"
+    // once the row is cached. So a transient error was written into the cache as a definitive
+    // "this secret does not exist" and served for the next 30 seconds, silently disabling
+    // whichever integration asked. Only a genuine ANSWER is cacheable.
+    const { data, error } = await supabase
       .from('platform_secrets')
       .select('*')
       .eq('key', key)
       .maybeSingle();
+    if (error) {
+      console.error(`[secrets] platform_secrets lookup for ${key} failed:`, error.message || error);
+      return null; // deliberately NOT cached — the next caller retries
+    }
     const row = (data ?? null) as PlatformSecretRow | null;
     ROW_CACHE.set(key, { row, at: Date.now() });
     return row;
-  } catch {
-    ROW_CACHE.set(key, { row: null, at: Date.now() });
-    return null;
+  } catch (e) {
+    console.error(`[secrets] platform_secrets lookup for ${key} threw:`, e);
+    return null; // as above: an outage is not an answer, so it does not become one
   }
 }
 

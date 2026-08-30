@@ -1,5 +1,5 @@
 /**
- * Two authorization shapes from #294 that nothing else can see.
+ * Three authorization shapes from #294 that nothing else can see.
  *
  * ## 1. `allowedRoles: ['admin', 'super_admin']` is NOT a platform gate
  *
@@ -11,8 +11,17 @@
  * So a *platform*-scoped function gated that way is reachable by any tenant's workspace admin.
  * `platform-secrets-admin` writes the store every tenant's integrations resolve through
  * (`resolveSecret()`: env > platform_secrets.value > default_value), so appointing a colleague
- * workspace admin also handed them the platform's credential store. `reset-platform` was moved
- * off the identical gate earlier, and the comment at that site records why.
+ * workspace admin also handed them the platform's credential store. `email-api`'s domain routes
+ * were the same shape: `email_domains` has no workspace_id — it is the PLATFORM's Resend registry
+ * — and add/verify/sync call Resend with the platform key, so a tenant's workspace owner could
+ * add and verify domains on our own sending account. `reset-platform` was moved off the identical
+ * gate earlier, and the comment at that site records why.
+ *
+ * ## 1b. Nav is UX; the API is the boundary
+ *
+ * Four `email-api` routes belong to the `email-marketing` add-on (EUR 9/mo, its own Stripe
+ * product) and checked nothing. The tile is hidden without the entitlement, which is exactly why
+ * nothing looked wrong — the endpoint was reachable directly the whole time.
  *
  * Only the operator holds an active workspace-`admin` row today, so this was latent — it arms
  * itself the first time a tenant uses an ordinary product feature.
@@ -58,6 +67,30 @@ describe('#294 — platform-scoped gates and body-supplied ids', () => {
 
   it('default_value is masked — it is a live resolution tier', () => {
     expect(secrets).toMatch(/default_value:\s*maskSecretValue\(/);
+  });
+
+  it('email-api guards the PLATFORM domain registry with the operator question', () => {
+    // `email_domains` has no workspace_id — it is the platform's own Resend registry, and
+    // add/verify/sync call Resend with the platform RESEND_API_KEY. They were gated on
+    // `allowedRoles: ['admin','super_admin','owner']`, so any tenant's workspace OWNER could add
+    // and verify domains on our sending account: a domain-reputation and phishing surface.
+    const src = read('email-api/index.ts');
+    expect(src).toMatch(/isPlatformOperator\(/);
+    expect(
+      src.match(/allowedRoles: \['admin', 'super_admin', 'owner'\]/g) ?? [],
+      "a domain route is back on a workspace-role gate",
+    ).toHaveLength(1); // only the freeform `send` operator check legitimately remains
+  });
+
+  it('email-api gates the email-marketing add-on at the API boundary', () => {
+    // Four routes belong to the EUR 9/mo add-on (its own Stripe product). The nav tile is hidden
+    // without it, but the endpoint is reachable directly — nav is UX, the API is the boundary.
+    const src = read('email-api/index.ts');
+    const gates = src.match(/assertEntitled\([^)]*'email-marketing'\)/g) ?? [];
+    expect(gates, 'one per marketing route: campaign stats + the three contact-sync routes')
+      .toHaveLength(4);
+    // …and each must sit behind the membership check, never instead of it.
+    expect((src.match(/userCanAccessWorkspace\(/g) ?? []).length).toBeGreaterThanOrEqual(4);
   });
 
   it('catalog-translate-pdf checks ownership before it spends or reads private storage', () => {

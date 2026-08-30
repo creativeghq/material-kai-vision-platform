@@ -15,6 +15,8 @@
 // deno-lint-ignore no-explicit-any
 type SupabaseLike = any;
 
+import { captureMessage } from './sentry.ts';
+
 export interface CronChargeResult {
   allowed: boolean;
   charged: number;
@@ -42,6 +44,17 @@ export async function chargeCronWorkspace(
     });
     if (error) {
       console.error(`[cron-billing] ${cronKey}/${workspaceId} charge RPC error (failing open):`, error.message);
+      // Fail-open is the deliberate policy here — a DB blip must not stop every metered cron
+      // platform-wide. What was NOT deliberate is that it was invisible: a console line in an
+      // edge worker nobody reads. If `cron_charge_workspace` breaks permanently this runs every
+      // cron free for ever and the only symptom is revenue that silently stops, which is the
+      // `stamp_job_refresh_cost` shape exactly. Reported so it can be seen; the fingerprint is
+      // stable so a persistent break is ONE issue rather than a flood.
+      void captureMessage('cron billing failed open — work ran unmetered', 'warning', {
+        tags: { subsystem: 'cron-billing', cron_key: cronKey },
+        extra: { workspaceId, error: error.message },
+        fingerprint: ['cron-billing', 'fail-open'],
+      });
       return { allowed: true, charged: 0, status: 'active', justPaused: false, justResumed: false };
     }
     const row = Array.isArray(data) ? data[0] : data;
@@ -54,6 +67,11 @@ export async function chargeCronWorkspace(
     };
   } catch (e) {
     console.error(`[cron-billing] ${cronKey}/${workspaceId} charge threw (failing open):`, e);
+    void captureMessage('cron billing failed open — work ran unmetered', 'warning', {
+      tags: { subsystem: 'cron-billing', cron_key: cronKey },
+      extra: { workspaceId, error: e instanceof Error ? e.message : String(e) },
+      fingerprint: ['cron-billing', 'fail-open'],
+    });
     return { allowed: true, charged: 0, status: 'active', justPaused: false, justResumed: false };
   }
 }

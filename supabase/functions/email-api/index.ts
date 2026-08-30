@@ -10,7 +10,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { renderReactEmailTemplate, renderTemplateWithVariables, generatePlainTextFromReactEmail } from '../_shared/react-email-renderer.ts';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, isAdminAccess, userCanAccessWorkspace, listUserWorkspaceIds } from '../_shared/auth.ts';
+import { assertEntitled } from '../_shared/entitlement.ts';
+import { authenticate, isAdminAccess, userCanAccessWorkspace, listUserWorkspaceIds, isPlatformOperator } from '../_shared/auth.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { notConfiguredResponse } from '../_shared/api-provider-errors.ts';
 import { resolveWorkspaceEmailSender, checkWorkspaceSendQuota } from '../_shared/email-sender.ts';
@@ -914,6 +915,13 @@ Deno.serve(withApiLogging('email-api', async (req) => {
             throw new HttpError(404, 'not found');
           }
         }
+        // Paid add-on (email-marketing, EUR 9/mo, its own Stripe product). The nav tile is
+        // hidden without it, but this endpoint is reachable directly — nav is UX, the API
+        // boundary is the security line. assertEntitled fails CLOSED.
+        {
+          const ent = await assertEntitled(supabaseClient, wsId, 'email-marketing');
+          if (!ent.ok) return ent.response;
+        }
 
         // The campaign must belong to the workspace.
         const { data: campaign } = await supabaseClient
@@ -1017,6 +1025,13 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         if (!isAdminAccess(auth)) {
           if (!auth.userId || !(await userCanAccessWorkspace(supabaseClient, auth.userId, wsId))) throw new HttpError(404, 'not found');
         }
+        // Paid add-on (email-marketing, EUR 9/mo, its own Stripe product). The nav tile is
+        // hidden without it, but this endpoint is reachable directly — nav is UX, the API
+        // boundary is the security line. assertEntitled fails CLOSED.
+        {
+          const ent = await assertEntitled(supabaseClient, wsId, 'email-marketing');
+          if (!ent.ok) return ent.response;
+        }
         const { apiKey, allowed } = await resolveContactsKey(supabaseClient, wsId);
         const { data: cfg } = await supabaseClient
           .from('workspace_email_config')
@@ -1054,6 +1069,13 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         if (!isAdminAccess(auth)) {
           if (!auth.userId || !(await userCanAccessWorkspace(supabaseClient, auth.userId, wsId))) throw new HttpError(404, 'not found');
         }
+        // Paid add-on (email-marketing, EUR 9/mo, its own Stripe product). The nav tile is
+        // hidden without it, but this endpoint is reachable directly — nav is UX, the API
+        // boundary is the security line. assertEntitled fails CLOSED.
+        {
+          const ent = await assertEntitled(supabaseClient, wsId, 'email-marketing');
+          if (!ent.ok) return ent.response;
+        }
         try {
           const summary = await syncCrmContactsToResend(supabaseClient, wsId);
           return new Response(JSON.stringify({ success: true, ...summary }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -1077,6 +1099,13 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         if (typeof requestBody.auto_sync !== 'boolean') throw new HttpError(400, 'auto_sync (boolean) is required');
         if (!isAdminAccess(auth)) {
           if (!auth.userId || !(await userCanAccessWorkspace(supabaseClient, auth.userId, wsId))) throw new HttpError(404, 'not found');
+        }
+        // Paid add-on (email-marketing, EUR 9/mo, its own Stripe product). The nav tile is
+        // hidden without it, but this endpoint is reachable directly — nav is UX, the API
+        // boundary is the security line. assertEntitled fails CLOSED.
+        {
+          const ent = await assertEntitled(supabaseClient, wsId, 'email-marketing');
+          if (!ent.ok) return ent.response;
         }
         const { error: cfgErr } = await supabaseClient.from('workspace_email_config').upsert(
           { workspace_id: wsId, contacts_auto_sync: requestBody.auto_sync, updated_at: new Date().toISOString() },
@@ -1107,8 +1136,15 @@ Deno.serve(withApiLogging('email-api', async (req) => {
       case 'add-domain': {
         if (req.method !== 'POST') throw new HttpError(405, 'Method not allowed');
 
-        const adminAuth = await authenticate(req, { allowedRoles: ['admin', 'super_admin', 'owner'] });
-        if (!adminAuth.success) throw new HttpError(403, 'Unauthorized: Admin access required');
+        // `email_domains` is the PLATFORM's Resend registry — no workspace_id, and these routes
+        // call Resend with the platform RESEND_API_KEY. `allowedRoles: ['admin','super_admin',
+        // 'owner']` is NOT a platform gate: authenticate() matches allowedRoles against
+        // workspace_members.role too, so any tenant's workspace owner passed and could add or
+        // verify a domain on our own sending account — a domain-reputation and phishing
+        // surface, and the same shape that had to be fixed in platform-secrets-admin.
+        if (!isAdminAccess(auth) && !(await isPlatformOperator(supabaseClient, auth.userId))) {
+          throw new HttpError(403, 'Platform operator access required');
+        }
 
         const { domain } = requestBody;
         if (!domain) throw new HttpError(400, 'Domain is required');
@@ -1153,8 +1189,15 @@ Deno.serve(withApiLogging('email-api', async (req) => {
       case 'verify-domain': {
         if (req.method !== 'POST') throw new HttpError(405, 'Method not allowed');
 
-        const adminAuth = await authenticate(req, { allowedRoles: ['admin', 'super_admin', 'owner'] });
-        if (!adminAuth.success) throw new HttpError(403, 'Unauthorized: Admin access required');
+        // `email_domains` is the PLATFORM's Resend registry — no workspace_id, and these routes
+        // call Resend with the platform RESEND_API_KEY. `allowedRoles: ['admin','super_admin',
+        // 'owner']` is NOT a platform gate: authenticate() matches allowedRoles against
+        // workspace_members.role too, so any tenant's workspace owner passed and could add or
+        // verify a domain on our own sending account — a domain-reputation and phishing
+        // surface, and the same shape that had to be fixed in platform-secrets-admin.
+        if (!isAdminAccess(auth) && !(await isPlatformOperator(supabaseClient, auth.userId))) {
+          throw new HttpError(403, 'Platform operator access required');
+        }
 
         const { domain } = requestBody;
         if (!domain) throw new HttpError(400, 'Domain is required');
@@ -1334,8 +1377,15 @@ Deno.serve(withApiLogging('email-api', async (req) => {
       case 'sync-domains': {
         if (req.method !== 'POST') throw new HttpError(405, 'Method not allowed');
 
-        const adminAuth = await authenticate(req, { allowedRoles: ['admin', 'super_admin', 'owner'] });
-        if (!adminAuth.success) throw new HttpError(403, 'Unauthorized: Admin access required');
+        // `email_domains` is the PLATFORM's Resend registry — no workspace_id, and these routes
+        // call Resend with the platform RESEND_API_KEY. `allowedRoles: ['admin','super_admin',
+        // 'owner']` is NOT a platform gate: authenticate() matches allowedRoles against
+        // workspace_members.role too, so any tenant's workspace owner passed and could add or
+        // verify a domain on our own sending account — a domain-reputation and phishing
+        // surface, and the same shape that had to be fixed in platform-secrets-admin.
+        if (!isAdminAccess(auth) && !(await isPlatformOperator(supabaseClient, auth.userId))) {
+          throw new HttpError(403, 'Platform operator access required');
+        }
 
         const apiKey = () => Deno.env.get('RESEND_API_KEY') || '';
         if (!apiKey()) throw new HttpError(503, 'RESEND_API_KEY is not configured');

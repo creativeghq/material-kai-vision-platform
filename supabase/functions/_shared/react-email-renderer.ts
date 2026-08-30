@@ -36,7 +36,9 @@ export async function renderReactEmailTemplate(
     return html;
   } catch (error) {
     console.error('Error rendering React Email template:', error);
-    throw new Error(`Failed to render email template: ${error.message}`);
+    throw new Error(
+      `Failed to render email template: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 

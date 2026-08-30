@@ -17,6 +17,8 @@
 // deno-lint-ignore no-explicit-any
 type Sb = any;
 
+import { captureMessage } from './sentry.ts';
+
 export interface ReserveResult {
   ok: boolean;
   /** User-facing message when ok=false (safe to return straight from an agent tool). */
@@ -50,8 +52,15 @@ export async function reserveCredits(
     return { ok: true, message: '' };
   } catch (e) {
     // Fail-open on an infra error so a transient RPC blip doesn't block paid users
-    // (mirrors meter_operation's fail-open in the Python path).
+    // (mirrors meter_operation's fail-open in the Python path). The policy stands; the SILENCE
+    // did not. A permanently broken debit RPC would run every reserve-gated paid tool free with
+    // no symptom but a console line. Stable fingerprint, so a persistent break is one issue.
     console.warn(`[credit-reserve] reserve error for ${opType} (allowing):`, (e as Error)?.message);
+    void captureMessage('credit reserve failed open — paid work ran unreserved', 'warning', {
+      tags: { subsystem: 'credit-reserve', operation: opType },
+      extra: { workspaceId: workspaceId ?? null, error: e instanceof Error ? e.message : String(e) },
+      fingerprint: ['credit-reserve', 'fail-open'],
+    });
     return { ok: true, message: '' };
   }
 }
