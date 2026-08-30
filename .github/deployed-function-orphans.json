@@ -5,6 +5,11 @@
       "reason": "Diagnostic from #370 (b2b search model/effort measurement). Already retired IN PLACE to a 4-line 410 stub whose own first comment reads 'RETIRED diagnostic (issue #370) ... Safe to DELETE'; the findings live on #370 and in _shared/tools/b2b-tools.ts. Nothing invokes it and it answers 410 to everything that tries.",
       "version": 10,
       "wayOut": "supabase functions delete tmp-b2b-search-probe --project-ref \"$PROJECT_REF\" — needs a management token, which is why it is recorded here rather than removed in the commit that added this file."
+    },
+    "tmp-replicate-fingerprint": {
+      "reason": "One-shot diagnostic from 2026-08-30 that compared which Replicate credential the edge runtime resolves against the one on the MIVAA droplet. It answered its question (same token, fingerprint 8fecbec9, account `basilakis`) and was retired IN PLACE the same day: version 2 is an 11-line stub that answers 410 to everything, holds no secret, and whose own first comment reads 'RETIRED 2026-08-30 ... DELETE IT'. Recorded rather than deleted for the same reason as the entry above — see wayOut. It made every deploy report failure from 08:52 on 2026-08-30 while the deploy step itself kept succeeding, which also skipped `mark-deployed-functions` and left the `deployed/functions` marker stale, so each push redeployed all 134 functions instead of the changed ones.",
+      "version": 2,
+      "wayOut": "supabase functions delete tmp-replicate-fingerprint --project-ref \"$PROJECT_REF\", or Supabase dashboard -> Edge Functions -> tmp-replicate-fingerprint -> Delete. Needs a management token: the Supabase MCP surface can deploy a function but not delete one, and no SUPABASE_ACCESS_TOKEN or supabase CLI is available in the environment this was recorded from."
     }
   }
 }
