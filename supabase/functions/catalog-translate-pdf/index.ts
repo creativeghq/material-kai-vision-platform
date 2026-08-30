@@ -13,7 +13,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate } from '../_shared/auth.ts';
+import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { getGenerationPrompt, renderPromptTemplate } from '../_shared/prompt-utils.ts';
@@ -147,6 +147,32 @@ Deno.serve(withApiLogging('catalog-translate-pdf', async (req) => {
       .eq('id', body.source_pdf_id)
       .single();
     if (pdfErr || !pdf) return jsonResponse({ success: false, error: 'Source PDF not found' }, 404);
+
+    // Invariant 1 (BOLA). This runs on the service-role client and BOTH ids come from the body,
+    // so ownership is checked by hand — and BEFORE the Vision call, not after, or an
+    // unauthorized caller still burns the credits (invariant 10). `source_pdf_id` reaches a
+    // download from the private `pdf-documents` bucket; `target_catalog_id` reaches an UPDATE of
+    // someone else's catalog body. Both answer 404 rather than 403, so neither id can be
+    // enumerated. Level 'secret' is the backend caller and is exempt by design — it supplies
+    // `caller_user_id` for cost attribution instead.
+    const { data: targetCatalog } = await supabase
+      .from('presentation_catalogs')
+      .select('id, workspace_id')
+      .eq('id', body.target_catalog_id)
+      .maybeSingle();
+    if (!targetCatalog) {
+      return jsonResponse({ success: false, error: 'Target catalog not found' }, 404);
+    }
+
+    if (auth.level !== 'secret') {
+      const [ownsSource, ownsTarget] = await Promise.all([
+        userCanAccessWorkspace(supabase, auth.userId, (pdf as { workspace_id?: string | null }).workspace_id),
+        userCanAccessWorkspace(supabase, auth.userId, targetCatalog.workspace_id),
+      ]);
+      if (!ownsSource || !ownsTarget) {
+        return jsonResponse({ success: false, error: 'Source PDF not found' }, 404);
+      }
+    }
 
     const { data: blob, error: dlErr } = await supabase.storage
       .from('pdf-documents')

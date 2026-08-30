@@ -5,7 +5,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate } from '../_shared/auth.ts';
+import { authenticate, isPlatformOperator } from '../_shared/auth.ts';
 import {
   resolveSecret,
   maskSecretValue,
@@ -42,8 +42,17 @@ Deno.serve(withApiLogging('platform-secrets-admin', async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
 
   try {
-    const auth = await authenticate(req, { requireUser: true, allowedRoles: ['admin', 'super_admin'] });
+    // `allowedRoles: ['admin', 'super_admin']` was NOT a platform gate. authenticate() matches
+    // allowedRoles against `workspace_members.role` as well as the global role, and 'admin' is an
+    // ordinary WORKSPACE role any tenant hands out from Profile -> Team. So appointing a workspace
+    // admin also granted write access to the platform-wide secret store — every tenant's
+    // integrations resolve through it. `reset-platform` was moved off the same gate for the same
+    // reason; this asks the operator question directly.
+    const auth = await authenticate(req, { requireUser: true });
     if (!auth.success) return json({ error: auth.error ?? 'Unauthorized' }, 401);
+    if (!(await isPlatformOperator(auth.supabase, auth.userId))) {
+      return json({ error: 'Platform operator access required' }, 403);
+    }
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -103,7 +112,10 @@ async function handleList(supabase: any, scope: string | null): Promise<Response
       category: row.category,
       primary_module_slug: row.primary_module_slug,
       is_sensitive: row.is_sensitive,
-      default_value: row.default_value,
+      // A live resolution tier (env > value > default_value), so it can hold a real
+      // credential — masked on the same `is_sensitive` flag as `value`, which means a
+      // non-sensitive default still shows in full.
+      default_value: maskSecretValue(row.default_value, row.is_sensitive),
       last_verified_at: row.last_verified_at,
       last_verified_status: row.last_verified_status,
       last_verified_error: row.last_verified_error,
@@ -139,9 +151,17 @@ async function handleSave(supabase: any, body: RequestBody, userId: string | nul
   if (body.value === '' || body.value === null) patch.value = null;
   else if (body.value !== undefined) patch.value = body.value;
 
+  // UPDATE, never upsert. `platform_secrets` is a declared registry — a key gets there by
+  // migration. An upsert let a caller invent any key, and `resolveSecret()` reads this table for
+  // every integration, so inventing one is choosing what an integration resolves to.
+  const { data: existing } = await supabase
+    .from('platform_secrets').select('key').eq('key', body.key).maybeSingle();
+  if (!existing) return json({ error: `Unknown secret key: ${body.key}` }, 400);
+
   const { error } = await supabase
     .from('platform_secrets')
-    .upsert(patch, { onConflict: 'key' });
+    .update(patch)
+    .eq('key', body.key);
   if (error) return json({ error: error.message }, 500);
 
   invalidateSecretCache(body.key);
@@ -156,10 +176,21 @@ async function handleSaveMany(supabase: any, body: RequestBody, userId: string |
     value: e.value === '' ? null : e.value,
     updated_by: userId,
   }));
-  const { error } = await supabase
-    .from('platform_secrets')
-    .upsert(patches, { onConflict: 'key' });
-  if (error) return json({ error: error.message }, 500);
+  // Same rule as handleSave, and the batch is rejected WHOLE: a partial apply would leave the
+  // form's own view of which keys are set disagreeing with the store.
+  const { data: known } = await supabase
+    .from('platform_secrets').select('key').in('key', patches.map(p => p.key));
+  const knownKeys = new Set((known ?? []).map((r: { key: string }) => r.key));
+  const unknown = patches.map(p => p.key).filter(k => !knownKeys.has(k));
+  if (unknown.length > 0) return json({ error: `Unknown secret key(s): ${unknown.join(', ')}` }, 400);
+
+  for (const patch of patches) {
+    const { error } = await supabase
+      .from('platform_secrets')
+      .update({ value: patch.value, updated_by: patch.updated_by })
+      .eq('key', patch.key);
+    if (error) return json({ error: error.message }, 500);
+  }
 
   for (const e of entries) invalidateSecretCache(e.key);
   return await handleList(supabase, body.module_slug ?? null);
