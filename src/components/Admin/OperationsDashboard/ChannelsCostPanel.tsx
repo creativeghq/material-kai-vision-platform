@@ -12,7 +12,7 @@
  * unprofitable until someone checked what a credit actually sells for.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { Radio, RefreshCw, Loader2, AlertTriangle } from 'lucide-react';
+import { Radio, RefreshCw, Loader2, AlertTriangle, Receipt } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
@@ -45,6 +45,49 @@ interface Row {
   net_usd: number;
 }
 
+/** One (period × country × category) group of what Meta charged against what we billed. */
+interface ReconRow {
+  period_start: string;
+  country_code: string | null;
+  category: string | null;
+  workspace_id: string | null;
+  workspace_name: string | null;
+  volume: number;
+  cost_usd: number | null;
+  /**
+   * FALSE means Meta did not REPORT a cost, not that it was zero.
+   *
+   * Meta withholds cost for a WABA on a Solution Partner's credit line, which is our situation
+   * today — so rendering a `$0` here would say "a free month" about a month whose cost is simply
+   * unknown. That distinction is the entire reason the column exists.
+   */
+  cost_available: boolean;
+  billed_messages: number;
+  billed_credits: number;
+  billed_usd: number;
+  /** NULL when the cost is unknown: a margin against an unknown cost is a guess with a decimal point. */
+  margin_usd: number | null;
+}
+
+/** One monthly recurring charge attempt. */
+interface ChargeRow {
+  id: string;
+  workspace_id: string | null;
+  workspace_name: string | null;
+  charge_type: string;
+  period_month: string;
+  quantity: number;
+  unit_cost_usd: number;
+  credits_charged: number;
+  status: string;
+  attempts: number;
+  last_attempt_at: string | null;
+  charged_at: string | null;
+  skip_reason: string | null;
+  /** Derived in SQL: a failed charge, or a skip that is NOT healthy idempotency. */
+  needs_attention: boolean;
+}
+
 /**
  * Zernio's account ladder, applied to the PLATFORM total. Not apportioned per workspace on
  * purpose: which tenant owns "the eleventh account" is an accident of ordering, and splitting the
@@ -64,8 +107,18 @@ const money = (v: number | null | undefined) => formatMoney(v ?? 0, 'USD');
 export const ChannelsCostPanel: React.FC = () => {
   const { toast } = useToast();
   const [rows, setRows] = useState<Row[]>([]);
+  const [recon, setRecon] = useState<ReconRow[]>([]);
+  const [charges, setCharges] = useState<ChargeRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [denied, setDenied] = useState(false);
+  /**
+   * Whether the two nightly jobs have EVER written a row.
+   *
+   * `null` while loading. An empty table and a job that has never run are opposite facts —
+   * "no charges yet" is healthy in month one and alarming in month six — so the empty state
+   * says which, rather than one reassuring sentence for both.
+   */
+  const [everRan, setEverRan] = useState<{ recon: boolean; charges: boolean } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -92,6 +145,37 @@ export const ChannelsCostPanel: React.FC = () => {
         net_usd: Number(r.net_usd),
       })));
     }
+    // The two billing tables, read through their own self-guarding RPCs. Failures here must not
+    // blank the cost table above — a reconciliation outage is not a reason to stop showing margin.
+    const rpc = supabase as unknown as {
+      rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }>;
+    };
+    const [rec, chg] = await Promise.all([
+      rpc.rpc('admin_whatsapp_reconciliation', { p_months: 3 }),
+      rpc.rpc('admin_channel_charges', { p_months: 6 }),
+    ]);
+    const recRows = (rec.error ? [] : (rec.data as ReconRow[] | null) ?? []).map((r) => ({
+      ...r,
+      volume: Number(r.volume),
+      cost_usd: r.cost_usd == null ? null : Number(r.cost_usd),
+      billed_messages: Number(r.billed_messages),
+      billed_credits: Number(r.billed_credits),
+      billed_usd: Number(r.billed_usd),
+      margin_usd: r.margin_usd == null ? null : Number(r.margin_usd),
+    }));
+    const chgRows = (chg.error ? [] : (chg.data as ChargeRow[] | null) ?? []).map((c) => ({
+      ...c,
+      quantity: Number(c.quantity),
+      unit_cost_usd: Number(c.unit_cost_usd),
+      credits_charged: Number(c.credits_charged),
+      attempts: Number(c.attempts),
+    }));
+    setRecon(recRows);
+    setCharges(chgRows);
+    // Distinguishing "nothing yet" from "the job never ran" needs to know whether the RPC answered
+    // at all. An error is not evidence of an empty table.
+    setEverRan({ recon: !rec.error, charges: !chg.error });
+
     setLoading(false);
   }, [toast]);
 
@@ -105,6 +189,7 @@ export const ChannelsCostPanel: React.FC = () => {
   // rather than smeared across the rows above it.
   const net = revenue - attributedCost - accountLadder;
   const overCount = rows.filter(r => r.over_allowance).length;
+  const attentionCount = charges.filter(c => c.needs_attention).length;
 
   if (denied) return null;
 
@@ -216,9 +301,139 @@ export const ChannelsCostPanel: React.FC = () => {
         <p className="text-xs text-muted-foreground">
           The account ladder is charged platform-wide and is not divided between the rows — which
           workspace owns &ldquo;the eleventh account&rdquo; is an accident of ordering. WhatsApp
-          template messages are billed by Meta directly to the WABA and never reach any figure
-          here; reconcile that invoice monthly against the template spend.
+          template messages are billed by Meta directly to the WABA and never reach the figures
+          above; the reconciliation section below is where that invoice is checked against what we
+          billed.
         </p>
+
+        {/* ── Recurring charges (#383 1b) ──────────────────────────────────────────────────────
+            Failures FIRST, and not sorted into a chronological list. A `failed` row is a workspace
+            that could not pay for its numbers, and while it sits unread the platform keeps paying
+            Zernio for them. `needs_attention` is derived in SQL so this list and any future alert
+            cannot disagree about what counts as a problem. */}
+        <div className="space-y-2">
+          <h3 className="flex items-center gap-2 text-sm font-semibold">
+            <Receipt className="h-4 w-4" /> Monthly charges
+            {attentionCount > 0 && (
+              <Badge variant="error">{attentionCount} need{attentionCount === 1 ? 's' : ''} attention</Badge>
+            )}
+          </h3>
+          {charges.length === 0 ? (
+            <HubEmptyState
+              variant="empty"
+              icon={Receipt}
+              title={everRan?.charges === false ? 'Charges could not be read' : 'No charges billed yet'}
+              description={everRan?.charges === false
+                ? 'The billing reader refused or failed. That is not the same as an empty month — check the function and the cron before concluding nothing was charged.'
+                : 'bill-channels-monthly runs on the 1st at 05:10. Rows appear here the first time a workspace is charged for a number or a seat.'}
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Month</TableHead>
+                    <TableHead>Workspace</TableHead>
+                    <TableHead>What for</TableHead>
+                    <TableHead className="text-right">Qty</TableHead>
+                    <TableHead className="text-right">Unit</TableHead>
+                    <TableHead className="text-right">Credits</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Attempts</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {charges.map((c) => (
+                    <TableRow key={c.id} className={c.needs_attention ? 'bg-[hsl(var(--error))]/[0.06]' : undefined}>
+                      <TableCell className="tabular-nums">{c.period_month?.slice(0, 7) ?? '—'}</TableCell>
+                      <TableCell className="font-medium">{c.workspace_name ?? '—'}</TableCell>
+                      <TableCell className="capitalize">{c.charge_type.replace(/_/g, ' ')}</TableCell>
+                      <TableCell className="text-right tabular-nums">{c.quantity}</TableCell>
+                      <TableCell className="text-right tabular-nums">{money(c.unit_cost_usd)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{c.credits_charged}</TableCell>
+                      <TableCell>
+                        <Badge variant={c.status === 'charged' ? 'success' : c.status === 'failed' ? 'error' : 'neutral'}>
+                          {c.status}
+                        </Badge>
+                        {/* "already billed this month" is healthy idempotency; "no owner to bill" is a
+                            workspace nobody can charge. The status column shows both as `skipped`. */}
+                        {c.skip_reason && (
+                          <span className="ml-2 text-xs text-muted-foreground">{c.skip_reason}</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="tabular-nums text-xs text-muted-foreground">
+                        {c.attempts}
+                        {c.last_attempt_at && ` · ${c.last_attempt_at.slice(0, 10)}`}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </div>
+
+        {/* ── WhatsApp reconciliation (#383 1a) ────────────────────────────────────────────────
+            Billed against actual, per country × category. Margin is derived from the two stored
+            figures and never stored — one derivation per money quantity. */}
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold">WhatsApp — billed vs actual</h3>
+          {recon.length === 0 ? (
+            <HubEmptyState
+              variant="empty"
+              icon={Radio}
+              title={everRan?.recon === false ? 'Reconciliation could not be read' : 'Nothing reconciled yet'}
+              description={everRan?.recon === false
+                ? 'The reconciliation reader refused or failed — which is not the same as a month with no template traffic.'
+                : 'reconcile-whatsapp-costs runs nightly at 04:20. Rows appear once template messages have been sent.'}
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Period</TableHead>
+                    <TableHead>Country</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Workspace</TableHead>
+                    <TableHead className="text-right">Volume</TableHead>
+                    <TableHead className="text-right">Meta cost</TableHead>
+                    <TableHead className="text-right">We billed</TableHead>
+                    <TableHead className="text-right">Margin</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {recon.map((r, i) => (
+                    <TableRow key={`${r.period_start}-${r.country_code}-${r.category}-${r.workspace_id ?? i}`}>
+                      <TableCell className="tabular-nums">{r.period_start?.slice(0, 7)}</TableCell>
+                      <TableCell>{r.country_code ?? '—'}</TableCell>
+                      <TableCell className="capitalize">{r.category ?? '—'}</TableCell>
+                      <TableCell>{r.workspace_name ?? '—'}</TableCell>
+                      <TableCell className="text-right tabular-nums">{r.volume}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {/* NOT $0. Meta withholds cost for a WABA on a Solution Partner's credit
+                            line, so a zero here would read as a free month. */}
+                        {r.cost_available
+                          ? money(r.cost_usd ?? 0)
+                          : <span className="text-muted-foreground">not reported</span>}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">{money(r.billed_usd)}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {r.margin_usd == null
+                          ? <span className="text-muted-foreground">unknown</span>
+                          : (
+                            <span className={r.margin_usd < 0 ? 'text-[hsl(var(--error))] font-semibold' : 'text-[hsl(var(--success))]'}>
+                              {money(r.margin_usd)}
+                            </span>
+                          )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
