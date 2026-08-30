@@ -148,7 +148,8 @@ Two `auth.users` INSERT triggers: `create_user_profile_on_signup` (creates `user
 - **`is_workspace_member(workspace_id) → bool`** — active member where `user_id = auth.uid()`.
 - **`assert_workspace_member(p_workspace_id)`** — raises `42501` if `auth.uid()` is set and not a member; **passes silently when `auth.uid()` is null** (service-role calls).
 - **`is_workspace_admin(p_workspace_id) → bool`** — active member with role `admin`/`owner`.
-- **`is_workspace_finance_manager(p_workspace_id) → bool`** — active member `owner`/`admin` **OR** global role `admin`/`super_admin`/`finance`. The finance-write gate.
+- **`is_workspace_finance_manager(p_workspace_id) → bool`** — active member `owner`/`admin` **OR** `is_platform_operator()`. The finance-write gate.
+  The second branch was an UNBOUND global role check (`admin`/`super_admin`/`finance`) until 2026-08-30, which made anyone holding one of those the finance manager of **every** workspace — and this is the sole gate on `workspace_aade_credentials`, `workspace_inbound_credentials`, `workspace_email_config` and `finance_settings`, i.e. every tenant's AADE password, myDATA key and Resend key (#294).
 - **`userCanAccessWorkspace(adminClient, userId, workspaceId)`** (TS, `_shared/auth.ts`) — edge equivalent.
 
 ### Hierarchy

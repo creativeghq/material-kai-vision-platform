@@ -1246,6 +1246,92 @@ never reached the line.
 - **Locked in by ratcheting** 50 → 24 across 15 files: a regression takes the count back up and
   fails the build.
 
+### A flat-rate provider call was billed even when it failed
+
+`log_external_call` (MIVAA) computed `billed = raw_cost_usd * markup` whatever `success` said, and
+`success` went only into `metadata`. 598 rows since 2026-06-26 carried **$1.86 raw / $2.79 billed
+of spend nobody made** — mostly Perplexity 401s and DataForSEO refusals — overstating lifetime AI
+cost by ~3.6%.
+
+- **Why it looked like four separate provider quirks:** token-priced models were never affected.
+  Their cost derives from `response.usage`, and a failed call returns no tokens, so the arithmetic
+  already produced zero. Only the flat `per_call` component survives a failure. It was one line in
+  the shared writer that `job_cost_logger` and `mention_cost_logger` both delegate to.
+- **Found by** asking why a 401 had a price, after `ops.silent_zero` reported `sonar` at 35 calls /
+  0 successes / $0.2625 billed. The probe was right and had been right for weeks; nobody had read
+  the cost field next to it.
+- **The fix keeps the evidence:** cost goes to zero, `unbilled_reason = 'call_failed'` says why, and
+  `metadata.would_have_cost_usd` holds the price it would have carried. Zeroing must not erase the
+  difference between "this provider is free" and "this provider charges real money and refused us
+  598 times" — that difference is the whole signal when a metric goes flat.
+- **Guarded by** `mivaa-pdf-extractor/tests/unit/test_failed_calls_are_not_billed.py`. The
+  derivation lives in `app/modules/_core/cost_accounting.py`, which imports nothing, because
+  MIVAA's CI installs pytest and no application dependencies — a test can only exercise real logic
+  if that logic sits somewhere importable without a database client.
+- **Blind spot:** it pins the shared writer. A module that grows its own `ai_usage_logs` insert
+  escapes the rule entirely.
+
+### "We never called them" was recorded as "they rejected us"
+
+When a deployment has no token for a provider, the model-health agent wrote
+`last_probe_status = 'auth_failed'` — which claims we asked and were refused. On 2026-08-30 that
+cost a real investigation: 18 Replicate rows read as a rejected key while the account was funded
+and the token worked.
+
+- Deploying a secret and rotating one are different jobs for different people, so `not_configured`
+  is now its own status: DB CHECK, the mirrored vocabulary, the agent, and the admin panel.
+- **Deliberately not authoritative.** The model was never asked anything, so letting it flip
+  availability would let one missing env var retire a working roster — the same reason
+  `schema_rejected` is excluded.
+- On the panel it is the FIRST verdict, ahead of credit and auth: if the token is not deployed,
+  every other status on that provider is stale — the last thing learned before the secret went
+  missing, not the state now. Reporting "out of credit" off that sends someone to top up an
+  account that is fine.
+- The vocabulary's own docblock had named `tests/unit/probeVocabulary.test.ts` as its guard. No
+  such file has ever existed; the real one is `paymentVocabulary.test.ts`. **A file that names a
+  guard nobody can find is worse than naming none** — the reader concludes it is covered.
+
+### A deterministic failure that threw its reason away
+
+`agent_tool_call_logs` holds seven `b2b_manufacturer_search` failures whose entire recorded cause is
+`Web search failed: 400`. Both call sites read Anthropic's error body, passed it to
+`console.error`, and returned the bare status.
+
+- **Transient and deterministic are different.** 429/529/5xx: the status IS the story, and leaking
+  a body there would invite the agent to blame a query that was fine. 400/401/403/404/422: the body
+  is the only actionable part, and the failure will recur identically until the request changes.
+- Console output in an edge worker is not somewhere anyone looks, and the log stores the RETURNED
+  string — so the only way to learn why those seven failed is to reproduce them.
+- **The guard found a second instance the fix had missed**: the progress emitter recorded the same
+  bare string on the step trail the USER watches.
+- Guarded by [tests/unit/anthropicFailureDetail.test.ts](../tests/unit/anthropicFailureDetail.test.ts).
+
+### A dead API surface hid its own table from the dead-schema guard
+
+`proposals` — a second, abandoned quoting system — had 0 rows ever, 0 requests in the whole lifetime
+of `api_usage_logs`, and no UI. It survived because `deadSchema.test.ts` convicts a table that no
+SOURCE TEXT mentions, and `quotes-api` still served three routes over it.
+
+- So the dead code was not merely untidy — **it was what kept the table invisible to the check
+  written to find exactly this.** Removing the routes without dropping the table would only have
+  moved the problem, and that registry is deliberately shrink-only ("wire it or drop it").
+- Same trap in reverse when writing the removal: a comment that names the table counts as a
+  reference. The name had to leave `types.ts` too.
+
+### A link that only worked in the direction that writes it
+
+`projects.property_id` shipped with a writer — the project's property picker — and no reader, so a
+building could be told which jobs happen there and could never say so.
+
+- Invisible from the writing side: the picker saves, the value persists, every screen that writes
+  it looks correct. That is #378's one-way-link class.
+- The issue asked for `properties.project_id`. **That is the wrong direction** — a building hosts
+  many jobs over its life, a job happens at one — and the FK already existed correctly. What was
+  missing was the read, not the relationship.
+- Guarded by [tests/unit/propertyLinkReaders.test.ts](../tests/unit/propertyLinkReaders.test.ts),
+  which guards REGRESSION rather than absence: deleting the reader or unmounting it restores the
+  exact original state, and nothing else would notice.
+
 ## The third prefix collision of the day — 2026-08-30
 
 `computeBlueprint`'s completeness check asks whether any schedule line references a derived count,

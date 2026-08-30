@@ -120,7 +120,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'project-plan-engine', label: 'project-plan-engine', sublabel: 'Authoritative compute for the Blueprint estimating engine (plans, pricing, versions, quotes)' },
   { id: 'public-project-plan', label: 'public-project-plan', sublabel: 'Public lead-gen Blueprint estimator (/tools/project-plan)' },
   { id: 'quote-public-share', label: 'quote-public-share', sublabel: 'Public token-based quote share lookup (anonymous-friendly)' },
-  { id: 'quotes-api', label: 'quotes-api', sublabel: 'REST API for quote requests and proposals (customer-facing)' },
+  { id: 'quotes-api', label: 'quotes-api', sublabel: 'REST API for quote requests (customer-facing)' },
   { id: 'real-estate-api', label: 'real-estate-api', sublabel: 'Real Estate module — listings, leads, viewings, offers, sales, lettings, investments and deals' },
   { id: 'real-estate-buyer-digests', label: 'real-estate-buyer-digests', sublabel: 'Daily cron — emails saved-search digests to buyers with a matching new listing' },
   { id: 'real-estate-vendor-reports', label: 'real-estate-vendor-reports', sublabel: 'Weekly cron — emails the instructing vendor a performance report on their own listing' },

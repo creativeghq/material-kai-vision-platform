@@ -136,7 +136,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `project-plan-engine` | JWT / secret | Authoritative compute for the Blueprint estimating engine (plans, pricing, versions, quotes) |
 | `public-project-plan` | public | Public lead-gen Blueprint estimator (/tools/project-plan) |
 | `quote-public-share` | token / public | Public token-based quote share lookup (anonymous-friendly) |
-| `quotes-api` _(GET + POST)_ | JWT | REST API for quote requests and proposals (customer-facing) |
+| `quotes-api` _(GET + POST)_ | JWT | REST API for quote requests (customer-facing) |
 | `send-quote-email` | JWT | Email a quote to a recipient with a public share link |
 
 **CRM**
