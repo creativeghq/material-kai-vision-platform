@@ -38,6 +38,49 @@ const creditDialog = read('src/modules/finance/components/NewCreditNoteDialog.ts
 const planning = read('src/modules/finance/tabs/PlanningTab.tsx');
 const parties = read('src/modules/finance/tabs/PartiesTab.tsx');
 
+/**
+ * Rewriting a project plan is ONE transaction.
+ *
+ * `writePlanItems` rewrote a plan as two statements over the wire — `delete().eq('plan_id', …)`
+ * then `insert(rows)`. The delete commits on its own, so a failing insert left the plan with ZERO
+ * items and an error message. The retry could not undo it either: reprice rebuilds the composition
+ * lines from `project_plans.composition`, but the MANUAL lines it preserves come from
+ * `loadPlanItems` — which by then returns nothing. A hand-built section and every task under it
+ * was gone for good, reported as a write error rather than as the data loss it was.
+ *
+ * `public.replace_plan_items(uuid, jsonb)` does both in one transaction. Watched 2026-08-30 on a
+ * seeded plan: a write whose second row violates the parent FK leaves the ORIGINAL two rows intact
+ * (`[Hand-added task, Kitchen]`), where the two-statement version left zero; a good write still
+ * replaces wholesale.
+ *
+ * The RPC is SECURITY INVOKER on purpose — RLS on `project_plan_items` is the boundary, and the
+ * engine calls it with the caller's client for a JWT request.
+ */
+describe('#285 — rewriting a project plan is one transaction', () => {
+  const engine = read('supabase/functions/project-plan-engine/index.ts');
+
+  it('writes through the atomic RPC', () => {
+    expect(engine, 'the plan rewrite must go through replace_plan_items')
+      .toMatch(/rpc\('replace_plan_items'/);
+  });
+
+  it('never deletes the plan lines as its own statement', () => {
+    // The precise shape: a bare delete on project_plan_items outside the RPC is the first half of
+    // the pair, and the half that commits.
+    expect(engine, 'a standalone delete of the plan lines is the defect, not a step')
+      .not.toMatch(/from\('project_plan_items'\)[\s\S]{0,120}\.delete\(\)/);
+    expect(engine, 'nor may it insert them directly')
+      .not.toMatch(/from\('project_plan_items'\)[\s\S]{0,120}\.insert\(/);
+  });
+
+  it('still sorts parents before children, because the RPC preserves the order it is given', () => {
+    // `parent_id` is a self-FK checked per row on insert. The RPC deliberately does not re-sort,
+    // so dropping the topological sort here would break every nested plan.
+    expect(engine).toMatch(/const ordered = topoOrder\(rows\)/);
+    expect(engine).toMatch(/p_rows: ordered/);
+  });
+});
+
 describe('#351 C1 — a POS sale is issued once', () => {
   it('the latch is synchronous, and it is checked before anything awaits', () => {
     // `disabled={issuing}` is React state and lands a frame late; a touchscreen bounce fits

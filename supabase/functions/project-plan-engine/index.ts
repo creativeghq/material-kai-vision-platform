@@ -251,15 +251,17 @@ async function writePlanItems(
       source: it.source ?? 'manual',
     };
   });
-  // parents must exist before children (self-FK). Insert sections first, then tasks by depth.
-  // Simpler: drop the self-FK ordering problem by inserting all with FK deferred is not available,
-  // so sort so parents precede children.
+  // Parents must exist before children — `parent_id` is a self-FK checked per row on insert — so
+  // the topological sort is load-bearing and the RPC preserves the array order it is given.
   const ordered = topoOrder(rows);
-  await supabase.from('project_plan_items').delete().eq('plan_id', planId);
-  if (ordered.length) {
-    const { error } = await supabase.from('project_plan_items').insert(ordered);
-    if (error) throw new HttpError(400, `Failed to write plan items: ${error.message}`);
-  }
+  // ONE transaction. This used to be `delete()` then `insert()` as two statements over the wire:
+  // the delete committed on its own, and a failing insert left the plan with ZERO items. The retry
+  // could not undo it either — reprice rebuilds the composition lines from the stored composition,
+  // but the MANUAL lines it preserves come from loadPlanItems, which by then returned nothing. A
+  // hand-built section and everything under it was gone, reported as a write error rather than as
+  // the data loss it was.
+  const { error } = await supabase.rpc('replace_plan_items', { p_plan_id: planId, p_rows: ordered });
+  if (error) throw new HttpError(400, `Failed to write plan items: ${error.message}`);
   return { subtotal: round2(subtotal) };
 }
 

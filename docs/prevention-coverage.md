@@ -1246,6 +1246,38 @@ never reached the line.
 - **Locked in by ratcheting** 50 → 24 across 15 files: a regression takes the count back up and
   fails the build.
 
+## Rewriting a project plan was two statements — 2026-08-30
+
+`writePlanItems` in `project-plan-engine` replaced a plan's lines as
+`delete().eq('plan_id', …)` then `insert(rows)`, two statements over the wire. The delete commits
+on its own, so a failing insert — one bad row, a constraint, a dropped connection — left the plan
+with **zero items** and an error message.
+
+The retry could not undo it. Reprice rebuilds the composition lines from
+`project_plans.composition`, but the MANUAL lines it preserves come from `loadPlanItems`, which by
+then returns nothing. A hand-built section and every task under it was gone for good, and the
+failure was reported as a write error rather than as the data loss it was. CLAUDE.md rule 4:
+naturally atomic → one SQL RPC.
+
+`public.replace_plan_items(uuid, jsonb)` does both in one transaction, `SECURITY INVOKER` because
+RLS on `project_plan_items` is the boundary and the engine calls it with the caller's client. It
+does NOT re-sort the array: `parent_id` is a self-FK checked per row on insert, so the caller's
+topological sort is load-bearing, and the guard pins both halves.
+
+**Watched to hold**, on a seeded plan inside an aborted transaction: a write whose second row
+violates the parent FK leaves the original rows intact — `[Hand-added task, Kitchen]`, where the
+two-statement version left zero — and a good write still replaces wholesale. Mutation-tested in
+[tests/unit/financeAtomicity.test.ts](../tests/unit/financeAtomicity.test.ts) by restoring the
+delete-then-insert pair.
+
+**A second defect came out of writing the test rather than the code.** The first version of the RPC
+used `jsonb_populate_recordset` and listed columns straight through, which fills an ABSENT key with
+NULL rather than the column DEFAULT — and eleven of these columns are NOT NULL with a default. That
+is not what the PostgREST `.insert()` it replaced did, where an omitted key takes the default.
+Today's only caller happens to send every column, so nothing broke; the next caller would have got
+a bare `23502`. Found by writing the fixture the way a person would, not the way the current caller
+does. Every such column is now coalesced to its default.
+
 ## Two Real Estate paths that were wrong about what they handed out — 2026-08-30
 
 **An unmatched lead that reported `matched_listing: true`.** `real-estate-inbound-lead` places a
