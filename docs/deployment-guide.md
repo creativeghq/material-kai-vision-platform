@@ -126,6 +126,10 @@ The catalog pipeline's layout + OCR backbone is **PaddleOCR-VL** (`PaddlePaddle/
 | **xAI / Aurora** | `XAI_API_KEY` | Edge Functions (`generate-social-image`) | https://console.x.ai/ | Pay-per-use — for Aurora image generation |
 | **Kling AI** | `KLINGAI_ACCESS_KEY` | Edge Functions (video generation via `_shared/ai-client.ts`) | https://platform.kling.ai/ → API Settings | Pay-per-use |
 | **Kling AI** | `KLINGAI_SECRET_KEY` | Edge Functions (video generation via `_shared/ai-client.ts`) | https://platform.kling.ai/ → API Settings | Pay-per-use |
+| **fal (H3 Max video)** | `FAL_KEY` | Edge Functions (`_shared/ai-client.ts` → H3 Max — the **default** social/interior reel) | https://fal.ai/dashboard/keys | Pay-per-use — **replaced direct MiniMax H3 on 2026-08-30 (#396)** |
+| **BytePlus ModelArk (Seedance 2.5)** | `ARK_API_KEY` | Edge Functions (`_shared/ai-client.ts` → Seedance video) | https://console.byteplus.com/ark → API Keys | Pay-per-use — must be a **BytePlus ModelArk** key, NOT a Volcano Engine key |
+| **Luma (Ray 3.2 video)** | `LUMA_API_KEY` | Edge Functions (`_shared/ai-client.ts` → Ray 3.2) | https://lumalabs.ai/ → Dream Machine API → Keys | Pay-per-use |
+| **Alibaba (WAN 3.0 video)** | `DASHSCOPE_API_KEY` | Edge Functions (`_shared/ai-client.ts` → WAN 3.0; also the Qwen research challenger) | https://modelstudio.console.alibabacloud.com/ → API-KEY (International) | Pay-per-use — Model Studio / DashScope International |
 | **Zernio** | `ZERNIO_API_KEY` | Edge Functions (`zernio-api`, `zernio-webhook-handler`, social background agents) | https://zernio.com/ → Settings → API | Social media scheduling |
 | **Zernio** | `ZERNIO_WEBHOOK_SECRET` | Edge Functions (`zernio-webhook-handler`) | Zernio webhook settings | HMAC-SHA256 signature verification |
 | **Modal** | `MODAL_TOKEN_ID` + `MODAL_TOKEN_SECRET` | GitHub Actions (`deploy-modal` job) | https://modal.com/settings/tokens (or `modal token new`) | Lets CI run `modal deploy` for the PaddleOCR-VL backbone |
@@ -306,10 +310,18 @@ modal app stop paddleocr-vl     # tear down
 | `REPLICATE_API_KEY` | **Secret** | `generate-interior-video-v2`, `generate-social-image`, `generate-social-video` | Replicate API key (same value as `REPLICATE_API_TOKEN` — set both identically) | `r8_xxxxxxxxxxxxxxxx` |
 | `KLINGAI_ACCESS_KEY` | **Secret** | `_shared/ai-client.ts` (video generation) | Kling AI native SDK access key for kling-v3.0 video model | Obtained from https://platform.kling.ai/ |
 | `KLINGAI_SECRET_KEY` | **Secret** | `_shared/ai-client.ts` (video generation) | Kling AI native SDK secret key | Obtained from https://platform.kling.ai/ |
-| `XAI_API_KEY` | **Secret** | `generate-social-image` | xAI Aurora image generation API key | Obtained from https://console.x.ai/ |
+| `XAI_API_KEY` | **Secret** | `generate-social-image`, `generate-interior-gemini` (Grok path) | xAI Aurora / Grok image generation API key | Obtained from https://console.x.ai/ |
+| `FAL_KEY` | **Secret** | `_shared/ai-client.ts` (**H3 Max** video — the default reel) | fal H3 Max — **replaced `MINIMAX_API_KEY` on 2026-08-30 (#396)** | Obtained from https://fal.ai/dashboard/keys |
+| `ARK_API_KEY` | **Secret** | `_shared/ai-client.ts` (Seedance 2.5 video) | BytePlus ModelArk key (NOT Volcano Engine) | Obtained from https://console.byteplus.com/ark |
+| `LUMA_API_KEY` | **Secret** | `_shared/ai-client.ts` (Luma Ray 3.2 video) | Luma Dream Machine API key | Obtained from https://lumalabs.ai/ |
+| `DASHSCOPE_API_KEY` | **Secret** | `_shared/ai-client.ts` (WAN 3.0 video + Qwen research challenger) | Alibaba Model Studio / DashScope International | Obtained from https://modelstudio.console.alibabacloud.com/ |
 | `GEMINI_API_KEY` | **Secret** | `generate-social-image` | Google Imagen 3 via REST API (`v1beta` endpoint) — same Google AI key as `GOOGLE_GENERATIVE_AI_API_KEY`, set both identically | `AIzaSyxxxxxxxxxxxxxxxx` |
 
 > **Note on Replicate key naming**: `REPLICATE_API_TOKEN` and `REPLICATE_API_KEY` refer to the same Replicate account token. Different edge functions use different variable names due to historical reasons — set both to the same value.
+>
+> **Where these resolve (admin page vs edge secret)**: `FAL_KEY`, `ARK_API_KEY`, `LUMA_API_KEY` and `DASHSCOPE_API_KEY` are read through `resolveSecret()`, so they can be set **either** as a Supabase Edge Function secret **or** from the admin **Platform Secrets** page (all four are declared rows there). `KLINGAI_ACCESS_KEY`, `KLINGAI_SECRET_KEY` and `XAI_API_KEY` are read via `Deno.env.get()` **only** — they MUST be set as Supabase Edge Function secrets; a value saved on the admin page alone will not reach them.
+>
+> **Retired — do NOT re-add**: `MINIMAX_API_KEY` (direct MiniMax H3) was removed on 2026-08-30 (#396); H3 Max on fal (`FAL_KEY`) replaced it — same model lineage, cheaper vendor. It is gone from the code's env sync and from `platform_secrets`.
 
 #### **VR World Generation**
 
