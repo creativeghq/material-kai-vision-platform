@@ -90,14 +90,24 @@ Deno.serve(withApiLogging('crm-lead-score', async (req) => {
   try {
     const { data: reMod } = await supabase.from('modules').select('enabled').eq('slug', 'real-estate').maybeSingle();
     if (reMod?.enabled) {
-      const [inq, interests, viewings, { data: ext }] = await Promise.all([
+      // DESTRUCTURE `.data`, all four. `interests` and `viewings` were bound to the whole
+      // PostgrestResponse — an object that is never null, so the `?? []` below never fired and
+      // `.map` / `.filter` / `.length` read off `{data, error, count, status, statusText}`.
+      // `.map` is undefined there, so the line threw `interests.map is not a function` straight
+      // into the `catch` below, which warns and moves on.
+      //
+      // The consequence is the whole reason this block exists: every property lead has been
+      // scored with NO inquiries, interests, viewings, offer flag, budget or pre-approval —
+      // silently, with the feature reading as working. `inq` kept working by accident, because
+      // `count` genuinely does live on the response rather than on `data`.
+      const [{ count: inquiryCount }, { data: interests }, { data: viewings }, { data: ext }] = await Promise.all([
         supabase.from('property_inquiries').select('id', { count: 'exact', head: true }).eq('crm_contact_id', contactId).eq('workspace_id', workspaceId),
         supabase.from('property_interests').select('interest_type').eq('crm_contact_id', contactId).eq('workspace_id', workspaceId),
         supabase.from('property_viewings').select('status').eq('crm_contact_id', contactId).eq('workspace_id', workspaceId),
         supabase.from('property_contacts_ext').select('budget_min, budget_max, pre_approval_status, pre_approval_amount').eq('crm_contact_id', contactId).maybeSingle(),
       ]);
       signals.property = {
-        inquiries: inq?.count ?? 0,
+        inquiries: inquiryCount ?? 0,
         interests: (interests ?? []).map((i: any) => i.interest_type),
         made_offer: (interests ?? []).some((i: any) => i.interest_type === 'offer_made'),
         viewings: (viewings ?? []).length, completed_viewings: (viewings ?? []).filter((v: any) => v.status === 'completed').length,

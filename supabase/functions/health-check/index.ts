@@ -129,7 +129,7 @@ async function checkClaude(): Promise<ServiceResult> {
     const body = await res.json().catch(() => ({}));
     return { status: 'unhealthy', latency_ms, error: body?.error?.message || `HTTP ${res.status}` };
   } catch (e) {
-    return { status: 'unhealthy', latency_ms: Date.now() - start, error: e.message };
+    return { status: 'unhealthy', latency_ms: Date.now() - start, error: e instanceof Error ? e.message : String(e) };
   }
 }
 
@@ -166,7 +166,7 @@ async function checkSlig(): Promise<ServiceResult> {
     if (res.status === 303 || res.status === 0) return { status: 'healthy', latency_ms, message: 'SLIG cold-starting (Modal)' };
     return { status: 'unhealthy', latency_ms, error: `HTTP ${res.status}` };
   } catch (e) {
-    return { status: 'unhealthy', latency_ms: Date.now() - start, error: e.message };
+    return { status: 'unhealthy', latency_ms: Date.now() - start, error: e instanceof Error ? e.message : String(e) };
   }
 }
 
@@ -185,7 +185,7 @@ async function checkVoyageAI(): Promise<ServiceResult> {
     const body = await res.json().catch(() => ({}));
     return { status: 'unhealthy', latency_ms, error: body?.detail || `HTTP ${res.status}` };
   } catch (e) {
-    return { status: 'unhealthy', latency_ms: Date.now() - start, error: e.message };
+    return { status: 'unhealthy', latency_ms: Date.now() - start, error: e instanceof Error ? e.message : String(e) };
   }
 }
 
@@ -199,7 +199,7 @@ async function checkPythonEndpoint(path: string): Promise<ServiceResult> {
     if (res.ok) return { status: 'healthy', latency_ms, message: 'Service operational' };
     return { status: 'unhealthy', latency_ms, error: `HTTP ${res.status}` };
   } catch (e) {
-    return { status: 'unhealthy', latency_ms: Date.now() - start, error: e.message };
+    return { status: 'unhealthy', latency_ms: Date.now() - start, error: e instanceof Error ? e.message : String(e) };
   }
 }
 
