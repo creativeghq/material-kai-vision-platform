@@ -21,6 +21,7 @@ import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { escapeHtml } from '../_shared/html.ts';
 import { recordPageEvent } from '../_shared/document-events.ts';
 import { contractContentHash, SIGNED_FIELDS } from '../_shared/contract-hash.ts';
+import { getTrustedClientIp } from '../_shared/client-ip.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -115,27 +116,46 @@ Deno.serve(withApiLogging('contracts-api', async (req: Request) => {
     const signerName = String(body?.signer_name ?? '').trim().slice(0, 160);
     if (!signerName) return json({ error: 'signer_name is required' }, 400);
 
-    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
+    // The TRUSTED hop, not the leftmost header entry.
+    //
+    // `x-forwarded-for.split(',')[0]` is whatever the caller put there — so the address recorded
+    // against a signature, the one a dispute would actually rely on, was chosen by the signer.
+    // Invariant 10 says to take the trusted hop for a QUOTA; evidence deserves it at least as
+    // much. `getTrustedClientIp` prefers `cf-connecting-ip` and otherwise takes the LAST hop.
+    const trustedIp = getTrustedClientIp(req);
+    const ip = trustedIp === 'unknown' ? null : trustedIp;
     const ua = req.headers.get('user-agent')?.slice(0, 400) ?? null;
     // What is being signed, hashed over the substantive terms exactly as they stand right now
     // (#356 `RC-1`). Without this the signature row said who and when and nothing about WHAT, so
     // a later edit to `value` reattached this signature to different terms with no way to tell.
     const signedHash = await contractContentHash(c as unknown as Record<string, unknown>);
 
-    const { error: sigErr } = await service.from('contract_signatures').insert({
-      contract_id: c.id,
-      workspace_id: c.workspace_id,
-      signed_content_sha256: signedHash,
-      signer_name: signerName,
-      signer_email: typeof body?.signer_email === 'string' ? body.signer_email.slice(0, 200) : null,
-      // Single-signer design: the person signing via the token IS the counterparty. Stamp it so the
-      // column carries meaning (was always NULL) and a future multi-party design has the field populated.
-      signer_role: 'counterparty',
-      signature_image: typeof body?.signature_image === 'string' ? body.signature_image.slice(0, 200_000) : null,
-      ip, user_agent: ua,
+    // ONE TRANSACTION, with the status flip as the CLAIM.
+    //
+    // This used to insert the signature and then stamp the contract as two statements. The insert
+    // commits on its own, so a failed stamp left the contract `sent` with a signature already
+    // against it — and the counterparty, still looking at a page that offers to sign, signed
+    // again. The check meant to stop them read `c.status`, the very column that failed to be
+    // written (CLAUDE.md rule 4: a duplicate guard reads the record written on the SUCCESS path).
+    // Two signature rows for one legal document, each with its own content hash.
+    const { data: signResult, error: signErr } = await service.rpc('sign_contract', {
+      p_token: token,
+      p_signer_name: signerName,
+      p_content_hash: signedHash,
+      p_signer_email: typeof body?.signer_email === 'string' ? body.signer_email.slice(0, 200) : null,
+      p_signature_image: typeof body?.signature_image === 'string' ? body.signature_image.slice(0, 200_000) : null,
+      p_ip: ip,
+      p_user_agent: ua,
     });
-    if (sigErr) return json({ error: 'Could not record signature' }, 500);
-    await service.from('contracts').update({ status: 'signed', signed_at: new Date().toISOString() }).eq('id', c.id);
+    if (signErr) return json({ error: 'Could not record signature' }, 500);
+    const outcome = signResult as { ok: boolean; reason?: string } | null;
+    if (!outcome?.ok) {
+      // The RPC re-checks under the claim, so these are the authoritative answers — the reads
+      // above are only there to fail fast and to build the hash.
+      if (outcome?.reason === 'already_signed') return json({ error: 'This contract is already signed.' }, 409);
+      if (outcome?.reason === 'not_found') return json({ not_found: true });
+      return json({ error: 'This contract is not open for signing.' }, 410);
+    }
 
     // Terminal outcome on the trail: 'signed' outranks every view, so the list
     // shows the result rather than "viewed 3x" next to a completed contract.

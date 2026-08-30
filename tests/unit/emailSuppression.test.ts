@@ -90,3 +90,107 @@ describe('the senders that were bypassing', () => {
     ).toMatch(/useState\(false\);\s*\/\/ email a calendar invite to attendees/);
   });
 });
+
+/**
+ * ── The webhook side, 2026-08-30 ────────────────────────────────────────────────────────────
+ *
+ * A hard bounce and a spam complaint are mandatory opt-outs — the mailbox is gone, or the
+ * recipient has told a provider we are spam. `email-webhooks` is the only thing that records
+ * either. Two defects there, both silent:
+ *
+ * (a) `bounce_type` was written as the literal `'Permanent'` while the suppression decision
+ *     forty lines below correctly read `bounce.type` from the payload. So the stored evidence
+ *     disagreed with the action taken on it: a Transient bounce was recorded as Permanent and
+ *     (rightly) not suppressed, leaving the row unable to explain the behaviour — and any
+ *     deliverability report reading that column counts every soft bounce as hard.
+ *
+ * (b) `email_unsubscribes` is keyed on `(workspace_id, email)`, so a send whose log carries no
+ *     workspace could not be suppressed at all — and the `if (wsId && toEmail)` guard skipped
+ *     it in silence. The SEND path skips its own check for the same reason, so nothing stopped
+ *     the next message either.
+ *
+ * MEASURED on this platform 2026-08-30: both hard bounces ever recorded
+ * (2026-07-31, 2026-08-03) landed on logs with a NULL `workspace_id`, and `email_unsubscribes`
+ * is empty. Two addresses that hard-bounced are still mailable. The CAUSE is already fixed —
+ * workspace attribution on `email_logs` closed in mid-August and all 82 logs since carry one —
+ * so what was missing is the part that would have told anyone. The integrity probe
+ * `email_hard_bounce_unsuppressed` (in `dic_detect__ops_silent_zero`, rostered in
+ * `ops.silent_zero_probe_missing`) is that part; it reports the two historical addresses.
+ */
+const HOOK = readFileSync(resolve(process.cwd(), 'supabase/functions/email-webhooks/index.ts'), 'utf8');
+
+describe('a recorded bounce says what the provider said', () => {
+  it('is pointed at the real file', () => {
+    expect(HOOK).toContain('bounce_type');
+    expect(HOOK, 'the bounced-event branch is what this guards').toMatch(/email\.bounced/);
+  });
+
+  it('never writes a constant severity', () => {
+    // The exact defect: `eventRecord.bounce_type = 'Permanent';`. Assigning ANY literal is the
+    // bug, not just that one — 'Transient' hardcoded would be the same lie in the other
+    // direction, and it is the one a well-meaning fix would reach for.
+    expect(HOOK, 'bounce_type is assigned a string literal — it must come from the payload')
+      .not.toMatch(/bounce_type\s*=\s*['"`](?:Permanent|Transient|Undetermined)['"`]/);
+  });
+
+  it('reads the severity off the payload', () => {
+    // The value assigned must trace back to `bounce.type`. Checked as a PAIR — a const derived
+    // from the payload, and that same const landing in the column — because either half alone
+    // passes while the other is a literal.
+    const derive = HOOK.match(/const (\w+) = String\([^;]*?bounce\?\.type[^;]*?\);/);
+    expect(derive, 'nothing in the file derives a bounce severity from the payload').not.toBeNull();
+    const assigned = HOOK.match(/bounce_type = ([A-Za-z_$][\w$]*)/);
+    expect(assigned, 'bounce_type is not assigned from a variable at all').not.toBeNull();
+    expect(assigned![1], 'bounce_type is assigned from something other than the value read off '
+      + 'the payload — that split between what is recorded and what is acted on IS the defect')
+      .toBe(derive![1]);
+  });
+
+  it('defaults an absent type to the honest answer, not the severe one', () => {
+    // Resend sends Permanent | Transient | Undetermined. An unstated type is unknown; recording
+    // it as Permanent invents a fact, and recording it as Transient hides one.
+    expect(HOOK, "an absent bounce type must fall back to 'Undetermined'")
+      .toMatch(/\|\|\s*'Undetermined'/);
+  });
+
+  it('and the suppression decision still reads the same field', () => {
+    // The two must not drift apart again — that split IS the defect.
+    expect(HOOK).toMatch(/bounceType\s*=\s*String\(/);
+    expect(HOOK, 'only a permanent bounce suppresses').toMatch(/bounceType === 'permanent'/);
+  });
+});
+
+describe('a suppression that could not happen is not silent', () => {
+  it('still guards on having a workspace and a recipient', () => {
+    // The guard is correct — the table is keyed on (workspace_id, email) and there is nothing
+    // to write without one. What was wrong is that failing it produced nothing at all.
+    expect(HOOK).toMatch(/if \(wsId && toEmail\)/);
+  });
+
+  it('has an else branch, and it reports', () => {
+    const i = HOOK.indexOf('if (wsId && toEmail)');
+    expect(i, 'the suppression guard is gone').toBeGreaterThan(-1);
+    const after = HOOK.slice(i, i + 2400);
+    expect(after, 'the unsuppressable case falls through in silence — an address that hard-bounced '
+      + 'keeps being mailed and nothing anywhere says so').toMatch(/\}\s*else\s*\{/);
+
+    // Scoped to the ELSE BODY, not the surrounding window. The `try` wrapping this guard ends in
+    // `catch (e) { console.error(...) }`, so a window-wide search for console.error passes while
+    // the report itself is downgraded to console.debug — which is the `segmentation_service`
+    // shape: a fallback that fires forever at a level nobody reads.
+    const elseAt = after.search(/\}\s*else\s*\{/);
+    const catchAt = after.indexOf('} catch');
+    expect(catchAt, 'the else body is not bounded by the catch this expects').toBeGreaterThan(elseAt);
+    const body = after.slice(elseAt, catchAt);
+    expect(body, 'the report must be an error — a debug line is not a report')
+      .toMatch(/console\.error\(/);
+    expect(body, 'the report must name the address it could not suppress').toContain('toEmail');
+  });
+
+  it('the hard-bounce path is what reaches that guard', () => {
+    const i = HOOK.indexOf('if (wsId && toEmail)');
+    const before = HOOK.slice(Math.max(0, i - 900), i);
+    expect(before, 'complaints and hard bounces are the two mandatory opt-outs')
+      .toMatch(/email\.complained' \|\| isHardBounce/);
+  });
+});

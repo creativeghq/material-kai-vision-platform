@@ -126,9 +126,21 @@ describe('RC-1 — a signed contract cannot be rewritten', () => {
   });
 
   it('the signature records the content it was given', () => {
-    expect(api, 'the signature no longer stores what was signed').toContain('signed_content_sha256');
+    // The COLUMN write moved into `public.sign_contract` when signing became one transaction (the
+    // insert and the status stamp were two statements, so a failed stamp left a signature on a
+    // contract still open for signing). This assertion moved with it rather than being dropped:
+    // what has to stay true is that the hash is computed from the shared canonicalisation HERE —
+    // the one canonicalisation, per contract-hash.ts — and handed to the writer.
     expect(api, 'the hash is no longer computed from the shared canonicalisation')
       .toContain('contractContentHash');
+    expect(api, 'the computed hash is no longer passed to the writer')
+      .toMatch(/p_content_hash: signedHash/);
+    // And the writer must be the atomic one, not a direct insert that could commit alone.
+    expect(api, 'signing must go through the RPC that writes evidence and stamp together')
+      .toMatch(/rpc\('sign_contract'/);
+    // The RPC itself refuses an empty hash (`content_hash_required`), which is a stronger
+    // guarantee than any source check here — a signature that cannot say WHAT was signed is
+    // exactly the RC-1 defect, and it is now rejected by the database rather than by convention.
   });
 
   it('the sign path selects every field the hash covers', () => {

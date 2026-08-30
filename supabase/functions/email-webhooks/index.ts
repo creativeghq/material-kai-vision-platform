@@ -448,7 +448,16 @@ Deno.serve(withApiLogging('email-webhooks', async (req) => {
     };
 
     if (event.type === 'email.bounced' && event.data.bounce) {
-      eventRecord.bounce_type = 'Permanent';
+      // RECORD WHAT THE PROVIDER SAID, not a constant. This was hardcoded to 'Permanent', while
+      // the suppression decision forty lines below correctly reads `bounce.type` — so the stored
+      // evidence disagreed with the action taken on it: a Transient bounce was written down as
+      // Permanent and (rightly) not suppressed, leaving the row unable to explain the behaviour.
+      // Anything reading this column for a deliverability report counts every soft bounce as hard.
+      //
+      // Resend sends Permanent | Transient | Undetermined. An absent type is 'Undetermined' — the
+      // honest answer — never the most severe one.
+      const reported = String((event.data as { bounce?: { type?: string } }).bounce?.type ?? '').trim();
+      eventRecord.bounce_type = reported || 'Undetermined';
       eventRecord.diagnostic_code = event.data.bounce.message;
     }
 
@@ -524,9 +533,9 @@ Deno.serve(withApiLogging('email-webhooks', async (req) => {
     const bounceType = String((event.data as any)?.bounce?.type ?? '').toLowerCase();
     const isHardBounce = event.type === 'email.bounced' && bounceType === 'permanent';
     if (event.type === 'email.complained' || isHardBounce) {
+      const wsId = (emailLog as { workspace_id?: string | null }).workspace_id ?? null;
+      const toEmail = (emailLog as { to_email?: string | null }).to_email ?? (event.data.to?.[0] ?? null);
       try {
-        const wsId = (emailLog as any).workspace_id ?? null;
-        const toEmail = (emailLog as any).to_email ?? (event.data.to?.[0] ?? null);
         if (wsId && toEmail) {
           await supabaseClient.from('email_unsubscribes').upsert({
             workspace_id: wsId,
@@ -534,6 +543,22 @@ Deno.serve(withApiLogging('email-webhooks', async (req) => {
             source: event.type === 'email.complained' ? 'complaint' : 'bounce',
             unsubscribed_at: new Date().toISOString(),
           }, { onConflict: 'workspace_id,email', ignoreDuplicates: true });
+        } else {
+          // NOT SILENT. `email_unsubscribes` is keyed on (workspace_id, email), so a send whose log
+          // carries no workspace cannot be suppressed at all — and the send path skips its own
+          // check for the same reason, so nothing stops the next one either. That combination is
+          // how an address that hard-bounced keeps being mailed, which is the fastest way to lose
+          // a sending domain.
+          //
+          // The attribution gap that caused this was closed in mid-August (every log since carries
+          // a workspace), so this branch should now be unreachable. Saying so loudly is what makes
+          // its return visible instead of silent, and `email.hard_bounce_unsuppressed` reports any
+          // address left in that state.
+          console.error(
+            `[email-webhooks] ${event.type} for ${toEmail ?? 'an unknown address'} could NOT be `
+            + `suppressed: the email_log carries ${wsId ? 'no recipient' : 'no workspace_id'}. `
+            + 'This address will keep receiving mail.',
+          );
         }
       } catch (e) { console.error('suppression upsert failed:', e); }
     }

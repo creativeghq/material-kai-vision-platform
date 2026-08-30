@@ -1332,6 +1332,118 @@ building could be told which jobs happen there and could never say so.
   which guards REGRESSION rather than absence: deleting the reader or unmounting it restores the
   exact original state, and nothing else would notice.
 
+## Two hard bounces nobody was ever going to act on — 2026-08-30
+
+Email Marketing is the first module in this round with real traffic (192 events, 98 logs, 95 sends
+→ 93 delivered, 2 bounced), and most of it had already been hardened by #357/#366: suppression is
+the default rather than a branch under a client-supplied `emailType`, the lookup fails closed, the
+unsubscribe page verifies an HMAC and survives link prefetch, campaign recipients are CLAIMED. Two
+things were left.
+
+**The recorded bounce severity was a constant.** `email-webhooks` wrote
+`eventRecord.bounce_type = 'Permanent'` while the suppression decision forty lines below correctly
+read `bounce.type` off the payload. So the stored evidence disagreed with the action taken on it: a
+Transient bounce was written down as Permanent and — rightly — not suppressed, leaving the row
+unable to explain the behaviour, and anything reading that column for a deliverability report
+counting every soft bounce as hard. Latent rather than fired: both live rows happen to be
+genuinely permanent. An absent type now records `Undetermined`, which is the honest answer; the
+mutation that "fixes" this by hardcoding `Transient` instead is caught too.
+
+**A suppression that could not happen happened silently.** `email_unsubscribes` is keyed on
+`(workspace_id, email)`, so a send whose log carries no workspace cannot be suppressed at all —
+and the send path skips its own check for the same reason, so nothing stops the next message
+either. The guard `if (wsId && toEmail)` was correct and its failure produced nothing.
+
+**Measured**: both hard bounces this platform has ever recorded — `accounting@acrosshotels.gr`
+(2026-07-31) and `viva-test@materialshub.gr` (2026-08-03) — landed on logs with a NULL
+`workspace_id`, and `email_unsubscribes` is empty. Two addresses that hard-bounced are still
+mailable.
+
+The **cause is already fixed**: workspace attribution on `email_logs` closed in mid-August, and all
+82 logs since carry one (week of 08-24: 73 logs, 0 missing; 08-17: 9, 0 missing; 08-10: 13, **6**
+missing; every week before that mostly missing). What was missing is the part that would have told
+anyone. `email.hard_bounce_unsuppressed` is that part — it counts addresses we have bounced or been
+complained about against addresses actually on a suppression list, matched on the ADDRESS rather
+than the workspace, because the absent workspace is the whole failure. **Watched to fire: activity
+2, signal 0**, naming both. Not auto-healed — which workspace owns the relationship with a bounced
+address is a person's call, not a guess a cron should make.
+
+> **Structural note, deliberately not "fixed" here.** A hard bounce is a property of the ADDRESS —
+> the mailbox does not exist for anyone — while `email_unsubscribes` is a per-tenant consent record,
+> which is right for an unsubscribe and wrong for a bounce. A platform-wide bounce list would be the
+> correct shape, and it is a schema change with a tenancy question attached (one tenant's bounce
+> suppressing another tenant's send is a decision, not a detail). Flagged rather than taken.
+
+Guarded by [tests/unit/emailSuppression.test.ts](../tests/unit/emailSuppression.test.ts), extended
+rather than duplicated into a tenth email test file. All five mutations caught, including the one
+that first slipped through: the report downgraded from `console.error` to `console.debug`. The
+assertion had been scoped to a window that also contained the surrounding `catch`'s own
+`console.error`, so it passed while the report went invisible — the `segmentation_service` shape.
+Scoped to the else body.
+
+## Signing a contract, and four things nobody was watching — 2026-08-30
+
+### The partial write on a legal document
+
+`contracts-api` signed as two statements over the wire: insert the evidence into
+`contract_signatures`, then stamp `contracts.status = 'signed'`. The insert commits on its own, so
+a failed stamp left the contract `sent` with a signature already against it — and the counterparty,
+still looking at a page that offers to sign, signed again. The check meant to stop them was
+`if (c.status === 'signed')`, reading the very column that failed to be written. Two signature rows
+for one contract, each with its own `signed_content_sha256`, and no way to say which is THE
+signature.
+
+There is no unique constraint on `contract_signatures(contract_id)` to fall back on — deliberately,
+the schema notes a future multi-party design — so the claim IS the guard. `public.sign_contract`
+does both in one transaction with the status flip narrowed on `status = 'sent'`, the same shape
+`pos_issue_receipt` and `bill_time_entries_to_invoice` already use.
+
+**Watched on the live database**, inside aborted transactions:
+
+| scenario | result |
+|---|---|
+| first sign | ok, status `signed`, one signature row, IP recorded |
+| the same token again | `already_signed`, and the row count **stays at one** |
+| evidence insert forced to fail (temp trigger) | status still `sent`, **zero** signatures — signable again, which is the honest state |
+| a signature offered with no content hash | refused: a signature that cannot say WHAT was signed is the #356 RC-1 defect |
+
+### The evidence the signer chose
+
+`contract_signatures.ip` came from `x-forwarded-for.split(',')[0]` — the LEFTMOST entry, which is
+whatever the caller put there. The address recorded against a signature, the one a dispute would
+actually rely on, was picked by the person signing. Invariant 10 requires the trusted hop for a
+QUOTA; evidence deserves it at least as much. Now `getTrustedClientIp`.
+
+**A pre-existing guard failed on this change and was right to.** `contractSignatureBinding.test.ts`
+asserted `contracts-api` contains `signed_content_sha256`; moving the column write into the RPC
+took that string out of the file. The assertion moved with it rather than being deleted — what has
+to stay true is that the hash is computed from the ONE canonicalisation here and handed to the
+writer, and that the writer is the atomic one.
+
+### Four unwatched things, now watched
+
+| check | what it catches |
+|---|---|
+| `moodboard.sheet_stuck_generating` (detect + **heal**) | a sheet stuck in `generating` past an hour against a 150s renderer ceiling. `cleanup_old_failed_sheets` takes `failed` only, so a stuck row was reaped by nothing and showed a spinner that never resolved. Heal marks it `failed` with an explanation, which makes the retry path and the 30-day reaper apply again — deleting it would throw away the operator's configuration |
+| `contracts.signature_integrity` | a signature with no signed contract (the partial write above), a signed contract with no signature, and a signature taken after content binding shipped that records no hash. Not auto-healed: each needs a person to establish what happened to a legal document |
+| `moodboard_failed_sheets_never_reaped` | the weekly reaper has stopped clearing. Platform-wide, not per workspace — sheets have no `workspace_id`, and "the cron stopped" is not a tenant's fact |
+| `contracts_never_expired` | `contracts-expire-daily` has stopped, so a contract past its deadline still renders a sign page that refuses while the owner's list shows it as out for signature |
+
+All four watched to fire, and the heal watched to resolve (detected → healed → gone, status
+`failed` with the message attached). Both new silent-zero probes are in the
+`ops.silent_zero_probe_missing` roster, so removing one is deliberate rather than free.
+
+### A blast-radius cap on the moodboard hard delete
+
+`moodboard_dormancy_scan` deleted every board whose `deletion_scheduled_at` had come due, unbounded.
+The stamp that sets that column is careful — written only after the warning email actually went out,
+guarded on `dormancy_warned_at IS NULL` — so the invariant holds today. But this is an
+unrecoverable delete of user content with FK cascade onto items and sheets, and one bad backfill
+touching that column would take every moodboard on the platform in a single nightly run.
+`storage-orphan-cleanup-cron` already caps itself at 5000 "to bound blast radius"; the same applies
+more strongly to content nobody can get back. Capped at 200 per run, with `due` and `deferred`
+returned so a capped run says so instead of looking ordinary.
+
 ## The client-view share link — 2026-08-30
 
 An anonymous surface that both reads private files and accepts a write. Three defects.
