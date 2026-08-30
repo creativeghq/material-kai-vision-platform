@@ -162,6 +162,18 @@ export interface CreditDebitResult {
   new_balance?: number;
   transaction_id?: string;
   error?: string;
+  /**
+   * The `ai_usage_logs` row this debit wrote, when it wrote one.
+   *
+   * The debit happens BEFORE the upstream call (invariant 10), so at insert time the outcome is
+   * unknowable and `metadata.success` cannot be set. `ops.silent_zero`'s provider-failure arm
+   * reads exactly that key and skips a row without it — correctly, since a row that never
+   * learned its outcome cannot be judged. The consequence is that every flat-rate provider
+   * debited this way is INVISIBLE to the probe that exists to catch a provider failing on
+   * essentially every attempt. Handing the id back lets a caller stamp the outcome once it has
+   * one; see `recordExternalServiceOutcome`.
+   */
+  usage_log_id?: string | null;
 }
 
 /**
@@ -279,7 +291,7 @@ export async function debitExternalServiceCredits(
       return { success: false, credits_debited: creditsToDebit, raw_cost_usd: rawCost, billed_cost_usd: billedCost, error: errMsg };
     }
 
-    const { error: logError } = await supabase.from('ai_usage_logs').insert({
+    const { data: logRow, error: logError } = await supabase.from('ai_usage_logs').insert({
       user_id: userId,
       // The same value the debit above used. It was in scope the whole time and simply never
       // reached the log row, so the spend was billed to a workspace pool and then reported
@@ -310,7 +322,10 @@ export async function debitExternalServiceCredits(
         cost_per_unit: pricing.cost_per_unit,
       },
       created_at: new Date().toISOString(),
-    });
+    })
+      // `select` so the row id comes back — the caller needs it to stamp the outcome later.
+      .select('id')
+      .maybeSingle();
 
     if (logError) {
       console.error(`[credit-utils] Failed to log usage for ${serviceName}:`, logError);
@@ -324,6 +339,7 @@ export async function debitExternalServiceCredits(
     );
 
     return {
+      usage_log_id: (logRow as { id?: string } | null)?.id ?? null,
       success: true,
       credits_debited: creditsToDebit,
       raw_cost_usd: rawCost,
@@ -583,6 +599,81 @@ export function invalidatePricingCache(): void {
  * When the unit count is only known AFTER the call (a batch whose size the provider decides), the
  * order cannot be fixed — use `checkCreditBalance` as a preflight first, then debit the real count.
  */
+/**
+ * Stamp the OUTCOME of an external-service call onto the `ai_usage_logs` row its debit wrote.
+ *
+ * The debit runs before the call (invariant 10), so the row is born not knowing whether the work
+ * succeeded. `ops.silent_zero`'s provider-failure arm reads `metadata.success` and skips a row
+ * without it — correctly, because a row that never learned its outcome cannot be judged. The
+ * effect is that a flat-rate provider debited this way can fail on every single attempt and the
+ * probe that exists to catch exactly that will never see it. `sonar` was caught only because
+ * MIVAA's logger records the outcome; the edge-side ones are not so lucky.
+ *
+ * Best-effort and never throws: telemetry must not fail the work it describes.
+ *
+ * Read-modify-write rather than a jsonb merge, because PostgREST has no `||` operator here. The
+ * race that would normally make that unsafe does not exist — nothing else writes this row's
+ * metadata after the insert.
+ */
+export async function recordExternalServiceOutcome(
+  supabase: DbClient,
+  usageLogId: string | null | undefined,
+  ok: boolean,
+  errorMessage?: string | null,
+): Promise<void> {
+  if (!usageLogId) return;
+  try {
+    const { data: row } = await supabase
+      .from('ai_usage_logs').select('metadata').eq('id', usageLogId).maybeSingle();
+    const meta = ((row as { metadata?: Record<string, unknown> } | null)?.metadata ?? {}) as Record<string, unknown>;
+    await supabase
+      .from('ai_usage_logs')
+      .update({
+        metadata: {
+          ...meta,
+          success: ok,
+          ...(ok ? {} : { error: (errorMessage ?? 'call failed').slice(0, 240) }),
+        },
+      })
+      .eq('id', usageLogId);
+  } catch (e) {
+    console.warn('[credit-utils] could not record service outcome (non-fatal):', (e as Error)?.message);
+  }
+}
+
+/**
+ * `debitOrRefuse`, but handing back the usage-log id so the caller can stamp the outcome.
+ *
+ * `debitOrRefuse` returns only the refusal string, which is all most callers need; this exists
+ * for the ones that go on to make the upstream call and can therefore answer the question the
+ * row is missing.
+ */
+export async function debitOrRefuseTracked(
+  supabase: DbClient,
+  userId: string,
+  serviceName: string,
+  operationType: string,
+  units: number = 1,
+  metadata?: Record<string, unknown>,
+  workspaceId?: string | null,
+  provenance: UsageProvenance = {},
+): Promise<{ refusal: string | null; usageLogId: string | null }> {
+  const result = await debitExternalServiceCredits(
+    supabase, userId, serviceName, operationType, units, metadata, workspaceId, provenance,
+  );
+  if (result.success) return { refusal: null, usageLogId: result.usage_log_id ?? null };
+  console.warn(`[credit-utils] refusing ${serviceName}/${operationType} for ${userId}: ${result.error}`);
+  return {
+    refusal: JSON.stringify({
+      success: false,
+      error: result.error ?? 'Insufficient credits',
+      credits_required: result.credits_debited,
+      service: serviceName,
+    }),
+    usageLogId: null,
+  };
+}
+
 export async function debitOrRefuse(
   supabase: DbClient,
   userId: string,

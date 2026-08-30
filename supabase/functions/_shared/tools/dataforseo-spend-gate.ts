@@ -28,7 +28,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { debitOrRefuse, getServicePricing } from '../credit-utils.ts';
+import { getServicePricing, debitOrRefuseTracked, recordExternalServiceOutcome } from '../credit-utils.ts';
 import { settleCredits } from '../credit-reserve.ts';
 
 /** `ai_model_pricing.model_key` for DataForSEO spend. One unit = $0.001 of provider cost. */
@@ -184,7 +184,7 @@ export async function openSpendGate(
   const creditsPerUnit = pricing.cost_per_unit * (pricing.markup_multiplier || FALLBACK_MARKUP) * 100;
   const reservedCredits = Math.round(units * creditsPerUnit * 100) / 100;
 
-  const refusal = await debitOrRefuse(
+  const { refusal, usageLogId } = await debitOrRefuseTracked(
     sb, userId, DATAFORSEO_SERVICE, opType, units,
     { kind, reserve: true, ceiling_units: units }, workspaceId,
     // Name the module. `ai_usage_logs.module_slug` exists and this writer left it null on 5,192
@@ -201,6 +201,15 @@ export async function openSpendGate(
     ok: true,
     settle: async (costUsd) => {
       const known = typeof costUsd === 'number' && Number.isFinite(costUsd) && costUsd >= 0;
+      // Settling is the moment the outcome becomes knowable, so it is where the usage row learns
+      // it. The debit ran BEFORE the call, so the row was written not knowing — and
+      // `ops.silent_zero`'s provider-failure arm reads `metadata.success` and skips a row without
+      // it. Every dataforseo_* operation shares this gate, so stamping here covers all of them
+      // without touching a single call site.
+      await recordExternalServiceOutcome(
+        sb, usageLogId, known,
+        known ? null : `${kind}: DataForSEO reported no cost_usd`,
+      );
       if (!known) {
         console.error(
           `[dataforseo-gate] ${kind} reported no cost_usd — keeping the ${units}-unit reserve. ` +
