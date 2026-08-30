@@ -86,7 +86,11 @@ export async function handleCrmStripe(req: Request): Promise<Response> {
         customerId = profile.stripe_customer_id;
       } else {
         const customer = await stripe.customers.create({
-          email: user.email,
+          // `user` is null for every non-'user' auth level (secret / anon / partner api_key),
+          // so `user.email` threw rather than 500ing cleanly. Stripe treats email as optional and
+          // the customer is linked by `metadata.supabase_user_id` regardless, so an absent address
+          // costs the receipt, not the checkout.
+          email: user?.email ?? undefined,
           metadata: { supabase_user_id: userId },
         });
         customerId = customer.id;
@@ -156,7 +160,11 @@ export async function handleCrmStripe(req: Request): Promise<Response> {
         customerId = creditProfile.stripe_customer_id;
       } else {
         const customer = await stripe.customers.create({
-          email: user.email,
+          // `user` is null for every non-'user' auth level (secret / anon / partner api_key),
+          // so `user.email` threw rather than 500ing cleanly. Stripe treats email as optional and
+          // the customer is linked by `metadata.supabase_user_id` regardless, so an absent address
+          // costs the receipt, not the checkout.
+          email: user?.email ?? undefined,
           metadata: { supabase_user_id: userId },
         });
         customerId = customer.id;

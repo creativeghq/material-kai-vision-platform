@@ -44,7 +44,6 @@ Deno.serve(withApiLogging('recommendations-api', async (req) => {
       );
     }
 
-    const user = auth.user;
     const userId = auth.userId;
 
     // This fn uses the service-role client (RLS bypassed) and trusts
@@ -96,11 +95,22 @@ Deno.serve(withApiLogging('recommendations-api', async (req) => {
         );
       }
 
+      // `user_material_interactions.user_id` is NOT NULL, and authenticate() succeeds with
+      // no user at all at 'secret'/'anon' level, so the caller's identity is required
+      // explicitly here. `user.id` threw a TypeError instead — a 500 with no usable message
+      // for every service-role call. 'api_key' sets `userId`, so partner keys still record.
+      if (!auth.userId) {
+        return new Response(
+          JSON.stringify({ error: 'An interaction must be recorded against a signed-in user.' }),
+          { status: 400, headers: corsHeaders },
+        );
+      }
+
       // Insert interaction
       const { data, error } = await supabase
         .from('user_material_interactions')
         .insert({
-          user_id: user.id,
+          user_id: auth.userId,
           workspace_id,
           material_id,
           interaction_type,
@@ -136,7 +146,9 @@ Deno.serve(withApiLogging('recommendations-api', async (req) => {
   } catch (error) {
     console.error('Error:', error);
     return new Response(
-      JSON.stringify({ error: error.message || 'Internal server error' }),
+      JSON.stringify({
+        error: (error instanceof Error ? error.message : String(error)) || 'Internal server error',
+      }),
       { status: 500, headers: corsHeaders },
     );
   }

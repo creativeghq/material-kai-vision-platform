@@ -242,7 +242,12 @@ export async function handleCompanies(req: Request): Promise<Response> {
       );
     }
 
-    const user = auth.user;
+    // `auth.userId`, never `auth.user.id`: authenticate() returns success with `user: null` at
+    // 'secret', 'anon' and 'api_key' level — only 'user' level populates it — and none of those
+    // is gated out here, because `requireUser` defaults to false and `allowedRoles` is applied
+    // only to user tokens. So `user.id` threw a TypeError on every service-role and partner-key
+    // call, 500ing the request. `userId` IS set for 'api_key', so a partner key keeps its real
+    // author, and these columns are nullable, so a backend write records "no human" honestly.
     const userId = auth.userId;
 
     // Workspace scoping: the handler runs under the service role (RLS bypassed), so we
@@ -360,7 +365,7 @@ export async function handleCompanies(req: Request): Promise<Response> {
         .insert({
           ...companyFields,
           workspace_id: targetWs,
-          created_by: user.id,
+          created_by: auth.userId,
         })
         .select();
 
@@ -376,7 +381,7 @@ export async function handleCompanies(req: Request): Promise<Response> {
       if (created) {
         try {
           await emitFlowEvent('crm_company_created', {
-            type: 'crm_company_created', workspace_id: targetWs, user_id: user.id,
+            type: 'crm_company_created', workspace_id: targetWs, user_id: auth.userId,
             company_id: created.id, company_name: created.name, email: created.email ?? null,
             title: `New company: ${created.name}`,
             body: `${created.name} was added to your CRM.`,
@@ -634,7 +639,7 @@ export async function handleCompanies(req: Request): Promise<Response> {
               title: 'Business deleted',
               description: companyName,
               metadata: { company_id: companyId },
-              actor_user_id: user.id,
+              actor_user_id: auth.userId,
               workspace_id: workspaceId,
             })),
           );
@@ -836,7 +841,7 @@ export async function handleCompanies(req: Request): Promise<Response> {
     );
   } catch (error) {
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error instanceof Error ? error.message : String(error) }),
       { status: 500, headers: corsHeaders },
     );
   }

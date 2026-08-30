@@ -1,30 +1,24 @@
 {
   "_comment": "Per-file deno-check error counts. The gate fails when a count rises or a new file appears. Lower these as you fix things; regenerate with: node scripts/check-edge-functions.mjs --write-baseline",
   "entrypoints": 187,
-  "total": 42,
+  "total": 28,
   "uncheckable": {},
   "files": {
-    "crm-api/handlers/companies-api-handler.ts": 4,
     "finance-issue-invoice/index.ts": 4,
     "xml-import-orchestrator/index.ts": 4,
-    "stripe-api/handlers/checkout.ts": 3,
     "background-agent-runner/index.ts": 2,
-    "crm-api/handlers/stripe-api-handler.ts": 2,
     "finance-invoice-pdf/index.ts": 2,
-    "generate-vr-world/index.ts": 2,
     "hr-checkin-cron/index.ts": 2,
     "mivaa-gateway/index.ts": 2,
-    "recommendations-api/index.ts": 2,
+    "stripe-api/handlers/checkout.ts": 2,
     "stripe-api/handlers/customer-portal.ts": 2,
-    "stripe-api/handlers/modules.ts": 2,
     "_shared/fonts/open-sans.ts": 1,
     "_shared/react-email-renderer.ts": 1,
     "_shared/shipping/searates.ts": 1,
-    "check-material-alerts/index.ts": 1,
-    "crm-api/handlers/address-units-api-handler.ts": 1,
     "finance-send-statement/index.ts": 1,
     "flow-engine/index.ts": 1,
     "generate-social-image/index.ts": 1,
-    "notification-dispatcher/index.ts": 1
+    "notification-dispatcher/index.ts": 1,
+    "stripe-api/handlers/modules.ts": 1
   }
 }

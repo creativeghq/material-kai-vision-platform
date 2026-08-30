@@ -374,16 +374,19 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
           .eq('id', vrWorldId)
           .single();
 
-        if (vrRecord?.credits_charged > 0) {
+        // Read the amount ONCE. `vrRecord.credits_charged` re-read inside the branch is the
+        // same value with a nullable type, so it neither narrows nor reads any better.
+        const chargedCredits = vrRecord?.credits_charged ?? 0;
+        if (chargedCredits > 0) {
           await supabase.rpc('refund_credits', {
             p_user_id: userId,
-            p_amount: vrRecord.credits_charged,
+            p_amount: chargedCredits,
             p_operation_type: 'vr_generation_refund',
             p_description: `VR World generation refund (failed)`,
             p_metadata: { vr_world_id: vrWorldId },
             p_workspace_id: wsId,
           });
-          console.log(`[generate-vr-world] Refunded ${vrRecord.credits_charged} credits to user ${userId}`);
+          console.log(`[generate-vr-world] Refunded ${chargedCredits} credits to user ${userId}`);
         }
       } catch (refundError) {
         console.error('[generate-vr-world] Refund failed:', refundError);

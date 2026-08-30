@@ -83,7 +83,12 @@ export async function handleAddressUnits(req: Request): Promise<Response> {
         { status: auth.error?.includes('Required roles') ? 403 : 401, headers: corsHeaders },
       );
     }
-    const user = auth.user;
+    // `auth.userId`, never `auth.user.id`: authenticate() returns success with `user: null` at
+    // 'secret', 'anon' and 'api_key' level — only 'user' level populates it — and none of those
+    // is gated out here, because `requireUser` defaults to false and `allowedRoles` is applied
+    // only to user tokens. So `user.id` threw a TypeError on every service-role and partner-key
+    // call, 500ing the request. `userId` IS set for 'api_key', so a partner key keeps its real
+    // author, and these columns are nullable, so a backend write records "no human" honestly.
     const scope = await getCrmScope(supabase, auth);
 
     const url = new URL(req.url);
@@ -134,7 +139,7 @@ export async function handleAddressUnits(req: Request): Promise<Response> {
           company_id: companyId ?? null,
           contact_id: contactId ?? null,
           workspace_id: ws,
-          created_by: user.id,
+          created_by: auth.userId,
         })
         .select();
       if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: corsHeaders });

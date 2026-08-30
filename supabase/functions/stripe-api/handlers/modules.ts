@@ -59,7 +59,14 @@ async function isOperator(service: DbClient, userId: string | null): Promise<boo
     .eq('user_id', userId)
     .eq('status', 'active')
     .in('role', ['owner', 'admin']);
-  return !!(data || []).some((r: { workspaces?: { is_root?: boolean } }) => r.workspaces?.is_root);
+  // `workspaces` is embedded through a MANY-TO-ONE fk (workspace_members.workspace_id), so
+  // PostgREST returns it as an OBJECT. The generated types declare an array for every embed
+  // regardless, which is why this needs the cast — do NOT "fix" the mismatch by indexing
+  // `workspaces[0]`: that reads `undefined` at runtime, `isOperator` then returns false for
+  // everyone, and every platform operator silently loses module administration.
+  return !!(data || []).some(
+    (r) => (r as unknown as { workspaces?: { is_root?: boolean } }).workspaces?.is_root,
+  );
 }
 
 export async function handleModuleAction(req: Request, body: Record<string, unknown>): Promise<Response> {

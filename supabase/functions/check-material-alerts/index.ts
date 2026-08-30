@@ -101,12 +101,16 @@ Deno.serve(withApiLogging('check-material-alerts', async (req: Request) => {
         product_id:     p.id,
       }));
 
+      // `onConflict`/`ignore` are OPTIONS TO `upsert`, not methods on the insert builder. Chained
+      // off `.insert()` they are `undefined`, so this threw `onConflict is not a function` the
+      // first time a saved search matched a product — and the throw escapes to the outer catch,
+      // so one user's search aborted the run for everyone before any `last_recommendation_sent_at`
+      // was written. `ignoreDuplicates` keeps the DO NOTHING, and `.select()` then returns only
+      // the rows actually written, which is what step 4 means by "truly new".
       const { data: insertedAlerts, error: alertErr } = await admin
         .from('material_alerts')
-        .insert(alertRows)
-        .select('id, product_id')
-        .onConflict('saved_search_id, product_id')
-        .ignore();
+        .upsert(alertRows, { onConflict: 'saved_search_id,product_id', ignoreDuplicates: true })
+        .select('id, product_id');
 
       if (alertErr) {
         console.error(`material_alerts insert failed for ${ss.id}:`, alertErr.message);
