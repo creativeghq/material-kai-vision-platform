@@ -42,7 +42,15 @@ interface PostRow {
   published_at: string | null;
   zernio_post_id: string | null;
   social_account_id: string | null;
-  metadata: { platform_post_url?: string | null } | null;
+  /**
+   * `platforms` is the PER-LEG outcome, keyed by platform name (#384 A). The aggregate `status`
+   * says the post published; a leg can still have failed underneath it, and until this was
+   * rendered a post that reached 3 of 4 networks was pixel-identical to one that reached all 4.
+   */
+  metadata: {
+    platform_post_url?: string | null;
+    platforms?: Record<string, { status?: string; error?: string; url?: string; at?: string }> | null;
+  } | null;
 }
 
 /**
@@ -194,6 +202,20 @@ const formatMetric = (key: string, m: { total: number; unit?: string; currency?:
 
 const statusVariant = (s: string) =>
   s === 'published' ? 'success' : s === 'failed' ? 'error' : s === 'scheduled' ? 'info' : 'neutral';
+
+/**
+ * The networks this post did NOT reach.
+ *
+ * Read from the per-leg record rather than from `status`: `post.partial` sets the aggregate to
+ * `published` and says only that SOMETHING failed, so the badge alone cannot distinguish a post
+ * that went everywhere from one that went almost everywhere. An empty list here means every leg
+ * we were told about succeeded — not that none was checked, because a post with no leg records at
+ * all renders nothing extra and keeps reading exactly as it did.
+ */
+const failedLegs = (post: { metadata?: { platforms?: Record<string, { status?: string; error?: string }> | null } | null }) =>
+  Object.entries(post.metadata?.platforms ?? {})
+    .filter(([, leg]) => leg?.status === 'failed')
+    .map(([platform, leg]) => ({ platform, error: leg?.error }));
 
 /** `—` for an absent value, never 0: "not synced yet" and "nobody saw it" are different facts. */
 const num = (v: number | null | undefined) => (v == null ? '—' : formatNumber(v));
@@ -959,6 +981,18 @@ export const SocialAnalyticsPanel: React.FC = () => {
                         </TableCell>
                         <TableCell>
                           <Badge variant={statusVariant(post.status)} className="capitalize">{post.status}</Badge>
+                          {/* A failed leg under a published post. Named, because "something
+                              failed" is not something anyone can act on (#384 A). */}
+                          {failedLegs(post).map((leg) => (
+                            <Badge
+                              key={leg.platform}
+                              variant="error"
+                              className="ml-1"
+                              title={leg.error ?? undefined}
+                            >
+                              {platformLabel(leg.platform)} failed
+                            </Badge>
+                          ))}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {post.published_at

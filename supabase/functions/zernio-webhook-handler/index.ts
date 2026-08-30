@@ -95,6 +95,70 @@ function firstPlatformError(post: any): string | undefined {
   return withError?.error;
 }
 
+/**
+ * Record one platform's outcome on a post, without touching the post's aggregate status (#384 A).
+ *
+ * `post.partial` says SOMETHING failed and `firstPlatformError` returns whichever error happens to
+ * come first — so a post that reached 3 of 4 networks looked fully published, and the one network
+ * that failed was never named. Zernio pushes `post.platform.published` / `post.platform.failed`
+ * per leg, carrying the platform and its own error and URL; we subscribed to both, had no branch,
+ * answered 200 and binned them.
+ *
+ * THE LEG AND THE POST ARE DIFFERENT FACTS, so they are written by different events. The aggregate
+ * status stays owned by `post.published` / `post.partial` / `post.failed`; this only ever writes
+ * under `metadata.platforms[<platform>]`. A per-leg event arriving before or after its aggregate
+ * therefore cannot flip the post's status, in either direction — which matters because the two
+ * arrive in no guaranteed order.
+ *
+ * Keyed by platform name rather than appended to a list: the same leg can report twice (a retry,
+ * a redelivery), and a list would show one network as two outcomes with no way to tell which is
+ * current.
+ */
+async function recordPlatformLeg(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  zernioPostId: string,
+  platform: string,
+  leg: { status: 'published' | 'failed'; error?: string | null; url?: string | null },
+): Promise<{ id: string; workspace_id: string; user_id: string; caption: string | null } | null> {
+  const { data: row } = await supabase
+    .from('social_posts')
+    .select('id, workspace_id, user_id, caption, metadata')
+    .eq('zernio_post_id', zernioPostId)
+    .maybeSingle();
+  if (!row) return null;
+
+  const meta = (row.metadata && typeof row.metadata === 'object' ? row.metadata : {}) as Record<string, unknown>;
+  const platforms = (meta.platforms && typeof meta.platforms === 'object' ? meta.platforms : {}) as Record<string, unknown>;
+
+  const { error } = await supabase
+    .from('social_posts')
+    .update({
+      metadata: {
+        ...meta,
+        platforms: {
+          ...platforms,
+          [platform]: {
+            status: leg.status,
+            ...(leg.error ? { error: leg.error } : {}),
+            ...(leg.url ? { url: leg.url } : {}),
+            at: new Date().toISOString(),
+          },
+        },
+      },
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', row.id);
+
+  // Reported, not swallowed: a leg we could not record is a post whose per-platform picture is
+  // now wrong, and silently dropping it is the shape this whole change exists to remove.
+  if (error) {
+    console.error('[zernio-webhook] platform leg not recorded:', platform, error.message);
+    return null;
+  }
+  return row as { id: string; workspace_id: string; user_id: string; caption: string | null };
+}
+
 const accountIdOf = (account: any): string | undefined => account?.accountId || account?.id || account?._id;
 
 /**
@@ -1608,6 +1672,50 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
     }
 
     const zernioPostId: string | undefined = post?.id;
+
+    // ── post.platform.published / post.platform.failed ──────────────
+    // Per-leg terminal outcomes (#384 A). Subscribed since the webhook was registered, dropped
+    // until now: `WebhookPayloadPostPlatform` carries a `platform` block naming the target and an
+    // `account` block naming the connected account, so the failing network is right there in the
+    // payload the dispatcher was throwing away.
+    if (event === 'post.platform.published' || event === 'post.platform.failed') {
+      const legPlatform: string | undefined =
+        (payload as any)?.platform?.platform ?? (payload as any)?.platform?.name ?? account?.platform;
+      if (!zernioPostId || !legPlatform) {
+        // Named rather than silently 200'd: without the platform there is nothing to key the leg
+        // on, and writing it under "unknown" would be worse than not writing it.
+        return jsonResponse({ received: true, event, note: 'no post id or platform on the payload' });
+      }
+      const failed = event === 'post.platform.failed';
+      const legError = failed
+        ? ((payload as any)?.platform?.error ?? firstPlatformError(post) ?? 'Publish failed on this platform')
+        : null;
+      const legUrl = !failed
+        ? ((payload as any)?.platform?.platformPostUrl ?? (payload as any)?.platform?.url ?? null)
+        : null;
+
+      const sp = await recordPlatformLeg(supabase, zernioPostId, legPlatform, {
+        status: failed ? 'failed' : 'published',
+        error: legError,
+        url: legUrl,
+      });
+
+      // Only a FAILED leg raises. A successful one is already covered by the aggregate
+      // `post.published` notification, and a second bell per network would make a four-platform
+      // post ring five times.
+      if (failed && sp) {
+        try {
+          await emitFlowEvent('social_post_failed', {
+            type: 'social_post_failed', workspace_id: sp.workspace_id, user_id: sp.user_id,
+            social_post_id: sp.id, platform: legPlatform, reason: legError,
+            title: `Post failed on ${platformLabel(legPlatform)}`,
+            body: `${sp.caption ? `"${String(sp.caption).slice(0, 80)}"` : 'Your post'} did not publish on ${platformLabel(legPlatform)}: ${legError}`,
+            action_url: '/social-media/accounts',
+          });
+        } catch { /* best-effort */ }
+      }
+      return jsonResponse({ received: true, event, platform: legPlatform, recorded: !!sp });
+    }
 
     // ── post.published ──────────────────────────────────────────────
     if (event === 'post.published' || event === 'post.partial') {
