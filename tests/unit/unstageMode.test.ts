@@ -110,6 +110,72 @@ describe('unstage — the image-edit gate applies', () => {
   });
 });
 
+describe('unstage — reachable from the image modal, on BOTH grids', () => {
+  const HUB = 'src/components/features/ai/AgentHub.tsx';
+  const GRID = 'src/components/features/ai/ProgressiveImageGrid.tsx';
+
+  it('the modal emits the |UNSTAGE| sentinel next to Virtual Staging', () => {
+    const src = read(GRID);
+    expect(src).toContain("'|UNSTAGE|'");
+    // The button is only useful beside the action it precedes.
+    expect(src).toContain('Virtual Staging');
+  });
+
+  it('|UNSTAGE| is a registered direct-edit action mapped to the unstage mode', () => {
+    const src = read(HUB);
+    const table = src.match(/const DIRECT_EDIT_ACTIONS\s*=\s*\[([\s\S]*?)\]\s*as const/);
+    expect(table, 'DIRECT_EDIT_ACTIONS not found').toBeTruthy();
+    expect(table![1]).toMatch(/sentinel:\s*'\|UNSTAGE\|',\s*mode:\s*'unstage'/);
+  });
+
+  it('BOTH onEditImage handlers decode through the shared helper, not an inline copy', () => {
+    // There are two identical handlers — the in-message grid and the single-image modal.
+    // The sentinel branch was already copy-pasted into both once; a surviving inline
+    // `indexOf('|LIGHTING|')` means one surface silently ignores every action added since,
+    // falling through to "open the edit modal" with no error.
+    const src = read(HUB);
+    const handlers = src.match(/onEditImage=\{\(imageUrl\)\s*=>\s*\{/g) ?? [];
+    expect(handlers.length, 'expected exactly two onEditImage handlers').toBe(2);
+    expect(src, 'an inline sentinel decode survives').not.toMatch(/indexOf\('\|LIGHTING\|'\)/);
+    const decodeCalls = src.match(/decodeDirectEditAction\(imageUrl\)/g) ?? [];
+    expect(decodeCalls.length, 'not every handler calls the shared decoder').toBe(handlers.length);
+  });
+});
+
+describe('unstage — the staging skill routes a FURNISHED room through it', () => {
+  // This skill is the tool-ORDER authority for the interior agent. Before unstage existed it
+  // sent every "stage this" straight to virtual_staging, and rule 5 forbade calling
+  // generate_gemini and virtual_staging in the same turn — which is exactly the chain.
+  const md = readFileSync(join(root, 'supabase/functions/_shared/skills/interior-staging-workflow/SKILL.md'), 'utf8');
+  const ts = readFileSync(join(root, 'supabase/functions/_shared/skills/interior-staging-workflow/skill.ts'), 'utf8');
+
+  it('names the unstage mode in its decision tree', () => {
+    expect(md).toContain('mode=`unstage`');
+  });
+
+  it('tells the agent to unstage BEFORE staging a furnished photo', () => {
+    expect(md).toMatch(/unstage[\s\S]{0,120}then[\s\S]{0,40}virtual_staging/i);
+  });
+
+  it('carves the chain out of the never-call-both rule', () => {
+    // Rule 5 stays — it is right for two takes on one brief. It just must not read as a ban
+    // on the two-halves-of-one-job case, or the agent follows it and stages a furnished room.
+    const rule = md.slice(md.indexOf('Never call both'));
+    expect(rule).toMatch(/exception/i);
+  });
+
+  it('the shipped .ts twin is in sync with the reviewed .md', () => {
+    // `npm run skills:sync` generates the .ts; the .md is what gets read in review. A drifted
+    // pair means the prompt that ships is not the one anybody approved. The generator escapes
+    // every backtick, so undo that rather than pinning the escaping — which is also the thing
+    // String.raw gets wrong, leaking a literal backslash into the prompt.
+    const unescaped = ts.replace(/\\`/g, '`');
+    for (const marker of ['mode=`unstage`', 'exception']) {
+      expect(unescaped, `skill.ts missing '${marker}' — run npm run skills:sync`).toContain(marker);
+    }
+  });
+});
+
 describe('unstage — the prompt comes from the database', () => {
   const src = read(EDGE);
   const branch = src.match(/else if \(mode === 'unstage'\)\s*\{[\s\S]*?\n {4}\}/);

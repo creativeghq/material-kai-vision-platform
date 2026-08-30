@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { getOptimizedImageUrl } from '@/utils/imageUrl';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, ZoomIn, Globe, Scan, Package, AlertCircle, RotateCcw, ExternalLink, X, Search, Paintbrush, Download, ShoppingCart, Video, BookmarkPlus, Layers, LayoutTemplate, Camera, ChevronDown, Check, Sparkles, Pencil, Sun } from 'lucide-react';
+import { Loader2, ZoomIn, Globe, Scan, Package, AlertCircle, RotateCcw, ExternalLink, X, Search, Paintbrush, Download, ShoppingCart, Video, BookmarkPlus, Layers, LayoutTemplate, Camera, ChevronDown, Check, Sparkles, Pencil, Sun, Eraser } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
@@ -1248,6 +1248,23 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                       >
                         {virtualStagingGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                         {virtualStagingGenerating ? 'Staging…' : 'Virtual Staging'}
+                      </button>
+                    )}
+                    {/* Empty Room — the step BEFORE Virtual Staging, which needs a bare room.
+                        Sits next to it because this is where someone looks at a furnished
+                        photo and reaches for the stager; without the button here the only
+                        offer on that screen is the one that fights the furniture. */}
+                    {onEditImage && selectedImage && (
+                      <button
+                        onClick={() => {
+                          const prompt = 'Remove every movable item from this room photo — furniture, rugs, art, lamps, plants, and personal clutter — and leave the architecture, camera angle and lighting exactly as they are.';
+                          onEditImage(selectedImage.url + '|UNSTAGE|' + prompt);
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-medium text-slate-700 transition-colors shadow-sm"
+                        title="Remove all furniture and decor, keeping the room's architecture — do this before staging a furnished photo (15 credits)"
+                      >
+                        <Eraser className="w-3.5 h-3.5" />
+                        Empty Room
                       </button>
                     )}
                     {/* Lighting Variants — generates same room under different lighting */}

@@ -821,6 +821,38 @@ interface AgentHubProps {
 
 
 
+/**
+ * The image modal (ProgressiveImageGrid) cannot reach the generation pipeline itself, so a
+ * one-click action there is handed back through `onEditImage` as a sentinel-encoded URL and
+ * auto-submitted here instead of opening the edit builder.
+ *
+ * Decoded in ONE place on purpose. There are TWO identical `onEditImage` handlers — the
+ * in-message grid and the single-image modal — and the sentinel branch was already copied
+ * into both. A third action added the same way is a coin flip on whether it works from the
+ * surface the user happens to be on, with no error either way: the un-updated site falls
+ * through to "open the edit modal", which looks like a deliberate design.
+ */
+const DIRECT_EDIT_ACTIONS = [
+  { sentinel: '|LIGHTING|', mode: 'image-edit' },
+  { sentinel: '|UNSTAGE|', mode: 'unstage' },
+] as const;
+
+function decodeDirectEditAction(
+  encoded: string,
+): { imageUrl: string; prompt: string; mode: string } | null {
+  for (const { sentinel, mode } of DIRECT_EDIT_ACTIONS) {
+    const idx = encoded.indexOf(sentinel);
+    if (idx !== -1) {
+      return {
+        imageUrl: encoded.slice(0, idx),
+        prompt: encoded.slice(idx + sentinel.length),
+        mode,
+      };
+    }
+  }
+  return null;
+}
+
 // Normalize Claude content — can be string, {type,text} object, or [{type,text}] array
 const normalizeContent = (content: unknown): string => {
   if (typeof content === 'string') return content;
@@ -4322,13 +4354,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       onGenerateMaterialsBoard={(imageUrl, boardMode) => handleGenerateMaterialsBoard(imageUrl, boardMode, message)}
       onGenerateVirtualStaging={(imageUrl, params) => handleGenerateVirtualStaging(imageUrl, params)}
       onEditImage={(imageUrl) => {
-        if (imageUrl.includes('|LIGHTING|')) {
-          const idx = imageUrl.indexOf('|LIGHTING|');
-          const imgUrl = imageUrl.slice(0, idx);
-          const prompt = imageUrl.slice(idx + '|LIGHTING|'.length);
-          setAttachedImages([imgUrl]);
-          setSelectedGenerationMode('image-edit');
-          setInput(prompt);
+        // One-click modal actions (lighting variant, empty the room) auto-submit; anything
+        // else opens the edit builder.
+        const direct = decodeDirectEditAction(imageUrl);
+        if (direct) {
+          setAttachedImages([direct.imageUrl]);
+          setSelectedGenerationMode(direct.mode);
+          setInput(direct.prompt);
           setTimeout(() => { handleSendMessageRef.current(); }, 100);
           return;
         }
@@ -6950,14 +6982,12 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           }}
           onGenerateVirtualStaging={(imageUrl, params) => handleGenerateVirtualStaging(imageUrl, params)}
           onEditImage={(imageUrl) => {
-            // Auto-submit lighting edits directly (skip modal)
-            if (imageUrl.includes('|LIGHTING|')) {
-              const idx = imageUrl.indexOf('|LIGHTING|');
-              const imgUrl = imageUrl.slice(0, idx);
-              const prompt = imageUrl.slice(idx + '|LIGHTING|'.length);
-              setAttachedImages([imgUrl]);
-              setSelectedGenerationMode('image-edit');
-              setInput(prompt);
+            // Auto-submit one-click modal actions (lighting variant, empty the room)
+            const direct = decodeDirectEditAction(imageUrl);
+            if (direct) {
+              setAttachedImages([direct.imageUrl]);
+              setSelectedGenerationMode(direct.mode);
+              setInput(direct.prompt);
               setTimeout(() => { handleSendMessageRef.current(); }, 100);
               return;
             }

@@ -1,7 +1,7 @@
 ---
 name: Interior Staging Workflow
 slug: interior-staging-workflow
-description: Stage or redesign a photographed room using the platform's Gemini + virtual-staging tools in the correct order. Use when the user uploads a room photo and asks to "stage", "redesign", "change the furniture/materials/lighting", or "show me this room with X". Ensures before/after comparability.
+description: Stage, empty or redesign a photographed room using the platform's Gemini + virtual-staging tools in the correct order. Use when the user uploads a room photo and asks to "stage", "redesign", "empty the room", "remove the furniture", "show it unfurnished", "change the furniture/materials/lighting", or "show me this room with X". Ensures a furnished photo is emptied before it is staged, and preserves before/after comparability.
 agents: [kai, interior-designer]
 tags: [design, staging, gemini, virtual-staging]
 ---
@@ -16,7 +16,9 @@ The platform has two image-generation tools — `generate_gemini` (precise edits
 |---|---|---|
 | "Remove the sofa and add a mid-century armchair" | `generate_gemini` mode=`image-edit` | Precise object-level edit; preserves room geometry |
 | "Render my floor plan as a photo-real room" | `generate_gemini` mode=`floor-plan-render` | Only Gemini preserves plan topology |
-| "Stage this empty room with modern furniture" | `virtual_staging` | Produces before/after with the `VirtualStagingViewer` slider |
+| "Empty this room" / "remove the furniture" / "show it unfurnished" | `generate_gemini` mode=`unstage` | Removes every movable item and rebuilds the floor and wall behind it; architecture, camera and lighting unchanged |
+| "Stage this **empty** room with modern furniture" | `virtual_staging` | Produces before/after with the `VirtualStagingViewer` slider |
+| "Stage this **furnished** room" / "restage my living room" | `generate_gemini` mode=`unstage`, **then** `virtual_staging` on the result | The stager furnishes bare space and fights anything already in the photo — see step 5 |
 | "Show me this room with wooden floors instead of tile" | `generate_gemini` mode=`image-edit` with a pinned material reference | Material swap needs the catalog image as anchor |
 | "Generate 4 variants of this living room" | `generate_3d` (Replicate grid) | Grid output, not 1:1 edit |
 
@@ -32,7 +34,11 @@ Never call `generate_3d` when the user wants to **modify** an uploaded photo —
 
 4. **For full staging**, use `virtual_staging` — this automatically preserves the source URL in `virtualStagingData.source_image_url` so the frontend's `VirtualStagingViewer` can render the before/after slider.
 
+   **First check whether the source room is empty.** `virtual_staging` furnishes bare space; given a furnished photo it fights what is already there and returns a cluttered, doubled room. If the photo has furniture in it, run `generate_gemini` mode=`unstage` first and stage the image that comes back. Say what you are doing — this is two generations and the user is paying for both.
+
 5. **Never call both `generate_gemini` and `virtual_staging` in the same turn** unless the user explicitly asks for two separate outputs — it doubles credits and produces confusingly similar results.
+
+   The **one** exception is the unstage → stage chain in step 4, which is not two takes on the same brief but two halves of one job: the second tool's input is the first tool's output, and neither result is a substitute for the other. Announce the two-step before running it so the credit cost is not a surprise.
 
 6. **After generation, offer the follow-up actions the user is most likely to want:**
    - If virtual staging was used: offer "Analyze Quality" (the Claude Vision assessment button)
