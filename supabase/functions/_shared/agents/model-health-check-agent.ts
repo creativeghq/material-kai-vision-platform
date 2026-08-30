@@ -172,19 +172,17 @@ export class ModelHealthCheckAgent implements AgentRunner {
       // Record it rather than returning quietly — "the token is missing" and "the account is empty"
       // produce identical user-visible symptoms and must be told apart on the Operations page.
       //
-      // The STATUS below is still 'auth_failed', which is a third thing again and is wrong: it
-      // says the provider rejected us when in fact it was never called. That mislabel cost a real
-      // investigation on 2026-08-30 — 18 rows read as a rejected key while the account was funded
-      // and the token worked. The honest value is 'not_configured', which is not yet in
-      // generation_models_last_probe_status_check nor in the mirrored probe vocabulary; adding it
-      // is a migration + probeVocabulary.ts + vocab:mirror + the admin status map. Until then the
-      // ERROR TEXT carries the distinction, so read that and not the status.
+      // `not_configured`, NOT `auth_failed`. The provider was never called, so saying it rejected
+      // us is the opposite of what happened — a mislabel that cost a real investigation on
+      // 2026-08-30, when 18 rows read as a rejected key while the account was funded and the
+      // token worked. Deploying a secret and rotating one are different jobs for different
+      // people. The status is not authoritative, so this cannot retire a working roster.
       await log('error', REPLICATE_NOT_CONFIGURED);
       await supabase
         .from('generation_models')
         .update({
           last_probe_at: new Date().toISOString(),
-          last_probe_status: 'auth_failed',
+          last_probe_status: 'not_configured',
           last_probe_error: REPLICATE_NOT_CONFIGURED,
         })
         .eq('provider', 'replicate')

@@ -38,7 +38,7 @@ const DB = {
   capability:
     "CHECK ((capability = ANY (ARRAY['legal_invoice'::text, 'pre_invoice_notice'::text, 'pdf_render'::text, 'tax_submission'::text, 'numbering'::text, 'payment_reconciliation'::text])))",
   probe:
-    "CHECK (((last_probe_status IS NULL) OR (last_probe_status = ANY (ARRAY['ok'::text, 'credit_exhausted'::text, 'not_found'::text, 'schema_rejected'::text, 'auth_failed'::text, 'error'::text, 'timeout'::text]))))",
+    "CHECK (((last_probe_status IS NULL) OR (last_probe_status = ANY (ARRAY['ok'::text, 'credit_exhausted'::text, 'not_found'::text, 'schema_rejected'::text, 'auth_failed'::text, 'error'::text, 'timeout'::text, 'not_configured'::text]))))",
   inquiry:
     "CHECK ((status = ANY (ARRAY['new'::text, 'contacted'::text, 'qualified'::text, 'viewing_booked'::text, 'closed'::text, 'spam'::text])))",
   party:
@@ -132,6 +132,18 @@ describe('#391 — derived subsets stay derived', () => {
     expect(AUTHORITATIVE_PROBE_STATUSES).not.toContain('error');
     expect(AUTHORITATIVE_PROBE_STATUSES).not.toContain('timeout');
     expect(AUTHORITATIVE_PROBE_STATUSES).not.toContain('schema_rejected');
+    // `not_configured` means the provider was NEVER CALLED — this deployment has no token for
+    // it. Letting that flip availability would retire a working roster over a missing env var,
+    // and it is the reason the status exists: it was written as `auth_failed`, which claims the
+    // opposite (that we asked and were refused) and cost a real investigation on 2026-08-30.
+    expect(AUTHORITATIVE_PROBE_STATUSES).not.toContain('not_configured');
+  });
+
+  it('a missing token and a rejected token are different statuses', () => {
+    // The whole point of the addition. If these ever collapse back into one value, the panel
+    // sends someone to rotate a key that is fine, or to top up an account that was never asked.
+    expect(PROBE_STATUSES as readonly string[]).toContain('not_configured');
+    expect(PROBE_STATUSES as readonly string[]).toContain('auth_failed');
   });
 });
 

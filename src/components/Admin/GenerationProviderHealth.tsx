@@ -14,6 +14,7 @@
  *   credit_exhausted (402)  the ACCOUNT is empty  → add funds; the models are fine
  *   auth_failed (401/403)   the TOKEN is wrong    → funding changes nothing
  *   not_found (404)         the model is DELETED  → no amount of money brings it back
+ *   not_configured          we NEVER CALLED them  → the secret is not deployed here
  *
  * Those three are indistinguishable from the user's side — every one is just "generation failed" —
  * and they have three different remedies. Collapsing them is how a four-model deletion and a
@@ -72,9 +73,22 @@ function summarise(provider: string, rows: ModelRow[]): ProviderSummary {
   const auth   = byStatus.auth_failed ?? 0;
   const gone   = byStatus.not_found ?? 0;
   const never  = byStatus.never ?? 0;
+  const unset  = byStatus.not_configured ?? 0;
 
   let verdict: ProviderSummary['verdict'];
-  if (credit > 0) {
+  // FIRST, ahead of every other verdict: if the token is not deployed we never reached the
+  // provider, so every other status on it is stale — the last thing we learned before the secret
+  // went missing, not the state now. Reporting "out of credit" off that would send someone to top
+  // up an account that is fine.
+  if (unset > 0) {
+    verdict = {
+      tone: 'critical',
+      headline: `No API token deployed — ${unset} of ${rows.length} models were never asked`,
+      action: 'This is our deployment, not the provider. Set the token in Profile → Keys or the '
+        + 'edge environment; the account may be perfectly healthy. Every other status shown for '
+        + 'this provider predates the token going missing.',
+    };
+  } else if (credit > 0) {
     verdict = {
       tone: 'critical',
       headline: `Out of credit — ${credit} of ${rows.length} models refused`,
@@ -118,6 +132,7 @@ const PROBE_LABEL: Record<ProbeStatus | 'never', string> = {
   not_found: 'deleted upstream',
   schema_rejected: 'input rejected',
   auth_failed: 'credentials rejected',
+  not_configured: 'no token deployed',
   error: 'error',
   timeout: 'timed out',
   never: 'never probed',
