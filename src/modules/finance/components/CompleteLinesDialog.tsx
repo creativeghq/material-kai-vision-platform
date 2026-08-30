@@ -23,6 +23,7 @@ import React, { useMemo, useState } from 'react';
 import { Loader2, Plus, Trash2, Wand2 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
+import { MoneyInput } from '@/components/core/ui/money-input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
@@ -198,9 +199,12 @@ export const CompleteLinesDialog: React.FC<{
                       />
                     </td>
                     <td className="px-3 py-1.5">
-                      <Input
-                        value={r.quantity ?? ''} inputMode="decimal"
-                        onChange={(e) => setRow(i, { quantity: e.target.value === '' ? null : parseDecimalOr(e.target.value, 0) })}
+                      {/* Number-backed, so it MUST be a MoneyInput: a plain controlled `<Input>`
+                          re-renders the parse of what is typed so far, which deletes the decimal
+                          separator the moment it is pressed — "9" "." "6" lands as 96. */}
+                      <MoneyInput
+                        value={r.quantity} onValueChange={(v) => setRow(i, { quantity: v })}
+                        displayDecimals={null}
                         className="h-8 text-xs text-right tabular-nums"
                       />
                     </td>
@@ -213,9 +217,8 @@ export const CompleteLinesDialog: React.FC<{
                       </Select>
                     </td>
                     <td className="px-3 py-1.5">
-                      <Input
-                        value={r.net_value ?? ''} inputMode="decimal"
-                        onChange={(e) => setRow(i, { net_value: e.target.value === '' ? null : parseDecimalOr(e.target.value, 0) })}
+                      <MoneyInput
+                        value={r.net_value} onValueChange={(v) => setRow(i, { net_value: v })}
                         className="h-8 text-xs text-right tabular-nums"
                       />
                     </td>
