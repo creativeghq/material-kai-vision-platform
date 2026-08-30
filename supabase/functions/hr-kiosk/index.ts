@@ -15,12 +15,9 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { fileWorkcardPunch } from '../_shared/ergani/workcard.ts';
 import { sha256hex } from '../_shared/hash.ts';
+import { getTrustedClientIp } from '../_shared/client-ip.ts';
 
 
-/** Trusted-ish client IP from the proxy hop. */
-function clientIp(req: Request): string {
-  return (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || '0.0.0.0';
-}
 const KIOSK_RATE_LIMIT_PER_MIN = 20; // lookups + clocks per IP per minute
 const PIN_MAX_FAILS = 8;             // wrong-PIN attempts per (workspace, VAT) before lockout
 const PIN_LOCKOUT_WINDOW_MS = 15 * 60_000;
@@ -100,8 +97,25 @@ Deno.serve(withApiLogging('hr-kiosk', async (req) => {
   }
   if (!kioskEnabled) return json({ error: 'kiosk_disabled', message: 'Clock-in kiosk is not enabled for this workspace.' }, 403);
 
-  // Rate limit: cap lookups + clocks per IP per minute (blunts VAT/PIN probing + punch spam).
-  const ip = clientIp(req);
+  /**
+   * Rate limit: cap lookups + clocks per IP per minute (blunts VAT/PIN probing + punch spam).
+   *
+   * The IP is the TRUSTED hop. This function carried its own `clientIp` returning the LEFTMOST
+   * `x-forwarded-for` entry — which the caller sends — under a comment calling it "trusted-ish
+   * from the proxy hop". Rotating that header minted a fresh bucket per request, so the throttle
+   * below counted to twenty against an attacker who never reached two. `hr-careers` next door had
+   * exactly this defect and was fixed in the same #354 sweep; the kiosk kept a local copy and was
+   * missed, which is the argument for the shared helper rather than a fifth implementation.
+   *
+   * What this does NOT change: the per-(workspace, VAT) PIN lockout is keyed on a subject hash,
+   * not on the IP, so PIN brute force was always capped at 8 per 15 minutes however many addresses
+   * the attacker claimed. What was uncapped is VAT enumeration and punch spam.
+   *
+   * And NO workspace-wide ceiling here, unlike `hr-careers`. A board takes a few applications an
+   * hour; a factory has every employee clocking in within the same five minutes at shift change,
+   * so a per-workspace cap would deny the primary use case at exactly the moment it is used.
+   */
+  const ip = getTrustedClientIp(req);
   const since = new Date(Date.now() - 60_000).toISOString();
   const { count, error: rateErr } = await supabase.from('hr_kiosk_attempts')
     .select('*', { count: 'exact', head: true }).eq('ip', ip).gte('created_at', since);

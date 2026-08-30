@@ -67,6 +67,10 @@ const EXEMPT: Record<string, string> = {
     + 'authorises the caller for it — the reference defines the tenant rather than crossing it.',
   'quotes-api/index.ts':
     'workspace_id on the new row is taken from the loaded quote, not from the body.',
+  'hr-api/expansion.ts':
+    "post-payroll-to-finance loads the run with .eq('id', id).eq('workspace_id', workspaceId) and "
+    + '404s when it misses, so by the time `id` is written onto planned_payments.payroll_run_id it '
+    + "is proven to be this workspace's run — the same shape already exempted for hr-api/index.ts.",
 };
 
 function walk(dir: string, out: string[] = []): string[] {

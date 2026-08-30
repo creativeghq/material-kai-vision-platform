@@ -282,3 +282,95 @@ describe('#354 HR-14 — the source tree holds source', () => {
     expect(existsSync(join(ROOT, 'docs/ergani-work-card-guide-2024.pdf'))).toBe(true);
   });
 });
+
+/**
+ * Posting a payroll run to Finance — 2026-08-30.
+ *
+ * `post-payroll-to-finance` inserts one planned payment per employee's net wages, plus one for
+ * income tax and one for EFKA, and only THEN stamps `hr_payroll_runs.posted_finance_ref`. Each
+ * insert is a separate call over the wire, so if any one fails — or the connection drops before the
+ * stamp — the payments exist and the stamp does not. The guard was
+ *
+ *     if (run.posted_finance_ref) return 409 'already posted'
+ *
+ * reading the very column that can be missing. The operator is holding an error for a posting that
+ * partly happened and the screen offers one thing: Post again. That schedules a second payment for
+ * every employee's salary, a second ΦΜΥ remittance and a second EFKA remittance.
+ *
+ * CLAUDE.md rule 4, the clause this file already asserts elsewhere: a duplicate guard reads the
+ * record written on the SUCCESS path, never a status column written after it. Here the success-path
+ * record is the payments — and nothing connected them to the run, the only link being the period
+ * interpolated into `title`. `planned_payments.payroll_run_id` is that link (the third of its kind
+ * next to `supplier_bill_id` and `invoice_id`), which is also what makes "Reverse the posting
+ * before re-opening it" — an error this same file raises one screen earlier — mean anything.
+ *
+ * Separately: the posting recorded `totals.net` from `run.total_net`, a CACHED column maintained by
+ * two other actions, while the three figures beside it were summed from the rows that actually
+ * produced the payments. It also counts lines this loop skips (`net <= 0`). So the audit record of
+ * a posting could disagree with the payments it describes. One derivation per money quantity.
+ */
+describe('posting payroll to Finance cannot pay everyone twice', () => {
+  /**
+   * The handler body, bounded by the next `case` rather than a fixed character count. A magic
+   * window is its own bug: the first version of this used 4000 chars and silently excluded the
+   * EFKA insert, so "every payment is linked" was asserted over two of the three.
+   */
+  const handler = (() => {
+    const i = expansion.indexOf("case 'post-payroll-to-finance'");
+    if (i < 0) return '';
+    const rest = expansion.slice(i + 10);
+    const nextCase = rest.search(/\n\s{4}case '/);
+    return nextCase < 0 ? expansion.slice(i) : expansion.slice(i, i + 10 + nextCase);
+  })();
+
+  it('is pointed at the real handler', () => {
+    expect(handler, 'the posting handler is gone').not.toBe('');
+    expect(handler, 'the net-wage payments are what this guards').toContain('planned_payments');
+    // The bound must actually contain the whole handler — all three inserts.
+    expect((handler.match(/planned_payments'\)/g) ?? []).length,
+      'the handler slice does not cover all four planned_payments references (1 check + 3 inserts)')
+      .toBeGreaterThanOrEqual(4);
+  });
+
+  it('asks the PAYMENTS whether this run was already posted, not the stamp written after them', () => {
+    expect(handler, 'the success-path check is gone — a retry after a partial posting doubles every salary')
+      .toMatch(/\.eq\('payroll_run_id', id\)/);
+    // And it must happen BEFORE the first insert. A check after the side effect is not a check.
+    const guardAt = handler.indexOf("payroll_run_id', id)");
+    const firstInsert = handler.search(/planned_payments'\)[\s\S]{0,40}\.insert\(/);
+    expect(firstInsert, 'no payment insert found — the slice is wrong').toBeGreaterThan(-1);
+    expect(guardAt, 'the duplicate check runs after the payments are already created')
+      .toBeLessThan(firstInsert);
+    // And the refusal must be conditioned on the count itself — a guard that is present but
+    // short-circuited reads identically to one that works.
+    expect(handler, 'the 409 is no longer conditioned on payments actually existing')
+      .toMatch(/if \(\(alreadyPosted \?\? 0\) > 0\)\s*\{/);
+    expect(handler, 'the partial-posting refusal is gone').toMatch(/partially_posted/);
+  });
+
+  it('fails CLOSED when it cannot tell', () => {
+    // An unanswerable count is not zero — that reading is what would schedule the salaries twice.
+    //
+    // Asserted as the CONDITION, not the presence of the identifier: `if (false) { throw ... }`
+    // keeps every token this used to look for while the branch can never fire, and that is the
+    // shape a disabled guard actually takes.
+    expect(handler, 'the refusal is no longer conditioned on the lookup having failed')
+      .toMatch(/if \(postedErr\)\s*\{/);
+    expect(handler, 'a failed check no longer refuses the posting').toMatch(/HttpError\(503/);
+  });
+
+  it('every payment it creates says which run created it', () => {
+    // Three inserts: net wages (per employee), income tax, EFKA. All three must be linked, or the
+    // guard above sees only part of a posting and lets the rest be repeated.
+    const stamped = handler.match(/payroll_run_id: id/g) ?? [];
+    expect(stamped.length, 'not every planned_payments insert carries payroll_run_id').toBe(3);
+  });
+
+  it('records the total it actually posted, not the cached run column', () => {
+    expect(handler, 'totals.net is back to reading the cached run.total_net — a second derivation of '
+      + 'a money quantity, which also counts the lines this loop skips')
+      .not.toMatch(/totals:\s*\{\s*net:\s*round2\(run\.total_net\)/);
+    expect(handler, 'the posted net is no longer accumulated from the rows that produced the payments')
+      .toMatch(/netPosted/);
+  });
+});

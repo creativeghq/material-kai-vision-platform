@@ -16,6 +16,7 @@ import type { DbClient } from '../_shared/supabase-client.ts';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
+import { getTrustedClientIp } from '../_shared/client-ip.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { sha256hex } from '../_shared/hash.ts';
 import { wrapUntrusted } from '../_shared/untrusted.ts';
@@ -3608,8 +3609,17 @@ const CONTACT_SENDER_WINDOW_MS = 10 * 60_000;
 /** How far back a repeat enquiry is folded into the conversation it continues. */
 const CONTACT_THREAD_REUSE_DAYS = 30;
 
+/**
+ * The trusted hop, for Turnstile's `remoteip`.
+ *
+ * This is not a quota key — the contact limits below are keyed on the recipient and the
+ * sender's address — so the blast radius is smaller than the same shape elsewhere. But
+ * `remoteip` is what Cloudflare scores the token against, and feeding it an address the
+ * caller chose degrades exactly the risk signal the challenge exists to provide.
+ */
 function clientIp(req: Request): string {
-  return (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || '0.0.0.0';
+  const ip = getTrustedClientIp(req);
+  return ip === 'unknown' ? '0.0.0.0' : ip;
 }
 
 async function verifyTurnstile(db: DbClient, token: string, ip: string): Promise<boolean> {

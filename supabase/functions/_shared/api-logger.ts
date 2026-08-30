@@ -67,6 +67,7 @@ import {
   classifyDbFailure, describeDeniedObject, summariseUpstreamFailure,
 } from './upstream-failure.ts';
 import { callerRoleFromAuthHeader } from './caller-role.ts';
+import { getTrustedClientIp } from './client-ip.ts';
 
 type Handler = (req: Request) => Promise<Response> | Response;
 
@@ -178,12 +179,25 @@ export function withApiLogging(
       functionName = typeof name === 'function' ? 'unknown' : name;
     }
 
-    // ip_address is NOT NULL on the table — fall back to a sentinel rather than
-    // letting the insert fail (which is exactly what used to happen).
-    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-      || req.headers.get('cf-connecting-ip')
-      || req.headers.get('x-real-ip')
-      || '0.0.0.0';
+    /**
+     * The TRUSTED hop, and the precedence used to be backwards.
+     *
+     * This tried the LEFTMOST `x-forwarded-for` entry first and only fell back to
+     * `cf-connecting-ip` — i.e. it preferred the one value the caller writes over the one
+     * Cloudflare overwrites and the client cannot forge. Every edge function is wrapped in this
+     * logger, so `api_usage_logs.ip_address` is caller-controlled platform-wide: the column an
+     * abuse investigation starts from reports whatever the abuser typed, and one client can wear
+     * a different address on every request.
+     *
+     * Not a quota, so not invariant 10 — but this is the widest-scope instance of the same
+     * mistake in the codebase, and the point of the shared helper is that the ordering lives in
+     * one place.
+     *
+     * ip_address is NOT NULL on the table, so keep the sentinel rather than letting the insert
+     * fail (which is exactly what used to happen).
+     */
+    const trustedIp = getTrustedClientIp(req);
+    const ip = trustedIp === 'unknown' ? '0.0.0.0' : trustedIp;
     const userAgent = req.headers.get('user-agent') || null;
     const method = req.method;
 

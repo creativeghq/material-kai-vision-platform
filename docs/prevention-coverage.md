@@ -1332,6 +1332,89 @@ building could be told which jobs happen there and could never say so.
   which guards REGRESSION rather than absence: deleting the reader or unmounting it restores the
   exact original state, and nothing else would notice.
 
+## Paying every salary twice, and an IP the caller chose — 2026-08-30
+
+HR has the same profile as Stock — every table empty, so every path is untested — but the logic is
+in the edge functions rather than `pg_proc` (only four HR functions exist in the database).
+
+### The payroll posting
+
+`post-payroll-to-finance` inserts one planned payment per employee's net wages, one for income tax
+and one for EFKA, then stamps `hr_payroll_runs.posted_finance_ref`. Each insert is a separate call
+over the wire, and the duplicate guard was:
+
+```
+if (run.posted_finance_ref) return 409 'already posted'
+```
+
+— reading the very column that can be missing. A failure on the third employee, or a dropped
+connection before the stamp, leaves payments created and nothing recording it; the operator holds
+an error and the screen offers one thing. Post again schedules a second payment for **every**
+employee's salary, a second ΦΜΥ remittance and a second EFKA remittance. This is the clause
+[hrFilingIntegrity.test.ts](../tests/unit/hrFilingIntegrity.test.ts) already asserts elsewhere: a
+duplicate guard reads the record written on the SUCCESS path, never a status column written after
+it.
+
+The success-path record is the payments — and nothing connected them to the run. The only link was
+the period interpolated into `title`, which is also why "Reverse the posting before re-opening it",
+an error this same file raises one screen earlier, had no mechanism behind it.
+`planned_payments.payroll_run_id` is that link, the third of its kind beside `supplier_bill_id` and
+`invoice_id`. `ON DELETE SET NULL`, never CASCADE: deleting a payroll run must not silently delete
+money scheduled to leave the company.
+
+Separately, the posting recorded `totals.net` from `run.total_net` — a CACHED column maintained by
+two other actions — while the three figures beside it were summed from the rows that actually
+produced the payments, and it counts lines the loop skips (`net <= 0`). The audit record of a
+posting could disagree with the payments it describes. One derivation per money quantity.
+
+**Two pre-existing guards failed on this change and both were right.** `sameWorkspaceFkSweep`
+flagged `payroll_run_id` as a body-supplied workspace-scoped FK — it is, and the guarantee is real
+(the run is loaded with `.eq('id', id).eq('workspace_id', workspaceId)` and 404s otherwise), so it
+is recorded as an exemption stating that, the same shape already exempted for `hr-api/index.ts`.
+`stripCommentsHelper` failed the new test file for hand-rolling a second comment stripper; it now
+imports the shared one.
+
+### The IP the caller chose
+
+`hr-kiosk` keyed its per-IP rate limit on the LEFTMOST `x-forwarded-for` entry — the one the caller
+prepends — under a comment calling it "Trusted-ish client IP from the proxy hop". Rotating that
+header minted a fresh bucket per request, so a limit that counts to twenty never reached two.
+
+What makes this worth a sweep rather than a fix: **it was already fixed once.** #354 HR-12 moved
+`hr-careers` onto the shared helper and left a comment saying so, while `hr-kiosk` — the sibling
+endpoint in the same module — kept its own local copy. Nothing checked the other files. Three more
+turned up:
+
+| site | what the value did |
+|---|---|
+| `_shared/api-logger` | the WIDEST instance: tried the spoofable header FIRST, falling back to `cf-connecting-ip` only if absent. Every edge function is wrapped in this, so `api_usage_logs.ip_address` — the column an abuse investigation starts from — was caller-controlled platform-wide, and one client could wear a different address per request |
+| `catalog-access` ×2 | written into the access log and the view events: evidence about who opened a private catalog, reporting what they typed |
+| `inbox-api` | handed to Turnstile as `remoteip`, degrading the risk signal the challenge exists to produce |
+
+Only the kiosk is invariant 10 — a QUOTA key. The rest are evidence, and the same rule applies for
+the reason `contracts-api`'s signature IP does: a recorded address chosen by the subject is not a
+record of anything.
+
+**Not changed, with the reason:** no workspace-wide ceiling on the kiosk, unlike `hr-careers`. A
+careers board takes a few applications an hour; a factory has every employee clocking in within the
+same five minutes at shift change, so a per-workspace cap would deny the primary use case at
+exactly the moment it is used. The per-(workspace, ΑΦΜ) PIN lockout is keyed on a subject hash
+rather than the IP, so PIN brute force was always capped at 8 per 15 minutes however many addresses
+an attacker claimed — what was uncapped is ΑΦΜ enumeration and punch spam.
+
+Guarded by [tests/unit/trustedClientIp.test.ts](../tests/unit/trustedClientIp.test.ts), which is a
+repo-wide sweep **because a partial sweep is how this defect persisted**. It bans the shape, not
+the header — `client-ip.ts` reads `x-forwarded-for` and takes the LAST hop, the one our own proxy
+appended — and separately asserts the four fixed here are positively wired, so a regex that quietly
+stops matching cannot pass on an empty set.
+
+Ten mutations across the two guards, all caught. Two needed the assertions tightened first: the
+payroll pair originally checked that `postedErr` and `HttpError(503` were *present*, which survives
+`if (false) { throw … }` — a guard that is present but can never fire reads identically to one that
+works, so both are now asserted as the condition. The other was a magic 4,000-character window over
+a 6,478-character handler, which silently excluded the EFKA insert and asserted "every payment is
+linked" over two of the three; it is bounded by the next `case` now.
+
 ## Receiving stock twice, on a path that had never once run — 2026-08-30
 
 Warehouse/Stock is the first module in this round with a large backlog and no output at all:

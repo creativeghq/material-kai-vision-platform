@@ -926,6 +926,33 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       const { data: run } = await supabase.from('hr_payroll_runs').select('*').eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
       if (!run) return json({ error: 'not found' }, 404);
       if (run.posted_finance_ref) return json({ error: 'This run is already posted to Finance.' }, 409);
+      /**
+       * The stamp above is written LAST, after every payment insert, so it is exactly the record
+       * that can be missing (CLAUDE.md rule 4: a duplicate guard reads the record written on the
+       * SUCCESS path, never a status column written after it).
+       *
+       * This posts N+2 payments as N+2 separate calls over the wire. If any one fails, or the
+       * connection drops before the stamp, the payments exist and `posted_finance_ref` does not —
+       * so the guard above waves the retry through and every salary is scheduled twice, along with
+       * a second income-tax and a second EFKA remittance. Ask the payments themselves.
+       */
+      const { count: alreadyPosted, error: postedErr } = await supabase
+        .from('planned_payments')
+        .select('id', { count: 'exact', head: true })
+        .eq('workspace_id', workspaceId)
+        .eq('payroll_run_id', id);
+      // An unanswerable count is not zero. Refuse rather than risk paying everyone twice — the
+      // operator can retry, and a posting that has not happened stays available.
+      if (postedErr) {
+        throw new HttpError(503, 'Could not check whether this run was already posted; the posting was refused rather than risk scheduling every salary twice.');
+      }
+      if ((alreadyPosted ?? 0) > 0) {
+        return json({
+          error: `This run already has ${alreadyPosted} payment(s) in Finance from an earlier posting that did not finish. Review and remove them before posting again.`,
+          code: 'partially_posted',
+          existing_payments: alreadyPosted,
+        }, 409);
+      }
       const { data: items } = await supabase.from('hr_payroll_items')
         .select('net, income_tax, employee_contributions, employer_contributions, employee:hr_employees!hr_payroll_items_employee_id_fkey ( crm_contact_id, contact:crm_contacts!hr_employees_crm_contact_id_fkey ( name ) )')
         .eq('run_id', id);
@@ -941,15 +968,22 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
 
       // 1) Net wages — one scheduled payment PER EMPLOYEE (counterparty = the employee's contact).
       const netPaymentIds: string[] = [];
+      // What was ACTUALLY scheduled, accumulated from the same rows that produce the payments.
+      // `run.total_net` is a cached column maintained by two other actions, and it counts lines
+      // this loop skips (`net <= 0`) — so recording it here made the posting's own audit record
+      // disagree with the payments it describes. One derivation per money quantity: the other
+      // three totals below are already summed from these rows; net was the odd one out.
+      let netPosted = 0;
       for (const it of rows) {
         const net = Number(it.net ?? 0);
         if (net <= 0) continue;
+        netPosted = round2(netPosted + net);
         const nm = (it as any).employee?.contact?.name || 'Employee';
         const { data: np, error } = await supabase.from('planned_payments').insert({
           workspace_id: workspaceId, direction: 'out', amount: net, currency: cur, scheduled_for: payday,
           category: 'salary', title: `Net pay — ${nm} — ${run.period}`,
           counterparty_contact_id: (it as any).employee?.crm_contact_id ?? null,
-          notes: `Payroll ${run.period} net wages`, created_by: userId,
+          notes: `Payroll ${run.period} net wages`, created_by: userId, payroll_run_id: id,
         }).select('id').single();
         if (error) throw new HttpError(400, `Finance posting failed (net): ${error.message}`);
         netPaymentIds.push(np.id);
@@ -960,7 +994,7 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
         const { data: tp, error } = await supabase.from('planned_payments').insert({
           workspace_id: workspaceId, direction: 'out', amount: totalTax, currency: cur, scheduled_for: statutoryDue,
           category: 'tax', title: `Payroll income tax (ΦΜΥ) — ${run.period}`,
-          notes: `Employee income tax withheld for payroll ${run.period}, remitted to the tax authority`, created_by: userId,
+          notes: `Employee income tax withheld for payroll ${run.period}, remitted to the tax authority`, created_by: userId, payroll_run_id: id,
         }).select('id').single();
         if (error) throw new HttpError(400, `Finance posting failed (tax): ${error.message}`);
         incomeTaxPaymentId = tp.id;
@@ -973,6 +1007,7 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
           category: 'social_security', title: `Payroll EFKA — ${run.period}`,
           notes: `EFKA contributions for payroll ${run.period}: employer ${erEfka} ${cur} + employee (withheld) ${eeEfka} ${cur}`,
           created_by: userId,
+          payroll_run_id: id,
         }).select('id').single();
         if (error) throw new HttpError(400, `Finance posting failed (EFKA): ${error.message}`);
         efkaPaymentId = ep.id;
@@ -981,7 +1016,7 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       const ref = {
         posted_at: new Date().toISOString(),
         net_payment_ids: netPaymentIds, income_tax_payment_id: incomeTaxPaymentId, efka_payment_id: efkaPaymentId,
-        totals: { net: round2(run.total_net), income_tax: totalTax, employee_efka: eeEfka, employer_efka: erEfka },
+        totals: { net: netPosted, income_tax: totalTax, employee_efka: eeEfka, employer_efka: erEfka },
       };
       await supabase.from('hr_payroll_runs').update({ posted_finance_ref: ref }).eq('id', id);
       return json({ ok: true, posted: ref });

@@ -28,6 +28,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
+import { getTrustedClientIp } from '../_shared/client-ip.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { recordPageEvent } from '../_shared/document-events.ts';
@@ -221,7 +222,11 @@ Deno.serve(withApiLogging('catalog-access', async (req) => {
         return jsonResponse({ granted_access: false });
       }
 
-      const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
+      // The trusted hop. This is an access-log entry, not a quota — but a recorded address the
+      // VISITOR chose is evidence that says who opened a private catalog while actually
+      // reporting what they put in a header.
+      const trusted = getTrustedClientIp(req);
+      const ip = trusted === 'unknown' ? null : trusted;
       const ua = req.headers.get('user-agent') || null;
 
       // Scope every membership / CRM lookup to the CATALOG's workspace (#364 EX-3). This used
@@ -300,7 +305,8 @@ Deno.serve(withApiLogging('catalog-access', async (req) => {
         return jsonResponse({ tracked: false }, 200);
       }
 
-      const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
+      const trustedIp = getTrustedClientIp(req);
+      const ip = trustedIp === 'unknown' ? null : trustedIp;
       const ua = req.headers.get('user-agent') || null;
       const eventType = body.action === 'track_view' ? 'page_view' : 'pdf_download';
 
