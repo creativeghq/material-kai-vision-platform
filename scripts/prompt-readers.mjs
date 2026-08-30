@@ -16,13 +16,26 @@ import ts from 'typescript';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-/** Deno loaders: fn name -> how to read (promptType, category) from the arg list. */
-const TS_LOADERS = {
+/**
+ * Deno loaders: fn name -> how to read (promptType, category) from the arg list.
+ *
+ * `Object.create(null)`, not `{}`, and the lookup below uses `Object.hasOwn`. With a plain object
+ * literal, `TS_LOADERS[fn]` inherits from `Object.prototype` — so a call ending in `.toString`
+ * (`validateUrl.toString()`, `searchUrl.toString()`) resolves to a real function, gets invoked as
+ * `Object.prototype.toString.call(args)`, returns the string `"[object Array]"`, and destructuring
+ * a STRING yields its characters: prompt_type `"["`, category `"o"`.
+ *
+ * That is the exact symptom the `add()` guard below was written against — its comment says "one
+ * run produced prompt_type='['" — and this is the cause. The guard caught it, so nothing was ever
+ * mis-attributed; what it cost was two lines of stderr on every run, and a guard that looks like
+ * it is defending against something mysterious rather than something understood.
+ */
+const TS_LOADERS = Object.assign(Object.create(null), {
   loadPrompt: (a) => [lit(a[1]), lit(a[2])],
   getToolPrompt: (a) => ['tool', lit(a[1])],
   getAgentSystemPrompt: (a) => ['agent', lit(a[1])],
   getGenerationPrompt: (a) => ['generation', lit(a[1])],
-};
+});
 /** Python loader: load_prompt(prompt_type, category, stage=...) */
 const PY_LOADER = /load_prompt\(\s*["']([\w-]+)["']\s*,\s*["']([\w-]+)["']/g;
 /** Python sync cache read: get_cached(prompt_type, category, ...) */
@@ -51,11 +64,21 @@ function walk(dir, out = []) {
 
 /** category -> Set(file) */
 const readers = new Map();
-/** The CHECK-able prompt_type values. Anything else means the extractor mis-read a call — one
- *  run produced prompt_type='[' — and a bogus key would write used_in onto nothing while
- *  looking like coverage. */
+/**
+ * Plausible `prompt_type` values. Anything else means the extractor mis-read a call, and a bogus
+ * key would write `used_in` onto nothing while looking like coverage.
+ *
+ * MIRRORS `select distinct prompt_type from public.prompts` — there is no CHECK constraint, so
+ * that column IS the vocabulary and this is a hand-kept copy of it. It had drifted: `embed` and
+ * `system` are both in use and were both missing here, so every loader call for them was silently
+ * dropped and their prompts would have read as never-read forever.
+ *
+ * The drift is self-reporting, which is why it was findable: a type missing from this list gives
+ * its prompts no reader, and `ops.prompt_never_read` fires on exactly that. Re-derive the list
+ * with the query above when adding a type.
+ */
 const PROMPT_TYPES = new Set(['agent', 'tool', 'generation', 'extraction', 'classification',
-  'search', 'template', 'chat_starter']);
+  'search', 'template', 'chat_starter', 'embed', 'system']);
 
 const add = (type, category, file) => {
   if (!type || !category) return;
@@ -88,7 +111,9 @@ for (const root of ['supabase/functions', 'api', 'src', 'mivaa-pdf-extractor/app
     const visit = (n) => {
       if (ts.isCallExpression(n)) {
         const fn = n.expression.getText().split('.').pop();
-        const reader = TS_LOADERS[fn];
+        // `hasOwn` as well as the null prototype: belt and braces, because the failure mode is a
+        // silent mis-read rather than an error.
+        const reader = Object.hasOwn(TS_LOADERS, fn) ? TS_LOADERS[fn] : null;
         if (reader) {
           const [type, category] = reader(n.arguments);
           add(type, category, file);
