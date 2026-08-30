@@ -233,6 +233,53 @@ Deno.serve(withApiLogging('catalog-access', async (req) => {
       // to be the owner's EARLIEST active membership: for a multi-workspace owner it decided
       // who may read a catalog using a different tenant's contact list entirely — the same
       // first-workspace mistake as `CM-22` in #359, except here it is the access decision.
+      /**
+       * THROTTLE THE ORACLE.
+       *
+       * `request` is public, unauthenticated, and answers "is this address in your CRM, or granted
+       * this catalog?" for any address asked. Nothing capped it, so anyone holding a catalog slug
+       * could walk a list and read back the workspace's customer base one `granted_access: false`
+       * at a time. The catalog contents were never the exposure here; the AUDIENCE was.
+       *
+       * Counted on FAILURES only, which is what separates the two populations. A mailshot lands
+       * many people on this endpoint at once and they nearly all succeed; an enumerator produces
+       * almost nothing but failures. Counting every attempt would throttle the mailshot — the one
+       * time this endpoint is supposed to be busy.
+       *
+       * Two dimensions, for the reason `hr-careers` carries two: the per-IP cap is only as good as
+       * the IP, so the per-CATALOG ceiling bounds what a distributed sweep can learn about one
+       * audience however many addresses it claims to come from. Set far above human mistyping.
+       *
+       * Keyed on `catalog_access_log`, which already records every attempt with its address,
+       * outcome and time — the throttle reads the record the endpoint was already writing.
+       */
+      const RL_WINDOW_MS = 10 * 60_000;
+      const RL_MAX_FAILED_PER_IP = 10;
+      const RL_MAX_FAILED_PER_CATALOG = 60;
+      const rlSince = new Date(Date.now() - RL_WINDOW_MS).toISOString();
+
+      const [{ count: ipFails, error: ipErr }, { count: catFails, error: catErr }] = await Promise.all([
+        ip
+          ? supabase.from('catalog_access_log').select('id', { count: 'exact', head: true })
+              .eq('ip_address', ip).eq('granted_access', false).gte('created_at', rlSince)
+          : Promise.resolve({ count: 0, error: null }),
+        supabase.from('catalog_access_log').select('id', { count: 'exact', head: true })
+          .eq('catalog_id', catalog.id).eq('granted_access', false).gte('created_at', rlSince),
+      ]);
+      // An unanswerable count is not a zero — and the load that breaks this query is the sweep it
+      // exists to stop. Refuse rather than open the gate.
+      if (ipErr || catErr) {
+        console.error('[catalog-access] throttle count failed — refusing (fail closed):',
+          ipErr?.message ?? catErr?.message);
+        return jsonResponse({ error: 'Too many attempts. Please wait a few minutes and try again.' }, 429);
+      }
+      if ((ipFails ?? 0) >= RL_MAX_FAILED_PER_IP || (catFails ?? 0) >= RL_MAX_FAILED_PER_CATALOG) {
+        // Deliberately identical wording whatever the reason, and returned BEFORE the lookup runs:
+        // a throttle that answers differently depending on which limit was hit is a smaller oracle,
+        // not no oracle.
+        return jsonResponse({ error: 'Too many attempts. Please wait a few minutes and try again.' }, 429);
+      }
+
       const match = await resolveEmailMatch(supabase, catalog.id, email, catalog.workspace_id ?? null);
 
       const tokenStr = match.granted ? generateToken() : null;

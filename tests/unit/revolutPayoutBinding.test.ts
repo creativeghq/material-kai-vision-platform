@@ -175,3 +175,85 @@ describe('#359 CM-22 — the panels configure the workspace you are looking at',
     });
   }
 });
+
+/**
+ * The bulk bill run — 2026-08-30.
+ *
+ * #359 CM-19 established `revolut_payouts.supplier_bill_id` as THE binding: `reconcileOutgoingRevolut`
+ * reads it first and only falls back to matching the reference TEXT when it is absent, which CM-19
+ * calls "guessing at something we recorded". Three instruction paths set it — the dialog's
+ * `send-payment`, `confirm-bill-match`, and the reconciler itself.
+ *
+ * `pay-due-bills` did not. That is the BULK path — the one whose whole purpose is paying many bills
+ * at once — so the payments most likely to need reliable reconciliation were exactly the ones
+ * reconciling by guess.
+ *
+ * With no link, nothing could answer "does this bill already have a payment out", either. A second
+ * run drafts the same bills again: a double-click, or a retry after the draft call timed out with
+ * the draft already created at Revolut. One approval in the Revolut app then executes an entire
+ * duplicate run. The approval step is what makes that survivable, not what makes it safe — a bill
+ * run exists so that one approval covers many payments, so "there are two of them" is precisely
+ * what an approver is least likely to notice.
+ *
+ * KNOWN GAP, stated rather than papered over: the reconciler finds a payout by
+ * `provider_id = tx.transaction_id`, and a bulk run stores the DRAFT id there, because Revolut
+ * returns one draft rather than a payment id per bill. So the link now recorded is correct and
+ * usable by the duplicate guard, but the feed-side lookup still cannot use it for bill-run
+ * payments. Closing that needs the executed payments' own ids, which arrive on a different event.
+ */
+describe('#359 CM-19 — the bulk bill run binds and does not double-draft', () => {
+  const run = (() => {
+    const i = api.indexOf("case 'pay-due-bills'");
+    if (i < 0) return '';
+    const rest = api.slice(i + 10);
+    const next = rest.search(/\n\s{4}case '/);
+    return next < 0 ? api.slice(i) : api.slice(i, i + 10 + next);
+  })();
+
+  it('is pointed at the real handler', () => {
+    expect(run, 'the bill-run handler is gone').not.toBe('');
+    expect(run).toContain('revolut_payouts');
+    expect(run, 'the handler slice does not reach the draft call').toContain('createPaymentDraft');
+  });
+
+  it('records which bill each drafted payment pays', () => {
+    expect(run, 'the bulk run stopped recording supplier_bill_id, so its payments reconcile by '
+      + 'guessing at the reference text — the thing CM-19 exists to stop')
+      .toMatch(/supplier_bill_id: bill\.id/);
+  });
+
+  it('skips a bill that already has a payment out', () => {
+    // Asserted as the CONDITION and the SKIP, not as the presence of the identifier: a guard
+    // short-circuited to `if (false)` keeps every name intact while never firing, and that is the
+    // shape a disabled guard actually takes.
+    expect(run, 'nothing stops a second run drafting the same bills — one approval then pays '
+      + 'every supplier twice').toMatch(/if \(alreadyOut\.has\(String\(bill\.id\)\)\)\s*\{/);
+    expect(run, 'the skipped bill is no longer reported back to the operator')
+      .toMatch(/already drafted or sent/);
+    // Keyed on the recorded link, not on parsing the reference string back out.
+    expect(run, 'the duplicate check no longer reads the recorded bill link')
+      .toMatch(/\.in\('supplier_bill_id'/);
+    // And the check must precede the drafting loop.
+    const checkAt = run.indexOf('alreadyOut');
+    const draftAt = run.indexOf('createPaymentDraft');
+    expect(checkAt, 'the duplicate check runs after the draft is created').toBeLessThan(draftAt);
+  });
+
+  it('a FAILED payout does not block a genuine retry', () => {
+    // The point of the guard is to stop a second payment, not to strand a bill whose payment
+    // never happened. A failed/cancelled payout is not a payment.
+    expect(run).toMatch(/DEAD_PAYOUT_STATES/);
+    for (const state of ['failed', 'cancelled', 'declined', 'expired', 'reverted']) {
+      expect(run, `${state} is no longer treated as a dead payout, so it would block a real retry`)
+        .toContain(`'${state}'`);
+    }
+  });
+
+  it('fails CLOSED when it cannot tell', () => {
+    // An unanswerable count is not "no payments out" — and this one guards money leaving.
+    // The CONDITION, for the same reason as above.
+    expect(run, 'the refusal is no longer conditioned on the lookup having failed')
+      .toMatch(/if \(livePayoutErr\)\s*\{/);
+    expect(run, 'a failed lookup no longer refuses the run').toMatch(/HttpError\(503/);
+  });
+});

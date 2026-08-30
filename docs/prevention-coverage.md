@@ -1332,6 +1332,85 @@ building could be told which jobs happen there and could never say so.
   which guards REGRESSION rather than absence: deleting the reader or unmounting it restores the
   exact original state, and nothing else would notice.
 
+## A bill run with no memory, and a gate that answered questions about your customers — 2026-08-30
+
+The last three modules: Banking/Revolut, CRM and Presentation Catalogs.
+
+### CRM came out clean, and that is a result
+
+44 companies, 10 contacts, 47 categories — the only module in this pass with enough real data to
+audit against reality rather than shape. Zero duplicate VAT keys, zero duplicate normalised company
+names, zero category members pointing at a deleted party, `crm.country_code_mismatch` quiet. And
+every member of a `role` or `employment` category is `source='auto'` — the "who someone *is* is
+never re-typed by hand" rule is actually holding in the data, not just in the prose.
+
+Two things nearly got reported and are not defects. `reconcile.ts` handles the per-leg trap
+explicitly in its own header (an `out` leg of ours makes the transaction an internal pocket move,
+whose `in` leg is otherwise indistinguishable from a customer payment). And `recordInvoicePayment`
+is genuinely idempotent and self-healing — it dedupes on `(provider, provider_ref)`, resolves the
+concurrent-insert race through the unique constraint, and repairs a payment whose allocation never
+landed (#287 T1-1) — so the settle path's create-then-stamp shape does not double-book. Checking
+before writing is the whole difference between those and the two below.
+
+### The bulk bill run forgot which bills it was paying
+
+#359 CM-19 established `revolut_payouts.supplier_bill_id` as THE binding between a payment we
+instructed and the bill it settles: `reconcileOutgoingRevolut` reads it first and falls back to
+matching the reference TEXT only when it is absent, which CM-19 calls "guessing at something we
+recorded". Three instruction paths set it — `send-payment`, `confirm-bill-match`, and the reconciler
+itself.
+
+`pay-due-bills` did not. That is the BULK path, the one whose entire purpose is paying many bills at
+once, so the payments most in need of reliable reconciliation were exactly the ones reconciling by
+guess.
+
+With no link, nothing could answer "does this bill already have a payment out" either. A second run
+drafts the same bills again — a double-click, or a retry after the draft call timed out with the
+draft already created at Revolut. One approval in the Revolut app then executes an entire duplicate
+run. The approval step is what makes that survivable, not what makes it safe: a bill run exists so
+that ONE approval covers MANY payments, which makes "there are two of them" precisely what an
+approver is least likely to notice. A payout that FAILED is not a payment, so those still permit a
+genuine retry.
+
+> **Known gap, stated rather than papered over.** The reconciler finds a payout by
+> `provider_id = tx.transaction_id`, and a bulk run stores the DRAFT id there, because Revolut
+> returns one draft rather than a payment id per bill. The link now recorded is correct and is what
+> the duplicate guard reads, but the feed-side lookup still cannot use it for bill-run payments.
+> Closing that needs the executed payments' own ids, which arrive on a different event.
+
+### A public gate that answered questions about your customer list
+
+`catalog-access?action=request` is unauthenticated, takes any email address, and returns
+`granted_access: true|false` — "is this address in your CRM, or granted this catalog?". **Nothing
+capped it.** Anyone holding a published catalog slug could walk a list and read the workspace's
+customer base back one `false` at a time. The catalog CONTENTS were never the exposure here; the
+AUDIENCE was, and the audience is the CRM.
+
+Now throttled per IP and per catalog, keyed on `catalog_access_log` — the record the endpoint was
+already writing, so no new table. Three decisions worth keeping:
+
+- **Count failures, not attempts.** A mailshot puts many people on this endpoint within minutes and
+  nearly all of them succeed; an enumerator produces almost nothing but failures. Throttling total
+  attempts would brake hardest exactly when the endpoint is doing its job.
+- **Two dimensions.** The per-IP cap is only as good as the IP, so the per-catalog ceiling bounds
+  what a distributed sweep can learn about one audience — the same reasoning `hr-careers` carries.
+- **One message, and before the lookup.** A throttle whose wording or timing differs by which limit
+  was hit is a smaller oracle, not the absence of one.
+
+### The mutation lesson, twice in one session
+
+Nine mutations, all caught — but four needed the assertions tightened first, and they failed the
+same way the payroll pair did earlier: asserting that an identifier is PRESENT survives
+`if (false) { … }`. A guard that is present but can never fire reads identically to one that works,
+and that is the shape a disabled guard actually takes. Every one is now asserted as its CONDITION.
+
+Two of the "misses" were bad mutations rather than weak tests, and both are worth recording because
+they cost real time: renaming a constant left the comparison referencing the old name so the string
+was still in the file, and `supplier_bill_id: bill.id` occurs twice, so a `replace(…, 1)` mutated
+`confirm-bill-match` while the test correctly sliced only `pay-due-bills`. A mutation test is only
+evidence if the mutation lands where you think it does — anchor inside the handler, and assert the
+occurrence count before replacing.
+
 ## Paying every salary twice, and an IP the caller chose — 2026-08-30
 
 HR has the same profile as Stock — every table empty, so every path is untested — but the logic is

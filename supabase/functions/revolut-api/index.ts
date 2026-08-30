@@ -707,7 +707,40 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
       const skipped: Array<{ bill: string; reason: string }> = [];
       const requestId = crypto.randomUUID();
 
+      /**
+       * A bill already out for payment is NOT drafted again.
+       *
+       * Nothing stopped a second run covering the same bills: a double-click, or a retry after
+       * the draft call timed out with the draft already created at Revolut. The operator then
+       * has two drafts that look alike, and approving both pays every supplier twice. The
+       * approval step is what makes this survivable, not what makes it safe — the whole point of
+       * a bill run is that one approval executes many payments, so "there are two of them" is
+       * exactly the thing an approver is least likely to catch.
+       *
+       * A payout that FAILED is not a payment, so those do not block a genuine retry. Anything
+       * else — drafted, awaiting approval, executed — does.
+       */
+      const DEAD_PAYOUT_STATES = ['failed', 'cancelled', 'declined', 'expired', 'reverted'];
+      const { data: livePayouts, error: livePayoutErr } = await service
+        .from('revolut_payouts')
+        .select('supplier_bill_id, state')
+        .eq('workspace_id', workspaceId)
+        .in('supplier_bill_id', (bills as any[]).map((b) => b.id));
+      // Not knowing is not the same as "none". Refuse rather than risk a second bill run.
+      if (livePayoutErr) {
+        throw new HttpError(503, 'Could not check which bills already have a payment out; the run was refused rather than risk paying suppliers twice.');
+      }
+      const alreadyOut = new Set(
+        (livePayouts ?? [])
+          .filter((r: any) => !DEAD_PAYOUT_STATES.includes(String(r.state ?? '').toLowerCase()))
+          .map((r: any) => String(r.supplier_bill_id)),
+      );
+
       for (const bill of bills as any[]) {
+        if (alreadyOut.has(String(bill.id))) {
+          skipped.push({ bill: bill.supplier_bill_number ?? bill.id, reason: 'a payment for this bill is already drafted or sent' });
+          continue;
+        }
         let bq = service
           .from('crm_bank_accounts')
           .select('id, revolut_counterparty_id, account_holder')
@@ -734,6 +767,15 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
           workspace_id: workspaceId,
           request_id: `${requestId}:${bill.id}`,
           kind: 'draft',
+          // WE INSTRUCTED THIS PAYMENT, SO WE KNOW WHICH BILL IT PAYS (#359 CM-19).
+          //
+          // `supplier_bill_id` is the real binding — `reconcileOutgoingRevolut` reads it first and
+          // only falls back to matching the reference TEXT when it is absent, which CM-19 calls
+          // "guessing at something we recorded". Three of the four instruction paths set it
+          // (`send-payment`, `confirm-bill-match`, the reconciler itself); this one — the bulk run,
+          // the path that pays the most bills at once — did not, so every bill paid through it
+          // reconciled by guess. It is also what the duplicate guard above reads.
+          supplier_bill_id: bill.id,
           amount: Number(bill.amount_due),
           currency: String(bill.currency ?? 'EUR').toUpperCase(),
           source_revolut_account_id: sourceAccountId,
