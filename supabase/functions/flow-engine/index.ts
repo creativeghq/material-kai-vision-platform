@@ -1979,11 +1979,23 @@ async function handleExecuteFlow(
   // seconds, while a normal high-volume flow stays well under it. Complements the per-loop-node cap.
   if (!isTestRun) {
     const since = new Date(Date.now() - 60_000).toISOString();
-    const { count: recentRuns } = await supabase
+    const { count: recentRuns, error: runCountErr } = await supabase
       .from('flow_runs')
       .select('id', { count: 'exact', head: true })
       .eq('flow_id', flow_id)
       .gte('started_at', since);
+    // A brake that cannot read its own gauge must engage, not disengage. `count ?? 0` turned an
+    // unanswerable query into "this flow has run zero times this minute" — and the condition most
+    // likely to make this count fail is a database already under load from the runaway loop this
+    // exists to stop. The brake came off exactly when it was needed.
+    //
+    // The trade-off is deliberate: a transient error now refuses ONE run rather than allowing an
+    // unbounded number. Flow runs are re-triggered by their events, so a refusal is a delay; the
+    // other direction is unmetered execution and spend.
+    if (runCountErr) {
+      console.error(`[flow-engine] could not count recent runs for flow ${flow_id} — refusing (fail closed):`, runCountErr.message);
+      return jsonResponse({ success: false, error: 'run_rate_unverifiable', data: { flow_id } }, 429);
+    }
     if ((recentRuns ?? 0) >= MAX_FLOW_RUNS_PER_MINUTE) {
       console.warn(`[flow-engine] flow ${flow_id} exceeded ${MAX_FLOW_RUNS_PER_MINUTE} runs/min — suspected loop, refusing`);
       return jsonResponse({ success: false, error: 'run_rate_exceeded', data: { flow_id } }, 429);
@@ -1999,11 +2011,17 @@ async function handleExecuteFlow(
      * loop. Refusing those would take away the tool.
      */
     if (effectiveWorkspaceId) {
-      const { count: wsRuns } = await supabase
+      const { count: wsRuns, error: wsCountErr } = await supabase
         .from('flow_runs')
         .select('id', { count: 'exact', head: true })
         .eq('workspace_id', effectiveWorkspaceId)
         .gte('started_at', since);
+      // Same rule as the per-flow cap above — and more so here, because this is the breaker for
+      // two flows triggering each other, which the per-flow cap never sees.
+      if (wsCountErr) {
+        console.error(`[flow-engine] could not count workspace runs for ${effectiveWorkspaceId} — refusing (fail closed):`, wsCountErr.message);
+        return jsonResponse({ success: false, error: 'run_rate_unverifiable', data: { flow_id } }, 429);
+      }
       if ((wsRuns ?? 0) >= MAX_WORKSPACE_FLOW_RUNS_PER_MINUTE) {
         console.error(
           `[flow-engine] workspace ${effectiveWorkspaceId} exceeded `

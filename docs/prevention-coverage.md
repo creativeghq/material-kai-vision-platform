@@ -1246,6 +1246,97 @@ never reached the line.
 - **Locked in by ratcheting** 50 → 24 across 15 files: a regression takes the count back up and
   fails the build.
 
+## Two Real Estate paths that were wrong about what they handed out — 2026-08-30
+
+**An unmatched lead that reported `matched_listing: true`.** `real-estate-inbound-lead` places a
+forwarded portal enquiry by the agency's `reference_code`, and falls back to the most recent live
+listing when it cannot — writing a "please re-point this lead" banner so an agent can fix it. The
+banner was gated on `!parsed.reference` — whether the email CONTAINED a reference — not on whether
+that reference matched anything. An enquiry quoting a code no listing carries took the fallback
+listing with no banner and a `matched_listing: true` response. The two unmatched states are now
+reported apart, because they need different people: no reference means the portal does not send
+one; a reference that matched nothing means that listing's `reference_code` is wrong here, and
+every future lead for it will misfile the same way.
+
+**A social post published with an expired image URL.** `property-media` is private, so
+`real-estate-listing-social` signed the cover photo and stored the URL in `social_posts.image_urls`;
+`zernio-api` handed that stored URL to the provider whenever the draft was eventually approved. A
+post reviewed after the signature lapsed went out with a link the provider gets a 403 for — or
+failed — and neither function could tell. Pipeline convention 7 exactly.
+
+**The fix for the second one introduced a worse bug, and it is the more useful half of this
+entry.** The first version stored `{bucket, path}` in `metadata.media_refs` and had the publisher
+re-sign from it. But `social_posts` carries a `FOR ALL` policy for workspace members, so its
+metadata is **user-writable** — while the publisher runs under the **service role**. Any member
+could have rewritten it to `{bucket: 'pdf-documents', path: '<another tenant's invoice>'}` and been
+handed a signed URL for it. A path taken from a row the user controls and resolved with elevated
+privilege is invariant 8 wearing a jsonb hat, and it was caught by asking who can write
+`social_posts` — not by any check, because the change passed lint, typecheck, edge typecheck and
+its own new guard.
+
+The reference is now an **ID**: `{kind: 'property_photo', id}`, resolved against `property_photos`
+filtered by the post's own `workspace_id`. The bucket and path come from the DB row, so the worst a
+rewritten id can name is a photo that member could already see. A ref that cannot be resolved or
+signed refuses the publish rather than falling through to the stale URL — falling through is what
+produced the original defect.
+
+Guarded by [tests/unit/realEstateOutboundMedia.test.ts](../tests/unit/realEstateOutboundMedia.test.ts),
+which asserts the flag is derived from the lookup, that no raw bucket is persisted into
+user-writable metadata, that the publisher accepts only an id and scopes the lookup to the post's
+workspace, and that an unresolvable ref returns rather than continues.
+
+## Nine rate limits that failed open — 2026-08-30
+
+Every rate limit here is two steps: count what this caller has already done, compare it to a
+ceiling. The count IS the enforcement decision, and
+
+```ts
+const { count } = await supabase.from('…').select('id', { count: 'exact', head: true })…;
+if ((count ?? 0) >= SOME_LIMIT) return refuse();
+```
+
+reads "I could not answer that" as "this caller has done nothing". The brake comes off for
+everybody, silently — and the load most likely to break the count query is the abuse the limit
+exists to stop, so the failure is self-reinforcing rather than random. Nothing was failing when
+this was found. That is the shape: it is invisible until the day the query breaks, and on that day
+it produces no error of its own.
+
+`real-estate-public.enforceLeadRateLimit` already carried the reasoning at length — the COUNT fails
+closed, the bookkeeping INSERT never blocks a legitimate caller — and it was the only one that had
+adopted it. Found while auditing the Projects estimator; the sweep that followed found the rest.
+
+| function | limiter | what failing open meant |
+|---|---|---|
+| `public-project-plan` | anonymous daily quota; kitchen-lead cap | unmetered use of the public estimator |
+| `flow-engine` | per-flow AND cross-flow **loop breakers** | unbounded execution and spend, released by the very load a runaway loop creates |
+| `hr-kiosk` | per-IP throttle; **PIN lockout** | unlimited attempts against a 4-digit PIN — the attack the lockout's own comment says it exists to blunt |
+| `hr-careers` | per-IP and per-workspace application caps | unlimited public form submissions |
+| `inbox-api` | public-profile contact form (sender + recipient); per-token challenge codes | a stranger's inbox as the attack surface |
+| `workspace-webhooks-api` | endpoints per workspace | unbounded endpoint registration |
+
+The `flow-engine` change is the one with a real trade-off, stated in the code: a transient error now
+refuses ONE run rather than allowing an unbounded number. Flow runs are re-triggered by their
+events, so a refusal is a delay; the other direction is unmetered execution.
+
+Guarded by [tests/unit/rateLimitFailsClosed.test.ts](../tests/unit/rateLimitFailsClosed.test.ts),
+which flags any count compared against a NAMED ceiling (`*MAX*`, `*CAP*`, `*QUOTA*`, `*LIMIT*`,
+`*THRESHOLD*`) whose query error was discarded. Informational counts — "does a row already exist" —
+are deliberately out of scope, because a guard that flags those gets suppressed.
+
+**Two things the guard got wrong first, both worth keeping in mind when writing this kind of scan:**
+
+- the ceiling matcher was `[A-Z][A-Z0-9_]*(?:MAX|CAP|…)[A-Z0-9_]*`, which requires a character
+  BEFORE the keyword — so it could not match `MAX_FLOW_RUNS_PER_MINUTE` and reported the loop
+  breaker's file clean. It is now two steps: an all-caps token that CONTAINS the keyword.
+- finding the query behind a count by taking the last `const` in the window flags every
+  already-fixed limiter, because the comparison is often itself written
+  `const limited = (count ?? 0) >= CAP`. It now takes the latest `const … = await …` that mentions
+  the count, and the lookback is generous, because a limiter that has been fixed carries the
+  reasoning between its query and its comparison.
+
+Mutation-tested by returning the PIN lockout to its fail-open form; the guard names the file and
+line.
+
 ## Billing a quote by stage had no running total — 2026-08-30
 
 `create_project_progress_invoice` validated that ONE percentage was in `(0,100]` and nothing else.

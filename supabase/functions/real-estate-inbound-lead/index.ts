@@ -68,11 +68,18 @@ Deno.serve(withApiLogging('real-estate-inbound-lead', async (req) => {
   }
 
   // Match the listing by the agency's own reference. Never trust a property id from the payload.
+  //
+  // `matchedByReference` is the answer to "is this lead on the RIGHT listing", and it is not the
+  // same question as "did the email contain a reference". Reading the second for the first is how
+  // an enquiry about ESP-9931 lands on an unrelated flat wearing `matched_listing: true` and no
+  // warning banner — the fallback below fires either way, and only the flag says whether it did.
   let propertyId: string | null = null;
+  let matchedByReference = false;
   if (parsed.reference) {
     const { data: p } = await supabase.from('properties')
       .select('id').eq('workspace_id', workspaceId).eq('reference_code', parsed.reference).maybeSingle();
     propertyId = p?.id ?? null;
+    matchedByReference = !!propertyId;
   }
   if (!propertyId) {
     // property_inquiries requires a property. An unmatched lead is real and must not be dropped, so
@@ -85,7 +92,14 @@ Deno.serve(withApiLogging('real-estate-inbound-lead', async (req) => {
   }
   if (!propertyId) return json({ ok: true, skipped: 'no listing to attach the lead to', portal: parsed.portal });
 
-  const unmatched = !parsed.reference || parsed.reference === null;
+  const unmatched = !matchedByReference;
+  // The two ways of being unmatched need different actions, so they are not collapsed into one
+  // sentence: no reference at all is usually a portal that does not send one, while a reference
+  // that matched nothing is a listing whose `reference_code` is missing or spelled differently
+  // here than on the portal — which will silently mis-file every future lead for it too.
+  const banner = parsed.reference
+    ? `[Reference "${parsed.reference}" does not match any listing in this workspace — this lead is on a placeholder listing. Re-point it, and check that listing's reference code.]`
+    : '[The portal sent no listing reference — this lead is on a placeholder listing. Please re-point it.]';
   const { data: assignee } = await supabase.rpc('route_property_lead', {
     p_workspace_id: workspaceId, p_property_id: propertyId,
   });
@@ -95,7 +109,7 @@ Deno.serve(withApiLogging('real-estate-inbound-lead', async (req) => {
     name: parsed.name ?? `${parsed.portal} enquiry`,
     email: parsed.email, phone: parsed.phone,
     message: unmatched
-      ? `[Could not match a listing reference — please re-point this lead]\n\n${parsed.message ?? ''}`.slice(0, 4000)
+      ? `${banner}\n\n${parsed.message ?? ''}`.slice(0, 4000)
       : parsed.message,
     status: 'new', source: `portal:${parsed.portal}`,
     // The portal collected the enquiry under its own terms; the buyer asked to be contacted about
@@ -108,5 +122,13 @@ Deno.serve(withApiLogging('real-estate-inbound-lead', async (req) => {
   }).select('id').single();
   if (error) throw new HttpError(400, error.message);
 
-  return json({ ok: true, inquiry_id: inserted.id, portal: parsed.portal, matched_listing: !unmatched, assigned: !!assignee });
+  return json({
+    ok: true, inquiry_id: inserted.id, portal: parsed.portal,
+    matched_listing: matchedByReference,
+    // Named separately so a forwarder's log distinguishes "this portal sends no reference" from
+    // "our reference codes are wrong", which are different jobs for different people.
+    reference: parsed.reference ?? null,
+    reference_matched: parsed.reference ? matchedByReference : null,
+    assigned: !!assignee,
+  });
 }));

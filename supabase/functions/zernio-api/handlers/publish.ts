@@ -78,11 +78,66 @@ export async function handleZernioPublish(req: Request, body: any): Promise<Resp
     // Build Zernio createPost payload (POST /v1/posts).
     const text = [post.caption, ...(post.hashtags || [])].filter(Boolean).join('\n\n');
 
+    // MEDIA. A post can be drafted today and published next month, so a URL stored on the row is
+    // the one thing that cannot be trusted at this moment: anything on a PRIVATE bucket has an
+    // expiry, and a link the provider fetches after it lapses publishes an imageless post or fails
+    // outright — with nothing here able to tell the difference. `metadata.media_refs` carries the
+    // durable {bucket, path} and is re-signed HERE, at the point of use, which is pipeline
+    // convention 7. `image_urls` stays the fallback for producers that write a public URL.
     const mediaItems: Array<{ type: string; url: string }> = [];
-    if (post.image_urls?.length) {
+    const mediaRefs = (post.metadata as Record<string, unknown> | null)?.media_refs;
+    const freshlySigned = new Set<string>();
+    if (Array.isArray(mediaRefs)) {
+      // `social_posts` is member-writable (`FOR ALL` for workspace members), so metadata is
+      // UNTRUSTED INPUT and this runs under the SERVICE ROLE. A {bucket, path} taken from here and
+      // signed would hand any member a signed URL for any private object in any bucket, including
+      // another tenant's. So only an ID is accepted, and the bucket and path come from the DB row
+      // it names — filtered by this post's own workspace, which is what makes a rewritten id
+      // useless.
+      const photoIds = (mediaRefs as Array<{ kind?: string; id?: string }>)
+        .filter((r) => r?.kind === 'property_photo' && typeof r?.id === 'string')
+        .map((r) => r.id as string);
+
+      if (photoIds.length) {
+        const { data: photos, error: photoErr } = await supabase
+          .from('property_photos')
+          .select('id, storage_bucket, storage_path')
+          .in('id', photoIds)
+          .eq('workspace_id', post.workspace_id);
+        if (photoErr) {
+          return jsonResponse({ success: false, error: "Could not prepare the post's media." }, 503);
+        }
+        const byId = new Map((photos ?? []).map((r: Record<string, string>) => [r.id, r]));
+        for (const id of photoIds) {
+          const row = byId.get(id);
+          // Not in this workspace, or deleted since the draft was made. Refuse rather than fall
+          // through to the stale URL below: a post that goes out with a broken image is worse than
+          // one the operator is told to retry, and falling through is what produced the first.
+          if (!row?.storage_path) {
+            return jsonResponse({
+              success: false,
+              error: "One of this post's images is no longer available. Re-attach it and try again.",
+            }, 409);
+          }
+          const { data: signed, error: signErr } = await supabase.storage
+            .from(row.storage_bucket || 'property-media')
+            // Only has to outlive the provider's own fetch, seconds after this call.
+            .createSignedUrl(row.storage_path, 3600);
+          if (signErr || !signed?.signedUrl) {
+            return jsonResponse({
+              success: false,
+              error: "Could not prepare the post's media. The file may have been removed.",
+            }, 409);
+          }
+          mediaItems.push({ type: 'image', url: signed.signedUrl });
+          freshlySigned.add('image');
+        }
+      }
+    }
+    if (post.image_urls?.length && !freshlySigned.has('image')) {
       for (const url of post.image_urls as string[]) mediaItems.push({ type: 'image', url });
     }
-    if (post.video_url) {
+    if (post.video_url && !freshlySigned.has('video')) {
       mediaItems.push({ type: 'video', url: post.video_url });
     }
 

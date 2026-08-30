@@ -3406,11 +3406,17 @@ async function handleTokenAction(db: DbClient, action: string, payload: Json): P
       // Rate limit per token: a code the customer did not ask for is a nuisance, and an
       // unthrottled endpoint turns their inbox into the attack.
       const sinceIso = new Date(Date.now() - 3_600_000).toISOString();
-      const { count: recent } = await db
+      const { count: recent, error: recentErr } = await db
         .from('inbox_thread_token_challenges')
         .select('id', { count: 'exact', head: true })
         .eq('token_id', String(tok.id))
         .gt('created_at', sinceIso);
+      // An unanswerable count is not a zero. Reading it as one turns "the customer's inbox is the
+      // attack" — the sentence directly above — into the default behaviour on any query failure.
+      if (recentErr) {
+        console.error('[inbox-api] challenge rate-limit count failed — refusing (fail closed):', recentErr.message);
+        throw new HttpError(429, 'Too many codes requested for this conversation. Try again in an hour.');
+      }
       if ((recent ?? 0) >= MAX_CHALLENGES_PER_HOUR) {
         throw new HttpError(429, 'Too many codes requested for this conversation. Try again in an hour.');
       }
@@ -3669,10 +3675,20 @@ async function handleProfileContact(db: DbClient, req: Request, payload: Json): 
   const contactMessages = () => db.from('inbox_messages')
     .select('*', { count: 'exact', head: true })
     .eq('metadata->>source', 'public_profile');
-  const [{ count: bySender }, { count: byRecipient }] = await Promise.all([
+  const [
+    { count: bySender, error: senderErr },
+    { count: byRecipient, error: recipientErr },
+  ] = await Promise.all([
     contactMessages().eq('metadata->>email_from', email).gte('created_at', since),
     contactMessages().eq('metadata->>profile_user_id', toUserId).gte('created_at', hourAgo),
   ]);
+  // Both counts ARE the enforcement decision, so neither may be read as zero when it could not be
+  // answered. `count ?? 0` on a failed query opened this public form to unlimited messages at a
+  // stranger's inbox, and reported nothing while doing it.
+  if (senderErr || recipientErr) {
+    console.error('[inbox-api] contact rate-limit count failed — refusing (fail closed):', (senderErr ?? recipientErr)?.message);
+    throw new HttpError(429, 'Too many messages right now — please try again later.');
+  }
   if ((bySender ?? 0) >= CONTACT_MAX_PER_SENDER_WINDOW || (byRecipient ?? 0) >= CONTACT_MAX_PER_RECIPIENT_HOUR) {
     throw new HttpError(429, 'Too many messages right now — please try again later.');
   }

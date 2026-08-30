@@ -196,16 +196,27 @@ Deno.serve(withApiLogging('hr-careers', async (req) => {
     // Per-IP throttle (works even when Turnstile isn't configured): cap applications per IP per window.
     const ip = clientIp(req);
     const rlSince = new Date(Date.now() - CAREERS_WINDOW_MS).toISOString();
-    const { count: recent } = await supabase.from('hr_kiosk_attempts')
+    // An unanswerable count is not a zero. `count ?? 0` let any error on this query open the
+    // public form to unlimited submissions, silently — the throttle exists precisely for the
+    // caller who would cause that load.
+    const { count: recent, error: recentErr } = await supabase.from('hr_kiosk_attempts')
       .select('*', { count: 'exact', head: true }).eq('ip', ip).eq('outcome', 'careers_apply').gte('created_at', rlSince);
+    if (recentErr) {
+      console.error('[hr-careers] per-IP throttle count failed — refusing (fail closed):', recentErr.message);
+      return json({ error: 'Too many applications from this network. Please try again later.' }, 429);
+    }
     if ((recent ?? 0) >= CAREERS_MAX_PER_WINDOW) {
       await supabase.from('hr_kiosk_attempts').insert({ workspace_id: ws.id, ip, outcome: 'careers_rl' });
       return json({ error: 'Too many applications from this network. Please try again later.' }, 429);
     }
     // …and the same window across the whole board, so the cap survives an IP we cannot trust.
-    const { count: recentWs } = await supabase.from('hr_kiosk_attempts')
+    const { count: recentWs, error: recentWsErr } = await supabase.from('hr_kiosk_attempts')
       .select('*', { count: 'exact', head: true })
       .eq('workspace_id', ws.id).eq('outcome', 'careers_apply').gte('created_at', rlSince);
+    if (recentWsErr) {
+      console.error('[hr-careers] per-workspace throttle count failed — refusing (fail closed):', recentWsErr.message);
+      return json({ error: 'This careers page is receiving too many applications right now. Please try again shortly.' }, 429);
+    }
     if ((recentWs ?? 0) >= CAREERS_MAX_PER_WORKSPACE_WINDOW) {
       await supabase.from('hr_kiosk_attempts').insert({ workspace_id: ws.id, ip, outcome: 'careers_rl' });
       return json({ error: 'This careers page is receiving too many applications right now. Please try again shortly.' }, 429);

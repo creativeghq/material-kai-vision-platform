@@ -103,8 +103,15 @@ Deno.serve(withApiLogging('hr-kiosk', async (req) => {
   // Rate limit: cap lookups + clocks per IP per minute (blunts VAT/PIN probing + punch spam).
   const ip = clientIp(req);
   const since = new Date(Date.now() - 60_000).toISOString();
-  const { count } = await supabase.from('hr_kiosk_attempts')
+  const { count, error: rateErr } = await supabase.from('hr_kiosk_attempts')
     .select('*', { count: 'exact', head: true }).eq('ip', ip).gte('created_at', since);
+  // An unanswerable count is not a zero. `count ?? 0` turned any failure of this query into
+  // "this IP has made no attempts", which lifts the throttle for everyone at once — and the
+  // load that breaks the query is the probing this throttle exists to blunt.
+  if (rateErr) {
+    console.error('[hr-kiosk] rate-limit count failed — refusing (fail closed):', rateErr.message);
+    return json({ error: 'rate_limited', message: 'Too many attempts. Please wait a minute and try again.' }, 429);
+  }
   const limited = (count ?? 0) >= KIOSK_RATE_LIMIT_PER_MIN;
   await supabase.from('hr_kiosk_attempts').insert({ workspace_id: ws.id, ip, outcome: limited ? 'rate_limited' : 'attempt' });
   if (limited) return json({ error: 'rate_limited', message: 'Too many attempts. Please wait a minute and try again.' }, 429);
@@ -130,8 +137,15 @@ Deno.serve(withApiLogging('hr-kiosk', async (req) => {
     // (a 4-digit PIN is only 10⁴). Lock the subject after PIN_MAX_FAILS failures in the window.
     const subject = await sha256hex(`vat:${ws.id}:${vat}`);
     const pinSince = new Date(Date.now() - PIN_LOCKOUT_WINDOW_MS).toISOString();
-    const { count: failCount } = await supabase.from('hr_kiosk_attempts')
+    const { count: failCount, error: failErr } = await supabase.from('hr_kiosk_attempts')
       .select('*', { count: 'exact', head: true }).eq('subject', subject).eq('outcome', 'pin_fail').gte('created_at', pinSince);
+    // A lockout that cannot read its own failure count must LOCK. `count ?? 0` meant an error on
+    // this query granted unlimited attempts against a 4-digit PIN — the precise attack the two
+    // lines above say this exists to stop, with the brake released by the load of mounting it.
+    if (failErr) {
+      console.error('[hr-kiosk] PIN lockout count failed — locking (fail closed):', failErr.message);
+      return json({ error: 'locked_out', message: 'Too many PIN attempts. Please wait and try again later.' }, 429);
+    }
     if ((failCount ?? 0) >= PIN_MAX_FAILS) return json({ error: 'locked_out', message: 'Too many PIN attempts. Please wait and try again later.' }, 429);
     const ok = emp.clock_pin_hash && (await sha256hex(`${ws.id}:${pin}`)) === emp.clock_pin_hash;
     if (!ok) {

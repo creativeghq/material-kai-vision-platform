@@ -110,10 +110,16 @@ Deno.serve(withApiLogging('workspace-webhooks-api', async (req) => {
       if (!(await userCanAccessWorkspace(supabase, auth.userId, workspaceId))) {
         throw new HttpError(404, 'Workspace not found');
       }
-      const { count } = await supabase
+      const { count, error: countErr } = await supabase
         .from('workspace_webhooks')
         .select('id', { count: 'exact', head: true })
         .eq('workspace_id', workspaceId);
+      // The cap is the enforcement decision, so an unanswerable count refuses rather than reading
+      // as "no endpoints registered" — which would let one workspace register without bound.
+      if (countErr) {
+        console.error('[workspace-webhooks-api] endpoint count failed — refusing (fail closed):', countErr.message);
+        throw new HttpError(503, 'Could not verify the endpoint limit right now. Please try again.');
+      }
       if ((count ?? 0) >= MAX_ENDPOINTS_PER_WORKSPACE) {
         throw new HttpError(400, `A workspace may register at most ${MAX_ENDPOINTS_PER_WORKSPACE} endpoints.`);
       }

@@ -956,49 +956,72 @@ class ProjectsService {
   // ---------- LINKED ARTIFACTS ----------
 
   /**
-   * Per-room budget rollup. Returns each room of the project with its budget_amount
-   * + the sum of line_total from accepted-quote items that reference that room_id.
+   * Per-room budget rollup, and — deliberately — what is NOT on a room.
+   *
+   * THIS IS NOT THE PROJECT ACTUAL, AND THE TWO SIT ON THE SAME CARD. `projects.actual_amount` is
+   * `SUM(grand_total)` of accepted quotes, maintained by a trigger. These rows are `SUM(line_total)`
+   * of accepted-quote ITEMS. Per `get_quote_totals`, grand_total is
+   * `(sum(line_total) - cash discount) + accepted upsells + VAT`, so the room rows can never add up
+   * to the project figure — and until `unassigned` existed, quote lines with no `room_id` were
+   * dropped from the breakdown entirely with nothing saying so. Money that is simply absent from a
+   * budget screen reads as money that was not spent.
+   *
+   * One query, one derivation. The caller formats and names the gap; it must not re-derive either
+   * half (CLAUDE.md rule 1).
    */
-  async getRoomBudgetSummary(projectId: string): Promise<Array<{
-    room: ProjectRoom;
-    actual_amount: number;
-    quote_count: number;
-    item_count: number;
-  }>> {
+  async getRoomBudgetSummary(projectId: string): Promise<{
+    rooms: Array<{ room: ProjectRoom; actual_amount: number; quote_count: number; item_count: number }>;
+    /** Accepted-quote line spend on this project that is not attributed to any room. */
+    unassigned: { actual_amount: number; item_count: number };
+  }> {
     const rooms = await this.listRooms(projectId);
-    if (rooms.length === 0) return [];
 
-    // Pull every accepted-quote item in this project that has a room_id set.
+    // Every accepted-quote item in this project, room-tagged or not.
     // !inner join filter ensures we only get items whose parent quote is accepted + in this project.
     // The error was discarded here, so a failed read reported every room as zero spent — which
     // on a budget screen reads as good news (#358 PQ-6). It throws now; the caller renders the
     // failure instead of a number nobody measured.
+    //
+    // The `room_id is not null` filter that used to live here is what made the untagged lines
+    // invisible. They are bucketed below instead of dropped.
     const { data: items, error: itemsError } = await (supabase as any)
       .from('quote_items')
       .select('room_id, line_total, quote_id, quote:quotes!inner(project_id, status)')
       .eq('quote.project_id', projectId)
-      .eq('quote.status', 'accepted')
-      .not('room_id', 'is', null);
+      .eq('quote.status', 'accepted');
     if (itemsError) throw itemsError;
 
     const rollup = new Map<string, { actual_amount: number; quotes: Set<string>; items: number }>();
-    for (const it of (items || []) as Array<{ room_id: string; line_total: number | null; quote_id: string }>) {
+    const unassigned = { actual_amount: 0, item_count: 0 };
+    const knownRooms = new Set(rooms.map(r => r.id));
+    for (const it of (items || []) as Array<{ room_id: string | null; line_total: number | null; quote_id: string }>) {
+      const amount = Number(it.line_total) || 0;
+      // A room_id pointing at a room that is no longer on the project counts as unassigned too —
+      // otherwise deleting a room would delete its spend from the screen.
+      if (!it.room_id || !knownRooms.has(it.room_id)) {
+        unassigned.actual_amount += amount;
+        unassigned.item_count += 1;
+        continue;
+      }
       if (!rollup.has(it.room_id)) rollup.set(it.room_id, { actual_amount: 0, quotes: new Set(), items: 0 });
       const agg = rollup.get(it.room_id)!;
-      agg.actual_amount += Number(it.line_total) || 0;
+      agg.actual_amount += amount;
       agg.quotes.add(it.quote_id);
       agg.items += 1;
     }
 
-    return rooms.map(r => {
-      const agg = rollup.get(r.id);
-      return {
-        room: r,
-        actual_amount: agg?.actual_amount || 0,
-        quote_count: agg?.quotes.size || 0,
-        item_count: agg?.items || 0,
-      };
-    });
+    return {
+      rooms: rooms.map(r => {
+        const agg = rollup.get(r.id);
+        return {
+          room: r,
+          actual_amount: agg?.actual_amount || 0,
+          quote_count: agg?.quotes.size || 0,
+          item_count: agg?.items || 0,
+        };
+      }),
+      unassigned,
+    };
   }
 
   async listProjectMoodboards(projectId: string) {

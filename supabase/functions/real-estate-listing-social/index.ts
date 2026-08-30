@@ -22,8 +22,19 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { isCronAuthorized } from '../_shared/auth.ts';
 
-/** Long enough for a scheduled post to still resolve the image when it goes out. */
-const MEDIA_URL_TTL_SECONDS = 7 * 24 * 3600;
+/**
+ * A draft is only ever a PREVIEW url, and it must not be the thing that gets published.
+ *
+ * `property-media` is private, so any URL for it expires. This used to persist a 7-day signed URL
+ * into `social_posts.image_urls` and hand that to the provider at publish time — so a draft that
+ * sat over a weekend and a bank holiday went out with a link Meta fetches and gets a 403 from,
+ * and the post publishes with no image or fails outright. That is pipeline convention 7 exactly:
+ * never persist a `file_url` for a private bucket; store bucket + path and mint the URL on read.
+ *
+ * The row now carries `metadata.media_refs`, and `zernio-api` re-signs from those at the moment
+ * it publishes. `image_urls` keeps a short-lived URL purely so the draft renders in the composer.
+ */
+const MEDIA_PREVIEW_TTL_SECONDS = 7 * 24 * 3600;
 
 const money = (n: number | null, ccy: string) =>
   n == null ? null : new Intl.NumberFormat('en-GB', { style: 'currency', currency: ccy || 'EUR', maximumFractionDigits: 0 }).format(Number(n));
@@ -69,12 +80,25 @@ serve(withApiLogging('real-estate-listing-social', async (req) => {
 
   // Cover image, signed — property-media is private, and Zernio has to be able to fetch it.
   const { data: cover } = await supabase.from('property_photos')
-    .select('storage_path').eq('property_id', propertyId)
+    .select('id, storage_bucket, storage_path').eq('property_id', propertyId)
     .order('is_cover', { ascending: false }).order('sort_order').limit(1).maybeSingle();
   let imageUrl: string | null = null;
+  // The durable half — an ID, deliberately NOT a bucket and path.
+  //
+  // `social_posts` carries a `FOR ALL` policy for workspace members, so its `metadata` is
+  // user-writable. A {bucket, path} here would be a path taken from a row the user controls and
+  // then resolved with the SERVICE ROLE at publish time: a member could point it at any private
+  // object in any bucket — another tenant's invoice PDF — and be handed a signed URL for it.
+  // That is invariant 8 wearing a jsonb hat. The publisher resolves this id against
+  // `property_photos` scoped to the post's own workspace, so the worst a rewritten metadata can
+  // name is a photo that member could already see.
+  const mediaRefs: Array<{ kind: 'property_photo'; id: string; type: 'image' }> = [];
   if (cover?.storage_path) {
-    const { data: signed } = await supabase.storage.from('property-media').createSignedUrl(cover.storage_path, MEDIA_URL_TTL_SECONDS);
+    const { data: signed } = await supabase.storage
+      .from(cover.storage_bucket || 'property-media')
+      .createSignedUrl(cover.storage_path, MEDIA_PREVIEW_TTL_SECONDS);
     imageUrl = signed?.signedUrl ?? null;
+    mediaRefs.push({ kind: 'property_photo', id: cover.id, type: 'image' });
   }
 
   const price = money(property.price, property.currency ?? 'EUR');
@@ -112,7 +136,12 @@ serve(withApiLogging('real-estate-listing-social', async (req) => {
     hashtags,
     image_urls: imageUrl ? [imageUrl] : null,
     status: 'draft',
-    metadata: { property_id: propertyId, source: 'realestate.listing_published' },
+    metadata: {
+      property_id: propertyId,
+      source: 'realestate.listing_published',
+      // Re-signed by zernio-api at publish time; see MEDIA_PREVIEW_TTL_SECONDS above.
+      media_refs: mediaRefs,
+    },
   }));
 
   const { data: inserted, error } = await supabase.from('social_posts').insert(rows).select('id');

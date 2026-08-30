@@ -54,7 +54,9 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
   const realEstate = isModuleAvailable('real-estate');
   const [savingProperty, setSavingProperty] = useState(false);
   const [rooms, setRooms] = useState<ProjectRoom[]>([]);
-  const [roomBudget, setRoomBudget] = useState<Awaited<ReturnType<typeof projectsService.getRoomBudgetSummary>>>([]);
+  const [roomBudget, setRoomBudget] = useState<Awaited<ReturnType<typeof projectsService.getRoomBudgetSummary>>>(
+    { rooms: [], unassigned: { actual_amount: 0, item_count: 0 } },
+  );
   const [roomBudgetFailed, setRoomBudgetFailed] = useState(false);
   const [tasks, setTasks] = useState<ProjectTaskWithSubtasks[]>([]);
 
@@ -70,7 +72,8 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
 
   // Per-room budget card replaces the simple rooms-badge card when any room has either
   // a budget set OR has accepted-quote spend (so the rollup is non-zero on at least one row).
-  const hasMeaningfulRoomBudget = roomBudget.some(r => r.room.budget_amount || r.actual_amount > 0);
+  const hasMeaningfulRoomBudget = roomBudget.rooms.some(r => r.room.budget_amount || r.actual_amount > 0)
+    || roomBudget.unassigned.actual_amount > 0;
 
   const budget = project.budget_amount || 0;
   const actual = Number(project.actual_amount) || 0;
@@ -271,7 +274,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {roomBudget.map(({ room, actual_amount, item_count }) => {
+              {roomBudget.rooms.map(({ room, actual_amount, item_count }) => {
                 const budget = Number(room.budget_amount) || 0;
                 const pct = budget > 0 ? Math.min(100, Math.round((actual_amount / budget) * 100)) : 0;
                 const over = budget > 0 && actual_amount > budget;
@@ -294,6 +297,25 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
                   </div>
                 );
               })}
+              {/* The rows above are accepted-quote LINE totals on a room. The project figure at the
+                  top of this page is SUM(grand_total), which also carries accepted upsells, the
+                  cash discount and VAT — so these can never add up to it. Naming what is missing
+                  is the difference between a breakdown and a breakdown with a hole in it. */}
+              {roomBudget.unassigned.actual_amount > 0 && (
+                <div className="flex items-center justify-between border-t border-hairline pt-3 text-sm">
+                  <span className="text-muted-foreground">Not assigned to a room</span>
+                  <span className="text-xs text-muted-foreground shrink-0">
+                    {formatMoney(roomBudget.unassigned.actual_amount, project.budget_currency)}
+                    {roomBudget.unassigned.item_count > 0 && (
+                      <> · {roomBudget.unassigned.item_count} {roomBudget.unassigned.item_count === 1 ? 'item' : 'items'}</>
+                    )}
+                  </span>
+                </div>
+              )}
+              <p className="text-[11px] text-muted-foreground">
+                Accepted-quote line totals. VAT, upsells and any cash discount sit outside these
+                figures, so they will not add up to the project total above.
+              </p>
             </div>
           </CardContent>
         </Card>

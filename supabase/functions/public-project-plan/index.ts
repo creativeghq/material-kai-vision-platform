@@ -59,14 +59,30 @@ async function verifyTurnstile(supabase: DbClient, token: string, ip: string): P
   return ok;
 }
 
+/**
+ * Throws when the budget cannot be ANSWERED, rather than reporting zero used.
+ *
+ * The count is the enforcement decision. `const { count } = await …` discarded the error and
+ * `count ?? 0` turned any failure — a timeout, a policy change, a bad index — into "this IP has
+ * used none of its quota", which disengages the brake for everyone at once and looks like a quiet
+ * day in the logs. `real-estate-public.enforceLeadRateLimit` already carries this reasoning at
+ * length; this is the same brake on the other public tool, and it was still failing open.
+ *
+ * Turnstile sits in front of this, but a captcha is a different control: it filters bots, not
+ * volume, and a solved token is exactly what an abusive caller has.
+ */
 async function quotaUsed(supabase: DbClient, ip: string): Promise<number> {
   const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-  const { count } = await supabase
+  const { count, error } = await supabase
     .from('public_lookup_log')
     .select('id', { count: 'exact', head: true })
     .eq('outcome', 'success')
     .eq('ip_address', ip)
     .gte('created_at', since);
+  if (error) {
+    console.error('[public-project-plan] quota count failed — refusing (fail closed):', error.message);
+    throw new HttpError(429, 'Too many requests. Please try again later.');
+  }
   return count ?? 0;
 }
 
@@ -204,12 +220,17 @@ const handler = withApiLogging('public-project-plan', async (req: Request): Prom
     }
 
     // Own cap — a lead is a write, not a lookup, so it does not share the scan budget.
+    // Same fail-closed rule as quotaUsed above: an unanswerable count is not a zero.
     const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-    const { count: leadsToday } = await supabase
+    const { count: leadsToday, error: leadCountErr } = await supabase
       .from('public_lookup_log')
       .select('id', { count: 'exact', head: true })
       .eq('scan_type', 'kitchen_lead').eq('outcome', 'success')
       .eq('ip_address', ip).gte('created_at', since);
+    if (leadCountErr) {
+      console.error('[public-project-plan] lead cap count failed — refusing (fail closed):', leadCountErr.message);
+      return json({ success: false, error: 'rate_limited', limit: LEAD_DAILY_CAP }, 429);
+    }
     if ((leadsToday ?? 0) >= LEAD_DAILY_CAP) {
       await logLead('rate_limited');
       return json({ success: false, error: 'rate_limited', limit: LEAD_DAILY_CAP }, 429);
