@@ -119,10 +119,10 @@ export const ImportListingsDialog: React.FC<{
           {preview && (
             <div className="rounded-xl border p-4">
               <div className="flex flex-wrap items-center gap-4 text-sm">
-                <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-emerald-500" /> {preview.summary.created} to create</span>
-                <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-emerald-500" /> {preview.summary.updated} to update</span>
+                <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-emerald-700 dark:text-emerald-500" /> {preview.summary.created} to create</span>
+                <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-emerald-700 dark:text-emerald-500" /> {preview.summary.updated} to update</span>
                 {preview.summary.skipped > 0 && (
-                  <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400"><AlertTriangle className="h-4 w-4" /> {preview.summary.skipped} skipped</span>
+                  <span className="flex items-center gap-1.5 text-amber-800 dark:text-amber-400"><AlertTriangle className="h-4 w-4" /> {preview.summary.skipped} skipped</span>
                 )}
               </div>
               {problems.length > 0 && (

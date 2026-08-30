@@ -193,7 +193,7 @@ export const ScheduleTab: React.FC<{ projectId: string; isOwner: boolean }> = ({
                     style={{ height: ROW_H }}
                     disabled={!isOwner}
                   >
-                    {t.is_milestone && <Diamond className="h-3 w-3 shrink-0 text-amber-400" />}
+                    {t.is_milestone && <Diamond className="h-3 w-3 shrink-0 text-amber-800 dark:text-amber-400" />}
                     <span className={`truncate ${t.parent_task_id ? 'pl-3 text-muted-foreground' : ''}`}>{t.title}</span>
                   </button>
                 ))}

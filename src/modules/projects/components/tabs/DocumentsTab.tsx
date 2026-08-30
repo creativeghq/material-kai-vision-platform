@@ -106,7 +106,7 @@ export const DocumentsTab: React.FC<{ projectId: string; isOwner: boolean }> = (
                       {d.discipline && <span className="text-[11px] text-muted-foreground">· {d.discipline}</span>}
                       {d.current
                         ? <span className="text-[11px] text-primary">Rev {d.current.rev_label}</span>
-                        : <span className="text-[11px] text-amber-400">No revision uploaded</span>}
+                        : <span className="text-[11px] text-amber-800 dark:text-amber-400">No revision uploaded</span>}
                     </div>
                     {d.current?.notes && <p className="mt-1 text-sm text-muted-foreground">{d.current.notes}</p>}
                     {d.revisions.length > 1 && (

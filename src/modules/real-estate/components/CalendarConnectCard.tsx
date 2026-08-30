@@ -54,7 +54,7 @@ export const CalendarConnectCard: React.FC<{ ws: string | null }> = ({ ws }) => 
 
   return (
     <Card><CardContent className="flex flex-wrap items-center gap-3 p-4">
-      <CalendarCheck className={`h-4 w-4 ${state.connected ? 'text-emerald-500' : 'text-muted-foreground'}`} />
+      <CalendarCheck className={`h-4 w-4 ${state.connected ? 'text-emerald-700 dark:text-emerald-500' : 'text-muted-foreground'}`} />
       <div className="min-w-0">
         <div className="text-sm font-medium">Google Calendar</div>
         <div className="text-xs text-muted-foreground">
@@ -63,7 +63,7 @@ export const CalendarConnectCard: React.FC<{ ws: string | null }> = ({ ws }) => 
             : <>Connect so viewings appear on your phone.</>}
         </div>
         {state.last_sync_error && (
-          <div className="mt-1 flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+          <div className="mt-1 flex items-center gap-1.5 text-xs text-amber-800 dark:text-amber-400">
             <AlertTriangle className="h-3 w-3" /> Last sync failed: {state.last_sync_error}
           </div>
         )}

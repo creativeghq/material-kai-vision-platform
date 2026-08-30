@@ -37,10 +37,10 @@ const STATUS_LABELS: Record<ProjectStatus, string> = {
 };
 
 const STATUS_TONES: Record<ProjectStatus, string> = {
-  planning: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
-  in_progress: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-  on_hold: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-  completed: 'bg-purple-500/15 text-purple-300 border-purple-500/30',
+  planning: 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30',
+  in_progress: 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border-emerald-500/30',
+  on_hold: 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30',
+  completed: 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30',
   archived: 'bg-muted text-muted-foreground border-border',
 };
 
@@ -229,7 +229,7 @@ export const ProjectsListPage: React.FC = () => {
                         {p.accepted_quote_count}
                       </span>
                       {p.deadline && (
-                        <span className={`flex items-center gap-1 ml-auto ${days !== null && days < 0 ? 'text-destructive' : days !== null && days <= 7 ? 'text-amber-300' : ''}`}>
+                        <span className={`flex items-center gap-1 ml-auto ${days !== null && days < 0 ? 'text-destructive' : days !== null && days <= 7 ? 'text-amber-800 dark:text-amber-300' : ''}`}>
                           {days !== null && days < 0 && <AlertTriangle className="h-3.5 w-3.5" />}
                           {days === null ? null : <Calendar className="h-3.5 w-3.5" />}
                           {days !== null && (days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? 'Today' : `${days}d left`)}

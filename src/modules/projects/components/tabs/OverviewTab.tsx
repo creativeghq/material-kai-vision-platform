@@ -220,7 +220,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
             <>
               <p className="text-2xl font-light">{formatDate(project.deadline)}</p>
               {days !== null && (
-                <p className={`text-sm mt-1 ${days < 0 ? 'text-destructive' : days <= 7 ? 'text-amber-300' : 'text-muted-foreground'}`}>
+                <p className={`text-sm mt-1 ${days < 0 ? 'text-destructive' : days <= 7 ? 'text-amber-800 dark:text-amber-300' : 'text-muted-foreground'}`}>
                   {days < 0 ? `${Math.abs(days)} days overdue` : days === 0 ? 'Today' : `${days} days left`}
                 </p>
               )}
@@ -254,7 +254,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
 
       {roomBudgetFailed && isOwner && (
         <Card className="dashboard-card lg:col-span-2">
-          <CardContent className="py-6 text-sm text-amber-400">
+          <CardContent className="py-6 text-sm text-amber-800 dark:text-amber-400">
             Budget by room could not be loaded. Spend against each room is unknown — this is not
             the same as nothing having been spent.
           </CardContent>
@@ -308,9 +308,9 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
           <CardContent className="space-y-3">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
               <Stat label="Todo" value={taskStats.todo} icon={<Circle className="h-3.5 w-3.5" />} />
-              <Stat label="Active" value={taskStats.in_progress} icon={<Clock className="h-3.5 w-3.5 text-blue-300" />} />
-              <Stat label="Done" value={taskStats.done} icon={<CheckCircle className="h-3.5 w-3.5 text-emerald-300" />} />
-              <Stat label="Blocked" value={taskStats.blocked} icon={<AlertTriangle className="h-3.5 w-3.5 text-amber-300" />} />
+              <Stat label="Active" value={taskStats.in_progress} icon={<Clock className="h-3.5 w-3.5 text-blue-600 dark:text-blue-300" />} />
+              <Stat label="Done" value={taskStats.done} icon={<CheckCircle className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-300" />} />
+              <Stat label="Blocked" value={taskStats.blocked} icon={<AlertTriangle className="h-3.5 w-3.5 text-amber-800 dark:text-amber-300" />} />
             </div>
             {upcomingTasks.length > 0 && (
               <div className="pt-2 border-t border-hairline">
@@ -322,7 +322,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
                       <li key={t.id} className="flex items-center gap-2 text-sm">
                         <Circle className="h-3 w-3 text-muted-foreground shrink-0" />
                         <span className="truncate flex-1">{t.title}</span>
-                        <span className={`text-xs shrink-0 ${d !== null && d < 0 ? 'text-destructive' : d !== null && d <= 3 ? 'text-amber-300' : 'text-muted-foreground'}`}>
+                        <span className={`text-xs shrink-0 ${d !== null && d < 0 ? 'text-destructive' : d !== null && d <= 3 ? 'text-amber-800 dark:text-amber-300' : 'text-muted-foreground'}`}>
                           {d === null ? '' : d < 0 ? `${Math.abs(d)}d over` : d === 0 ? 'Today' : `${d}d`}
                         </span>
                       </li>

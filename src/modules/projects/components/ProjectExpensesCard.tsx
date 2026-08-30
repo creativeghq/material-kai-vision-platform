@@ -30,7 +30,7 @@ import { todayLocalISO } from '@/utils/datetime';
 const money = (n: number | null | undefined, c: string | null | undefined) => formatMoney(n, c ?? 'EUR');
 
 const approvalTone = (s: string) =>
-  s === 'approved' ? 'text-emerald-400' : s === 'rejected' ? 'text-destructive' : 'text-amber-400';
+  s === 'approved' ? 'text-emerald-700 dark:text-emerald-400' : s === 'rejected' ? 'text-destructive' : 'text-amber-800 dark:text-amber-400';
 
 export const ProjectExpensesCard: React.FC<{
   projectId: string;

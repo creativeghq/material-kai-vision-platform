@@ -135,7 +135,7 @@ export const InviteLandingPage: React.FC = () => {
       <div className="min-h-screen flex items-center justify-center bg-background px-4">
         <Card className="dashboard-card max-w-md w-full">
           <CardContent className="p-8 text-center">
-            <AlertTriangle className="h-10 w-10 text-amber-300 mx-auto mb-3" />
+            <AlertTriangle className="h-10 w-10 text-amber-800 dark:text-amber-300 mx-auto mb-3" />
             <h2 className="text-lg font-light mb-2">Invitation expired</h2>
             <p className="text-sm text-muted-foreground">
               This invitation has passed its expiry date. Ask the project owner to send a new one.
@@ -173,7 +173,7 @@ export const InviteLandingPage: React.FC = () => {
 
           {sent ? (
             <div className="space-y-3 text-center pt-2">
-              <CheckCircle2 className="h-10 w-10 text-emerald-300 mx-auto" />
+              <CheckCircle2 className="h-10 w-10 text-emerald-700 dark:text-emerald-300 mx-auto" />
               <h3 className="font-medium">Check your email</h3>
               <p className="text-sm text-muted-foreground">
                 We sent a sign-in link to <strong>{email}</strong>. Click it to view the project — no password needed.

@@ -39,7 +39,7 @@ export const ValuationWidget: React.FC<{ userId: string }> = ({ userId }) => {
   if (state === 'done') {
     return (
       <div className="rounded-2xl border bg-card p-6">
-        <CheckCircle2 className="mb-2 h-7 w-7 text-emerald-500" />
+        <CheckCircle2 className="mb-2 h-7 w-7 text-emerald-700 dark:text-emerald-500" />
         <h3 className="font-semibold">Thanks — we’ll be in touch</h3>
         {result?.estimate != null ? (
           <div className="mt-2">

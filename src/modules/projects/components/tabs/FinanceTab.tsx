@@ -143,7 +143,7 @@ export const FinanceTab: React.FC<{ projectId: string; projectName?: string }> =
       />
 
       {mixed && (
-        <p className="flex items-start gap-2 text-xs text-amber-400">
+        <p className="flex items-start gap-2 text-xs text-amber-800 dark:text-amber-400">
           <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
           This project mixes {summary.currencies.join(', ')}. The totals below add different
           currencies together and are indicative only.
@@ -163,9 +163,9 @@ export const FinanceTab: React.FC<{ projectId: string; projectName?: string }> =
         </CardContent></Card>
       </div>
 
-      <Section title="Receivables" icon={<ArrowDownLeft className="h-4 w-4 text-emerald-400" />}
+      <Section title="Receivables" icon={<ArrowDownLeft className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />}
         rows={summary.receivables} total={t.receivable_total} due={t.receivable_due} kind="receivable" />
-      <Section title="Payables" icon={<ArrowUpRight className="h-4 w-4 text-amber-400" />}
+      <Section title="Payables" icon={<ArrowUpRight className="h-4 w-4 text-amber-800 dark:text-amber-400" />}
         rows={summary.payables} total={t.payable_total} due={t.payable_due} kind="payable" />
 
       {/* This project's orders (sales & purchase). */}

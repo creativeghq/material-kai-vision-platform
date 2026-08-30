@@ -130,7 +130,7 @@ const OrderRow: React.FC<{ o: CommercialLinks['orders'][number] }> = ({ o }) => 
 const Tile: React.FC<{ label: string; m: MoneyByCurrency; tone?: 'green' | 'amber' }> = ({ label, m, tone }) => (
   <div className="rounded-md border border-hairline px-2.5 py-1.5">
     <div className="text-[9px] uppercase tracking-wide text-muted-foreground">{label}</div>
-    <div className={`text-sm font-medium tabular-nums ${tone === 'green' ? 'text-emerald-500' : tone === 'amber' ? 'text-amber-500' : ''}`}>
+    <div className={`text-sm font-medium tabular-nums ${tone === 'green' ? 'text-emerald-700 dark:text-emerald-500' : tone === 'amber' ? 'text-amber-800 dark:text-amber-500' : ''}`}>
       {formatMoney(Number(m.amount), m.currency)}
     </div>
   </div>

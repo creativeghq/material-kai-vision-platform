@@ -63,7 +63,7 @@ const PhotoStrip: React.FC<{ paths: string[]; urls: Record<string, string>; alt:
 
 const severityTone = (s: SnagSeverity) =>
   s === 'critical' ? 'text-destructive'
-    : s === 'high' ? 'text-amber-400'
+    : s === 'high' ? 'text-amber-800 dark:text-amber-400'
       : s === 'medium' ? 'text-muted-foreground' : 'text-muted-foreground';
 
 export const SiteTab: React.FC<{ projectId: string; isOwner: boolean }> = ({ projectId, isOwner }) => {

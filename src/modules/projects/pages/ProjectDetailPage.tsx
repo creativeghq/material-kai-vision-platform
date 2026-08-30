@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   FolderKanban,
   Loader2,
@@ -76,13 +76,39 @@ const STATUS_LABELS: Record<ProjectStatus, string> = {
   archived: 'Archived',
 };
 
+// A raw palette shade is a light/dark PAIR. The bare `-300` these carried is chosen for the
+// plum-black dark theme and measures ~1.2:1 on the light themes' cream — the same defect the Inbox
+// source chip had. Both halves are measured by tests/unit/inboxChipContrast.test.ts.
 const STATUS_TONES: Record<ProjectStatus, string> = {
-  planning: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
-  in_progress: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-  on_hold: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-  completed: 'bg-purple-500/15 text-purple-300 border-purple-500/30',
+  planning: 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30',
+  in_progress: 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border-emerald-500/30',
+  on_hold: 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30',
+  completed: 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30',
   archived: 'bg-muted text-muted-foreground border-border',
 };
+
+/**
+ * Every tab this page can render, in trigger order. `availableTabs` below filters it by the SAME
+ * conditions the triggers and the contents are written with, so a `?tab=` naming a tab this viewer
+ * cannot see falls back to Overview instead of rendering a blank panel — the trap
+ * `PropertyWorkbench.availableTabs` exists to close, on the page that had no equivalent.
+ *
+ * Until this existed the page ignored `?tab=` entirely, so `BillingTab`'s own "see the quotes"
+ * button and all four `project_request_*` notification `action_url`s
+ * (`/projects/:id?tab=requests&request=…`) landed the reader on Overview with no hint of where to
+ * go next. Guarded by tests/unit/projectTabLinks.test.ts.
+ */
+const PROJECT_TABS = [
+  'overview', 'rooms', 'products', 'moodboards', 'plan', 'purchases', 'quotes', 'billing',
+  'finance', 'sheets', 'client-view', 'contracts', 'handover', 'tasks', 'site', 'documents',
+  'requests', 'timeline',
+] as const;
+type ProjectTab = typeof PROJECT_TABS[number];
+
+/** Tabs only the owner sees. `finance` needs `finance.manage` on top and is handled separately. */
+const OWNER_ONLY_TABS = new Set<ProjectTab>([
+  'products', 'plan', 'purchases', 'billing', 'client-view', 'contracts', 'handover', 'timeline',
+]);
 
 export const ProjectDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -92,7 +118,7 @@ export const ProjectDetailPage: React.FC = () => {
   const { can, persona } = usePermissions();
   const [project, setProject] = useState<ProjectWithClient | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'overview' | 'rooms' | 'products' | 'purchases' | 'plan' | 'moodboards' | 'quotes' | 'finance' | 'sheets' | 'client-view' | 'contracts' | 'handover' | 'tasks' | 'timeline'>('overview');
+  const [sp, setSp] = useSearchParams();
   const [showInvite, setShowInvite] = useState(false);
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
 
@@ -106,6 +132,27 @@ export const ProjectDetailPage: React.FC = () => {
   // Hard-delete is a principal action: the owner, and only the business personas
   // (operator / dealer / architect) — not project-client end-users or staff.
   const canDeleteProject = isOwner && ['operator', 'dealer', 'architect'].includes(persona);
+
+  // The tabs actually rendered for THIS viewer. Kept next to the value passed to <Tabs> so the two
+  // cannot drift — a trigger added without an entry here reintroduces the blank-panel state.
+  const availableTabs = PROJECT_TABS.filter((t) => {
+    if (t === 'finance') return canFinance;
+    return isOwner || !OWNER_ONLY_TABS.has(t);
+  });
+  // Validated against what THIS viewer gets, so `?tab=timeline` on a collaborator's link falls
+  // back to Overview instead of rendering a blank panel. Safe to read `isOwner` here: the page
+  // returns a loader above and only reaches the tabs once the project has resolved.
+  const requested = sp.get('tab') as ProjectTab | null;
+  const tab: ProjectTab = requested && availableTabs.includes(requested) ? requested : 'overview';
+  const setTab = useCallback((next: string) => {
+    setSp((prev) => {
+      const p = new URLSearchParams(prev);
+      if (next === 'overview') p.delete('tab'); else p.set('tab', next);
+      // The focused record belongs to the tab that was open; carrying it across is meaningless.
+      p.delete('request');
+      return p;
+    }, { replace: true });
+  }, [setSp]);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -181,7 +228,7 @@ export const ProjectDetailPage: React.FC = () => {
         actions={
           <>
             {!isOwner && (
-              <Badge variant="outline" className="hidden sm:inline-flex bg-blue-500/15 text-blue-300 border-blue-500/30">
+              <Badge variant="outline" className="hidden sm:inline-flex bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30">
                 <Eye className="h-3 w-3 mr-1" />
                 Shared with you
               </Badge>
@@ -230,7 +277,7 @@ export const ProjectDetailPage: React.FC = () => {
       />
 
       <main className="px-4 sm:px-6 py-6">
-        <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="space-y-5">
+        <Tabs value={tab} onValueChange={setTab} className="space-y-5">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
             <TabsTrigger value="overview" className="flex items-center gap-2">
               <LayoutDashboard className="h-3.5 w-3.5" />
@@ -362,7 +409,7 @@ export const ProjectDetailPage: React.FC = () => {
           <TabsContent value="tasks"><TasksAndScheduleTab projectId={project.id} isOwner={isOwner} /></TabsContent>
           <TabsContent value="site"><SiteTab projectId={project.id} isOwner={isOwner} /></TabsContent>
           <TabsContent value="documents"><DocumentsTab projectId={project.id} isOwner={isOwner} /></TabsContent>
-          <TabsContent value="requests"><RequestsTab projectId={project.id} isOwner={isOwner} /></TabsContent>
+          <TabsContent value="requests"><RequestsTab projectId={project.id} isOwner={isOwner} focusRequestId={sp.get('request')} /></TabsContent>
           {isOwner && <TabsContent value="timeline"><TimelineTab projectId={project.id} /></TabsContent>}
         </Tabs>
       </main>

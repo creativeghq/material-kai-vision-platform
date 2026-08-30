@@ -699,6 +699,9 @@ looked different at 20 rows and at 900.
 | `crm_bank_accounts_iban_mod97_check` + `public.iban_is_valid(text)` | every write, DB | shape: a typo'd payment destination | **yes** — watched to reject a single-digit typo and accept the real IBAN, as `authenticated`, inside a rolled-back transaction (2026-08-16) |
 | [tests/unit/emailSuppression.test.ts](../tests/unit/emailSuppression.test.ts) | `npm test`, blocking | shape 6c — the unsubscribe check cannot move back inside the marketing branch, must read its lookup error, and the periodic pushes stay off the transactional allowlist | **yes** — the ordering assertion was watched to fail against a decoy match before being anchored |
 | `check_security_invariants()` RPC | nightly | invariants 2–4, live DB | no |
+| [tests/unit/realEstateSubmoduleGates.test.ts](../tests/unit/realEstateSubmoduleGates.test.ts) | `npm test`, blocking | a paid Real Estate add-on is enforced where the query runs. Membership is DERIVED from the table each handler touches, so a new action is covered the day it is written, not the day someone remembers the list | **yes** — the pre-fix sets restored; the test named all seven unguarded actions (`update-tenancy-lifecycle`, `rotate-tenant-portal-token`, the inspection pair, all three deletes) and passed again on the fix (2026-08-30) |
+| [tests/unit/projectTabLinks.test.ts](../tests/unit/projectTabLinks.test.ts) | `npm test`, blocking | a `/projects/:id?tab=…` link lands on that tab: every link site in the repo names a declared tab, the page actually reads the URL, and the declared list equals the rendered triggers AND contents | **yes** — written against the defect: the page held its tab in `useState` and ignored `?tab=` entirely, so all seven links (a button in `BillingTab`, four `project_request_*` notifications, the sheet-share function) landed on Overview (2026-08-30) |
+| [tests/unit/inboxChipContrast.test.ts](../tests/unit/inboxChipContrast.test.ts) | `npm test`, blocking | a colour is a light/dark PAIR and clears WCAG AA against the REAL `--card` of all four themes — palette and theme tokens both read from source, so neither is a copy that can drift | **yes** — extended 2026-08-30 to `statusTone` (the platform-wide helper: `emerald-600` measured 3.57:1 on cream, `amber-600` 3.02:1, `red-500` 3.57:1) and to the Projects + Real Estate modules, and it failed on all three before the fix |
 | `run_data_integrity_checks` | nightly cron | detect/heal registry | yes — `ops.integrity_registry_broken` validates the registry's own signatures |
 | `npm run typecheck` | CI, blocking | `src/` types | n/a |
 | `npm run typecheck:edge` | CI, blocking | edge types, baseline-ratcheted | yes — re-runs quiet files alone, because `deno check` prints nothing on a cache hit |
@@ -1242,6 +1245,39 @@ never reached the line.
   way, verified against production PostgREST rather than assumed.
 - **Locked in by ratcheting** 50 → 24 across 15 files: a regression takes the count back up and
   fails the build.
+
+## `ops.storage_paths_unregistered` — both arms rewritten 2026-08-30, and watched to fire
+
+The probe existed and reported clean while two tables sat outside `build_storage_reference_set()`
+with live files 6 days from the reaper. Two independent blind spots, either of which alone was
+enough to hide them:
+
+1. **It only looked at columns NAMED `%storage_path%`.** `generation_3d` records every AI image
+   this platform generates as `models_results -> <model> -> image_url` — the `image_urls` column
+   is `[]` on every row — and `project_purchase_items.design_image_url` holds the product shot the
+   purchase spec sheet embeds. Neither name matches, so neither was ever a candidate.
+2. **The registration test was a substring match with a collision in the direction nobody had
+   considered.** Its own comment warns about the short-name-satisfied-by-long-name case
+   (`documents` satisfying `hr_documents`) and qualifies the name to close it. But
+   `public.generation_3d` is a PREFIX of `public.generation_3d_segments`, registered for months —
+   so even once `generation_3d` became a candidate, `strpos()` said it was covered.
+
+Now: a **name** arm (unchanged semantics — an object-path column is reported whether or not the
+table has rows, because the latent case is most of the value) and a **data** arm, which samples up
+to 500 rows of any `%url%` / jsonb / array column for `/storage/v1/object/` and reports only what
+it can prove. Name alone cannot separate `design_image_url` from `virtual_tour_url`, and a probe
+that flags every `*_url` column in the schema is one nobody reads. The registration test is now
+`\M`-anchored at both ends.
+
+**Watched to fire.** Inside an aborted subtransaction, the `generation_3d` branch was cut back out
+of `build_storage_reference_set()`: the set lost all 16 of its `gemini/` rows and the probe went
+from reporting nothing to naming `generation_3d.models_results [data x14]`. Against the fixed
+function it reports nothing, and `find_orphan_storage_objects('generation-images', …)` returns 0.
+
+`credit_transactions.metadata` is exempt with the reason recorded in the function body: it quotes a
+past generation's source image as billing evidence, does not own the file (`vr_worlds` and
+`generation_3d` do, both registered), and has no TTL by design — registering it would pin every
+source image forever.
 
 ## Not defects — checked, and deliberately left alone
 

@@ -136,6 +136,30 @@ function classStrings(slice: string): string[] {
     .filter((v) => /\b(?:bg|text|border)-[a-z]+-\d{2,3}\b/.test(v));
 }
 
+/**
+ * Every class string in a whole FILE, not just a named palette const. Most of a module's colour
+ * is not in a `const TONES = {...}` map — it is inline on the element, in a `className="..."` or
+ * inside a template literal's ternary, and those are exactly the ones written while looking at
+ * one theme. Single quotes, double quotes and template chunks all count; a chunk with no palette
+ * shade in it is dropped by the same filter `classStrings` uses.
+ */
+function fileClassStrings(...files: string[]): string[] {
+  const out: string[] = [];
+  for (const file of files) {
+    const src = readFileSync(join(ROOT, file), 'utf8');
+    expect(src.length, `${file} is empty — this guard is pointed at nothing`).toBeGreaterThan(0);
+    for (const m of src.matchAll(/'([^'\n]*)'|"([^"\n]*)"|`([^`]*)`/g)) {
+      const raw = m[1] ?? m[2] ?? m[3] ?? '';
+      // A template literal's ${...} holes split the run; the fragments either side are separate
+      // class strings, and joining them would invent a pairing that never renders together.
+      for (const chunk of raw.split(/\$\{[^}]*\}/)) {
+        if (/\b(?:bg|text|border)-[a-z]+-\d{2,3}\b/.test(chunk)) out.push(chunk);
+      }
+    }
+  }
+  return out;
+}
+
 interface Util { util: string; color: string; shade: string; alpha: number | null; dark: boolean; raw: string }
 
 function utilities(cls: string): Util[] {
@@ -143,6 +167,9 @@ function utilities(cls: string): Util[] {
   for (const token of cls.split(/\s+/).filter(Boolean)) {
     const m = /^(dark:)?(bg|text|border)-([a-z]+)-(\d{2,3})(?:\/(\d{1,3}))?$/.exec(token);
     if (!m) continue;
+    // `text-primary-…`-shaped tokens are theme TOKENS, not ramp colours. Whole-file scanning
+    // meets them; they carry their own light/dark values in index.css and are not ours.
+    if (!(colors as unknown as Record<string, unknown>)[m[3]]) continue;
     out.push({
       dark: !!m[1], util: m[2], color: m[3], shade: m[4],
       alpha: m[5] ? Number(m[5]) / 100 : null, raw: token,
@@ -181,6 +208,64 @@ const PALETTES: Array<{ what: string; strings: string[] }> = [
       block('src/components/features/ai/AgentHub.tsx', 'const REASONING_STEP_TONE', '\n};'),
     ),
   },
+  {
+    // The platform-wide tone helper, and the last place this defect could hide: every module
+    // imports it, so nobody owns it. `emerald-600` measured 3.57:1 on cream, `amber-600` 3.02:1,
+    // `red-500` 3.57:1 — one file, every table in the app.
+    what: 'status tone helper (src/utils/statusTone.ts)',
+    strings: fileClassStrings('src/utils/statusTone.ts'),
+  },
+  {
+    // Projects was authored dark-only end to end — 44 sites across 16 files, from the status
+    // badge on a list card to the overdue-deadline countdown to the timeline event icons.
+    // Scanned whole-file rather than per-const, because almost none of it lives in a const.
+    what: 'the Projects module (src/modules/projects)',
+    strings: fileClassStrings(
+      'src/modules/projects/pages/ProjectsListPage.tsx',
+      'src/modules/projects/pages/ProjectDetailPage.tsx',
+      'src/modules/projects/pages/InviteLandingPage.tsx',
+      'src/modules/projects/components/JobCostCard.tsx',
+      'src/modules/projects/components/ProjectExpensesCard.tsx',
+      'src/modules/projects/components/tabs/ClientViewTab.tsx',
+      'src/modules/projects/components/tabs/DocumentsTab.tsx',
+      'src/modules/projects/components/tabs/FinanceTab.tsx',
+      'src/modules/projects/components/tabs/OverviewTab.tsx',
+      'src/modules/projects/components/tabs/ProductsTab.tsx',
+      'src/modules/projects/components/tabs/RequestsTab.tsx',
+      'src/modules/projects/components/tabs/RoomsTab.tsx',
+      'src/modules/projects/components/tabs/ScheduleTab.tsx',
+      'src/modules/projects/components/tabs/SiteTab.tsx',
+      'src/modules/projects/components/tabs/TasksTab.tsx',
+      'src/modules/projects/components/tabs/TimelineTab.tsx',
+    ),
+  },
+  {
+    // Real Estate had the same shape one step down the ramp — `-500` rather than `-300`, which
+    // looks less obviously wrong in source and measures 2.04:1 for amber on cream. 31 sites: the
+    // dashboard KPI row, the offer badges, the sale commission figure, the AML verdict.
+    what: 'the Real Estate module (src/modules/real-estate)',
+    strings: fileClassStrings(
+      'src/modules/real-estate/components/CalendarConnectCard.tsx',
+      'src/modules/real-estate/components/CmaReportDialog.tsx',
+      'src/modules/real-estate/components/CommissionSplitsCard.tsx',
+      'src/modules/real-estate/components/ImportListingsDialog.tsx',
+      'src/modules/real-estate/components/KycPanel.tsx',
+      'src/modules/real-estate/components/LeadRoutingCard.tsx',
+      'src/modules/real-estate/components/ListingPerformancePanel.tsx',
+      'src/modules/real-estate/components/PropertyBuyerPanel.tsx',
+      'src/modules/real-estate/components/PropertyCardGrid.tsx',
+      'src/modules/real-estate/components/PropertyCommercialCard.tsx',
+      'src/modules/real-estate/components/PropertyDiscoveryTab.tsx',
+      'src/modules/real-estate/components/PropertyFormDialog.tsx',
+      'src/modules/real-estate/components/ShortLetTab.tsx',
+      'src/modules/real-estate/components/ValuationWidget.tsx',
+      'src/modules/real-estate/index.ts',
+      'src/modules/real-estate/pages/PropertyWorkbench.tsx',
+      'src/modules/real-estate/pages/RealEstatePage.tsx',
+      'src/modules/real-estate/realEstateVocabulary.ts',
+      'src/modules/real-estate/services/realEstateService.ts',
+    ),
+  },
 ];
 
 describe('inbox chips are legible in all four themes', () => {
@@ -206,6 +291,14 @@ describe('inbox chips are legible in all four themes', () => {
       for (const cls of strings) {
         const seen = new Map<string, { light: Util[]; dark: Util[] }>();
         for (const u of utilities(cls)) {
+          // Pairing is a TEXT rule. What a theme changes is the GROUND a colour is read
+          // against, and a fill is not read against the ground — it either IS the ground
+          // (`bg-emerald-700`, opaque) or it is a wash of the chip's own hue that composites the
+          // same way over anything (`bg-amber-500/15`). Requiring `dark:bg-amber-500/15` beside
+          // `bg-amber-500/15` would be duplication asserting nothing, and where a chip really
+          // does drop its tint in one theme the ratio test below still measures its text against
+          // the bare card, so nothing escapes by being skipped here.
+          if (u.util !== 'text') continue;
           const k = `${u.util}-${u.color}`;
           const e = seen.get(k) ?? { light: [], dark: [] };
           (u.dark ? e.dark : e.light).push(u);

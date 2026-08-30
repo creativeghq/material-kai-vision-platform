@@ -91,6 +91,28 @@ export type BookingChannel = (typeof BOOKING_CHANNELS)[number];
 export const SYNCABLE_CHANNELS = BOOKING_CHANNELS.filter((c) => c !== 'direct');
 export type SyncableChannel = Exclude<BookingChannel, 'direct'>;
 
+/**
+ * `property_tenancy_inspections_inspection_type_check` and `..._condition_rating_check`.
+ *
+ * Both were written ONCE — inline in `real-estate-api`, which was the only runtime that had
+ * them, because the feature had no UI. Adding the Lettings inspection section makes the client
+ * a second consumer, and a closed value-set two runtimes need is declared here and mirrored
+ * rather than retyped (CLAUDE.md). Drift wider and the UI offers a value the write rejects with
+ * a raw 23514; drift narrower and a valid option silently vanishes.
+ */
+export const INSPECTION_TYPES = ['check_in', 'routine', 'check_out'] as const;
+export type InspectionType = (typeof INSPECTION_TYPES)[number];
+
+export const INSPECTION_CONDITIONS = ['good', 'fair', 'poor'] as const;
+export type InspectionCondition = (typeof INSPECTION_CONDITIONS)[number];
+
+export function isInspectionType(v: unknown): v is InspectionType {
+  return typeof v === 'string' && (INSPECTION_TYPES as readonly string[]).includes(v);
+}
+export function isInspectionCondition(v: unknown): v is InspectionCondition {
+  return typeof v === 'string' && (INSPECTION_CONDITIONS as readonly string[]).includes(v);
+}
+
 export function isInquiryStatus(v: unknown): v is InquiryStatus {
   return typeof v === 'string' && (INQUIRY_STATUSES as readonly string[]).includes(v);
 }

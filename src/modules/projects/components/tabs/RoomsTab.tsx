@@ -197,7 +197,7 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({ projectId, budgetCurrency, i
                   const summary = roomGeometrySummary(r);
                   return (
                     <div className="flex items-center justify-between gap-2 pt-1 border-t border-white/10">
-                      <span className={`text-xs ${summary.calibrated ? 'text-emerald-400' : 'text-muted-foreground'}`}>
+                      <span className={`text-xs ${summary.calibrated ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'}`}>
                         {summary.text}
                       </span>
                       <Button

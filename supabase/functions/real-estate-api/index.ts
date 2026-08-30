@@ -174,9 +174,11 @@ const DOC_TYPES = ['energy_certificate', 'building_id', 'title_deed', 'floor_pla
 /** AML/KYC vocabulary. Mirrors the CHECKs on property_kyc_checks. */
 // One source (#391) — the generated mirror.
 import { KYC_CHECK_TYPES, isKycCheckType } from '../_shared/realEstateVocabulary.generated.ts';
+import {
+  INSPECTION_TYPES, INSPECTION_CONDITIONS, isInspectionType, isInspectionCondition,
+} from '../_shared/realEstateVocabulary.generated.ts';
 const KYC_STATUSES = ['pending', 'passed', 'failed', 'waived'];
 /** Tenancy inspection points. Mirrors the CHECK on property_tenancy_inspections. */
-const INSPECTION_TYPES = ['check_in', 'routine', 'check_out'];
 /** Short-let vocabulary. `BOOKING_CHANNELS` is imported above. */
 const BOOKING_STATUSES = ['tentative', 'confirmed', 'cancelled', 'completed', 'blocked'];
 // `virtual` added 2026-08-01. The scheduling dialog has always offered
@@ -263,8 +265,21 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
 
   // Sub-module entitlement gates: Property Management + Investments are add-ons on top of
   // Real Estate. A workspace without the add-on gets 402 on those actions (root workspace is entitled).
-  const PM_ACTIONS = new Set(['list-tenancies', 'upsert-tenancy', 'list-rent-charges', 'generate-rent-schedule', 'mark-rent-paid', 'list-maintenance', 'upsert-maintenance', 'landlord-statement', 'invoice-rent-charge', 'renew-tenancy']);
-  const INVEST_ACTIONS = new Set(['get-investment', 'upsert-investment', 'list-investments']);
+  //
+  // The membership test is the TABLE the handler touches, not the tab it happens to be drawn on:
+  // `property_tenancies` / `property_rent_charges` / `property_maintenance` /
+  // `property_tenancy_inspections` are Property Management, `property_investments` is Investments.
+  // Seven actions reaching those tables were missing from these sets — the lifecycle/portal-token
+  // writes and the inspection pair the Lettings tab itself calls, plus all three deletes. The tab
+  // was hidden the whole time, which is exactly why nothing looked wrong: the page guard is UX and
+  // this is the boundary (`_shared/entitlement.ts`), and `real-estate-api` is reachable directly.
+  const PM_ACTIONS = new Set([
+    'list-tenancies', 'upsert-tenancy', 'list-rent-charges', 'generate-rent-schedule', 'mark-rent-paid',
+    'list-maintenance', 'upsert-maintenance', 'landlord-statement', 'invoice-rent-charge', 'renew-tenancy',
+    'update-tenancy-lifecycle', 'rotate-tenant-portal-token', 'list-inspections', 'upsert-inspection',
+    'delete-tenancy', 'delete-maintenance',
+  ]);
+  const INVEST_ACTIONS = new Set(['get-investment', 'upsert-investment', 'list-investments', 'delete-investment']);
   if (PM_ACTIONS.has(action)) { const g = await assertEntitled(supabase, workspaceId, 'real-estate-management'); if (!g.ok) return g.response; }
   if (INVEST_ACTIONS.has(action)) { const g = await assertEntitled(supabase, workspaceId, 'real-estate-investments'); if (!g.ok) return g.response; }
 
@@ -754,7 +769,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         const patch: Record<string, unknown> = {};
         if (body.inspection_type !== undefined) {
           const it = String(body.inspection_type);
-          if (!INSPECTION_TYPES.includes(it)) return json({ error: `inspection_type must be one of ${INSPECTION_TYPES.join(', ')}` }, 400);
+          if (!isInspectionType(it)) return json({ error: `inspection_type must be one of ${INSPECTION_TYPES.join(', ')}` }, 400);
           patch.inspection_type = it;
         }
         if (body.scheduled_for !== undefined) patch.scheduled_for = body.scheduled_for || null;
@@ -762,7 +777,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         if (body.document_id !== undefined) patch.document_id = body.document_id || null;
         if (body.condition_rating !== undefined) {
           const cr = body.condition_rating ? String(body.condition_rating) : null;
-          if (cr && !['good', 'fair', 'poor'].includes(cr)) return json({ error: 'invalid condition_rating' }, 400);
+          if (cr && !isInspectionCondition(cr)) return json({ error: `condition_rating must be one of ${INSPECTION_CONDITIONS.join(', ')}` }, 400);
           patch.condition_rating = cr;
         }
         if (body.completed === true) { patch.completed_at = new Date().toISOString(); patch.inspector_user_id = userId; }

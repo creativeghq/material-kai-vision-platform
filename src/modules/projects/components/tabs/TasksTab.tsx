@@ -48,9 +48,9 @@ interface TasksTabProps {
 
 const STATUS_ICON: Record<TaskStatus, React.ReactNode> = {
   todo: <Circle className="h-4 w-4 text-muted-foreground" />,
-  in_progress: <Clock className="h-4 w-4 text-blue-300" />,
-  done: <CheckCircle2 className="h-4 w-4 text-emerald-300" />,
-  blocked: <AlertTriangle className="h-4 w-4 text-amber-300" />,
+  in_progress: <Clock className="h-4 w-4 text-blue-600 dark:text-blue-300" />,
+  done: <CheckCircle2 className="h-4 w-4 text-emerald-700 dark:text-emerald-300" />,
+  blocked: <AlertTriangle className="h-4 w-4 text-amber-800 dark:text-amber-300" />,
 };
 
 const STATUS_LABEL: Record<TaskStatus, string> = {
@@ -399,13 +399,13 @@ const TaskRow: React.FC<TaskRowProps> = ({
                 </span>
               )}
               {task.due_date && (
-                <span className={days !== null && days < 0 ? 'text-destructive' : days !== null && days <= 3 ? 'text-amber-300' : ''}>
+                <span className={days !== null && days < 0 ? 'text-destructive' : days !== null && days <= 3 ? 'text-amber-800 dark:text-amber-300' : ''}>
                   {days === null ? formatDate(task.due_date) :
                     days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? 'Today' : `${days}d left`}
                 </span>
               )}
               {task.visibility === 'client_visible' && (
-                <span className="flex items-center gap-1 text-emerald-300">
+                <span className="flex items-center gap-1 text-emerald-700 dark:text-emerald-300">
                   <Eye className="h-3 w-3" />
                   Client visible
                 </span>
@@ -491,12 +491,12 @@ const TaskRow: React.FC<TaskRowProps> = ({
                     {(sub.due_date || sub.visibility === 'client_visible') && (
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
                         {sub.due_date && (
-                          <span className={subDays !== null && subDays < 0 ? 'text-destructive' : subDays !== null && subDays <= 3 ? 'text-amber-300' : ''}>
+                          <span className={subDays !== null && subDays < 0 ? 'text-destructive' : subDays !== null && subDays <= 3 ? 'text-amber-800 dark:text-amber-300' : ''}>
                             {subDays === null ? '' : subDays < 0 ? `${Math.abs(subDays)}d overdue` : subDays === 0 ? 'Today' : `${subDays}d left`}
                           </span>
                         )}
                         {sub.visibility === 'client_visible' && (
-                          <span className="flex items-center gap-1 text-emerald-300">
+                          <span className="flex items-center gap-1 text-emerald-700 dark:text-emerald-300">
                             <Eye className="h-3 w-3" />Client visible
                           </span>
                         )}

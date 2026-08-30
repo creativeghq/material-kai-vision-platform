@@ -200,7 +200,7 @@ export const ProductsTab: React.FC<{ projectId: string; workspaceId?: string | n
               <div className="text-right w-[110px]">
                 <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Reference</p>
                 {r.price_source === 'ask_for_quote' && r.reference_price == null ? (
-                  <Badge variant="outline" className="text-[10px] bg-amber-500/15 text-amber-300 border-amber-500/30">Ask for a quote</Badge>
+                  <Badge variant="outline" className="text-[10px] bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30">Ask for a quote</Badge>
                 ) : (
                   <p className="text-sm">{money(r.reference_price, r.price_currency)}</p>
                 )}

@@ -17,6 +17,18 @@ Three purchasable slugs, all `is_addon=true`, `price_tier='pro'`:
 | `real-estate-management` | Property Management | Tenancies, rent schedules, maintenance, landlord statements, rent→invoice |
 | `real-estate-investments` | Investments | Investment cases with yield / ROI modelling |
 
+> **The gate is the TABLE, not the tab.** `PM_ACTIONS` / `INVEST_ACTIONS` in
+> [real-estate-api/index.ts](../supabase/functions/real-estate-api/index.ts) are the boundary; the
+> page-side `pmEnabled` / `investEnabled` / `<ModuleTabGate>` are UX. An action that touches
+> `property_tenancies`, `property_rent_charges`, `property_maintenance` or
+> `property_tenancy_inspections` belongs to Property Management; one that touches
+> `property_investments` belongs to Investments. Seven actions were outside those sets until
+> 2026-08-30 — the tenancy lifecycle and portal-token writes the Lettings tab itself calls, the
+> inspection pair, and all three deletes — so a workspace with no add-on could not READ a tenancy
+> and could DELETE one. Derived and enforced by
+> [tests/unit/realEstateSubmoduleGates.test.ts](../tests/unit/realEstateSubmoduleGates.test.ts);
+> never hand-extend the sets without adding the table to that rule.
+
 The two sub-modules mount **additional tabs on the same `/properties` route** rather than pages of their own — buying Property Management doesn't move the user anywhere new, it grows the workbench they already use. A workspace without the add-on gets `402` from the corresponding actions and never sees the tab.
 
 ### Routes
@@ -71,7 +83,7 @@ A `realestate_agent` also gets a **reduced nav**: only Dashboard and Real Estate
 | `property_price_history` | Price changes over the life of the listing. |
 | `property_open_houses` | Scheduled open-house events. Created from the workbench **Viewings** tab. |
 | `property_documents` | Listing paperwork (ΠΕΑ, Ηλ. Ταυτότητα, title deed, agency agreement…). Workbench **Documents** tab; private bucket, signed URL per read. |
-| `real_estate_settings` | Per-workspace: `feed_token`, `feed_enabled`, `feed_format`. |
+| `real_estate_settings` | Per-workspace: `feed_token`, `feed_enabled`, `feed_format`, the `inbound_lead_token` pair, and the **AML policy** (`kyc_required_for_offers`, `kyc_required_types`) — edited from the Syndication tab. |
 | `public_realestate_submissions` | Hashed-IP counters backing the anonymous lead throttle. |
 
 Contacts are **not** duplicated: sellers, buyers and tenants are ordinary `crm_contacts` rows with a `property_contacts_ext` companion. The same person can be a supplier in Finance and a vendor in Real Estate without a second record.

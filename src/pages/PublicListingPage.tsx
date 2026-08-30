@@ -165,7 +165,7 @@ const InquiryForm: React.FC<{ token: string }> = ({ token }) => {
 
   if (state === 'sent') return (
     <div className="rounded-xl border bg-emerald-500/5 p-6 text-center">
-      <CheckCircle2 className="mx-auto mb-2 h-8 w-8 text-emerald-500" />
+      <CheckCircle2 className="mx-auto mb-2 h-8 w-8 text-emerald-700 dark:text-emerald-500" />
       <p className="text-sm font-medium">Thanks — your enquiry has been sent.</p>
     </div>
   );

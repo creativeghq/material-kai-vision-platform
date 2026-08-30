@@ -100,8 +100,8 @@ export const CommissionSplitsCard: React.FC<{ ws: string | null; saleId: string;
             {s.label && <span className="text-xs text-muted-foreground">{s.label}</span>}
             <span className="ml-auto font-medium tabular-nums">{money(s.amount, s.currency)}</span>
             {s.paid_at
-              ? <span className="text-xs text-emerald-600 dark:text-emerald-400">paid {formatDate(s.paid_at)}</span>
-              : <span className="text-xs text-amber-600 dark:text-amber-400">unpaid</span>}
+              ? <span className="text-xs text-emerald-700 dark:text-emerald-400">paid {formatDate(s.paid_at)}</span>
+              : <span className="text-xs text-amber-800 dark:text-amber-400">unpaid</span>}
             {canManage && (
               <div className="flex items-center gap-1">
                 <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => markPaid(s)}>

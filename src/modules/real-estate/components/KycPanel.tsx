@@ -52,8 +52,8 @@ export const KycPanel: React.FC<{ ws: string | null; contactId: string | null; c
       <CardHeader className="space-y-0 pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           {status.satisfied
-            ? <><ShieldCheck className="h-4 w-4 text-emerald-500" /> AML checks complete</>
-            : <><ShieldAlert className="h-4 w-4 text-amber-500" /> AML checks outstanding</>}
+            ? <><ShieldCheck className="h-4 w-4 text-emerald-700 dark:text-emerald-500" /> AML checks complete</>
+            : <><ShieldAlert className="h-4 w-4 text-amber-800 dark:text-amber-500" /> AML checks outstanding</>}
         </CardTitle>
         <p className="mt-1 text-xs text-muted-foreground">
           {status.required

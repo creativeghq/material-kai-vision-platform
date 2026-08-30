@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Loader2, Plus, FileText, Share2, Link2, Trash2, RefreshCw, Eye,
-  MessageSquare, Check, Pencil, X, ExternalLink, GripVertical,
+  MessageSquare, Check, Pencil, X, ExternalLink, GripVertical, Presentation, FileImage,
 } from 'lucide-react';
 
 import { Card, CardContent } from '@/components/core/ui/card';
+import { HubEmptyState } from '@/components/core/hub';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -37,8 +39,8 @@ type VrWorld = { id: string; display_name: string | null; thumbnail_url: string 
 
 const STATUS_TONE: Record<string, string> = {
   draft: 'bg-muted text-muted-foreground border-border',
-  generating: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
-  completed: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+  generating: 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30',
+  completed: 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border-emerald-500/30',
   failed: 'bg-destructive/15 text-destructive border-destructive/30',
 };
 
@@ -77,6 +79,7 @@ const emptyForm = (): FormState => ({
 });
 
 export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, projectName, isOwner }) => {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const { activeWorkspaceId } = useWorkspace();
   const [views, setViews] = useState<ClientView[]>([]);
@@ -363,7 +366,16 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
             <div className="space-y-2">
               <Label>Sheets to include {form.selectedSheetIds.length > 0 && <span className="text-muted-foreground">({form.selectedSheetIds.length} selected, in order)</span>}</Label>
               {sheets.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No sheets yet. Create sheets on this project's moodboards first (via the KAI agent or the moodboard Sheets tab).</p>
+                <HubEmptyState
+                  icon={FileImage}
+                  title="No sheets yet"
+                  description="A client view is built from presentation sheets. Make them on this project's moodboards first — the Sheets tab, or ask the agent."
+                  action={(
+                    <Button variant="outline" size="sm" onClick={() => navigate(`/projects/${projectId}?tab=sheets`)}>
+                      <FileImage className="h-4 w-4 mr-1" /> Go to Sheets
+                    </Button>
+                  )}
+                />
               ) : (
                 <div className="space-y-3">
                   {/* Ordered selection */}
@@ -434,7 +446,7 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
                   {(() => {
                     const sel = quotes.find((q) => q.id === form.quoteId);
                     if (sel && sel.status && sel.status !== 'accepted') {
-                      return <p className="text-[11px] text-amber-500">This quote is <strong>{sel.status}</strong>, not accepted — its pricing will be shown to the client as-is.</p>;
+                      return <p className="text-[11px] text-amber-800 dark:text-amber-400">This quote is <strong>{sel.status}</strong>, not accepted — its pricing will be shown to the client as-is.</p>;
                     }
                     return null;
                   })()}
@@ -498,8 +510,13 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
       {/* Existing views */}
       {views.length === 0 && !editorOpen ? (
         <Card className="dashboard-card">
-          <CardContent className="p-8 text-center text-sm text-muted-foreground">
-            No client views yet. Create one to bundle sheets into a shareable PDF + online presentation.
+          <CardContent className="p-0">
+            <HubEmptyState
+              icon={Presentation}
+              title="No client views yet"
+              description="Bundle this project's sheets into one client-ready PDF and a shareable online presentation."
+              action={<Button onClick={openCreate}><Plus className="h-4 w-4 mr-1" /> New client view</Button>}
+            />
           </CardContent>
         </Card>
       ) : (
@@ -573,7 +590,7 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
                       ) : fb.map((f) => (
                         <div key={f.id} className="text-sm flex items-start gap-2">
                           {f.status === 'approved'
-                            ? <Check className="h-4 w-4 text-emerald-400 mt-0.5" />
+                            ? <Check className="h-4 w-4 text-emerald-700 dark:text-emerald-400 mt-0.5" />
                             : <MessageSquare className="h-4 w-4 text-muted-foreground mt-0.5" />}
                           <div>
                             <span className="font-medium">{f.author_name || 'Client'}</span>

@@ -11,6 +11,11 @@ Before Projects, moodboards and quotes were standalone objects scoped to one use
 **Routes:**
 - `/projects` — list of the user's active projects (card grid)
 - `/projects/:id` — project detail (7 tabs: Overview / Rooms / Moodboards / Quotes / Sheets / Tasks / Timeline)
+- `/projects/:id?tab=<tab>` — every tab is deep-linkable, and `?tab=requests&request=<id>` opens
+  that thread (un-hiding it if it has been closed). The page validates the tab against what it
+  renders **for this viewer**, so a link to an owner-only tab falls back to Overview instead of a
+  blank panel. Guarded by [tests/unit/projectTabLinks.test.ts](../tests/unit/projectTabLinks.test.ts) —
+  a link naming a tab that does not exist fails the build.
 - `/projects/invite/:token` — public landing for invitees (no auth)
 - `/projects/accept-invite?token=…` — post-OTP redirect target
 

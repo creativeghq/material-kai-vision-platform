@@ -20,7 +20,7 @@ const money = (n: number | null | undefined, c: string) => formatMoney(n, c);
 const hoursOf = (minutes: number) => Math.round((minutes / 60) * 100) / 100;
 
 /** Positive margin reads as good, negative as a problem. Plain coloured text, never a pill. */
-const marginTone = (n: number) => (n < 0 ? 'text-destructive' : 'text-emerald-400');
+const marginTone = (n: number) => (n < 0 ? 'text-destructive' : 'text-emerald-700 dark:text-emerald-400');
 
 const Stat: React.FC<{ label: string; value: string; hint?: string; tone?: string }> = ({ label, value, hint, tone }) => (
   <div>
@@ -101,7 +101,7 @@ export const JobCostCard: React.FC<{
       </CardHeader>
       <CardContent className="p-5 space-y-5">
         {mixed && (
-          <p className="flex items-start gap-2 text-xs text-amber-400">
+          <p className="flex items-start gap-2 text-xs text-amber-800 dark:text-amber-400">
             <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
             This project mixes {pnl.currencies.join(', ')}. Totals below add different currencies
             together and are indicative only.

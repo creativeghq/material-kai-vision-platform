@@ -20,7 +20,12 @@ import {
   type ProjectRequestWithMessages, type RequestKind, type RequestStatus,
 } from '../../services/projectRequestsService';
 
-export const RequestsTab: React.FC<{ projectId: string; isOwner: boolean }> = ({ projectId, isOwner }) => {
+export const RequestsTab: React.FC<{
+  projectId: string;
+  isOwner: boolean;
+  /** `?request=` from the notification's action_url — the thread to open on arrival. */
+  focusRequestId?: string | null;
+}> = ({ projectId, isOwner, focusRequestId }) => {
   const { toast } = useToast();
   const [requests, setRequests] = useState<ProjectRequestWithMessages[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,6 +41,17 @@ export const RequestsTab: React.FC<{ projectId: string; isOwner: boolean }> = ({
     finally { setLoading(false); }
   }, [projectId, toast]);
   useEffect(() => { void load(); }, [load]);
+
+  // The four project_request_* notifications link to one thread by id. Opening it (and
+  // un-hiding it when it has since been closed) is what makes that link land on the thing
+  // it names rather than on a list the reader has to search.
+  useEffect(() => {
+    if (!focusRequestId) return;
+    const target = requests.find((r) => r.id === focusRequestId);
+    if (!target) return;
+    setOpenId(focusRequestId);
+    if (REQUEST_CLOSED_STATUSES.includes(target.status)) setShowClosed(true);
+  }, [focusRequestId, requests]);
 
   const visible = useMemo(
     () => requests.filter((r) => showClosed || !REQUEST_CLOSED_STATUSES.includes(r.status)),
@@ -105,7 +121,11 @@ export const RequestsTab: React.FC<{ projectId: string; isOwner: boolean }> = ({
             {visible.map((r) => {
               const expanded = openId === r.id;
               return (
-                <div key={r.id} className="p-4">
+                <div
+                  key={r.id}
+                  ref={(el) => { if (el && expanded && r.id === focusRequestId) el.scrollIntoView({ block: 'center' }); }}
+                  className="p-4"
+                >
                   <div className="flex items-start gap-3">
                     <button
                       type="button"
@@ -116,7 +136,7 @@ export const RequestsTab: React.FC<{ projectId: string; isOwner: boolean }> = ({
                         <p className="font-medium">{r.title}</p>
                         <span className="text-[11px] text-muted-foreground">{humanizeLabel(r.kind)}</span>
                         {r.approval_decision && (
-                          <span className={`text-[11px] ${r.approval_decision === 'approved' ? 'text-emerald-400' : 'text-destructive'}`}>
+                          <span className={`text-[11px] ${r.approval_decision === 'approved' ? 'text-emerald-700 dark:text-emerald-400' : 'text-destructive'}`}>
                             {humanizeLabel(r.approval_decision)}
                           </span>
                         )}

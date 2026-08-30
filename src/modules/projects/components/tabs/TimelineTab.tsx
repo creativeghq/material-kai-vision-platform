@@ -29,22 +29,22 @@ interface TimelineTabProps {
 
 const EVENT_ICON: Record<string, React.ReactNode> = {
   'project.created': <FolderKanban className="h-3.5 w-3.5 text-primary" />,
-  'project.status_changed': <Tag className="h-3.5 w-3.5 text-blue-300" />,
-  'project.budget_changed': <Wallet className="h-3.5 w-3.5 text-emerald-300" />,
-  'project.deadline_changed': <Calendar className="h-3.5 w-3.5 text-amber-300" />,
+  'project.status_changed': <Tag className="h-3.5 w-3.5 text-blue-600 dark:text-blue-300" />,
+  'project.budget_changed': <Wallet className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-300" />,
+  'project.deadline_changed': <Calendar className="h-3.5 w-3.5 text-amber-800 dark:text-amber-300" />,
   'room.added': <Home className="h-3.5 w-3.5 text-primary" />,
   'room.removed': <Home className="h-3.5 w-3.5 text-muted-foreground" />,
   'moodboard.attached': <Palette className="h-3.5 w-3.5 text-primary" />,
   'moodboard.detached': <Palette className="h-3.5 w-3.5 text-muted-foreground" />,
   'quote.attached': <FileText className="h-3.5 w-3.5 text-primary" />,
   'quote.detached': <FileText className="h-3.5 w-3.5 text-muted-foreground" />,
-  'quote.status_changed': <FileText className="h-3.5 w-3.5 text-blue-300" />,
+  'quote.status_changed': <FileText className="h-3.5 w-3.5 text-blue-600 dark:text-blue-300" />,
   'quote.revised': <GitBranch className="h-3.5 w-3.5 text-primary" />,
   'task.created': <Plus className="h-3.5 w-3.5 text-muted-foreground" />,
-  'task.completed': <CheckCircle2 className="h-3.5 w-3.5 text-emerald-300" />,
+  'task.completed': <CheckCircle2 className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-300" />,
   'task.deleted': <Trash2 className="h-3.5 w-3.5 text-destructive" />,
   'subtask.created': <Plus className="h-3.5 w-3.5 text-muted-foreground" />,
-  'subtask.completed': <CheckCircle2 className="h-3.5 w-3.5 text-emerald-300" />,
+  'subtask.completed': <CheckCircle2 className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-300" />,
   'subtask.deleted': <Trash2 className="h-3.5 w-3.5 text-destructive" />,
 };
 

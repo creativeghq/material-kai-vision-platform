@@ -322,6 +322,9 @@ export interface FeedSettings {
   /** Inbound portal-lead ingestion. The token IS the credential for writing leads into this
    *  workspace, so rotating it revokes every forwarder immediately — no grace window. */
   inbound_lead_token: string | null; inbound_leads_enabled: boolean;
+  /** AML policy. `get-feed-settings` returns the whole settings row, so these ride along with it —
+   *  the alternative was a second round trip for two booleans on the same table. */
+  kyc_required_for_offers: boolean; kyc_required_types: string[] | null;
 }
 
 /** The URL an inbound-email service posts forwarded portal mail to. */
@@ -569,8 +572,10 @@ export const realEstateService = {
     call<{ status: KycStatus; checks: KycCheck[] }>(ws, 'kyc-status', { contact_id: contactId }),
   upsertKycCheck: (ws: string, fields: { contact_id: string; check_type: string; status: string; reference?: string; notes?: string; expires_at?: string | null }) =>
     call<{ check: KycCheck }>(ws, 'upsert-kyc-check', fields).then((r) => r.check),
+  /** Unwrapped like every other write here — the envelope is the transport, not the answer. */
   updateKycPolicy: (ws: string, fields: { kyc_required_for_offers?: boolean; kyc_required_types?: string[] }) =>
-    call<{ policy: { kyc_required_for_offers: boolean; kyc_required_types: string[] } }>(ws, 'update-kyc-policy', fields),
+    call<{ policy: { kyc_required_for_offers: boolean; kyc_required_types: string[] } }>(ws, 'update-kyc-policy', fields)
+      .then((r) => r.policy),
 
   // Commission splits (broker-only writes) + the per-agent statement
   listCommissionSplits: (ws: string, saleId: string) =>

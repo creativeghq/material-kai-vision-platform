@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { formatMoney } from '@/utils/decimal';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Building2, Plus, Eye, Globe, Inbox, CalendarClock, LayoutDashboard, Loader2, Store, Handshake, KeyRound, Users, Wrench, Lock, LineChart, Columns3, Link as LinkIcon, Trash2, Pencil, Upload, Percent, Layers } from 'lucide-react';
+import { Building2, Plus, Eye, Globe, Inbox, CalendarClock, LayoutDashboard, Loader2, Store, Handshake, KeyRound, Users, Wrench, Lock, LineChart, Columns3, Link as LinkIcon, Trash2, Pencil, Upload, Percent, Layers, UserPlus, Contact, ShieldCheck } from 'lucide-react';
 import { ImportListingsDialog } from '../components/ImportListingsDialog';
 import { LeadRoutingCard } from '../components/LeadRoutingCard';
 import { CalendarConnectCard } from '../components/CalendarConnectCard';
@@ -23,7 +23,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { HubEmptyState } from '@/components/core/hub';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/core/ui/tabs';
-import { realEstateService, feedUrl, inboundLeadUrl, type PropertyListItem, type PropertyInquiry, type PropertyViewing, type RealEstateDashboard, type FeedSettings, type SellerLead, type PropertySale, type Tenancy, type MaintenanceWorkOrder, type BuyerRequirement, type PropertyInvestment, type InvestmentPortfolio } from '../services/realEstateService';
+import { realEstateService, feedUrl, inboundLeadUrl, KYC_TYPE_LABELS, type PropertyListItem, type PropertyInquiry, type PropertyViewing, type RealEstateDashboard, type FeedSettings, type SellerLead, type PropertySale, type Tenancy, type MaintenanceWorkOrder, type BuyerRequirement, type PropertyInvestment, type InvestmentPortfolio } from '../services/realEstateService';
 import { statusTone } from '@/utils/statusTone';
 import { Rss, Copy, RefreshCw } from 'lucide-react';
 import { TemplatePickerDialog } from '@/components/features/templates/TemplatePickerDialog';
@@ -132,7 +132,7 @@ export default function RealEstatePage() {
               <InvestmentsPanel ws={ws} />
             </ModuleTabGate>
           </TabsContent>
-          {canManage && <TabsContent value="syndication"><FeedCard ws={ws} /></TabsContent>}
+          {canManage && <TabsContent value="syndication" className="space-y-4"><FeedCard ws={ws} /><KycPolicyCard ws={ws} /></TabsContent>}
         </Tabs>
       </div>
 
@@ -163,10 +163,10 @@ const DashboardPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
         {kpi('Listings', d.totals.listings)}
-        {kpi('Active', d.totals.active, 'text-emerald-500')}
-        {kpi('Public', d.totals.public, 'text-emerald-500')}
+        {kpi('Active', d.totals.active, 'text-emerald-700 dark:text-emerald-500')}
+        {kpi('Public', d.totals.public, 'text-emerald-700 dark:text-emerald-500')}
         {kpi('Draft', d.totals.draft, 'text-muted-foreground')}
-        {kpi('Under offer', d.totals.under_offer, 'text-amber-500')}
+        {kpi('Under offer', d.totals.under_offer, 'text-amber-800 dark:text-amber-500')}
         {kpi('New leads', d.new_leads, 'text-primary')}
       </div>
       {d.commission && d.commission.sold_count > 0 && (() => {
@@ -176,7 +176,7 @@ const DashboardPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
             <div className="text-sm font-semibold">Commissions <span className="text-xs font-normal text-muted-foreground">(year to date)</span></div>
             <div><div className="text-[11px] text-muted-foreground">Sold</div><div className="text-base font-semibold">{d.commission.sold_count}</div></div>
             <div><div className="text-[11px] text-muted-foreground">Gross sales</div><div className="text-base font-semibold">{money(d.commission.gross_sales)}</div></div>
-            <div><div className="text-[11px] text-muted-foreground">Commission (net)</div><div className="text-base font-semibold text-emerald-500">{money(d.commission.commission_net)}</div></div>
+            <div><div className="text-[11px] text-muted-foreground">Commission (net)</div><div className="text-base font-semibold text-emerald-700 dark:text-emerald-500">{money(d.commission.commission_net)}</div></div>
             <div><div className="text-[11px] text-muted-foreground">Invoiced</div><div className="text-base font-semibold">{d.commission.invoiced_count}/{d.commission.sold_count}</div></div>
           </CardContent></Card>
         );
@@ -207,6 +207,73 @@ const DashboardPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
         </CardContent></Card>
       </div>
     </div>
+  );
+};
+
+/**
+ * The AML gate switch, and the reason the whole KYC feature was unreachable.
+ *
+ * `accept-offer` refuses with a 422 and the missing checks when `kyc_required_for_offers` is on,
+ * and `KycPanel` renders NOTHING while the gate is off and no check has been recorded. The column
+ * defaults to false and `update-kyc-policy` — live in the edge function and in the service since
+ * #281 — had no caller anywhere, so the gate could never be turned on, so the panel never rendered,
+ * so no check could ever be recorded, so the panel never rendered. A closed loop: a shipped
+ * compliance feature that no workspace could reach, and nothing failed while it sat there.
+ *
+ * Broker-only, like the verdicts themselves — the API returns 403 to an agent either way.
+ */
+const KycPolicyCard: React.FC<{ ws: string | null }> = ({ ws }) => {
+  const { toast } = useToast();
+  const [s, setS] = useState<FeedSettings | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { if (ws) realEstateService.getFeedSettings(ws).then(setS).catch(() => {}); }, [ws]);
+  if (!ws) return null;
+
+  const selected = new Set(s?.kyc_required_types ?? []);
+  const save = async (fields: { kyc_required_for_offers?: boolean; kyc_required_types?: string[] }) => {
+    setBusy(true);
+    try {
+      const policy = await realEstateService.updateKycPolicy(ws, fields);
+      setS((prev) => (prev ? { ...prev, ...policy } : prev));
+    } catch (e) {
+      toast({ title: 'Could not update the AML policy', description: (e as Error).message, variant: 'destructive' });
+    } finally { setBusy(false); }
+  };
+  const toggleType = (t: string) => {
+    const next = new Set(selected);
+    if (next.has(t)) next.delete(t); else next.add(t);
+    // The API refuses an empty list rather than silently disabling the gate, so say so here
+    // instead of sending a request that can only fail.
+    if (next.size === 0) { toast({ title: 'Keep at least one check', description: 'Turn the gate off instead if no check is required.' }); return; }
+    void save({ kyc_required_types: [...next] });
+  };
+
+  return (
+    <Card><CardContent className="p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <ShieldCheck className="h-4 w-4 text-primary" />
+        <span className="text-sm font-semibold">AML / KYC policy</span>
+        <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
+          <Checkbox checked={!!s?.kyc_required_for_offers} disabled={busy || !s}
+            onCheckedChange={(v) => void save({ kyc_required_for_offers: v === true })} /> Require before accepting an offer
+        </label>
+      </div>
+      <p className="mb-3 text-xs text-muted-foreground">
+        Accepting an offer rejects every competing bid, moves the listing to under offer and cancels its viewings — it is
+        the point of no return. With this on, it is refused until the buyer&apos;s checks are recorded, and the outstanding
+        ones show on the listing&apos;s Buyer panel rather than surfacing at the worst moment.
+      </p>
+      {s && (
+        <div className="flex flex-wrap gap-2">
+          {Object.entries(KYC_TYPE_LABELS).map(([t, label]) => (
+            <label key={t} className={`flex items-center gap-1.5 rounded-sm border px-2 py-1 text-xs ${busy ? 'opacity-60' : ''}`}>
+              <Checkbox checked={selected.has(t)} disabled={busy} onCheckedChange={() => toggleType(t)} />
+              {label}
+            </label>
+          ))}
+        </div>
+      )}
+    </CardContent></Card>
   );
 };
 
@@ -333,7 +400,7 @@ const ListingsPanel: React.FC<{ ws: string | null; canManage: boolean; creating:
           </div>
           <div className="hidden shrink-0 text-sm font-medium sm:block">{money(r.price, r.currency)}</div>
           <div className="flex shrink-0 items-center gap-2">
-            {r.is_public && <Globe className="h-3.5 w-3.5 text-emerald-500" aria-label="Public" />}
+            {r.is_public && <Globe className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-500" aria-label="Public" />}
             {r.view_count > 0 && <span className="flex items-center gap-1 text-xs text-muted-foreground"><Eye className="h-3 w-3" />{r.view_count}</span>}
             <span className={`text-[11px] capitalize ${statusTone(r.listing_status)}`}>{r.listing_status.replace('_', ' ')}</span>
           </div>
@@ -609,7 +676,7 @@ const DeleteIconButton: React.FC<{ title: string; confirmText: string; onDelete:
   const go = async () => { setBusy(true); try { await onDelete(); setOpen(false); } finally { setBusy(false); } };
   return (
     <>
-      <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0 text-red-500 hover:bg-red-500/10 hover:text-red-600" title={title} onClick={(e) => { e.stopPropagation(); setOpen(true); }}><Trash2 className="h-3.5 w-3.5" /></Button>
+      <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0 text-red-700 dark:text-red-500 hover:bg-red-500/10 hover:text-red-600" title={title} onClick={(e) => { e.stopPropagation(); setOpen(true); }}><Trash2 className="h-3.5 w-3.5" /></Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>{title}?</DialogTitle></DialogHeader>
@@ -692,7 +759,18 @@ const SellersPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
     </div>
   ) : null;
   if (rows === null) return <>{cmaButton}<InlineLoader /></>;
-  if (rows.length === 0) return <>{cmaButton}<div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No seller leads yet. Valuation requests from your public profile capture sellers here — and you can pitch one with a CMA above.</div></>;
+  if (rows.length === 0) return (
+    <>{cmaButton}
+      <div className="dashboard-card">
+        <HubEmptyState
+          icon={UserPlus}
+          title="No seller leads yet"
+          description="Valuation requests from your public profile land here. You can also add a vendor yourself, or pitch one with a comparative market analysis."
+          action={ws ? <AddPartyButton ws={ws} role="seller" onAdded={load} /> : undefined}
+        />
+      </div>
+    </>
+  );
   return (
     <>
     {cmaButton}
@@ -764,7 +842,18 @@ const BuyersPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
   useEffect(() => { load(); }, [load]);
   const header = ws ? <div className="mb-3 flex justify-end"><AddBuyerButton ws={ws} onAdded={load} /></div> : null;
   if (rows === null) return <>{header}<InlineLoader /></>;
-  if (rows.length === 0) return <>{header}<div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No registered buyers yet. Add one here, or from a CRM contact → Property tab — new matching listings alert you automatically.</div></>;
+  if (rows.length === 0) return (
+    <>{header}
+      <div className="dashboard-card">
+        <HubEmptyState
+          icon={Contact}
+          title="No registered buyers yet"
+          description="A buyer requirement is a saved search. Register one and every new listing that satisfies it alerts you the day it goes live — you can also add one from a CRM contact's Property tab."
+          action={ws ? <AddBuyerButton ws={ws} onAdded={load} /> : undefined}
+        />
+      </div>
+    </>
+  );
   const copyPortal = (token?: string | null) => {
     if (!token) { toast({ title: 'No portal link for this search yet', variant: 'destructive' }); return; }
     void navigator.clipboard.writeText(`${window.location.origin}/buyer/${token}`);
@@ -809,7 +898,16 @@ const LettingsPortfolioPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
       {ws && <div className="flex justify-end"><AddViaPropertyButton ws={ws} label="Add tenancy" tab="lettings" /></div>}
       <div>
         <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold"><KeyRound className="h-4 w-4" /> Active tenancies</div>
-        {tenancies.length === 0 ? <div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No tenancies yet. Set one up from a rental listing’s Lettings tab.</div> : (
+        {tenancies.length === 0 ? (
+          <div className="dashboard-card">
+            <HubEmptyState
+              icon={KeyRound}
+              title="No tenancies yet"
+              description="A tenancy carries the term, the rent and the deposit, and materialises the rent ledger. It is set up on the listing itself — pick a rental and open its Lettings tab."
+              action={ws ? <AddViaPropertyButton ws={ws} label="Add tenancy" tab="lettings" /> : undefined}
+            />
+          </div>
+        ) : (
           <Card><CardContent className="p-0"><div className="divide-y divide-border">
             {tenancies.map((t) => (
               <div key={t.id} className="flex items-center hover:bg-muted/40">
@@ -828,7 +926,7 @@ const LettingsPortfolioPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
       </div>
       {work.length > 0 && (
         <div>
-          <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold"><Wrench className="h-4 w-4" /> Open maintenance <Badge className="border-0 bg-amber-500/15 text-[10px] text-amber-500">{work.length}</Badge></div>
+          <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold"><Wrench className="h-4 w-4" /> Open maintenance <Badge className="border-0 bg-amber-500/15 text-[10px] text-amber-800 dark:text-amber-500">{work.length}</Badge></div>
           <Card><CardContent className="p-0"><div className="divide-y divide-border">
             {work.map((w) => (
               <button key={w.id} onClick={() => navigate(`/properties/${w.property_id}`)} className="flex w-full items-center gap-4 px-4 py-3 text-left text-sm hover:bg-muted/40">
@@ -888,7 +986,7 @@ const SalesPanel: React.FC<{ ws: string | null; canManage: boolean }> = ({ ws, c
     <div className="space-y-4">
       <Card><CardContent className="flex flex-wrap items-center gap-x-8 gap-y-2 p-4">
         <div><div className="text-[11px] text-muted-foreground">Completed</div><div className="text-base font-semibold">{rows.length}</div></div>
-        <div><div className="text-[11px] text-muted-foreground">Commission (net)</div><div className="text-base font-semibold text-emerald-500">{commissionEntries.length === 0 ? money(0, 'EUR') : commissionEntries.map(([cur, amt]) => money(amt, cur)).join(' · ')}</div></div>
+        <div><div className="text-[11px] text-muted-foreground">Commission (net)</div><div className="text-base font-semibold text-emerald-700 dark:text-emerald-500">{commissionEntries.length === 0 ? money(0, 'EUR') : commissionEntries.map(([cur, amt]) => money(amt, cur)).join(' · ')}</div></div>
         <div><div className="text-[11px] text-muted-foreground">Invoiced</div><div className="text-base font-semibold">{rows.filter((s) => s.invoice_id).length}/{rows.length}</div></div>
       </CardContent></Card>
       <Card><CardContent className="p-0"><div className="divide-y divide-border">
@@ -902,7 +1000,7 @@ const SalesPanel: React.FC<{ ws: string | null; canManage: boolean }> = ({ ws, c
                 <div className="mt-0.5 text-xs text-muted-foreground">{s.seller?.name ? `${s.seller.name} · ` : ''}{formatDate(s.completed_at)}</div>
               </div>
               <div className="text-right">
-                <div className="text-sm font-semibold text-emerald-500">{money(s.commission_base, s.currency)}</div>
+                <div className="text-sm font-semibold text-emerald-700 dark:text-emerald-500">{money(s.commission_base, s.currency)}</div>
                 {s.invoice_id
                   ? <span className={`text-[10px] capitalize ${statusTone(s.invoice_status || 'invoiced')}`}>{s.invoice_status || 'invoiced'}</span>
                   : <span className="text-[10px] text-muted-foreground">not invoiced</span>}
@@ -978,7 +1076,7 @@ const InvestmentsPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
                 <div className="font-medium">{iv.property?.title || 'Property'} <span className="text-xs text-muted-foreground">· {money(iv.metrics?.total_investment ?? 0, iv.currency)} in</span></div>
                 <div className="mt-0.5 text-xs text-muted-foreground">net yield {iv.metrics?.net_yield_pct ?? 0}% · cap {iv.metrics?.cap_rate_pct ?? 0}% · CoC {iv.metrics?.cash_on_cash_pct ?? 0}%</div>
               </div>
-              <div className={`shrink-0 text-sm font-semibold ${(iv.metrics?.monthly_cash_flow ?? 0) >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{money(iv.metrics?.monthly_cash_flow ?? 0, iv.currency)}/mo</div>
+              <div className={`shrink-0 text-sm font-semibold ${(iv.metrics?.monthly_cash_flow ?? 0) >= 0 ? 'text-emerald-700 dark:text-emerald-500' : 'text-red-700 dark:text-red-500'}`}>{money(iv.metrics?.monthly_cash_flow ?? 0, iv.currency)}/mo</div>
             </button>
             <div className="pr-3"><DeleteIconButton title="Delete investment analysis" confirmText={`Remove the investment analysis for ${iv.property?.title || 'this property'}? The listing itself is not affected.`} onDelete={() => realEstateService.deleteInvestment(ws as string, iv.property_id).then(load)} /></div>
           </div>

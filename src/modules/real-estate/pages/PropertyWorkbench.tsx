@@ -23,14 +23,16 @@ import { Card, CardContent } from '@/components/core/ui/card';
 import { Skeleton } from '@/components/core/ui/skeleton';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/core/ui/tabs';
+import { HubEmptyState } from '@/components/core/hub';
 import {
   realEstateService, isPublishBlocked,
   type Property, type PropertyPhoto, type PropertyInquiry, type PropertyViewing, type PropertyOffer,
   type Tenancy, type RentCharge, type MaintenanceWorkOrder, type LandlordStatement, type PropertySale,
-  type InvestmentMetrics, type PropertyDocument, type OpenHouse, DOC_TYPE_LABELS,
+  type InvestmentMetrics, type PropertyDocument, type OpenHouse, type TenancyInspection, DOC_TYPE_LABELS,
 } from '../services/realEstateService';
 import { ContractsSection } from '@/components/features/contracts/ContractsSection';
 import { statusTone } from '@/utils/statusTone';
+import { INSPECTION_TYPES, INSPECTION_CONDITIONS } from '../realEstateVocabulary';
 import { PartySearchDropdown, partyColumns, partyRefOf } from '@/components/business/crm/PartySearchDropdown';
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
 import { CmaReportDialog } from '../components/CmaReportDialog';
@@ -96,7 +98,20 @@ const DocumentsTab: React.FC<{ ws: string | null; propertyId: string; canManage:
           <span className="text-[11px] text-muted-foreground">Private — links expire after an hour.</span>
         </div>
       )}
-      {docs.length === 0 ? <div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No documents yet. Attach the ΠΕΑ, building ID and agency agreement here.</div> : (
+      {docs.length === 0 ? (
+        <div className="dashboard-card">
+          <HubEmptyState
+            icon={FileText}
+            title="No documents yet"
+            description="Attach the ΠΕΑ, the electronic building ID, the title deed and the agency agreement — stored privately, links expire after an hour."
+            action={canManage ? (
+              <Button size="sm" disabled={busy} onClick={() => fileRef.current?.click()}>
+                <Upload className="mr-1 h-4 w-4" /> Upload document
+              </Button>
+            ) : undefined}
+          />
+        </div>
+      ) : (
         <Card><CardContent className="p-0"><div className="divide-y divide-border">
           {docs.map((d) => (
             <div key={d.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
@@ -273,6 +288,22 @@ export default function PropertyWorkbench() {
     catch (e) { toast({ title: 'Could not delete', description: (e as Error).message, variant: 'destructive' }); setBusy(false); }
   };
 
+  /** Swap one photo with its neighbour and persist the whole order. `reorder-photos` takes the
+   *  full id list and rewrites sort_order from it, so sending the swapped array is the whole
+   *  operation — there is no per-photo index to keep in step. */
+  const movePhoto = async (index: number, delta: -1 | 1) => {
+    if (!ws) return;
+    const to = index + delta;
+    if (to < 0 || to >= photos.length) return;
+    const next = [...photos];
+    [next[index], next[to]] = [next[to], next[index]];
+    setPhotos(next); // optimistic: the grid must not lurch back before the round trip lands
+    setBusy(true);
+    try { await realEstateService.reorderPhotos(ws, next.map((p) => p.id)); await load(); }
+    catch (err) { toast({ title: 'Could not reorder', description: (err as Error).message, variant: 'destructive' }); await load(); }
+    finally { setBusy(false); }
+  };
+
   const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []); if (!ws || !files.length) return;
     setBusy(true);
@@ -343,14 +374,14 @@ export default function PropertyWorkbench() {
             {editable && <Button size="sm" onClick={save} disabled={saving}><Save className="mr-1 h-4 w-4" /> {saving ? 'Saving…' : 'Save'}</Button>}
             {/* Reuse this listing's shape — type, condition, features, boilerplate copy (#322). */}
             {editable && <Button variant="outline" size="sm" onClick={() => setSaveTemplateOpen(true)} title="Save the listing shape as a reusable template"><Layers className="mr-1 h-4 w-4" /> Template</Button>}
-            {editable && <Button variant="ghost" size="sm" className="text-red-500 hover:bg-red-500/10 hover:text-red-600" onClick={() => setDelOpen(true)} disabled={busy} title="Delete listing"><Trash2 className="mr-1 h-4 w-4" /> Delete</Button>}
+            {editable && <Button variant="ghost" size="sm" className="text-red-700 dark:text-red-500 hover:bg-red-500/10 hover:text-red-600" onClick={() => setDelOpen(true)} disabled={busy} title="Delete listing"><Trash2 className="mr-1 h-4 w-4" /> Delete</Button>}
           </div>
         } />
 
       <div className="p-3 sm:p-6">
         {publicUrl && property.is_public && (
           <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-4 py-2 text-sm">
-            <Globe className="h-4 w-4 text-emerald-500" /> <span className="text-muted-foreground">Live at</span>
+            <Globe className="h-4 w-4 text-emerald-700 dark:text-emerald-500" /> <span className="text-muted-foreground">Live at</span>
             <code className="truncate text-xs">{publicUrl}</code>
             <Button variant="ghost" size="sm" className="ml-auto" onClick={copyPublicLink}><Copy className="mr-1 h-3.5 w-3.5" /> Copy</Button>
             <a href={publicUrl} target="_blank" rel="noreferrer"><Button variant="ghost" size="sm"><ExternalLink className="mr-1 h-3.5 w-3.5" /> Open</Button></a>
@@ -387,7 +418,7 @@ export default function PropertyWorkbench() {
             )}
             {!property.is_public && (
               <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-2 text-xs text-muted-foreground">
-                <Zap className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+                <Zap className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-800 dark:text-amber-500" />
                 <span><span className="font-medium text-foreground">To publish{isGRbuilding ? ' in Greece' : ''}:</span>{' '}
                   title/description + price{isShortLet ? ', short-let licence (ΑΜΑ)' : isLand ? ', land use / zoning' : ', energy class + Electronic Building ID'}
                   {isGRbuilding ? ' are required.' : ' are recommended.'}</span>
@@ -642,11 +673,24 @@ export default function PropertyWorkbench() {
               )}
             </div>
             {photos.length === 0 ? (
-              <div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No photos yet.</div>
+              <div className="dashboard-card">
+                <HubEmptyState
+                  icon={ImageIcon}
+                  title="No photos yet"
+                  description="Photos are the listing. Add them here and the AI can tag rooms and pick the cover for you."
+                  action={editable ? (
+                    <Button size="sm" onClick={() => fileRef.current?.click()} disabled={busy}>
+                      <Upload className="mr-1 h-4 w-4" /> Upload photos
+                    </Button>
+                  ) : undefined}
+                />
+              </div>
             ) : (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                {photos.map((ph) => (
+                {photos.map((ph, i) => (
                   <PhotoCard key={ph.id} photo={ph} ws={ws!} canManage={editable}
+                    canMoveBack={i > 0} canMoveForward={i < photos.length - 1}
+                    onMove={editable ? (delta) => void movePhoto(i, delta) : null}
                     onCover={async () => { await realEstateService.setCover(ws!, id, ph.id); await load(); }}
                     onDelete={async () => { await realEstateService.deletePhoto(ws!, ph.id); await load(); }} />
                 ))}
@@ -878,6 +922,9 @@ const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: 
   const [busy, setBusy] = useState(false);
   const [woAdding, setWoAdding] = useState(false);
   const [wf, setWf] = useState<Record<string, any>>({ priority: 'normal' });
+  const [inspections, setInspections] = useState<TenancyInspection[]>([]);
+  const [inspAdding, setInspAdding] = useState(false);
+  const [inspF, setInspF] = useState<Record<string, any>>({ inspection_type: 'routine' });
 
   const load = useCallback(async () => {
     if (!ws) return;
@@ -886,11 +933,14 @@ const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: 
     setTenancy(t);
     if (t) {
       setF({ tenant_contact_id: t.tenant_contact_id, tenant_company_id: t.tenant_company_id, landlord_contact_id: t.landlord_contact_id, landlord_company_id: t.landlord_company_id, rent_amount: t.rent_amount, currency: t.currency, rent_frequency: t.rent_frequency, deposit: t.deposit, start_date: t.start_date, end_date: t.end_date, status: t.status, notes: t.notes });
-      const [c, s] = await Promise.all([
+      const [c, s, insp] = await Promise.all([
         realEstateService.listRentCharges(ws, t.id).catch(() => []),
         realEstateService.landlordStatement(ws, t.id).catch(() => null),
+        realEstateService.listInspections(ws, t.id).catch(() => []),
       ]);
-      setCharges(c); setStmt(s?.summary ?? null);
+      setCharges(c); setStmt(s?.summary ?? null); setInspections(insp);
+    } else {
+      setInspections([]);
     }
     setWos(await realEstateService.listMaintenance(ws, { property_id: propertyId }).catch(() => []));
   }, [ws, propertyId]);
@@ -955,6 +1005,45 @@ const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: 
     catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
     finally { setBusy(false); }
   };
+  // Inspections. `list-inspections` / `upsert-inspection` and the whole
+  // `property_tenancy_inspections` table shipped with #281 and had no surface at all, so the
+  // check-in / check-out condition record — the evidence a deposit deduction rests on — could be
+  // written by the API and by nothing a person could click.
+  const addInspection = async () => {
+    if (!ws || !tenancy) return;
+    setBusy(true);
+    try {
+      await realEstateService.upsertInspection(ws, {
+        tenancy_id: tenancy.id,
+        inspection_type: inspF.inspection_type,
+        scheduled_for: inspF.scheduled_for || null,
+        findings: inspF.findings || null,
+      });
+      setInspF({ inspection_type: 'routine' });
+      setInspAdding(false);
+      await load();
+    } catch (e) { toast({ title: 'Could not save the inspection', description: (e as Error).message, variant: 'destructive' }); }
+    finally { setBusy(false); }
+  };
+  const completeInspection = async (i: TenancyInspection, rating: string) => {
+    if (!ws) return;
+    setBusy(true);
+    try { await realEstateService.upsertInspection(ws, { inspection_id: i.id, completed: true, condition_rating: rating }); await load(); }
+    catch (e) { toast({ title: 'Could not complete the inspection', description: (e as Error).message, variant: 'destructive' }); }
+    finally { setBusy(false); }
+  };
+
+  // `delete-maintenance` shipped in real-estate-api and in the service, and nothing ever called
+  // it — a work order raised by mistake could only be closed, never removed.
+  const removeWo = async (id: string) => {
+    if (!ws) return;
+    if (!confirm('Delete this work order? The maintenance record and its cost are removed.')) return;
+    setBusy(true);
+    try { await realEstateService.deleteMaintenance(ws, id); await load(); }
+    catch (e) { toast({ title: 'Could not delete the work order', description: (e as Error).message, variant: 'destructive' }); }
+    finally { setBusy(false); }
+  };
+
   const setWoStatus = async (id: string, status: string) => {
     if (!ws) return;
     try { await realEstateService.upsertMaintenance(ws, { work_order_id: id, status }); await load(); }
@@ -1082,7 +1171,18 @@ const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: 
             <div className="flex items-center gap-1.5 text-sm font-semibold"><Receipt className="h-4 w-4" /> Rent ledger</div>
             {canManage && <Button size="sm" variant="outline" onClick={genSchedule} disabled={busy}>Generate 12 periods</Button>}
           </div>
-          {charges.length === 0 ? <div className="dashboard-card p-8 text-center text-sm text-muted-foreground">No rent charges yet. Generate a schedule to start the ledger.</div> : (
+          {charges.length === 0 ? (
+            <div className="dashboard-card">
+              <HubEmptyState
+                icon={Receipt}
+                title="No rent charges yet"
+                description="The ledger is materialised from the tenancy: generate the schedule and each period becomes a charge you can mark paid or invoice."
+                action={canManage ? (
+                  <Button size="sm" onClick={genSchedule} disabled={busy}>Generate 12 periods</Button>
+                ) : undefined}
+              />
+            </div>
+          ) : (
             <Card><CardContent className="p-0"><div className="divide-y divide-border">
               {charges.map((c) => (
                 <div key={c.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
@@ -1138,10 +1238,13 @@ const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: 
                   {w.description && <div className="mt-0.5 text-xs text-muted-foreground">{w.description}</div>}
                   <div className="mt-0.5 text-xs text-muted-foreground">{[w.contractor_name, w.cost != null ? offerMoney(w.cost, ccy) : null, formatDate(w.reported_at)].filter(Boolean).join(' · ')}</div>
                 </div>
-                {canManage && w.status !== 'completed' && w.status !== 'cancelled' && (
+                {canManage && (
                   <div className="flex shrink-0 gap-1.5">
                     {w.status === 'open' && <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setWoStatus(w.id, 'in_progress')}>Start</Button>}
-                    <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setWoStatus(w.id, 'completed')}><Check className="mr-1 h-3 w-3" /> Done</Button>
+                    {w.status !== 'completed' && w.status !== 'cancelled' && (
+                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setWoStatus(w.id, 'completed')}><Check className="mr-1 h-3 w-3" /> Done</Button>
+                    )}
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive" title="Delete work order" disabled={busy} onClick={() => removeWo(w.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                   </div>
                 )}
               </div>
@@ -1149,6 +1252,65 @@ const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: 
           </div></CardContent></Card>
         )}
       </div>
+
+      {tenancy && (
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-sm font-semibold"><ListChecks className="h-4 w-4" /> Inspections</div>
+            {canManage && !inspAdding && <Button size="sm" variant="outline" onClick={() => setInspAdding(true)}>Schedule inspection</Button>}
+          </div>
+          {inspAdding && (
+            <Card className="mb-3"><CardContent className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-4">
+              <Sel value={inspF.inspection_type} opts={[...INSPECTION_TYPES]} onChange={(v) => setInspF((p) => ({ ...p, inspection_type: v }))} />
+              <Input type="date" value={inspF.scheduled_for ?? ''} onChange={(e) => setInspF((p) => ({ ...p, scheduled_for: e.target.value }))} />
+              <Textarea placeholder="Findings (optional)" className="sm:col-span-4" value={inspF.findings ?? ''} onChange={(e) => setInspF((p) => ({ ...p, findings: e.target.value }))} />
+              <div className="col-span-full flex gap-2"><Button size="sm" onClick={addInspection} disabled={busy}>Save</Button><Button size="sm" variant="ghost" onClick={() => setInspAdding(false)}>Cancel</Button></div>
+            </CardContent></Card>
+          )}
+          {inspections.length === 0 ? (
+            <div className="dashboard-card">
+              <HubEmptyState
+                icon={ListChecks}
+                title="No inspections yet"
+                description="Check-in and check-out records are the evidence a deposit deduction rests on — schedule one, and record the condition when it is done."
+                action={canManage && !inspAdding ? (
+                  <Button size="sm" onClick={() => setInspAdding(true)}>Schedule inspection</Button>
+                ) : undefined}
+              />
+            </div>
+          ) : (
+            <Card><CardContent className="p-0"><div className="divide-y divide-border">
+              {inspections.map((i) => (
+                <div key={i.id} className="flex items-start gap-3 px-4 py-3 text-sm">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium capitalize">{i.inspection_type.replace('_', ' ')}</span>
+                      <span className={`text-[10px] ${statusTone(i.completed_at ? 'completed' : 'scheduled')}`}>
+                        {i.completed_at ? `completed ${formatDate(i.completed_at)}` : i.scheduled_for ? `due ${formatDate(i.scheduled_for)}` : 'unscheduled'}
+                      </span>
+                      {i.condition_rating && (
+                        <span className={`text-[10px] capitalize ${statusTone(i.condition_rating === 'good' ? 'passed' : i.condition_rating === 'poor' ? 'failed' : 'pending')}`}>
+                          {i.condition_rating}
+                        </span>
+                      )}
+                    </div>
+                    {i.findings && <div className="mt-0.5 text-xs text-muted-foreground">{i.findings}</div>}
+                  </div>
+                  {canManage && !i.completed_at && (
+                    <div className="flex shrink-0 items-center gap-1">
+                      {/* The rating IS the completion. Closing one with no condition on it records
+                          that somebody visited and nothing about what they found. */}
+                      {INSPECTION_CONDITIONS.map((r) => (
+                        <Button key={r} size="sm" variant="ghost" className="h-7 px-2 text-xs capitalize" disabled={busy} onClick={() => completeInspection(i, r)}>{r}</Button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div></CardContent></Card>
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -1236,7 +1398,7 @@ const InvestmentTab: React.FC<{ ws: string | null; propertyId: string; canManage
 const InvStat: React.FC<{ label: string; value: string; accent?: boolean; tone?: 'pos' | 'neg' }> = ({ label, value, accent, tone }) => (
   <div className={`dashboard-card p-3 ${accent ? 'ring-1 ring-primary/30' : ''}`}>
     <div className="text-[11px] text-muted-foreground">{label}</div>
-    <div className={`mt-0.5 text-base font-semibold ${tone === 'pos' ? 'text-emerald-500' : tone === 'neg' ? 'text-red-500' : accent ? 'text-primary' : ''}`}>{value}</div>
+    <div className={`mt-0.5 text-base font-semibold ${tone === 'pos' ? 'text-emerald-700 dark:text-emerald-500' : tone === 'neg' ? 'text-red-700 dark:text-red-500' : accent ? 'text-primary' : ''}`}>{value}</div>
   </div>
 );
 const Detail: React.FC<{ label: string; value: string }> = ({ label, value }) => (
@@ -1314,9 +1476,9 @@ const CommissionPanel: React.FC<{ ws: string | null; propertyId: string; propert
         </div>
         <div>
           <div className="text-xs text-muted-foreground">Commission {sale.commission_pct ? `(${sale.commission_pct}%${sale.commission_fixed ? ` + ${offerMoney(sale.commission_fixed, ccy)}` : ''})` : ''}</div>
-          <div className="text-lg font-semibold text-emerald-500">{offerMoney(sale.commission_base, ccy)}<span className="text-xs font-normal text-muted-foreground"> + VAT</span></div>
+          <div className="text-lg font-semibold text-emerald-700 dark:text-emerald-500">{offerMoney(sale.commission_base, ccy)}<span className="text-xs font-normal text-muted-foreground"> + VAT</span></div>
         </div>
-        <Badge className="border-0 bg-emerald-500/15 text-[11px] text-emerald-500">Sold {formatDate(sale.completed_at)}</Badge>
+        <Badge className="border-0 bg-emerald-500/15 text-[11px] text-emerald-700 dark:text-emerald-500">Sold {formatDate(sale.completed_at)}</Badge>
       </div>
       {canManage && (
         <div className="flex items-center gap-3">
@@ -1367,6 +1529,14 @@ const OffersTab: React.FC<{ ws: string | null; propertyId: string; canManage: bo
     } catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
     finally { setBusy(false); }
   };
+  const remove = async (id: string) => {
+    if (!ws) return;
+    if (!confirm('Delete this offer? The bid and its qualification flags are removed from the ledger.')) return;
+    setBusy(true);
+    try { await realEstateService.deleteOffer(ws, id); await load(); }
+    catch (e) { toast({ title: 'Could not delete the offer', description: (e as Error).message, variant: 'destructive' }); }
+    finally { setBusy(false); }
+  };
   const add = async () => {
     if (!ws || !f.amount) return;
     setBusy(true);
@@ -1402,7 +1572,20 @@ const OffersTab: React.FC<{ ws: string | null; propertyId: string; canManage: bo
         </CardContent></Card>
       ) : <Button variant="outline" size="sm" onClick={() => setAdding(true)}><Gavel className="mr-1.5 h-4 w-4" /> Record an offer</Button>)}
 
-      {offers.length === 0 ? <div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No offers yet.</div> : (
+      {offers.length === 0 ? (
+        <div className="dashboard-card">
+          <HubEmptyState
+            icon={Gavel}
+            title="No offers yet"
+            description="Record what a buyer has offered and on what terms — accepting one moves the listing to under offer and cancels the remaining viewings."
+            action={canManage && !adding ? (
+              <Button size="sm" onClick={() => setAdding(true)}>
+                <Gavel className="mr-1 h-4 w-4" /> Record an offer
+              </Button>
+            ) : undefined}
+          />
+        </div>
+      ) : (
         <Card><CardContent className="p-0"><div className="divide-y divide-border">
           {offers.map((o) => (
             <div key={o.id} className="flex items-start gap-4 px-4 py-3">
@@ -1410,16 +1593,21 @@ const OffersTab: React.FC<{ ws: string | null; propertyId: string; canManage: bo
                 <div className="flex items-center gap-2"><span className="font-semibold">{offerMoney(o.amount, o.currency)}</span><span className={`text-[11px] capitalize ${statusTone(o.status)}`}>{o.status.replace('_', ' ')}</span></div>
                 <div className="mt-0.5 text-xs text-muted-foreground">{o.buyer?.name || o.buyer_name || 'Buyer'} · {formatDate(o.created_at)}</div>
                 <div className="mt-1 flex flex-wrap gap-1.5">
-                  {o.proof_of_funds && <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-500">Proof of funds</span>}
-                  {o.mortgage_in_principle && <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-500">MIP</span>}
-                  {o.chain_free && <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-500">Chain-free</span>}
+                  {o.proof_of_funds && <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-700 dark:text-emerald-500">Proof of funds</span>}
+                  {o.mortgage_in_principle && <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-700 dark:text-emerald-500">MIP</span>}
+                  {o.chain_free && <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-700 dark:text-emerald-500">Chain-free</span>}
                 </div>
                 {o.terms && <div className="mt-1 text-xs text-muted-foreground">{o.terms}</div>}
               </div>
-              {canManage && ['offered', 'countered'].includes(o.status) && (
+              {canManage && (
                 <div className="flex shrink-0 gap-1">
-                  <Button size="icon" variant="ghost" className="h-8 w-8 text-emerald-500" title="Accept" disabled={busy} onClick={() => setStatus(o.id, 'accepted')}><Check className="h-4 w-4" /></Button>
-                  <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" title="Reject" disabled={busy} onClick={() => setStatus(o.id, 'rejected')}><X className="h-4 w-4" /></Button>
+                  {['offered', 'countered'].includes(o.status) && (<>
+                    <Button size="icon" variant="ghost" className="h-8 w-8 text-emerald-700 dark:text-emerald-500" title="Accept" disabled={busy} onClick={() => setStatus(o.id, 'accepted')}><Check className="h-4 w-4" /></Button>
+                    <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" title="Reject" disabled={busy} onClick={() => setStatus(o.id, 'rejected')}><X className="h-4 w-4" /></Button>
+                  </>)}
+                  {/* `delete-offer` existed on both sides and had no caller. An offer recorded
+                      against the wrong listing could be rejected but not withdrawn. */}
+                  <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive" title="Delete offer" disabled={busy} onClick={() => remove(o.id)}><Trash2 className="h-4 w-4" /></Button>
                 </div>
               )}
             </div>
@@ -1511,7 +1699,13 @@ const NumInput: React.FC<{ v: any; on: (x: number | '') => void }> = ({ v, on })
   <Input type="number" value={v ?? ''} onChange={(e) => on(e.target.value === '' ? '' : Number(e.target.value))} />
 );
 
-const PhotoCard: React.FC<{ photo: PropertyPhoto; ws: string; canManage: boolean; onCover: () => void; onDelete: () => void }> = ({ photo, canManage, onCover, onDelete }) => {
+const PhotoCard: React.FC<{
+  photo: PropertyPhoto; ws: string; canManage: boolean;
+  onCover: () => void; onDelete: () => void;
+  /** Null at the ends of the gallery — a move that cannot happen shows no handle. */
+  onMove: ((delta: -1 | 1) => void) | null;
+  canMoveBack: boolean; canMoveForward: boolean;
+}> = ({ photo, canManage, onCover, onDelete, onMove, canMoveBack, canMoveForward }) => {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
@@ -1522,9 +1716,14 @@ const PhotoCard: React.FC<{ photo: PropertyPhoto; ws: string; canManage: boolean
   return (
     <div className="group relative overflow-hidden rounded-lg border bg-muted">
       <div className="aspect-[4/3] w-full">{url ? <img src={url} alt={photo.caption ?? ''} className="h-full w-full object-cover" /> : <Skeleton className="h-full w-full" />}</div>
-      {photo.is_cover && <Badge className="absolute left-2 top-2 border-0 bg-emerald-500 text-[10px] text-white">Cover</Badge>}
+      {photo.is_cover && <Badge className="absolute left-2 top-2 border-0 bg-emerald-700 text-[10px] text-white">Cover</Badge>}
       {canManage && (
         <div className="absolute inset-x-0 bottom-0 flex justify-end gap-1 bg-gradient-to-t from-black/60 to-transparent p-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+          {/* Gallery ORDER is what the public page and the portal feed publish, and
+              `reorder-photos` had been live on both sides with no caller — so the order was
+              whatever order the files happened to upload in, permanently. */}
+          {onMove && canMoveBack && <Button size="icon" variant="ghost" className="h-7 w-7 text-white hover:bg-white/20" onClick={() => onMove(-1)} title="Move earlier"><ChevronLeft className="h-3.5 w-3.5" /></Button>}
+          {onMove && canMoveForward && <Button size="icon" variant="ghost" className="h-7 w-7 text-white hover:bg-white/20" onClick={() => onMove(1)} title="Move later"><ChevronRight className="h-3.5 w-3.5" /></Button>}
           {!photo.is_cover && <Button size="icon" variant="ghost" className="h-7 w-7 text-white hover:bg-white/20" onClick={onCover} title="Set as cover"><Star className="h-3.5 w-3.5" /></Button>}
           <Button size="icon" variant="ghost" className="h-7 w-7 text-white hover:bg-white/20" onClick={onDelete} title="Delete"><Trash2 className="h-3.5 w-3.5" /></Button>
         </div>
