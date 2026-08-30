@@ -21,10 +21,30 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { recordPageEvent } from '../_shared/document-events.ts';
+import { getTrustedClientIp } from '../_shared/client-ip.ts';
 import { SHEET_ASSET_BUCKET, sheetAssetPath } from '../_shared/sheetAssetRefs.generated.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+/** Where snag / site-log photos live since #358 PQ-9 — PRIVATE, signed per read. */
+const SITE_PHOTO_BUCKET = 'pdf-documents';
+const SITE_PHOTO_TTL_SECONDS = 60 * 60;
+
+/**
+ * Anonymous feedback is a WRITE from a link that is meant to be forwarded.
+ *
+ * A client-view URL travels by email and group chat; possession of it is not evidence of who is
+ * holding it. Every accepted feedback row also emits `client_view_feedback_received`, which
+ * notifies (and can email) the deliverable's owner — so an unthrottled endpoint is both a storage
+ * cost and a way to flood somebody's inbox from a link they shared with a client.
+ *
+ * Same shape and the same budget as `real-estate-public`'s anonymous lead cap, which is the
+ * pattern this follows: hash the trusted-hop IP, never store it raw.
+ */
+const FEEDBACK_HOURLY_LIMIT = 12;
+/** And what ONE caller may contribute to that, so a flood cannot lock out the real client. */
+const FEEDBACK_PER_CALLER_HOURLY_LIMIT = 6;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -70,6 +90,66 @@ async function ensureDeliverablePdf(
   return signed?.signedUrl ?? null;
 }
 
+/**
+ * Refuses when this view has taken too much feedback in the last hour, or when this caller has.
+ *
+ * The COUNT is the enforcement decision, so an unanswerable one refuses — reading a failed query
+ * as "nobody has written anything" is the fail-open shape that lifts a limit at the exact moment
+ * it is needed. The IP is hashed before it is stored and is never returned or displayed.
+ *
+ * Returns the hash to stamp on the row, or a Response to send instead.
+ */
+async function checkFeedbackBudget(
+  supabase: DbClient,
+  req: Request,
+  clientViewId: string,
+): Promise<{ ipHash: string | null } | Response> {
+  const sinceIso = new Date(Date.now() - 3_600_000).toISOString();
+
+  let ipHash: string | null = null;
+  try {
+    const raw = getTrustedClientIp(req);
+    if (raw && raw !== 'unknown') {
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
+      ipHash = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 40);
+    }
+  } catch {
+    // A hash we could not compute costs us the per-caller budget, not the per-view one below.
+    ipHash = null;
+  }
+
+  const { count: viewCount, error: viewErr } = await supabase
+    .from('client_view_feedback')
+    .select('id', { count: 'exact', head: true })
+    .eq('client_view_id', clientViewId)
+    .gte('created_at', sinceIso);
+  if (viewErr) {
+    console.error('[moodboard-sheet-share] feedback budget count failed — refusing (fail closed):', viewErr.message);
+    return jsonResponse({ error: 'Too many messages right now — please try again later.' }, 429);
+  }
+  if ((viewCount ?? 0) >= FEEDBACK_HOURLY_LIMIT) {
+    return jsonResponse({ error: 'Too many messages right now — please try again later.' }, 429);
+  }
+
+  if (ipHash) {
+    const { count: mine, error: mineErr } = await supabase
+      .from('client_view_feedback')
+      .select('id', { count: 'exact', head: true })
+      .eq('client_view_id', clientViewId)
+      .eq('ip_hash', ipHash)
+      .gte('created_at', sinceIso);
+    if (mineErr) {
+      console.error('[moodboard-sheet-share] per-caller feedback count failed — refusing (fail closed):', mineErr.message);
+      return jsonResponse({ error: 'Too many messages right now — please try again later.' }, 429);
+    }
+    if ((mine ?? 0) >= FEEDBACK_PER_CALLER_HOURLY_LIMIT) {
+      return jsonResponse({ error: 'Too many messages right now — please try again later.' }, 429);
+    }
+  }
+
+  return { ipHash };
+}
+
 Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
   await bootstrapForFunction();
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -98,6 +178,8 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
     // Feedback write path
     if (feedback && typeof feedback === 'object') {
       if (!view.feedback_enabled) return jsonResponse({ error: 'Feedback disabled' }, 403);
+      const budget = await checkFeedbackBudget(supabase, req, view.id);
+      if (budget instanceof Response) return budget;
       const kind = ['comment', 'approval', 'change_request'].includes(feedback.kind) ? feedback.kind : 'comment';
       const status = ['approved', 'changes_requested'].includes(feedback.status) ? feedback.status : null;
       // Only accept a sheet_id that actually belongs to THIS client view — an anonymous
@@ -115,6 +197,7 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
         kind,
         status,
         body: typeof feedback.body === 'string' ? feedback.body.slice(0, 4000) : null,
+        ip_hash: budget.ipHash,
       });
       if (fErr) return jsonResponse({ error: 'Could not save feedback' }, 500);
       // Flows — notify the deliverable owner that a client responded. Resolve the owning
@@ -318,15 +401,35 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
       .eq('client_visible', true)
       .order('created_at', { ascending: true });
 
+    // One round trip for every photo on the list. A path that cannot be signed is dropped rather
+    // than rendered as a broken image — the same choice siteService.photoUrls makes internally.
+    const snagPhotoUrls: Record<string, string> = {};
+    {
+      const paths = [...new Set((snagRows || []).flatMap((s: any) => (s.photo_paths || []) as string[]).filter(Boolean))];
+      if (paths.length) {
+        const { data: signedRows, error: signErr } = await supabase.storage
+          .from(SITE_PHOTO_BUCKET).createSignedUrls(paths, SITE_PHOTO_TTL_SECONDS);
+        if (signErr) console.error('[moodboard-sheet-share] could not sign snag photos:', signErr.message);
+        for (const row of signedRows ?? []) {
+          if (row.path && row.signedUrl) snagPhotoUrls[row.path] = row.signedUrl;
+        }
+      }
+    }
+
     const snags = (snagRows || []).map((s: any) => ({
       id: s.id,
       title: s.title,
       status: s.status,
       room: s.project_rooms?.name ?? null,
       resolved: ['fixed', 'verified', 'wont_fix'].includes(s.status),
-      photo_urls: (s.photo_paths || []).map(
-        (p: string) => supabase.storage.from('generation-images').getPublicUrl(p).data.publicUrl,
-      ),
+      // Signed from the PRIVATE bucket the photos actually live in. #358 PQ-9 moved snag and
+      // site-log photos out of `generation-images` (public) into `pdf-documents` under
+      // `project-site/…` precisely because a defect photo of the inside of a client's home was
+      // openable by anyone holding the URL. Every internal reader moved with it; THIS one — the
+      // client-facing handover list — was left building `getPublicUrl` against the old bucket, so
+      // it emitted URLs for a file that is not there. Not a leak any more: just every snag photo
+      // on a client view silently a broken image, with the list itself still rendering.
+      photo_urls: (s.photo_paths || []).map((p: string) => snagPhotoUrls[p]).filter(Boolean),
     }));
 
     return jsonResponse({

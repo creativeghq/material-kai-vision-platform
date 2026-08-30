@@ -13,6 +13,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { escapeHtml } from '../_shared/html.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 
 function page(title: string, message: string, ok: boolean): Response {
@@ -76,6 +77,9 @@ Deno.serve(withApiLogging('moodboard-keep-active', async (req: Request) => {
     return page('Something went wrong', 'We could not update the moodboard. Please open it in the app to keep it active.', false);
   }
 
-  const title = String(board.title ?? 'Your moodboard').replace(/[<>&]/g, '');
+  // Canonical escaper (invariant 11). `page()` builds an HTML string, and the previous local
+  // stripper deleted `< > &` instead of escaping them — mangling any board with an ampersand in
+  // its name on the one page that exists to reassure the owner it was kept.
+  const title = escapeHtml(board.title ?? 'Your moodboard');
   return page('Kept active', `"${title}" will be kept. Thanks — it won't be removed.`, true);
 }));

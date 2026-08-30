@@ -1332,6 +1332,43 @@ building could be told which jobs happen there and could never say so.
   which guards REGRESSION rather than absence: deleting the reader or unmounting it restores the
   exact original state, and nothing else would notice.
 
+## The client-view share link — 2026-08-30
+
+An anonymous surface that both reads private files and accepts a write. Three defects.
+
+**Snag photos pointed at a bucket the files are not in.** #358 PQ-9 moved snag and site-log photos
+out of the public `generation-images` into the PRIVATE `pdf-documents` under `project-site/…`, read
+through signed URLs — because a defect photo of the inside of a client's home was openable by
+anyone holding the URL. Every internal reader moved with it. `moodboard-sheet-share`, the
+CLIENT-facing handover list, kept building `getPublicUrl()` against the old bucket. Not a leak any
+more: just every snag photo on a client view silently a broken image, with the list rendering
+around the gaps. Now signed in one batch from the real bucket, and a path that cannot be signed is
+dropped rather than emitted dead.
+
+**The anonymous feedback write had no rate limit at all.** A share link is MEANT to be forwarded —
+it travels by email and group chat, and possession says nothing about who is holding it — and every
+accepted row emits `client_view_feedback_received`, which notifies and can email the owner. One
+leaked link was an unbounded write into somebody's storage and inbox, from a URL they handed to a
+client themselves. The budget is counted on `client_view_feedback` itself (no second store to keep
+consistent): a per-VIEW cap bounds the flood at all, and a per-CALLER cap keyed on a hashed
+trusted-hop IP targets the one abusing it without locking out an honest client on the same link.
+Both counts fail closed.
+
+**Two hand-rolled HTML escapers, and the guard could not see either.** `moodboard-dormancy-cron`
+and `moodboard-keep-active` sanitised with an inline `String(t).replace(/[<>&]/g, '')`. Weaker than
+the canonical set (no `"`, no `'`) and LOSSY in a way users saw: a board called "Kitchen & Bath"
+reached its owner's dormancy-warning email as "Kitchen  Bath". The existing guard read exactly one
+file (`api/kb-prerender.js`) and looked only for something NAMED `escapeHtml`, so an unnamed inline
+strip in a file it never opened was invisible twice over.
+
+`escapeHtmlParity.test.ts` now sweeps every edge and `api/` source: a file that BUILDS HTML and
+sanitises with a character class over `< > &` must use the canonical escaper. Two paths are exempt
+by name with their real contract stated — the myDATA SOAP **XML** escaper and the SEO
+**prompt-injection fence** — and a third case asserts each exemption still exists and has not
+quietly become HTML. That self-check earned its place immediately: matching tags
+case-INSENSITIVELY made SOAP's `<Body>` look like an HTML page, and the exemption test caught it
+rather than the detector silently mis-classifying a file.
+
 ## The third prefix collision of the day — 2026-08-30
 
 `computeBlueprint`'s completeness check asks whether any schedule line references a derived count,

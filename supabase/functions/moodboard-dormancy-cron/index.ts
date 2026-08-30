@@ -25,6 +25,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { authenticate, isAdminAccess, isCronAuthorized } from '../_shared/auth.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
+import { escapeHtml } from '../_shared/html.ts';
 
 const IDLE_DAYS = 30;          // inactivity before the first warning
 const GRACE_DAYS = 15;         // warning → deletion
@@ -36,9 +37,12 @@ function keepActiveUrl(token: string): string {
 }
 
 function warningEmailHtml(title: string, keepUrl: string, daysLeft: number): string {
-  // No untrusted interpolation beyond the board title (owner's own text); still
-  // keep it plain to avoid markup issues.
-  const safeTitle = String(title ?? 'your moodboard').replace(/[<>&]/g, '');
+  // The CANONICAL escaper, not a local one. Invariant 11 forbids a hand-rolled copy because the
+  // per-file copies drifted to three different strengths — and this one was weaker than it looks
+  // in a way that also damaged ordinary titles: it STRIPPED `< > &` rather than escaping them, so
+  // a board called "Kitchen & Bath" went out to the owner as "Kitchen  Bath". Escaping renders it
+  // correctly and is strictly safer than deleting characters.
+  const safeTitle = escapeHtml(title ?? 'your moodboard');
   return `
     <div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;color:#222">
       <h2 style="font-weight:600">Is "${safeTitle}" still needed?</h2>
