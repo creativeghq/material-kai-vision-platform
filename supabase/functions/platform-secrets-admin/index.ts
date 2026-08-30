@@ -156,7 +156,15 @@ async function handleSave(supabase: any, body: RequestBody, userId: string | nul
   // every integration, so inventing one is choosing what an integration resolves to.
   const { data: existing } = await supabase
     .from('platform_secrets').select('key').eq('key', body.key).maybeSingle();
-  if (!existing) return json({ error: `Unknown secret key: ${body.key}` }, 400);
+  if (!existing) {
+    // Name the remedy. `platform_secrets` is a declared registry, so the answer is always
+    // "add the row", never "try a different spelling" — and 12 keys the code already
+    // resolved were missing from it when this check went in.
+    return json({
+      error: `Unknown secret key: ${body.key}. Keys are declared by migration before they can `
+        + `be set — add a platform_secrets row for it, then save again.`,
+    }, 400);
+  }
 
   const { error } = await supabase
     .from('platform_secrets')
@@ -182,7 +190,12 @@ async function handleSaveMany(supabase: any, body: RequestBody, userId: string |
     .from('platform_secrets').select('key').in('key', patches.map(p => p.key));
   const knownKeys = new Set((known ?? []).map((r: { key: string }) => r.key));
   const unknown = patches.map(p => p.key).filter(k => !knownKeys.has(k));
-  if (unknown.length > 0) return json({ error: `Unknown secret key(s): ${unknown.join(', ')}` }, 400);
+  if (unknown.length > 0) {
+    return json({
+      error: `Unknown secret key(s): ${unknown.join(', ')}. Keys are declared by migration `
+        + `before they can be set — add a platform_secrets row for each, then save again.`,
+    }, 400);
+  }
 
   for (const patch of patches) {
     const { error } = await supabase
