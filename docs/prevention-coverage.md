@@ -1246,6 +1246,41 @@ never reached the line.
 - **Locked in by ratcheting** 50 → 24 across 15 files: a regression takes the count back up and
   fails the build.
 
+## The third prefix collision of the day — 2026-08-30
+
+`computeBlueprint`'s completeness check asks whether any schedule line references a derived count,
+so that "30 hinges derived and nothing counting them" is reported rather than discovered on fitting
+day. It asked with a SUBSTRING:
+
+```ts
+if (!referenced.includes(`total_${row.key}`)) issues.push(...)
+```
+
+`total_socket` is a prefix of `total_socket_dedicated`. So a kitchen whose only electrical schedule
+line counted the oven's dedicated circuit ALSO satisfied the check for ordinary sockets — nine of
+them derived, nothing counting them, no issue raised. Of every key pair in the schema this is the
+one that can collide, and it is the one that reaches an electrician.
+
+Now word-anchored (`` does not match between `socket` and `_dedicated`, because `_` is a word
+character), with the key escaped because it comes from the blueprint author's schema. Guarded by
+"a dedicated circuit does not answer for the general sockets" in
+[tests/unit/blueprintComposition.test.ts](../tests/unit/blueprintComposition.test.ts), which
+asserts both directions — the counted key is not reported, the uncounted prefix still is —
+and mutation-tested by restoring the `.includes()`.
+
+**This is the third instance of one shape in a single session**, which is the reason it is written
+up as its own entry rather than folded into the blueprint notes:
+
+| where | the collision |
+|---|---|
+| `dic_detect__ops_storage_paths_unregistered` | `public.generation_3d` read as registered because `public.generation_3d_segments` was |
+| `tests/unit/rateLimitFailsClosed.test.ts` (my own first draft) | the ceiling matcher required a character before the keyword, so `MAX_FLOW_RUNS_PER_MINUTE` never matched |
+| `computeBlueprint` | `total_socket` satisfied by `total_socket_dedicated` |
+
+Each was a name-matching check that was ALMOST right, each failed silently in the safe-looking
+direction (reporting clean), and none of them could be caught by a type or a lint. When a check
+asks "does this name appear", anchor both ends.
+
 ## A channel link that reported someone else's double booking — 2026-08-30
 
 `real-estate-ical` pulls every active short-let channel calendar in one pass and stamps each link

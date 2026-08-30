@@ -900,6 +900,35 @@ describe('the services schedule', () => {
     }
   });
 
+  it('a dedicated circuit does not answer for the general sockets', () => {
+    // `total_socket` is a PREFIX of `total_socket_dedicated`, and the completeness check used to
+    // ask `referenced.includes('total_' + key)`. So a kitchen whose only electrical schedule line
+    // counted the oven's dedicated circuit ALSO satisfied the check for ordinary sockets — nine
+    // of them derived, nothing counting them, and no issue raised. The one key pair where this
+    // can happen is the one that reaches an electrician.
+    const scheduleLine = {
+      id: 'sched-dedicated', parent_id: null, kind: 'task', label: 'Dedicated circuits',
+      is_schedule: true, quantity_formula: 'total_socket_dedicated', unit: 'pcs',
+      material_cost: null, labor_rate: null, margin_pct: 0, default_quantity: 0,
+    } as unknown as typeof applianceItems[number];
+
+    const issues = computeBlueprint([...applianceItems, scheduleLine], {}, null, {
+      schema: kitchen,
+      config: kcfg([appliance({ type: 'dishwasher', placement: 'under' })]),
+    }).composition!.issues;
+
+    // The dedicated circuit IS counted, so it must not be reported...
+    expect(
+      issues.some((i) => i.includes('total_socket_dedicated')),
+      'a key a line does count must not be reported as uncounted',
+    ).toBe(false);
+    // ...while the plain sockets, which nothing counts, still must be.
+    expect(
+      issues.some((i) => i.includes('(total_socket)')),
+      'a prefix of another key must not be satisfied by it',
+    ).toBe(true);
+  });
+
   it('raises the same completeness issue as a hinge nobody counts', () => {
     // Nine sockets derived and no line counting them is the silent-zero shape: the kitchen needs
     // first-fix electrics, the schedule says nothing, and the electrician finds out on site.

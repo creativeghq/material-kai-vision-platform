@@ -164,8 +164,19 @@ export function computeBlueprint(
       .filter((r) => r.is_schedule && r.quantity_formula)
       .map((r) => String(r.quantity_formula))
       .join(' ');
+    // WORD-ANCHORED, not a substring. `total_socket` is a PREFIX of `total_socket_dedicated`,
+    // so a plain `.includes()` let a line counting the oven's dedicated circuit answer for the
+    // general sockets too — and a kitchen deriving ordinary socket counts that NOTHING schedules
+    // then raised no issue at all. That is precisely the case this check exists for: the
+    // electrician finds out on fitting day.
+    //
+    // A trailing word boundary does not match between `socket` and `_dedicated`, because `_` is
+    // a word character — which is the whole point. Keys come from the blueprint author's schema,
+    // so they are escaped rather than trusted to be identifier-safe.
+    const countsKey = (k: string) =>
+      new RegExp(String.raw`\btotal_` + k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + String.raw`\b`);
     for (const row of derived.schedule) {
-      if (!referenced.includes(`total_${row.key}`)) {
+      if (!countsKey(row.key).test(referenced)) {
         derived.issues.push(
           `${row.quantity} ${row.unit} of ${row.label.toLowerCase()} are derived but no schedule line counts them (total_${row.key}).`,
         );
