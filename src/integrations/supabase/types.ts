@@ -36400,7 +36400,6 @@ export type Database = {
         Args: { p_order: string }
         Returns: Json
       }
-      has_price_monitoring_access: { Args: never; Returns: boolean }
       has_role:
         | {
             Args: {
