@@ -863,6 +863,8 @@ const AddExpenseDialog: React.FC<{
   const [method, setMethod] = useState<ExpensePaymentMethod>('personal');
   const [billable, setBillable] = useState(false);
   const [projectId, setProjectId] = useState('');
+  const [orderId, setOrderId] = useState('');
+  const [orders, setOrders] = useState<Array<{ id: string; order_number: string | null; order_type: string }>>([]);
   const [projects, setProjects] = useState<Array<{ id: string; name: string | null }>>([]);
   const [saving, setSaving] = useState(false);
 
@@ -873,6 +875,13 @@ const AddExpenseDialog: React.FC<{
     if (!open || !workspaceId) return;
     void supabase.from('projects').select('id, name').eq('workspace_id', workspaceId).order('created_at', { ascending: false }).limit(200)
       .then(({ data }) => setProjects((data as any[]) ?? []));
+    // Open orders, so a cost incurred FOR a commitment lands against it (#378 L6). Separate
+    // from the job: an order may have no project, and a project has many orders — deriving
+    // one from the other would attribute the cost to a commitment nobody chose.
+    void supabase.from('orders').select('id, order_number, order_type')
+      .eq('workspace_id', workspaceId).in('status', ['draft', 'confirmed', 'partially_fulfilled'])
+      .order('created_at', { ascending: false }).limit(200)
+      .then(({ data }) => setOrders((data as any[]) ?? []));
   }, [open, workspaceId]);
 
   const save = async () => {
@@ -884,9 +893,9 @@ const AddExpenseDialog: React.FC<{
         report_id: reportId, expense_date: date, category,
         description: description.trim() || null, vendor: vendor.trim() || null,
         amount: amt, currency, payment_method: method,
-        billable, project_id: projectId || null,
+        billable, project_id: projectId || null, order_id: orderId || null,
       });
-      setDescription(''); setVendor(''); setAmount(''); setBillable(false); setProjectId('');
+      setDescription(''); setVendor(''); setAmount(''); setBillable(false); setProjectId(''); setOrderId('');
       onOpenChange(false);
       onAdded();
     } catch (err: any) {
@@ -961,6 +970,26 @@ const AddExpenseDialog: React.FC<{
             <p className="text-[11px] text-muted-foreground">
               Counts towards the project&apos;s cost once approved.
             </p>
+          </div>
+          {/* The order, separately (#378 L6). A job says which margin bears the cost; an order says
+              which commitment it lands against, and the two are not the same question — an order
+              may have no project, and a project has many orders. Without this the trip cost reached
+              the job and never the order's Expenses tab, its three-way match, or committed-vs-actual. */}
+          <div className="space-y-1">
+            <label htmlFor="tripexpensespanel-order" className="text-xs text-muted-foreground">
+              Order <span className="text-muted-foreground">— which commitment this cost is against</span>
+            </label>
+            <Select value={orderId || '__none__'} onValueChange={(v) => setOrderId(v === '__none__' ? '' : v)}>
+              <SelectTrigger id="tripexpensespanel-order"><SelectValue placeholder="Pick the order this cost is for" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">— No order —</SelectItem>
+                {orders.map((o) => (
+                  <SelectItem key={o.id} value={o.id}>
+                    {o.order_number || o.id.slice(0, 8)} · {o.order_type === 'purchase' ? 'purchase' : 'sales'}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
         <DialogFooter>

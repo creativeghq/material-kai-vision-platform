@@ -104,6 +104,15 @@ export interface TripExpenseItem {
   payment_method: ExpensePaymentMethod | null;
   billable: boolean;
   project_id: string | null;
+  /**
+   * The order this cost was incurred for (#378 L6).
+   *
+   * Independent of `project_id`, and never derived from it: an order may have no project,
+   * and a project has many orders. `get_project_pnl` already read the job side, so job P&L
+   * was right and the ORDER never saw the cost — its Expenses tab, its three-way match and
+   * committed-vs-actual at order level all missed the trip.
+   */
+  order_id: string | null;
   receipt_bucket: string | null;
   receipt_path: string | null;
   receipt_name: string | null;
@@ -168,6 +177,7 @@ export interface CreateItemInput {
   payment_method?: ExpensePaymentMethod;
   billable?: boolean;
   project_id?: string | null;
+  order_id?: string | null;
   sort_order?: number;
   /**
    * Set only by the receipt scanner (#379). `extraction_status` is an EXPLICIT marker: NULL means
@@ -304,6 +314,7 @@ export const tripExpenseService = {
         payment_method: input.payment_method ?? 'personal',
         billable: input.billable ?? false,
         project_id: input.project_id ?? null,
+        order_id: input.order_id ?? null,
         sort_order: input.sort_order ?? 0,
         extraction_status: input.extraction_status ?? null,
         extracted: input.extracted ?? null,
@@ -379,7 +390,7 @@ export const tripExpenseService = {
   },
 
   async updateItem(id: string, patch: Partial<Pick<TripExpenseItem,
-    'expense_date' | 'category' | 'description' | 'vendor' | 'amount' | 'currency' | 'vat_amount' | 'payment_method' | 'billable' | 'project_id' | 'sort_order'>>): Promise<void> {
+    'expense_date' | 'category' | 'description' | 'vendor' | 'amount' | 'currency' | 'vat_amount' | 'payment_method' | 'billable' | 'project_id' | 'order_id' | 'sort_order'>>): Promise<void> {
     const { error } = await supabase.from('trip_expense_items').update(patch).eq('id', id);
     if (error) throw error;
   },

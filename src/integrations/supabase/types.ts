@@ -29798,6 +29798,7 @@ export type Database = {
           id: string
           payment_method: string | null
           project_id: string | null
+          order_id: string | null
           receipt_bucket: string | null
           receipt_mime: string | null
           receipt_name: string | null
@@ -29826,6 +29827,7 @@ export type Database = {
           id?: string
           payment_method?: string | null
           project_id?: string | null
+          order_id?: string | null
           receipt_bucket?: string | null
           receipt_mime?: string | null
           receipt_name?: string | null
@@ -29854,6 +29856,7 @@ export type Database = {
           id?: string
           payment_method?: string | null
           project_id?: string | null
+          order_id?: string | null
           receipt_bucket?: string | null
           receipt_mime?: string | null
           receipt_name?: string | null
