@@ -7,6 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
+import { MoneyInput } from '@/components/core/ui/money-input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
@@ -252,8 +253,10 @@ export const NewDeliveryNoteDialog: React.FC<{
                 {lines.map((l, i) => (
                   <div key={i} className="flex items-center gap-2 text-sm">
                     <div className="flex-1 min-w-0 truncate">{l.description}{l.unit ? <span className="text-muted-foreground"> /{l.unit}</span> : ''}</div>
-                    <Input type="number" min="1" step="1" className="h-8 w-20 text-xs" value={l.quantity}
-                      onChange={(e) => setQty(i, Number(e.target.value) || 1)} />
+                    {/* `delivery_note_items.quantity` is numeric — 17.92 m² of tile is a real
+                        delivery line, so this must not be an integer stepper. */}
+                    <MoneyInput displayDecimals={null} className="h-8 w-20 text-xs" value={l.quantity}
+                      onValueChange={(v) => setQty(i, v || 1)} />
                     <button type="button" className="text-muted-foreground hover:text-destructive" onClick={() => removeLine(i)}><Trash2 className="h-3.5 w-3.5" /></button>
                   </div>
                 ))}

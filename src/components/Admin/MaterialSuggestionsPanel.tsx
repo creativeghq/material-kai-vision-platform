@@ -10,6 +10,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
+import { MoneyInput } from '@/components/core/ui/money-input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import {
@@ -283,17 +284,15 @@ export const MaterialSuggestionsPanel: React.FC<{ embedded?: boolean }> = ({ emb
 
               <div className="space-y-2">
                 <Label htmlFor="threshold">Confidence Threshold</Label>
-                <Input
+                <MoneyInput
                   id="threshold"
-                  type="number"
-                  min="0"
-                  max="1"
-                  step="0.1"
+                  displayDecimals={null}
                   value={config.confidenceThreshold}
-                  onChange={(e) =>
+                  onValueChange={(v) =>
                     setConfig((prev) => ({
                       ...prev,
-                      confidenceThreshold: parseFloat(e.target.value),
+                      // Was the native `max="1"`, which a text-mode input has no equivalent for.
+                      confidenceThreshold: Math.min(1, Math.max(0, v ?? 0)),
                     }))
                   }
                 />

@@ -3,6 +3,7 @@ import { Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
+import { MoneyInput } from '@/components/core/ui/money-input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
@@ -200,8 +201,8 @@ export const PromptTemplateEditorModal: React.FC<{
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <div className="space-y-1">
               <Label>Temperature</Label>
-              <Input type="number" step="0.1" min="0" max="2" value={form.temperature}
-                onChange={(e) => set('temperature', Math.min(2, Math.max(0, parseFloat(e.target.value) || 0)))} />
+              <MoneyInput value={form.temperature} displayDecimals={null}
+                onValueChange={(v) => set('temperature', Math.min(2, Math.max(0, v ?? 0)))} />
             </div>
             <div className="space-y-1">
               <Label>Max tokens</Label>

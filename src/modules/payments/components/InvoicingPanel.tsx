@@ -24,6 +24,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
+import { MoneyInput } from '@/components/core/ui/money-input';
 import { Label } from '@/components/core/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -309,13 +310,10 @@ export const InvoicingPanel: React.FC<Props> = (_props) => {
             </div>
             <div>
               <Label className="text-xs">Default VAT rate (%)</Label>
-              <Input
-                type="number"
-                min={0}
-                max={100}
-                step={0.5}
+              <MoneyInput
                 value={fields.default_vat_rate}
-                onChange={e => setFields({ ...fields, default_vat_rate: Math.max(0, Math.min(100, parseFloat(e.target.value || '0'))) })}
+                displayDecimals={null}
+                onValueChange={v => setFields({ ...fields, default_vat_rate: Math.max(0, Math.min(100, v ?? 0)) })}
                 disabled={saving}
               />
             </div>

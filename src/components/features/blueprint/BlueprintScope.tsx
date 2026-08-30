@@ -15,6 +15,7 @@ import { HubEmptyState } from '@/components/core/hub';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
+import { MoneyInput } from '@/components/core/ui/money-input';
 import { Switch } from '@/components/core/ui/switch';
 import { UnitSelect } from '@/components/features/blueprint/UnitSelect';
 import type { BlueprintItem, DimensionDef } from '@/services/blueprintsService';
@@ -62,7 +63,7 @@ export const BlueprintScope: React.FC<BlueprintScopeProps> = ({
       </div>
       {it.is_allowance ? (
         <div className="flex items-center gap-2 pl-1 text-[11px] text-muted-foreground">Allowance Amount
-          <Input className="h-6 w-24 text-right" value={String(it.allowance_amount ?? 0)} onChange={(e) => patch(it.id, { allowance_amount: Number(e.target.value) || 0 })} />
+          <MoneyInput className="h-6 w-24 text-right" value={it.allowance_amount ?? 0} onValueChange={(v) => patch(it.id, { allowance_amount: v ?? 0 })} />
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-3 pl-1 text-[11px] text-muted-foreground">
@@ -70,16 +71,16 @@ export const BlueprintScope: React.FC<BlueprintScopeProps> = ({
             <Input className="h-6 w-40" value={it.quantity_formula ?? ''} placeholder="= floor_area * 1.1" onChange={(e) => patch(it.id, { quantity_formula: e.target.value || null })} />
           </span>
           <span className="flex items-center gap-1">Default
-            <Input className="h-6 w-14 text-right" value={String(it.default_quantity ?? 1)} onChange={(e) => patch(it.id, { default_quantity: Number(e.target.value) || 0 })} />
+            <MoneyInput className="h-6 w-14 text-right" value={it.default_quantity ?? 1} displayDecimals={null} onValueChange={(v) => patch(it.id, { default_quantity: v ?? 0 })} />
           </span>
           <span className="flex items-center gap-1">Labor
-            <Input className="h-6 w-16 text-right" value={it.labor_rate != null ? String(it.labor_rate) : ''} placeholder="—" onChange={(e) => patch(it.id, { labor_rate: e.target.value === '' ? null : Number(e.target.value) })} />
+            <MoneyInput className="h-6 w-16 text-right" value={it.labor_rate} placeholder="—" onValueChange={(v) => patch(it.id, { labor_rate: v })} />
           </span>
           <span className="flex items-center gap-1">Material
-            <Input className="h-6 w-16 text-right" value={it.material_cost != null ? String(it.material_cost) : ''} placeholder="—" onChange={(e) => patch(it.id, { material_cost: e.target.value === '' ? null : Number(e.target.value) })} />
+            <MoneyInput className="h-6 w-16 text-right" value={it.material_cost} placeholder="—" onValueChange={(v) => patch(it.id, { material_cost: v })} />
           </span>
           <span className="flex items-center gap-1">Margin
-            <Input className="h-6 w-14 text-right" value={String(it.margin_pct ?? 0)} onChange={(e) => patch(it.id, { margin_pct: Number(e.target.value) || 0 })} />%
+            <MoneyInput className="h-6 w-14 text-right" value={it.margin_pct ?? 0} displayDecimals={null} onValueChange={(v) => patch(it.id, { margin_pct: v ?? 0 })} />%
           </span>
           <span className="flex items-center gap-1">Option
             <Input className="h-6 w-24" value={it.option_group ?? ''} placeholder="group" onChange={(e) => patch(it.id, { option_group: e.target.value || null })} />
@@ -134,7 +135,7 @@ export const BlueprintScope: React.FC<BlueprintScopeProps> = ({
               <Input className="h-8 w-32" value={d.key} placeholder="key" onChange={(e) => onPatchDim?.(idx, { key: e.target.value.replace(/[^a-zA-Z0-9_]/g, '_') })} />
               <Input className="h-8 flex-1" value={d.label} placeholder="label" onChange={(e) => onPatchDim?.(idx, { label: e.target.value })} />
               <Input className="h-8 w-20" value={d.unit ?? ''} placeholder="unit" onChange={(e) => onPatchDim?.(idx, { unit: e.target.value })} />
-              <Input className="h-8 w-20 text-right" value={String(d.default ?? 0)} placeholder="default" onChange={(e) => onPatchDim?.(idx, { default: Number(e.target.value) || 0 })} />
+              <MoneyInput className="h-8 w-20 text-right" value={Number(d.default ?? 0)} displayDecimals={null} placeholder="default" onValueChange={(v) => onPatchDim?.(idx, { default: v ?? 0 })} />
               {!readOnly && (
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onDeleteDim?.(idx)}><Trash2 className="h-3.5 w-3.5 text-muted-foreground" /></Button>
               )}

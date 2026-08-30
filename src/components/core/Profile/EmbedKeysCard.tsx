@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
+import { MoneyInput } from '@/components/core/ui/money-input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Switch } from '@/components/core/ui/switch';
@@ -773,14 +774,12 @@ export const EmbedKeysCard: React.FC = () => {
               </div>
               <div className="space-y-1.5 pt-1">
                 <Label htmlFor="embed-key-usd">Most per day (USD)</Label>
-                <Input
+                <MoneyInput
                   id="embed-key-usd"
-                  type="number"
-                  min={0}
-                  step={0.25}
-                  max={MAX_DAILY_USD_CAP}
                   value={form.usdCap}
-                  onChange={(e) => setForm((f) => ({ ...f, usdCap: Number(e.target.value) }))}
+                  // The ceiling moved off the native `max` attribute, which a text-mode input has
+                  // no equivalent for — clamped here so it is still enforced.
+                  onValueChange={(v) => setForm((f) => ({ ...f, usdCap: Math.min(MAX_DAILY_USD_CAP, Math.max(0, v ?? 0)) }))}
                 />
                 <p className="text-xs text-muted-foreground">
                   One ceiling for everything this key can spend in a day. Roughly a hundred written

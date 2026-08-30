@@ -16,6 +16,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { SaveAsTemplateDialog } from '@/components/features/templates/SaveAsTemplateDialog';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
+import { MoneyInput } from '@/components/core/ui/money-input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Badge } from '@/components/core/ui/badge';
@@ -1701,8 +1702,12 @@ const ChkGrid: React.FC<{ items: readonly (readonly [string, string])[]; form: R
   </div>
 );
 // Numeric input that emits number | '' (so a cleared field saves as null).
+// MoneyInput rather than `type="number"`: it holds the typed text while focused, so a decimal
+// survives being typed. Latitude and every m² field come through here — with a number-backed
+// `type="number"` the browser hands back "" for the half-typed "37.", which cleared the box on
+// the keystroke, and a coordinate could not be entered at all.
 const NumInput: React.FC<{ v: any; on: (x: number | '') => void }> = ({ v, on }) => (
-  <Input type="number" value={v ?? ''} onChange={(e) => on(e.target.value === '' ? '' : Number(e.target.value))} />
+  <MoneyInput displayDecimals={null} value={v ?? null} onValueChange={(x) => on(x ?? '')} />
 );
 
 const PhotoCard: React.FC<{

@@ -14,6 +14,7 @@ import { getErrorMessage } from '@/core/errors/utils';
 import { Button } from '@/components/core/ui/button';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Input } from '@/components/core/ui/input';
+import { MoneyInput } from '@/components/core/ui/money-input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
@@ -127,7 +128,7 @@ const FieldInput: React.FC<{
     case 'textarea':
       return <Textarea value={value || ''} onChange={(e) => onChange(e.target.value)} rows={3} placeholder={field.placeholder} />;
     case 'number':
-      return <Input type="number" value={value ?? ''} onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))} placeholder={field.placeholder} />;
+      return <MoneyInput displayDecimals={null} value={value ?? null} onValueChange={(v) => onChange(v)} placeholder={field.placeholder} />;
     case 'email':
       return <Input type="email" value={value || ''} onChange={(e) => onChange(e.target.value)} placeholder={field.placeholder} />;
     case 'url':

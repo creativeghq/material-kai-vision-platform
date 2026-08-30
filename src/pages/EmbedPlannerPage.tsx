@@ -24,7 +24,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Loader2, Plus, Ruler, Trash2, RotateCw } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
-import { Input } from '@/components/core/ui/input';
+import { MoneyInput } from '@/components/core/ui/money-input';
 import { Label } from '@/components/core/ui/label';
 import { RoomPlannerCanvas } from '@/components/features/roomplanner/RoomPlannerCanvas';
 import type { ResolvedLayoutItem } from '@/services/roomPlannerService';
@@ -161,22 +161,18 @@ export default function EmbedPlannerPage() {
       <div className="flex flex-wrap items-end gap-3">
         <div className="w-28">
           <Label className="text-xs">Room width (m)</Label>
-          <Input
-            type="number"
-            step="0.1"
-            min="1"
+          <MoneyInput
+            displayDecimals={null}
             value={room.widthM}
-            onChange={(e) => setRoom((r) => ({ ...r, widthM: Math.max(1, Number(e.target.value) || 1) }))}
+            onValueChange={(v) => setRoom((r) => ({ ...r, widthM: Math.max(1, v || 1) }))}
           />
         </div>
         <div className="w-28">
           <Label className="text-xs">Room depth (m)</Label>
-          <Input
-            type="number"
-            step="0.1"
-            min="1"
+          <MoneyInput
+            displayDecimals={null}
             value={room.depthM}
-            onChange={(e) => setRoom((r) => ({ ...r, depthM: Math.max(1, Number(e.target.value) || 1) }))}
+            onValueChange={(v) => setRoom((r) => ({ ...r, depthM: Math.max(1, v || 1) }))}
           />
         </div>
       </div>

@@ -33,6 +33,7 @@ import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Input } from '@/components/core/ui/input';
+import { MoneyInput } from '@/components/core/ui/money-input';
 import { Switch } from '@/components/core/ui/switch';
 import type {
   AppliancePlacementDef,
@@ -232,10 +233,10 @@ export const CompositionEditor: React.FC<CompositionEditorProps> = ({
                           </select>
                           {zone.seats && (
                             <>
-                              <Input
+                              <MoneyInput
                                 className="h-6 w-14 text-right" aria-label="Centimetres per seat"
-                                value={String(zone.seats.cm_per_seat ?? 60)}
-                                onChange={(e) => patchZone(zi, { seats: { ...zone.seats!, cm_per_seat: Number(e.target.value) || 0 } })}
+                                value={zone.seats.cm_per_seat ?? 60} displayDecimals={null}
+                                onValueChange={(v) => patchZone(zi, { seats: { ...zone.seats!, cm_per_seat: v ?? 0 } })}
                               />cm each
                             </>
                           )}
@@ -271,7 +272,7 @@ export const CompositionEditor: React.FC<CompositionEditorProps> = ({
                         {g.type === 'number' ? (
                           <>
                             <Input className="h-7 w-16" value={g.unit ?? ''} placeholder="unit" onChange={(e) => patchGlobal(zi, gi, { unit: e.target.value || undefined })} />
-                            <Input className="h-7 w-20 text-right" value={String(g.default ?? 0)} placeholder="default" onChange={(e) => patchGlobal(zi, gi, { default: Number(e.target.value) || 0 })} />
+                            <MoneyInput className="h-7 w-20 text-right" value={Number(g.default ?? 0)} displayDecimals={null} placeholder="default" onValueChange={(v) => patchGlobal(zi, gi, { default: v ?? 0 })} />
                           </>
                         ) : g.type === 'choice' ? (
                           <>
@@ -363,16 +364,16 @@ export const CompositionEditor: React.FC<CompositionEditorProps> = ({
                             <Input className="h-7 flex-1 min-w-[8rem]" value={m.label} placeholder="label" onChange={(e) => patchModule(zi, mi, { label: e.target.value })} />
                             <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
                               Width
-                              <Input className="h-7 w-16 text-right" value={String(m.default_width_cm ?? 0)} onChange={(e) => patchModule(zi, mi, { default_width_cm: Number(e.target.value) || 0 })} />cm
+                              <MoneyInput className="h-7 w-16 text-right" value={m.default_width_cm ?? 0} displayDecimals={null} onValueChange={(v) => patchModule(zi, mi, { default_width_cm: v ?? 0 })} />cm
                             </span>
                             <select className={selectClass} value={m.price_mode} onChange={(e) => patchModule(zi, mi, { price_mode: e.target.value as ModuleTypeDef['price_mode'] })}>
                               <option value="per_m">Per metre × zone rate</option>
                               <option value="per_piece">Flat price each</option>
                             </select>
                             {m.price_mode === 'per_piece' && (
-                              <Input
-                                className="h-7 w-20 text-right" placeholder="price" value={m.unit_price != null ? String(m.unit_price) : ''}
-                                onChange={(e) => patchModule(zi, mi, { unit_price: e.target.value === '' ? undefined : Number(e.target.value) })}
+                              <MoneyInput
+                                className="h-7 w-20 text-right" placeholder="price" value={m.unit_price}
+                                onValueChange={(v) => patchModule(zi, mi, { unit_price: v ?? undefined })}
                               />
                             )}
                             {!readOnly && (
@@ -396,7 +397,7 @@ export const CompositionEditor: React.FC<CompositionEditorProps> = ({
                             </label>
                             <span className="flex items-center gap-1">
                               Margin
-                              <Input className="h-6 w-14 text-right" value={String(m.margin_pct ?? 0)} onChange={(e) => patchModule(zi, mi, { margin_pct: Number(e.target.value) || 0 })} />%
+                              <MoneyInput className="h-6 w-14 text-right" value={m.margin_pct ?? 0} displayDecimals={null} onValueChange={(v) => patchModule(zi, mi, { margin_pct: v ?? 0 })} />%
                             </span>
                             {/* What one piece is made of. Uncontrolled + onBlur: reformatting the
                                 bag on every keystroke would eat the colon you are still typing. */}
@@ -454,9 +455,9 @@ export const CompositionEditor: React.FC<CompositionEditorProps> = ({
                                     className="h-6 flex-1" value={c.label} placeholder="label"
                                     onChange={(e) => patchOption(zi, mi, oi, { choices: (opt.choices ?? []).map((x, i) => (i === ci ? { ...x, label: e.target.value } : x)) })}
                                   />
-                                  <Input
-                                    className="h-6 w-20 text-right" value={String(c.price ?? 0)} placeholder="price"
-                                    onChange={(e) => patchOption(zi, mi, oi, { choices: (opt.choices ?? []).map((x, i) => (i === ci ? { ...x, price: Number(e.target.value) || 0 } : x)) })}
+                                  <MoneyInput
+                                    className="h-6 w-20 text-right" value={c.price ?? 0} placeholder="price"
+                                    onValueChange={(v) => patchOption(zi, mi, oi, { choices: (opt.choices ?? []).map((x, i) => (i === ci ? { ...x, price: v ?? 0 } : x)) })}
                                   />
                                   <label className="flex items-center gap-1 text-[11px] text-muted-foreground whitespace-nowrap">
                                     Default
@@ -516,9 +517,9 @@ export const CompositionEditor: React.FC<CompositionEditorProps> = ({
                               {optionGroups.map((og) => <option key={og} value={og}>{og}</option>)}
                             </select>
                             {!a.option_group && (
-                              <Input
-                                className="h-7 w-20 text-right" placeholder="price" value={a.unit_price != null ? String(a.unit_price) : ''}
-                                onChange={(e) => patchAppliance(zi, ai, { unit_price: e.target.value === '' ? undefined : Number(e.target.value) })}
+                              <MoneyInput
+                                className="h-7 w-20 text-right" placeholder="price" value={a.unit_price}
+                                onValueChange={(v) => patchAppliance(zi, ai, { unit_price: v ?? undefined })}
                               />
                             )}
                             {!readOnly && (
@@ -534,9 +535,9 @@ export const CompositionEditor: React.FC<CompositionEditorProps> = ({
                           <div className="flex flex-wrap items-center gap-3 pl-1 text-[11px] text-muted-foreground">
                             <span className="flex items-center gap-1">
                               Aperture
-                              <Input
-                                className="h-6 w-16 text-right" value={a.width_cm != null ? String(a.width_cm) : ''} placeholder="60"
-                                onChange={(e) => patchAppliance(zi, ai, { width_cm: e.target.value === '' ? undefined : Number(e.target.value) })}
+                              <MoneyInput
+                                className="h-6 w-16 text-right" value={a.width_cm} displayDecimals={null} placeholder="60"
+                                onValueChange={(v) => patchAppliance(zi, ai, { width_cm: v ?? undefined })}
                               />cm
                             </span>
                             <span className="flex items-center gap-1">
@@ -606,9 +607,9 @@ export const CompositionEditor: React.FC<CompositionEditorProps> = ({
                                     {(housingZone?.modules ?? []).map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}
                                   </select>
                                 )}
-                                <Input
-                                  className="h-6 w-20 text-right" value={p.price != null ? String(p.price) : ''} placeholder="fitting"
-                                  onChange={(e) => patchPlacement(zi, ai, pi, { price: e.target.value === '' ? undefined : Number(e.target.value) })}
+                                <MoneyInput
+                                  className="h-6 w-20 text-right" value={p.price} placeholder="fitting"
+                                  onValueChange={(v) => patchPlacement(zi, ai, pi, { price: v ?? undefined })}
                                 />
                                 {!readOnly && (
                                   <Button

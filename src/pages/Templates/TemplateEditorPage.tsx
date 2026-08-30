@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
+import { MoneyInput } from '@/components/core/ui/money-input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Switch } from '@/components/core/ui/switch';
@@ -227,17 +228,21 @@ export const TemplateEditorPage: React.FC = () => {
                 return (
                   <div key={f.key} className="space-y-1">
                     <Label className="text-xs text-muted-foreground">{f.label}</Label>
-                    <Input
-                      type={f.kind === 'number' ? 'number' : 'text'}
-                      value={value == null ? '' : String(value)}
-                      disabled={readOnly}
-                      onChange={(e) => setPayloadKey(
-                        f.key,
-                        f.kind === 'number'
-                          ? (e.target.value === '' ? null : Number(e.target.value))
-                          : (e.target.value || null),
-                      )}
-                    />
+                    {f.kind === 'number' ? (
+                      <MoneyInput
+                        displayDecimals={null}
+                        value={value == null ? null : Number(value)}
+                        disabled={readOnly}
+                        onValueChange={(v) => setPayloadKey(f.key, v)}
+                      />
+                    ) : (
+                      <Input
+                        type="text"
+                        value={value == null ? '' : String(value)}
+                        disabled={readOnly}
+                        onChange={(e) => setPayloadKey(f.key, e.target.value || null)}
+                      />
+                    )}
                     {f.hint && <div className="text-xs text-muted-foreground">{f.hint}</div>}
                   </div>
                 );

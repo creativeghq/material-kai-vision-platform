@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Search, Loader2 } from 'lucide-react';
 import { Input } from '@/components/core/ui/input';
+import { MoneyInput } from '@/components/core/ui/money-input';
 import { Button } from '@/components/core/ui/button';
 import { realEstatePublic, type PublicListingCard, type DiscoverFilters } from '../services/realEstateService';
 import { PropertyCardGrid } from './PropertyCardGrid';
@@ -38,7 +39,7 @@ export const PropertyDiscoveryTab: React.FC = () => {
         <select className="h-9 rounded-md border bg-background px-2 text-sm capitalize" value={filters.property_type ?? ''} onChange={(e) => set('property_type', e.target.value)}>
           {TYPES.map((o) => <option key={o} value={o}>{o === '' ? 'Any type' : o}</option>)}
         </select>
-        <Input type="number" placeholder="Max €" className="w-28" value={filters.price_max ?? ''} onChange={(e) => set('price_max', e.target.value === '' ? '' : Number(e.target.value))} />
+        <MoneyInput displayDecimals={null} placeholder="Max €" className="w-28" value={filters.price_max ?? null} onValueChange={(v) => set('price_max', v ?? '')} />
         <Input type="number" placeholder="Min beds" className="w-24" value={filters.bedrooms_min ?? ''} onChange={(e) => set('bedrooms_min', e.target.value === '' ? '' : Number(e.target.value))} />
         <Button onClick={() => run(filters)} disabled={loading}>{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}</Button>
       </div>

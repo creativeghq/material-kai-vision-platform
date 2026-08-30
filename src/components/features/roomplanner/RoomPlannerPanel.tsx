@@ -16,7 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Input } from '@/components/core/ui/input';
+import { MoneyInput } from '@/components/core/ui/money-input';
 import { Label } from '@/components/core/ui/label';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -442,13 +442,13 @@ export const RoomPlannerPanel: React.FC = () => {
             <>
               <div className="w-24">
                 <Label className="text-xs">Width (m)</Label>
-                <Input type="number" step="0.1" min="0.5" value={Number(layout.room_width_m)}
-                  onChange={(e) => resize({ room_width_m: Number(e.target.value) || 1 })} />
+                <MoneyInput displayDecimals={null} value={Number(layout.room_width_m)}
+                  onValueChange={(v) => resize({ room_width_m: v || 1 })} />
               </div>
               <div className="w-24">
                 <Label className="text-xs">Depth (m)</Label>
-                <Input type="number" step="0.1" min="0.5" value={Number(layout.room_depth_m)}
-                  onChange={(e) => resize({ room_depth_m: Number(e.target.value) || 1 })} />
+                <MoneyInput displayDecimals={null} value={Number(layout.room_depth_m)}
+                  onValueChange={(v) => resize({ room_depth_m: v || 1 })} />
               </div>
             </>
           )}

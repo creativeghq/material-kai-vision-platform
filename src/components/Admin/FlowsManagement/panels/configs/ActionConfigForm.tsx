@@ -1,6 +1,7 @@
 import React from 'react';
 import { ShieldAlert } from 'lucide-react';
 import { Input } from '@/components/core/ui/input';
+import { MoneyInput } from '@/components/core/ui/money-input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Switch } from '@/components/core/ui/switch';
@@ -759,10 +760,9 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Amount</Label>
-              <Input
-                inputMode="decimal"
-                value={String(cfg.amount ?? '')}
-                onChange={(e) => onChange({ ...cfg, amount: Number(e.target.value) })}
+              <MoneyInput
+                value={cfg.amount}
+                onValueChange={(v) => onChange({ ...cfg, amount: v ?? undefined })}
                 placeholder="0.00"
               />
             </div>

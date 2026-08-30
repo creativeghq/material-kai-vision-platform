@@ -8,6 +8,7 @@ import { Loader2, Plus, Pencil, Trash2, Wrench, Save, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
+import { MoneyInput } from '@/components/core/ui/money-input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
@@ -15,7 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { servicesService, type ServiceItem, type ServiceInput } from '@/modules/finance/services/servicesService';
 import { invoicingSetupService, type RefRow } from '@/services/invoicingSetupService';
 import { VAT_CATEGORIES } from '@/modules/finance/services/financeService';
-import { parseDecimal, formatMoney } from '@/utils/decimal';
+import { formatMoney } from '@/utils/decimal';
 import { HubEmptyState } from '@/components/core/hub';
 
 const EMPTY: ServiceInput = { name: '', description: '', unit: '', price: null, currency: 'EUR', vatCategory: 1, incType: '', incCat: '' };
@@ -105,7 +106,7 @@ export const ServicesCard: React.FC<{ workspaceId: string }> = ({ workspaceId })
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
                   <Label className="text-xs">Price</Label>
-                  <Input className="h-8 text-xs" type="text" inputMode="decimal" value={form.price ?? ''} onChange={(e) => setForm({ ...form, price: e.target.value ? parseDecimal(e.target.value) : null })} placeholder="0.00" />
+                  <MoneyInput className="h-8 text-xs" value={form.price} onValueChange={(v) => setForm({ ...form, price: v })} placeholder="0.00" />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Currency</Label>
