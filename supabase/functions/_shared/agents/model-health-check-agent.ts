@@ -28,11 +28,12 @@
  *   providers     string[]  Optional subset of providers (default: replicate only — see below)
  *   timeout_ms    number    Per-model HTTP timeout in ms (default 20000)
  *   test_prompt   string    Override probe prompt
- *   max_models    number    Models probed per run, least-recently-probed first (default 6)
- *   deadline_ms   number    Stop starting new waits past this (default 120000, under the edge ceiling)
+ *   max_models      number  Models probed per run, least-recently-probed first (default 6)
+ *   min_interval_ms number  Gap between creates (default 11000 — the provider allows ~1 per 10s)
+ *   deadline_ms     number  Stop starting new waits past this (default 120000, under the edge ceiling)
  *
- * A RUN DOES NOT COVER THE WHOLE ROSTER, ON PURPOSE. The provider rate-limits creates hard enough
- * that probing every model in one pass reports most of them broken; see the note on `max_models`
+ * A RUN DOES NOT COVER THE WHOLE ROSTER, ON PURPOSE. The provider allows about one create every ten
+ * seconds, so a full sweep does not fit inside an edge invocation; see the note on `min_interval_ms`
  * in run() for the measurements. Read a run as "these N were checked", never as a full sweep.
  */
 
@@ -113,20 +114,27 @@ export class ModelHealthCheckAgent implements AgentRunner {
     const providers  = (cfg.providers as string[] | undefined) ?? PROBEABLE_PROVIDERS;
 
     /**
-     * A run probes a SLICE of the roster, least-recently-checked first, and stops at a deadline.
+     * SPACE THE CREATES OUT. This is the whole fix, and it is not optional.
      *
-     * Measured 2026-08-30: Replicate throttles prediction creates to 6 per minute with a burst of
-     * ONE. It is per model and the first create on a given model consumes that model's burst, so
-     * probing 17 models back to back returns 201 for the first and 429 for the other sixteen —
-     * which this agent then recorded as sixteen broken models. It also does not matter how the
-     * calls are spaced or whether each prediction is cancelled first; both were tested and neither
-     * changes the outcome. (`black-forest-labs/flux-schnell` is exempt and answers 15/15, which is
-     * exactly why an eyeball test against it "proves" there is no throttle. Do not use it to check.)
+     * Replicate rate-limits prediction creates to 6 per minute with a burst of one — i.e. one
+     * create per ~10 seconds — and says so in the body of every 429 it sends. This agent used to
+     * fire the whole roster back to back, roughly one per second, so the first model returned 201
+     * and every model after it returned 429. The agent then wrote those 429s into
+     * `generation_models` as verdicts, which is how 15 of 17 healthy models came to be recorded as
+     * broken. Measured 2026-08-30: the identical five models at ~1s spacing score 1/5, and at 11s
+     * spacing score 5/5 with no 429 at all.
      *
-     * So the whole roster cannot be probed in one pass, and pacing alone cannot fix that either:
-     * 17 models at ~10s a piece is past the edge function ceiling. Rotating means each run covers
-     * a few models honestly and successive scheduled runs cover the rest.
+     * Two traps that cost a lot of time on the way to that one-line conclusion:
+     *   • `black-forest-labs/flux-schnell` is exempt and answers 15/15 however fast you hammer it,
+     *     so any quick check written against it "proves" there is no throttle. Never verify with it.
+     *   • The 429 body attributes the limit to having "less than $5.0 in credit", which was false —
+     *     the account held $19.28. The stated REASON being wrong does not make the stated RATE
+     *     wrong, and discarding the whole message because of the bad half is what kept this hidden.
+     *
+     * At 11s a piece a run cannot cover the roster inside the edge ceiling, so it probes a SLICE,
+     * least-recently-checked first, and successive scheduled runs cover the rest.
      */
+    const minIntervalMs = Number(cfg.min_interval_ms ?? 11_000);
     const maxModels  = Number(cfg.max_models ?? 6);
     const deadlineAt = Date.now() + Number(cfg.deadline_ms ?? 120_000);
 
@@ -195,8 +203,11 @@ export class ModelHealthCheckAgent implements AgentRunner {
     /** Models the throttle would not let us measure. NOT a verdict — see the write below. */
     const throttled: string[] = [];
 
-    for (const model of modelList) {
+    for (const [modelIndex, model] of modelList.entries()) {
       await heartbeat();
+      // Proactive spacing. Reacting to a 429 alone works, but it spends an attempt to learn what
+      // the provider already told us last time; staying under the rate is cheaper and quieter.
+      if (modelIndex > 0) await new Promise((r) => setTimeout(r, minIntervalMs));
       const start = Date.now();
       let result: ModelProbeResult;
 
