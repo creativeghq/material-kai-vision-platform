@@ -541,6 +541,68 @@ describe('project job cost has exactly one derivation', () => {
     ).toEqual([]);
   });
 
+  /**
+   * HOW MUCH OF THIS QUOTE IS ALREADY BILLED — the quantity that did not exist, so nothing asked.
+   *
+   * `create_project_progress_invoice` validated that ONE percentage was in (0,100] and nothing
+   * else, and the Billing dialog opened on a hardcoded 50 with no running total anywhere. So
+   * 30 + 40 + 50 billed 120% of the job, and a retry after a dropped connection billed the same
+   * stage twice — every invoice individually valid, which is why no integrity check could see it.
+   * Its sibling `issue_invoice_from_quote` had guarded against a duplicate since it shipped; the
+   * path meant to be called REPEATEDLY had no guard at all.
+   *
+   * `public.get_quote_billing_progress` is now the single derivation, read by BOTH gates and by
+   * the dialog — so what is offered and what is allowed cannot disagree.
+   */
+  const BILLED_DECL =
+    /\b(?:const|let|var)\s+(?:billed|billedPct|billed_pct|remaining|remainingPct|remaining_pct|alreadyBilled)\s*(?::[^=]+)?=\s*(.+)$/;
+
+  it('the billing-progress pattern matches the shape it exists to catch', () => {
+    const bad = '    const billedPct = invoices.reduce((s, i) => s + (i.progress_pct ?? 0), 0);';
+    const m = BILLED_DECL.exec(bad);
+    expect(m, 'pattern must match a hand-rolled billed-percent sum').not.toBeNull();
+    expect(/[-+*/]|reduce\(/.test(m![1])).toBe(true);
+
+    const good = '    const remaining = progress ? Number(progress.remaining_pct) : 100;';
+    const g = BILLED_DECL.exec(good);
+    expect(g, 'pattern must still see the reading form').not.toBeNull();
+    expect(/[-+*/]|reduce\(/.test(g![1])).toBe(false);
+  });
+
+  it('never re-sums progress_pct to work out what is left on a quote', () => {
+    const offenders: string[] = [];
+    for (const f of files) {
+      const src = strippedSource(f);
+      for (const [i, line] of src.split('\n').entries()) {
+        const m = BILLED_DECL.exec(line);
+        if (!m) continue;
+        if (/reduce\(|[-+*/]/.test(m[1].replace(/\?\?/g, ''))) {
+          offenders.push(`${posix(f)}:${i + 1}: ${line.trim().slice(0, 120)}`);
+        }
+      }
+    }
+    expect(
+      offenders,
+      'What is left to bill on a quote is derived ONCE, by `public.get_quote_billing_progress`, ' +
+      'which both invoice writers gate on. Read it via `projectsService.quoteBillingProgress()` — ' +
+      'a second copy here is how the dialog starts offering a percentage the write refuses.\n' +
+      offenders.join('\n'),
+    ).toEqual([]);
+  });
+
+  it('the billing dialog reads the derivation the write gates on', () => {
+    // Not a style rule: the number the operator types is bounded by this, and the SQL refuses
+    // anything over it. If the dialog stops reading it, it goes back to offering 50 on a quote
+    // with 30 left and the only feedback is a raw 23514 after the round trip.
+    const tab = strippedSource(join(ROOT, 'src/modules/projects/components/tabs/BillingTab.tsx'));
+    expect(tab, 'BillingTab must read the billing progress')
+      .toMatch(/quoteBillingProgress\(/);
+    expect(tab, 'the percent input must be bounded by the remainder, not by a constant 100')
+      .toMatch(/max=\{remaining\}/);
+    expect(tab, 'a part-billed quote cannot take a full invoice, so it must not be offered')
+      .toMatch(/disabled=\{alreadyBilled > 0\}/);
+  });
+
   it('never re-sums time_entries for labor cost in the projects module', () => {
     const offenders: string[] = [];
     for (const f of files) {

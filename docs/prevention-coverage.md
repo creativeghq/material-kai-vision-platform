@@ -1246,6 +1246,119 @@ never reached the line.
 - **Locked in by ratcheting** 50 → 24 across 15 files: a regression takes the count back up and
   fails the build.
 
+## Billing a quote by stage had no running total — 2026-08-30
+
+`create_project_progress_invoice` validated that ONE percentage was in `(0,100]` and nothing else.
+The Billing dialog opened on a hardcoded `50` every time, and neither side had any notion of what
+had already been billed. So:
+
+- 30% + 40% + 50% bills **120%** of the job, silently;
+- a retry after a dropped connection bills the same stage twice — the dialog closes only on
+  success, but the RPC may already have committed;
+- each invoice is individually valid and consumes its own number, so no integrity check, no
+  typecheck and no drift probe could see it. `finance.order_payment_status_drift` compares a
+  cached status against a derivation; there was no derivation here to compare against.
+
+Its sibling `issue_invoice_from_quote` has had a "does an invoice already exist" early return since
+it shipped. **The path meant to be called repeatedly was the one with no guard**, which is the
+inversion worth remembering.
+
+`public.get_quote_billing_progress(uuid[])` is now the single derivation — `billed_pct`,
+`remaining_pct`, `invoice_count`, `has_full` — and it gates BOTH writers and feeds the dialog, so
+what is offered and what is allowed cannot disagree. `SECURITY INVOKER`, because it reads
+`invoices` and RLS there is the boundary.
+
+**What counts is asymmetric, and getting it wrong broke the feature outright.** The first version
+of this function counted any non-void invoice. Accepting a quote runs
+`_generate_order_from_quote_core`, which inserts a pre-invoice **without setting `invoice_kind`**,
+so it takes the column default `'full'` — meaning every accepted quote in the system already has a
+`full/draft` invoice against it. `billed_pct` came back **100 on a quote nobody had billed a cent
+of**, and the gate refused *every* progress invoice with "already invoiced in full". A total
+regression of the feature the gate exists to protect.
+
+It survived the first round of checks because those built their fixture with a direct
+`INSERT INTO quotes (… status='accepted')`, which does not fire the accept trigger and so has no
+pre-invoice. It was caught by accepting a quote the way the app does —
+`update quotes set status='accepted'` — and reading what came back. **A fixture that skips the
+trigger is not the state the code runs in.**
+
+So:
+
+- a **stage** invoice (`progress`/`milestone`/`final`) counts in any non-void status, draft
+  included — creating one is a deliberate operator act, and counting drafts is precisely what
+  closes the double-submit hole;
+- a **full** invoice counts only once **issued**. While it is a draft it is the accept trigger's
+  placeholder, not a claim on the customer.
+
+`void` releases a share — the operator's escape hatch from an over-billed stage. `credit_noted`
+deliberately does not, because a credit note can be partial and reading it as a full release hands
+back more room than was actually returned, which is the direction that over-bills.
+
+Both gates spliced by surgery on the live `pg_get_functiondef`, anchored and asserted — neither
+body was reauthored, because `issue_invoice_from_quote` carries the VAT-exemption gate whose own
+comment pins it ABOVE the existing-invoice check, and that ordering is exactly what a rewrite from
+a partial read loses.
+
+**Watched, on a quote accepted through the trigger**, impersonating the workspace owner inside an
+aborted transaction:
+
+| scenario | result |
+|---|---|
+| fresh accepted quote (pre-invoice present) | `billed=0 remaining=100 has_full=false count=0` |
+| first 30% stage | **allowed** — the normal path, and what the first version broke |
+| 30 + 40, then ask for 50 (=120) | **refused**, naming what is billed and what remains |
+| full invoice on top of 70 billed by stage | **refused**, pointing at a final invoice instead |
+| exactly the remaining 30 | **allowed** |
+| any stage after the full invoice is **issued** | **refused** |
+
+Guarded in the repo by three cases in
+[tests/unit/moneyDerivation.test.ts](../tests/unit/moneyDerivation.test.ts), mutation-tested by
+putting `max="100"` back on the percent input. Note what those source-shape guards can and cannot
+do: they hold the derivation in one place and keep the dialog reading it, and they would **not**
+have caught the pre-invoice mistake. Only running the thing did.
+
+## Four silent-zero probes for Real Estate and Projects — 2026-08-30, each watched to fire
+
+Between them these two modules run four crons, an append-only timeline and a rent→Finance
+bridge, and had **no silent-zero probe at all**. Running the detectors returned nothing, which
+reads as "clean" and meant "nobody is looking" — the reading shape 4 exists to prevent. Worse,
+this platform's own data floor for Real Estate is empty, so there was no live defect to find
+either: the honest state was *unobserved*, not *healthy*.
+
+Each probe requires DEMONSTRATED ACTIVITY before it can fire, so a module nobody has used yet
+stays silent rather than alarming about its own emptiness.
+
+| Probe | Activity | Signal | Fires when |
+|---|---|---|---|
+| `realestate_ical_sync_never_lands` | an active `property_channel_links` row with an import URL | that link syncing within 3 days | an hourly cron is green 178/178 and no feed has actually been read |
+| `realestate_rent_never_invoiced` | charges ≥2 days past due on an active tenancy with a tenant | any charge on those tenancies reaching an invoice | `createRentInvoiceForCharge` fails into the `failed` counter the cron returns inside its 200 |
+| `realestate_buyer_digest_never_sent` | ≥1 consenting digest subscriber **and** ≥3 listings published in 14 days | any `last_digest_at` inside the window | the consent capture regresses, or the send breaks — the two flags are written by different paths |
+| `project_timeline_never_appends` | project tasks created in 14 days | the `task.%` events that creation emits | `_project_log_task` is detached or raising; the tab keeps rendering, just with nothing after a date nobody notices |
+
+**Appended by surgery on the live `pg_get_functiondef`, with assertions** — the probes are inline
+and have accumulated across a dozen migrations, and a whole-body replace from a stale source
+deletes whichever landed since. The floor assertion is worth reading: the first version counted
+occurrences of `'silent_zero_probe'` and aborted, because probes do **not** share one
+`entity_table` — that literal appears 7 times against a roster of 22. It now pins body size plus
+the presence of named probes from several different eras. All four names are in the
+`ops.silent_zero_probe_missing` roster, so removing one is now deliberate rather than free.
+
+**Watched to fire, both directions, inside aborted transactions:**
+
+- `project_timeline_never_appends` — cleared the window, disabled the `project_tasks` triggers,
+  inserted 3 tasks → **fired**. Re-enabled the triggers, inserted 3 more → **silent**.
+- `realestate_ical_sync_never_lands` — active link with `last_synced_at IS NULL` → **fired**;
+  stamped it → **silent**.
+- `realestate_buyer_digest_never_sent` — consenting subscriber + 3 listings published, no digest →
+  **fired**; stamped `last_digest_at` → **silent**.
+- `realestate_rent_never_invoiced` — 3 charges past due, none invoiced → **fired**; one charge
+  invoiced → **silent**; back to none invoiced but only 2 overdue (under `min_activity`) →
+  **silent**. The first attempt at this control was a no-op — `select id from invoices` returned
+  NULL because the table is empty, so `invoice_id` was set to NULL and nothing changed. The probe
+  was right and the test was wrong, which is the usual direction and worth stating.
+
+Nothing leaked: every fixture rolled back, and the 9 real task events are intact.
+
 ## `ops.storage_paths_unregistered` — both arms rewritten 2026-08-30, and watched to fire
 
 The probe existed and reported clean while two tables sat outside `build_storage_reference_set()`

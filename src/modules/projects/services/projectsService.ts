@@ -246,6 +246,15 @@ export interface ProjectFinanceSummary {
  * this file recomputes any of it. Note `contracted_revenue` and `billed_revenue` are two separate
  * views of revenue and must never be added together — an invoice normally derives from a quote.
  */
+/** `get_quote_billing_progress` — derived in SQL, formatted here and nowhere else. */
+export interface QuoteBillingProgress {
+  quote_id: string;
+  billed_pct: number;
+  remaining_pct: number;
+  invoice_count: number;
+  has_full: boolean;
+}
+
 export interface ProjectPnl {
   /** Accepted quotes — what the client agreed to. */
   contracted_revenue: number;
@@ -1029,6 +1038,21 @@ class ProjectsService {
     const { data, error } = await (supabase as any).rpc('issue_invoice_from_quote', { p_quote_id: quoteId });
     if (error) throw error;
     return data as string;
+  }
+
+  /**
+   * How much of a quote is already billed — the SAME derivation `create_project_progress_invoice`
+   * and `issue_invoice_from_quote` gate on, so the dialog cannot offer a percentage the write
+   * will refuse. Never re-add this up from the invoice list: two answers to one money question is
+   * the shape CLAUDE.md rule 1 exists for.
+   */
+  async quoteBillingProgress(quoteIds: string[]): Promise<Record<string, QuoteBillingProgress>> {
+    if (quoteIds.length === 0) return {};
+    const { data, error } = await (supabase as any).rpc('get_quote_billing_progress', { p_quote_ids: quoteIds });
+    if (error) throw error;
+    const out: Record<string, QuoteBillingProgress> = {};
+    for (const r of (data || []) as QuoteBillingProgress[]) out[r.quote_id] = r;
+    return out;
   }
 
   /** Progress / milestone / final invoice for a percentage of an accepted project quote. */

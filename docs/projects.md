@@ -25,6 +25,12 @@ Before Projects, moodboards and quotes were standalone objects scoped to one use
 
 **External API:** [docs/projects-api.md](projects-api.md) (`/api/v1/projects/*` — Bearer `kai_*` partner integrations).
 
+**Billing a quote by stage:** `public.get_quote_billing_progress(uuid[])` is the single source for
+how much of a quote is already invoiced. Both `create_project_progress_invoice` and
+`issue_invoice_from_quote` refuse a write that would take the total past 100%, and the Billing
+dialog reads the same function to show the remainder and bound the input — so the two cannot
+disagree. Void an invoice to release its share; a credit note does not release it.
+
 **JARVIS agent surface:** four tools on the `kai` + `interior-designer` agents — `create_project`, `list_my_projects`, `find_project`, `add_task`. See [supabase/functions/_shared/tools/project-tools.ts](../supabase/functions/_shared/tools/project-tools.ts).
 
 ---
