@@ -45,6 +45,7 @@ const { researchWithQwen } = await import('../ai-client.ts');
 const { compareResearchSources } = await import('../research-validation.ts');
 
 import { debitOrRefuse } from '../credit-utils.ts';
+import { describeAnthropicFailure } from './anthropic-failure.ts';
 import { reserveCredits, refundCredits } from '../credit-reserve.ts';
 import { resolveTokenPrice } from '../ai-logger.ts';
 import { assertSafeUrl } from '../ssrf-guard.ts';
@@ -213,14 +214,12 @@ export const createWebSearchTool = (
         await refundCredits(supabase, userId, workspaceId ?? undefined, SEARCH_CEILING, 'web_search', { reason: `http_${response.status}` });
         console.error(`[web_search] Anthropic ${response.status}: ${errText}`);
         const retryable = response.status === 429 || response.status === 529 || response.status >= 500;
+        // Same reasoning as b2b-tools: on a deterministic status the upstream body is the only
+        // thing that explains the failure, and console output is not somewhere anyone looks.
         return JSON.stringify({
           success: false,
           retryable,
-          error: retryable
-            ? `The web search provider is overloaded (${response.status}) and did not recover after retries. `
-              + 'This is upstream and temporary — not a problem with the query or the account. '
-              + 'Say so plainly and offer to retry in a minute.'
-            : `Web search failed: ${response.status}`,
+          error: describeAnthropicFailure(response.status, errText, 'Web search', retryable),
         });
       }
 

@@ -40,6 +40,10 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 type B2BChunkSink = ((chunk: any) => void) | undefined;
 
 import { debitExternalServiceCredits, debitOrRefuse, preflightOrRefuse } from '../credit-utils.ts';
+import { describeAnthropicFailure } from './anthropic-failure.ts';
+
+/** Transient upstream, not a bad request: wait and retry rather than change anything. */
+const retryableStatus = (status: number) => status === 429 || status === 529 || status >= 500;
 import { reserveCredits, refundCredits } from '../credit-reserve.ts';
 import { resolveTokenPrice } from '../ai-logger.ts';
 import { getToolPrompt, loadPrompt, renderPromptTemplate } from '../prompt-utils.ts';
@@ -504,21 +508,26 @@ export const createB2BManufacturerSearchTool = (
         if (!response.ok) {
           const errText = await response.text();
           console.error(`❌ Web search API error ${response.status}: ${errText}`);
-          emitter.step({ step_id: STEPS.B2B_RESEARCH[0], status: 'failed', error_message: `Web search failed: ${response.status}` });
+          // The step trail is what the USER watches, so it gets the same reason the agent gets —
+          // a step that says only "Web search failed: 400" is the console.error problem again,
+          // one layer up.
+          emitter.step({
+            step_id: STEPS.B2B_RESEARCH[0],
+            status: 'failed',
+            error_message: describeAnthropicFailure(response.status, errText, 'Web search', retryableStatus(response.status)),
+          });
           // 429/529/5xx are TRANSIENT — the request was fine, the upstream was busy. Two 529s in
           // seven seconds killed a real sweep on 2026-08-18 and sent the agent looking for a
           // background lane it did not need. `retryable` tells the agent to try again rather than
           // reroute; `postRequest` above already retries the transient ones itself, so reaching
           // here means the retries were exhausted too.
-          const retryable = response.status === 429 || response.status === 529 || response.status >= 500;
+          const retryable = retryableStatus(response.status);
+          // A 400 is deterministic and `errText` is the only thing that says WHY. It used to go to
+          // console.error and nowhere else, so seven of them are logged with no cause at all.
           return JSON.stringify({
             success: false,
             retryable,
-            error: retryable
-              ? `The web search provider is overloaded (${response.status}) and did not recover after retries. `
-                + `This is upstream and temporary — it is NOT a problem with the query, the account or the markets. `
-                + `Say so plainly and offer to retry in a minute or to run a narrower scope now.`
-              : `Web search failed: ${response.status}`,
+            error: describeAnthropicFailure(response.status, errText, 'Web search', retryable),
           });
         }
 
