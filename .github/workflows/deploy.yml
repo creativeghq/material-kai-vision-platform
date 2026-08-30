@@ -35,6 +35,17 @@ on:
       # the guards and skips every deploy.)
       - '.github/workflows/**'
       - '.github/semgrep-security.yml'
+      # Fourth instance of the same trap, and the one that hid the other three's lesson:
+      # the RATCHET FILES that decide whether this workflow passes were themselves outside
+      # its trigger paths. All seven `.github/*.json` gate a unit test or a CI script —
+      # a11y, empty-state, pill-control, tenancy-parity, tenant-tables, edge-typecheck and
+      # deployed-function-orphans — so a commit that touched only one of them ran no guard
+      # at all. Editing a baseline is exactly when you want its guard to run: that commit is
+      # either recording reality or quietly widening what is allowed, and only the guard can
+      # tell those apart. Observed 2026-08-30 — the orphan entry that unblocked six red
+      # deploys was committed, pushed, and triggered nothing.
+      # `.github/workflows/edge-typecheck.yml` already lists its own baseline this way.
+      - '.github/*.json'
   workflow_dispatch:
     inputs:
       deployment_reason:
