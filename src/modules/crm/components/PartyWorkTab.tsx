@@ -38,7 +38,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import {
   FolderKanban, Palette, Home, KeyRound, Handshake, Tag, FileText, ShoppingCart,
-  Receipt, FileSignature, Wrench, Loader2, Briefcase, type LucideIcon,
+  Receipt, FileSignature, Wrench, Loader2, Briefcase, Banknote, type LucideIcon,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -101,11 +101,15 @@ const KINDS: Record<string, {
   property_offer: { label: 'Property offers', icon: Tag,           group: GROUP_PROPERTY,   href: (r) => (r.parent_id ? `/properties/${r.parent_id}` : null) },
   project:        { label: 'Projects',        icon: FolderKanban,  group: GROUP_DELIVERY,   href: (r) => `/projects/${r.id}` },
   asset:          { label: 'Equipment',       icon: Wrench,        group: GROUP_AFTER },
+  // A payment's own id is not a route, so it opens the ORDER it settles — same reason tenancy
+  // and property_sale open their property. `status` already says received/sent, which is the
+  // distinction that matters: the same table holds both sides of the trade.
+  payment:        { label: 'Payments',        icon: Banknote,      group: GROUP_COMMERCIAL, href: (r) => (r.parent_id ? `${FINANCE_BASE}/orders/${r.parent_id}` : null) },
 };
 
 /** Rail order. Anything the function returns that is not named here is appended, never dropped. */
 const KIND_ORDER = [
-  'project', 'moodboard', 'deal', 'quote', 'order', 'invoice', 'contract',
+  'project', 'moodboard', 'deal', 'quote', 'order', 'invoice', 'payment', 'contract',
   'property', 'tenancy', 'property_sale', 'property_offer', 'asset',
 ];
 const GROUP_ORDER = [GROUP_DELIVERY, GROUP_COMMERCIAL, GROUP_PROPERTY, GROUP_AFTER];
