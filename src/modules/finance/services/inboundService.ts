@@ -132,6 +132,20 @@ export interface InboundDocument {
  */
 export const INBOUND_LIST_LIMIT = 2000;
 
+/** One supplier's unfiled pile, from `inbound_backlog_by_issuer`. */
+export interface IssuerBacklogRow {
+  issuer_vat: string;
+  issuer_name: string | null;
+  docs: number;
+  total_net: number | null;
+  currency: string | null;
+  first_issue_date: string | null;
+  last_issue_date: string | null;
+  /** Set once this supplier has been filed before — the next arrival lands here on its own. */
+  learned_category_id: string | null;
+  learned_category_name: string | null;
+}
+
 export const inboundService = {
   /**
    * Columns the LIST needs. Deliberately not `*`.
@@ -315,6 +329,44 @@ export const inboundService = {
   },
 
   /** Assign / clear the internal finance category on an inbound (myDATA) document. */
+  /**
+   * The unfiled backlog, grouped by SUPPLIER — because that is the unit of the decision.
+   *
+   * 1,866 myDATA documents arrived and every one sits in the generic myAADE bucket that
+   * `finance-inbound-sync` stamps on arrival. Filing them one at a time is 1,866 decisions;
+   * grouped by issuer it is 241, and the top 45 issuers carry 1,324 of the documents — 71%.
+   * A supplier's invoices almost always belong in one category, so this is the queue that
+   * actually clears.
+   */
+  async backlogByIssuer(workspaceId: string): Promise<IssuerBacklogRow[]> {
+    const { data, error } = await (supabase as any).rpc('inbound_backlog_by_issuer', {
+      p_workspace_id: workspaceId,
+    });
+    if (error) throw error;
+    return (data ?? []) as IssuerBacklogRow[];
+  },
+
+  /**
+   * File every one of a supplier's still-unfiled documents at once.
+   *
+   * Returns how many moved. Only documents still sitting in a SYSTEM bucket are touched — one
+   * the operator filed deliberately is never re-filed by a bulk action.
+   *
+   * Filing an issuer also teaches the platform: `remember_inbound_issuer_category` records the
+   * default and `finance-inbound-sync` applies it to everything that arrives afterwards, so the
+   * same supplier never needs filing twice. That is why the RPC refuses a system category as the
+   * target — it would move the documents and teach nothing.
+   */
+  async fileIssuer(workspaceId: string, issuerVat: string, categoryId: string): Promise<number> {
+    const { data, error } = await (supabase as any).rpc('inbound_file_issuer', {
+      p_workspace_id: workspaceId,
+      p_issuer_vat: issuerVat,
+      p_category_id: categoryId,
+    });
+    if (error) throw error;
+    return Number(data ?? 0);
+  },
+
   async setCategory(docId: string, categoryId: string | null): Promise<void> {
     const { error } = await supabase.from('inbound_documents').update({ category_id: categoryId, updated_at: new Date().toISOString() }).eq('id', docId);
     if (error) throw error;

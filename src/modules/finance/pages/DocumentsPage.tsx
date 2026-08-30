@@ -26,6 +26,7 @@ import { chequesService, type Cheque } from '@/modules/finance/services/chequesS
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsMenu';
 import { InboundDocActionsMenu } from '@/modules/finance/components/InboundDocActionsMenu';
+import { InboundBacklogCard } from '@/modules/finance/components/InboundBacklogCard';
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
 import { NewDeliveryNoteDialog } from '@/modules/finance/components/NewDeliveryNoteDialog';
 import { NewChequeDialog } from '@/modules/finance/components/NewChequeDialog';
@@ -453,6 +454,18 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
           {/* Content — the document-type nav lives in FinancePage's DOC_TABS sidebar. */}
           <div className="min-w-0 flex-1 space-y-3">
+            {/* The inbox arrives pre-stamped with the generic myAADE category, so nothing is
+                "uncategorised" and nothing looks wrong — it is simply all in one bucket. Filing
+                it document by document is thousands of decisions; by supplier it is a few
+                dozen, and each one files that supplier's future invoices too. Renders nothing
+                once the backlog is clear. */}
+            {type === 'expenses' && activeWorkspaceId && !isAccountant ? (
+              <InboundBacklogCard
+                workspaceId={activeWorkspaceId}
+                categories={categories}
+                onFiled={() => { void load(); }}
+              />
+            ) : null}
             {type === 'dispatch' ? (
               <>
                 <div className="flex items-center justify-between gap-2 flex-wrap">
