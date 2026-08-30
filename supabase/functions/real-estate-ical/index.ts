@@ -73,7 +73,12 @@ Deno.serve(withApiLogging('real-estate-ical', async (req) => {
     .select('id, workspace_id, property_id, channel, ical_import_url')
     .eq('is_active', true).not('ical_import_url', 'is', null).limit(200);
 
-  let imported = 0, skipped = 0, failed = 0;
+  // `conflicts` totals the RUN; each link counts its own below. They were one variable, declared
+  // here and never reset, so the first double booking anywhere stamped every link synced after it
+  // `partial` with "N date conflict(s) — check for a double booking" — on properties that had
+  // none, with N being the running total rather than that link's. An operator chasing a phantom
+  // double booking on a calendar that is fine.
+  let imported = 0, conflicts = 0, failed = 0;
   for (const link of links ?? []) {
     const finish = (status: string, message: string, count = 0) =>
       supabase.from('property_channel_links')
@@ -91,6 +96,8 @@ Deno.serve(withApiLogging('real-estate-ical', async (req) => {
 
       const events = parseIcal(body);
       let count = 0;
+      // Per LINK — this is what decides this link's status and message.
+      let linkConflicts = 0;
       for (const ev of events) {
         // Idempotent on (property, channel, UID): a channel republishes its whole calendar every
         // poll, so without this every sync would duplicate every stay.
@@ -104,15 +111,19 @@ Deno.serve(withApiLogging('real-estate-ical', async (req) => {
         // 23P01 = the exclusion constraint: these nights are already held by another channel. That
         // IS the double booking, and it must be surfaced rather than swallowed — the operator has to
         // resolve it on the channel that sold it twice.
-        if (error) { if (error.code === '23P01') skipped++; else failed++; }
+        if (error) { if (error.code === '23P01') { linkConflicts++; conflicts++; } else failed++; }
         else { count++; imported++; }
       }
-      await finish(skipped > 0 ? 'partial' : 'ok', skipped > 0 ? `${skipped} date conflict(s) — check for a double booking` : `${count} event(s)`, count);
+      await finish(
+        linkConflicts > 0 ? 'partial' : 'ok',
+        linkConflicts > 0 ? `${linkConflicts} date conflict(s) — check for a double booking` : `${count} event(s)`,
+        count,
+      );
     } catch (e) {
       failed++;
       await finish('failed', e instanceof Error ? e.message : 'sync failed');
     }
   }
 
-  return json({ ok: true, links: (links ?? []).length, imported, conflicts: skipped, failed });
+  return json({ ok: true, links: (links ?? []).length, imported, conflicts, failed });
 }));

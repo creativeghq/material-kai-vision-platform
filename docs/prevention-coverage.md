@@ -1246,6 +1246,36 @@ never reached the line.
 - **Locked in by ratcheting** 50 → 24 across 15 files: a regression takes the count back up and
   fails the build.
 
+## A channel link that reported someone else's double booking — 2026-08-30
+
+`real-estate-ical` pulls every active short-let channel calendar in one pass and stamps each link
+with `last_sync_status` / `last_sync_message`. The conflict counter — the one that means *these
+nights are already held, someone has double-booked* — was declared once, outside the per-link loop,
+and never reset:
+
+```ts
+let imported = 0, skipped = 0, failed = 0;
+for (const link of links) {
+  for (const ev of events) { if (error.code === '23P01') skipped++; }
+  await finish(skipped > 0 ? 'partial' : 'ok', `${skipped} date conflict(s) — check for a double booking`);
+}
+```
+
+So the first genuine conflict anywhere in the run stamped **every link processed after it** as
+`partial`, telling the operator to go and find a double booking on a property that has none — and
+quoting the running total across all links rather than that link's. The one link that really had a
+conflict was reported correctly and buried among false ones.
+
+Nothing could catch it: every value is a valid integer, every status is a valid status, and the
+only reader is a person looking at a list and believing it.
+
+Now a per-link `linkConflicts` decides the stamp, while the run total is returned to the cron
+caller — both numbers are wanted, and conflating them is what broke. Guarded by
+[tests/unit/realEstateChannelSync.test.ts](../tests/unit/realEstateChannelSync.test.ts), which
+asserts the counter's SCOPE structurally (its declaration must appear after the `for (const link`
+that owns it) rather than by name, because scope is the whole defect. Mutation-tested by hoisting
+the declaration back above the loop.
+
 ## Rewriting a project plan was two statements — 2026-08-30
 
 `writePlanItems` in `project-plan-engine` replaced a plan's lines as
