@@ -661,6 +661,35 @@ function fails the first time a user calls it.
   authoring time it costs one query.
 
 
+### 21. A fix whose cost scales with the data, in a place that is never tested with any
+
+`job-cleanup-cron` deleted `flow_run_steps` by age alone, so a run still in flight after 30 days
+lost its history. AD-28 fixed that properly: resolve the finished parents first, delete only their
+steps. The new query passed one uuid per finished run into a PostgREST `in.(…)` filter — and that
+filter travels in the URL.
+
+Measured against production: **900 uuids is a 33,399-byte URL and the gateway answers 400**; 20
+uuids answers 200. The reaper returned 200 every Sunday until 2026-08-16 and 500 on 08-23 and
+08-30 — it broke the week flows got busy, not the week the code changed. Nothing about the code
+looked different at 20 rows and at 900.
+
+- **The tell:** a filter built by `.map()` over a previous query's rows, where that query carries
+  `.limit(1000)`. The URL length is then set by how busy the platform is, which is the one variable
+  a test never has.
+- **The repair was a deletion.** `flow_run_steps.flow_run_id` is `ON DELETE CASCADE`, so deleting
+  the finished runs already removes exactly their steps — atomically, with no id list and no window
+  in which the parent is gone and the children are not. Before reaching for chunking, check whether
+  the database already does the work.
+- **Counting is not exempt.** The replacement counts through an inner join on the parent
+  (`flow_runs!inner(status,created_at)`), so the reported number stays true with a fixed-length URL.
+- **What caught it:** `ops.cron_reported_success_but_no_effect`. pg_cron reported `succeeded` for
+  two weeks because it only sees that `net.http_post` was enqueued — the invocation's own status is
+  invisible to it. That probe is the only thing standing between this class and silence.
+- **Guarded** by [tests/unit/jobCleanupCron.test.ts](../tests/unit/jobCleanupCron.test.ts), which
+  also counts `console.error` calls against `failures.push` calls — `generation_3d` was still
+  swallowing its error two months after AD-29 removed that shape from the other ten blocks.
+
+
 ## Mechanism inventory
 
 | Mechanism | Runs | Enforces | Self-proving? |
