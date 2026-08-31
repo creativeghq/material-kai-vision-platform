@@ -33888,6 +33888,10 @@ export type Database = {
         Args: { p_company_id: string; p_contact_id: string }
         Returns: Json
       }
+      catalog_authority_rank: {
+        Args: { p_authority: string }
+        Returns: number
+      }
       catalog_bump_unique_email_count: {
         Args: { p_catalog_id: string; p_email: string }
         Returns: number
@@ -34390,6 +34394,15 @@ export type Database = {
         }[]
       }
       dic_detect__catalog_facet_canonicalization_degraded: {
+        Args: never
+        Returns: {
+          detail: Json
+          entity_id: string
+          entity_table: string
+          workspace_id: string
+        }[]
+      }
+      dic_detect__catalog_master_authority_unstamped: {
         Args: never
         Returns: {
           detail: Json
@@ -38602,6 +38615,7 @@ export type Database = {
           p_platform_supplier_id: string
           p_product_id?: string
           p_sku: string
+          p_source_workspace_id?: string
         }
         Returns: string
       }
