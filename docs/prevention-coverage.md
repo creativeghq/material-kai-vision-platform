@@ -1332,6 +1332,76 @@ building could be told which jobs happen there and could never say so.
   which guards REGRESSION rather than absence: deleting the reader or unmounting it restores the
   exact original state, and nothing else would notice.
 
+## Two live BOLA holes, proven by calling them as a stranger — 2026-08-31
+
+Invariant 1 is the one CLAUDE.md says is not machine-checkable in general, so it was swept the way
+the check-then-act shape was: a query over `pg_proc` for SECURITY DEFINER functions that are
+executable by `authenticated`, take a `uuid`, and never mention a membership helper. Thirty
+candidates, triaged by what they expose or mutate. **Every finding below was proven by executing it
+under a non-member's JWT with `SET ROLE authenticated`** — not inferred from reading.
+
+### Another tenant's supplier invoices
+
+`inbound_docs_needing_extraction(p_workspace_id, p_limit)` takes the workspace straight from the
+caller and returns that workspace's inbound documents **including `lines`** — supplier names, item
+descriptions and values off real AADE invoices. SECURITY DEFINER means the RLS on
+`inbound_documents` never applies, so nothing stood between the parameter and the data.
+
+Proven: a signed-in user with no membership read 5 documents belonging to another workspace, line
+text included. There are 1,866 documents in that table.
+
+### An opt-out they could not see, and could still delete
+
+`messaging_clear_optout(p_workspace_id, p_phone, …)` DELETEs from `messaging_optouts` for the
+caller-supplied workspace. An opt-out is the record of a person telling us to stop messaging them;
+removing one is not a data edit but the removal of a legal control.
+
+The proof has a detail worth keeping. Under the outsider's role the SELECT returned **0** — RLS
+correctly hid the row — while the DEFINER function deleted it and returned **1**. *They could not
+see it and could still destroy it.* That is the whole argument for why a SECURITY DEFINER function
+cannot lean on the RLS of the table it touches: the two answer different questions.
+
+`messaging_record_optout` is the mirror image and was fixed with it: any signed-in user could
+suppress messaging to any number in any workspace. Suppressing is the fail-SAFE direction, which is
+exactly why it would never have been reported — nobody notices messages that quietly stopped.
+
+### The same defect, two different remedies
+
+Which fix is correct depends on **who actually calls the function**, and that has to be checked
+rather than assumed:
+
+| function | remedy | why |
+|---|---|---|
+| `inbound_docs_needing_extraction` | `assert_workspace_member` | converted from `LANGUAGE sql` to plpgsql — a set-returning sql function has nowhere to raise from |
+| `messaging_record_optout` / `_clear_optout` | `assert_workspace_member` | `messagingService.ts` calls both by RPC from the browser, so revoking would break the feature |
+| `append_project_event` | **REVOKE** from `authenticated` | six SQL callers, no client caller anywhere in the repository |
+
+`assert_workspace_member` rather than a bare `is_workspace_member`, because it exempts
+`service_role` — which is what keeps the inbound STOP-keyword path working for a customer who has
+no account at all, and the crons that legitimately act across tenants.
+
+`append_project_event` deserved the revoke rather than a check: it inserts an event into ANY project
+id with a caller-supplied `actor_id` and then prunes that project's history to the newest 500 rows,
+so an outsider could not merely add noise but **evict a project's real timeline** by pushing 500
+events. All six callers are SECURITY DEFINER owned by `postgres`, so they keep EXECUTE; verified
+end-to-end by updating a project as a real member and watching the trigger path run clean.
+
+### What the sweep did NOT change, and why that matters
+
+Most of the thirty were correct, and three are worth recording so nobody "fixes" them later:
+
+- `enable_workspace` calls `is_platform_operator()` — the regex simply did not know that helper's name.
+- `set_quote_upsell_decision` is exemplary: `user_can_read_quote(v_quote)` under the comment *"404, not 403: a distinguishable 'not yours' is an id oracle."*
+- `autoapprove_pending_items_for_document` derives its workspace FROM the document rather than taking one.
+
+The Supabase advisors were run afterwards as CLAUDE.md requires. 470 lints, of which 433 are the
+generic *"signed-in users can execute a SECURITY DEFINER function"* warning — precisely the haystack
+this sweep worked through by hand. Its single ERROR, `marketplace_public_listings` being
+`security_invoker=off`, is a FALSE POSITIVE: a cross-tenant marketplace cannot function under RLS,
+and the view self-guards on both sides — the caller must be an approved participant AND the
+listing's own workspace must be (`mp2.workspace_id = l.workspace_id`) — with `security_barrier=true`
+and no `anon` grant. A linter cannot see a gate written into the view body.
+
 ## The check-then-act sweep: three more, one of them under 1,866 live documents — 2026-08-31
 
 Fixing three stock receivers taught the shape well enough to go looking for it everywhere instead
