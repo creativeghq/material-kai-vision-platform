@@ -70,9 +70,20 @@ export const TENANT_TRIGGERS = [
   'realestate.buyer_matches_found', 'realestate.new_listing_for_buyer',
 ] as const;
 
-/** Actions a workspace-owned flow may run. Mirrors `tenant_flow_allowed_actions()`. */
+/**
+ * Actions a workspace-owned flow may run. Mirrors `tenant_flow_allowed_actions()`.
+ *
+ * The first five tell a person; the last four write a record. Until 2026-08-31 only the first
+ * five were here, so 64 triggers all ended the same way — a human is told, and the human does
+ * the work. The record-writing four were already implemented in flow-engine, with palette items
+ * and config forms; this list was the only thing making them unreachable.
+ *
+ * `create_planned_payment` is implemented and deliberately NOT here: it creates a money
+ * obligation, which is a trust decision of its own rather than a rider on four safe actions.
+ */
 export const TENANT_ACTIONS = [
   'send_email', 'send_whatsapp', 'create_notification', 'send_agent_message', 'send_campaign',
+  'create_task', 'advance_deal_stage', 'add_note', 'assign_user',
 ] as const;
 
 /**
