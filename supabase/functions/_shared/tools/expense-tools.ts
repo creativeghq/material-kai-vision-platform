@@ -44,6 +44,21 @@ const { createClient } = await import('npm:@supabase/supabase-js@2');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 function svc() { return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY); }
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+/**
+ * User-scoped client, for the RPCs that ask WHO IS CALLING rather than which workspace.
+ *
+ * `assert_workspace_member` exempts `service_role`, so most reads here can use the service client
+ * with an explicit `workspace_id`. `is_workspace_finance_manager` does NOT: it is `auth.uid()` in
+ * `workspace_members` and nothing else, so a service-role caller is not a finance manager and
+ * `workspace_inbound_status` returns NO ROW — an unconfigured-looking answer for a workspace that
+ * is configured, which is the silent zero this tool exists to close, not to ship.
+ */
+function userClient(jwt: string | undefined) {
+  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: jwt ? { Authorization: `Bearer ${jwt}` } : {} },
+  });
+}
 
 /** Find (or create) an expense-side finance category by name. */
 async function resolveCategory(workspaceId: string, name: string): Promise<{ id: string; name: string }> {
@@ -472,8 +487,42 @@ export const createGetExpensePaymentsTool = (userId: string, workspaceId: string
   });
 
 // ───────────────────────────── list_recent_expenses ─────────────────────────────
+
+/**
+ * Where each recorded expense CAME FROM, as a fact rather than a guess.
+ *
+ * Asked "only the expenses from myAADE, not the ones added manually", the model had no filter and
+ * no column, so it read the origin out of the `notes` prose ("From myDATA received document 4000…")
+ * and answered from a string. `inbound_documents.created_supplier_bill_id` is the actual link, and
+ * `supplier_bills.order_id` is the other one — both joinable, neither previously asked.
+ *
+ * Three origins, because there are three: a document ΑΑΔΕ sent us, a cost booked against one of our
+ * own orders, and something a person typed in.
+ */
+async function stampExpenseSource(sb: any, workspaceId: string, rows: any[]): Promise<any[]> {
+  if (rows.length === 0) return rows;
+  const fromMydata = new Set<string>();
+  try {
+    const { data } = await sb.from('inbound_documents')
+      .select('created_supplier_bill_id')
+      .eq('workspace_id', workspaceId)
+      .in('created_supplier_bill_id', rows.map((r) => r.id));
+    for (const d of (data ?? []) as Array<{ created_supplier_bill_id: string | null }>) {
+      if (d.created_supplier_bill_id) fromMydata.add(d.created_supplier_bill_id);
+    }
+  } catch {
+    // Unknown is not "manual". Leaving `source` off the row entirely is the honest failure: the
+    // card shows no origin column rather than a column that quietly says everything was typed in.
+    return rows;
+  }
+  return rows.map((r) => ({
+    ...r,
+    source: fromMydata.has(r.id) ? 'mydata' : (r.order_id ? 'order' : 'manual'),
+  }));
+}
+
 export const createListExpensesTool = (userId: string, workspaceId: string, onChunk?: (c: any) => void) =>
-  tool(async ({ limit }: { limit?: number }) => {
+  tool(async ({ limit, source }: { limit?: number; source?: 'all' | 'mydata' | 'order' | 'manual' }) => {
     const denied = await moduleGate(workspaceId, 'sales-finance');
     if (denied) return denied;
     try {
@@ -488,20 +537,230 @@ export const createListExpensesTool = (userId: string, workspaceId: string, onCh
         .order('issued_at', { ascending: false, nullsFirst: false })
         .limit(Math.min(Math.max(limit ?? 15, 1), 50));
       if (error) throw error;
-      const expenses = await attachPartyNames(sb, data ?? [], [
+      const named = await attachPartyNames(sb, data ?? [], [
         { idField: 'supplier_company_id', nameField: 'supplier_name' },
       ]);
+      const stamped = await stampExpenseSource(sb, workspaceId, named);
+      const want = source && source !== 'all' ? source : null;
+      const expenses = want ? stamped.filter((r) => r.source === want) : stamped;
       // Ship the rows in the chunk (not just a count) so the card renders line items, like the
       // finance-tools list chunks — a count-only chunk rendered an empty-looking card.
-      onChunk?.({ type: 'expenses_list', data: { count: expenses.length, expenses } });
-      return JSON.stringify({ success: true, expenses });
+      onChunk?.({ type: 'expenses_list', data: { count: expenses.length, source: source ?? 'all', expenses } });
+      return JSON.stringify({
+        success: true,
+        source: source ?? 'all',
+        expenses,
+        // Said out loud, because this list is BOOKED expenses only. A workspace can have two of
+        // these and 1,800 documents sitting in the myDATA inbox unconverted, and answering
+        // "expenses from myDATA" with the booked two reads as the whole picture.
+        note: want === 'mydata'
+          ? 'These are myDATA documents already booked as expenses. Documents ΑΑΔΕ has sent that nobody has booked yet are NOT here — use list_mydata_expenses for those.'
+          : undefined,
+      });
     } catch (e: any) {
       return JSON.stringify({ success: false, error: e?.message || 'Could not list expenses' });
     }
   }, {
     name: 'list_recent_expenses',
-    description: "List the workspace's recent recorded expenses / supplier bills with their status and amount due.",
+    description:
+      "List the workspace's recent RECORDED expenses / supplier bills — the ones already in our books — "
+      + 'with their status, amount due and where each one came from. `source` filters by origin: '
+      + '"mydata" (a myDATA/ΑΑΔΕ document booked as an expense), "order" (a cost booked against one of '
+      + 'our orders), "manual" (entered by hand). For the myDATA / ΑΑΔΕ / myAADE expenses feed ITSELF — '
+      + 'documents suppliers have filed against us, including the ones nobody has booked yet — use '
+      + 'list_mydata_expenses instead; there are usually far more of those than there are booked expenses.',
     schema: z.object({
       limit: z.number().optional().describe('How many to return (default 15, max 50)'),
+      source: z.enum(['all', 'mydata', 'order', 'manual']).optional()
+        .describe('Filter by where the expense came from. Default all.'),
+    }),
+  });
+
+// ───────────────────────────── list_mydata_expenses ─────────────────────────────
+/**
+ * The myDATA / ΑΑΔΕ expenses feed — what suppliers have filed against US.
+ *
+ * This did not exist, and its absence was invisible. Asked for "the expenses we get from myAADE",
+ * the agent had exactly one expense tool — `list_recent_expenses` over `supplier_bills` — so it
+ * answered with the SIX booked expenses and inferred which came from myDATA by reading the `notes`
+ * prose. It reported two. There were 1,866 documents in the inbox spanning 2024-02 to 2026-08.
+ * Every part of that answer was well-formed and confidently wrong by three orders of magnitude:
+ * the silent-zero shape (CLAUDE.md, anti-regression 2) seen from the reader's side.
+ *
+ * `inbound_documents` was reachable from ONE place in the whole agent surface — a lookup inside
+ * `pay_expense` to find a bill to settle — so a document nobody had booked could be paid and never
+ * listed.
+ *
+ * Three questions, because they are three different answers and conflating them is how "we have
+ * none" and "we never connected" become the same sentence:
+ *   • `status`    — is myDATA connected at all, when did it last sync, how much is sitting there
+ *   • `suppliers` — who has filed against us, how much, how much still unfiled (with the CRM link)
+ *   • `documents` — the documents themselves
+ *
+ * The first two are DERIVED IN SQL and read, not re-derived: `workspace_inbound_status` and
+ * `inbound_issuers_summary` are what the Finance page's own supplier inbox reads, so the agent and
+ * the screen cannot disagree about how many documents a supplier has sent.
+ */
+export const createMydataExpensesTool = (userId: string, workspaceId: string, jwt: string | undefined, onChunk?: (c: any) => void) =>
+  tool(async ({ action, booked, issuer, from, to, limit }: {
+    action?: 'documents' | 'suppliers' | 'status';
+    booked?: 'all' | 'only_unbooked' | 'only_booked';
+    issuer?: string; from?: string; to?: string; limit?: number;
+  }) => {
+    const denied = await moduleGate(workspaceId, 'sales-finance');
+    if (denied) return denied;
+    const sb = svc();
+    const act = action ?? 'documents';
+
+    try {
+      if (act === 'status') {
+        // As the USER, not the service role — see `userClient`. Read through the service client
+        // this answers "not configured" for every workspace, forever, and reads like data.
+        const { data, error } = await userClient(jwt).rpc('workspace_inbound_status', { p_workspace_id: workspaceId });
+        if (error) throw error;
+        if (!data) {
+          // The RPC yields no row to a caller who is not a finance manager. That is a permission
+          // answer, and saying "not connected" instead would be a lie about the integration.
+          return JSON.stringify({
+            success: false,
+            error: 'Only a workspace owner or admin can see the myDATA connection status.',
+          });
+        }
+        onChunk?.({ type: 'mydata_inbound_status', data });
+        return JSON.stringify({ success: true, status: data });
+      }
+
+      if (act === 'suppliers') {
+        const { data, error } = await sb.rpc('inbound_issuers_summary', { p_workspace_id: workspaceId });
+        if (error) throw error;
+        let rows = (data ?? []) as any[];
+        if (issuer) {
+          const q = issuer.trim().toLowerCase();
+          rows = rows.filter((r) =>
+            String(r.issuer_name ?? '').toLowerCase().includes(q)
+            || String(r.crm_company_name ?? '').toLowerCase().includes(q)
+            || String(r.issuer_vat ?? '').includes(q));
+        }
+        // Reshaped so the columns the card picks are the ones worth reading — it takes the first
+        // seven scalar keys, and the RPC's own order leads with the ΑΦΜ and buries the totals.
+        const suppliers = rows.slice(0, Math.min(Math.max(limit ?? 25, 1), 200)).map((r) => ({
+          crm_company_id: r.crm_company_id ?? null,
+          issuer_name: r.issuer_name ?? r.crm_company_name ?? null,
+          issuer_vat: r.issuer_vat,
+          crm_company_name: r.crm_company_name ?? null,
+          documents: r.docs,
+          unfiled: r.unfiled,
+          in_books: r.in_books,
+          total_gross: r.total_gross,
+          currency: r.currency,
+          first_issue_date: r.first_issue_date,
+          last_issue_date: r.last_issue_date,
+        }));
+        onChunk?.({ type: 'mydata_expense_suppliers', data: { count: rows.length, suppliers } });
+        return JSON.stringify({ success: true, count: rows.length, suppliers });
+      }
+
+      // ── documents ──
+      let q = sb.from('inbound_documents')
+        .select('id, issue_date, issuer_vat, issuer_name, series, aa, doc_type, currency, total_net, total_vat, total_gross, mark, status, created_supplier_bill_id')
+        .eq('workspace_id', workspaceId)
+        .order('issue_date', { ascending: false, nullsFirst: false })
+        .limit(Math.min(Math.max(limit ?? 25, 1), 200));
+      // "Not yet in our books" is the operator's real question far more often than "everything
+      // ΑΑΔΕ ever sent" — but it is asked for, never assumed.
+      if (booked === 'only_unbooked') q = q.is('created_supplier_bill_id', null);
+      if (booked === 'only_booked') q = q.not('created_supplier_bill_id', 'is', null);
+      if (from) q = q.gte('issue_date', from);
+      if (to) q = q.lte('issue_date', to);
+      if (issuer) {
+        const t = issuer.trim();
+        // An ΑΦΜ is digits; anything else is a name. Matching a name against the VAT column would
+        // silently return nothing rather than saying it could not find them.
+        q = /^[0-9]{6,}$/.test(t) ? q.eq('issuer_vat', t) : q.ilike('issuer_name', `%${t}%`);
+      }
+      const { data, error } = await q;
+      if (error) throw error;
+
+      // Which CRM company each ΑΦΜ is. Read from `inbound_issuers_summary` rather than matched
+      // here: that RPC already owns the rule (`crm_vat_norm(issuer_vat) = crm_companies.vat_norm`,
+      // oldest first) and the supplier list, the document peek and this table must not each hold
+      // their own idea of who an ΑΦΜ belongs to. One call for the whole workspace, not one per row.
+      const crmByVat = new Map<string, { id: string; name: string | null }>();
+      try {
+        const { data: issuers } = await sb.rpc('inbound_issuers_summary', { p_workspace_id: workspaceId });
+        for (const i of (issuers ?? []) as any[]) {
+          if (i.issuer_vat && i.crm_company_id) {
+            crmByVat.set(String(i.issuer_vat), { id: i.crm_company_id, name: i.crm_company_name ?? null });
+          }
+        }
+      } catch { /* No CRM link is a missing link, not a missing document. */ }
+
+      const documents = (data ?? []).map((d: any) => {
+        const crm = d.issuer_vat ? crmByVat.get(String(d.issuer_vat)) : undefined;
+        return {
+          id: d.id,
+          issuer_company_id: crm?.id ?? null,
+          // ΑΑΔΕ identifies the issuer by ΑΦΜ only and never sends a name (measured: of 1,146
+          // unnamed documents, zero carried a <name> tag), so the CRM name is the fallback.
+          document: [d.series, d.aa].filter(Boolean).join(' ') || d.mark || '—',
+          issuer_name: d.issuer_name ?? crm?.name ?? null,
+          issuer_vat: d.issuer_vat,
+          issued_at: d.issue_date,
+          total_gross: d.total_gross,
+          currency: d.currency,
+          // The reader's question is "is this in our books yet"; `created_supplier_bill_id` answers
+          // it and is hidden from the table as a join key, so the answer is stated as a value too.
+          booked: d.created_supplier_bill_id ? 'booked' : 'not booked',
+          doc_type: d.doc_type,
+          mark: d.mark,
+          total_net: d.total_net,
+          total_vat: d.total_vat,
+          created_supplier_bill_id: d.created_supplier_bill_id,
+        };
+      });
+
+      // A count over the whole feed, not over the page — "25 documents" under a 25-row limit is a
+      // number that means nothing, and this feed is thousands of rows deep.
+      let total: number | null = null;
+      try {
+        let c = sb.from('inbound_documents').select('id', { count: 'exact', head: true })
+          .eq('workspace_id', workspaceId);
+        if (booked === 'only_unbooked') c = c.is('created_supplier_bill_id', null);
+        if (booked === 'only_booked') c = c.not('created_supplier_bill_id', 'is', null);
+        if (from) c = c.gte('issue_date', from);
+        if (to) c = c.lte('issue_date', to);
+        const { count } = await c;
+        total = count ?? null;
+      } catch { total = null; }
+
+      onChunk?.({
+        type: 'mydata_expense_documents',
+        data: { count: documents.length, total_matching: total, booked: booked ?? 'all', documents },
+      });
+      return JSON.stringify({ success: true, count: documents.length, total_matching: total, documents });
+    } catch (e: any) {
+      return JSON.stringify({ success: false, error: e?.message || 'Could not read the myDATA expenses feed' });
+    }
+  }, {
+    name: 'list_mydata_expenses',
+    description:
+      'The myDATA / ΑΑΔΕ / myAADE EXPENSES FEED — the documents our suppliers have filed against us, '
+      + 'straight from ΑΑΔΕ, whether or not anyone has booked them as expenses yet. Use this for '
+      + '"expenses from myDATA/myAADE/ΑΑΔΕ", "what has been filed against us", "supplier documents", '
+      + '"the expenses inbox", or anything asking for supplier invoices we did NOT enter ourselves. '
+      + 'action: "documents" (the documents; filter by booked/issuer/date), "suppliers" (who has filed '
+      + 'against us, totals and how much is still unfiled), "status" (is myDATA connected and when did '
+      + 'it last sync — so "nothing here" and "never connected" are different answers). '
+      + 'Note this is a DIFFERENT and usually much larger set than list_recent_expenses, which only '
+      + 'shows expenses already booked into our own ledger. 0 credits.',
+    schema: z.object({
+      action: z.enum(['documents', 'suppliers', 'status']).optional()
+        .describe('What to return. Default "documents".'),
+      booked: z.enum(['all', 'only_unbooked', 'only_booked']).optional()
+        .describe('Whether the document has been turned into an expense in our books yet. Default all.'),
+      issuer: z.string().optional().describe('Supplier name (partial) or their ΑΦΜ / VAT number.'),
+      from: z.string().optional().describe('Earliest issue date, YYYY-MM-DD.'),
+      to: z.string().optional().describe('Latest issue date, YYYY-MM-DD.'),
+      limit: z.number().optional().describe('How many to return (default 25, max 200)'),
     }),
   });

@@ -69,7 +69,7 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
     tool_ids: ['create_trip_card', 'add_trip_expense', 'list_trip_cards', 'submit_trip_card'],
   },
   'expenses': {
-    tool_ids: ['record_expense', 'list_recent_expenses', 'pay_expense', 'get_expense_payments'],
+    tool_ids: ['record_expense', 'list_recent_expenses', 'pay_expense', 'get_expense_payments', 'list_mydata_expenses'],
   },
   'company-assets': {
     tool_ids: ['manage_company_assets'],

@@ -27,7 +27,7 @@
  *
  * @see tests/unit/recordLinks.test.ts
  */
-import { Receipt, Banknote, FileSignature, type LucideIcon } from 'lucide-react';
+import { Receipt, Banknote, FileSignature, Inbox, type LucideIcon } from 'lucide-react';
 
 import { FINANCE_TAB, financeTabUrl } from '@/modules/finance/routes';
 
@@ -40,7 +40,7 @@ import {
 import type { Capability } from '@/auth/capabilities';
 
 /** Kinds that exist only as a row in somebody's list — no page, no palette entry. */
-export type ExtraRecordKind = 'expense' | 'payment' | 'contract';
+export type ExtraRecordKind = 'expense' | 'payment' | 'contract' | 'inbound_document';
 
 export type RecordKind = GlobalSearchKind | ExtraRecordKind;
 
@@ -71,6 +71,7 @@ export interface RecordLinkSpec {
 const PEEKABLE = new Set<RecordKind>([
   'company', 'contact', 'deal', 'order', 'invoice', 'quote',
   'project', 'product', 'property', 'expense', 'payment', 'contract',
+  'inbound_document',
 ]);
 
 /**
@@ -108,6 +109,20 @@ const EXTRA_RECORD_KINDS: readonly RecordLinkSpec[] = [
     route: null,
     listRoute: '/contracts',
     moduleSlug: 'contracts',
+    peekable: true,
+  },
+  {
+    // A document a supplier filed against us on myDATA — which may or may not be an expense in our
+    // books yet. Distinct from `expense` on purpose: the workspace measured here had 1,866 of these
+    // and 2 booked, and collapsing the two is what made the agent answer "2" to "the expenses we
+    // get from myAADE".
+    kind: 'inbound_document',
+    label: 'myDATA document',
+    icon: Inbox,
+    route: null,
+    listRoute: financeTabUrl(FINANCE_TAB.expenseSuppliers),
+    requireAnyCapability: ['finance.manage'],
+    moduleSlug: 'sales-finance',
     peekable: true,
   },
 ];
@@ -273,6 +288,11 @@ const LIST_KEY_KIND: Record<string, RecordKind> = {
  * a name only a human can map, and the list-key rule covers the rest.
  */
 const RESULT_TYPE_ROW_KIND: Record<string, RecordKind> = {
+  // `documents` is deliberately NOT in LIST_KEY_KIND: it is a word several tools use for
+  // completely different things (`my_hr_documents` among them), and a wrong link goes somewhere
+  // real and wrong. Keyed on the chunk instead.
+  mydata_expense_documents: 'inbound_document',
+  mydata_expense_suppliers: 'company',
   price_lookup_matches: 'product',
   find_products_by_spec_result: 'product',
   related_products_result: 'product',
@@ -321,7 +341,17 @@ export function rowRecordRef(
 ): RecordRef | null {
   const kind = rowRecordKind(row, listKey, resultType);
   if (!kind) return null;
-  const raw = row.id ?? row[`${kind}_id`];
+  let raw = row.id ?? row[`${kind}_id`];
+  if (typeof raw !== 'string' || !UUID_RE.test(raw)) {
+    // The row's own id under a PREFIXED key — `inbound_issuers_summary` calls a company's id
+    // `crm_company_id`, and requiring `id`/`company_id` left every one of those rows dead. Only a
+    // key pointing at this row's OWN kind qualifies, so an expense's `supplier_company_id` (a
+    // company, not an expense) can never be mistaken for the row itself.
+    const own = Object.entries(row ?? {}).find(
+      ([k, v]) => typeof v === 'string' && UUID_RE.test(v) && recordKindForIdKey(k) === kind,
+    );
+    raw = own?.[1];
+  }
   const id = typeof raw === 'string' && UUID_RE.test(raw) ? raw : null;
   if (!id) return null;
   return { kind, id };

@@ -790,12 +790,27 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'list_mydata_expenses',
+    file: 'supabase/functions/_shared/tools/expense-tools.ts',
+    factory: 'createMydataExpensesTool',
+    description: 'The myDATA / ΑΑΔΕ / myAADE EXPENSES FEED — the documents our suppliers have filed against us, straight from ΑΑΔΕ, whether or not anyone has booked them as expenses yet.',
+    params: [
+      { name: 'action', type: 'enum', enum: ['documents', 'suppliers', 'status'], optional: true, description: 'What to return. Default "documents".' },
+      { name: 'booked', type: 'enum', enum: ['all', 'only_unbooked', 'only_booked'], optional: true, description: 'Whether the document has been turned into an expense in our books yet. Default all.' },
+      { name: 'issuer', type: 'string', optional: true, description: 'Supplier name (partial) or their ΑΦΜ / VAT number.' },
+      { name: 'from', type: 'string', optional: true, description: 'Earliest issue date, YYYY-MM-DD.' },
+      { name: 'to', type: 'string', optional: true, description: 'Latest issue date, YYYY-MM-DD.' },
+      { name: 'limit', type: 'number', optional: true, description: 'How many to return (default 25, max 200)' },
+    ],
+  },
+  {
     name: 'list_recent_expenses',
     file: 'supabase/functions/_shared/tools/expense-tools.ts',
     factory: 'createListExpensesTool',
-    description: 'List the workspace\'s recent recorded expenses / supplier bills with their status and amount due.',
+    description: 'List the workspace\'s recent RECORDED expenses / supplier bills — the ones already in our books — with their status, amount due and where each one came from.',
     params: [
       { name: 'limit', type: 'number', optional: true, description: 'How many to return (default 15, max 50)' },
+      { name: 'source', type: 'enum', enum: ['all', 'mydata', 'order', 'manual'], optional: true, description: 'Filter by where the expense came from. Default all.' },
     ],
   },
   {

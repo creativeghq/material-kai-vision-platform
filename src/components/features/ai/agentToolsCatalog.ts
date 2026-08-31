@@ -1798,9 +1798,39 @@ export const TOOLKITS: ToolkitDefinition[] = [
     // operator root. None of its four tools has an `AgentToolEntry` either, so the command palette
     // did not list them individually — Expenses was unreachable from both browse surfaces.
     moduleSlug: 'sales-finance',
-    tool_ids: ['record_expense', 'list_recent_expenses', 'pay_expense', 'get_expense_payments'],
+    tool_ids: ['record_expense', 'list_recent_expenses', 'pay_expense', 'get_expense_payments', 'list_mydata_expenses'],
     quick_starts: [
-      { label: 'Recent expenses', description: 'List recent expenses', prompt: 'Show my recent expenses.', icon: 'ListChecks' },
+      {
+        label: 'Recent expenses', description: 'What we have booked', icon: 'ListChecks',
+        prompt: 'Show my recent expenses.',
+        done: 'Here are the expenses we have booked.',
+        run: { tool: 'list_recent_expenses' },
+        // `autoFields` derives the Source select from the tool's own z.enum, so "only the ones
+        // from myDATA" is a control rather than a sentence the model has to interpret — and the
+        // options cannot drift from what the tool accepts.
+        autoFields: true,
+      },
+      {
+        label: 'From myDATA', description: 'What suppliers filed against us', icon: 'Inbox',
+        prompt: 'Show the expense documents our suppliers have filed against us on myDATA.',
+        done: 'Here is what suppliers have filed against us on myDATA.',
+        run: { tool: 'list_mydata_expenses', fixedArgs: { action: 'documents' } },
+        // The one filter that changes the answer rather than narrowing it: everything ΑΑΔΕ ever
+        // sent, versus what nobody has booked yet.
+        form: [
+          { key: 'booked', label: 'Show', kind: 'select', options: [
+            { value: 'all', label: 'Everything from myDATA' },
+            { value: 'only_unbooked', label: 'Not booked yet' },
+            { value: 'only_booked', label: 'Already booked' },
+          ] },
+        ],
+      },
+      {
+        label: 'Suppliers on myDATA', description: 'Who files against us, and how much', icon: 'Building2',
+        prompt: 'Which suppliers have filed documents against us on myDATA, and how much is still unfiled?',
+        done: 'Here are the suppliers filing against us on myDATA.',
+        run: { tool: 'list_mydata_expenses', fixedArgs: { action: 'suppliers' } },
+      },
       { label: 'Pay an expense', description: 'Settle a supplier bill', prompt: 'I want to pay an expense — show me what is unpaid.', icon: 'Banknote' },
       { label: 'Record an expense', description: 'Log a business cost', prompt: 'Record a business expense — I\'ll give you the details.', icon: 'Plus' },
     ],

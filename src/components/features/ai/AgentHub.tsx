@@ -392,6 +392,12 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   customer_balance_result: 'Customer balance',
   finance_invoice_issued: 'Invoice issued',
   // Finance expenses
+  // The myDATA/ΑΑΔΕ expenses FEED — a different and much larger set than `expenses_list`, which
+  // is only what we have booked. Both quick-starts are `run:` (no model turn), so an unregistered
+  // chunk here is a cheerful "done" over an empty screen.
+  mydata_expense_documents: 'myDATA expense documents',
+  mydata_expense_suppliers: 'Suppliers filing against us',
+  mydata_inbound_status: 'myDATA connection',
   expense_recorded: 'Expense recorded',
   expenses_list: 'Recent expenses',
   expense_paid: 'Expense paid',

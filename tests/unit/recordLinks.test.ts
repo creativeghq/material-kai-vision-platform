@@ -175,7 +175,7 @@ describe('the tools ship the identity the card links', () => {
   // Anchored on the CHUNK, and read backwards from it — the chunk is what reaches the card, so
   // "the query above the emission selects these columns" is the claim worth holding. Anchoring on
   // `.from('invoices')` instead matches whichever query happens to come first in the file.
-  const REQUIRED: Array<{ file: string; chunk: string; columns: string[] }> = [
+  const REQUIRED: Array<{ file: string; chunk: string; columns: string[]; span?: number }> = [
     {
       file: 'supabase/functions/_shared/tools/expense-tools.ts',
       chunk: 'expenses_list',
@@ -201,14 +201,27 @@ describe('the tools ship the identity the card links', () => {
       chunk: 'crm_deals_list',
       columns: ['company_id', 'contact_id'],
     },
+    {
+      file: 'supabase/functions/_shared/tools/expense-tools.ts',
+      chunk: 'mydata_expense_documents',
+      columns: ['issuer_company_id', 'created_supplier_bill_id'],
+      // The row shape is built above a long note about reusing the canonical ΑΦΜ→CRM resolution,
+      // so the default look-back does not reach it.
+      span: 3200,
+    },
+    {
+      file: 'supabase/functions/_shared/tools/expense-tools.ts',
+      chunk: 'mydata_expense_suppliers',
+      columns: ['crm_company_id'],
+    },
   ];
 
-  for (const { file, chunk, columns } of REQUIRED) {
+  for (const { file, chunk, columns, span } of REQUIRED) {
     it(`${chunk} ships what the row links to`, () => {
       const src = read(file);
       const at = src.indexOf(`type: '${chunk}'`);
       expect(at, `${chunk} must still be emitted from ${file}`).toBeGreaterThan(-1);
-      const window = src.slice(Math.max(0, at - 1600), at);
+      const window = src.slice(Math.max(0, at - (span ?? 1600)), at);
       for (const col of columns) {
         expect(window, `the query behind ${chunk} must select ${col}`).toContain(col);
       }
@@ -273,5 +286,97 @@ describe('the card renders the record layer', () => {
     // from that table.
     expect(CARD).toContain("from '@/utils/recordDisplay'");
     expect(CARD, 'no local status map').not.toMatch(/const STATUS_VARIANT\s*[:=]/);
+  });
+});
+
+/**
+ * The myDATA expenses feed has a route of its own.
+ *
+ * Asked "only the expenses from myAADE, not the ones added manually", the agent had one expense
+ * tool — `list_recent_expenses` over `supplier_bills` — so it answered from the six BOOKED expenses
+ * and worked out the origin by reading the `notes` prose. It said two. The inbox held 1,866
+ * documents. Nothing failed: a wrong count is a valid number, the tool ran clean, and the sentence
+ * read like an answer.
+ *
+ * Two halves have to hold, and each is silent alone. The tool must exist and be reachable; and its
+ * DESCRIPTION must carry the words a person uses for it, because tool selection is the step that
+ * actually failed — a perfect tool the router never considers is the same screen as no tool.
+ */
+describe('the myDATA expenses feed is reachable and findable', () => {
+  const tools = read('supabase/functions/_shared/tools/expense-tools.ts');
+  const chat = read('supabase/functions/agent-chat/index.ts');
+  const catalog = read('src/components/features/ai/agentToolsCatalog.ts');
+  const hub = read('src/components/features/ai/AgentHub.tsx');
+
+  it('reads the inbox, not just the bills we booked from it', () => {
+    expect(tools).toContain("name: 'list_mydata_expenses'");
+    // `inbound_documents` used to be touched in exactly one place — a lookup inside pay_expense —
+    // so a document nobody had booked could be PAID and never listed.
+    const listing = tools.slice(tools.indexOf('createMydataExpensesTool'));
+    expect(listing).toContain("from('inbound_documents')");
+  });
+
+  it('is bound, not merely defined', () => {
+    // `AGENT_CONFIGS[agentId].tools` is the binding; a push site alone reaches nobody.
+    expect(chat).toContain("'list_mydata_expenses'");
+    expect(chat).toContain('createMydataExpensesTool');
+    expect(catalog).toContain("'list_mydata_expenses'");
+  });
+
+  it('renders what it returns', () => {
+    // Both quick-starts are `run:` — no model turn, so an unregistered chunk is a cheerful "done"
+    // over an empty screen.
+    for (const chunk of ['mydata_expense_documents', 'mydata_expense_suppliers', 'mydata_inbound_status']) {
+      expect(hub, `${chunk} must be in AGENT_RESULT_TITLES`).toContain(chunk);
+    }
+  });
+
+  it('says the words a person uses, so the router can find it', () => {
+    const desc = tools.slice(tools.indexOf("name: 'list_mydata_expenses'"), tools.indexOf("name: 'list_mydata_expenses'") + 1600);
+    for (const word of ['myDATA', 'myAADE', 'ΑΑΔΕ']) {
+      expect(desc, `the description must name ${word}`).toContain(word);
+    }
+  });
+
+  it('does not let the booked list answer for the feed', () => {
+    // The other half of the miss: `list_recent_expenses` is the tool that WAS chosen, so it has to
+    // say what it is not and where the rest lives.
+    const desc = tools.slice(tools.indexOf("name: 'list_recent_expenses'"), tools.indexOf("name: 'list_recent_expenses'") + 1200);
+    expect(desc).toContain('list_mydata_expenses');
+    expect(desc, 'it must say these are the BOOKED ones').toMatch(/RECORDED|booked/);
+  });
+
+  it('answers origin from the link, not from the notes prose', () => {
+    expect(tools).toContain('stampExpenseSource');
+    // `inbound_documents.created_supplier_bill_id` is the joinable fact; `notes` is a sentence.
+    const fn = tools.slice(tools.indexOf('async function stampExpenseSource'));
+    expect(fn.slice(0, 900)).toContain('created_supplier_bill_id');
+  });
+});
+
+describe('a myDATA document is its own kind of record', () => {
+  it('is peekable, has no page, and lives in the supplier inbox', () => {
+    const spec = recordSpec('inbound_document')!;
+    expect(spec, 'inbound_document must be registered').toBeTruthy();
+    expect(spec.peekable).toBe(true);
+    // Collapsing it into `expense` is exactly what produced "2" for a 1,866-document feed.
+    expect(spec.route, 'a received document has no page of its own').toBeNull();
+    expect(spec.listRoute).toBe('/finance?tab=expense_suppliers');
+  });
+
+  it('opens the row from a prefixed id key', () => {
+    const id = '11111111-2222-3333-4444-555555555555';
+    // `inbound_issuers_summary` names a company's id `crm_company_id`; requiring `id`/`company_id`
+    // left every one of those rows dead.
+    expect(rowRecordRef({ crm_company_id: id, issuer_name: 'ACME' }, 'suppliers')).toEqual({ kind: 'company', id });
+    // ...but only for the row's OWN kind: an expense's supplier is a company, not the expense.
+    expect(rowRecordRef({ supplier_company_id: id, total: 10 }, 'expenses')).toBeNull();
+  });
+
+  it('keys documents on the chunk, never on the word "documents"', () => {
+    // `my_hr_documents` also returns a list called `documents`, and a wrong link goes somewhere
+    // real and wrong.
+    expect(rowRecordKind({}, 'documents')).toBeNull();
+    expect(rowRecordKind({}, 'documents', 'mydata_expense_documents')).toBe('inbound_document');
   });
 });
