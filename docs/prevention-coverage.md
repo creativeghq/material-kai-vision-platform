@@ -1332,6 +1332,61 @@ building could be told which jobs happen there and could never say so.
   which guards REGRESSION rather than absence: deleting the reader or unmounting it restores the
   exact original state, and nothing else would notice.
 
+## The check-then-act sweep: three more, one of them under 1,866 live documents — 2026-08-31
+
+Fixing three stock receivers taught the shape well enough to go looking for it everywhere instead
+of module by module. One query over `pg_proc`: functions that compare a status against a literal,
+then `UPDATE … SET status`, with no `FOR UPDATE`. Forty candidates, triaged not by how the code
+looks but by **what is irreversible if it runs twice**. Three were real.
+
+### One AADE document, two supplier bills
+
+`_inbound_doc_to_supplier_bill_core` guards itself with
+`IF d.created_supplier_bill_id IS NOT NULL THEN RETURN …` — reading the column that is written
+LAST, after the INSERT. Rule 4's exact clause: a duplicate guard must read the record written on
+the SUCCESS path. Two concurrent calls both see NULL and both insert. Nothing catches it —
+`supplier_bills` has no unique constraint on `supplier_bill_number`, only the PK on id — and the
+number is derived deterministically from the MARK, so the duplicate is byte-identical.
+
+**Proven on live data**, in an aborted transaction: two different bill ids sharing the number
+`IN-400015056922778`, **EUR 40 booked for a EUR 20 document**. This is the one that matters most
+right now: 1,866 real AADE documents are sitting in `inbound_documents` waiting to be billed, and
+each is one double-click away from being counted twice in payables.
+
+### Dispatching a line twice
+
+`_deliver_order_line_core` computes `v_delta := v_new - coalesce(oi.quantity_shipped, 0)`, moves
+stock by that delta, and only afterwards writes `quantity_shipped = v_new`. Two concurrent
+dispatches of the same line both read 0, both compute the full quantity, and both decrement. The
+goods leave twice on paper.
+
+### A gap burned in a fiscal sequence
+
+`mark_invoice_issued` reads `WHERE id = … AND status = 'draft'`, which *looks* like a guard and is
+a plain snapshot read, so both callers pass it. They then serialise on the `finance_settings` row
+and take DIFFERENT numbers — and `legal_number = coalesce(legal_number, v_legal)` discards the
+loser's. The number is consumed and never used: a permanent gap in a sequence Greek fiscal law
+requires to be unbroken, and gaps are what an audit asks about. On the no-order branch it also
+calls `_record_stock_movement_core` unconditionally, so stock leaves twice as well. (The order
+branch is saved by `_deliver_order_line_core`'s own quantity check — which is the second function
+in this list, so that protection only exists once *both* are correct.)
+
+### What the sweep did not change
+
+Most of the forty were fine, and two are worth recording so nobody "fixes" them later:
+`pos_issue_receipt` is protected by its `p_client_token` idempotency key rather than a lock — the
+documented pattern for work that is legitimately retried but must not repeat — and `sign_contract`,
+`submit_line_rfq`, `disable_workspace`, `recover_stale_jobs` and `mark_pdf_job_for_recovery` all
+already check `ROW_COUNT` on a claiming UPDATE, which is the same guarantee by the other route.
+
+### Guard
+
+`stock.receiver_lost_its_claim` grows from three functions to six rather than a second detector
+appearing beside it — same rule, a NAMED roster and one literal token, never a heuristic over the
+live schema. Watched: quiet at HEAD; the claim stripped back out of
+`_inbound_doc_to_supplier_bill_core` → fires, naming it. All three fixes were then CALLED, not
+merely linted, and a genuine repeat of the billing path now returns the SAME bill with one row.
+
 ## A bill run with no memory, and a gate that answered questions about your customers — 2026-08-30
 
 The last three modules: Banking/Revolut, CRM and Presentation Catalogs.
