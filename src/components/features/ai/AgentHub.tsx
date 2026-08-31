@@ -60,6 +60,7 @@ import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { useToast } from '@/hooks/use-toast';
 import { DemoAgentResults } from './DemoAgentResults';
 import { AgentResultCard } from './AgentResultCard';
+import { useRecordLinkAccess } from '@/hooks/useRecordLinkAccess';
 import { ConversationManagerModal } from './ConversationManagerModal';
 import { CanvasPanel, ArtifactChip, type CanvasArtifact } from './CanvasPanel';
 import {
@@ -930,6 +931,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     return () => { cancelled = true; };
   }, [initialMoodboardId]);
   const [convManagerOpen, setConvManagerOpen] = useState(false);
+  // Who is reading, for the result cards' record links: which kinds this persona may open, and
+  // the two role facts the destination routes branch on. Resolved once here — the card takes it
+  // as a prop so it stays renderable outside every provider.
+  const recordLinkAccess = useRecordLinkAccess();
   // Studio canvas: artifacts (moodboard sheet / products /
   // virtual staging) render full-width in a left-docked panel; the chat sits on
   // the right. Off by default — opening it collapses the matching chat cards to
@@ -5068,7 +5073,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       );
     }
     if (message.techRadarData) return <TechRadarFindingsCard data={message.techRadarData} />;
-    if (message.agentResultData) return <AgentResultCard title={message.agentResultData.title} data={message.agentResultData.data} resultType={message.agentResultData.resultType} onAsk={handleCardAsk} />;
+    if (message.agentResultData) return <AgentResultCard title={message.agentResultData.title} data={message.agentResultData.data} resultType={message.agentResultData.resultType} onAsk={handleCardAsk} access={recordLinkAccess} />;
     return renderDataCardBody(message);
   };
 
@@ -5706,7 +5711,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                             onOpen={() => focusCanvas(message.id)}
                           />
                         ) : (
-                          <AgentResultCard title={message.agentResultData.title} data={message.agentResultData.data} resultType={message.agentResultData.resultType} onAsk={handleCardAsk} />
+                          <AgentResultCard title={message.agentResultData.title} data={message.agentResultData.data} resultType={message.agentResultData.resultType} onAsk={handleCardAsk} access={recordLinkAccess} />
                         )}
                       </div>
                     ) : message.sourcingOptionsData ? (

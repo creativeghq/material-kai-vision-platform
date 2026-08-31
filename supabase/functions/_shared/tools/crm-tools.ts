@@ -1,5 +1,6 @@
 import { describeUpstreamError } from '../tool-result-shape.ts';
 import { moduleGate } from './module-gate.ts';
+import { attachPartyNames } from './record-labels.ts';
 /**
  * CRM Tools for JARVIS — workspace-scoped queries over the CRM roster.
  *
@@ -325,12 +326,25 @@ export const createManageDealTool = (
 
       if (action === 'list') {
         const { data, error } = await db.from('crm_deals')
-          .select('id, title, stage, status, value, currency, expected_close_date, type:crm_deal_types ( label ), contact:crm_contacts!crm_deals_contact_id_fkey ( name )')
+          .select('id, title, stage, status, value, currency, expected_close_date, company_id, contact_id, project_id, type:crm_deal_types ( label ), contact:crm_contacts!crm_deals_contact_id_fkey ( name )')
           .eq('workspace_id', workspaceId).neq('status', 'lost').order('updated_at', { ascending: false }).limit(50);
         if (error) return JSON.stringify({ success: false, error: error.message });
-        const deals = (data ?? []) as AnyRow[];
-        onChunk?.({ type: 'crm_deals_list', count: deals.length, deals, timestamp: Date.now() });
-        return JSON.stringify({ success: true, count: deals.length, deals });
+        // Flattened, because a nested `{type: {label}}` is not a table column: the card's row
+        // builder skips non-scalars, so the deal type and the contact were in the payload and on
+        // screen nowhere. The ids ride along so each row opens its deal, company and contact.
+        const deals = ((data ?? []) as AnyRow[]).map((d) => {
+          const { type, contact, ...rest } = d as AnyRow;
+          return {
+            ...rest,
+            deal_type: (type as AnyRow)?.label ?? null,
+            contact_name: (contact as AnyRow)?.name ?? null,
+          };
+        });
+        const withNames = await attachPartyNames(db, deals, [
+          { idField: 'company_id', nameField: 'company_name' },
+        ]);
+        onChunk?.({ type: 'crm_deals_list', count: withNames.length, deals: withNames, timestamp: Date.now() });
+        return JSON.stringify({ success: true, count: withNames.length, deals: withNames });
       }
 
       if (action === 'forecast') {

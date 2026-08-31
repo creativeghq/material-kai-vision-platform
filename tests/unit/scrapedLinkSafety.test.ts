@@ -36,6 +36,26 @@ const EXEMPT: Array<{ file: string; expr: string; why: string }> = [
     expr: 'setupDest.route',
     why: 'An in-app route from appDestinations — safeHref only admits https/http/mailto and would refuse it.',
   },
+  {
+    file: 'src/components/features/ai/AgentResultCard.tsx',
+    expr: 'recordHref',
+    why: 'An in-app record route built by config/recordLinks from the ⌘K palette catalogue — our own path, and safeHref would refuse a relative URL.',
+  },
+  {
+    file: 'src/components/features/ai/AgentResultCard.tsx',
+    expr: 'selfHref',
+    why: 'The in-app page of the record the row IS, from config/recordLinks — our own path, which safeHref would refuse for being relative.',
+  },
+  {
+    file: 'src/components/features/ai/AgentResultCard.tsx',
+    expr: 'chipHref',
+    why: 'The in-app page of a related record, from config/recordLinks — our own path, which safeHref would refuse for being relative.',
+  },
+  {
+    file: 'src/components/features/ai/RecordPeekDialog.tsx',
+    expr: 'telHref',
+    why: 'A tel: URL whose scheme the template fixes, so the stored value cannot choose one; safeHref has no tel: in its allowlist and would inert the link.',
+  },
 ];
 
 function tsxFiles(dir: string): string[] {

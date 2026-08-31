@@ -1,13 +1,21 @@
-import React from 'react';
+import React, { createContext, useContext, useMemo, useState } from 'react';
 import { ExternalLink, Plus, Link2 } from 'lucide-react';
 import { Link, useInRouterContext } from 'react-router-dom';
 import {
   RESULT_TYPE_CAPABILITY, RESULT_RECORD_KEY, RESULT_SETUP_DESTINATION,
   buildPageUrl, capabilityHubLabel, resultOffersCreate,
 } from '@/config/capabilities';
+import {
+  canOpenRecordKind, labelKeyForIdKey, recordKindForIdKey, recordRoute, recordSpec,
+  relatedRecordRefs, rowRecordRef, type RecordRef,
+} from '@/config/recordLinks';
 import { getDestination } from '@/config/appDestinations';
 import { Badge } from '@/components/core/ui/badge';
 import { formatDate } from '@/utils/datetime';
+import { formatMoney } from '@/utils/decimal';
+import { labelizeValue, statusBadgeVariant, STATUS_KEYS } from '@/utils/recordDisplay';
+import type { RecordLinkAccess } from '@/hooks/useRecordLinkAccess';
+import { RecordPeekDialog } from './RecordPeekDialog';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { safeHref } from '@/utils/safeUrl';
 
@@ -76,7 +84,7 @@ function Scalar({ v }: { v: any }) {
       // Time only when the value carries one — a date-only field gains nothing from "12:00 AM".
       return <span>{formatDate(v, { withTime: /[T ]\d{2}:\d{2}/.test(v) })}</span>;
     }
-    if (ENUM_VALUE_RE.test(v)) return <span>{labelize(v)}</span>;
+    if (ENUM_VALUE_RE.test(v)) return <span>{labelizeValue(v)}</span>;
     if (IMG_URL_RE.test(v)) {
       return (
         <a href={safeHref(v)} target="_blank" rel="noopener noreferrer" className="inline-block" aria-label="Open image in a new tab">
@@ -111,12 +119,15 @@ function ArrayItem({ item, depth }: { item: any; depth: number }) {
 
 // One value, rendered to a sensible depth (objects expand via <details>, arrays
 // cap inline with a "Show all" disclosure for the overflow).
-function Value({ v, depth = 0 }: { v: any; depth?: number }) {
+function Value({ v, depth = 0, listKey }: { v: any; depth?: number; listKey?: string }) {
   if (isScalar(v)) return <Scalar v={v} />;
   if (Array.isArray(v)) {
     if (v.length === 0) return <span className="text-muted-foreground">None</span>;
     const cols = tabularColumns(v);
-    if (cols) return <RecordTable rows={v} columns={cols} />;
+    // `listKey` is the key this array sits under — the one thing that says what its rows ARE. A
+    // nested table inheriting the OUTER list's key is how a row of line items would end up
+    // linking to an expense.
+    if (cols) return <RecordTable rows={v} columns={cols} listKey={listKey} />;
     const shown = v.slice(0, ARRAY_INLINE_CAP);
     const rest = v.slice(ARRAY_INLINE_CAP);
     return (
@@ -169,15 +180,9 @@ function Value({ v, depth = 0 }: { v: any; depth?: number }) {
 // absent value, status as a tinted squared Badge, and the whole thing in its own overflow-x
 // container so a wide table scrolls instead of pushing the page sideways.
 
-/** Status-ish values map onto the semantic badge tints; anything unknown stays neutral. */
-const STATUS_VARIANT: Record<string, 'success' | 'warning' | 'error' | 'info' | 'neutral'> = {
-  active: 'success', live: 'success', published: 'success', completed: 'success', done: 'success',
-  paid: 'success', approved: 'success', sent: 'success', verified: 'success', enabled: 'success',
-  pending: 'warning', draft: 'warning', processing: 'warning', queued: 'warning', partial: 'warning',
-  failed: 'error', error: 'error', cancelled: 'error', canceled: 'error', overdue: 'error', rejected: 'error',
-  paused: 'neutral', archived: 'neutral', inactive: 'neutral', disabled: 'neutral',
-};
-const STATUS_KEYS = new Set(['status', 'state', 'stage', 'tier', 'severity', 'ring', 'payment_status']);
+// Status tint and enum-to-prose live in `@/utils/recordDisplay` — the record peek dialog opened
+// FROM this table renders the same words, and two copies is how a status ends up amber here and
+// grey one click deeper.
 
 const isNumericCol = (rows: any[], k: string) =>
   rows.some((r) => typeof r?.[k] === 'number') &&
@@ -227,13 +232,105 @@ function singularize(word: string): string {
   return w.replace(/s$/, '');
 }
 
-function RecordTable({ rows, columns }: { rows: any[]; columns: string[] }) {
+// ── The rows are RECORDS, and a record you cannot open is a screenshot ───────
+//
+// Every id in these payloads was hidden as plumbing (`isPlumbing`, above) — correct, a raw uuid is
+// not information, and wrong in one respect: it was the only thing that could make the table
+// interactive. So the ids stay OUT of the columns and go INTO the links. `recordLinks.ts` answers
+// what an id points at, which cell holds its name, and where that kind opens; the ⌘K palette owns
+// the routes and the gates, so a link offered here opens exactly where the palette would send you.
+//
+// Two different gestures, because they are two different intentions:
+//   • the row's own name OPENS THE PEEK — the detail, in place, without losing the conversation.
+//   • a name belonging to some OTHER record (the supplier on an expense) is an anchor to that
+//     record's page with target=_blank, because following it is leaving.
+interface RecordLinkCtx {
+  access: RecordLinkAccess;
+  onPeek: (ref: RecordRef) => void;
+  /** Which list this table is, and which chunk carried it — how a row learns what kind it is. */
+  listKey?: string;
+  resultType?: string;
+}
+const RecordLinkContext = createContext<RecordLinkCtx | null>(null);
+
+/** The href for another record this row points at, or null when the persona cannot open it. */
+function useRelatedHref(kind: string | null, id: unknown): string | null {
+  const ctx = useContext(RecordLinkContext);
+  if (!ctx || !kind || typeof id !== 'string' || !UUID_RE.test(id)) return null;
+  if (!canOpenRecordKind(kind, ctx.access.gate)) return null;
+  return recordRoute(kind, id, ctx.access.route);
+}
+
+/** Columns whose number is an amount — formatted with the row's currency instead of beside it. */
+const MONEY_COL_RE = /(^|_)(total|amount|amount_due|amount_paid|price|value|subtotal|balance|due|paid|revenue|spend|cost|grand_total)$/i;
+
+/**
+ * One cell. Everything the plain `Scalar` did, plus: money reads with the row's own currency, a
+ * status reads as a tag, and a name that belongs to a record becomes a way to that record.
+ *
+ * Money matters more than it looks. The chat's prose answer said `€328.00` and the card said
+ * `328` in one column and `EUR` in another — the same six expenses reading as two different
+ * answers depending on which half of the screen you looked at.
+ *
+ * `noLink` is for the cell that sits INSIDE the row's own open button: an anchor nested in a
+ * button is invalid markup and gives one gesture two meanings.
+ */
+function Cell({ row, col, numeric, noLink }: { row: any; col: string; numeric: boolean; noLink?: boolean }) {
+  const v = row?.[col];
+  // The id this cell is the NAME of, if any: `supplier_name` ← `supplier_company_id`.
+  const idKey = useMemo(() => {
+    if (typeof v !== 'string' || !v) return null;
+    for (const k of Object.keys(row ?? {})) {
+      if (!recordKindForIdKey(k)) continue;
+      if (labelKeyForIdKey(k, row) === col) return k;
+    }
+    return null;
+  }, [row, col, v]);
+  const recordHref = useRelatedHref(idKey ? recordKindForIdKey(idKey) : null, idKey ? row[idKey] : null);
+
+  if (STATUS_KEYS.has(col) && typeof v === 'string' && v) {
+    return <Badge variant={statusBadgeVariant(v)}>{labelizeValue(v)}</Badge>;
+  }
+  if (numeric && typeof v === 'number' && MONEY_COL_RE.test(col) && typeof row?.currency === 'string') {
+    return <span>{formatMoney(v, row.currency)}</span>;
+  }
+  if (recordHref && !noLink) {
+    return (
+      <a
+        href={recordHref}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-primary hover:underline"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {v}
+      </a>
+    );
+  }
+  return <Scalar v={v} />;
+}
+
+function RecordTable({ rows, columns, listKey }: { rows: any[]; columns: string[]; listKey?: string }) {
+  const outer = useContext(RecordLinkContext);
+  const ctx = outer && listKey ? { ...outer, listKey } : outer;
+  // `currency` beside a money column is not a fact the reader needs as its own column — it is part
+  // of the amount. Folded into `Cell` and dropped here.
+  const shown = useMemo(() => {
+    const hasMoney = columns.some((c) => MONEY_COL_RE.test(c) && isNumericCol(rows, c));
+    return hasMoney ? columns.filter((c) => c !== 'currency') : columns;
+  }, [columns, rows]);
+  // The column the row is NAMED by: the first one that is neither a number nor a status.
+  const nameCol = useMemo(
+    () => shown.find((c) => !isNumericCol(rows, c) && !STATUS_KEYS.has(c)) ?? shown[0],
+    [shown, rows],
+  );
+
   return (
     <div className="-mx-1 overflow-x-auto custom-scrollbar">
       <table className="w-full border-collapse text-xs">
         <thead>
           <tr className="bg-surface-sunken">
-            {columns.map((c) => (
+            {shown.map((c) => (
               <th
                 key={c}
                 className={`whitespace-nowrap px-2 py-1.5 text-[11px] font-semibold text-muted-foreground ${
@@ -246,26 +343,106 @@ function RecordTable({ rows, columns }: { rows: any[]; columns: string[] }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((r, i) => (
-            <tr key={i} className="border-t border-hairline align-top">
-              {columns.map((c) => {
-                const v = r?.[c];
-                const numeric = isNumericCol(rows, c);
-                return (
-                  <td
-                    key={c}
-                    className={`px-2 py-1.5 ${numeric ? 'text-right tabular-nums' : 'text-left'}`}
-                  >
-                    {STATUS_KEYS.has(c) && typeof v === 'string' && v
-                      ? <Badge variant={STATUS_VARIANT[v.toLowerCase()] ?? 'neutral'}>{v}</Badge>
-                      : <Scalar v={v} />}
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
+          {rows.map((r, i) => {
+            const self = ctx ? rowRecordRef(r, ctx.listKey, ctx.resultType) : null;
+            const openable = self && canOpenRecordKind(self.kind, ctx!.access.gate) ? self : null;
+            // A kind `get_record_peek` does not model has nothing to show in a dialog — opening
+            // one would say "this record is no longer available" about a record that is fine. An
+            // inbox thread, a moodboard, a catalog all have a PAGE, so they go there instead.
+            const selfHref = openable && !recordSpec(openable.kind)?.peekable
+              ? recordRoute(openable.kind, openable.id, ctx!.access.route)
+              : null;
+            return (
+              <tr key={i} className="border-t border-hairline align-top">
+                {shown.map((c) => {
+                  const numeric = isNumericCol(rows, c);
+                  const isName = c === nameCol;
+                  return (
+                    <td
+                      key={c}
+                      className={`px-2 py-1.5 ${numeric ? 'text-right tabular-nums' : 'text-left'}`}
+                    >
+                      {openable && isName && isScalar(r?.[c]) && r?.[c] != null && r?.[c] !== '' ? (
+                        selfHref ? (
+                          <a
+                            href={selfHref}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-medium text-foreground underline decoration-dotted decoration-muted-foreground underline-offset-2 hover:text-primary hover:decoration-primary"
+                            title={`Open this ${recordSpec(openable.kind)?.label.toLowerCase() ?? 'record'}`}
+                          >
+                            <Cell row={r} col={c} numeric={numeric} noLink />
+                          </a>
+                        ) : (
+                          // A button, not a click-handling <td>: this has to work from the keyboard,
+                          // and the row also carries anchors that must not open the peek instead.
+                          <button
+                            type="button"
+                            onClick={() => ctx!.onPeek({ ...openable, title: String(r?.[c] ?? '') || null })}
+                            className="text-left font-medium text-foreground underline decoration-dotted decoration-muted-foreground underline-offset-2 hover:text-primary hover:decoration-primary"
+                            title={`Open this ${recordSpec(openable.kind)?.label.toLowerCase() ?? 'record'}`}
+                          >
+                            <Cell row={r} col={c} numeric={numeric} noLink />
+                          </button>
+                        )
+                      ) : (
+                        <Cell row={r} col={c} numeric={numeric} />
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/**
+ * The other records this payload points at, as chips. For a SINGLE-record result — `{invoice_id,
+ * legal_number, customer_company_id, …}` — there is no table to hang links off, and the ids were
+ * being dropped on the floor: the card told you an invoice was issued and gave you no way to
+ * reach it or the customer it was issued to.
+ */
+function RelatedChips({ obj }: { obj: Record<string, any> }) {
+  const ctx = useContext(RecordLinkContext);
+  const refs = useMemo(() => {
+    if (!ctx) return [];
+    const seen = new Set<string>();
+    return relatedRecordRefs(obj).filter((ref) => {
+      if (!canOpenRecordKind(ref.kind, ctx.access.gate)) return false;
+      const key = `${ref.kind}:${ref.id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [obj, ctx]);
+
+  if (!ctx || refs.length === 0) return null;
+  return (
+    <div className="mt-3 flex flex-wrap gap-1.5 border-t border-hairline pt-2">
+      {refs.map((ref) => {
+        const spec = recordSpec(ref.kind);
+        const Icon = spec?.icon ?? Link2;
+        const label = <>
+          <Icon className="h-3 w-3 shrink-0 text-primary" />
+          <span className="truncate">{ref.title || spec?.label || ref.kind}</span>
+        </>;
+        const chip = 'inline-flex max-w-full items-center gap-1.5 rounded-sm border border-hairline px-2 py-1 text-xs text-foreground transition-colors hover:bg-primary/10';
+        // Same split as a row: the peek is for kinds SQL can describe; everything else has a page.
+        const chipHref = spec?.peekable ? null : recordRoute(ref.kind, ref.id, ctx.access.route);
+        return chipHref ? (
+          <a key={`${ref.key}-${ref.id}`} href={chipHref} target="_blank" rel="noopener noreferrer" className={chip}>
+            {label}
+          </a>
+        ) : (
+          <button key={`${ref.key}-${ref.id}`} type="button" onClick={() => ctx.onPeek(ref)} className={chip}>
+            {label}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -279,7 +456,7 @@ function KeyValues({ obj, depth = 0, inline = false }: { obj: any; depth?: numbe
       {entries.map(([k, v]) => (
         <div key={k} className={inline ? 'text-xs' : 'grid grid-cols-[140px_1fr] gap-2 text-xs items-start'}>
           <span className="text-muted-foreground">{labelize(k)}{inline ? ': ' : ''}</span>
-          <div className="text-foreground"><Value v={v} depth={depth} /></div>
+          <div className="text-foreground"><Value v={v} depth={depth} listKey={k} /></div>
         </div>
       ))}
     </div>
@@ -301,13 +478,41 @@ export const AgentResultCard: React.FC<{
    * exists the agent answers with a form on the canvas rather than an interrogation.
    */
   onAsk?: (prompt: string) => void;
-}> = ({ title, data, resultType, onAsk }) => {
+  /**
+   * Who is reading, from `useRecordLinkAccess()`. It is a PROP rather than a hook call inside the
+   * card so this component stays renderable on its own — the card's own render test drives it with
+   * `renderToStaticMarkup`, outside every provider, and a hook here would have made the presentation
+   * layer untestable to unlock a link.
+   *
+   * Omitted = no record links and no peek. `recordLinks.test.ts` holds every call site to passing
+   * it, because a silently link-less card is exactly the "offered but not bound" shape that hides.
+   */
+  access?: RecordLinkAccess;
+}> = ({ title, data: rawData, resultType, onAsk, access }) => {
+  // A chunk that wraps its whole answer in one `data` key — `{data: {count: 6, expenses: […]}}`,
+  // which is what half the tools emit — used to render as a field LABELLED "Data" with the real
+  // answer nested inside it: the shape of the JSON showing through as a heading, exactly the leak
+  // the list-unwrapping below already exists to stop. On the canvas that is the whole artifact, so
+  // the same six expenses read as a debug dump there and as a clean table in the chat.
+  const data = useMemo(() => {
+    let d = rawData;
+    for (let i = 0; i < 2; i++) {
+      const keys = d && typeof d === 'object' && !Array.isArray(d) ? Object.keys(d) : [];
+      const inner = keys.length === 1 && (keys[0] === 'data' || keys[0] === 'result') ? (d as any)[keys[0]] : null;
+      if (!inner || typeof inner !== 'object' || Array.isArray(inner)) break;
+      d = inner;
+    }
+    return d;
+  }, [rawData]);
+
   // Rail-3 reverse handoff: resolve the owning capability's page + Hub label.
   const capId = resultType ? RESULT_TYPE_CAPABILITY[resultType] : undefined;
   const recordId = capId && resultType ? (data?.[RESULT_RECORD_KEY[resultType]] as string | undefined) : undefined;
   const pageUrl = capId ? buildPageUrl(capId, recordId) : null;
   const hubLabel = capId ? capabilityHubLabel(capId) : undefined;
   const inRouter = useInRouterContext();
+
+  const [peek, setPeek] = useState<RecordRef | null>(null);
 
   // The setup flow this list is fed by, when adding one is not something the agent can do.
   const setup = resultType ? RESULT_SETUP_DESTINATION[resultType] : undefined;
@@ -350,7 +555,13 @@ export const AgentResultCard: React.FC<{
     )
   ) : null;
 
+  const linkCtx = useMemo(
+    () => (access ? { access, onPeek: setPeek, listKey: listEntry?.[0], resultType } : null),
+    [access, listEntry, resultType],
+  );
+
   return (
+    <RecordLinkContext.Provider value={linkCtx}>
     <div className="bg-card text-card-foreground rounded-xl p-4 border border-border">
       <div className="text-xs text-muted-foreground mb-2">{title}</div>
       {/*
@@ -389,7 +600,7 @@ export const AgentResultCard: React.FC<{
             const rest = entries.filter(([k]) => k !== key);
             return (
               <>
-                <RecordTable rows={rows} columns={cols} />
+                <RecordTable rows={rows} columns={cols} listKey={key} />
                 {/* A scalar sitting beside the list is context for it (`days: 7` = the window
                     searched), so it reads under the table rather than above it. */}
                 {rest.length > 0 && (
@@ -403,6 +614,10 @@ export const AgentResultCard: React.FC<{
         }
         return <KeyValues obj={data} />;
       })()}
+      {/* A single-record result — "invoice issued", "deal saved" — has no table to hang links off,
+          so the records it names get chips. Without this the card announced an invoice and gave
+          you no way to reach it or the customer it was issued to. */}
+      {!listEntry && <RelatedChips obj={data} />}
       {(pageUrl || addLabel || (setupLink && !showsEmptyState)) && (
         <div className="mt-3 flex flex-wrap justify-end gap-2">
           {/* Where adding one means connecting something, the button is a LINK to that flow.
@@ -434,6 +649,15 @@ export const AgentResultCard: React.FC<{
         </div>
       )}
     </div>
+      {access && (
+        <RecordPeekDialog
+          record={peek}
+          onClose={() => setPeek(null)}
+          routeContext={access.route}
+          gateContext={access.gate}
+        />
+      )}
+    </RecordLinkContext.Provider>
   );
 };
 

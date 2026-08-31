@@ -51,9 +51,12 @@ describe('AgentResultCard renders a record list as a table', () => {
   });
 
   it('renders status as a tinted badge, mapped to meaning', () => {
-    expect(html).toMatch(/success-bg[\s\S]*?active/);   // active  → success
-    expect(html).toMatch(/warning-bg[\s\S]*?draft/);    // draft   → warning
-    expect(html).toMatch(/surface-sunken[\s\S]*?paused/); // paused → neutral
+    // The badge used to print the stored value verbatim, so `partially_paid` reached the screen
+    // as `partially_paid` — the same enum leak this card fixes in every other cell. The word is
+    // now humanised on the way in, so the tint and the label are asserted together.
+    expect(html).toMatch(/success-bg[\s\S]*?Active/);   // active  → success
+    expect(html).toMatch(/warning-bg[\s\S]*?Draft/);    // draft   → warning
+    expect(html).toMatch(/surface-sunken[\s\S]*?Paused/); // paused → neutral
   });
 
   it('never shows a raw ISO timestamp', () => {
@@ -63,7 +66,9 @@ describe('AgentResultCard renders a record list as a table', () => {
 
   it('labelises a stored enum value', () => {
     expect(html).not.toContain('>quote_approved<');
-    expect(html).toContain('Quote Approved');
+    // Sentence case, not Title Case: this is a VALUE, and "Partially paid" is how a person writes
+    // it. Column HEADINGS keep Title Case — they are labels, not prose.
+    expect(html).toContain('Quote approved');
   });
 
   it('does not repeat the list key as a heading above its own table', () => {
@@ -168,5 +173,139 @@ describe('AgentResultCard offers the next action', () => {
       React.createElement(AgentResultCard, { title: 'Contacts', data: { contacts: [] }, resultType: 'x' }),
     );
     expect(html).not.toContain('Add contact');
+  });
+});
+
+/**
+ * The record layer — conversation 46b837fb, "show me the first 5 expenses by supplier".
+ *
+ * The agent answered TWICE in that conversation: a prose table in the chat with a Supplier column
+ * and real amounts, and this card on the canvas with the whole payload nested under a field
+ * labelled "Data", a Notes column instead of a supplier, and `328` in one column next to `EUR` in
+ * another. Same six expenses, two different answers depending on which half of the screen you
+ * were looking at — and nothing on the canvas was clickable.
+ *
+ * The payload below is the real one, plus the identity columns `list_recent_expenses` now selects.
+ */
+const EXPENSES = {
+  data: {
+    count: 2,
+    expenses: [
+      {
+        id: 'e3f10239-c2d5-436f-b3ac-58d547dd223f',
+        supplier_bill_number: 'IN-400014625258038',
+        supplier_company_id: '0d2ec35e-2721-405b-89b7-657f763195c7',
+        supplier_name: 'ΑΠΟΣΤΟΛΙΔΗΣ ΑΕΒΕ',
+        total: 322.44,
+        amount_due: 322.44,
+        currency: 'EUR',
+        status: 'received',
+        issued_at: '2026-07-29',
+      },
+      {
+        id: '829c1d38-a21c-48ef-9505-2d78c8821a1a',
+        supplier_bill_number: 'IN-400014633955947',
+        supplier_company_id: '1d2ec35e-2721-405b-89b7-657f763195c8',
+        supplier_name: 'TEMA SALES ΑΝΤΙΠΡΟΣΩΠΕΙΕΣ Α.Ε.',
+        total: 90.87,
+        amount_due: 90.87,
+        currency: 'EUR',
+        status: 'received',
+        issued_at: '2026-07-29',
+      },
+    ],
+  },
+};
+
+const FULL_ACCESS = {
+  route: { isPlatformOperator: false, isWorkspaceManager: true },
+  gate: { can: () => true, isModuleAvailable: () => true, isWorkspaceManager: true },
+};
+
+describe('AgentResultCard makes the records reachable', () => {
+  const html = renderToStaticMarkup(
+    React.createElement(AgentResultCard, {
+      title: 'Recent expenses',
+      data: EXPENSES,
+      resultType: 'expenses_list',
+      access: FULL_ACCESS,
+    }),
+  );
+
+  it('unwraps the single `data` envelope instead of labelling it', () => {
+    // `{data: {count, expenses}}` used to render as a field called "Data" with the answer nested
+    // inside — the shape of the JSON leaking through as a heading. On the canvas that IS the
+    // whole artifact, so the leak was the entire screen.
+    expect(html).not.toMatch(/>Data</);
+    expect(html).toContain('<table');
+    expect(html).toContain('>Supplier Name<');
+  });
+
+  it('links the supplier to its CRM entry, in a new tab', () => {
+    // "link to the crm name entry (new window)" — following it is LEAVING, and the conversation
+    // has to still be there afterwards.
+    expect(html).toContain('href="/crm/companies/0d2ec35e-2721-405b-89b7-657f763195c7"');
+    expect(html).toMatch(/href="\/crm\/companies\/[^"]+"[^>]*target="_blank"/);
+    expect(html).toContain('ΑΠΟΣΤΟΛΙΔΗΣ ΑΕΒΕ');
+  });
+
+  it('makes the row itself open its own record', () => {
+    // The expense has no page of its own, so the bill number is a button (the peek dialog), not
+    // an anchor to a list pretending to be the record.
+    expect(html).toMatch(/<button[^>]*>[\s\S]{0,120}IN-400014625258038/);
+  });
+
+  it('reads money with its currency instead of beside it', () => {
+    expect(html).toContain('€322.44');
+    expect(html).not.toContain('>Currency<');
+  });
+
+  it('offers no links at all when it was given no reader', () => {
+    // Gates come from the persona, and a card rendered without one must not guess. This is also
+    // what keeps the component renderable outside every provider.
+    const bare = renderToStaticMarkup(
+      React.createElement(AgentResultCard, { title: 'Recent expenses', data: EXPENSES, resultType: 'expenses_list' }),
+    );
+    expect(bare).toContain('<table');
+    expect(bare).not.toContain('/crm/companies/');
+  });
+
+  it('withholds a link the persona cannot open', () => {
+    const walled = renderToStaticMarkup(
+      React.createElement(AgentResultCard, {
+        title: 'Recent expenses',
+        data: EXPENSES,
+        resultType: 'expenses_list',
+        access: {
+          route: { isPlatformOperator: false, isWorkspaceManager: false },
+          gate: { can: () => false, isModuleAvailable: () => false, isWorkspaceManager: false },
+        },
+      }),
+    );
+    // The name is still readable; it is simply not a door onto a permission wall.
+    expect(walled).toContain('ΑΠΟΣΤΟΛΙΔΗΣ ΑΕΒΕ');
+    expect(walled).not.toContain('/crm/companies/');
+  });
+});
+
+describe('AgentResultCard sends a record where its detail actually lives', () => {
+  it('links a kind the peek does not model straight to its page', () => {
+    // `get_record_peek` models twelve kinds. An inbox thread is not one of them, and it has a
+    // page — so opening a dialog for it would say "this record is no longer available" about a
+    // thread that is perfectly fine. The row is an anchor instead.
+    const html = renderToStaticMarkup(
+      React.createElement(AgentResultCard, {
+        title: 'Inbox',
+        resultType: 'inbox_threads_list',
+        access: FULL_ACCESS,
+        data: {
+          threads: [
+            { id: 'aaaaaaaa-1111-2222-3333-444444444444', subject: 'Quote request', status: 'open' },
+            { id: 'bbbbbbbb-1111-2222-3333-444444444444', subject: 'Delivery question', status: 'closed' },
+          ],
+        },
+      }),
+    );
+    expect(html).toContain('href="/inbox?thread=aaaaaaaa-1111-2222-3333-444444444444"');
   });
 });

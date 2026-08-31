@@ -22,6 +22,7 @@
 
 import { computeExpenseSplit } from '../finance/expense-math.ts';
 import { moduleGate } from './module-gate.ts';
+import { attachPartyNames } from './record-labels.ts';
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what
@@ -477,16 +478,23 @@ export const createListExpensesTool = (userId: string, workspaceId: string, onCh
     if (denied) return denied;
     try {
       const sb = svc();
+      // WHO the expense is with is the first thing anyone asks of this list, and it was the one
+      // thing the select left out: the supplier survived only inside `notes` ("From myDATA
+      // received document 4000… · ΑΠΟΣΤΟΛΙΔΗΣ ΑΕΒΕ"), so the card had no Supplier column and
+      // nothing to link to CRM. `supplier_company_id` + `order_id` are what make the row openable.
       const { data, error } = await sb.from('supplier_bills')
-        .select('id, supplier_bill_number, total, amount_due, currency, status, issued_at, category_id, notes')
+        .select('id, supplier_bill_number, supplier_company_id, supplier_name, total, amount_due, currency, status, issued_at, order_id, project_id, category_id, notes')
         .eq('workspace_id', workspaceId)
         .order('issued_at', { ascending: false, nullsFirst: false })
         .limit(Math.min(Math.max(limit ?? 15, 1), 50));
       if (error) throw error;
+      const expenses = await attachPartyNames(sb, data ?? [], [
+        { idField: 'supplier_company_id', nameField: 'supplier_name' },
+      ]);
       // Ship the rows in the chunk (not just a count) so the card renders line items, like the
       // finance-tools list chunks — a count-only chunk rendered an empty-looking card.
-      onChunk?.({ type: 'expenses_list', data: { count: data?.length || 0, expenses: data || [] } });
-      return JSON.stringify({ success: true, expenses: data || [] });
+      onChunk?.({ type: 'expenses_list', data: { count: expenses.length, expenses } });
+      return JSON.stringify({ success: true, expenses });
     } catch (e: any) {
       return JSON.stringify({ success: false, error: e?.message || 'Could not list expenses' });
     }

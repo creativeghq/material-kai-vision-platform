@@ -263,7 +263,9 @@ describe('agent result card follows the table language', () => {
   });
 
   it('renders status as a tinted Badge rather than raw text', () => {
-    expect(/STATUS_VARIANT/.test(card) && /<Badge variant=/.test(card),
+    // The tint map moved to `@/utils/recordDisplay` so the peek dialog opened FROM this table
+    // renders the same word the same colour; what matters here is still that a status is a Badge.
+    expect(/statusBadgeVariant/.test(card) && /<Badge variant=/.test(card),
       'status/stage/severity render as a squared tinted tag, per the table spec').toBe(true);
   });
 

@@ -40,6 +40,7 @@ const MODULE_SLUG = 'sales-finance';
 const UNPAID_STATUSES = ['issued', 'partially_paid', 'overdue', 'sent'];
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
+import { attachPartyNames } from './record-labels.ts';
 /** User-scoped client so RLS + membership-asserting RPCs behave exactly as on the page. */
 function userClient(jwt: string | undefined) {
   return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -141,8 +142,14 @@ export const createManageFinanceTool = (
         if (unpaid_only) q = q.in('status', UNPAID_STATUSES);
         const { data, error } = await q;
         if (error) return JSON.stringify({ success: false, error: error.message });
-        onChunk?.({ type: 'finance_invoices_list', workspace_id: workspaceId, customer: company, unpaid_only: !!unpaid_only, invoices: data ?? [], timestamp: Date.now() });
-        return JSON.stringify({ success: true, count: (data ?? []).length, invoices: (data ?? []).slice(0, 15) });
+        // The customer id was already here; the NAME was not, so the card had a column of nothing
+        // to link and the reader had a list of invoices with no counterparty on it.
+        const invoices = await attachPartyNames(sb, data ?? [], [
+          { idField: 'customer_company_id', nameField: 'customer_name' },
+          { idField: 'customer_contact_id', nameField: 'customer_name', table: 'crm_contacts' },
+        ]);
+        onChunk?.({ type: 'finance_invoices_list', workspace_id: workspaceId, customer: company, unpaid_only: !!unpaid_only, invoices, timestamp: Date.now() });
+        return JSON.stringify({ success: true, count: invoices.length, invoices: invoices.slice(0, 15) });
       }
 
       if (action === 'list_orders') {
@@ -151,27 +158,39 @@ export const createManageFinanceTool = (
           company = await resolveCompany(sb, workspaceId, customer_company_id, customer_name);
           if (!company) return JSON.stringify({ success: false, error: 'customer not found in this workspace' });
         }
-        let q = sb.from('orders').select('id, order_number, status, total, currency, created_at, customer_company_id')
+        let q = sb.from('orders').select('id, order_number, order_type, status, payment_status, total, currency, created_at, customer_company_id, supplier_company_id, project_id')
           .eq('workspace_id', workspaceId)
           .order('created_at', { ascending: false })
           .limit(Math.min(limit, 50));
         if (company) q = q.eq('customer_company_id', company.id);
         const { data, error } = await q;
         if (error) return JSON.stringify({ success: false, error: error.message });
-        onChunk?.({ type: 'finance_orders_list', workspace_id: workspaceId, customer: company, orders: data ?? [], timestamp: Date.now() });
-        return JSON.stringify({ success: true, count: (data ?? []).length, orders: (data ?? []).slice(0, 15) });
+        // A purchase order's counterparty is the SUPPLIER, so both sides get a name — picking one
+        // would leave half the list with a blank party column.
+        const orders = await attachPartyNames(sb, data ?? [], [
+          { idField: 'customer_company_id', nameField: 'customer_name' },
+          { idField: 'supplier_company_id', nameField: 'supplier_name' },
+        ]);
+        onChunk?.({ type: 'finance_orders_list', workspace_id: workspaceId, customer: company, orders, timestamp: Date.now() });
+        return JSON.stringify({ success: true, count: orders.length, orders: orders.slice(0, 15) });
       }
 
       if (action === 'list_payments') {
-        let q = sb.from('payments').select('id, amount, currency, direction, method, paid_at, created_at')
+        let q = sb.from('payments').select('id, reference, amount, currency, direction, method, paid_at, counterparty_company_id, counterparty_contact_id, counterparty_name, order_id')
           .eq('workspace_id', workspaceId)
           .order('paid_at', { ascending: false, nullsFirst: false })
           .limit(Math.min(limit, 50));
         if (direction) q = q.eq('direction', direction);
         const { data, error } = await q;
         if (error) return JSON.stringify({ success: false, error: error.message });
-        onChunk?.({ type: 'finance_payments_list', workspace_id: workspaceId, direction: direction || 'all', payments: data ?? [], timestamp: Date.now() });
-        return JSON.stringify({ success: true, count: (data ?? []).length, payments: (data ?? []).slice(0, 15) });
+        // "Who was this paid to" is the whole point of a payment row, and the select answered it
+        // for nobody: a list of amounts and dates with no counterparty at all.
+        const payments = await attachPartyNames(sb, data ?? [], [
+          { idField: 'counterparty_company_id', nameField: 'counterparty_name' },
+          { idField: 'counterparty_contact_id', nameField: 'counterparty_name', table: 'crm_contacts' },
+        ]);
+        onChunk?.({ type: 'finance_payments_list', workspace_id: workspaceId, direction: direction || 'all', payments, timestamp: Date.now() });
+        return JSON.stringify({ success: true, count: payments.length, payments: payments.slice(0, 15) });
       }
 
       if (action === 'customer_balance') {
