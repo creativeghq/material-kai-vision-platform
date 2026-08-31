@@ -10,31 +10,31 @@
  *
  * So a surface that renders the menu without passing `onAddLineDetail` does not get a disabled
  * entry, or an error, or a type failure — the entry is simply NOT THERE. The menu looks complete,
- * every other action works, and the one thing standing between a value-only document and the
- * whole downstream chain (warehouse receive, product extraction, catalog, the markup ladder) is
- * unreachable from that screen.
+ * every other action works, and nothing anywhere reports it.
  *
- * That is exactly what happened. Finance → Expenses passed it; the CRM company card never did;
- * and when the Expenses-by-Supplier modal was built by extracting the CRM card's table, it
- * inherited the gap. Two thirds of this workspace's received documents (1,161 of 1,769) carry
- * value-only lines, so on those two surfaces the majority of documents could never be completed.
+ * That is what happened. Two tables render inbound documents — the Expenses inbox and the shared
+ * supplier document table (CRM company card + the Expenses-by-Supplier modal) — and each spelled
+ * the menu's props out for itself. One passed `onAddLineDetail`, the other never had, so "say what
+ * was actually on this document" was unreachable from two of the three surfaces. Two thirds of
+ * this workspace's received documents (1,161 of 1,769) carry value-only lines, and until one is
+ * completed, warehouse receive, product extraction, the catalog and the markup ladder all skip it.
  * Found by a person opening the modal and asking where the option had gone.
  *
- * `onOpenPayments` is the same shape one notch quieter: the entry renders but sits permanently
- * disabled, so the balance behind the bronze Gross column — a settled document still shows its
- * whole amount there — was unreachable from every surface that forgot it.
+ * WHAT IS ENFORCED, AND WHY IT CHANGED SHAPE
+ * ------------------------------------------
+ * The first version of this test checked that EVERY call site passed every gating prop. That was
+ * the right check while there were two call sites. The fix went further and deleted the second
+ * one: `useInboundDocActions` now owns the state, the wiring and the dialogs, and each table
+ * renders `actions.renderActions(doc)` plus `actions.dialogs`. So the invariant is stronger and
+ * simpler — the menu is CONSTRUCTED IN ONE PLACE, and that place passes everything.
  *
- * WHAT IS ENFORCED
- * ----------------
- * Every `<InboundDocActionsMenu …>` in `src/` passes every handler that gates an entry. This is a
- * source-text check on purpose: the props are optional in TypeScript (they must be — the menu is
- * built to degrade), so the type system cannot see the omission, and a render test would need
+ * Both halves are asserted, because either one alone is defeatable: "one call site" without the
+ * prop check permits the single site to drop a handler, and the prop check without "one call site"
+ * permits a new table to hand-roll its own menu again.
+ *
+ * Source-text on purpose. The props are optional in TypeScript and must stay that way — the menu
+ * is built to degrade — so the type system cannot see the omission, and a render test would need
  * every host wired up to prove a NEGATIVE about a dropdown that is closed.
- *
- * If a new surface genuinely cannot host one of these dialogs, the honest fix is to give it the
- * dialog, not to drop the prop. There is deliberately no exemption list: the last two times this
- * shape appeared the "surface cannot host a dialog" comment was true when written and false six
- * months later, and nothing went back to check.
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -44,13 +44,16 @@ import { blankComments } from '../helpers/stripComments';
 
 const ROOT = process.cwd();
 const SRC = join(ROOT, 'src');
-const MENU = join(SRC, 'modules', 'finance', 'components', 'InboundDocActionsMenu.tsx');
+const FINANCE = join(SRC, 'modules', 'finance', 'components');
+const MENU = join(FINANCE, 'InboundDocActionsMenu.tsx');
+/** The one place allowed to construct the menu. */
+const HOOK = join(FINANCE, 'useInboundDocActions.tsx');
 
 /**
- * Handlers whose ABSENCE removes or disables an entry. Kept here rather than derived, so adding a
+ * Handlers whose ABSENCE removes or disables an entry. Listed rather than derived, so adding a
  * gated entry to the menu is a deliberate two-line change: the entry, and this list.
  */
-const GATING_PROPS = ['onAddLineDetail', 'onOpenPayments', 'onCreateOrder'] as const;
+const GATING_PROPS = ['onAddLineDetail', 'onOpenPayments', 'onCreateOrder', 'onReceiveStock'] as const;
 
 function walk(dir: string, out: string[] = []): string[] {
   let entries: string[];
@@ -69,7 +72,7 @@ function walk(dir: string, out: string[] = []): string[] {
 
 const rel = (p: string) => relative(ROOT, p).split(sep).join('/');
 
-/** Each `<InboundDocActionsMenu … />` element body, per file. */
+/** Every `<InboundDocActionsMenu … />` element in `src/`, outside the menu's own file. */
 function callSites(): { file: string; body: string }[] {
   const out: { file: string; body: string }[] = [];
   for (const file of walk(SRC)) {
@@ -79,7 +82,6 @@ function callSites(): { file: string; body: string }[] {
     for (;;) {
       const at = src.indexOf('<InboundDocActionsMenu', from);
       if (at === -1) break;
-      // Props run to the element's self-closing `/>`; every use of this menu is self-closing.
       const end = src.indexOf('/>', at);
       if (end === -1) break;
       out.push({ file: rel(file), body: src.slice(at, end) });
@@ -91,29 +93,45 @@ function callSites(): { file: string; body: string }[] {
 
 describe('a received document offers the same actions wherever it is shown', () => {
   it('the menu still gates entries on the handler being passed', () => {
-    // If this stops being true the test above is measuring nothing, so it is asserted rather
-    // than assumed — a guard that silently stops guarding is worse than no guard.
+    // If this stops being true the rest of the file is measuring nothing, so it is asserted
+    // rather than assumed — a guard that silently stops guarding is worse than no guard.
     const menu = blankComments(readFileSync(MENU, 'utf8'));
     expect(menu).toMatch(/!!onAddLineDetail/);
     expect(menu).toMatch(/disabled=\{!onOpenPayments/);
   });
 
-  it('every surface rendering the menu is a call site we found', () => {
-    const sites = callSites();
-    // Two today: the Expenses inbox table and the shared supplier document table (which the CRM
-    // company card and the Expenses-by-Supplier modal both render).
-    expect(sites.length).toBeGreaterThanOrEqual(2);
+  it('the menu is constructed in exactly one place', () => {
+    const files = [...new Set(callSites().map((s) => s.file))];
+    expect(
+      files,
+      'Every surface must go through useInboundDocActions().renderActions(doc). A table that '
+      + 'builds the menu itself has to restate every handler, and the ones it forgets do not '
+      + 'render disabled — they vanish. That is the bug this whole file exists for.',
+    ).toEqual([rel(HOOK)]);
   });
 
-  it.each(GATING_PROPS)('every call site passes %s', (prop) => {
+  it.each(GATING_PROPS)('the one construction site passes %s', (prop) => {
     const missing = callSites()
       .filter((s) => !s.body.includes(`${prop}=`))
       .map((s) => s.file);
     expect(
       missing,
       `${prop} gates a menu entry. Omitting it does not disable the entry — it deletes it, `
-      + `silently, on these surfaces:\n  ${missing.join('\n  ')}\n`
-      + 'Pass the handler and host the dialog it opens.',
+      + `silently, on every surface at once now that there is one wiring site:\n  ${missing.join('\n  ')}`,
     ).toEqual([]);
+  });
+
+  it('both tables render the shared actions and the shared dialogs', () => {
+    // The hook is only worth anything if the tables actually use it — an unused hook and a
+    // hand-rolled menu look identical from the hook's side.
+    for (const f of [
+      join(FINANCE, 'SupplierInboundDocs.tsx'),
+      join(SRC, 'modules', 'finance', 'pages', 'DocumentsPage.tsx'),
+    ]) {
+      const src = blankComments(readFileSync(f, 'utf8'));
+      expect(src, `${rel(f)} should call useInboundDocActions`).toMatch(/useInboundDocActions\(/);
+      expect(src, `${rel(f)} should render the shared row actions`).toMatch(/renderActions\(/);
+      expect(src, `${rel(f)} should mount the shared dialogs`).toMatch(/\.dialogs\}/);
+    }
   });
 });

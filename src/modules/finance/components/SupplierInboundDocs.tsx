@@ -20,20 +20,11 @@ import { Loader2, CalendarDays } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
-import { useToast } from '@/hooks/use-toast';
 import { formatMoney } from '@/modules/finance/services/financeService';
 import { inboundService, type InboundDocument, type IssuerMoney } from '@/modules/finance/services/inboundService';
 import { inboundOutcomes } from '@/modules/finance/components/inboundStatus';
 import { MydataTypeLabel } from '@/modules/finance/components/MydataTypeLabel';
-import { InboundDocActionsMenu } from '@/modules/finance/components/InboundDocActionsMenu';
-import { InboundDocPreviewDialog } from '@/modules/finance/components/InboundDocPreviewDialog';
-import { CompleteLinesDialog } from '@/modules/finance/components/CompleteLinesDialog';
-import { ExpensePaymentsDialog } from '@/modules/finance/components/ExpensePaymentsDialog';
-import { ReceiveToWarehouseDialog } from '@/modules/finance/components/ReceiveToWarehouseDialog';
-import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
-import { NewOrderModal } from '@/modules/finance/components/OrdersPanel';
-import { orderLinesFromDoc, docsWithOrders } from '@/modules/finance/utils/inboundToOrder';
-import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
+import { useInboundDocActions } from '@/modules/finance/components/useInboundDocActions';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { formatDate } from '@/utils/datetime';
 import { inboundDocumentNumber, invoicedTotal, isReverseCharged, needsLineDetail, selfAccountedVat } from '@/modules/finance/utils/inboundProvenance';
@@ -160,33 +151,10 @@ export const SupplierInboundDocs: React.FC<{
   onCounts?: (counts: SupplierInboundCounts) => void;
 }> = ({ workspaceId, vatNumber, companyId, readOnly, spanFrom, spanTo, onCounts }) => {
   const fieldId = React.useId();
-  const { toast } = useToast();
   const [rows, setRows] = useState<InboundDocument[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [receiveDoc, setReceiveDoc] = useState<InboundDocument | null>(null);
-  const [payDoc, setPayDoc] = useState<InboundDocument | null>(null);
-  const [orderDoc, setOrderDoc] = useState<InboundDocument | null>(null);
-  /**
-   * "Say what was actually on it" — the editor for a document whose lines carry a value and no
-   * name. Two thirds of this workspace's received documents are that shape, and until one is
-   * completed nothing downstream (warehouse receive, product extraction, the markup ladder) can
-   * touch it. The inbox has offered it all along; this surface passed no handler, and
-   * `canAddDetail` requires one — so the menu entry was silently absent rather than disabled.
-   */
-  const [detailDoc, setDetailDoc] = useState<InboundDocument | null>(null);
-  /** The bill a document became — its payments and what is still owed on it, read-only. */
-  const [paymentsExpenseId, setPaymentsExpenseId] = useState<string | null>(null);
-  /** Documents that already produced an order — read via their expense's `order_id`. */
-  const [ordered, setOrdered] = useState<Set<string>>(new Set());
-  /**
-   * The document being read. Opens OVER whatever is hosting this table — a card on a CRM record,
-   * or the supplier modal — which stays mounted underneath, so closing it returns to the same
-   * page of the same list rather than to the top of a re-fetched one.
-   */
-  const [previewDoc, setPreviewDoc] = useState<InboundDocument | null>(null);
   /**
    * Spend / booked / paid for the SAME window as the list. Derived by `inbound_issuer_money`,
    * never by adding the loaded page up — the list is paged, so a page total would be a total of
@@ -212,7 +180,6 @@ export const SupplierInboundDocs: React.FC<{
   const from = bound(range.from);
   const to = bound(range.to);
   const windowed = !!(from || to);
-  const [categories, setCategories] = useState<FinanceCategory[]>([]);
 
   const load = useCallback(async () => {
     if (!workspaceId || !vatNumber) { setRows([]); setTotal(0); setLoading(false); return; }
@@ -226,18 +193,12 @@ export const SupplierInboundDocs: React.FC<{
       setRows(list.rows);
       setTotal(list.total);
       setMoney(sums);
-      setOrdered(await docsWithOrders(list.rows).catch(() => new Set<string>()));
     }
     catch { setRows([]); setTotal(0); setMoney(null); }
     finally { setLoading(false); }
   }, [workspaceId, vatNumber, from, to]);
 
   useEffect(() => { void load(); }, [load]);
-  // Categories only matter for the order form; fetched once so opening it is instant.
-  useEffect(() => {
-    if (!workspaceId) return;
-    financeCategoriesService.list(workspaceId).then(setCategories).catch(() => setCategories([]));
-  }, [workspaceId]);
   useEffect(() => { setPage((p) => clampPage(p, rows.length)); }, [rows.length]);
   useEffect(() => {
     if (loading) return;
@@ -249,12 +210,18 @@ export const SupplierInboundDocs: React.FC<{
     });
   }, [loading, rows, total, windowed, onCounts]);
 
-  const dismiss = async (id: string) => {
-    setBusy(id);
-    try { await inboundService.dismiss(id); await load(); }
-    catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
-    finally { setBusy(null); }
-  };
+  /**
+   * Every action a received document has, wired ONCE. The menu gates entries on the handler
+   * existing, so spelling the props out per table is how one of them loses an entry silently —
+   * which is exactly what happened to "Add line detail" here.
+   */
+  const actions = useInboundDocActions({
+    workspaceId,
+    rows,
+    onChanged: () => { void load(); },
+    // We are already scoped to one issuer, so their CRM company is known for every row.
+    crmCompanyIdFor: () => companyId ?? undefined,
+  });
 
   const clearRange = () => setRange({ from: '', to: '' });
 
@@ -347,7 +314,7 @@ export const SupplierInboundDocs: React.FC<{
             </tr>
           )}
           {paginate(rows, page).map((d) => {
-            const outcomes = inboundOutcomes(d, { ordered: ordered.has(d.id) });
+            const outcomes = inboundOutcomes(d, { ordered: actions.ordered.has(d.id) });
             return (
               <tr
                 key={d.id}
@@ -355,7 +322,7 @@ export const SupplierInboundDocs: React.FC<{
                 // Row onClick is a MOUSE CONVENIENCE only — the keyboard/AT path is the button on
                 // the Number cell. A <tr> cannot be made focusable correctly: tabIndex +
                 // role="button" on a row is invalid ARIA and yields a focus stop with no name.
-                onClick={() => setPreviewDoc(d)}
+                onClick={() => actions.openPreview(d)}
               >
                 <td className="px-4 py-2">{d.issue_date ? formatDate(d.issue_date) : '—'}</td>
                 <td className="px-4 py-2">
@@ -364,7 +331,7 @@ export const SupplierInboundDocs: React.FC<{
                   <button
                     type="button"
                     className="rounded text-left text-xs font-medium hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    onClick={(e) => { e.stopPropagation(); setPreviewDoc(d); }}
+                    onClick={(e) => { e.stopPropagation(); actions.openPreview(d); }}
                     title="Open this document as AADE holds it"
                   >
                     {inboundDocumentNumber(d) ?? '—'}
@@ -403,27 +370,7 @@ export const SupplierInboundDocs: React.FC<{
                 </td>
                 {!readOnly && (
                   <td className="px-4 py-2 text-right" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex justify-end">
-                      <InboundDocActionsMenu
-                        doc={d}
-                        workspaceId={workspaceId}
-                        busy={busy === d.id}
-                        // Set when the issuer is already in CRM — the menu then offers the link
-                        // rather than letting a duplicate be started.
-                        crmCompanyId={companyId ?? undefined}
-                        onRecordPayment={() => setPayDoc(d)}
-                        onCreateOrder={() => setOrderDoc(d)}
-                        hasOrder={ordered.has(d.id)}
-                        onReceiveStock={() => setReceiveDoc(d)}
-                        onAddLineDetail={() => setDetailDoc(d)}
-                        // The balance behind the bronze Gross column: a settled document still
-                        // shows its whole amount there, and this is the only way to reach what is
-                        // actually outstanding on the bill it became.
-                        onOpenPayments={d.created_supplier_bill_id ? () => setPaymentsExpenseId(d.created_supplier_bill_id!) : undefined}
-                        onDismiss={() => dismiss(d.id)}
-                        onChanged={load}
-                      />
-                    </div>
+                    <div className="flex justify-end">{actions.renderActions(d)}</div>
                   </td>
                 )}
               </tr>
@@ -436,62 +383,9 @@ export const SupplierInboundDocs: React.FC<{
       </>
       )}
 
-      {/* Stacked ON TOP of whatever hosts this table, never instead of it — Radix layers each
-          dialog's portal in mount order, so the host stays mounted and its state survives. */}
-      {previewDoc && (
-        <InboundDocPreviewDialog
-          doc={previewDoc}
-          open
-          onOpenChange={(v) => { if (!v) setPreviewDoc(null); }}
-        />
-      )}
-      {detailDoc && (
-        <CompleteLinesDialog
-          doc={detailDoc}
-          onOpenChange={(v) => { if (!v) setDetailDoc(null); }}
-          onDone={() => { setDetailDoc(null); void load(); }}
-        />
-      )}
-      <ExpensePaymentsDialog
-        workspaceId={workspaceId}
-        expenseId={paymentsExpenseId}
-        open={!!paymentsExpenseId}
-        onOpenChange={(v) => { if (!v) setPaymentsExpenseId(null); }}
-        onChanged={load}
-      />
-      {receiveDoc && (
-        <ReceiveToWarehouseDialog
-          doc={receiveDoc}
-          workspaceId={workspaceId}
-          onOpenChange={(v) => { if (!v) setReceiveDoc(null); }}
-          onDone={() => { setReceiveDoc(null); void load(); }}
-        />
-      )}
-      {orderDoc && (
-        // The platform's ONE order form, seeded from the document. Everything stays editable, so
-        // the order can be corrected before saving — the whole point of keeping them separate.
-        // The party is only LOCKED when the issuer is in CRM; otherwise the form asks, which is
-        // the same duplicate-safe path "Add issuer → CRM" takes.
-        <NewOrderModal
-          workspaceId={workspaceId}
-          lockedCompanyId={companyId ?? undefined}
-          preset={{ orderType: 'purchase', draft: false }}
-          prefill={{ currency: orderDoc.currency, notes: `From myDATA ${orderDoc.series ?? ''}${orderDoc.aa ? ` ${orderDoc.aa}` : ''} · MARK ${orderDoc.mark}`.trim(), lines: orderLinesFromDoc(orderDoc), fromDocument: true, inboundDocumentId: orderDoc.id }}
-          categories={categories}
-          open
-          onOpenChange={(v) => { if (!v) setOrderDoc(null); }}
-          onCreated={() => { setOrderDoc(null); void load(); }}
-        />
-      )}
-      {payDoc && (
-        <RecordPaymentDialog
-          workspaceId={workspaceId}
-          presetExpenseId={payDoc.created_supplier_bill_id ?? undefined}
-          open
-          onOpenChange={(v) => { if (!v) setPayDoc(null); }}
-          onSaved={() => { setPayDoc(null); void load(); }}
-        />
-      )}
+      {/* Every dialog those actions open, mounted once. They stack ON TOP of whatever hosts
+          this table and leave it mounted, so the errand does not cost the operator their place. */}
+      {actions.dialogs}
     </>
   );
 };

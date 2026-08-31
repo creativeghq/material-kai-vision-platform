@@ -25,14 +25,12 @@ import { deliveryNotesService, type DeliveryNote } from '@/modules/finance/servi
 import { chequesService, type Cheque } from '@/modules/finance/services/chequesService';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsMenu';
-import { InboundDocActionsMenu } from '@/modules/finance/components/InboundDocActionsMenu';
+import { useInboundDocActions } from '@/modules/finance/components/useInboundDocActions';
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
 import { NewDeliveryNoteDialog } from '@/modules/finance/components/NewDeliveryNoteDialog';
 import { NewChequeDialog } from '@/modules/finance/components/NewChequeDialog';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { ExpensePaymentsDialog } from '@/modules/finance/components/ExpensePaymentsDialog';
-import { NewOrderModal } from '@/modules/finance/components/OrdersPanel';
-import { orderLinesFromDoc, docsWithOrders } from '@/modules/finance/utils/inboundToOrder';
 import { NewCreditNoteDialog } from '@/modules/finance/components/NewCreditNoteDialog';
 import { QuickCategoryDialog } from '@/modules/finance/components/QuickCategoryDialog';
 import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog';
@@ -40,13 +38,11 @@ import { MydataSyncDialog } from '@/modules/finance/components/MydataSyncDialog'
 import { MydataTypeLabel } from '@/modules/finance/components/MydataTypeLabel';
 import { useMydataTypeLabels } from '@/modules/finance/components/mydataTypes';
 import { inboundOutcomes } from '@/modules/finance/components/inboundStatus';
-import { CompleteLinesDialog } from '@/modules/finance/components/CompleteLinesDialog';
 import {
   INBOUND_SOURCE_CHIP, inboundDocumentNumber, invoicedTotal, isReverseCharged, needsLineDetail,
   selfAccountedVat,
 } from '@/modules/finance/utils/inboundProvenance';
 import type { InboundSource } from '@/modules/finance/services/inboundService';
-import { ReceiveToWarehouseDialog } from '@/modules/finance/components/ReceiveToWarehouseDialog';
 import { DispatchBoard } from '@/modules/finance/components/DispatchBoard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { supabase } from '@/integrations/supabase/client';
@@ -830,8 +826,8 @@ const ChequesTable: React.FC<{ rows: Cheque[]; readOnly: boolean; onChanged: () 
 const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; onChanged: () => void } & DocEmptyProps> = ({ rows, readOnly, onChanged, ...empty }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const financeBase = FINANCE_BASE;
   const [busy, setBusy] = React.useState<string | null>(null);
+  const financeBase = FINANCE_BASE;
   const issue = async (id: string) => {
     setBusy(id);
     try { await deliveryNotesService.issue(id); toast({ title: 'Delivery note issued · stock decremented' }); onChanged(); }
@@ -1171,16 +1167,6 @@ const IssuerCell: React.FC<{ doc: InboundDocument; crmCompanyId?: string }> = ({
 
 const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; workspaceId: string | null; readOnly: boolean; onChanged: () => void; categories: FinanceCategory[]; categoryName: (id: any) => string; onOpenExpense: (billId: string) => void }> = ({ rows, financeBase, workspaceId, readOnly, onChanged, categories, categoryName, onOpenExpense }) => {
   const { toast } = useToast();
-  const [busy, setBusy] = React.useState<string | null>(null);
-  const [receiveDoc, setReceiveDoc] = React.useState<InboundDocument | null>(null);
-  /** Document whose value-only lines are being completed (issue #377, Phase 1b). */
-  const [detailDoc, setDetailDoc] = React.useState<InboundDocument | null>(null);
-  /** Document being paid before it is an expense — the conversion happens when that form saves. */
-  const [payDoc, setPayDoc] = React.useState<InboundDocument | null>(null);
-  /** Document being turned into the purchase order it was always for. */
-  const [orderDoc, setOrderDoc] = React.useState<InboundDocument | null>(null);
-  /** Which rows already produced an order — held on their expense (`supplier_bills.order_id`). */
-  const [ordered, setOrdered] = React.useState<Set<string>>(new Set());
   const [localCat, setLocalCat] = React.useState<Record<string, string | null>>({});
   // VAT → CRM company id, so a known issuer's name links straight to their record instead of
   // making the operator go and search for them.
@@ -1205,29 +1191,23 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
   }, [workspaceId, rows.length]);
 
   /**
-   * Recording a payment is ONE act with ONE form — the platform's Record Payment dialog, preset
-   * to this document. Whether an expense exists yet is our bookkeeping, not the operator's
-   * question: if it does the payment settles it, if it doesn't the document is converted on
-   * save. (This briefly branched to a different modal when the expense existed, which is exactly
-   * the "why are there two of these?" the operator hit. Opening never writes either way.)
+   * Every action a received document has, wired ONCE — see [[useInboundDocActions]]. This table
+   * and the supplier document table used to spell the props out separately, and the menu gates
+   * entries on the handler existing, so the copies drifted and one lost "Add line detail".
    */
-  const openPayments = (d: InboundDocument) => setPayDoc(d);
-
-  React.useEffect(() => {
-    let live = true;
-    docsWithOrders(rows).then((s) => { if (live) setOrdered(s); }).catch(() => {});
-    return () => { live = false; };
-  }, [rows]);
+  const actions = useInboundDocActions({
+    workspaceId,
+    rows,
+    onChanged,
+    crmCompanyIdFor: (d) => (d.issuer_vat ? crmByVat[d.issuer_vat.replace(/\D/g, '')] : undefined),
+    // Finance already mounts the payments ledger at page level; delegate rather than open a second.
+    onOpenExpense,
+    categories,
+  });
   const setCategory = async (id: string, categoryId: string | null) => {
     setLocalCat((m) => ({ ...m, [id]: categoryId }));
     try { await inboundService.setCategory(id, categoryId); }
     catch (err: any) { toast({ title: 'Failed to set category', description: err?.message, variant: 'destructive' }); onChanged(); }
-  };
-  const dismiss = async (id: string) => {
-    setBusy(id);
-    try { await inboundService.dismiss(id); onChanged(); }
-    catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
-    finally { setBusy(null); }
   };
 
   if (rows.length === 0) {
@@ -1277,7 +1257,7 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
       <tbody>
         {rows.map((d) => {
           const cat = d.id in localCat ? localCat[d.id] : (d.category_id ?? null);
-          const outcomes = inboundOutcomes(d, { ordered: ordered.has(d.id) });
+          const outcomes = inboundOutcomes(d, { ordered: actions.ordered.has(d.id) });
           // Reverse charge: the VAT on a 13.x/14.x is self-accounted and reclaimed in the same
           // return, so it is not owed to this supplier and gross is not what we pay. SQL decides
           // the payable (`_inbound_doc_to_supplier_bill_core`); this only stops the table
@@ -1352,71 +1332,15 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
             </td>
             <td className="px-4 py-2 text-right">
               {!readOnly && workspaceId && (
-                <div className="flex justify-end">
-                  <InboundDocActionsMenu
-                    doc={d}
-                    workspaceId={workspaceId}
-                    busy={busy === d.id}
-                    crmCompanyId={d.issuer_vat ? crmByVat[d.issuer_vat.replace(/\D/g, '')] : undefined}
-                    onRecordPayment={() => openPayments(d)}
-                    onCreateOrder={() => setOrderDoc(d)}
-                    hasOrder={ordered.has(d.id)}
-                    // The inbox half of the link described on `paymentsExpenseId`. It was passed
-                    // down but never called, so the balance behind the bronze Gross column was
-                    // unreachable from this table — the menu item simply did not exist.
-                    onOpenPayments={d.created_supplier_bill_id ? () => onOpenExpense(d.created_supplier_bill_id!) : undefined}
-                    onReceiveStock={() => setReceiveDoc(d)}
-                    onAddLineDetail={() => setDetailDoc(d)}
-                    onDismiss={() => dismiss(d.id)}
-                    onChanged={onChanged}
-                  />
-                </div>
+                <div className="flex justify-end">{actions.renderActions(d)}</div>
               )}
             </td>
           </tr>
           );
         })}
       </tbody>
-      {detailDoc && (
-        <CompleteLinesDialog
-          doc={detailDoc}
-          onOpenChange={(v) => { if (!v) setDetailDoc(null); }}
-          onDone={() => { setDetailDoc(null); onChanged(); }}
-        />
-      )}
-      {receiveDoc && workspaceId && (
-        <ReceiveToWarehouseDialog
-          doc={receiveDoc}
-          workspaceId={workspaceId}
-          onOpenChange={(v) => { if (!v) setReceiveDoc(null); }}
-          onDone={() => { setReceiveDoc(null); onChanged(); }}
-        />
-      )}
-      {orderDoc && workspaceId && (
-        <NewOrderModal
-          workspaceId={workspaceId}
-          lockedCompanyId={orderDoc.issuer_vat ? crmByVat[orderDoc.issuer_vat.replace(/\D/g, '')] : undefined}
-          preset={{ orderType: 'purchase', draft: false }}
-          prefill={{ currency: orderDoc.currency, notes: `From myDATA ${orderDoc.series ?? ''}${orderDoc.aa ? ` ${orderDoc.aa}` : ''} · MARK ${orderDoc.mark}`.trim(), lines: orderLinesFromDoc(orderDoc), fromDocument: true, inboundDocumentId: orderDoc.id }}
-          categories={categories}
-          open
-          onOpenChange={(v) => { if (!v) setOrderDoc(null); }}
-          // The modal owns the document → order → expense → payment chain (and reports its own
-          // failures), so there is nothing left to do here but refresh.
-          onCreated={() => { setOrderDoc(null); onChanged(); }}
-        />
-      )}
-      {payDoc && workspaceId && (
-        <RecordPaymentDialog
-          workspaceId={workspaceId}
-          // Same form either way — it settles the expense if this document already became one,
-          // and converts it on save if it hasn't.
-          presetExpenseId={payDoc.created_supplier_bill_id ?? undefined}
-          open
-          onOpenChange={(v) => { if (!v) setPayDoc(null); }}
-          onSaved={() => { setPayDoc(null); onChanged(); }}
-        />
-      )}
+      {/* Every dialog those actions open, mounted once by the hook. */}
+      {actions.dialogs}
     </table>
     </div>
   );
