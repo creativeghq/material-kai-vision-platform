@@ -159,6 +159,33 @@ export interface ExpenseIssuerRow {
   crm_is_supplier: boolean | null;
 }
 
+/**
+ * What one supplier invoiced, what of it reached the books, and what has been paid — for a date
+ * window. DERIVED by `inbound_issuer_money`; nothing here is added up in the browser.
+ *
+ * `paid` can only exist for documents that BECAME a supplier bill, which is why
+ * `booked_documents` travels with it. A supplier with 206 documents and none booked genuinely has
+ * paid nothing, but a bare "EUR 0 paid" reads as an unpaid debt rather than as work nobody has
+ * done yet — so every reader of `paid` must show that ratio next to it.
+ */
+export interface IssuerMoney {
+  /** Documents in the window. */
+  documents: number;
+  /** What the supplier actually invoiced — reverse charge counted at NET, per `inbound_invoiced_total`. */
+  invoiced: number;
+  /** VAT we self-assess and reclaim on reverse-charged purchases. Never part of a cost; here so
+   *  it stays reachable rather than silently vanishing. */
+  self_accounted_vat: number;
+  booked_documents: number;
+  booked_total: number;
+  paid: number;
+  credited: number;
+  outstanding: number;
+  /** Null when the window mixes currencies — the totals are then not addable and must not be shown. */
+  currency: string | null;
+  mixed_currency: boolean;
+}
+
 export const inboundService = {
   /**
    * Columns the LIST needs. Deliberately not `*`.
@@ -266,6 +293,39 @@ export const inboundService = {
     if (error) throw error;
     const rows = (data ?? []) as InboundDocument[];
     return { rows, total: count ?? rows.length };
+  },
+
+  /**
+   * The money side of the same window `listForIssuerVat` lists. Two calls rather than one because
+   * the list is PAGED and the totals are not: deriving them from the loaded page would make every
+   * figure a total of twenty documents.
+   */
+  async issuerMoney(
+    workspaceId: string,
+    vat: string,
+    opts: { from?: string | null; to?: string | null } = {},
+  ): Promise<IssuerMoney | null> {
+    const { data, error } = await (supabase as any).rpc('inbound_issuer_money', {
+      p_workspace_id: workspaceId,
+      p_issuer_vat: vat,
+      p_from: opts.from ?? null,
+      p_to: opts.to ?? null,
+    });
+    if (error) throw error;
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row) return null;
+    return {
+      documents: Number(row.documents ?? 0),
+      invoiced: Number(row.invoiced ?? 0),
+      self_accounted_vat: Number(row.self_accounted_vat ?? 0),
+      booked_documents: Number(row.booked_documents ?? 0),
+      booked_total: Number(row.booked_total ?? 0),
+      paid: Number(row.paid ?? 0),
+      credited: Number(row.credited ?? 0),
+      outstanding: Number(row.outstanding ?? 0),
+      currency: row.currency ?? null,
+      mixed_currency: !!row.mixed_currency,
+    };
   },
 
   /**

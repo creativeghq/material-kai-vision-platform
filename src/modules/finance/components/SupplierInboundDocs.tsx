@@ -22,7 +22,7 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { formatMoney } from '@/modules/finance/services/financeService';
-import { inboundService, type InboundDocument } from '@/modules/finance/services/inboundService';
+import { inboundService, type InboundDocument, type IssuerMoney } from '@/modules/finance/services/inboundService';
 import { inboundOutcomes } from '@/modules/finance/components/inboundStatus';
 import { MydataTypeLabel } from '@/modules/finance/components/MydataTypeLabel';
 import { InboundDocActionsMenu } from '@/modules/finance/components/InboundDocActionsMenu';
@@ -51,6 +51,97 @@ export interface SupplierInboundCounts {
    */
   windowed: boolean;
 }
+
+/** One figure with the sentence that makes it readable. Never a bare number. */
+const Tile: React.FC<{ label: string; value: React.ReactNode; note?: React.ReactNode; tone?: string }> = ({
+  label, value, note, tone,
+}) => (
+  <div className="min-w-0 flex-1 px-4 py-2">
+    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+    <div className={`text-sm font-semibold tabular-nums ${tone ?? ''}`}>{value}</div>
+    {note ? <div className="text-[10px] text-muted-foreground">{note}</div> : null}
+  </div>
+);
+
+/**
+ * Spend, booked and paid for the window in force.
+ *
+ * Three rules this encodes, all of them the difference between a number and a lie:
+ *
+ *  - A FAILED read is not zero. `null` says the totals could not be read; it never prints 0.
+ *  - PAID is only meaningful against what was BOOKED. A supplier can have 206 documents, EUR
+ *    37,525.96 invoiced and nothing paid simply because nobody has turned any of it into an
+ *    expense yet — which is a to-do, not a debt. The ratio sits under the figure so the two
+ *    cannot be read apart.
+ *  - Currencies are not added. A window spanning EUR and USD has no single total, so it says so
+ *    instead of printing their sum.
+ */
+const MoneyStrip: React.FC<{ money: IssuerMoney | null | undefined; loading: boolean; windowed: boolean }> = ({
+  money, loading, windowed,
+}) => {
+  // Every load, not just the first: keeping the previous figures on screen while a NEW window is
+  // being fetched pairs last window's money with this window's label, which is a wrong number
+  // rather than a stale one.
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 border-b border-hairline bg-surface-sunken px-4 py-3 text-xs text-muted-foreground">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Totalling…
+      </div>
+    );
+  }
+  if (money === null) {
+    return (
+      <div className="border-b border-amber-500/40 bg-amber-500/10 px-4 py-2 text-[11px] text-amber-800 dark:text-amber-300">
+        The totals could not be read. They are <strong>unknown</strong>, not zero — the documents below are still accurate.
+      </div>
+    );
+  }
+  if (!money) return null;
+  const cur = money.currency ?? 'EUR';
+  const scope = windowed ? 'in this window' : 'all time';
+  if (money.mixed_currency) {
+    return (
+      <div className="border-b border-hairline bg-surface-sunken px-4 py-2 text-[11px] text-muted-foreground">
+        {money.documents} documents {scope} across more than one currency — there is no single total to show.
+        Narrow the window to one currency.
+      </div>
+    );
+  }
+  const nothingBooked = money.booked_documents === 0;
+  return (
+    <div className="flex flex-wrap divide-x divide-hairline border-b border-hairline bg-surface-sunken">
+      <Tile
+        label="Invoiced"
+        value={formatMoney(money.invoiced, cur)}
+        note={<>{money.documents} document{money.documents === 1 ? '' : 's'} {scope}
+          {money.self_accounted_vat > 0
+            ? ` · ${formatMoney(money.self_accounted_vat, cur)} VAT self-accounted, not payable`
+            : ''}</>}
+      />
+      <Tile
+        label="In the books"
+        value={nothingBooked ? '—' : formatMoney(money.booked_total, cur)}
+        note={nothingBooked
+          ? 'None of these are expenses yet'
+          : `${money.booked_documents} of ${money.documents} document${money.documents === 1 ? '' : 's'} booked`}
+        tone={nothingBooked ? 'text-muted-foreground' : undefined}
+      />
+      <Tile
+        label="Paid"
+        value={nothingBooked ? '—' : formatMoney(money.paid, cur)}
+        // Paid measures settlement of the BOOKED total. Printing EUR 0 against an unbooked pile
+        // says "we owe them and have not paid"; the truth is that nobody has recorded the cost.
+        note={nothingBooked
+          ? 'Nothing booked, so nothing to settle'
+          : <>
+              {money.outstanding > 0 ? `${formatMoney(money.outstanding, cur)} still owed` : 'Settled in full'}
+              {money.credited > 0 ? ` · ${formatMoney(money.credited, cur)} credited` : ''}
+            </>}
+        tone={nothingBooked ? 'text-muted-foreground' : undefined}
+      />
+    </div>
+  );
+};
 
 export const SupplierInboundDocs: React.FC<{
   workspaceId: string;
@@ -85,6 +176,13 @@ export const SupplierInboundDocs: React.FC<{
    */
   const [previewDoc, setPreviewDoc] = useState<InboundDocument | null>(null);
   /**
+   * Spend / booked / paid for the SAME window as the list. Derived by `inbound_issuer_money`,
+   * never by adding the loaded page up — the list is paged, so a page total would be a total of
+   * twenty documents wearing the label of a supplier's whole history. `undefined` = not read yet;
+   * `null` = the read FAILED, which must not render as zeros.
+   */
+  const [money, setMoney] = useState<IssuerMoney | null | undefined>(undefined);
+  /**
    * The issue-date window. Empty by default and bounded by the supplier's own span, because a
    * prefilled window is a filter nobody set: it would silently drop any document carrying NO
    * issue date, and the header's all-time counts would stop agreeing with the table for a reason
@@ -108,12 +206,17 @@ export const SupplierInboundDocs: React.FC<{
     if (!workspaceId || !vatNumber) { setRows([]); setTotal(0); setLoading(false); return; }
     setLoading(true);
     try {
-      const { rows: docs, total: n } = await inboundService.listForIssuerVat(workspaceId, vatNumber, { from, to });
-      setRows(docs);
-      setTotal(n);
-      setOrdered(await docsWithOrders(docs).catch(() => new Set<string>()));
+      const [list, sums] = await Promise.all([
+        inboundService.listForIssuerVat(workspaceId, vatNumber, { from, to }),
+        // A failed total is UNKNOWN, not zero — the tiles say so rather than reporting 0 spend.
+        inboundService.issuerMoney(workspaceId, vatNumber, { from, to }).catch(() => null),
+      ]);
+      setRows(list.rows);
+      setTotal(list.total);
+      setMoney(sums);
+      setOrdered(await docsWithOrders(list.rows).catch(() => new Set<string>()));
     }
-    catch { setRows([]); setTotal(0); }
+    catch { setRows([]); setTotal(0); setMoney(null); }
     finally { setLoading(false); }
   }, [workspaceId, vatNumber, from, to]);
 
@@ -186,6 +289,8 @@ export const SupplierInboundDocs: React.FC<{
           </span>
         )}
       </div>
+
+      <MoneyStrip money={money} loading={loading} windowed={windowed} />
 
       {loading ? (
         <div className="p-6 text-center"><Loader2 className="h-4 w-4 animate-spin inline" /></div>
