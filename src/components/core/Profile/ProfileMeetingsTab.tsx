@@ -12,6 +12,8 @@ import { Badge } from '@/components/core/ui/badge';
 import { statusTone } from '@/utils/statusTone';
 import { useToast } from '@/hooks/use-toast';
 import { crmMeetingsService, type CrmMeeting } from '@/services/crmMeetingsService';
+import { SubjectLinkField, type SubjectValue } from '@/components/business/crm/SubjectLinkField';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { getErrorMessage } from '@/core/errors/utils';
 
 const fmt = (iso: string) => new Date(iso).toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' });
@@ -22,11 +24,24 @@ export const ProfileMeetingsTab: React.FC = () => {
   const [meetings, setMeetings] = useState<CrmMeeting[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const { activeWorkspaceId } = useWorkspace();
+
+  /**
+   * What each meeting is about, resolved to a label for the control (#378 N10).
+   *
+   * The list read gives ids only, and a picker showing a uuid is a picker nobody uses. Held
+   * beside the rows rather than denormalized onto them: a stored label is one more thing to
+   * keep in step with a rename.
+   */
+  const [subjects, setSubjects] = useState<Record<string, SubjectValue | null>>({});
+
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setMeetings(await crmMeetingsService.listMine({ limit: 200 }));
+      const rows = await crmMeetingsService.listMine({ limit: 200 });
+      setMeetings(rows);
+      setSubjects(await crmMeetingsService.resolveSubjects(rows));
     } catch (err) {
       toast({ title: 'Could not load your meetings', description: getErrorMessage(err), variant: 'destructive' });
     } finally {
@@ -64,6 +79,20 @@ export const ProfileMeetingsTab: React.FC = () => {
           <Clock className="h-3.5 w-3.5" /> {fmt(m.meeting_at)}
         </div>
         {m.notes && <p className="mt-1 text-xs text-muted-foreground whitespace-pre-wrap">{m.notes}</p>}
+        {/* What it is ABOUT (#378 N10) — a site visit, a measure-up and a handover are all
+            meetings about a job, a deal, a building or an order, and this calendar could say who
+            it was WITH and never what it was FOR. Editable in place: the subject is usually known
+            after the meeting is booked, not before. */}
+        <div className="mt-2 max-w-xs">
+          <SubjectLinkField
+            workspaceId={activeWorkspaceId}
+            value={subjects[m.id] ?? null}
+            disabled={busyId === m.id}
+            onChange={(next) => act(m.id, async () => {
+              await crmMeetingsService.setSubject(m.id, next ? { kind: next.kind, id: next.id } : null);
+            })}
+          />
+        </div>
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           {m.party_name && m.target_id && (
             <button type="button" onClick={() => openParty(m)}

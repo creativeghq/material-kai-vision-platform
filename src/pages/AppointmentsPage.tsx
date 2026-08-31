@@ -6,10 +6,8 @@ import {
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { HubEmptyState } from '@/components/core/hub';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
-import { ProjectLinkField } from '@/modules/finance/components/ProjectLinkField';
-import { PropertyLinkField } from '@/modules/finance/components/PropertyLinkField';
+import { SubjectLinkField, type SubjectKind, type SubjectValue } from '@/components/business/crm/SubjectLinkField';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { statusTone } from '@/utils/statusTone';
@@ -19,6 +17,7 @@ import {
 import { FilterBar, useFilters } from '@/components/core/filters';
 import { buildAppointmentFilters } from './appointmentFilters';
 import { supabase } from '@/integrations/supabase/client';
+import { propertyLabel } from '@/utils/propertyLabel';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { flowEventService } from '@/services/flows/flowEventService';
@@ -49,7 +48,29 @@ export interface Appointment {
 }
 
 /** The subjects this surface offers. The schema also carries deal and order, set from those records. */
-type SubjectKind = 'none' | 'project' | 'property';
+/** Which of an appointment's four subject columns is set, if any. At most one — the CHECK says so. */
+function appointmentSubjectRef(appt: Appointment | null): { kind: SubjectKind; id: string } | null {
+  if (!appt) return null;
+  if (appt.project_id) return { kind: 'project', id: appt.project_id };
+  if (appt.deal_id) return { kind: 'deal', id: appt.deal_id };
+  if (appt.property_id) return { kind: 'property', id: appt.property_id };
+  if (appt.order_id) return { kind: 'order', id: appt.order_id };
+  return null;
+}
+
+/** The stored id resolved to something a human recognises. Null when the row is gone. */
+async function resolveSubjectLabel(kind: SubjectKind, id: string): Promise<string | null> {
+  const spec: Record<SubjectKind, { table: string; cols: string; pick: (r: Record<string, unknown>) => string }> = {
+    project: { table: 'projects', cols: 'name', pick: (r) => (r.name as string) || 'Project' },
+    deal: { table: 'crm_deals', cols: 'title', pick: (r) => (r.title as string) || 'Deal' },
+    // `propertyLabel` is the one fallback chain for naming a building.
+    property: { table: 'properties', cols: 'title, address, reference_code', pick: (r) => propertyLabel(r) },
+    order: { table: 'orders', cols: 'order_number', pick: (r) => (r.order_number as string) || 'Order' },
+  };
+  const { table, cols, pick } = spec[kind];
+  const { data } = await supabase.from(table).select(cols).eq('id', id).maybeSingle();
+  return data ? pick(data as Record<string, unknown>) : null;
+}
 
 const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-amber-100 text-amber-700 border-amber-200',
@@ -86,26 +107,27 @@ function AppointmentDetailDrawer({
   const { toast } = useToast();
   const navigate = useNavigate();
   const { activeWorkspaceId } = useWorkspace();
-  const [subjectKind, setSubjectKind] = useState<SubjectKind>('none');
+  const [subject, setSubject] = useState<SubjectValue | null>(null);
   const [savingSubject, setSavingSubject] = useState(false);
 
   /**
    * Set or clear the subject. Goes through the RPC because the appointment's own RLS cannot check
    * the SUBJECT's workspace — see the block that renders this.
    */
-  const saveSubject = async (kind: SubjectKind, subjectId: string | null) => {
+  const saveSubject = async (next: SubjectValue | null) => {
     if (!appt) return;
     setSavingSubject(true);
     const { error } = await (supabase as any).rpc('set_appointment_subject', {
       p_appointment_id: appt.id,
-      p_kind: subjectId ? kind : 'none',
-      p_subject_id: subjectId,
+      p_kind: next?.kind ?? 'none',
+      p_subject_id: next?.id ?? null,
     });
     setSavingSubject(false);
     if (error) {
       toast({ title: 'Could not set what this is about', description: error.message, variant: 'destructive' });
       return;
     }
+    setSubject(next);
     onUpdated();
   };
 
@@ -114,7 +136,16 @@ function AppointmentDetailDrawer({
 
   useEffect(() => {
     setNotes(appt?.notes ?? '');
-    setSubjectKind(appt?.project_id ? 'project' : appt?.property_id ? 'property' : 'none');
+    // The row carries ids; the control needs a label. Resolved on open rather than denormalized,
+    // so a renamed project does not leave a stale name on the appointment.
+    let cancelled = false;
+    void (async () => {
+      const found = appointmentSubjectRef(appt);
+      if (!found) { if (!cancelled) setSubject(null); return; }
+      const label = await resolveSubjectLabel(found.kind, found.id);
+      if (!cancelled) setSubject(label ? { ...found, label } : null);
+    })();
+    return () => { cancelled = true; };
   }, [appt]);
 
   if (!appt) return null;
@@ -264,47 +295,31 @@ function AppointmentDetailDrawer({
             Open inbox
           </Button>
 
-          {/* What this appointment is ABOUT (#378 C4). A site visit, a measure-up, a viewing and a
-              handover are all appointments about something, and none of them could say what.
+          {/* What this appointment is ABOUT (#378 C4, completed by N10).
+
+              A site visit, a measure-up, a viewing and a handover are all appointments about
+              something. C4 gave the table four subject columns and this screen wrote two of them:
+              `deal_id` and `order_id` were declared, typed, CHECK-constrained and reachable from
+              nothing — the comment here even claimed they were "set from those records", and
+              nothing set them. One control offering all four now, shared with the CRM calendar so
+              the two surfaces cannot drift into supporting different subjects.
 
               Written through `set_appointment_subject`, never as a direct column update:
               `appointments` has no workspace_id and its RLS is keyed on professional_user_id, so
               nothing about a plain UPDATE would stop attaching this to a job in a workspace the
-              caller has nothing to do with. The RPC checks both.
-
-              Project and property are offered here — the two things a booking is usually for.
-              The deal and order columns exist and are set from those records. */}
+              caller has nothing to do with. The RPC resolves the workspace FROM the target. */}
           {activeWorkspaceId && (
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
                 <LinkIcon className="h-3.5 w-3.5" /> What is this about?
               </p>
-              <Select value={subjectKind} onValueChange={(v) => setSubjectKind(v as SubjectKind)}>
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Nothing in particular</SelectItem>
-                  <SelectItem value="project">A project</SelectItem>
-                  <SelectItem value="property">A property</SelectItem>
-                </SelectContent>
-              </Select>
-              {subjectKind === 'project' && (
-                <ProjectLinkField
-                  workspaceId={activeWorkspaceId}
-                  projectId={appt.project_id}
-                  disabled={savingSubject}
-                  onChange={(id) => saveSubject('project', id)}
-                  label=""
-                />
-              )}
-              {subjectKind === 'property' && (
-                <PropertyLinkField
-                  workspaceId={activeWorkspaceId}
-                  propertyId={appt.property_id}
-                  disabled={savingSubject}
-                  onChange={(id) => saveSubject('property', id)}
-                  label=""
-                />
-              )}
+              <SubjectLinkField
+                workspaceId={activeWorkspaceId}
+                value={subject}
+                disabled={savingSubject}
+                label=""
+                onChange={(next) => saveSubject(next)}
+              />
             </div>
           )}
 

@@ -237,6 +237,29 @@ export const dealsService = {
     return (data ?? []).map(withTaskCounts);
   },
 
+  /**
+   * Deals matching a term, ACROSS deal types — for a picker that asks "which deal is this about?"
+   * rather than "show me the construction pipeline" (#378 N10).
+   *
+   * Here rather than in the picker because `crm_deals` is read through this service and nowhere
+   * else: a second query path is a second place that has to remember the workspace scope and the
+   * embed hints, which is what `dealPipelineDerivation.test.ts` refuses. Deliberately NOT
+   * `listDeals`, which is board-shaped and requires a deal type — a subject picker has no type to
+   * offer, because a meeting can be about a deal of any kind.
+   */
+  async searchDeals(workspaceId: string, q: string, limit = 8): Promise<Array<{ id: string; title: string }>> {
+    let query = supabase
+      .from('crm_deals')
+      .select('id, title')
+      .eq('workspace_id', workspaceId)
+      .order('updated_at', { ascending: false })
+      .limit(limit);
+    if (q.trim()) query = query.ilike('title', `%${q.trim()}%`);
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data ?? []).map((r) => ({ id: (r as { id: string }).id, title: (r as { title: string | null }).title ?? 'Deal' }));
+  },
+
   async createDeal(workspaceId: string, input: DealInput): Promise<Deal> {
     const { data: { user } } = await supabase.auth.getUser();
     // Allowlisted payload — never spread caller input into a write (invariant 8).

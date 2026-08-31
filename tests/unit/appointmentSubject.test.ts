@@ -55,15 +55,25 @@ describe('the appointment subject is written through the guarded RPC', () => {
     expect(src).toMatch(/'none'/);
   });
 
-  it('offers only the subjects it actually renders a picker for', () => {
-    // A Select option with no picker behind it is a row that silently does nothing — the same
-    // shape as an unhandled OrderLinkPicker kind.
-    const offered = [...src.matchAll(/<SelectItem value="(project|property|deal|order)"/g)].map((m) => m[1]);
-    for (const kind of offered) {
-      const field = kind === 'project' ? '<ProjectLinkField' : kind === 'property' ? '<PropertyLinkField' : null;
-      expect(field, `the page offers "${kind}" but this test knows no picker for it`).not.toBeNull();
-      expect(src, `"${kind}" is offered with no picker behind it`).toContain(field as string);
-    }
-    expect(offered.length, 'at least one subject should be offered').toBeGreaterThan(0);
+  it('offers every subject the table models, through one control', () => {
+    /**
+     * The rule is unchanged — an option with no picker behind it is a row that silently does
+     * nothing — but the shape it guards is not.
+     *
+     * This used to read a `<SelectItem>` list and pair each entry with a per-kind adapter, which
+     * encoded the very design that shipped the defect: the Select offered TWO of the four subjects
+     * the table declares, so `deal_id` and `order_id` were constrained, typed, handled by the RPC
+     * and reachable from nothing (#378 N10). A test that checks "everything offered has a picker"
+     * passes perfectly while half the columns are unreachable, because they were never offered.
+     *
+     * One control now offers and searches all four, shared with the CRM calendar.
+     * `calendarSubject.test.ts` holds the stronger invariant — every declared kind must be
+     * SEARCHABLE, not merely listed — for both surfaces at once.
+     */
+    expect(src, 'the page must mount the shared subject control').toContain('<SubjectLinkField');
+    expect(
+      src,
+      'per-kind adapters covered only project and property — the shape that left two columns dead',
+    ).not.toMatch(/<(ProjectLinkField|PropertyLinkField)/);
   });
 });

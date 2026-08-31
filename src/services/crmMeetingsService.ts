@@ -2,7 +2,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
 import { emailService } from '@/modules/email/services/emailService';
 import { escapeHtml } from '@/utils/escapeHtml';
+import { propertyLabel } from '@/utils/propertyLabel';
 import type { CrmActivityTarget } from './crmActivitiesService';
+import type { SubjectKind, SubjectValue as MeetingSubject } from '@/components/business/crm/SubjectLinkField';
 
 /** RFC 5545 text escaping for a single ICS property value. */
 const icsEscape = (s: string): string =>
@@ -56,6 +58,15 @@ export interface CrmMeeting {
   created_at: string;
   /** Resolved party label for the Profile Calendar list. */
   party_name?: string | null;
+  /**
+   * What the meeting is ABOUT (#378 N10). At most one is set — enforced by
+   * `crm_meetings_single_subject_ck` — because a meeting about two things is about neither.
+   * `target_kind`/`target_id` above answer a different question (WHO it is with) and stay.
+   */
+  project_id: string | null;
+  deal_id: string | null;
+  property_id: string | null;
+  order_id: string | null;
 }
 
 class CrmMeetingsService {
@@ -168,6 +179,76 @@ class CrmMeetingsService {
     const rows = (data || []) as CrmMeeting[];
     await this.resolvePartyNames(rows);
     return rows;
+  }
+
+  /**
+   * Point the meeting at what it is about, or clear it (#378 N10).
+   *
+   * Through the RPC, never a direct column write: RLS on `crm_meetings` sees the meeting's own
+   * workspace but not the SUBJECT's, so "is that project in this meeting's tenant" can only be
+   * answered server-side. `set_meeting_subject` also clears the other three, because the CHECK
+   * refuses a row with two.
+   */
+  async setSubject(id: string, subject: { kind: 'project' | 'deal' | 'property' | 'order'; id: string } | null): Promise<void> {
+    const { error } = await supabase.rpc('set_meeting_subject', {
+      p_meeting_id: id,
+      p_kind: subject?.kind ?? 'none',
+      p_subject_id: subject?.id ?? null,
+    } as never);
+    if (error) throw error;
+  }
+
+  /**
+   * Resolve each meeting's subject id to a LABEL for the picker (#378 N10).
+   *
+   * Batched by kind — four reads for the whole list rather than one per row. Labels are resolved
+   * on read rather than denormalized onto the meeting: a stored copy is one more thing to keep in
+   * step with a rename, and this list is short.
+   *
+   * A subject whose row has since been deleted resolves to null, which the control renders as
+   * "Not linked" — honest, and the FKs are ON DELETE SET NULL anyway.
+   */
+  async resolveSubjects(rows: CrmMeeting[]): Promise<Record<string, MeetingSubject | null>> {
+    const out: Record<string, MeetingSubject | null> = {};
+    const byKind: Record<SubjectKind, Set<string>> = {
+      project: new Set(), deal: new Set(), property: new Set(), order: new Set(),
+    };
+    const kindOf = (m: CrmMeeting): { kind: SubjectKind; id: string } | null => {
+      if (m.project_id) return { kind: 'project', id: m.project_id };
+      if (m.deal_id) return { kind: 'deal', id: m.deal_id };
+      if (m.property_id) return { kind: 'property', id: m.property_id };
+      if (m.order_id) return { kind: 'order', id: m.order_id };
+      return null;
+    };
+    for (const m of rows) {
+      const s = kindOf(m);
+      out[m.id] = null;
+      if (s) byKind[s.kind].add(s.id);
+    }
+
+    const labels = new Map<string, string>();
+    const collect = async (kind: SubjectKind, table: string, cols: string, pick: (r: Record<string, unknown>) => string) => {
+      const ids = [...byKind[kind]];
+      if (ids.length === 0) return;
+      const { data } = await supabase.from(table).select(cols).in('id', ids);
+      for (const r of (data ?? []) as Record<string, unknown>[]) {
+        labels.set(`${kind}:${r.id as string}`, pick(r));
+      }
+    };
+    await Promise.all([
+      collect('project', 'projects', 'id, name', (r) => (r.name as string) || 'Project'),
+      collect('deal', 'crm_deals', 'id, title', (r) => (r.title as string) || 'Deal'),
+      collect('property', 'properties', 'id, title, address, reference_code', (r) => propertyLabel(r)),
+      collect('order', 'orders', 'id, order_number', (r) => (r.order_number as string) || 'Order'),
+    ]);
+
+    for (const m of rows) {
+      const s = kindOf(m);
+      if (!s) continue;
+      const label = labels.get(`${s.kind}:${s.id}`);
+      out[m.id] = label ? { kind: s.kind, id: s.id, label } : null;
+    }
+    return out;
   }
 
   async setStatus(id: string, status: CrmMeeting['status']): Promise<void> {
