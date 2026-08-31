@@ -9,7 +9,11 @@
  * gained an action.
  *
  * Deliberately chrome-free: no Card, no heading. The host frames it, because one host is a card on
- * a company record and the other is a row expanding inside a table.
+ * a company record and the other is a modal opened off a supplier row.
+ *
+ * A row OPENS — it does not navigate. Every dialog here (preview, receive, record payment, new
+ * order) stacks on top of the host and leaves it mounted, so the errand runs without the operator
+ * losing the list, the page they were on, or a form they had half filled in.
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
@@ -19,6 +23,7 @@ import { inboundService, type InboundDocument } from '@/modules/finance/services
 import { inboundOutcomes } from '@/modules/finance/components/inboundStatus';
 import { MydataTypeLabel } from '@/modules/finance/components/MydataTypeLabel';
 import { InboundDocActionsMenu } from '@/modules/finance/components/InboundDocActionsMenu';
+import { InboundDocPreviewDialog } from '@/modules/finance/components/InboundDocPreviewDialog';
 import { ReceiveToWarehouseDialog } from '@/modules/finance/components/ReceiveToWarehouseDialog';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { NewOrderModal } from '@/modules/finance/components/OrdersPanel';
@@ -59,6 +64,12 @@ export const SupplierInboundDocs: React.FC<{
   const [orderDoc, setOrderDoc] = useState<InboundDocument | null>(null);
   /** Documents that already produced an order — read via their expense's `order_id`. */
   const [ordered, setOrdered] = useState<Set<string>>(new Set());
+  /**
+   * The document being read. Opens OVER whatever is hosting this table — a card on a CRM record,
+   * or the supplier modal — which stays mounted underneath, so closing it returns to the same
+   * page of the same list rather than to the top of a re-fetched one.
+   */
+  const [previewDoc, setPreviewDoc] = useState<InboundDocument | null>(null);
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
 
   const load = useCallback(async () => {
@@ -132,12 +143,26 @@ export const SupplierInboundDocs: React.FC<{
           {paginate(rows, page).map((d) => {
             const outcomes = inboundOutcomes(d, { ordered: ordered.has(d.id) });
             return (
-              <tr key={d.id} className={`border-b border-border/30 ${d.status === 'dismissed' ? 'opacity-60' : ''}`}>
+              <tr
+                key={d.id}
+                className={`cursor-pointer border-b border-border/30 hover:bg-muted/30 ${d.status === 'dismissed' ? 'opacity-60' : ''}`}
+                // Row onClick is a MOUSE CONVENIENCE only — the keyboard/AT path is the button on
+                // the Number cell. A <tr> cannot be made focusable correctly: tabIndex +
+                // role="button" on a row is invalid ARIA and yields a focus stop with no name.
+                onClick={() => setPreviewDoc(d)}
+              >
                 <td className="px-4 py-2">{d.issue_date ? formatDate(d.issue_date) : '—'}</td>
                 <td className="px-4 py-2">
                   {/* Our own ΑΦΜ is not the supplier's invoice number — see
                       `inboundDocumentNumber`. */}
-                  <div className="text-xs font-medium">{inboundDocumentNumber(d) ?? '—'}</div>
+                  <button
+                    type="button"
+                    className="rounded text-left text-xs font-medium hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    onClick={(e) => { e.stopPropagation(); setPreviewDoc(d); }}
+                    title="Open this document as AADE holds it"
+                  >
+                    {inboundDocumentNumber(d) ?? '—'}
+                  </button>
                   {d.mark ? <div className="text-[10px] font-mono text-muted-foreground" title={`MARK ${d.mark}`}>{d.mark}</div> : null}
                 </td>
                 <td className="px-4 py-2"><MydataTypeLabel code={d.doc_type} /></td>
@@ -163,7 +188,7 @@ export const SupplierInboundDocs: React.FC<{
                     : <span className="text-[10px] text-muted-foreground/50">Not in books</span>}
                 </td>
                 {!readOnly && (
-                  <td className="px-4 py-2 text-right">
+                  <td className="px-4 py-2 text-right" onClick={(e) => e.stopPropagation()}>
                     <div className="flex justify-end">
                       <InboundDocActionsMenu
                         doc={d}
@@ -190,6 +215,15 @@ export const SupplierInboundDocs: React.FC<{
       </div>
       <TablePagination page={page} total={rows.length} onPageChange={setPage} label="documents" />
 
+      {/* Stacked ON TOP of whatever hosts this table, never instead of it — Radix layers each
+          dialog's portal in mount order, so the host stays mounted and its state survives. */}
+      {previewDoc && (
+        <InboundDocPreviewDialog
+          doc={previewDoc}
+          open
+          onOpenChange={(v) => { if (!v) setPreviewDoc(null); }}
+        />
+      )}
       {receiveDoc && (
         <ReceiveToWarehouseDialog
           doc={receiveDoc}

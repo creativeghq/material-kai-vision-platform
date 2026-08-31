@@ -19,8 +19,12 @@
  *     duplicate probe on the normalised ΑΦΜ, then the ΑΑΔΕ → ΓΕΜΗ → web research chain — never a
  *     silent create, because the ΑΑΔΕ leg writes an audit entry into the issuer's own TAXISnet
  *     inbox and that is the operator's call to make.
- *  3. HISTORY. Opening a row loads that supplier's whole run of documents inline — the same table,
- *     menu and dialogs as their CRM record ([[SupplierInboundDocs]]).
+ *  3. HISTORY. Opening a row shows that supplier's whole run of documents in a MODAL — the same
+ *     table, menu and dialogs as their CRM record ([[SupplierInboundDocs]]). Modal and not an
+ *     expanding row because both lists are long (241 suppliers, up to 206 documents each), so
+ *     inline the expansion pushed the rest of the queue off screen. Opening a document stacks a
+ *     third layer and leaves this one MOUNTED, which is the point: read it, book it, receive it,
+ *     pay it, come back to the same page of the same list.
  *
  * Every number in the table is derived by `inbound_issuers_summary`, including the counts that
  * decide what is offered. Counting the loaded page instead would be a different number on every
@@ -28,12 +32,13 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, Inbox, Check, Building2, ChevronRight, ChevronDown, ExternalLink, Search, UserPlus } from 'lucide-react';
+import { Loader2, Inbox, Check, Building2, ChevronRight, ExternalLink, Search, UserPlus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/core/ui/select';
@@ -77,7 +82,18 @@ export const ExpenseSuppliersTab: React.FC<{
   const [q, setQ] = useState('');
   const [onlyUnfiled, setOnlyUnfiled] = useState(false);
   const [page, setPage] = useState(1);
-  const [open, setOpen] = useState<string | null>(null);
+  /**
+   * The ΑΦΜ whose documents are open. A MODAL, not an expanding row: the list is 241 rows and a
+   * supplier's history is up to 206 more, so inline it pushed everything below it off the screen
+   * and the operator lost the row they were working. It also stays MOUNTED while a document opens
+   * on top of it, which is what keeps the page, the scroll and any half-finished form alive
+   * across the whole errand.
+   *
+   * The KEY is held, not the row: the modal header states counts, and booking a document inside
+   * it changes them. Looking the row up on every render means the header cannot go on saying
+   * "none in books" about a document the operator just booked.
+   */
+  const [openVat, setOpenVat] = useState<string | null>(null);
   const [choice, setChoice] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
   /** The issuer being added to CRM. Never a silent write — the dialog dedupes and researches. */
@@ -90,22 +106,32 @@ export const ExpenseSuppliersTab: React.FC<{
     [categories],
   );
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (quiet = false) => {
     if (!workspaceId) return;
-    setLoading(true);
+    // A QUIET refresh keeps the rows on screen. Used when the supplier modal closes: work done
+    // inside it changes these counts, and swapping a settled table for a spinner to say so reads
+    // as the page reloading under the operator.
+    if (!quiet) setLoading(true);
     try {
       setRows(await inboundService.issuersSummary(workspaceId));
       setError(null);
     } catch (e) {
-      // A source that FAILED must not render as a source that is empty.
-      setRows([]);
+      // A source that FAILED must not render as a source that is empty. A quiet refresh keeps
+      // what it had rather than blanking a list the operator is still reading.
+      if (!quiet) setRows([]);
       setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setLoading(false);
+      if (!quiet) setLoading(false);
     }
   }, [workspaceId]);
 
   useEffect(() => { void load(); }, [load]);
+
+  /** The open supplier, re-read from the current rows so the modal header follows the data. */
+  const openSupplier = useMemo(
+    () => (openVat ? rows.find((r) => r.issuer_vat === openVat) ?? null : null),
+    [rows, openVat],
+  );
 
   const filtered = useMemo(
     () => rows.filter((r) => matches(r, q) && (!onlyUnfiled || r.unfiled > 0)),
@@ -240,23 +266,22 @@ export const ExpenseSuppliersTab: React.FC<{
                   )}
                   {paginate(filtered, page).map((r) => {
                     const selected = choice[r.issuer_vat] ?? r.learned_category_id ?? '';
-                    const expanded = open === r.issuer_vat;
                     return (
                       <React.Fragment key={r.issuer_vat}>
-                        <tr className="border-b border-hairline hover:bg-muted/30">
+                        <tr
+                          className="cursor-pointer border-b border-hairline hover:bg-muted/30"
+                          // Row onClick is a MOUSE CONVENIENCE only — the keyboard/AT path is the
+                          // button on the name cell. A <tr> cannot be made focusable correctly.
+                          onClick={() => setOpenVat(r.issuer_vat)}
+                        >
                           <td className="max-w-[24rem] px-5 py-2 text-sm">
-                            {/* The name IS the disclosure control — a <tr> cannot be made
-                                focusable correctly, so the keyboard path is this button. */}
                             <button
                               type="button"
                               className="flex w-full items-center gap-1.5 rounded text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                              aria-expanded={expanded}
-                              onClick={() => setOpen(expanded ? null : r.issuer_vat)}
-                              title={expanded ? 'Hide this supplier’s documents' : 'Show every document from this supplier'}
+                              onClick={(e) => { e.stopPropagation(); setOpenVat(r.issuer_vat); }}
+                              title="Open every document from this supplier"
                             >
-                              {expanded
-                                ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                                : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                               <span className="truncate font-medium">{r.issuer_name || r.issuer_vat}</span>
                             </button>
                             <div className="mt-0.5 flex flex-wrap items-center gap-2 pl-5">
@@ -269,6 +294,8 @@ export const ExpenseSuppliersTab: React.FC<{
                                   to={`/crm/companies/${r.crm_company_id}`}
                                   className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                                   title={r.crm_company_name ?? undefined}
+                                  // Leaving for CRM is not "open this supplier's documents".
+                                  onClick={(e) => e.stopPropagation()}
                                 >
                                   <Building2 className="h-3 w-3" />
                                   <span className="max-w-[12rem] truncate">{r.crm_company_name || 'In CRM'}</span>
@@ -280,7 +307,7 @@ export const ExpenseSuppliersTab: React.FC<{
                                 <button
                                   type="button"
                                   className="inline-flex items-center gap-1 rounded text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                  onClick={() => setAddToCrm(r)}
+                                  onClick={(e) => { e.stopPropagation(); setAddToCrm(r); }}
                                   title="Add this supplier to the platform — checks for a duplicate ΑΦΜ first, then fills their identity from ΑΑΔΕ / ΓΕΜΗ and the web"
                                 >
                                   <UserPlus className="h-3 w-3" />
@@ -315,7 +342,7 @@ export const ExpenseSuppliersTab: React.FC<{
                               ? ` → ${formatDate(r.last_issue_date)}` : ''}
                           </td>
                           {!isAccountant && (
-                            <td className="px-5 py-2">
+                            <td className="px-5 py-2" onClick={(e) => e.stopPropagation()}>
                               {r.unfiled === 0 ? (
                                 <span className="text-xs text-muted-foreground">
                                   {r.learned_category_name ? 'Files itself' : 'Nothing to file'}
@@ -350,18 +377,6 @@ export const ExpenseSuppliersTab: React.FC<{
                             </td>
                           )}
                         </tr>
-                        {expanded && (
-                          <tr className="border-b border-hairline bg-surface-sunken/40">
-                            <td colSpan={columns} className="p-0">
-                              <SupplierInboundDocs
-                                workspaceId={workspaceId}
-                                vatNumber={r.issuer_vat}
-                                companyId={r.crm_company_id}
-                                readOnly={isAccountant}
-                              />
-                            </td>
-                          </tr>
-                        )}
                       </React.Fragment>
                     );
                   })}
@@ -373,6 +388,62 @@ export const ExpenseSuppliersTab: React.FC<{
         )}
       </CardContent>
     </Card>
+
+    {/* One supplier's whole run of documents. Keyed on the ΑΦΜ so switching suppliers starts a
+        fresh list rather than showing the previous one's page number over new rows. Opening a
+        DOCUMENT from inside stacks another dialog on top and leaves this one mounted, so the
+        errand — read it, book it, receive it, pay it — is one trip, not four round trips through
+        a list that reset each time. */}
+    <Dialog
+      open={!!openSupplier}
+      onOpenChange={(v) => { if (!v) { setOpenVat(null); void load(true); } }}
+    >
+      {openSupplier && (
+        <DialogContent key={openSupplier.issuer_vat} className="max-w-5xl p-0">
+          <DialogHeader className="border-b border-hairline px-5 py-3">
+            <DialogTitle className="font-display text-base">
+              {openSupplier.issuer_name || openSupplier.issuer_vat}
+            </DialogTitle>
+            <DialogDescription className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+              <span className="font-mono">{openSupplier.issuer_vat}</span>
+              <span aria-hidden>·</span>
+              <span>
+                {openSupplier.docs} document{openSupplier.docs === 1 ? '' : 's'}
+                {openSupplier.unfiled > 0 ? `, ${openSupplier.unfiled} to file` : ''}
+                {openSupplier.in_books > 0 ? `, ${openSupplier.in_books} in books` : ', none in books'}
+              </span>
+              {openSupplier.learned_category_name && (
+                <>
+                  <span aria-hidden>·</span>
+                  <span>Files as {openSupplier.learned_category_name}</span>
+                </>
+              )}
+              {openSupplier.crm_company_id && (
+                <>
+                  <span aria-hidden>·</span>
+                  <Link
+                    to={`/crm/companies/${openSupplier.crm_company_id}`}
+                    className="inline-flex items-center gap-1 text-primary hover:underline"
+                  >
+                    <Building2 className="h-3 w-3" />
+                    {openSupplier.crm_company_name || 'Open in CRM'}
+                    <ExternalLink className="h-3 w-3" />
+                  </Link>
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[70vh] overflow-y-auto">
+            <SupplierInboundDocs
+              workspaceId={workspaceId}
+              vatNumber={openSupplier.issuer_vat}
+              companyId={openSupplier.crm_company_id}
+              readOnly={isAccountant}
+            />
+          </div>
+        </DialogContent>
+      )}
+    </Dialog>
 
     {/* Adding a supplier from here stays PUT: the operator is mid-way down a filing queue, so the
         list refreshes and the row's link appears in place rather than navigating them away. */}
