@@ -2060,6 +2060,40 @@ past generation's source image as billing evidence, does not own the file (`vr_w
 `generation_3d` do, both registered), and has no TTL by design — registering it would pin every
 source image forever.
 
+### `ops.silent_zero` intake arm — the queue is blocked on a DECISION, not a bug — 2026-08-31
+
+The probe says outright that "an unattended queue and a broken approve path look identical from
+here", which is the right thing for it to say and the reason to go and tell them apart.
+
+Told apart: **the approve path works.** `match_pending_items_for_document` and
+`autoapprove_pending_items_for_document` both run clean on a real document (38 lines) and return
+0 — and all **1,733** pending lines already carry a `match_reason`, so the matcher has run on
+every one of them. It matches against stock we hold and against the catalog; both are **empty**
+(0 `warehouse_items`, 0 `products`). Every line therefore lands correctly on *"Nothing in stock
+or the catalog matched — will create a new product"*.
+
+So approving is not a click someone forgot. It **creates the catalog** — 1,733 products from 605
+supplier documents — and nobody has decided to do that. Recording it here so the next reader
+does not re-derive it, and so the finding is not mistaken for a broken button.
+
+### Two addresses that hard-bounced before attribution existed — 2026-08-31
+
+`ops.silent_zero` reported bounced addresses with nothing suppressed. The CODE was already
+right: `email-webhooks` suppresses on a permanent bounce or complaint and logs loudly when it
+cannot. Both rows were HISTORICAL, from before the fix that gave every `email_log` a workspace —
+and `email_unsubscribes` is keyed on `(workspace_id, email)`, so at the time there was nothing to
+key them to.
+
+Not merely untidy: the send path skips its own suppression check for a workspace-less send too,
+so both would have kept receiving mail, and repeatedly mailing a dead mailbox is the fastest way
+to lose a sending domain.
+
+Suppressed by hand, and only because attribution was **unambiguous** for both — over-suppressing
+silently removes a valid address from all marketing with no path back, so a bulk guess would be
+worse than the finding. One resolved to exactly one workspace through the `crm_companies` row
+owning the relationship; the other is a test mailbox on the platform's own sending domain with no
+CRM relationship anywhere, belonging to the operator root by construction.
+
 ## Not defects — checked, and deliberately left alone
 
 Recording these so they are not re-raised every time an advisor runs.
