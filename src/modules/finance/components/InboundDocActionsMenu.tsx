@@ -7,29 +7,18 @@
  *   • Add products → warehouse (reuses the existing ReceiveToWarehouseDialog via callback).
  * Mirrors the InvoiceActionsMenu pattern so it drops into the InboundTable row.
  *
- * The research chain (ΑΑΔΕ → ΓΕΜΗ → web/Apollo enrichment) is the shared
- * [[researchCompany]] routine, so an issuer added here lands with the exact same data an
- * operator would get from Add Company or the refresh button on the company record. It used
- * to run ΑΑΔΕ only, which is why inbox-created issuers had no Γ.Ε.ΜΗ. number or website.
+ * The add-to-CRM half is [[AddIssuerToCrmDialog]] — the dedupe probe, the ΑΑΔΕ → ΓΕΜΗ →
+ * web/Apollo research chain and the write all live there, so this menu and the
+ * Expenses-by-Supplier list offer the same act rather than two spellings of it.
  */
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MoreVertical, Building2, ListPlus, PackagePlus, Trash2, Loader2, ExternalLink, Sparkles, Eye, Wallet, ShoppingCart, Receipt } from 'lucide-react';
+import { MoreVertical, Building2, ListPlus, PackagePlus, Trash2, Loader2, Eye, Wallet, ShoppingCart, Receipt } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/core/ui/dropdown-menu';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter , DialogDescription } from '@/components/core/ui/dialog';
-import { Checkbox } from '@/components/core/ui/checkbox';
-import { Button } from '@/components/core/ui/button';
-import { Input } from '@/components/core/ui/input';
-import { Label } from '@/components/core/ui/label';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-// One normalised VAT key (#353 CRM-4).
-import { normalizeVat, CRM_VAT_COLUMN } from '@/components/business/crm/companyIdentity';
-import { companiesAPI } from '@/services/crm.service';
-import { researchCompany, greekAfm, summarizeResearch, missingSoftIdentity } from '@/modules/crm/services/companyResearch';
+import { AddIssuerToCrmDialog } from '@/modules/finance/components/AddIssuerToCrmDialog';
 import type { InboundDocument } from '@/modules/finance/services/inboundService';
 import { docFamily, isPayrollDocument, needsLineDetail } from '@/modules/finance/utils/inboundProvenance';
 import { InboundDocPreviewDialog } from '@/modules/finance/components/InboundDocPreviewDialog';
@@ -70,11 +59,7 @@ interface Props {
   onChanged?: () => void;
 }
 
-/** A bare 9-digit number is a Greek ΑΦΜ — only those are resolvable via the ΑΑΔΕ / ΓΕΜΗ registries. */
-const isGreekVat = (vat: string | null | undefined) => !!greekAfm(vat);
-
 export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy, crmCompanyId, onRecordPayment, onCreateOrder, hasOrder, onOpenPayments, onReceiveStock, onAddLineDetail, onDismiss, onChanged }) => {
-  const { toast } = useToast();
   const navigate = useNavigate();
 
   // ONE goods receipt per purchase. Receiving the document and receiving the purchase order it
@@ -110,102 +95,10 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
   // Read-only view of the document exactly as AADE holds it.
   const [previewOpen, setPreviewOpen] = useState(false);
 
-  // ---- Add issuer → CRM supplier dialog ----
+  // ---- Add issuer → CRM supplier ----
+  // The dedupe probe, the research chain and the write all live in the shared dialog, so this row
+  // and the Expenses-by-Supplier list offer the same act rather than two spellings of it.
   const [crmOpen, setCrmOpen] = useState(false);
-  const [name, setName] = useState(doc.issuer_name ?? '');
-  // Research is on by default whenever there is something to research — a Greek ΑΦΜ (registries)
-  // or at least a name (web research).
-  const [enrich, setEnrich] = useState(isGreekVat(doc.issuer_vat) || !!doc.issuer_name?.trim());
-  const [saving, setSaving] = useState(false);
-  const [existing, setExisting] = useState<{ id: string; name: string | null } | null>(null);
-  const [checking, setChecking] = useState(false);
-  // Sub-phase label while the research chain runs ("Checking ΓΕΜΗ registry…").
-  const [statusLine, setStatusLine] = useState<string | null>(null);
-
-  const openCrm = async () => {
-    setName(doc.issuer_name ?? '');
-    setEnrich(isGreekVat(doc.issuer_vat) || !!doc.issuer_name?.trim());
-    setExisting(null);
-    setCrmOpen(true);
-    // Dedupe: is a supplier with this VAT already in the workspace? RLS scopes the read.
-    // Match on BOTH the raw string and the digits-only form — a CRM row saved as "EL800370260"
-    // must still dedupe against a myDATA issuer_vat of "800370260" (an exact-string match let
-    // duplicates straight through).
-    const vat = doc.issuer_vat?.trim();
-    if (vat) {
-      setChecking(true);
-      try {
-        // One normalised key (#353 CRM-4) — this was a third hand-rolled copy of the same
-        // guess-list, and it missed a stored `GR 800 370 260` exactly like the others.
-        const vatKey = normalizeVat(vat);
-        const { data } = await supabase
-          .from('crm_companies')
-          .select('id, name')
-          .eq('workspace_id', workspaceId)
-          .eq(CRM_VAT_COLUMN, vatKey)
-          .limit(1)
-          .maybeSingle();
-        if (data) setExisting({ id: (data as any).id, name: (data as any).name ?? null });
-      } catch { /* non-blocking — worst case we create a dup the user can merge */ }
-      finally { setChecking(false); }
-    }
-  };
-
-  const saveCrm = async () => {
-    const vat = doc.issuer_vat?.trim() || undefined;
-    const typedName = name.trim();
-    // Research needs *something* to work from: a Greek ΑΦΜ (registries) or a name (web research).
-    const doResearch = enrich && !!(isGreekVat(vat) || typedName);
-    if (!typedName && !isGreekVat(vat)) {
-      toast({ title: 'Name required', description: 'Enter a supplier name — this issuer has no Greek ΑΦΜ to look up.', variant: 'destructive' });
-      return;
-    }
-    setSaving(true);
-    let researchNote: string | null = null;
-    try {
-      let payload: Record<string, unknown> = {
-        name: typedName || vat,
-        vat_number: vat,
-        is_supplier: true,
-        // MUST be explicit: crm_companies.is_customer DEFAULTS TO TRUE, so omitting it here
-        // filed every issuer as a customer as well — a company we only ever buy from showed up
-        // in customer pickers, AR statements and the receivables aging. The document is an
-        // expense we RECEIVED; its issuer sells to us and nothing more.
-        is_customer: false,
-        workspace_id: workspaceId,
-      };
-      if (doResearch) {
-        // Full chain: ΑΑΔΕ → ΓΕΜΗ → web/Apollo. No companyId yet (the row doesn't exist), so
-        // everything comes back as fields and lands in the single insert below.
-        const res = await researchCompany({
-          vatNumber: vat,
-          name: typedName || undefined,
-          workspaceId,
-          reason: 'invoice_counterparty',
-          existing: { name: typedName || undefined },
-          onProgress: setStatusLine,
-        });
-        payload = { ...payload, ...res.fields, name: typedName || res.resolvedName || vat };
-        // Report the outcome either way. `res.ok` is true if ANY leg worked, so gating the
-        // message on failure hid the common case: registries answered, the web pass found only a
-        // website, and the supplier arrived with no phone or industry and no explanation.
-        researchNote = summarizeResearch(res.steps);
-        const stillMissing = missingSoftIdentity(payload);
-        if (stillMissing.length) researchNote += ` Still missing: ${stillMissing.join(', ')}.`;
-      }
-      if (!payload.name) { toast({ title: 'Name required', variant: 'destructive' }); setSaving(false); return; }
-      const { data } = await companiesAPI.createCompany(payload);
-      toast({
-        title: 'Supplier added to CRM',
-        description: researchNote ?? undefined,
-      });
-      setCrmOpen(false);
-      onChanged?.();
-      if (data?.id) navigate(`/crm/companies/${data.id}`);
-    } catch (err: any) {
-      toast({ title: 'Failed to add supplier', description: err?.message, variant: 'destructive' });
-    } finally { setSaving(false); setStatusLine(null); }
-  };
 
   return (
     <>
@@ -230,7 +123,7 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
               <Building2 className="h-4 w-4 mr-2" /> Issuer in CRM
             </DropdownMenuItem>
           ) : (
-            <DropdownMenuItem onClick={openCrm} disabled={!hasIssuer}>
+            <DropdownMenuItem onClick={() => setCrmOpen(true)} disabled={!hasIssuer}>
               <Building2 className="h-4 w-4 mr-2" /> Add issuer to CRM
             </DropdownMenuItem>
           )}
@@ -283,58 +176,16 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
 
       <InboundDocPreviewDialog doc={doc} open={previewOpen} onOpenChange={setPreviewOpen} />
 
-      {/* Add issuer → CRM supplier */}
-      <Dialog open={crmOpen} onOpenChange={setCrmOpen}>
-        <DialogContent className="sm:max-w-md" onClick={(e) => e.stopPropagation()}>
-          <DialogHeader><DialogTitle>Add Issuer as CRM Supplier</DialogTitle><DialogDescription className="sr-only">Process this received (myDATA) document.</DialogDescription></DialogHeader>
-          {existing ? (
-            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
-              <div className="flex items-center justify-between gap-2">
-                <span>Already in CRM: <span className="font-medium">{existing.name ?? '—'}</span></span>
-                <Button size="sm" variant="outline" onClick={() => { setCrmOpen(false); navigate(`/crm/companies/${existing.id}`); }}>
-                  <ExternalLink className="h-3.5 w-3.5 mr-1" /> Open
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Supplier name</Label>
-                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={isGreekVat(doc.issuer_vat) ? 'Leave blank to fetch from ΑΑΔΕ' : 'Supplier name'} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">VAT number</Label>
-                <Input value={doc.issuer_vat ?? ''} disabled className="font-mono text-xs" />
-              </div>
-              <label className="flex items-start gap-2 cursor-pointer rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs">
-                <Checkbox className="mt-0.5 h-3.5 w-3.5 rounded" checked={enrich} onCheckedChange={(v) => setEnrich(v === true)} />
-                <span>
-                  <span className="flex items-center gap-1 font-medium">
-                    <Sparkles className="h-3 w-3" />
-                    {isGreekVat(doc.issuer_vat) ? 'Research: ΑΑΔΕ + ΓΕΜΗ + Business Info' : 'Research business info'}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {isGreekVat(doc.issuer_vat)
-                      ? "Fills name, address, tax office & ΚΑΔ from ΑΑΔΕ, the Γ.Ε.ΜΗ. number from ΓΕΜΗ, and website / phone / socials from the web. The ΑΑΔΕ call writes an audit entry to the issuer's TAXISnet inbox (ΑΑΔΕ policy)."
-                      : 'Looks up website, phone, socials and industry from the web. No Greek ΑΦΜ, so the ΑΑΔΕ / ΓΕΜΗ registries are skipped.'}
-                  </span>
-                </span>
-              </label>
-              {statusLine && (
-                <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" />{statusLine}</p>
-              )}
-            </div>
-          )}
-          {!existing && (
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setCrmOpen(false)} disabled={saving}>Cancel</Button>
-              <Button onClick={saveCrm} disabled={saving || checking}>
-                {saving ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Adding…</> : 'Add supplier'}
-              </Button>
-            </DialogFooter>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Add issuer → CRM supplier. Navigates on success, as it always has: this menu acts on
+          ONE document, so landing on the record just created is the end of the errand. */}
+      <AddIssuerToCrmDialog
+        workspaceId={workspaceId}
+        issuerVat={doc.issuer_vat}
+        issuerName={doc.issuer_name}
+        open={crmOpen}
+        onOpenChange={setCrmOpen}
+        onCreated={(id) => { onChanged?.(); if (id) navigate(`/crm/companies/${id}`); }}
+      />
     </>
   );
 };

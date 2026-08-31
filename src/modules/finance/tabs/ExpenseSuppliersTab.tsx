@@ -14,9 +14,11 @@
  *     `remember_inbound_issuer_category` records it and every later arrival files itself.
  *  2. IDENTITY. A supplier who is already a CRM company is LINKED, so their documents, their
  *     registry identity and their orders are one record rather than an ΑΦΜ on a screen. Matched on
- *     the normalised VAT key in SQL (#353 CRM-4); 37 of 241 issuers resolve today. Adding the rest
- *     goes through the row menu inside a supplier's documents, which dedupes and researches — this
- *     surface never creates a company silently.
+ *     the normalised VAT key in SQL (#353 CRM-4); 37 of 241 issuers resolve today, and the other
+ *     204 carry the way to fix that in the same cell. It opens [[AddIssuerToCrmDialog]] — a
+ *     duplicate probe on the normalised ΑΦΜ, then the ΑΑΔΕ → ΓΕΜΗ → web research chain — never a
+ *     silent create, because the ΑΑΔΕ leg writes an audit entry into the issuer's own TAXISnet
+ *     inbox and that is the operator's call to make.
  *  3. HISTORY. Opening a row loads that supplier's whole run of documents inline — the same table,
  *     menu and dialogs as their CRM record ([[SupplierInboundDocs]]).
  *
@@ -26,7 +28,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, Inbox, Check, Building2, ChevronRight, ChevronDown, ExternalLink, Search } from 'lucide-react';
+import { Loader2, Inbox, Check, Building2, ChevronRight, ChevronDown, ExternalLink, Search, UserPlus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -43,6 +45,7 @@ import { formatDate } from '@/utils/datetime';
 import { FINANCE_TAB, financeTabUrl } from '@/modules/finance/routes';
 import { inboundService, type ExpenseIssuerRow } from '@/modules/finance/services/inboundService';
 import { SupplierInboundDocs } from '@/modules/finance/components/SupplierInboundDocs';
+import { AddIssuerToCrmDialog } from '@/modules/finance/components/AddIssuerToCrmDialog';
 
 interface CategoryOption { id: string; name: string; kind?: string | null; is_system?: boolean | null }
 
@@ -77,6 +80,8 @@ export const ExpenseSuppliersTab: React.FC<{
   const [open, setOpen] = useState<string | null>(null);
   const [choice, setChoice] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
+  /** The issuer being added to CRM. Never a silent write — the dialog dedupes and researches. */
+  const [addToCrm, setAddToCrm] = useState<ExpenseIssuerRow | null>(null);
 
   // A system category is not a filing destination — the RPC refuses it, because filing into the
   // bucket the documents are already in would move them and teach nothing.
@@ -143,6 +148,7 @@ export const ExpenseSuppliersTab: React.FC<{
   const columns = isAccountant ? 5 : 6;
 
   return (
+    <>
     <Card>
       <CardHeader className="border-b border-hairline px-5 py-3 flex-row items-start justify-between gap-3 flex-wrap space-y-0">
         <div className="min-w-0">
@@ -255,9 +261,9 @@ export const ExpenseSuppliersTab: React.FC<{
                             </button>
                             <div className="mt-0.5 flex flex-wrap items-center gap-2 pl-5">
                               <span className="font-mono text-xs text-muted-foreground">{r.issuer_vat}</span>
-                              {/* The supplier's CRM record when their ΑΦΜ resolves to one. Not a
-                                  "create" affordance: a CRM party goes through the duplicate
-                                  search first, which the row menu inside the documents does. */}
+                              {/* Their CRM record when the ΑΦΜ resolves to one, and the way to
+                                  make one when it does not. Both ends of the same fact, in the
+                                  cell where the operator noticed it was missing. */}
                               {r.crm_company_id ? (
                                 <Link
                                   to={`/crm/companies/${r.crm_company_id}`}
@@ -268,10 +274,18 @@ export const ExpenseSuppliersTab: React.FC<{
                                   <span className="max-w-[12rem] truncate">{r.crm_company_name || 'In CRM'}</span>
                                   <ExternalLink className="h-3 w-3" />
                                 </Link>
+                              ) : isAccountant ? (
+                                <span className="text-xs text-muted-foreground/70">Not in CRM</span>
                               ) : (
-                                <span className="text-xs text-muted-foreground/70" title="This ΑΦΜ matches no CRM company. Add them from the menu on one of their documents — it searches the registries and dedupes first.">
-                                  Not in CRM
-                                </span>
+                                <button
+                                  type="button"
+                                  className="inline-flex items-center gap-1 rounded text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                  onClick={() => setAddToCrm(r)}
+                                  title="Add this supplier to the platform — checks for a duplicate ΑΦΜ first, then fills their identity from ΑΑΔΕ / ΓΕΜΗ and the web"
+                                >
+                                  <UserPlus className="h-3 w-3" />
+                                  Not in CRM — add
+                                </button>
                               )}
                               {r.learned_category_name && (
                                 <Badge variant="success">
@@ -359,5 +373,19 @@ export const ExpenseSuppliersTab: React.FC<{
         )}
       </CardContent>
     </Card>
+
+    {/* Adding a supplier from here stays PUT: the operator is mid-way down a filing queue, so the
+        list refreshes and the row's link appears in place rather than navigating them away. */}
+    {addToCrm && (
+      <AddIssuerToCrmDialog
+        workspaceId={workspaceId}
+        issuerVat={addToCrm.issuer_vat}
+        issuerName={addToCrm.issuer_name}
+        open
+        onOpenChange={(v) => { if (!v) setAddToCrm(null); }}
+        onCreated={() => { setAddToCrm(null); void load(); }}
+      />
+    )}
+    </>
   );
 };
