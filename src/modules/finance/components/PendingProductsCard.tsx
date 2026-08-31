@@ -104,7 +104,7 @@ import {
   warehouseService, INTAKE_LINE_PAGE_SIZE,
   type IntakeSupplierGroup, type IntakeLine, type IntakeLineDetails, type IntakeIgnoredIssuer,
   type IntakeCandidate,
-  type PriceRung, type Warehouse,
+  type PriceRung, type Warehouse, type OntologyGap,
 } from '@/services/warehouseService';
 import { QuickAddCompanyDialog } from '@/components/business/crm/QuickAddCompanyDialog';
 import { parseSupplierLine, type ParsedSupplierLine } from '@/modules/finance/utils/parseSupplierLine';
@@ -330,6 +330,12 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
     () => warehouses.find((w) => w.is_default)?.id ?? warehouses[0]?.id ?? '',
     [warehouses],
   );
+  /**
+   * Terms in this queue that resolve to nothing — makers with no CRM company, issuers whose VAT
+   * could not name them. Each one blocks a rung of the markup ladder for every line that carries
+   * it, which is why the list is ranked by how many lines that is.
+   */
+  const [ontologyGaps, setOntologyGaps] = useState<OntologyGap[]>([]);
   useEffect(() => { setTargetWarehouse((cur) => cur || defaultWh); }, [defaultWh]);
 
   // Debounce the search box: each keystroke would otherwise re-query the whole queue.
@@ -341,7 +347,7 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      const [gs, cats, fin, ign, mats, companies] = await Promise.all([
+      const [gs, cats, fin, ign, mats, companies, gaps] = await Promise.all([
         warehouseService.intakeSupplierGroups(workspaceId),
         financeCategoriesService.list(workspaceId)
           .then((c) => c.filter((x) => x.kind === 'income' || x.kind === 'both')).catch(() => []),
@@ -358,8 +364,16 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
             (r) => (r.data ?? []) as MakerRow[],
             () => [] as MakerRow[],
           ),
+        // ONTOLOGY. Scan first (idempotent), then read the ranked work list. This is the call
+        // site that stops the layer being inert: it shipped a week earlier and was reached by
+        // nothing — not one file — which is the exact defect class this queue's own probes exist
+        // to catch. Best-effort: a failure here must never stop the queue from loading.
+        warehouseService.scanIntakeTerms(workspaceId)
+          .then(() => warehouseService.ontologyGaps(workspaceId, { limit: 200 }))
+          .catch(() => [] as OntologyGap[]),
       ]);
       setGroups(gs);
+      setOntologyGaps(gaps);
       setCategories(cats);
       setIgnored(ign);
       setMaterialCategories(mats);
@@ -557,6 +571,49 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
           </label>
         </div>
       </div>
+
+      {/*
+        ONTOLOGY GAPS — the terms this queue uses that resolve to nothing.
+
+        Rungs 2 and 3 of the markup ladder match `products.brand_company_id` and
+        `products.supplier_company_id`. A maker or issuer with no CRM company means those rungs
+        are unreachable for every line carrying the name, so the ladder falls to the workspace
+        default. Ranked by how many lines each term blocks, because clearing the top of the list
+        is what unblocks the most of the queue.
+
+        Rendered rather than merely counted: a number nobody can act on is how the last version
+        of this idea sat unused for a week.
+      */}
+      {ontologyGaps.length > 0 && (
+        <div className="border-b border-hairline bg-amber-500/5 px-4 py-2.5">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
+            <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+            <span className="font-medium text-foreground/90">
+              {ontologyGaps.length} name{ontologyGaps.length === 1 ? '' : 's'} in this queue match nothing in CRM
+            </span>
+            <span className="text-muted-foreground">
+              — their lines cannot reach the brand or supplier markup rung
+            </span>
+          </div>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {ontologyGaps.slice(0, 6).map((g) => (
+              <span key={g.binding_id}
+                className="inline-flex items-center gap-1 rounded-sm border border-hairline bg-card px-1.5 py-0.5 text-[11px]"
+                title={`${g.concept_type === 'manufacturer' ? 'Manufacturer' : 'Supplier'} · ${g.occurrences} queued line${g.occurrences === 1 ? '' : 's'}`}>
+                <span className="max-w-[220px] truncate">{g.raw_term}</span>
+                <span className="tabular-nums text-muted-foreground">{g.occurrences}</span>
+                {/* A model's guess is shown AS a guess. `candidate` is not `confirmed`. */}
+                {g.status === 'candidate' && g.target_label && (
+                  <span className="text-amber-700 dark:text-amber-400">→ {g.target_label}?</span>
+                )}
+              </span>
+            ))}
+            {ontologyGaps.length > 6 && (
+              <span className="text-[11px] text-muted-foreground">+{ontologyGaps.length - 6} more</span>
+            )}
+          </div>
+        </div>
+      )}
 
       <CardContent className="p-0">
         {search ? (

@@ -574,6 +574,79 @@ export const warehouseService = {
   // line never finishes. The old flat read (every pending row, plus one price-preview round trip
   // PER ROW) is what made the tab take a minute to become usable.
 
+  /**
+   * ONTOLOGY — turn the queue's free text into a ranked work list.
+   *
+   * `ontology_scan_intake_terms` notes every distinct maker on a queued line, and every issuer
+   * NAME whose VAT could not already answer who they are. Terms an existing home can resolve are
+   * returned and written nowhere; the rest become gaps, counted by how many LINES carry them.
+   *
+   * Why this is called from the intake screen rather than a cron: the gaps only matter to the
+   * person looking at the queue, and a layer nothing calls is the failure this whole system is
+   * organised against — the ontology shipped a week before this and was reached by nothing, not
+   * one file. Idempotent, so calling it on page load is safe.
+   */
+  async scanIntakeTerms(workspaceId: string): Promise<{
+    terms_scanned: number; already_resolved: number;
+    manufacturer_gaps: number; supplier_gaps: number;
+  }> {
+    const { data, error } = await supabase.rpc('ontology_scan_intake_terms', {
+      p_workspace_id: workspaceId, p_limit: 5000,
+    });
+    if (error) throw error;
+    const r = (data ?? {}) as Record<string, unknown>;
+    return {
+      terms_scanned: Number(r.terms_scanned ?? 0),
+      already_resolved: Number(r.already_resolved ?? 0),
+      manufacturer_gaps: Number(r.manufacturer_gaps ?? 0),
+      supplier_gaps: Number(r.supplier_gaps ?? 0),
+    };
+  },
+
+  /**
+   * The work list: terms nobody can resolve, ranked by how many queued lines they block.
+   *
+   * `status` is the whole point of reading this rather than a plain alias table — `candidate`
+   * means a model proposed a target and no human has agreed, and a caller that renders it as
+   * settled has thrown away the distinction the layer exists to preserve.
+   */
+  async ontologyGaps(
+    workspaceId: string,
+    opts: { conceptType?: OntologyConceptType | null; status?: OntologyBindingStatus | null; limit?: number } = {},
+  ): Promise<OntologyGap[]> {
+    const { data, error } = await supabase.rpc('ontology_gaps', {
+      p_workspace_id: workspaceId,
+      p_concept_type: opts.conceptType ?? null,
+      p_status: opts.status ?? null,
+      p_limit: opts.limit ?? 100,
+    });
+    if (error) throw error;
+    return (data ?? []) as OntologyGap[];
+  },
+
+  /** A human agrees with a binding. The ONLY path to `confirmed`; requires a workspace admin. */
+  async ontologyConfirm(bindingId: string, target: { id?: string | null; key?: string | null }): Promise<{
+    promoted_to_global_vocabulary: boolean; note: string | null;
+  }> {
+    const { data, error } = await supabase.rpc('ontology_confirm_binding', {
+      p_binding_id: bindingId, p_target_id: target.id ?? null, p_target_key: target.key ?? null,
+    });
+    if (error) throw error;
+    const r = (data ?? {}) as Record<string, unknown>;
+    return {
+      promoted_to_global_vocabulary: r.promoted_to_global_vocabulary === true,
+      note: (r.note as string | null) ?? null,
+    };
+  },
+
+  /** A human says no. The term and its evidence are KEPT, so the next run cannot re-propose it. */
+  async ontologyReject(bindingId: string, note?: string): Promise<void> {
+    const { error } = await supabase.rpc('ontology_reject_binding', {
+      p_binding_id: bindingId, p_note: note ?? null,
+    });
+    if (error) throw error;
+  },
+
   /** Who is waiting, and how much of the queue each one is. One call, no lines. */
   async intakeSupplierGroups(workspaceId: string): Promise<IntakeSupplierGroup[]> {
     const { data, error } = await supabase.rpc('warehouse_intake_supplier_groups', { p_workspace_id: workspaceId });
@@ -747,6 +820,43 @@ export interface PendingProduct {
 }
 
 /** One issuer's share of the intake queue. */
+/**
+ * The concept types the ontology currently binds. Mirrors `ontology_concept_types.key`, which is
+ * the operator-owned vocabulary — a value absent there is rejected by a FK, so this union and
+ * that table must move together.
+ *
+ * `facet_value` is deliberately absent: `facet_canonical_values` owns canonical facet values,
+ * with aliases and embeddings, and a second home is what this layer exists to prevent.
+ */
+export type OntologyConceptType = 'material_category' | 'manufacturer' | 'supplier';
+
+/**
+ * `candidate` is NOT `confirmed`. A model proposed it; no human has agreed. Rendering the two the
+ * same way discards the only distinction that makes an AI-assisted mapping safe to act on.
+ */
+export type OntologyBindingStatus = 'unresolved' | 'candidate' | 'confirmed' | 'rejected';
+
+/** One unresolved or proposed term, and how many queued lines it blocks. */
+export interface OntologyGap {
+  binding_id: string;
+  concept_type: OntologyConceptType;
+  /** Exactly as the source wrote it — "ΕΓΓΕΡ" and "EGGER" are different observations. */
+  raw_term: string;
+  term_norm: string;
+  status: OntologyBindingStatus;
+  /** How many LINES carry the term. This is what ranks the list. */
+  occurrences: number;
+  confidence: number | null;
+  proposed_by: 'ai' | 'operator' | 'exact_alias' | 'exact_name' | 'controlled_vocab' | null;
+  target_id: string | null;
+  target_key: string | null;
+  /** The proposed target's human name, resolved server-side so the row can be read as a sentence. */
+  target_label: string | null;
+  evidence: Record<string, unknown>;
+  first_seen_at: string;
+  last_seen_at: string;
+}
+
 export interface IntakeSupplierGroup {
   /** Normalized VAT (`public._vat_key`), or 'unknown'. The grouping key everywhere. */
   issuer_key: string;
