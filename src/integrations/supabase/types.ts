@@ -2101,44 +2101,6 @@ export type Database = {
           },
         ]
       }
-      cart_items: {
-        Row: {
-          added_at: string | null
-          cart_id: string
-          id: string
-          notes: string | null
-          product_id: string
-          quantity: number | null
-          unit_price: number | null
-        }
-        Insert: {
-          added_at?: string | null
-          cart_id: string
-          id?: string
-          notes?: string | null
-          product_id: string
-          quantity?: number | null
-          unit_price?: number | null
-        }
-        Update: {
-          added_at?: string | null
-          cart_id?: string
-          id?: string
-          notes?: string | null
-          product_id?: string
-          quantity?: number | null
-          unit_price?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "cart_items_cart_id_fkey"
-            columns: ["cart_id"]
-            isOneToOne: false
-            referencedRelation: "shopping_carts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       catalog_access_log: {
         Row: {
           catalog_id: string
@@ -6348,54 +6310,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      designer_projects: {
-        Row: {
-          camera_position: Json | null
-          camera_target: Json | null
-          created_at: string | null
-          description: string | null
-          id: string
-          is_public: boolean | null
-          items: Json
-          name: string
-          room_config: Json
-          share_token: string | null
-          thumbnail_url: string | null
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          camera_position?: Json | null
-          camera_target?: Json | null
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          is_public?: boolean | null
-          items?: Json
-          name: string
-          room_config?: Json
-          share_token?: string | null
-          thumbnail_url?: string | null
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          camera_position?: Json | null
-          camera_target?: Json | null
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          is_public?: boolean | null
-          items?: Json
-          name?: string
-          room_config?: Json
-          share_token?: string | null
-          thumbnail_url?: string | null
-          updated_at?: string | null
-          user_id?: string
-        }
-        Relationships: []
       }
       document_chunks: {
         Row: {
@@ -27220,36 +27134,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      shopping_carts: {
-        Row: {
-          created_at: string | null
-          id: string
-          status: string | null
-          total_items: number | null
-          updated_at: string | null
-          user_id: string
-          workspace_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          status?: string | null
-          total_items?: number | null
-          updated_at?: string | null
-          user_id: string
-          workspace_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          status?: string | null
-          total_items?: number | null
-          updated_at?: string | null
-          user_id?: string
-          workspace_id?: string | null
-        }
-        Relationships: []
       }
       social_account_insights: {
         Row: {

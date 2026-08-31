@@ -90,9 +90,6 @@ const KNOWN_UNREFERENCED: Record<string, string> = {
     + 'Needs that column dropped from agent_runs first.',
   agent_project_snapshots:
     'DROP, BLOCKED — empty and unreachable, but live agent_runs.snapshot_id FKs it.',
-  shopping_carts:
-    'DROP, BLOCKED — empty; cart_items.cart_id FKs it. The pair goes together or not at all.',
-
   // ── WIRE, do not drop: the parent feature is LIVE and the gap is user-facing ────────────────
   // A DROP here would delete a design that is actually wanted. The fix is a writer.
   kb_doc_versions:
@@ -230,6 +227,31 @@ describe('dead schema', () => {
         + 'deliberately does NOT let an admin edit the rules, because a SECURITY DEFINER '
         + 'function running admin-supplied SQL is a privilege-escalation surface. Field-level '
         + 'plausibility lives on material_metadata_fields.validation_rules.',
+      ).toBe(false);
+    }
+  });
+
+  /**
+   * #378 N9/D2 — two abandoned systems whose SCHEMA was the thing that read as live.
+   *
+   * `proposals` (dropped 2026-08-30) was a complete-looking second quoting API over a table that
+   * never held a row; `shopping_carts` / `cart_items` were the rest of it; `designer_projects` had
+   * one reader in the entire codebase — a `count` on a Profile tile, which could therefore render
+   * nothing but 0 beside real numbers.
+   *
+   * Named individually rather than left to the general check above, because the general check
+   * only convicts a table NOTHING mentions — and each of these survived it at some point by being
+   * mentioned. `cart_items` was held up by a COMMENT (`.from('quote_items') // Changed from
+   * cart_items`), and `proposals` by the three routes `quotes-api` was still serving. A mention is
+   * not a use, and re-adding any of these is a decision someone has to argue for.
+   */
+  it('the abandoned cart / proposal / designer-project tables stay dropped', () => {
+    for (const gone of ['proposals', 'shopping_carts', 'cart_items', 'designer_projects']) {
+      expect(
+        names.includes(gone),
+        `${gone} is back in the generated types. Live quotes are \`quotes\` / \`quote_items\`; `
+        + 'live projects are `projects`. If a cart or a proposal is genuinely wanted, it needs a '
+        + 'writer and a UI in the same change — not a table that reads as a capability.',
       ).toBe(false);
     }
   });

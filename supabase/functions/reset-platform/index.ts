@@ -196,11 +196,8 @@ const TABLES_TO_CLEAR = [
   'proposals',                     // User proposals
 
   // ── Designer module (user-generated) ────────────────────────────────
-  'designer_projects',             // Designer projects
 
   // ── Storefront (transient commerce state) ───────────────────────────
-  'cart_items',                    // Cart line items (child of shopping_carts, CASCADE)
-  'shopping_carts',                // Shopping carts
 
   // ── Social content (connection tokens are PRESERVED) ────────────────
   'social_post_analytics',         // Post analytics (child of social_posts, CASCADE)

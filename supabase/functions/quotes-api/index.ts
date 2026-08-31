@@ -61,11 +61,11 @@ Deno.serve(withApiLogging('quotes-api', async (req) => {
     // POST /api/quote-requests - Create quote request
     if (method === 'POST' && path[0] === 'quote-requests') {
       const body = await parseJsonBody(req);
-      const { quote_id, notes } = body; // Changed from cart_id
+      const { quote_id, notes } = body;
 
       if (!quote_id) {
         return new Response(
-          JSON.stringify({ error: 'Missing quote_id' }), // Changed from cart_id
+          JSON.stringify({ error: 'Missing quote_id' }),
           { status: 400, headers: corsHeaders },
         );
       }
@@ -93,9 +93,9 @@ Deno.serve(withApiLogging('quotes-api', async (req) => {
 
       // Get quote items count
       const { data: quoteItems, error: quoteError } = await supabase
-        .from('quote_items') // Changed from cart_items
+        .from('quote_items')
         .select('id')
-        .eq('quote_id', quote_id); // Changed from cart_id
+        .eq('quote_id', quote_id);
 
       if (quoteError) {
         return new Response(
@@ -109,7 +109,7 @@ Deno.serve(withApiLogging('quotes-api', async (req) => {
         .from('quote_requests')
         .insert({
           user_id: user.id,
-          quote_id, // Changed from cart_id
+          quote_id,
           workspace_id: quoteRow.workspace_id,
           status: 'pending',
           items_count: quoteItems?.length || 0, // Changed from cartItems

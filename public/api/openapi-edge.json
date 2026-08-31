@@ -10552,9 +10552,9 @@
         "tags": [
           "Quotes"
         ],
-        "summary": "REST API for quote requests and proposals (customer-facing)",
+        "summary": "REST API for quote requests (customer-facing)",
         "operationId": "post_quotes_api",
-        "description": "Path-routed REST handler for quote requests and seller proposals. Supports creating quote requests from a quote, listing/getting quote requests, updating status, listing/getting proposals, and accepting/rejecting proposals. All operations scoped to the authenticated user.\n\n**Routes / actions:**\n- `POST /quote-requests` — Create a quote request from a quote\n- `GET /quote-requests` — List the authenticated user's quote requests\n- `GET /quote-requests/:id` — Get a specific quote request owned by the user\n- `PATCH /quote-requests/:id` — Update the status of a quote request\n- `GET /proposals` — List proposals for the user's quote requests\n- `GET /proposals/:id` — Get a specific proposal (ownership-verified)\n- `PATCH /proposals/:id` — Accept or reject a proposal",
+        "description": "Path-routed REST handler for customer quote requests: create one from a quote, list/get the caller’s own, and update its status. All operations scoped to the authenticated user. The /proposals routes were removed with the `proposals` table on 2026-08-30 (#378 N9) — it was an abandoned second quoting system that never held a row. Live quotes are `quotes` / `quote_items`.\n\n**Routes / actions:**\n- `POST /quote-requests` — Create a quote request from a quote\n- `GET /quote-requests` — List the authenticated user's quote requests\n- `GET /quote-requests/:id` — Get a specific quote request owned by the user\n- `PATCH /quote-requests/:id` — Update the status of a quote request",
         "security": [
           {
             "supabaseJwt": []
@@ -10627,9 +10627,9 @@
         "tags": [
           "Quotes"
         ],
-        "summary": "REST API for quote requests and proposals (customer-facing)",
+        "summary": "REST API for quote requests (customer-facing)",
         "operationId": "get_quotes_api",
-        "description": "Path-routed REST handler for quote requests and seller proposals. Supports creating quote requests from a quote, listing/getting quote requests, updating status, listing/getting proposals, and accepting/rejecting proposals. All operations scoped to the authenticated user.\n\n**Routes / actions:**\n- `POST /quote-requests` — Create a quote request from a quote\n- `GET /quote-requests` — List the authenticated user's quote requests\n- `GET /quote-requests/:id` — Get a specific quote request owned by the user\n- `PATCH /quote-requests/:id` — Update the status of a quote request\n- `GET /proposals` — List proposals for the user's quote requests\n- `GET /proposals/:id` — Get a specific proposal (ownership-verified)\n- `PATCH /proposals/:id` — Accept or reject a proposal",
+        "description": "Path-routed REST handler for customer quote requests: create one from a quote, list/get the caller’s own, and update its status. All operations scoped to the authenticated user. The /proposals routes were removed with the `proposals` table on 2026-08-30 (#378 N9) — it was an abandoned second quoting system that never held a row. Live quotes are `quotes` / `quote_items`.\n\n**Routes / actions:**\n- `POST /quote-requests` — Create a quote request from a quote\n- `GET /quote-requests` — List the authenticated user's quote requests\n- `GET /quote-requests/:id` — Get a specific quote request owned by the user\n- `PATCH /quote-requests/:id` — Update the status of a quote request",
         "security": [
           {
             "supabaseJwt": []
@@ -10692,9 +10692,9 @@
         "tags": [
           "Quotes"
         ],
-        "summary": "REST API for quote requests and proposals (customer-facing)",
+        "summary": "REST API for quote requests (customer-facing)",
         "operationId": "patch_quotes_api",
-        "description": "Path-routed REST handler for quote requests and seller proposals. Supports creating quote requests from a quote, listing/getting quote requests, updating status, listing/getting proposals, and accepting/rejecting proposals. All operations scoped to the authenticated user.\n\n**Routes / actions:**\n- `POST /quote-requests` — Create a quote request from a quote\n- `GET /quote-requests` — List the authenticated user's quote requests\n- `GET /quote-requests/:id` — Get a specific quote request owned by the user\n- `PATCH /quote-requests/:id` — Update the status of a quote request\n- `GET /proposals` — List proposals for the user's quote requests\n- `GET /proposals/:id` — Get a specific proposal (ownership-verified)\n- `PATCH /proposals/:id` — Accept or reject a proposal",
+        "description": "Path-routed REST handler for customer quote requests: create one from a quote, list/get the caller’s own, and update its status. All operations scoped to the authenticated user. The /proposals routes were removed with the `proposals` table on 2026-08-30 (#378 N9) — it was an abandoned second quoting system that never held a row. Live quotes are `quotes` / `quote_items`.\n\n**Routes / actions:**\n- `POST /quote-requests` — Create a quote request from a quote\n- `GET /quote-requests` — List the authenticated user's quote requests\n- `GET /quote-requests/:id` — Get a specific quote request owned by the user\n- `PATCH /quote-requests/:id` — Update the status of a quote request",
         "security": [
           {
             "supabaseJwt": []

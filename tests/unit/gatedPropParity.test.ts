@@ -67,15 +67,18 @@ const EXEMPT: Record<string, string> = {
   'OrderLinkPicker.allowProperty':
     'Same per-control design, plus: `invoices` has no `property_id`, so InvoiceActionsMenu offering '
     + 'the group would ship a row that silently does nothing — the failure the picker exists to avoid.',
-  'ProductDetailModal.onUseIn3DScene':
-    'OPEN, tracked as #378 F4. The handler pushes its result into the agent chat stream, so outside '
-    + 'the chat there is nowhere for the output to land. Needs a destination before a prop.',
-  'ProductDetailModal.onGenerateVR': 'OPEN, #378 F4 — see onUseIn3DScene.',
-  'ProductDetailModal.onGenerateVideo': 'OPEN, #378 F4 — see onUseIn3DScene.',
+  'ProductDetailModal.onGenerateVR':
+    'Both of these SPEND CREDITS and their output has nowhere to land outside the agent chat yet '
+    + '(#378 F4 / N7 — `generation_videos` links to no product, project or moodboard). A button '
+    + 'that starts a paid job with no surface to show the result is worse than no button. The '
+    + 'third action of that row, "place it in a room", needed no prop at all in the end: the Room '
+    + 'Planner already accepts `?product=`, so the modal does it BY DEFAULT and the handler is '
+    + 'only an override.',
+  'ProductDetailModal.onGenerateVideo': 'See onGenerateVR — same credits, same missing surface.',
   'WorldViewer.onRetry':
-    'PublicListingPage is correct to withhold it: retrying spends credits and a visitor must not. '
-    + 'PropertyWorkbench is a real gap (#378 F5) — retry needs the source image off `vr_worlds`, '
-    + 'which the workbench does not read yet.',
+    'PublicListingPage withholds it BECAUSE retrying spends 18 credits and an anonymous visitor '
+    + 'must not be able to. PropertyWorkbench was the real gap and now passes it, gated on '
+    + '`editable`, running the same `startWalkthrough` the Create button runs (#378 F5).',
   'ProgressiveImageGrid.onZoneSelectedForReplacement':
     'The second mount is the direct-image modal (`jobId=""`, `modelCount={0}`), which shows one '
     + 'finished image rather than a job grid — there are no zones to select.',
@@ -85,6 +88,12 @@ const EXEMPT: Record<string, string> = {
   'ProductCard.allowEmbeddedRetail':
     'Retail offers are shown where a retailer link is in scope (agent results), not on the public '
     + 'tools pages, which have no retailer context to resolve.',
+  'WorkflowInlineForm.onCancel':
+    'The wizard gives the step RICHER escapes than a Cancel, in its own footer rather than in the '
+    + 'form: "Or describe in your own words" (which swaps the structured form for free prose) and '
+    + '"Skip step" when the step is skippable. In AgentHub the form is standalone, so cancelling '
+    + 'means clearing the awaiting-input state; inside a wizard step that has no defined meaning — '
+    + 'skip the step, or abort the run, both of which exist and say which they are.',
 };
 
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build']);
@@ -116,13 +125,49 @@ function allOptionalProps(src: string): Set<string> {
   return new Set([...src.matchAll(/\b([a-z]\w*)\?\s*:/g)].map((m) => m[1]));
 }
 
-/** Of those, the ones used as a RENDER GATE rather than merely read. */
+/**
+ * Of those, the ones used as a RENDER GATE rather than merely read.
+ *
+ * The distinction is the whole point: this file exists because an ENTRY DISAPPEARS, not because a
+ * prop is consulted. `prop && (` / `prop && <` is the JSX-conditional idiom; `!!prop` is the
+ * deliberate boolean coercion, which catches the laundered form the inbound menu used
+ * (`const canAddDetail = … && !!onAddLineDetail && …` and then `{canAddDetail && <…>}`).
+ *
+ * A bare `prop &&` inside an `if`, or a `prop ? a : b` picking a label, is NOT a gate — the
+ * control still renders. `ProductDetailModal` now places a product in the room planner by
+ * default and consults the handler only to decide which behaviour and label to use; reporting
+ * that as a withheld capability would be asking it to un-fix itself.
+ */
 function gatingProps(src: string, optional: Set<string>): Set<string> {
   const gated = new Set<string>();
-  const patterns = [/!!\s*(\w+)/g, /\b(\w+)\s*&&/g, /Boolean\(\s*(\w+)\s*\)/g];
-  for (const re of patterns) {
-    for (const m of src.matchAll(re)) if (optional.has(m[1])) gated.add(m[1]);
+
+  for (const line of src.split('\n')) {
+    // `!!prop` / `Boolean(prop)` — the deliberate coercion, always a gate wherever it sits.
+    for (const re of [/!!\s*(\w+)/g, /Boolean\(\s*(\w+)\s*\)/g]) {
+      for (const m of line.matchAll(re)) if (optional.has(m[1])) gated.add(m[1]);
+    }
+
+    // `prop && …` — a gate unless it is the condition of an `if`, where the control still
+    // renders and the prop only decides which branch runs.
+    for (const m of line.matchAll(/\b(\w+)\s*&&/g)) {
+      if (!optional.has(m[1])) continue;
+      if (/\bif\s*\(/.test(line.slice(0, m.index))) continue;
+      gated.add(m[1]);
+    }
+
+    // `prop ? <JSX…> : undefined | null` — renders NOTHING when withheld, which is exactly the
+    // `HubEmptyState action={canManageTypes ? <Button/> : undefined}` shape that `emptyStates`
+    // cannot see.
+    //
+    // The true branch must be JSX. `onRowClick ? 'cursor-pointer' : undefined` and
+    // `onRowClick ? () => onRowClick(row) : undefined` also render nothing when withheld — but
+    // what they withhold is an AFFORDANCE on a row that is still there, not an entry that
+    // vanishes. A table whose rows have nowhere to go legitimately omits the handler.
+    for (const m of line.matchAll(/\b(\w+)\s*\?\s*<[^?]*?:\s*(undefined|null)\b/g)) {
+      if (optional.has(m[1])) gated.add(m[1]);
+    }
   }
+
   // A prop given a truthy default in the destructure is not withholdable.
   return new Set([...gated].filter((p) => !new RegExp(`\\b${p}\\s*=\\s*true`).test(src)));
 }
@@ -152,25 +197,38 @@ function stateBackedGates(src: string, gated: Set<string>, everyOptional: Set<st
   return dropped;
 }
 
-/** Opening-tag text for every `<Name …>` in a source file. */
-function openingTags(src: string, name: string): string[] {
-  const out: string[] = [];
+/**
+ * Opening-tag text for every `<Name …>` in a source file, plus whether the tag prop-SPREADS.
+ *
+ * The spread flag has to be depth-aware. A first cut tested the whole tag for `{...`, which also
+ * matches an ordinary object spread inside a handler — `onCancel={() => setWorkflows((prev) => ({
+ * ...prev, … }))}` — so a host that passed the prop was silently dropped from the comparison, the
+ * component fell to one host, and the check skipped it. It hid a real asymmetry
+ * (`WorkflowInlineForm.onCancel`) behind a rule meant to avoid false positives.
+ */
+function openingTags(src: string, name: string): Array<{ tag: string; spreads: boolean }> {
+  const out: Array<{ tag: string; spreads: boolean }> = [];
   const re = new RegExp(`<${name}(?![A-Za-z0-9_])`, 'g');
   let m: RegExpExecArray | null;
   while ((m = re.exec(src))) {
     let depth = 0;
     let quote: string | null = null;
     let tag = '';
+    let spreads = false;
     for (let i = m.index + m[0].length; i < src.length; i++) {
       const c = src[i];
       tag += c;
       if (quote) { if (c === quote) quote = null; continue; }
       if (c === '"' || c === "'" || c === '`') { quote = c; continue; }
-      if (c === '{') depth++;
-      else if (c === '}') depth--;
+      if (c === '{') {
+        // A JSX prop-spread is `{...x}` at the top level of the tag. Anything deeper is an
+        // object literal inside a prop value and says nothing about which props are passed.
+        if (depth === 0 && /^\{\s*\.\.\./.test(src.slice(i, i + 8))) spreads = true;
+        depth++;
+      } else if (c === '}') depth--;
       else if (c === '>' && depth <= 0) break;
     }
-    out.push(tag);
+    out.push({ tag, spreads });
   }
   return out;
 }
@@ -178,8 +236,6 @@ function openingTags(src: string, name: string): string[] {
 const passes = (tag: string, prop: string) => new RegExp(`\\b${prop}(\\s*[=}]|\\s*/?>)`).test(tag);
 /** Refinement 2 — a read-only/disabled placeholder is not a host that withheld a capability. */
 const degenerate = (tag: string) => /\breadOnly(\s*[/>]|\s*$)/.test(tag) || /\breadOnly=\{true\}/.test(tag);
-/** A spread could be carrying the prop; the scan cannot see through it, so it does not convict. */
-const spreads = (tag: string) => /\{\s*\.\.\./.test(tag);
 
 interface Violation { component: string; group: string[]; on: string[]; off: string[] }
 
@@ -199,22 +255,22 @@ function findViolations(): Violation[] {
     for (const m of src.matchAll(/export\s+(?:const|function)\s+([A-Z]\w*)/g)) names.add(m[1]);
 
     for (const name of names) {
-      const tags: string[] = [];
+      const mounts: Array<{ host: string; tag: string }> = [];
       for (const [hostFile, hostSrc] of SOURCES) {
         if (hostFile === file) continue;
-        for (const tag of openingTags(hostSrc, name)) {
-          if (degenerate(tag) || spreads(tag)) continue;
-          tags.push(`${relative(ROOT, hostFile)} ${tag}`);
+        for (const { tag, spreads } of openingTags(hostSrc, name)) {
+          // A real prop-spread could be carrying the prop and the scan cannot see through it.
+          if (degenerate(tag) || spreads) continue;
+          mounts.push({ host: relative(ROOT, hostFile), tag });
         }
       }
-      if (tags.length < 2) continue;
+      if (mounts.length < 2) continue;
 
       for (const unit of units) {
         if (unit.some((p) => EXEMPT[`${name}.${p}`])) continue;
         const on: string[] = [];
         const off: string[] = [];
-        for (const entry of tags) {
-          const [host, tag] = entry.split(' ');
+        for (const { host, tag } of mounts) {
           // A group is "offered" when the host passes ANY of it; withheld when it passes none.
           if (unit.some((p) => passes(tag, p))) on.push(host); else off.push(host);
         }

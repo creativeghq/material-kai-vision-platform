@@ -525,7 +525,7 @@ export const ProfileTab: React.FC = () => {
     reviewsAvg: 0,
     quotesCreated: 0,
     vrWorldsCreated: 0,
-    designerProjects: 0,
+    projectsCreated: 0,
     moodboardComments: 0,
   });
 
@@ -644,7 +644,12 @@ export const ProfileTab: React.FC = () => {
         supabase.from('moodboard_quote_requests').select('*', { count: 'exact', head: true }).eq('moodboard_creator_id', user.id),
         supabase.from('quotes').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
         supabase.from('vr_worlds').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('status', 'completed'),
-        supabase.from('designer_projects').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
+        // `projects`, not `designer_projects` (#378 D2). The old table has 0 rows, no writer
+        // anywhere and this count was its ONLY reader, so the tile could read nothing but 0
+        // forever — a metric that is a hidden zero rather than a value or a stated reason there
+        // is none. The live table is `projects`, which is what "Projects" means everywhere else
+        // in the product.
+        supabase.from('projects').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
       ]);
 
       // Moodboard views
@@ -700,7 +705,7 @@ export const ProfileTab: React.FC = () => {
         reviewsAvg: revAvg,
         quotesCreated: quotesCount ?? 0,
         vrWorldsCreated: vrCount ?? 0,
-        designerProjects: dpCount ?? 0,
+        projectsCreated: dpCount ?? 0,
         moodboardComments: mbComments,
       });
     } finally {
@@ -1326,7 +1331,7 @@ export const ProfileTab: React.FC = () => {
                   {[
                     { icon: FileText,      label: 'Quotes',    value: analytics.quotesCreated },
                     { icon: Sparkles,      label: 'VR worlds', value: analytics.vrWorldsCreated },
-                    { icon: Layers,        label: 'Projects',  value: analytics.designerProjects },
+                    { icon: Layers,        label: 'Projects',  value: analytics.projectsCreated },
                     { icon: MessageCircle, label: 'Comments',  value: analytics.moodboardComments },
                   ].map(({ icon: Icon, label, value }) => (
                     <div key={label} className="rounded-md bg-muted/40 p-1.5 text-center">

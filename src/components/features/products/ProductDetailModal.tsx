@@ -2228,20 +2228,45 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 quote-based platform, retail/wholesale/stock aren't tracked.
                 Quick quote/moodboard actions live in the DialogHeader. */}
 
-            {/* VR / Video / 3D Actions */}
-            {(onGenerateVR || onGenerateVideo || onUseIn3DScene) && currentImage?.url && (
+            {/*
+              Place it in a room — ALWAYS offered, never gated on a handler (#378 F4).
+
+              This was `{onUseIn3DScene && …}`, and only the agent chat passed the handler. The
+              same product opened from the admin catalogue, a moodboard, the product strip, the
+              dashboard, Discover or a quote's lines showed no such button — not disabled, absent.
+              Nine hosts, one capability, and nothing anywhere reported the other eight.
+
+              It has a destination that does not need the chat: the Room Planner already accepts
+              `?product=`, creates a layout when the workspace has none, and places the item at the
+              centre of the room. So the default behaviour lives HERE and the prop is an OVERRIDE
+              — the chat still prefills its composer instead. A host cannot withhold it by
+              forgetting, because there is nothing to remember.
+
+              Both routes involved sit behind `AuthGuard` and `/room-planner` adds no capability
+              guard, so every surface that can open this modal can also follow the link.
+            */}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-1.5 text-xs"
+                onClick={() => {
+                  if (onUseIn3DScene && currentImage?.url) onUseIn3DScene(currentImage.url, product.name);
+                  else navigate(`/room-planner?product=${encodeURIComponent(product.id)}`);
+                  onClose();
+                }}
+              >
+                <Box className="h-3.5 w-3.5" />
+                {onUseIn3DScene ? 'Use in 3D scene' : 'Place in a room'}
+              </Button>
+            </div>
+
+            {/* VR / Video — still handler-gated: both SPEND CREDITS and their output has nowhere
+                to land outside the agent chat yet. Exempted by name in gatedPropParity.test.ts
+                rather than passed everywhere, because a button that starts a paid job with no
+                surface to show the result is worse than no button. */}
+            {(onGenerateVR || onGenerateVideo) && currentImage?.url && (
               <div className="flex flex-wrap gap-2">
-                {onUseIn3DScene && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex items-center gap-1.5 text-xs"
-                    onClick={() => { onUseIn3DScene(currentImage.url, product.name); onClose(); }}
-                  >
-                    <Box className="h-3.5 w-3.5" />
-                    Use in 3D scene
-                  </Button>
-                )}
                 {onGenerateVR && (
                   <Button
                     variant="outline"

@@ -5169,8 +5169,8 @@
   {
     "name": "quotes-api",
     "tag": "Quotes",
-    "summary": "REST API for quote requests and proposals (customer-facing)",
-    "description": "Path-routed REST handler for quote requests and seller proposals. Supports creating quote requests from a quote, listing/getting quote requests, updating status, listing/getting proposals, and accepting/rejecting proposals. All operations scoped to the authenticated user.",
+    "summary": "REST API for quote requests (customer-facing)",
+    "description": "Path-routed REST handler for customer quote requests: create one from a quote, list/get the caller’s own, and update its status. All operations scoped to the authenticated user. The /proposals routes were removed with the `proposals` table on 2026-08-30 (#378 N9) — it was an abandoned second quoting system that never held a row. Live quotes are `quotes` / `quote_items`.",
     "security": [
       "supabaseJwt"
     ],
@@ -5230,31 +5230,6 @@
           }
         ],
         "response": "{data: quote_request}"
-      },
-      {
-        "name": "GET /proposals",
-        "summary": "List proposals for the user's quote requests",
-        "params": [],
-        "response": "{data: proposal[]}"
-      },
-      {
-        "name": "GET /proposals/:id",
-        "summary": "Get a specific proposal (ownership-verified)",
-        "params": [],
-        "response": "{data: proposal}"
-      },
-      {
-        "name": "PATCH /proposals/:id",
-        "summary": "Accept or reject a proposal",
-        "params": [
-          {
-            "name": "status",
-            "type": "string ('accepted'|'rejected')",
-            "required": true,
-            "desc": "Decision."
-          }
-        ],
-        "response": "{data: proposal}"
       }
     ]
   },

@@ -2307,3 +2307,77 @@ the agent chat before a prop makes sense; `WorldViewer.onRetry` on the property 
 **Watched to fire 2026-08-31**, three separate breaks, each naming the exact prop: dropping
 `allowCreate` from one Real Estate mount, dropping `canManageTypes`, and splitting `issueDoc` back
 into two optionals.
+
+### The same sweep, finished — and three ways the guard was wrong about itself — 2026-08-31
+
+F4, F5 and F6 closed the rest of the class, and each taught the guard something:
+
+- **F5 `WorldViewer.onRetry`** — a failed VR walkthrough offered Retry in the agent chat and, on
+  the property workbench, nothing but "Remove". Fixed by hoisting the workbench's own
+  `startWalkthrough` out of the Create button so Create and Retry are literally the same call,
+  passed as `onRetry` gated on `editable`. The public listing page still withholds it, and now for
+  a stated reason: retrying spends 18 credits and an anonymous visitor must not be able to.
+- **F4 `ProductDetailModal`** — "Use in 3D scene" was gated on a handler only the agent chat
+  passed, so eight other surfaces showed no such button. The strongest available fix was not to
+  pass the prop eight more times but to **remove the gate**: the Room Planner already accepts
+  `?product=`, creates a layout when the workspace has none and places the item, so the modal now
+  does that BY DEFAULT and the handler is only an override. A host cannot withhold a capability by
+  forgetting when there is nothing to remember. `onGenerateVR` / `onGenerateVideo` stay gated and
+  exempt with their reason — both spend credits and their output has nowhere to land outside the
+  chat (N7), and a button that starts a paid job with no surface to show the result is worse than
+  no button.
+- **F6 `WorkflowInlineForm.onCancel`** — a false positive, exempted with the evidence: the wizard
+  gives the step *richer* escapes in its own footer ("Or describe in your own words", "Skip step"),
+  and a Cancel inside a wizard step has no defined meaning that skip/abort do not already have.
+
+**Three defects in the guard itself, all found by watching its output rather than by reasoning:**
+
+1. **It was passing vacuously on one axis.** Hosts were collected into a string joined with a
+   separator and split again, and the separator had become a NUL byte — which git then treated as
+   a binary file. The join and the split agreed, so the three original breaks still fired and the
+   fault was invisible. Replaced with an object array: no delimiter, nothing to disagree about.
+2. **A prop-spread check was dropping real hosts.** `{...` was tested against the whole tag, so an
+   ordinary object spread inside a handler (`onCancel={() => setX((prev) => ({ ...prev }))}`)
+   read as a JSX prop-spread. That host was skipped, the component fell to one host, and the check
+   passed. Made depth-aware: only `{...x}` at the top level of the tag is a prop-spread. Fixing it
+   immediately surfaced `WorkflowInlineForm.onCancel`, which it had been hiding.
+3. **"Used as a gate" was twice wrong, in opposite directions.** First too loose — `if (prop && …)`
+   and `prop ? 'a' : 'b'` are not gates, and counting them would have demanded F4 un-fix itself.
+   Then too tight — requiring `&& (` / `&& <` immediately after the prop made it blind to
+   `canManageTypes`, whose gates are `{prop && !lockedTypeKey && (` and
+   `action={prop ? <Button/> : undefined}`, and **break 2 silently stopped firing**. The rule now
+   reads line by line: `!!prop` always; `prop &&` unless it is an `if` condition; and
+   `prop ? <JSX> : undefined|null`, where the true branch must be JSX — because
+   `onRowClick ? 'cursor-pointer' : undefined` withholds an affordance on a row that is still
+   there, not an entry that vanishes.
+
+The lesson worth keeping: **a guard that is not watched to fire after every change to its own rule
+is not a guard.** Each of the three tightenings above looked correct and one of them silently
+disarmed a case that had been proven to work an hour earlier.
+
+### D2 — the residue nobody could see, cleared
+
+`proposals` went on 2026-08-30; the rest went today. `shopping_carts`, `cart_items` and
+`designer_projects` dropped after verifying, for each, 0 rows / 0 inbound foreign keys / 0 SQL
+functions / 0 views / 0 non-internal triggers. The `// Changed from cart_items` comment that was
+holding `cart_items` up in front of `deadSchema.test.ts` is gone with them, and a named regression
+keeps all four dropped — named individually, because the general check only convicts a table
+NOTHING mentions and each of these survived it at some point by being mentioned.
+
+The Profile "Projects" tile now counts `projects` instead of `designer_projects`, so it reads a
+real number rather than a permanent 0 beside real ones.
+
+**The published API spec was advertising three routes that 404.** `scripts/edge-endpoints.json`
+still declared `GET /proposals`, `GET /proposals/:id` and `PATCH /proposals/:id`, and
+`public/api/openapi-edge.json` is built from it — so an integrator reading the public spec saw a
+quoting API that had been deleted. Removed and the spec rebuilt, with the removal explained in the
+description rather than silently dropped.
+
+**A sub-route parity guard was attempted and rejected on measurement**, which is worth recording
+so nobody re-runs it expecting findings. `edgeEndpointsCoverage.test.ts` checks FUNCTION-level
+parity, so a dead route inside a live function is invisible to it. Extending it needs the action's
+identifying token, and the spec's 626 actions come in three unrelated naming shapes — only 4 are
+`METHOD /path`. The best rule found flagged 10 of 232 checkable actions, and every one sampled was
+a naming mismatch rather than a dead route. A guard that needs a ten-entry exemption list on the
+day it ships is the "list of the sites somebody already looked at" failure this repo names
+elsewhere.
