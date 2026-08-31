@@ -205,6 +205,20 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // A supplier workspace that has not finished its claim lands on the page's own "claim your
   // identity" empty state, which is the correct next step for them rather than a dead end.
   { id: 'supplier-portal', label: 'Supplier Portal', path: '/supplier-portal', icon: Store, requireSupplierWorkspace: true, surface: 'app', hub: 'finance', description: 'Purchase orders sent to you as a claimed supplier — confirm and mark shipped.' },
+  // Page Monitoring (#331) — watch a page you do NOT control and report the diff. Shipped with NO
+  // surface linking it at all; the route existed and the only way in was typing the URL.
+  //
+  // It sat in Marketing until 2026-08-31, next to Social and SEO, because "watches a web page"
+  // reads as a marketing verb. It is not one here: the default category is `supplier_terms`, and
+  // what this actually watches is a supplier's payment terms, MOQ and price list — the same
+  // relationship Payables and the Supplier Portal are about. Whoever deals with that supplier is
+  // who needs to hear the terms changed, and they do not open the Marketing hub.
+  //
+  // Deliberately NO moduleSlug even though `page-monitoring` is a real, enabled `modules` row:
+  // the launcher hides a tile whose module a workspace is not entitled to, and this needs no
+  // entitlement — it is a workspace-scoped tool like the other ungated ones. The page itself
+  // reads the module flag and says so when an operator has switched it off.
+  { id: 'page-monitoring', label: 'Page Monitoring', path: '/monitoring/pages', icon: FileSearch, surface: 'app', hub: 'finance', description: 'Watch a page you do not control — a supplier price list, a competitor spec — and see what changed.' },
   // Contracts & e-signature — agent-driven (Trinity); the send-for-signature is confirm-gated.
   { id: 'contracts', label: 'Contracts', path: '/agent-hub?capability=contract', icon: FileSignature, requireCapability: 'agent.use', moduleSlug: 'contracts', surface: 'app', hub: 'finance', description: 'List contracts and send drafts for e-signature — in the AI studio.' },
   // HR module: appears only when the workspace is entitled to 'hr' AND the persona holds
@@ -240,11 +254,6 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // get_workspace_module_access only returns published modules — gating on it would hide the tile
   // from everyone, root workspace included. Add the slug here the day the module is published.
   { id: 'mention-monitoring', label: 'Mention Monitoring', path: '/mention-monitoring', icon: Radar, requireRole: 'admin', surface: 'app', hub: 'marketing', description: 'Track where your brand is mentioned across the web.' },
-  // Page Monitoring (#331) — watch a non-product page and report the diff. Shipped with NO surface
-  // linking it at all; the route existed and the only way in was typing the URL. Carries no module
-  // and no capability of its own, so it is gated like the other workspace-scoped tools: nesting it
-  // under a paid tile would hide it behind an add-on it does not need.
-  { id: 'page-monitoring', label: 'Page Monitoring', path: '/monitoring/pages', icon: FileSearch, surface: 'app', hub: 'marketing', description: 'Watch any page — a supplier price list, a competitor spec — and see what changed.' },
   // Platform-wide buyer demand. Per-supplier analytics are NOT here — they live on the CRM
   // company's Market tab, keyed on brand_company_id (#350). The old 'factory' role gate went with
   // them: it resolved from user_profiles.factory_verified, which no account has ever held, so this
@@ -391,10 +400,13 @@ export const BOTTOM_NAV_PRIORITY: readonly string[] = [
   'seo-websites',
   'automations',
   'mention-monitoring',
-  'page-monitoring',
   // Cross-cutting
   'templates',
   // Niche / role-specific
   'market-trends',
   'supplier-portal',
+  // Sits with the supplier surfaces rather than under Marketing, matching its Hub — what it
+  // actually watches is a supplier's terms page, and it is niche enough never to earn a slot
+  // in the visible bottom four.
+  'page-monitoring',
 ];
