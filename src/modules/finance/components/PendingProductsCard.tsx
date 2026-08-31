@@ -107,6 +107,7 @@ import {
   type PriceRung, type Warehouse, type OntologyGap,
 } from '@/services/warehouseService';
 import { QuickAddCompanyDialog } from '@/components/business/crm/QuickAddCompanyDialog';
+import { OntologyGapsDialog } from '@/modules/finance/components/OntologyGapsDialog';
 import { parseSupplierLine, type ParsedSupplierLine } from '@/modules/finance/utils/parseSupplierLine';
 import {
   VAT_PCT_BY_CATEGORY, vatPctForCategory, resolveIntakeUnit, netValueDrift,
@@ -336,6 +337,7 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
    * it, which is why the list is ranked by how many lines that is.
    */
   const [ontologyGaps, setOntologyGaps] = useState<OntologyGap[]>([]);
+  const [gapsOpen, setGapsOpen] = useState(false);
   useEffect(() => { setTargetWarehouse((cur) => cur || defaultWh); }, [defaultWh]);
 
   // Debounce the search box: each keystroke would otherwise re-query the whole queue.
@@ -611,8 +613,24 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
             {ontologyGaps.length > 6 && (
               <span className="text-[11px] text-muted-foreground">+{ontologyGaps.length - 6} more</span>
             )}
+            {/* An empty surface must offer the way out of being empty; so must a blocked one. */}
+            <Button size="sm" variant="outline" className="ml-auto h-6 rounded-sm text-[11px]"
+              onClick={() => setGapsOpen(true)}>
+              Resolve names
+            </Button>
           </div>
         </div>
+      )}
+
+      {gapsOpen && (
+        <OntologyGapsDialog
+          open={gapsOpen}
+          onOpenChange={setGapsOpen}
+          workspaceId={workspaceId}
+          // Re-read the queue: a resolved supplier changes what its lines can price at, and the
+          // banner above must stop claiming a name is unknown the moment it is not.
+          onChanged={() => { void load(); }}
+        />
       )}
 
       <CardContent className="p-0">

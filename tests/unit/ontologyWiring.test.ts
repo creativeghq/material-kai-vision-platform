@@ -28,6 +28,8 @@ const INDEX = sourceIndex({ exclude: ['_generated'], filter: (p) => p !== 'src/i
 const SERVICE = 'src/services/warehouseService.ts';
 /** The surface that both feeds the ontology and shows what it found. */
 const INTAKE_UI = 'src/modules/finance/components/PendingProductsCard.tsx';
+/** Where a human actually decides — the half that makes the governance claim true. */
+const RESOLVER_UI = 'src/modules/finance/components/OntologyGapsDialog.tsx';
 
 /**
  * Mirrors the seeded `ontology_concept_types.key` values. The table is operator-owned and
@@ -81,6 +83,38 @@ describe('the ontology is reached', () => {
     const ui = strippedSource(INTAKE_UI);
     expect(ui.includes('scanIntakeTerms'), `${INTAKE_UI} never scans, so no gap is ever recorded`).toBe(true);
     expect(ui.includes('ontologyGaps'), `${INTAKE_UI} never reads the work list`).toBe(true);
+  });
+
+  /**
+   * The resolver is where a human actually decides, so it is the half that makes the governance
+   * claim true rather than aspirational. A dialog nobody mounts is as inert as the layer was —
+   * the same failure one level up, and exactly how `price_my_spec` stayed unreachable behind a
+   * perfect push site.
+   */
+  it('the resolution screen is mounted and can confirm', () => {
+    const all = INDEX.all();
+    expect(
+      /<OntologyGapsDialog\b/.test(all),
+      'OntologyGapsDialog is never rendered, so the work list has no way to be cleared',
+    ).toBe(true);
+    const dialog = strippedSource(RESOLVER_UI);
+    expect(dialog.includes('ontologyConfirm'), `${RESOLVER_UI} cannot confirm a binding`).toBe(true);
+    expect(dialog.includes('ontologyReject'), `${RESOLVER_UI} cannot reject a binding`).toBe(true);
+  });
+
+  /**
+   * The best outcome of resolving a SUPPLIER gap is not a binding at all: it is a CRM company
+   * carrying the issuer's VAT, because `_approve_pending_item_core` attributes by exact VAT match
+   * and would then answer for every line that issuer ever sends. Seeding only the name makes the
+   * operator retype the one thing the invoice already told us.
+   */
+  it('creating a supplier from a gap seeds the VAT we already have', () => {
+    const dialog = strippedSource(RESOLVER_UI);
+    expect(
+      /initialVat=\{[\s\S]{0,200}issuer_vat/.test(dialog),
+      `${RESOLVER_UI} opens the create dialog without the issuer VAT, so the exact-match path `
+      + 'that would make the binding unnecessary is left to chance',
+    ).toBe(true);
   });
 
   /**
