@@ -132,18 +132,31 @@ export interface InboundDocument {
  */
 export const INBOUND_LIST_LIMIT = 2000;
 
-/** One supplier's unfiled pile, from `inbound_backlog_by_issuer`. */
-export interface IssuerBacklogRow {
+/**
+ * One expense supplier, from `inbound_issuers_summary`. Every figure here is DERIVED in SQL —
+ * the client formats them and never re-counts a pile it can only see one page of.
+ */
+export interface ExpenseIssuerRow {
   issuer_vat: string;
   issuer_name: string | null;
+  /** Every document this ΑΦΜ has ever filed against us. */
   docs: number;
+  /** Still `new` AND still in the generic system bucket — i.e. what filing this row would move. */
+  unfiled: number;
+  /** How many became a supplier bill, so they actually reach Payables and the P&L. */
+  in_books: number;
   total_net: number | null;
+  total_gross: number | null;
   currency: string | null;
   first_issue_date: string | null;
   last_issue_date: string | null;
   /** Set once this supplier has been filed before — the next arrival lands here on its own. */
   learned_category_id: string | null;
   learned_category_name: string | null;
+  /** The CRM company this ΑΦΜ resolves to, matched on the normalised VAT key. Null = not in CRM. */
+  crm_company_id: string | null;
+  crm_company_name: string | null;
+  crm_is_supplier: boolean | null;
 }
 
 export const inboundService = {
@@ -219,20 +232,29 @@ export const inboundService = {
    * CRM company created today instantly claims documents polled months ago, and nothing ever
    * needs backfilling. Matched on the raw string, the digits-only form and the EL-prefixed form,
    * because myDATA sends '099430615' where a CRM row may hold 'EL099430615'.
+   *
+   * Returns the TOTAL alongside the page for the same reason [[list]] does: the biggest issuer
+   * on this workspace has 206 documents and the old cap was 200, so its history rendered as a
+   * complete list that was quietly missing its oldest six.
    */
-  async listForIssuerVat(workspaceId: string, vat: string, limit = 200): Promise<InboundDocument[]> {
+  async listForIssuerVat(
+    workspaceId: string,
+    vat: string,
+    limit = 500,
+  ): Promise<{ rows: InboundDocument[]; total: number }> {
     const digits = (vat ?? '').replace(/\D/g, '');
-    if (!digits) return [];
+    if (!digits) return { rows: [], total: 0 };
     const forms = Array.from(new Set([vat.trim(), digits, `EL${digits}`].filter(Boolean)));
-    const { data, error } = await supabase
+    const { data, error, count } = await supabase
       .from('inbound_documents')
-      .select('*')
+      .select('*', { count: 'exact' })
       .eq('workspace_id', workspaceId)
       .in('issuer_vat', forms)
       .order('issue_date', { ascending: false, nullsFirst: false })
       .limit(limit);
     if (error) throw error;
-    return (data ?? []) as InboundDocument[];
+    const rows = (data ?? []) as InboundDocument[];
+    return { rows, total: count ?? rows.length };
   },
 
   /**
@@ -328,22 +350,26 @@ export const inboundService = {
     if (error) throw error;
   },
 
-  /** Assign / clear the internal finance category on an inbound (myDATA) document. */
   /**
-   * The unfiled backlog, grouped by SUPPLIER — because that is the unit of the decision.
+   * The expenses inbox grouped by SUPPLIER — because that is the unit of every decision made
+   * about it.
    *
    * 1,866 myDATA documents arrived and every one sits in the generic myAADE bucket that
    * `finance-inbound-sync` stamps on arrival. Filing them one at a time is 1,866 decisions;
    * grouped by issuer it is 241, and the top 45 issuers carry 1,324 of the documents — 71%.
    * A supplier's invoices almost always belong in one category, so this is the queue that
    * actually clears.
+   *
+   * Returns EVERY issuer, not only the ones with something outstanding: this is the surface a
+   * supplier's history is read from, and a list that empties itself as the backlog clears would
+   * answer "who do we buy from?" with a blank page.
    */
-  async backlogByIssuer(workspaceId: string): Promise<IssuerBacklogRow[]> {
-    const { data, error } = await (supabase as any).rpc('inbound_backlog_by_issuer', {
+  async issuersSummary(workspaceId: string): Promise<ExpenseIssuerRow[]> {
+    const { data, error } = await (supabase as any).rpc('inbound_issuers_summary', {
       p_workspace_id: workspaceId,
     });
     if (error) throw error;
-    return (data ?? []) as IssuerBacklogRow[];
+    return (data ?? []) as ExpenseIssuerRow[];
   },
 
   /**
@@ -367,6 +393,7 @@ export const inboundService = {
     return Number(data ?? 0);
   },
 
+  /** Assign / clear the internal finance category on an inbound (myDATA) document. */
   async setCategory(docId: string, categoryId: string | null): Promise<void> {
     const { error } = await supabase.from('inbound_documents').update({ category_id: categoryId, updated_at: new Date().toISOString() }).eq('id', docId);
     if (error) throw error;

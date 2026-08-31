@@ -78,6 +78,7 @@ import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog'
 import { PlanningTab } from '@/modules/finance/tabs/PlanningTab';
 import { ReportsTab } from '@/modules/finance/tabs/ReportsTab';
 import { MydataBookTab } from '@/modules/finance/tabs/MydataBookTab';
+import { ExpenseSuppliersTab } from '@/modules/finance/tabs/ExpenseSuppliersTab';
 import { TimeBillingTab } from '@/modules/finance/tabs/TimeBillingTab';
 import { PartiesTab } from '@/modules/finance/tabs/PartiesTab';
 import { SettingsTab } from '@/modules/finance/tabs/SettingsTab';
@@ -89,7 +90,7 @@ import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsM
 import DocumentsView from '@/modules/finance/pages/DocumentsPage';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
 import SupplierPortalPage from '@/pages/SupplierPortalPage';
-import { FileText, FileMinus, Banknote, Truck, FileSignature, PackageCheck, ShoppingCart, PackageSearch, Pencil, Layers, CheckCircle2 } from 'lucide-react';
+import { FileText, FileMinus, Banknote, Truck, FileSignature, PackageCheck, ShoppingCart, PackageSearch, Pencil, Layers, CheckCircle2, Building2 } from 'lucide-react';
 import { HubEmptyState, HubRailSectionLabel } from '@/components/core/hub';
 import { EditSupplierBillDialog } from '@/modules/finance/components/EditSupplierBillDialog';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -573,9 +574,20 @@ const FinancePage: React.FC = () => {
 
               <HubRailSectionLabel>Documents</HubRailSectionLabel>
               {DOC_TABS.map((d) => (
-                <TabsTrigger key={d.value} value={d.value} className="w-full justify-start">
-                  <d.icon className="h-4 w-4 mr-2" /> {d.label}
-                </TabsTrigger>
+                <React.Fragment key={d.value}>
+                  <TabsTrigger value={d.value} className="w-full justify-start">
+                    <d.icon className="h-4 w-4 mr-2" /> {d.label}
+                  </TabsTrigger>
+                  {/* Sits next to Expenses because it is the same inbox read the other way
+                      round — by issuer rather than by document. It used to be a panel ON the
+                      Expenses list, where it pushed the documents that tab exists to show below
+                      the fold. */}
+                  {d.value === FINANCE_TAB.expenses && (
+                    <TabsTrigger value={FINANCE_TAB.expenseSuppliers} className="w-full justify-start">
+                      <Building2 className="h-4 w-4 mr-2" /> By Supplier
+                    </TabsTrigger>
+                  )}
+                </React.Fragment>
               ))}
               <HubRailSectionLabel>Tools</HubRailSectionLabel>
 
@@ -1256,6 +1268,11 @@ const FinancePage: React.FC = () => {
               {d.type === 'orders' ? <OrdersPanel workspaceId={workspaceId} /> : <DocumentsView embeddedType={d.type} />}
             </TabsContent>
           ))}
+
+          {/* ─────────── EXPENSES BY SUPPLIER (the same inbox, grouped by issuer) ─────────── */}
+          <TabsContent value={FINANCE_TAB.expenseSuppliers} className="space-y-4">
+            <ExpenseSuppliersTab workspaceId={workspaceId} categories={categories} onFiled={() => loadAll(workspaceId)} />
+          </TabsContent>
 
           {/* ─────────── PLANNING ─────────── */}
           <TabsContent value="planning" className="space-y-4">

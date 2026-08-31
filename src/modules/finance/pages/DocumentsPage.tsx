@@ -7,7 +7,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { Loader2, Plus, FileText, Receipt, Wallet, Tags, Repeat, Pause, Play, Trash2, Truck, ChevronDown, Send } from 'lucide-react';
+import { Loader2, Plus, FileText, Receipt, Wallet, Tags, Repeat, Pause, Play, Trash2, Truck, ChevronDown, Send, Building2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -19,14 +19,13 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { financeService, formatMoney, type Invoice, type CreditNote, type SupplierCreditNote, type PaymentWithAllocation, type RecurringExpense } from '@/modules/finance/services/financeService';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
-import { FINANCE_BASE } from '@/modules/finance/routes';
+import { FINANCE_BASE, FINANCE_TAB, financeTabUrl } from '@/modules/finance/routes';
 import { inboundService, type InboundDocument } from '@/modules/finance/services/inboundService';
 import { deliveryNotesService, type DeliveryNote } from '@/modules/finance/services/deliveryNotesService';
 import { chequesService, type Cheque } from '@/modules/finance/services/chequesService';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsMenu';
 import { InboundDocActionsMenu } from '@/modules/finance/components/InboundDocActionsMenu';
-import { InboundBacklogCard } from '@/modules/finance/components/InboundBacklogCard';
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
 import { NewDeliveryNoteDialog } from '@/modules/finance/components/NewDeliveryNoteDialog';
 import { NewChequeDialog } from '@/modules/finance/components/NewChequeDialog';
@@ -392,6 +391,16 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
           <Tags className="h-3.5 w-3.5 mr-1" /> Income category
         </Button>
       )}
+      {/* The same inbox by ISSUER — filing a supplier once files their whole run and everything
+          that arrives afterwards. It used to be a panel on top of this list, which is why the
+          documents this tab exists to show started below the fold. */}
+      {type === 'expenses' && (
+        <Link to={financeTabUrl(FINANCE_TAB.expenseSuppliers)}>
+          <Button size="sm" variant="outline" title="Group this inbox by supplier — file in bulk, and see one supplier's whole history">
+            <Building2 className="h-3.5 w-3.5 mr-1" /> By supplier
+          </Button>
+        </Link>
+      )}
       {type === 'expenses' && canOperateFinance && (
         <Button size="sm" variant="outline" onClick={() => setCategoryKind('expense')} title="Add an internal expense category">
           <Tags className="h-3.5 w-3.5 mr-1" /> Expense category
@@ -454,18 +463,6 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
           {/* Content — the document-type nav lives in FinancePage's DOC_TABS sidebar. */}
           <div className="min-w-0 flex-1 space-y-3">
-            {/* The inbox arrives pre-stamped with the generic myAADE category, so nothing is
-                "uncategorised" and nothing looks wrong — it is simply all in one bucket. Filing
-                it document by document is thousands of decisions; by supplier it is a few
-                dozen, and each one files that supplier's future invoices too. Renders nothing
-                once the backlog is clear. */}
-            {type === 'expenses' && activeWorkspaceId && !isAccountant ? (
-              <InboundBacklogCard
-                workspaceId={activeWorkspaceId}
-                categories={categories}
-                onFiled={() => { void load(); }}
-              />
-            ) : null}
             {type === 'dispatch' ? (
               <>
                 <div className="flex items-center justify-between gap-2 flex-wrap">

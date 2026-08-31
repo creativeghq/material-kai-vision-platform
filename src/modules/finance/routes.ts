@@ -41,6 +41,8 @@ export const FINANCE_TAB = {
   creditNotes: 'doc_credit_notes',
   payments: 'doc_payments',
   expenses: 'doc_expenses',
+  /** The same inbox seen by ISSUER — filing, the CRM link, and one supplier's whole history. */
+  expenseSuppliers: 'expense_suppliers',
   deliveryNotes: 'doc_delivery',
   cheques: 'doc_cheques',
   parties: 'parties',
