@@ -29,6 +29,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { FlowBuilderTab } from '@/components/Admin/FlowsManagement/FlowBuilderTab';
 import { flowService } from '@/services/flows';
 import { PlatformDefaultsSection } from '../components/PlatformDefaultsSection';
+import { AutomationSuggestions } from '../components/AutomationSuggestions';
 
 interface WorkspaceFlow {
   id: string;
@@ -304,6 +305,17 @@ export default function FlowsPage() {
           </div>
         )}
         </div>
+
+        {/* What to automate, argued from what this user actually did — each suggestion carries the
+            count it rests on. Sits above the defaults because it is the answer to the question an
+            empty automations list leaves you holding. */}
+        <AutomationSuggestions
+          onOpenFlow={(id) => setBuilderFlowId(id)}
+          onChanged={() => {
+            setRefreshTick((t) => t + 1);
+            void load();
+          }}
+        />
 
         {/* Notifications this workspace gets from the platform's own seeded flows. Rendered even
             when the list above is empty — an owner drowning in inbox email arrives here looking

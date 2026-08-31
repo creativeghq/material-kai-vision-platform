@@ -626,6 +626,23 @@ export const conditionPaletteItems = paletteItems.filter(i => i.category === 'co
 export const actionPaletteItems = paletteItems.filter(i => i.category === 'action');
 
 /**
+ * The human name for a trigger, read from the palette — which is where these are already named,
+ * once, for all 133 of them.
+ *
+ * Anything that has to SAY "when X happens" needs this, and the temptation is a little local
+ * `Record<string, string>` covering the dozen triggers that surface happens to show. FlowsPage
+ * has exactly that map with 11 entries; a second reader adding a third copy is how a trigger ends
+ * up named two different things on two screens. Falls back to the raw event name with its
+ * separators opened up, so an unnamed trigger reads as words rather than rendering blank.
+ */
+export function triggerLabel(triggerType: string): string {
+  const hit = triggerPaletteItems.find(
+    (i) => (i.defaultData as { triggerType?: string }).triggerType === triggerType,
+  );
+  return hit?.label ?? triggerType.replace(/[_.]/g, ' ');
+}
+
+/**
  * The tenant-safe subset a workspace user may drop in the visual builder — DERIVED, not restated.
  *
  * This was a hand-typed list, and it had drifted WIDER than the enforcer, which is the dangerous
