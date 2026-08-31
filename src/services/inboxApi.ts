@@ -51,6 +51,13 @@ export interface InboxThread {
    * place the mailbox list learns who owns a conversation.
    */
   assignees?: InboxThreadAssignee[];
+  /**
+   * The active customer participant this thread is WITH, derived server-side by `list_threads` /
+   * `get_thread`. It is the seed for that person's character avatar everywhere the inbox draws
+   * their face — see `castSeedForThreadCounterparty`. NULL on an internal thread, which has no
+   * counterparty.
+   */
+  counterparty_participant_id?: string | null;
 }
 
 export interface InboxThreadAssignee {

@@ -63,6 +63,45 @@ export function castObjectFor(seed: string | null | undefined): {
 }
 
 /**
+ * ── One person, one seed ──
+ *
+ * The seed is the thing that decides WHICH of the 24 characters somebody gets, so two places
+ * seeding the same person differently is two different people on screen — and it is completely
+ * silent, because both faces load, both are from the cast, and both look designed.
+ *
+ * That is exactly what shipped: the conversation header seeded on the THREAD id and the message
+ * rows seeded on the SENDER PARTICIPANT id, so the counterparty of thread
+ * `d3a43bcd…` wore `cast/016` at the top of the screen and `cast/021` beside every one of his
+ * messages — a woman in the header, a man in the transcript, for one man. Nothing could catch it:
+ * a wrong seed is a valid string and a wrong face is a 200.
+ *
+ * So the seed is the COUNTERPARTY'S PARTICIPANT ROW, everywhere, and these two functions are the
+ * only places that decide it. The participant id and not the contact id: a WhatsApp number is
+ * filed into the CRM later, and seeding on `contact_id` would hand somebody a new face on the day
+ * their record is tidied up — the failure this module's header warns about, one column over. Not
+ * the thread id either: a thread can hold two customers (one does), and they must not share a
+ * face.
+ */
+
+/** The seed for the face of a thread's counterparty — the header, the list row, the drawer, the rail. */
+export function castSeedForThreadCounterparty(
+  thread: { counterparty_participant_id?: string | null; id?: string | null } | null | undefined,
+  fallback?: string | null,
+): string | null {
+  // `counterparty_participant_id` is attached by inbox-api (`list_threads` / `get_thread`). The
+  // thread id remains the floor for an INTERNAL thread, which has no counterparty at all.
+  return thread?.counterparty_participant_id || thread?.id || fallback || null;
+}
+
+/** The seed for the face beside one message — the same key, read off the message. */
+export function castSeedForSender(
+  message: { sender_participant_id?: string | null } | null | undefined,
+  fallback?: string | null,
+): string | null {
+  return message?.sender_participant_id || fallback || null;
+}
+
+/**
  * A ready-to-render URL for a seed's character.
  *
  * `generation-images` is public-read, so this is a plain public URL rather than a signed one. It

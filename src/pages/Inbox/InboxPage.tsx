@@ -16,7 +16,7 @@ import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 import { marketplaceService } from '@/services/marketplaceService';
 import { messagingService } from '@/modules/messaging/services/messagingService';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
-import { castObjectFor } from '@/utils/characterAvatar';
+import { castObjectFor, castSeedForThreadCounterparty, castSeedForSender } from '@/utils/characterAvatar';
 import { moodStyle, urgencyLabel, urgencyIsLoud } from '@/utils/conversationMood';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useToast } from '@/hooks/use-toast';
@@ -1611,7 +1611,7 @@ function castAvatarSrc(seed: string | null | undefined): string {
 }
 
 const ThreadAvatar: React.FC<{
-  thread?: Pick<InboxThread, 'id' | 'metadata'> | null;
+  thread?: Pick<InboxThread, 'id' | 'metadata' | 'counterparty_participant_id'> | null;
   name: string;
   className?: string;
   fallbackClassName?: string;
@@ -1638,11 +1638,18 @@ const ThreadAvatar: React.FC<{
    * 0/516 contacts). So this is not a placeholder waiting for something better — it is the
    * avatar, and it should look like it was designed rather than like a missing image.
    *
-   * Seeded on the THREAD ID, never the name. A name gets corrected, re-capitalised, or arrives
-   * one way from WhatsApp and another from the CRM, and seeding on it would recolour someone
-   * every time their record is tidied.
+   * Seeded on the COUNTERPARTY'S PARTICIPANT ROW, never the name and never the thread. A name
+   * gets corrected, re-capitalised, or arrives one way from WhatsApp and another from the CRM,
+   * and seeding on it would recolour someone every time their record is tidied. The thread was
+   * the first answer and it was wrong for a quieter reason: the message rows below seed on the
+   * SENDER participant, so header and transcript hashed to different cast slots and one man was
+   * drawn as a woman at the top of his own conversation. `castSeedForThreadCounterparty` and
+   * `castSeedForSender` are now the only two places that decide, and they agree by construction.
    */
-  const generated = useMemo(() => castAvatarSrc(thread?.id ?? name), [thread?.id, name]);
+  const generated = useMemo(
+    () => castAvatarSrc(castSeedForThreadCounterparty(thread, name)),
+    [thread?.counterparty_participant_id, thread?.id, name],
+  );
 
   /*
    * The mood the conversation was last read as, worn by the face.
@@ -2147,11 +2154,12 @@ const MessageBubble: React.FC<{
           row of grey initials is the permanent state rather than a brief one.
 
           The agent keeps its glyph — it is not a person and should not be given a person's mark.
-          Seeded on the participant id so one sender is one mark for the whole thread.
+          Seeded on the participant id so one sender is one mark for the whole thread — and it is
+          the SAME key the header seeds on, which is the thing that was not true before.
         */}
         {!isAgent && (
           <AvatarImage
-            src={info?.avatarUrl || castAvatarSrc(m.sender_participant_id ?? displayLabel)}
+            src={info?.avatarUrl || castAvatarSrc(castSeedForSender(m, displayLabel))}
             alt={displayLabel ?? ''}
             className="object-cover"
           />

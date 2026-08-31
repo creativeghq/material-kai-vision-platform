@@ -91,6 +91,29 @@ interface Attachment {
 const ACTIVE_MEMBER = (s: string | null | undefined) => !s || s === 'active';
 const BUSINESS_ROLES = new Set(['owner', 'admin', 'member', 'staff', 'sales']);
 
+/**
+ * Who a thread is WITH — the active customer participant, earliest joined.
+ *
+ * Returned to the client as `counterparty_participant_id` so every place that draws this person's
+ * face seeds on the same row. The inbox used to seed the header on the THREAD id and each message
+ * on the SENDER PARTICIPANT id, which is two hashes, two cast slots and two faces for one man.
+ * Deriving it here rather than in the client is what stops the mailbox list, the header and the
+ * transcript each answering "who is this thread with" separately.
+ *
+ * Ordered, not just picked: one live thread carries two customers, and `.find()` on an unordered
+ * PostgREST result would swap their faces between page loads.
+ *
+ * NULL for an internal (team) thread, which genuinely has no counterparty.
+ */
+function counterpartyParticipantId(
+  rows: Array<{ id: string; participant_type: string; status?: string; joined_at?: string | null }>,
+): string | null {
+  const customers = rows
+    .filter((p) => p.participant_type === 'customer' && (!p.status || p.status === 'active'))
+    .sort((a, b) => (a.joined_at || '').localeCompare(b.joined_at || '') || a.id.localeCompare(b.id));
+  return customers[0]?.id ?? null;
+}
+
 /** Global platform operator: admin/super_admin global role OR owner/admin of the root workspace. */
 async function isOperator(db: DbClient, userId: string): Promise<boolean> {
   const { data: prof } = await db
@@ -2235,14 +2258,24 @@ async function handleJwtAction(
       // is modelled as a participant row, not a column on the thread, so the mailbox list had no
       // way to show or filter by who owns a conversation without this second round trip.
       const assigneesByThread = new Map<string, Array<{ user_id: string; name: string; thread_role: string }>>();
+      // ...and the COUNTERPARTY, from the same rows — see `counterpartyParticipantId`. The list
+      // row draws that person's face, and it has to be the face the open thread draws.
+      const counterpartyByThread = new Map<string, string>();
       if (threadIds.length) {
         const { data: parts } = await db.from('inbox_participants')
-          .select('thread_id, user_id, thread_role')
+          .select('id, thread_id, participant_type, user_id, thread_role, joined_at')
           .in('thread_id', threadIds)
-          .eq('participant_type', 'member')
-          .eq('status', 'active')
-          .not('user_id', 'is', null);
-        const partRows = (parts || []) as Array<{ thread_id: string; user_id: string; thread_role: string }>;
+          .eq('status', 'active');
+        const allRows = (parts || []) as Array<{
+          id: string; thread_id: string; participant_type: string;
+          user_id: string | null; thread_role: string; joined_at: string | null;
+        }>;
+        for (const id of threadIds) {
+          const cp = counterpartyParticipantId(allRows.filter((p) => p.thread_id === id));
+          if (cp) counterpartyByThread.set(id, cp);
+        }
+        const partRows = allRows.filter((p) => p.participant_type === 'member' && p.user_id) as
+          Array<{ user_id: string; thread_id: string; thread_role: string }>;
         const assigneeIds = [...new Set(partRows.map((p) => p.user_id))];
         const nameById = new Map<string, string>();
         if (assigneeIds.length) {
@@ -2268,7 +2301,12 @@ async function handleJwtAction(
         const unread = lastReadByThread.has(id)
           ? (!lr || new Date(String(t.last_message_at)) > new Date(lr))
           : true;
-        return { ...t, unread, labels: labelsByThread.get(id) || [], assignees: assigneesByThread.get(id) || [] };
+        return {
+          ...t, unread,
+          labels: labelsByThread.get(id) || [],
+          assignees: assigneesByThread.get(id) || [],
+          counterparty_participant_id: counterpartyByThread.get(id) ?? null,
+        };
       });
       return json({ threads: enriched });
     }
@@ -2314,7 +2352,17 @@ async function handleJwtAction(
 
       // The thread row itself carries the routing metadata the relay reads — the mailbox we send
       // from, the provider conversation id — plus assignment and internal counters.
-      const threadForCaller = isMember ? thread : {
+      //
+      // `counterparty_participant_id` rides along for the same reason `list_threads` returns it:
+      // the header and the message rows must seed one person's face on one row. Derived from the
+      // participants just fetched, so it costs nothing. Member-only — the customer projection
+      // below is a deliberate narrowing (#359 CM-10) and nothing on that path draws a cast face.
+      const threadForCaller = isMember ? {
+        ...thread,
+        counterparty_participant_id: counterpartyParticipantId(
+          (participants || []) as unknown as Array<{ id: string; participant_type: string; status?: string; joined_at?: string | null }>,
+        ),
+      } : {
         id: thread.id,
         subject: thread.subject,
         status: thread.status,

@@ -7,7 +7,10 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { CAST_SIZE, castSlotFor, castObjectFor, castAvatarUrl } from '../../src/utils/characterAvatar';
+import {
+  CAST_SIZE, castSlotFor, castObjectFor, castAvatarUrl,
+  castSeedForThreadCounterparty, castSeedForSender,
+} from '../../src/utils/characterAvatar';
 
 const API = readFileSync(
   join(process.cwd(), 'supabase', 'functions', 'messaging-api', 'index.ts'), 'utf8');
@@ -61,5 +64,60 @@ describe('character avatar cast', () => {
     // A safety refusal on one prompt or a rate limit is the normal failure here, and "9 of 12"
     // must not read as a complete cast.
     expect(API).toMatch(/made\.length === count/);
+  });
+});
+
+/**
+ * One person is ONE face.
+ *
+ * The inbox draws a counterparty five times — list row, header, message rows, profile drawer,
+ * details rail — and the seed decides which of the 24 characters they get. Two sites seeding
+ * differently is two people on screen, and it is completely silent: both URLs load, both faces
+ * are from the cast, both look designed. Thread `d3a43bcd…` shipped exactly that — its header
+ * seeded on the thread id (`cast/016`, a woman) while every one of the man's messages seeded on
+ * his participant id (`cast/021`).
+ */
+describe('one person is one face', () => {
+  const THREAD = { id: 'd3a43bcd-1490-47c0-b10e-86e24ee8c37c' };
+  const CUSTOMER = 'bed5590f-483c-414e-9501-6a0e56666ffd';
+
+  it('gives the header and the message rows the same character', () => {
+    const thread = { ...THREAD, counterparty_participant_id: CUSTOMER };
+    const headerSeed = castSeedForThreadCounterparty(thread, 'Drosopoulos Dev.');
+    const bubbleSeed = castSeedForSender({ sender_participant_id: CUSTOMER }, 'Drosopoulos Dev.');
+    expect(headerSeed).toBe(bubbleSeed);
+    // The seeds agreeing is the mechanism; the SLOT agreeing is what the operator sees.
+    expect(castSlotFor(headerSeed)).toBe(castSlotFor(bubbleSeed));
+  });
+
+  it('is the historical regression, so the fix is watched to matter', () => {
+    // Seeding the header on the thread id — what it used to do — picks a different character.
+    // If this ever stops being true the test above has stopped proving anything.
+    expect(castSlotFor(THREAD.id)).not.toBe(castSlotFor(CUSTOMER));
+  });
+
+  it('never seeds on the name, which is edited', () => {
+    // A WhatsApp push name, then the CRM name, then a tidy-up: seeding on it is a new face each
+    // time. The fallback is only reached when there is no participant AND no thread.
+    const named = { id: 't-1', counterparty_participant_id: 'p-1' };
+    expect(castSeedForThreadCounterparty(named, 'Κώστας')).toBe('p-1');
+    expect(castSeedForThreadCounterparty({ ...named, counterparty_participant_id: null }, 'Κώστας')).toBe('t-1');
+  });
+
+  it('keeps two customers in one thread apart', () => {
+    // One live thread has two customer participants. Collapsing the message rows onto the thread
+    // id — the other way to make these agree — would draw both of them as the same person.
+    expect(castSlotFor(castSeedForSender({ sender_participant_id: 'p-a' })))
+      .not.toBe(castSlotFor(castSeedForSender({ sender_participant_id: 'p-b' })));
+  });
+
+  it('is derived server-side, not re-answered per screen', () => {
+    // The mailbox list has no participants loaded, so if the field is not on the thread the list
+    // silently falls back to the thread id and the face changes the moment you click the row.
+    const EDGE = readFileSync(
+      join(process.cwd(), 'supabase', 'functions', 'inbox-api', 'index.ts'), 'utf8');
+    expect(EDGE).toMatch(/function counterpartyParticipantId/);
+    // Both readers of a thread must attach it — list_threads for the row, get_thread for the header.
+    expect(EDGE.match(/counterparty_participant_id/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
   });
 });
