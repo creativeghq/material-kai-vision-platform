@@ -246,6 +246,11 @@ describe('tenant flow vocabulary', () => {
     'seo.article_refresh_due', 'seo.site_health_changed', 'seo.report_ready',
     'seo.ranking_movement', 'seo.backlink_movement',
     'realestate.buyer_matches_found', 'realestate.new_listing_for_buyer',
+    // Opened 2026-08-31 — emitters verified to stamp workspace_id. `appointment_booked`
+    // stays out for the same reason it was removed: no workspace_id on the payload.
+    'order_dispatched', 'quote_requested', 'quote_pdf_generated',
+    'moodboard_created', 'moodboard_shared', 'freight_quote_requested',
+    'video_generation_completed', 'video_generation_failed',
   ];
   const RPC_ACTIONS = [
     'send_email', 'send_whatsapp', 'create_notification', 'send_agent_message', 'send_campaign',
@@ -406,6 +411,7 @@ describe('tenant flow vocabulary', () => {
       rfq_lines_priced:      'same site as rfq_lines_requested (the other status branch)',
       'seo.ranking_movement': "eventType parameter of maybeAlert(), supabase/functions/seo-domain-tracker — payload carries workspace_id: website.workspace_id",
       'seo.backlink_movement': 'same maybeAlert() helper as seo.ranking_movement',
+      order_dispatched:      "SQL: public._notify_order_dispatched — payload carries 'workspace_id'; confirmed against live flow_runs.trigger_event_data, which holds it on all 4,760 runs",
     };
 
     const offenders: string[] = [];

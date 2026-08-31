@@ -68,6 +68,12 @@ export const TENANT_TRIGGERS = [
   'seo.ranking_movement', 'seo.backlink_movement',
   // Real estate
   'realestate.buyer_matches_found', 'realestate.new_listing_for_buyer',
+  // Business events a workspace OWNS. Their emitters stamp workspace_id (verified 2026-08-31
+  // by reading each emit payload); without that a tenant flow can never match and never fires.
+  // `order_dispatched` is emitted from SQL by `_notify_order_dispatched`, which stamps it too.
+  'order_dispatched', 'quote_requested', 'quote_pdf_generated',
+  'moodboard_created', 'moodboard_shared', 'freight_quote_requested',
+  'video_generation_completed', 'video_generation_failed',
 ] as const;
 
 /**

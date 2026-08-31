@@ -298,6 +298,10 @@ export class QuotesService {
       user_id: user.id,
       name: quote.name,
       status: quote.status,
+      // Without this, flow-engine matches only `is_global` flows and a workspace's own
+      // automation on its own quote can never fire — the trigger would be offered and silently
+      // dead. The row was just inserted and selected, so the value is right here.
+      workspace_id: quote.workspace_id,
     });
 
     return quote;
