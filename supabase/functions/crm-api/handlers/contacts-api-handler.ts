@@ -5,6 +5,7 @@ import { authenticate } from '../../_shared/auth.ts';
 import { getCrmScope, scopeAllows, rowInScope, type CrmScope } from './_scope.ts';
 import { emitFlowEvent } from '../../_shared/flow-events.ts';
 import { foldForSearch, escapeLike } from '../../_shared/searchFold.ts';
+import { guardDuplicateParty } from './_partyDedupe.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -167,6 +168,16 @@ export async function handleContacts(req: Request): Promise<Response> {
           { status: 400, headers: corsHeaders },
         );
       }
+
+      // Server-side dedupe (#378 F2), the same guarantee `crm_companies` has had since #366 BU-3.
+      // The client-side rule — reach create only THROUGH a search that came back empty — held on
+      // the screens that opted into it and nowhere else, and it cannot hold at all for a caller
+      // that is not a screen (the agent, a partner `kai_` key, the API). One query on the same
+      // transliterated key immediately before the insert is the guarantee.
+      const contactDuplicate = await guardDuplicateParty(
+        supabase, 'crm_contacts', targetWs, name, body.allow_duplicate === true, corsHeaders,
+      );
+      if (contactDuplicate) return contactDuplicate;
 
       const { data, error } = await supabase
         .from('crm_contacts')

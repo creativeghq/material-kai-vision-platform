@@ -4692,11 +4692,18 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
         presetInvoiceId={order.order_type === 'sales' ? (fin?.invoices ?? []).find((iv) => Number(iv.amount_due) > 0)?.id : undefined}
         // Offered only while a SALES order has no sales document yet — once one exists, issuing a
         // second from a payment would duplicate the filing. A purchase order issues nothing.
-        fiscalDocKind={order.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0 ? salesDocKind : undefined}
-        fiscalDocReason={salesDocumentKindReason(buyerIdentity)}
-        // Forward the operator's pick. Dropping the argument here would make the dialog's
-        // τιμολόγιο/ΑΛΠ choice decorative — it would issue whatever the buyer rule derived.
-        onIssueDoc={(kind) => createSalesDocument(kind)}
+        //
+        // One object, so the OFFER and the ISSUER cannot be supplied apart (#378 F1): the kind is
+        // what puts the myDATA rows in the picker, and `issue` is what performs the filing.
+        // `issue` forwards the operator's pick — dropping the argument would make the dialog's
+        // τιμολόγιο/ΑΛΠ choice decorative, issuing whatever the buyer rule derived.
+        issueDoc={order.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0
+          ? {
+            kind: salesDocKind,
+            reason: salesDocumentKindReason(buyerIdentity),
+            issue: (kind) => createSalesDocument(kind),
+          }
+          : undefined}
         onSaved={() => { setPayInOpen(null); void load(order.id); onChanged(); }}
       />
     )}

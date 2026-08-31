@@ -910,6 +910,11 @@ export const ContactDetailPage: React.FC = () => {
                                   excludeCompanyIds={(contact.companies ?? []).map((c: any) => c.company_id)}
                                   placeholder="Search & attach a company…"
                                   selectedCompanyId={isNew ? (pendingCompanyId || null) : null}
+                                  // The employer that is not in the CRM yet (#378 F2). The link
+                                  // below creates a business FROM this contact — same name, same
+                                  // VAT — which is a different act and cannot stand in for
+                                  // "the company she actually works for".
+                                  allowCreate
                                 />
                                 {!isNew && (
                                   <button type="button" onClick={createBusinessFromContact} disabled={creatingBusiness} className="text-xs text-primary hover:underline disabled:opacity-50">

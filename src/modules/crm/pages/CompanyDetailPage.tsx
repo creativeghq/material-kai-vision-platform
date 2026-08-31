@@ -1289,6 +1289,12 @@ export const CompanyDetailPage: React.FC = () => {
                   excludeContactIds={company?.contacts?.map((c: any) => c.contact_id) || []}
                   placeholder="Search contacts..."
                   selectedContactId={selectedContactId || null}
+                  // Create the person you just searched for, from the search that did not find
+                  // them (#378 F2). Without it a name that is not in the CRM yet is a dead end on
+                  // this tab, and the way out is the New Contact tab beside it — a create path
+                  // that never ran a search. Both are duplicate-guarded server-side now; this one
+                  // additionally shows the misses first, which is the point of the rule.
+                  allowCreate
 />
               </TabsContent>
               <TabsContent value="new" className="mt-4 space-y-3">

@@ -275,8 +275,10 @@ export const contactsAPI = {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to create contact');
+      // Same shape as `createCompany` — the contact endpoint refuses a duplicate too (#378 F2),
+      // and flattening its 409 to a message string is what turns "we already have her" into a
+      // dead end the user solves by adding a digit to the name.
+      throw partyCreateError(await response.json(), 'Failed to create contact', 'duplicate_contact');
     }
 
     return response.json();
@@ -457,13 +459,34 @@ export const contactsAPI = {
 };
 
 /**
- * What `createCompany` throws when crm-api refuses the create because the workspace already
- * holds a business under that (folded) name. Carries the row it found so the caller can offer
- * it instead of just reporting a failure.
+ * What `createCompany` / `createContact` throw when crm-api refuses the create because the
+ * workspace already holds a party under that (transliterated, folded) name. Carries the row it
+ * found so the caller can offer it instead of just reporting a failure.
+ *
+ * One type for both kinds (#378 F2): the contact endpoint gained the same guarantee the company
+ * endpoint has had since #366 BU-3, and a second near-identical error type is how the caller ends
+ * up handling one of them and flattening the other into a toast.
  */
-export interface CreateCompanyError extends Error {
-  code?: 'duplicate_company';
+export interface CreatePartyError extends Error {
+  code?: 'duplicate_company' | 'duplicate_contact';
   existing?: { id: string; name: string };
+}
+
+/** @deprecated Use {@link CreatePartyError}. Kept so existing importers keep compiling. */
+export type CreateCompanyError = CreatePartyError;
+
+/** Carry crm-api's structured duplicate refusal through, rather than flattening it to a string. */
+function partyCreateError(
+  payload: { error?: string; code?: string; existing?: { id?: unknown; name?: unknown } },
+  fallback: string,
+  expected: 'duplicate_company' | 'duplicate_contact',
+): CreatePartyError {
+  const err = new Error(payload.error || fallback) as CreatePartyError;
+  if (payload.code === expected && payload.existing?.id) {
+    err.code = expected;
+    err.existing = { id: String(payload.existing.id), name: String(payload.existing.name ?? '') };
+  }
+  return err;
 }
 
 // Companies API
@@ -481,16 +504,10 @@ export const companiesAPI = {
     });
 
     if (!response.ok) {
-      const error = await response.json();
       // crm-api refuses a create whose folded name already exists in the workspace and returns
       // the row it found (#366 BU-3). Carry that through as structured data rather than flattening
       // it to a message string — the caller offers "use the existing one" instead of a dead end.
-      const err = new Error(error.error || 'Failed to create company') as CreateCompanyError;
-      if (error.code === 'duplicate_company' && error.existing?.id) {
-        err.code = 'duplicate_company';
-        err.existing = { id: String(error.existing.id), name: String(error.existing.name ?? '') };
-      }
-      throw err;
+      throw partyCreateError(await response.json(), 'Failed to create company', 'duplicate_company');
     }
 
     return response.json();

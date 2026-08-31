@@ -2229,3 +2229,81 @@ Recording these so they are not re-raised every time an advisor runs.
 | 87 of 106 active flows have never run | They are seeded defaults whose trigger events have not occurred on a platform holding 1 product — appointments, warranty expiry, card-spend thresholds. 12+ default flows HAVE fired, so the delivery mechanism is proven end to end. `flowEventContract.test.ts` already tracks emitter coverage informationally. |
 | The `email_stranded_queued` findings were "two customers never told their order shipped" | **They were not.** `delivery_notes` is empty, no order is named `DN-*`, and all 136 rows carried `to_email = 'null'` — the four-character STRING, which is why Resend refused them. Two subjects repeated ~68 times each over 2026-07-26→28, then stopped: a dev loop. Deleted 2026-08-14 (they were 136 of 150 rows, so every delivery dashboard read as catastrophically broken). **The bug behind them is still real** — a failed send left the row at `queued` with no failure marker and nothing retried or reported it. Only the customer impact was imagined, by reading a subject line instead of checking the document it named. |
 | `agent_memory_never_promoted` fires | The `runInBackground` repair shipped 2026-08-12 and **no agent chat has happened since 2026-08-08**. The probe is reporting pre-fix turns still inside its 30-day window. It cannot clear, or be validated, until someone sends one message. |
+
+## A capability gated on an optional prop — three surfaces, one guard — 2026-08-31
+
+`useInboundDocActions` (#378 F, `ca4d98931`) fixed one instance of a shape worth generalising:
+
+```ts
+const canAddDetail = needsDetail && … && !!onAddLineDetail && …;
+{canAddDetail && <DropdownMenuItem onClick={onAddLineDetail}>Add line detail</…>}
+```
+
+A host that omits the prop does not get a disabled entry, or an error, or a type failure — the
+entry is **not there**. The props must stay optional for the component to degrade, so the type
+system cannot see the omission, and a render test would have to prove a negative about a dropdown
+that is closed. This is the class-C defect of #378 (*"mounted on creation forms and nowhere else"*)
+with the mount **present** and silently thinner.
+
+Swept `src/` three ways — optional handler used as a render gate, optional boolean capability flag
+used as a render gate, and shared dialogs whose hosts disagree on optional props. Three real.
+
+### The offer and the issuer were two props, on the fiscal path
+
+`RecordPaymentDialog` took `fiscalDocKind` (which puts the myDATA rows in the picker) and
+`onIssueDoc` (which performs the filing) as independent optionals, ending in
+`if (issuesFiscal && onIssueDoc)`. A caller passing the first without the second offers *"Issue a
+retail receipt (ΑΛΠ) to myDATA"*, records the payment, issues nothing, and shows the success toast.
+Seven surfaces mount the dialog; one passes either, and it passes both — correct **by discipline,
+not by construction**. Folded into one `issueDoc: { kind, reason?, issue }` object, so the pairing
+is a type error. Same reasoning as `updateSupplierBillMeta`'s nested `link`: a caller able to set
+part of a set can leave the record with two answers to a question that has one.
+
+### The duplicate check was a client-side convention
+
+`ContactSearchDropdown` / `CompanySearchDropdown` document why create is reachable only *through* a
+search: the party has already been looked for, in Greek script and in Latin. `allowCreate` defaults
+false and was on at one mount, so on the CRM company card, the contact card and three Real Estate
+dialogs a name that is not in the CRM yet was a dead end — and the way out was to create the party
+somewhere unchecked. Real Estate said so in its own copy: *"New person? Create them in CRM first."*
+
+The client half is now on at all five. The server half is the part that matters: `crm_companies`
+has refused a duplicate fold since #366 BU-3 and `crm_contacts` never asked, on **either** of its
+two create paths — `POST /contacts` and the create-and-attach branch behind the company page's
+"New Contact" tab, which never passes through a search at all. `_partyDedupe.ts` is now the one
+implementation for both kinds, matching on `name_xscript` (`crm_translit(crm_fold(name))`), with
+the `allow_duplicate` escape hatch and the fail-closed rule on a failed lookup carried with it.
+
+Verified against the live DB rather than read: `crm_translit(crm_fold('Παπαδόπουλος'))` and
+`…('Papadopoulos')` both give `papadopoulos` and the plain fold does **not** match them, and a
+rolled-back insert confirmed the stored generated column equals the probe's key. 0 rows leaked.
+
+### An empty state that named the way out and did not offer it
+
+`PipelineBoard`'s empty state is `HubEmptyState` with
+`action={canManageTypes ? <Add a deal type> : undefined}`. Real Estate mounts it without the flag,
+so a workspace with no `real_estate` deal type — the only door to configuring that pipeline's
+stages, which are per deal type — reads *"Add one and its board appears here"* with no way to.
+**`emptyStates.test.ts` could not see it**: the surface IS `HubEmptyState` and it DOES pass
+`action`, conditionally, at one host. A component-level ratchet cannot see a prop-level gate.
+
+### The guard
+
+[tests/unit/gatedPropParity.test.ts](../tests/unit/gatedPropParity.test.ts): for every component
+with two or more hosts, an optional prop used as a render gate must be passed by all of them or
+none. Two refinements keep it from crying wolf, both found by verifying its own output:
+
+- **A gate that also needs host-owned STATE is configuration, not a capability.** `HubDataTable`
+  computes `selectable = !!selected && !!onSelectedChange`; a host with no selection state cannot
+  opt in and has lost nothing. Contrast the shape above, where the host supplies no data and the
+  prop is purely a switch, so omitting it can only be an oversight.
+- **A degenerate mount is not a host.** `IndustrySelect` renders a `readOnly` placeholder while it
+  loads. Requiring a create handler there is asking a spinner to offer a capability.
+
+`EXEMPT` is shrink-only and each entry names a reason a reader can check — including two that are
+still OPEN rather than fine (`ProductDetailModal`'s three actions, which need a destination outside
+the agent chat before a prop makes sense; `WorldViewer.onRetry` on the property workbench).
+
+**Watched to fire 2026-08-31**, three separate breaks, each naming the exact prop: dropping
+`allowCreate` from one Real Estate mount, dropping `canManageTypes`, and splitting `issueDoc` back
+into two optionals.

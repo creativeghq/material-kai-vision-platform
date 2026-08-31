@@ -40,7 +40,7 @@ const InlineLoader: React.FC = () => (
 );
 
 export default function RealEstatePage() {
-  const { activeWorkspaceId, loading: wsLoading } = useWorkspace();
+  const { activeWorkspaceId, loading: wsLoading, workspaceRole } = useWorkspace();
   const { can } = usePermissions();
   const { isModuleAvailable } = useEntitlements();
   const { toast } = useToast();
@@ -48,6 +48,14 @@ export default function RealEstatePage() {
   const [creating, setCreating] = useState(false);
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const canManage = can('realestate.listings.manage');
+  /**
+   * Same flag CRM passes (#378 F3). Without it `PipelineBoard`'s empty state renders
+   * "No deal types configured … Add one and its board appears here" with `action={undefined}` —
+   * a surface that names the way out of being empty and does not offer it, to an owner who can
+   * do it from /crm. The header's Types button stays hidden regardless, because it is gated on
+   * `!lockedTypeKey` and this board is locked to `real_estate`.
+   */
+  const isWsAdmin = workspaceRole === 'owner' || workspaceRole === 'admin';
   const ws = activeWorkspaceId;
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = searchParams.get('tab') || 'overview'; // deep-linkable from the App launcher
@@ -113,7 +121,7 @@ export default function RealEstatePage() {
           </TabsList>
           <TabsContent value="overview"><DashboardPanel ws={ws} /></TabsContent>
           {/* The board is a CRM object; Real Estate is one consumer of it, pinned to its own deal type. */}
-          <TabsContent value="pipeline"><PipelineBoard ws={ws} canManage={canManage} lockedTypeKey="real_estate" analyticsHref="/crm/pipeline/analytics" /></TabsContent>
+          <TabsContent value="pipeline"><PipelineBoard ws={ws} canManage={canManage} canManageTypes={isWsAdmin} lockedTypeKey="real_estate" analyticsHref="/crm/pipeline/analytics" /></TabsContent>
           <TabsContent value="listings"><ListingsPanel ws={ws} canManage={canManage} creating={creating} onCreate={createDraft} /></TabsContent>
           <TabsContent value="leads"><LeadsPanel ws={ws} canManage={canManage} /></TabsContent>
           <TabsContent value="buyers"><BuyersPanel ws={ws} /></TabsContent>
@@ -482,8 +490,12 @@ const AddPartyButton: React.FC<{ ws: string; role: 'seller' | 'buyer'; onAdded: 
         <DialogContent>
           <DialogHeader><DialogTitle className="capitalize">Add a {role}</DialogTitle></DialogHeader>
           <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">Pick an existing CRM contact to track as a {role}. New person? Create them in CRM first, then link here.</p>
-            <ContactSearchDropdown selectedContactId={contactId} onSelect={setContactId} placeholder={`Search CRM contacts to add as ${role}…`} />
+            {/* The instruction used to be "New person? Create them in CRM first, then link here."
+                — the product telling the operator to leave the screen and come back. The dropdown
+                has always been able to create from a search that came back empty; this page just
+                never turned it on (#378 F2). */}
+            <p className="text-sm text-muted-foreground">Pick a CRM contact to track as a {role}, or create them from the search.</p>
+            <ContactSearchDropdown selectedContactId={contactId} onSelect={setContactId} placeholder={`Search CRM contacts to add as ${role}…`} allowCreate />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
@@ -540,7 +552,9 @@ const ScheduleViewingButton: React.FC<{ ws: string; onAdded: () => void }> = ({ 
               <div><label htmlFor="viewing-type" className="mb-1 block text-xs text-muted-foreground">Type</label><select id="viewing-type" className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={type} onChange={(e) => setType(e.target.value)}>{/* These values are real-estate-api's VIEWING_TYPES. The select used to emit 'in_person' and 'virtual', neither of which the allowlist knew, and the API SUBSTITUTED rather than rejected — so two of three options, including the default, were silently stored as an ordinary viewing. */}
                 {([['viewing', 'in person'], ['virtual', 'virtual'], ['tour', 'tour'], ['open_house', 'open house']] as const).map(([v, label]) => <option key={v} value={v}>{label}</option>)}</select></div>
             </div>
-            <div><span className="mb-1 block text-xs text-muted-foreground">Attendee (optional)</span><ContactSearchDropdown selectedContactId={contactId} onSelect={setContactId} placeholder="Link a CRM contact…" /></div>
+            {/* A viewing is very often the first time a buyer exists as a record at all, so this
+                is exactly the search that comes back empty (#378 F2). */}
+            <div><span className="mb-1 block text-xs text-muted-foreground">Attendee (optional)</span><ContactSearchDropdown selectedContactId={contactId} onSelect={setContactId} placeholder="Link a CRM contact…" allowCreate /></div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
@@ -583,7 +597,7 @@ const AddBuyerButton: React.FC<{ ws: string; onAdded: () => void }> = ({ ws, onA
         <DialogContent>
           <DialogHeader><DialogTitle>Add a Buyer</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div><label htmlFor="realestatepage-contact" className="mb-1 block text-xs text-muted-foreground">Contact</label><ContactSearchDropdown selectedContactId={contactId} onSelect={setContactId} placeholder="Search CRM contacts…" /></div>
+            <div><label htmlFor="realestatepage-contact" className="mb-1 block text-xs text-muted-foreground">Contact</label><ContactSearchDropdown selectedContactId={contactId} onSelect={setContactId} placeholder="Search CRM contacts…" allowCreate /></div>
             <input id="realestatepage-contact" placeholder="Label (e.g. “3-bed in Athens”)" className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={label} onChange={(e) => setLabel(e.target.value)} />
             <div>
               <div className="mb-1 text-xs text-muted-foreground">Requirements (optional — auto-matches new listings)</div>

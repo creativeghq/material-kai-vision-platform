@@ -8,8 +8,7 @@ import { emitFlowEvent } from '../../_shared/flow-events.ts';
 import { foldForSearch } from '../../_shared/searchFold.ts';
 // Generated mirror of src/services/crm/vatNormalize.ts — the receipt key (#353 CRM-7).
 import { normalizeVat } from '../../_shared/crm/vatNormalize.generated.ts';
-// Generated mirror of src/services/crm/greekTransliteration.ts (#353 CRM-1).
-import { transliterateGreek } from '../../_shared/crm/greekTransliteration.generated.ts';
+import { guardDuplicateParty } from './_partyDedupe.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -327,38 +326,13 @@ export async function handleCompanies(req: Request): Promise<Response> {
       // `allow_duplicate: true` is the escape hatch for the genuine case (two distinct legal
       // entities sharing a trading name). Refusing by default and opting in is the right way
       // round: the accidental duplicate is silent, the deliberate one is typed by a human.
-      if (body.allow_duplicate !== true) {
-        const { data: existing, error: dupError } = await supabase
-          .from('crm_companies')
-          .select('id, name')
-          .eq('workspace_id', targetWs)
-          // `name_xscript`, not `name_fold` (#353 CRM-1). The old key folded case and accents
-          // but could not see across ALPHABETS: `Παπαδόπουλος` and `Papadopoulos` folded to
-          // different strings, so the same party could be created twice, once per script, and
-          // this guarantee said yes both times. The new key transliterates Greek to Latin on
-          // both the stored side and the probe.
-          .eq('name_xscript', transliterateGreek(foldForSearch(body.name)))
-          .limit(1)
-          .maybeSingle();
-        // A failed lookup does NOT fall through to the insert. Creating a duplicate is cheap to
-        // detect and expensive to unpick; retrying a create is neither.
-        if (dupError) {
-          return new Response(
-            JSON.stringify({ error: `Could not check for an existing business: ${dupError.message}` }),
-            { status: 503, headers: corsHeaders },
-          );
-        }
-        if (existing) {
-          return new Response(
-            JSON.stringify({
-              error: `"${existing.name}" already exists in this workspace.`,
-              code: 'duplicate_company',
-              existing: { id: existing.id, name: existing.name },
-            }),
-            { status: 409, headers: corsHeaders },
-          );
-        }
-      }
+      // The query, the key and the fail-closed rule now live in `_partyDedupe.ts`, because
+      // `crm_contacts` needed the same guarantee and a second copy is where the judgement
+      // drifts (#378 F2).
+      const companyDuplicate = await guardDuplicateParty(
+        supabase, 'crm_companies', targetWs, body.name, body.allow_duplicate === true, corsHeaders,
+      );
+      if (companyDuplicate) return companyDuplicate;
 
       const { data, error } = await supabase
         .from('crm_companies')
@@ -706,6 +680,15 @@ export async function handleCompanies(req: Request): Promise<Response> {
             { status: 400, headers: corsHeaders },
           );
         }
+        // Same guarantee the company create has had since #366 BU-3. This branch is reached from
+        // the "New Contact" tab on the company page, which is a create path that never passes
+        // through a search — so the client-side "search before you create" convention does not
+        // reach it, and it was the un-gated door into the contact book (#378 F2).
+        const contactDuplicate = await guardDuplicateParty(
+          supabase, 'crm_contacts', companyWs, name, body.allow_duplicate === true, corsHeaders,
+        );
+        if (contactDuplicate) return contactDuplicate;
+
         const { data: created, error: createErr } = await supabase
           .from('crm_contacts')
           .insert({

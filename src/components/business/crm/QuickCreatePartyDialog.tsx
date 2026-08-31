@@ -87,7 +87,11 @@ export const QuickCreatePartyDialog: React.FC<Props> = ({ kind, initialName = ''
       // already exists" is a button that uses it — not a dead end the user solves by adding a
       // digit to the name.
       const e = err as { code?: string; existing?: { id: string; name: string }; message?: string };
-      if (e.code === 'duplicate_company' && e.existing) {
+      // Both kinds, since the contact endpoint gained the same guarantee (#378 F2). Keyed on the
+      // kind being created rather than on "either code", so a company create that somehow answered
+      // `duplicate_contact` is reported rather than quietly offering the wrong row.
+      const expected = kind === 'contact' ? 'duplicate_contact' : 'duplicate_company';
+      if (e.code === expected && e.existing) {
         setDuplicate(e.existing);
       } else {
         toast({ title: 'Could not create', description: e.message, variant: 'destructive' });
