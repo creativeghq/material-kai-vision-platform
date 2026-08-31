@@ -240,18 +240,29 @@ export const inboundService = {
   async listForIssuerVat(
     workspaceId: string,
     vat: string,
-    limit = 500,
+    opts: {
+      /** Inclusive ISO `yyyy-mm-dd` bounds on the ISSUE date — the date the table shows. */
+      from?: string | null;
+      to?: string | null;
+      limit?: number;
+    } = {},
   ): Promise<{ rows: InboundDocument[]; total: number }> {
     const digits = (vat ?? '').replace(/\D/g, '');
     if (!digits) return { rows: [], total: 0 };
     const forms = Array.from(new Set([vat.trim(), digits, `EL${digits}`].filter(Boolean)));
-    const { data, error, count } = await supabase
+    let q = supabase
       .from('inbound_documents')
       .select('*', { count: 'exact' })
       .eq('workspace_id', workspaceId)
-      .in('issuer_vat', forms)
+      .in('issuer_vat', forms);
+    // Bounded SERVER-side, not on the loaded page: a window narrower than the cap must be able
+    // to reach documents the cap would otherwise have cut off, or "no invoices in 2024" would
+    // mean "none in the most recent 500".
+    if (opts.from) q = q.gte('issue_date', opts.from);
+    if (opts.to) q = q.lte('issue_date', opts.to);
+    const { data, error, count } = await q
       .order('issue_date', { ascending: false, nullsFirst: false })
-      .limit(limit);
+      .limit(opts.limit ?? 500);
     if (error) throw error;
     const rows = (data ?? []) as InboundDocument[];
     return { rows, total: count ?? rows.length };

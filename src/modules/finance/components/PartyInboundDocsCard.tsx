@@ -17,6 +17,22 @@ import { Button } from '@/components/core/ui/button';
 import { Inbox as InboxIcon, ExternalLink } from 'lucide-react';
 import { SupplierInboundDocs, type SupplierInboundCounts } from '@/modules/finance/components/SupplierInboundDocs';
 
+/**
+ * The second sentence of the subtitle. Split out because it is FOUR statements, not one with
+ * three conditionals wired through it: whether anything is unbooked, and whether the reader is
+ * looking at the supplier's whole history or a date window they set. Written as nested ternaries
+ * it was unreadable, which is how a sentence ends up claiming something about all of a
+ * supplier's documents while showing one month of them.
+ */
+const subtitle = (c: SupplierInboundCounts): string => {
+  if (c.notInBooks > 0) {
+    return c.windowed
+      ? `${c.notInBooks} in this window are not in your books yet.`
+      : `${c.notInBooks} not in your books yet — until one is added to Expenses it doesn't reach Payables or the P&L.`;
+  }
+  return c.windowed ? 'Everything in this window is in Expenses.' : 'All of them are in Expenses.';
+};
+
 export const PartyInboundDocsCard: React.FC<{
   workspaceId: string;
   companyId: string;
@@ -31,8 +47,10 @@ export const PartyInboundDocsCard: React.FC<{
 
   // Nothing to say when this party has no VAT number — they can't be matched to any document.
   if (!vatNumber) return null;
-  // A supplier who has filed nothing gets no panel about their filings.
-  if (counts && counts.total === 0) return null;
+  // A supplier who has filed nothing gets no panel about their filings. NOT while a date window
+  // is in force, though: narrowing to a quiet month would otherwise delete the panel — and with
+  // it the only control that could widen the window again.
+  if (counts && counts.total === 0 && !counts.windowed) return null;
 
   return (
     <Card>
@@ -41,11 +59,7 @@ export const PartyInboundDocsCard: React.FC<{
           <CardTitle className="flex items-center gap-2"><InboxIcon className="h-4 w-4" /> Invoices</CardTitle>
           <p className="mt-0.5 text-xs text-muted-foreground">
             What this supplier filed with AADE against us.
-            {counts == null
-              ? ''
-              : counts.notInBooks > 0
-                ? ` ${counts.notInBooks} not in your books yet — until one is added to Expenses it doesn't reach Payables or the P&L.`
-                : ' All of them are in Expenses.'}
+            {counts == null ? '' : ` ${subtitle(counts)}`}
           </p>
         </div>
         {/* Carry the supplier through, so the Inbox opens on THEIR documents rather than

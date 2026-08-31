@@ -32,12 +32,14 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, Inbox, Check, Building2, ChevronRight, ExternalLink, Search, UserPlus } from 'lucide-react';
+import { Loader2, Inbox, Check, Building2, ChevronRight, ExternalLink, UserPlus, Users, CalendarDays, Coins, Wallet } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge, badgeVariants } from '@/components/core/ui/badge';
-import { Input } from '@/components/core/ui/input';
 import { cn } from '@/lib/utils';
+import {
+  FilterBar, NONE_VALUE, optionsFromRows, useFilters, type FilterGroupDef,
+} from '@/components/core/filters';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import {
@@ -55,18 +57,91 @@ import { AddIssuerToCrmDialog } from '@/modules/finance/components/AddIssuerToCr
 
 interface CategoryOption { id: string; name: string; kind?: string | null; is_system?: boolean | null }
 
-/** Free-text match over the two things an operator knows a supplier by. */
-const matches = (r: ExpenseIssuerRow, q: string) => {
-  if (!q) return true;
-  const needle = q.trim().toLowerCase();
-  const digits = needle.replace(/\D/g, '');
-  return (
-    (r.issuer_name ?? '').toLowerCase().includes(needle)
-    || (r.crm_company_name ?? '').toLowerCase().includes(needle)
-    || r.issuer_vat.toLowerCase().includes(needle)
-    || (!!digits && r.issuer_vat.replace(/\D/g, '').includes(digits))
-  );
+/**
+ * The dimensions this list actually has — the shared filter engine, the same one Parties and the
+ * document lists use, rather than a private search box that could only do one of these.
+ *
+ * Every option list is derived from the loaded rows, so it carries live counts and cannot offer a
+ * value that matches nothing. Ranges are widened to a round number so the slider ends are not
+ * pinned to whichever supplier happens to be the biggest today.
+ */
+const bound = (rows: ExpenseIssuerRow[], pick: (r: ExpenseIssuerRow) => unknown) => {
+  const max = rows.reduce((m, r) => Math.max(m, Number(pick(r)) || 0), 0);
+  return { min: 0, max: Math.max(Math.ceil(max / 10) * 10, 10) };
 };
+
+function buildExpenseSupplierFilters(rows: ExpenseIssuerRow[]): FilterGroupDef[] {
+  const docs = bound(rows, (r) => r.docs);
+  const net = bound(rows, (r) => r.total_net);
+  return [
+    {
+      key: 'general', label: 'General', icon: Users,
+      fields: [
+        {
+          key: 'q', type: 'text', label: 'Search', placeholder: 'Supplier or ΑΦΜ',
+          // The ΑΦΜ is matched in both spellings a person types it in — with and without
+          // separators — because "143 270 771" is the same supplier as "143270771".
+          accessor: (r: ExpenseIssuerRow) => [
+            r.issuer_name, r.crm_company_name, r.issuer_vat, r.issuer_vat.replace(/\D/g, ''),
+          ],
+        },
+        {
+          key: 'to_file', type: 'bool', label: 'Filing',
+          description: 'Documents still sitting in the generic myAADE bucket.',
+          trueLabel: 'Has documents to file', falseLabel: 'Nothing to file',
+          accessor: (r: ExpenseIssuerRow) => r.unfiled > 0,
+        },
+        {
+          key: 'in_crm', type: 'bool', label: 'CRM record',
+          description: 'Whether this ΑΦΜ resolves to a company in the workspace.',
+          trueLabel: 'In CRM', falseLabel: 'Not in CRM',
+          accessor: (r: ExpenseIssuerRow) => !!r.crm_company_id,
+        },
+        {
+          key: 'in_books', type: 'bool', label: 'In the books',
+          description: 'Whether any of their documents became a supplier bill.',
+          trueLabel: 'Some in books', falseLabel: 'None in books',
+          accessor: (r: ExpenseIssuerRow) => r.in_books > 0,
+        },
+        {
+          key: 'category', type: 'multi', label: 'Files as', searchable: true,
+          options: [
+            ...optionsFromRows(rows, (r: ExpenseIssuerRow) => r.learned_category_name ?? undefined),
+            { value: NONE_VALUE, label: 'No filing rule yet' },
+          ],
+          accessor: (r: ExpenseIssuerRow) => r.learned_category_name ?? undefined,
+        },
+      ],
+    },
+    {
+      key: 'activity', label: 'Activity', icon: CalendarDays,
+      fields: [
+        {
+          key: 'last_issue_date', type: 'dateRange', label: 'Last document',
+          description: 'When they last issued anything against us — how to find the ones who went quiet.',
+          accessor: (r: ExpenseIssuerRow) => r.last_issue_date ?? undefined,
+        },
+        {
+          key: 'first_issue_date', type: 'dateRange', label: 'First document',
+          accessor: (r: ExpenseIssuerRow) => r.first_issue_date ?? undefined,
+        },
+      ],
+    },
+    {
+      key: 'size', label: 'Size', icon: Coins,
+      fields: [
+        {
+          key: 'docs', type: 'range', label: 'Documents',
+          min: docs.min, max: docs.max, accessor: (r: ExpenseIssuerRow) => r.docs,
+        },
+        {
+          key: 'total_net', type: 'range', label: 'Net total', unit: '€',
+          min: net.min, max: net.max, accessor: (r: ExpenseIssuerRow) => Number(r.total_net ?? 0),
+        },
+      ],
+    },
+  ];
+}
 
 export const ExpenseSuppliersTab: React.FC<{
   workspaceId: string | null | undefined;
@@ -80,8 +155,6 @@ export const ExpenseSuppliersTab: React.FC<{
   const [rows, setRows] = useState<ExpenseIssuerRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [q, setQ] = useState('');
-  const [onlyUnfiled, setOnlyUnfiled] = useState(false);
   const [page, setPage] = useState(1);
   /**
    * The ΑΦΜ whose documents are open. A MODAL, not an expanding row: the list is 241 rows and a
@@ -134,12 +207,12 @@ export const ExpenseSuppliersTab: React.FC<{
     [rows, openVat],
   );
 
-  const filtered = useMemo(
-    () => rows.filter((r) => matches(r, q) && (!onlyUnfiled || r.unfiled > 0)),
-    [rows, q, onlyUnfiled],
-  );
+  const filterGroups = useMemo(() => buildExpenseSupplierFilters(rows), [rows]);
+  const { values: filterValues, setValues: setFilterValues, filtered, previewCount, reset: resetFilters } =
+    useFilters<ExpenseIssuerRow>(rows, filterGroups);
   useEffect(() => { setPage((p) => clampPage(p, filtered.length)); }, [filtered.length]);
-  useEffect(() => { setPage(1); }, [q, onlyUnfiled]);
+  // Any filter change narrows the list — start the narrowed set at its first page.
+  useEffect(() => { setPage(1); }, [filterValues]);
 
   // Totals describe the WHOLE inbox, not the filtered page — that is the point of a header.
   const totals = useMemo(() => rows.reduce(
@@ -196,28 +269,14 @@ export const ExpenseSuppliersTab: React.FC<{
                     </>}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Supplier or ΑΦΜ"
-              aria-label="Search suppliers by name or ΑΦΜ"
-              className="h-8 w-48 pl-7 text-xs"
-            />
-          </div>
-          {totals.unfiled > 0 && (
-            <Button
-              size="sm"
-              variant={onlyUnfiled ? 'secondary' : 'outline'}
-              aria-pressed={onlyUnfiled}
-              onClick={() => setOnlyUnfiled((v) => !v)}
-            >
-              To file only
-            </Button>
-          )}
-        </div>
+        <FilterBar
+          groups={filterGroups}
+          values={filterValues}
+          onChange={setFilterValues}
+          previewCount={previewCount}
+          searchPlaceholder="Supplier or ΑΦΜ"
+          title="Filter suppliers"
+        />
       </CardHeader>
       <CardContent className="p-0">
         {/* A source that FAILED must not render as a source that is empty. */}
@@ -259,8 +318,8 @@ export const ExpenseSuppliersTab: React.FC<{
                         <HubEmptyState
                           variant="filtered"
                           title="No supplier matches"
-                          description={`${rows.length} supplier${rows.length === 1 ? '' : 's'} ${rows.length === 1 ? 'is' : 'are'} in the inbox — the current search excludes ${rows.length === 1 ? 'it' : 'them all'}.`}
-                          action={<Button size="sm" variant="outline" onClick={() => { setQ(''); setOnlyUnfiled(false); }}>Clear filters</Button>}
+                          description={`${rows.length} supplier${rows.length === 1 ? '' : 's'} ${rows.length === 1 ? 'is' : 'are'} in the inbox — the current filters exclude ${rows.length === 1 ? 'it' : 'them all'}.`}
+                          action={<Button size="sm" variant="outline" onClick={resetFilters}>Clear filters</Button>}
                         />
                       )}
                     </td></tr>
@@ -448,6 +507,23 @@ export const ExpenseSuppliersTab: React.FC<{
                   Not in CRM — Add
                 </button>
               )}
+              {/* The account card — bills, orders, PAYMENTS, the running ledger and the emailed
+                  statement. It is keyed on the CRM party, so it exists only once the ΑΦΜ resolves
+                  to one: offering it before then would open a page about nobody. */}
+              {openSupplier.crm_company_id && (
+                <>
+                  <span aria-hidden>·</span>
+                  <Link
+                    to={`${financeTabUrl(FINANCE_TAB.parties)}&party=company:${openSupplier.crm_company_id}`}
+                    className="inline-flex items-center gap-1 text-primary hover:underline"
+                    title="Their account: bills, orders, payments, the running ledger and the account statement"
+                  >
+                    <Wallet className="h-3 w-3" />
+                    Account &amp; payments
+                    <ExternalLink className="h-3 w-3" />
+                  </Link>
+                </>
+              )}
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-[70vh] overflow-y-auto">
@@ -456,6 +532,10 @@ export const ExpenseSuppliersTab: React.FC<{
               vatNumber={openSupplier.issuer_vat}
               companyId={openSupplier.crm_company_id}
               readOnly={isAccountant}
+              // Bounds the date pickers to the span the summary already derived, so the window
+              // cannot be set to a period this supplier has never issued anything in.
+              spanFrom={openSupplier.first_issue_date}
+              spanTo={openSupplier.last_issue_date}
             />
           </div>
         </DialogContent>
