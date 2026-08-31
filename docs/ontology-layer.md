@@ -1,8 +1,9 @@
 # The ontology layer
 
-> **Status:** Phase 1 shipped 2026-08-26 — typed concepts, governed term bindings, resolution,
-> the review lifecycle and two integrity probes. Phases 2–4 (relationships, knowledge statements,
-> neutral rules) are not built yet and are sketched at the bottom.
+> **Status:** shipped and reached. Phase 1 (2026-08-26) built typed concepts, governed term
+> bindings, resolution, the review lifecycle and two probes; 2026-08-31 wired it to the intake
+> queue and added the screen where a human decides. The AI proposer was **measured and dropped** —
+> see below. Phases 2–4 (relationships, knowledge statements, neutral rules) are not built.
 
 ## Why this exists, and what it deliberately is not
 
@@ -143,6 +144,50 @@ unreachable and the default is zero. The ladder is complete, explained and probe
 structurally guaranteed to return cost.
 
 Clearing the top of `ontology_gaps()` is what makes those rungs reachable.
+
+## Wired to the queue (2026-08-31)
+
+Phase 1 shipped on 2026-08-26 and was called by **nothing** for five days and 237 commits — not
+one TypeScript file, not one SQL function. Correct, probe-guarded and unreachable, which at
+runtime is indistinguishable from never having been built.
+
+- `ontology_scan_intake_terms(workspace)` notes every distinct maker on a queued line, and every
+  issuer NAME whose VAT could not already answer who they are. Idempotent.
+- `PendingProductsCard` scans on load and **renders** the ranked gaps above the queue.
+- `OntologyGapsDialog` is where a human decides: CRM search per row, confirm / reject, and
+  "Not in CRM" opening `QuickAddCompanyDialog` — with the **issuer VAT seeded**, because
+  `_approve_pending_item_core` attributes by exact VAT match, so a company created with that
+  number answers for every line that issuer will ever send and the binding is never consulted.
+- Guarded by [tests/unit/ontologyWiring.test.ts](../tests/unit/ontologyWiring.test.ts) — 12 tests,
+  9/9 mutations caught. It does not test that the ontology works; it tests that it is **reached**.
+  Every RPC is asserted as a CALL (`rpc('x'`), never a mention.
+
+First run against the live backlog — 1,734 lines, 118 issuers:
+
+| | terms | lines blocked | top 10 clears |
+|---|---|---|---|
+| supplier | 92 | 988 | 616 (62%) |
+| manufacturer | 88 | 203 | 87 (43%) |
+
+MEGAWATT alone blocks 241 lines.
+
+## The AI proposer was measured and dropped
+
+The plan called for a job that proposes targets for each gap. Measured against the live data with
+trigram similarity before building it:
+
+| | terms | plausible (≥0.55) | weak | **no candidate at all** | best seen |
+|---|---|---|---|---|---|
+| manufacturer | 88 | 0 | 0 | **88** | 0.19 |
+| supplier | 92 | 1 | 8 | **83** | 0.81 |
+
+**The bottleneck is not matching — it is that the targets do not exist.** There are zero CRM
+manufacturers, so there is nothing for a maker to be matched *to*. A proposer built today would
+return "no suggestion" for 171 of 180 terms, and would itself be the inert layer this document
+opens by describing.
+
+The work is *creation*, not disambiguation, and the resolver already offers it. Revisit when CRM
+holds enough parties that matching is the hard part.
 
 ## Not built yet
 
