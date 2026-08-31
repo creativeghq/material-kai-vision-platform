@@ -793,7 +793,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     name: 'list_mydata_expenses',
     file: 'supabase/functions/_shared/tools/expense-tools.ts',
     factory: 'createMydataExpensesTool',
-    description: 'The myDATA / ΑΑΔΕ / myAADE EXPENSES FEED — the documents our suppliers have filed against us, straight from ΑΑΔΕ, whether or not anyone has booked them as expenses yet.',
+    description: 'ONLY when the request explicitly names myDATA / ΑΑΔΕ / myAADE (or "the expenses inbox", "what suppliers have filed against us").',
     params: [
       { name: 'action', type: 'enum', enum: ['documents', 'suppliers', 'status'], optional: true, description: 'What to return. Default "documents".' },
       { name: 'booked', type: 'enum', enum: ['all', 'only_unbooked', 'only_booked'], optional: true, description: 'Whether the document has been turned into an expense in our books yet. Default all.' },
@@ -807,10 +807,10 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     name: 'list_recent_expenses',
     file: 'supabase/functions/_shared/tools/expense-tools.ts',
     factory: 'createListExpensesTool',
-    description: 'List the workspace\'s recent RECORDED expenses / supplier bills — the ones already in our books — with their status, amount due and where each one came from.',
+    description: 'THE tool for expenses.',
     params: [
       { name: 'limit', type: 'number', optional: true, description: 'How many to return (default 15, max 50)' },
-      { name: 'source', type: 'enum', enum: ['all', 'mydata', 'order', 'manual'], optional: true, description: 'Filter by where the expense came from. Default all.' },
+      { name: 'source', type: 'enum', enum: ['all', 'mydata', 'order', 'manual'], optional: true, description: 'Filter the booked expenses by origin: mydata | order | manual. Default all.' },
     ],
   },
   {

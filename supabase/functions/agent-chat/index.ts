@@ -2790,7 +2790,19 @@ async function executeAgent(
       if (config.tools.includes('list_recent_expenses')) tools.push(expMod.createListExpensesTool(userId, workspaceId, onChunk));
       if (config.tools.includes('pay_expense')) tools.push(expMod.createPayExpenseTool(userId, workspaceId, onChunk));
       if (config.tools.includes('get_expense_payments')) tools.push(expMod.createGetExpensePaymentsTool(userId, workspaceId, onChunk));
-      if (config.tools.includes('list_mydata_expenses')) tools.push(expMod.createMydataExpensesTool(userId, workspaceId, userJwt, onChunk));
+      if (config.tools.includes('list_mydata_expenses')) {
+        // The myDATA feed and our own expense ledger both answer to the word "expenses", and they
+        // are 1,866 rows and 6 rows in the workspace this was measured in. Which one the turn gets
+        // is decided HERE, from what the person actually wrote, not left to tool selection — see
+        // `_shared/finance/mydata-intent.ts`. A quick-start click is itself the explicit request.
+        const { userTurnText } = await import('../_shared/finance/mydata-intent.ts');
+        tools.push(expMod.createMydataExpensesTool(
+          userId, workspaceId, userJwt,
+          userTurnText(messages, userInput),
+          directTool?.name === 'list_mydata_expenses',
+          onChunk,
+        ));
+      }
     } catch (expErr) {
       console.warn('⚠️ Could not register expense tools:', expErr);
     }

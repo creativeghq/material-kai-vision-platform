@@ -23,6 +23,7 @@
 import { computeExpenseSplit } from '../finance/expense-math.ts';
 import { moduleGate } from './module-gate.ts';
 import { attachPartyNames } from './record-labels.ts';
+import { mentionsMyDataFeed } from '../finance/mydata-intent.ts';
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what
@@ -563,16 +564,20 @@ export const createListExpensesTool = (userId: string, workspaceId: string, onCh
   }, {
     name: 'list_recent_expenses',
     description:
-      "List the workspace's recent RECORDED expenses / supplier bills — the ones already in our books — "
-      + 'with their status, amount due and where each one came from. `source` filters by origin: '
-      + '"mydata" (a myDATA/ΑΑΔΕ document booked as an expense), "order" (a cost booked against one of '
-      + 'our orders), "manual" (entered by hand). For the myDATA / ΑΑΔΕ / myAADE expenses feed ITSELF — '
-      + 'documents suppliers have filed against us, including the ones nobody has booked yet — use '
-      + 'list_mydata_expenses instead; there are usually far more of those than there are booked expenses.',
+      "THE tool for expenses. Any question about our expenses, spending, supplier bills or payables "
+      + 'answers from here — "recent expenses", "expenses by supplier", "unpaid expenses", "what did '
+      + 'we spend" — because expenses means the ones RECORDED IN OUR OWN BOOKS. Returns each bill '
+      + 'with its supplier, status, amount due and origin. '
+      + 'ONE exception, and it is absolute: if the request names myDATA / ΑΑΔΕ / myAADE at all, do '
+      + 'NOT use this tool — use list_mydata_expenses, even when the person also says "expenses".',
     schema: z.object({
       limit: z.number().optional().describe('How many to return (default 15, max 50)'),
       source: z.enum(['all', 'mydata', 'order', 'manual']).optional()
-        .describe('Filter by where the expense came from. Default all.'),
+        // Documented on the PARAMETER, not in the tool description. Spelling out "so myDATA
+        // expenses are answered here" up there was measured pulling two explicit feed requests
+        // onto this tool — the description is what selection reads, and the rule has to be one
+        // sentence with no competing clause.
+        .describe('Filter the booked expenses by origin: mydata | order | manual. Default all.'),
     }),
   });
 
@@ -601,7 +606,19 @@ export const createListExpensesTool = (userId: string, workspaceId: string, onCh
  * `inbound_issuers_summary` are what the Finance page's own supplier inbox reads, so the agent and
  * the screen cannot disagree about how many documents a supplier has sent.
  */
-export const createMydataExpensesTool = (userId: string, workspaceId: string, jwt: string | undefined, onChunk?: (c: any) => void) =>
+export const createMydataExpensesTool = (
+  userId: string,
+  workspaceId: string,
+  jwt: string | undefined,
+  /**
+   * The text of THIS turn, from the user's side. The feed opens only when the request names it —
+   * see `mydata-intent.ts` for why this is a gate and not a line in the description.
+   */
+  turnText: string,
+  /** A quick-start click IS the explicit request; it names the feed on the button. */
+  explicitlyRequested: boolean,
+  onChunk?: (c: any) => void,
+) =>
   tool(async ({ action, booked, issuer, from, to, limit }: {
     action?: 'documents' | 'suppliers' | 'status';
     booked?: 'all' | 'only_unbooked' | 'only_booked';
@@ -611,6 +628,18 @@ export const createMydataExpensesTool = (userId: string, workspaceId: string, jw
     if (denied) return denied;
     const sb = svc();
     const act = action ?? 'documents';
+
+    // FAIL CLOSED on the wrong table. `status` is exempt — it returns no expense data, only
+    // whether the integration is connected, and the model uses it as a preamble.
+    if (act !== 'status' && !explicitlyRequested && !mentionsMyDataFeed(turnText)) {
+      return JSON.stringify({
+        success: false,
+        error: 'This request did not ask for the myDATA / ΑΑΔΕ feed, so this tool does not apply. '
+          + 'Expenses means the ones recorded in our own books — use list_recent_expenses '
+          + '(its `source` parameter filters to the ones that originally came from myDATA). '
+          + 'Only reach for the feed when the person names myDATA / ΑΑΔΕ / myAADE or the expenses inbox.',
+      });
+    }
 
     try {
       if (act === 'status') {
@@ -744,15 +773,15 @@ export const createMydataExpensesTool = (userId: string, workspaceId: string, jw
   }, {
     name: 'list_mydata_expenses',
     description:
-      'The myDATA / ΑΑΔΕ / myAADE EXPENSES FEED — the documents our suppliers have filed against us, '
-      + 'straight from ΑΑΔΕ, whether or not anyone has booked them as expenses yet. Use this for '
-      + '"expenses from myDATA/myAADE/ΑΑΔΕ", "what has been filed against us", "supplier documents", '
-      + '"the expenses inbox", or anything asking for supplier invoices we did NOT enter ourselves. '
-      + 'action: "documents" (the documents; filter by booked/issuer/date), "suppliers" (who has filed '
-      + 'against us, totals and how much is still unfiled), "status" (is myDATA connected and when did '
-      + 'it last sync — so "nothing here" and "never connected" are different answers). '
-      + 'Note this is a DIFFERENT and usually much larger set than list_recent_expenses, which only '
-      + 'shows expenses already booked into our own ledger. 0 credits.',
+      'ONLY when the request explicitly names myDATA / ΑΑΔΕ / myAADE (or "the expenses inbox", '
+      + '"what suppliers have filed against us"). For every other question about expenses — '
+      + '"our expenses", "recent expenses", "expenses by supplier", "unpaid expenses", "what did we '
+      + 'spend" — use list_recent_expenses instead; this tool will REFUSE those. '
+      + 'What it returns: the ΑΑΔΕ feed itself — documents suppliers filed against us, most of which '
+      + 'have never been booked into our books, so it is a DIFFERENT and far larger set than our own '
+      + 'expenses. action: "documents" (the documents; filter by booked/issuer/date), "suppliers" '
+      + '(who has filed against us, totals, how much is still unfiled), "status" (is myDATA connected '
+      + '— so "nothing here" and "never connected" are different answers). 0 credits.',
     schema: z.object({
       action: z.enum(['documents', 'suppliers', 'status']).optional()
         .describe('What to return. Default "documents".'),
