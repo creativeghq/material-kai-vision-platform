@@ -20,6 +20,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
 import { JobCostCard } from '../JobCostCard';
 import { ProjectExpensesCard } from '../ProjectExpensesCard';
+import { ProjectLabourCard } from '../ProjectLabourCard';
 import {
   projectsService,
   type ProjectFinanceRow,
@@ -133,6 +134,11 @@ export const FinanceTab: React.FC<{ projectId: string; projectName?: string }> =
     <div className="space-y-4">
       {/* Job cost first: margin is the question this tab exists to answer. AR/AP is the detail. */}
       <JobCostCard projectId={projectId} reloadToken={costToken} workspaceId={activeWorkspaceId} />
+
+      {/* Labour, at the typed rate against what payroll says it actually cost (#378 N1). Sits
+          beside the job cost because it is the half of the margin that was an estimate wearing the
+          costume of an actual — and `get_project_labor` had no reader in the app at all. */}
+      <ProjectLabourCard projectId={projectId} currency={summary.currencies[0] ?? null} />
 
       {/* Costs booked straight onto the job, plus linking imported card spend to it. */}
       <ProjectExpensesCard

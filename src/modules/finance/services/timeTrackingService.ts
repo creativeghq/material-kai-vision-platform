@@ -35,58 +35,26 @@ export interface NewTimeEntry {
   hourly_rate: number;
   description: string;
   is_billable?: boolean;
+  /**
+   * Whose hours these are when the worker has NO platform login (#378 N1) — an `hr_employees` id.
+   * Mutually exclusive with the signed-in user, enforced by `time_entries_single_worker_ck`:
+   * recording somebody else's hours must not also claim they are yours.
+   *
+   * N2 made a task assignable to such a person; until this existed the schedule could name
+   * somebody who could never appear on that job's labour cost.
+   */
+  employee_id?: string | null;
 }
 
-/** Per-user slice of a project's labor roll-up. Derived in SQL by `get_project_labor`. */
-export interface ProjectLaborByUser {
-  user_id: string | null;
-  minutes: number;
-  cost: number;
-  billable_minutes: number;
-  billable_cost: number;
-}
+// The roll-up shapes and their parse live in a pure module so they can be unit-tested without the
+// Supabase client. Re-exported here so existing importers are unaffected.
+// Re-export is not an import: the service CALLS these too.
+import { parseProjectLabor, type ProjectLabor } from '@/modules/finance/utils/projectLabor';
 
-/**
- * A project's labor roll-up. This is READ from `get_project_labor` — the single SQL derivation
- * of labor cost — and never recomputed here. `get_project_pnl` reads the same function, so the
- * P&L card and the labor strip can never disagree.
- */
-export interface ProjectLabor {
-  total_minutes: number;
-  total_cost: number;
-  billable_minutes: number;
-  billable_cost: number;
-  billed_cost: number;
-  entry_count: number;
-  by_user: ProjectLaborByUser[];
-}
-
-/** jsonb numerics can arrive as strings; coerce at the boundary rather than at each use site. */
-const num = (v: unknown): number => (v == null ? 0 : Number(v));
-
-export const EMPTY_PROJECT_LABOR: ProjectLabor = {
-  total_minutes: 0, total_cost: 0, billable_minutes: 0, billable_cost: 0,
-  billed_cost: 0, entry_count: 0, by_user: [],
-};
-
-export function parseProjectLabor(raw: any): ProjectLabor {
-  if (!raw) return EMPTY_PROJECT_LABOR;
-  return {
-    total_minutes: num(raw.total_minutes),
-    total_cost: num(raw.total_cost),
-    billable_minutes: num(raw.billable_minutes),
-    billable_cost: num(raw.billable_cost),
-    billed_cost: num(raw.billed_cost),
-    entry_count: num(raw.entry_count),
-    by_user: (raw.by_user ?? []).map((u: any) => ({
-      user_id: u.user_id ?? null,
-      minutes: num(u.minutes),
-      cost: num(u.cost),
-      billable_minutes: num(u.billable_minutes),
-      billable_cost: num(u.billable_cost),
-    })),
-  };
-}
+export {
+  parseProjectLabor, EMPTY_PROJECT_LABOR,
+  type ProjectLaborByUser, type ProjectLaborWorker, type ProjectLaborPayroll, type ProjectLabor,
+} from '@/modules/finance/utils/projectLabor';
 
 import { round2 } from '@/utils/decimal';
 
@@ -151,7 +119,10 @@ export const timeTrackingService = {
     const { data: auth } = await supabase.auth.getUser();
     const { data, error } = await supabase.from('time_entries').insert({
       workspace_id: workspaceId,
-      user_id: auth.user?.id ?? null,
+      // One worker or the other, never both — the CHECK refuses it, and claiming a
+      // subcontractor's hours as your own would put them in the wrong person's "my time".
+      user_id: entry.employee_id ? null : (auth.user?.id ?? null),
+      employee_id: entry.employee_id ?? null,
       customer_company_id: entry.customer_company_id ?? null,
       customer_contact_id: entry.customer_contact_id ?? null,
       project_id: entry.project_id ?? null,
