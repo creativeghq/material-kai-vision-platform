@@ -185,7 +185,7 @@ export const SupplierInboundDocs: React.FC<{
                           </React.Fragment>
                         ))}
                       </span>
-                    : <span className="text-[10px] text-muted-foreground/50">Not in books</span>}
+                    : <span className="text-[10px] text-muted-foreground/50">Not in Books</span>}
                 </td>
                 {!readOnly && (
                   <td className="px-4 py-2 text-right" onClick={(e) => e.stopPropagation()}>

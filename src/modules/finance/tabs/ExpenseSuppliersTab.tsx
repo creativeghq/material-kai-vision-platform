@@ -35,8 +35,9 @@ import { Link } from 'react-router-dom';
 import { Loader2, Inbox, Check, Building2, ChevronRight, ExternalLink, Search, UserPlus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
+import { Badge, badgeVariants } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
+import { cn } from '@/lib/utils';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import {
@@ -91,7 +92,7 @@ export const ExpenseSuppliersTab: React.FC<{
    *
    * The KEY is held, not the row: the modal header states counts, and booking a document inside
    * it changes them. Looking the row up on every render means the header cannot go on saying
-   * "none in books" about a document the operator just booked.
+   * "None in Books" about a document the operator just booked.
    */
   const [openVat, setOpenVat] = useState<string | null>(null);
   const [choice, setChoice] = useState<Record<string, string>>({});
@@ -302,16 +303,22 @@ export const ExpenseSuppliersTab: React.FC<{
                                   <ExternalLink className="h-3 w-3" />
                                 </Link>
                               ) : isAccountant ? (
-                                <span className="text-xs text-muted-foreground/70">Not in CRM</span>
+                                <Badge variant="warning" className="text-[10px]">Not in CRM</Badge>
                               ) : (
+                                // The warning TAG is the platform's existing word for this state
+                                // (PendingProductsCard says it the same way about the same fact);
+                                // rendered on a button so the tag that reports the gap is also the
+                                // way to close it. `badgeVariants` rather than a <Badge> inside a
+                                // <button> — a div in a button is invalid, and the tag styling has
+                                // one definition either way.
                                 <button
                                   type="button"
-                                  className="inline-flex items-center gap-1 rounded text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                  className={cn(badgeVariants({ variant: 'warning' }), 'text-[10px] transition-opacity hover:opacity-80')}
                                   onClick={(e) => { e.stopPropagation(); setAddToCrm(r); }}
                                   title="Add this supplier to the platform — checks for a duplicate ΑΦΜ first, then fills their identity from ΑΑΔΕ / ΓΕΜΗ and the web"
                                 >
                                   <UserPlus className="h-3 w-3" />
-                                  Not in CRM — add
+                                  Not in CRM — Add
                                 </button>
                               )}
                               {r.learned_category_name && (
@@ -325,7 +332,7 @@ export const ExpenseSuppliersTab: React.FC<{
                           <td className="px-3 py-2 text-right text-sm tabular-nums">
                             {r.docs}
                             <div className="text-[10px] text-muted-foreground">
-                              {r.in_books > 0 ? `${r.in_books} in books` : 'none in books'}
+                              {r.in_books > 0 ? `${r.in_books} in Books` : 'None in Books'}
                             </div>
                           </td>
                           <td className="px-3 py-2 text-right text-sm tabular-nums">
@@ -410,7 +417,7 @@ export const ExpenseSuppliersTab: React.FC<{
               <span>
                 {openSupplier.docs} document{openSupplier.docs === 1 ? '' : 's'}
                 {openSupplier.unfiled > 0 ? `, ${openSupplier.unfiled} to file` : ''}
-                {openSupplier.in_books > 0 ? `, ${openSupplier.in_books} in books` : ', none in books'}
+                {openSupplier.in_books > 0 ? `, ${openSupplier.in_books} in Books` : ', None in Books'}
               </span>
               {openSupplier.learned_category_name && (
                 <>
@@ -418,18 +425,28 @@ export const ExpenseSuppliersTab: React.FC<{
                   <span>Files as {openSupplier.learned_category_name}</span>
                 </>
               )}
-              {openSupplier.crm_company_id && (
-                <>
-                  <span aria-hidden>·</span>
-                  <Link
-                    to={`/crm/companies/${openSupplier.crm_company_id}`}
-                    className="inline-flex items-center gap-1 text-primary hover:underline"
-                  >
-                    <Building2 className="h-3 w-3" />
-                    {openSupplier.crm_company_name || 'Open in CRM'}
-                    <ExternalLink className="h-3 w-3" />
-                  </Link>
-                </>
+              <span aria-hidden>·</span>
+              {openSupplier.crm_company_id ? (
+                <Link
+                  to={`/crm/companies/${openSupplier.crm_company_id}`}
+                  className="inline-flex items-center gap-1 text-primary hover:underline"
+                >
+                  <Building2 className="h-3 w-3" />
+                  {openSupplier.crm_company_name || 'Open in CRM'}
+                  <ExternalLink className="h-3 w-3" />
+                </Link>
+              ) : isAccountant ? (
+                <Badge variant="warning" className="text-[10px]">Not in CRM</Badge>
+              ) : (
+                <button
+                  type="button"
+                  className={cn(badgeVariants({ variant: 'warning' }), 'text-[10px] transition-opacity hover:opacity-80')}
+                  onClick={() => setAddToCrm(openSupplier)}
+                  title="Add this supplier to the platform — checks for a duplicate ΑΦΜ first, then fills their identity from ΑΑΔΕ / ΓΕΜΗ and the web"
+                >
+                  <UserPlus className="h-3 w-3" />
+                  Not in CRM — Add
+                </button>
               )}
             </DialogDescription>
           </DialogHeader>
@@ -446,7 +463,10 @@ export const ExpenseSuppliersTab: React.FC<{
     </Dialog>
 
     {/* Adding a supplier from here stays PUT: the operator is mid-way down a filing queue, so the
-        list refreshes and the row's link appears in place rather than navigating them away. */}
+        tag turns into the CRM link in place rather than navigating them away. The refresh is
+        QUIET for two reasons — it can be triggered from inside the supplier modal, where a
+        spinner would blank a list being read, and a failed one must not empty `rows` under a
+        modal whose open row is looked up from them. */}
     {addToCrm && (
       <AddIssuerToCrmDialog
         workspaceId={workspaceId}
@@ -454,7 +474,7 @@ export const ExpenseSuppliersTab: React.FC<{
         issuerName={addToCrm.issuer_name}
         open
         onOpenChange={(v) => { if (!v) setAddToCrm(null); }}
-        onCreated={() => { setAddToCrm(null); void load(); }}
+        onCreated={() => { setAddToCrm(null); void load(true); }}
       />
     )}
     </>
