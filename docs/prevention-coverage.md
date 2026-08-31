@@ -2381,3 +2381,84 @@ identifying token, and the spec's 626 actions come in three unrelated naming sha
 a naming mismatch rather than a dead route. A guard that needs a ten-entry exemption list on the
 day it ships is the "list of the sites somebody already looked at" failure this repo names
 elsewhere.
+
+## Three derivations that were estimates, and a column nobody could fill — 2026-08-31
+
+Closing out #378: F1's live half, L5, N10 and N1.
+
+### The document you file at the moment you take the money (F1)
+
+Folding `fiscalDocKind` + `onIssueDoc` into one object closed the LATENT half — a caller could no
+longer offer a myDATA document it had no way to issue. It did not close the live one: the offer was
+still handed in by the host, and on the generic payment screens the order is chosen INSIDE the
+dialog, so there is no order for a host to resolve from. Passing the object to six more surfaces
+was structurally impossible, not merely unwritten.
+
+Whether an order can still produce a sales document is a property of the ORDER.
+`resolveOrderIssueOffer` derives it, `issueSalesDocumentForOrder` acts on it, they sit together,
+and the prop is gone — so there is no pair left to half-pass on any surface, present or future.
+A VOIDED document does not block a re-issue: that is the state an operator voids INTO. Deliberately
+stricter than `ordersService.invoicedOrderIds`, which answers a different question and counts void
+ones.
+
+### A note and a cheque know their job by derivation (L5)
+
+Neither gets a column. A delivery note is cut FROM an order and a cheque settles an invoice or a
+supplier bill, so both parents already hold the job; a stored copy is free to disagree the moment
+somebody re-files the parent, and `get_project_pnl` reads the PARENT — so the copy would not even
+be the number the P&L used.
+
+The cheque rule is a DIRECTION, not a precedence. A cheque carries both `invoice_id` and
+`supplier_bill_id`; "whichever is set" would let one holding both point at the wrong side of the
+trade — the mistake `moneyDerivation` guards, one document down.
+
+All six PostgREST embed paths were checked against `pg_constraint` before use: an ambiguous
+relationship is a runtime error the typecheck cannot see.
+
+### A meeting about something (N10), and two columns nobody could fill
+
+This issue records N10 as closed by C4. It was not. C4 gave `appointments` four subject columns and
+the UI wrote TWO — `deal_id` and `order_id` were declared, typed, CHECK-constrained, handled by the
+RPC, and reachable from nothing. The comment above the control claimed they were "set from those
+records"; nothing set them. Meanwhile `crm_meetings.target_kind` was still ('contact','company'),
+so the calendar that owns the invites, the reminders, the cron and `property_viewings.meeting_id`
+could say WHO a meeting was with and never WHAT it was for.
+
+`set_meeting_subject` is stricter than its appointment twin and can afford to be: `crm_meetings`
+HAS a `workspace_id`, so the subject must be in the meeting's OWN workspace rather than merely
+somewhere the caller is a member — otherwise a caller belonging to two tenants could file tenant
+A's meeting against tenant B's project, and every reader of that project would see it.
+
+**Three existing guards fired on the first cut and two were right about me**: `crm_deals` is read
+through `dealsService` and nowhere else, and a building is named by `propertyLabel()` and nowhere
+else — I had re-rolled the fallback chain in three places. The third,
+`appointmentSubject`'s "everything offered has a picker", encoded the very design that shipped the
+defect: it passes perfectly while half the columns are unreachable, because they were never
+offered.
+
+### A job's labour was an estimate wearing the costume of an actual (N1)
+
+`get_project_labor` costs a job at a rate somebody typed; `hr_payroll_items.employer_cost` is what
+the hour actually cost, and it reached Finance and never the job. The roll-up also had **no reader
+in `src/` at all** — derived, typed, consumed only by `get_project_pnl` inside SQL.
+
+The blocker first: `time_entries.user_id` FKs `auth.users`, while N2 had made a task assignable to
+an `hr_employees` row with no login. The schedule could name somebody who could never appear on
+that job's labour cost, so any reconciliation compared two populations that do not overlap.
+
+The actual is an ALLOCATION and says so — effective employer cost per hour, divided by the hours
+those runs PAID FOR rather than a nominal month, because a part-timer's hourly cost is not their
+monthly cost over 160. Both figures are shown; the estimate is never silently replaced. A worker
+with no payroll contributes NULL and is counted under a stated reason, with `uncosted_minutes`
+naming the coverage — a variance over two thirds of the hours is not a variance over the job.
+
+`parseProjectLabor` moved to a pure module for the reason `billLink.ts` exists: importing the
+service pulls in the Supabase client, so the only available check would have been source text, and
+null-vs-zero is exactly what source text cannot see.
+
+### The probe recipe, restated
+
+Every SQL claim here was verified by CALLING the function in a rolled-back transaction while
+IMPERSONATING a real workspace member via `set_config('request.jwt.claims', …)` — otherwise
+`assert_workspace_member` refuses and the probe proves the guard works while proving nothing about
+the derivation behind it. Leak counts checked after every rollback.
