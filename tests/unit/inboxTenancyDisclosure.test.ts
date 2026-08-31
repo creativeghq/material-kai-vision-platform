@@ -156,8 +156,25 @@ describe('#359 CM-10 — a customer sees the customer projection', () => {
   it('the thread row is projected too', () => {
     // It carries the routing metadata the relay reads — the mailbox we send FROM, the provider
     // conversation id — plus assignment and internal counters.
+    //
+    // Asserted as the customer branch's KEY SET rather than as `isMember ? thread : {`, which is
+    // what this used to pin. That shape was a proxy for the rule and it broke the moment the
+    // MEMBER half was legitimately enriched (`counterparty_participant_id`) — a change that
+    // cannot widen what a customer receives, but failed the anchor anyway. A proxy that fires on
+    // safe edits gets relaxed by whoever hits it next, and the relaxation is where the real leak
+    // walks in. So: name the seven columns. Adding an eighth to the customer's copy fails here.
     const get = sliceCase("case 'get_thread'");
-    expect(get).toMatch(/const threadForCaller = isMember \? thread : \{/);
+    expect(get).toMatch(/const threadForCaller = isMember \?/);
+    const decl = get.slice(get.indexOf('const threadForCaller = isMember ?'));
+    const body = decl.slice(0, decl.indexOf('\n      };') + 9);
+    // Everything after the ternary's own `: {` is the customer's half. The member half holds no
+    // object literal of its own, so the LAST occurrence is the ternary's — true whether that half
+    // is a bare `thread` or a spread.
+    const forCustomer = body.slice(body.lastIndexOf(': {') + 3);
+    const keys = [...forCustomer.matchAll(/^\s*(\w+):/gm)].map((m) => m[1]);
+    expect(new Set(keys)).toEqual(new Set([
+      'id', 'subject', 'status', 'channel', 'thread_type', 'last_message_at', 'created_at',
+    ]));
     expect(get).toMatch(/return json\(\{ thread: threadForCaller,/);
   });
 

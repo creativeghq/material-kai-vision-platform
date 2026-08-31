@@ -1776,10 +1776,19 @@ const MessageActions: React.FC<{
        *
        * A message you REPLY to or REACT to is almost always the other person's, so that is the
        * side that had to be right.
+       *
+       * ── It must stay on while its OWN popover is open ──
+       * The reaction picker is a Radix Popover, so its content is PORTALLED to the body: the
+       * moment it opens, focus moves into the portal and the pointer follows it, so neither
+       * `group-hover/msg` nor `group-focus-within/msg` holds any more and this bar computed to
+       * `hidden`. That does not merely hide it — the trigger IS the popover's anchor, and a
+       * `display:none` anchor measures 0×0 at the origin, so the emoji row flew to the corner of
+       * the screen the instant you clicked it. `pickingEmoji` pins the bar open for exactly as
+       * long as the thing it anchors.
        */
-      className={`absolute -top-3 ${ours ? 'left-2' : 'right-2'} z-20 hidden group-hover/msg:flex
-                  group-focus-within/msg:flex items-center gap-0.5 rounded-full border border-hairline
-                  bg-card px-1 py-0.5 shadow-overlay`}
+      className={`absolute -top-3 ${ours ? 'left-2' : 'right-2'} z-20 items-center gap-0.5
+                  rounded-full border border-hairline bg-card px-1 py-0.5 shadow-overlay
+                  ${pickingEmoji ? 'flex' : 'hidden group-hover/msg:flex group-focus-within/msg:flex'}`}
     >
       {onReact && (
         <Popover open={pickingEmoji} onOpenChange={setPickingEmoji}>
@@ -1789,8 +1798,10 @@ const MessageActions: React.FC<{
             </button>
           </PopoverTrigger>
           {/* Opens back over the bubble rather than off the edge of the pane — mirrored with
-              the anchor above, so flipping one without the other cannot push it out of view. */}
-          <PopoverContent className="w-auto p-1.5" align={ours ? 'start' : 'end'}>
+              the anchor above, so flipping one without the other cannot push it out of view.
+              Upward, because the default (`bottom`) drops the emoji row straight over the words
+              you are reacting to; Radix flips it back down by itself at the top of the pane. */}
+          <PopoverContent className="w-auto p-1.5" side="top" sideOffset={6} align={ours ? 'start' : 'end'}>
             <div className="flex gap-0.5">
               {QUICK_REACTIONS.map((e) => (
                 <button
@@ -2127,7 +2138,22 @@ const MessageBubble: React.FC<{
   const moodStyleForMessage = (!ours && mood && mood !== 'neutral') ? moodStyle(mood) : null;
 
   return (
-    <div className={`group/msg relative flex gap-2.5 max-w-[82%] ${ours ? 'ml-auto flex-row-reverse' : ''}`}>
+    /*
+     * `w-fit`, and it is load-bearing rather than tidiness.
+     *
+     * A `div` with `flex` is a BLOCK-level flex container, so this row was 82% of the pane wide
+     * on every message — a five-character "χαχαχ" occupied the same box as a paragraph. Nothing
+     * looked wrong, because the bubble inside is content-sized and sits at the correct end.
+     *
+     * What it broke is the hover bar, which is `absolute right-2` against THIS box: it anchored
+     * to 82% of the pane instead of to the message, so on a short reply it floated hundreds of
+     * pixels out in the blank gutter with nothing under it. `w-fit` shrinks the row to the
+     * bubble, which is what `left-2`/`right-2` were always describing.
+     *
+     * Long messages are unchanged: `fit-content` still resolves to the available width and
+     * `max-w-[82%]` still caps it.
+     */
+    <div className={`group/msg relative flex w-fit gap-2.5 max-w-[82%] ${ours ? 'ml-auto flex-row-reverse' : ''}`}>
       {!isSystem && (
         <MessageActions
           ours={ours}
