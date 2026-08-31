@@ -27,6 +27,8 @@ import { inboundOutcomes } from '@/modules/finance/components/inboundStatus';
 import { MydataTypeLabel } from '@/modules/finance/components/MydataTypeLabel';
 import { InboundDocActionsMenu } from '@/modules/finance/components/InboundDocActionsMenu';
 import { InboundDocPreviewDialog } from '@/modules/finance/components/InboundDocPreviewDialog';
+import { CompleteLinesDialog } from '@/modules/finance/components/CompleteLinesDialog';
+import { ExpensePaymentsDialog } from '@/modules/finance/components/ExpensePaymentsDialog';
 import { ReceiveToWarehouseDialog } from '@/modules/finance/components/ReceiveToWarehouseDialog';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { NewOrderModal } from '@/modules/finance/components/OrdersPanel';
@@ -34,7 +36,7 @@ import { orderLinesFromDoc, docsWithOrders } from '@/modules/finance/utils/inbou
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { formatDate } from '@/utils/datetime';
-import { inboundDocumentNumber, invoicedTotal, isReverseCharged, selfAccountedVat } from '@/modules/finance/utils/inboundProvenance';
+import { inboundDocumentNumber, invoicedTotal, isReverseCharged, needsLineDetail, selfAccountedVat } from '@/modules/finance/utils/inboundProvenance';
 
 /** What the host needs to describe the list it is framing, without re-fetching it. */
 export interface SupplierInboundCounts {
@@ -167,6 +169,16 @@ export const SupplierInboundDocs: React.FC<{
   const [receiveDoc, setReceiveDoc] = useState<InboundDocument | null>(null);
   const [payDoc, setPayDoc] = useState<InboundDocument | null>(null);
   const [orderDoc, setOrderDoc] = useState<InboundDocument | null>(null);
+  /**
+   * "Say what was actually on it" — the editor for a document whose lines carry a value and no
+   * name. Two thirds of this workspace's received documents are that shape, and until one is
+   * completed nothing downstream (warehouse receive, product extraction, the markup ladder) can
+   * touch it. The inbox has offered it all along; this surface passed no handler, and
+   * `canAddDetail` requires one — so the menu entry was silently absent rather than disabled.
+   */
+  const [detailDoc, setDetailDoc] = useState<InboundDocument | null>(null);
+  /** The bill a document became — its payments and what is still owed on it, read-only. */
+  const [paymentsExpenseId, setPaymentsExpenseId] = useState<string | null>(null);
   /** Documents that already produced an order — read via their expense's `order_id`. */
   const [ordered, setOrdered] = useState<Set<string>>(new Set());
   /**
@@ -313,6 +325,7 @@ export const SupplierInboundDocs: React.FC<{
             <th className="px-4 py-2 text-right">Net</th>
             <th className="px-4 py-2 text-right">VAT</th>
             <th className="px-4 py-2 text-right">Payable</th>
+            <th className="px-4 py-2 text-center">Detail</th>
             <th className="px-4 py-2 text-center">Handled</th>
             {!readOnly && <th className="px-4 py-2 text-right"><span className="sr-only">Actions</span></th>}
           </tr>
@@ -320,7 +333,7 @@ export const SupplierInboundDocs: React.FC<{
         <tbody>
           {rows.length === 0 && (
             <tr>
-              <td colSpan={readOnly ? 7 : 8} className="px-4 py-6 text-center text-xs text-muted-foreground">
+              <td colSpan={readOnly ? 8 : 9} className="px-4 py-6 text-center text-xs text-muted-foreground">
                 {/* Two different kinds of nothing, and they need opposite responses. */}
                 {windowed ? (
                   <>
@@ -368,6 +381,14 @@ export const SupplierInboundDocs: React.FC<{
                     : formatMoney(d.total_vat ?? 0, d.currency)}
                 </td>
                 <td className="px-4 py-2 text-right font-medium">{formatMoney(invoicedTotal(d), d.currency)}</td>
+                {/* Value-only lines: the money is transmitted, the detail never was. Said out
+                    loud, because it is the one thing standing between this document and every
+                    downstream consumer that keys on a line description. */}
+                <td className="px-4 py-2 text-center">
+                  {needsLineDetail(d)
+                    ? <span className="text-[10px] text-amber-800 dark:text-amber-300" title="Value-only lines — nothing here can be received to the warehouse or turned into a product until someone says what was on it.">Needs detail</span>
+                    : <span className="text-[10px] text-muted-foreground/50">—</span>}
+                </td>
                 <td className="px-4 py-2 text-center">
                   {outcomes.length > 0
                     ? <span className="text-[10px]">
@@ -394,6 +415,11 @@ export const SupplierInboundDocs: React.FC<{
                         onCreateOrder={() => setOrderDoc(d)}
                         hasOrder={ordered.has(d.id)}
                         onReceiveStock={() => setReceiveDoc(d)}
+                        onAddLineDetail={() => setDetailDoc(d)}
+                        // The balance behind the bronze Gross column: a settled document still
+                        // shows its whole amount there, and this is the only way to reach what is
+                        // actually outstanding on the bill it became.
+                        onOpenPayments={d.created_supplier_bill_id ? () => setPaymentsExpenseId(d.created_supplier_bill_id!) : undefined}
                         onDismiss={() => dismiss(d.id)}
                         onChanged={load}
                       />
@@ -419,6 +445,20 @@ export const SupplierInboundDocs: React.FC<{
           onOpenChange={(v) => { if (!v) setPreviewDoc(null); }}
         />
       )}
+      {detailDoc && (
+        <CompleteLinesDialog
+          doc={detailDoc}
+          onOpenChange={(v) => { if (!v) setDetailDoc(null); }}
+          onDone={() => { setDetailDoc(null); void load(); }}
+        />
+      )}
+      <ExpensePaymentsDialog
+        workspaceId={workspaceId}
+        expenseId={paymentsExpenseId}
+        open={!!paymentsExpenseId}
+        onOpenChange={(v) => { if (!v) setPaymentsExpenseId(null); }}
+        onChanged={load}
+      />
       {receiveDoc && (
         <ReceiveToWarehouseDialog
           doc={receiveDoc}
