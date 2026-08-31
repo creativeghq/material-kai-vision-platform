@@ -14,7 +14,8 @@ import { round2, extractNet, vatCategory } from '@/modules/finance/lib/vatMath';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { EmailSendError } from '@/modules/email/services/emailService';
 import { unwrapEmailSendError } from '@/modules/email/lib/emailSenderGate';
-import type { BuyerIdentity } from '@/modules/finance/utils/salesDocumentKind';
+import type { BuyerIdentity, SalesDocumentKind } from '@/modules/finance/utils/salesDocumentKind';
+import { salesDocumentKindFor, salesDocumentKindReason } from '@/modules/finance/utils/salesDocumentKind';
 import { toLocalISODate } from '@/utils/datetime';
 
 // ─── Finance flow events (fire-and-forget) ───────────────────────────────────
@@ -2526,6 +2527,77 @@ const _financeServiceCore = {
       return { isCompany: false, vatNumber: (data as any).vat_number ?? null, contactType: (data as any).contact_type ?? null };
     }
     return null;
+  },
+
+  /**
+   * Can this order still produce a sales document, and which one? (#378 F1)
+   *
+   * WHY THIS IS A SERVICE CALL AND NOT A PROP
+   * -----------------------------------------
+   * `RecordPaymentDialog` used to take the answer from its host as two independent optionals —
+   * `fiscalDocKind` put the myDATA rows in the picker, `onIssueDoc` performed the filing — so a
+   * caller could offer a document it had no way to issue. Only ONE of seven surfaces passed
+   * either, which meant "take the money and file the document in one step" existed on the order
+   * screen and nowhere else. It could not simply be passed to the other six: on the generic
+   * surfaces the order is chosen INSIDE the dialog, so there is no order for a host to resolve
+   * from.
+   *
+   * The answer therefore has to be derived from the order, wherever the order comes from. One
+   * function, so the offer and the issue can never disagree.
+   *
+   * Returns null when there is nothing to offer, and the reasons are different on purpose:
+   *   - the order does not exist, or is not OURS to invoice (a purchase order issues nothing);
+   *   - it already carries a sales document, and a second from a payment would duplicate the
+   *     filing.
+   *
+   * VOID IS NOT A DOCUMENT. A voided invoice must not block a re-issue — that is precisely the
+   * state an operator gets into after a mistake, and the whole point of voiding it. Note this is
+   * deliberately stricter than `ordersService.invoicedOrderIds`, which answers a different
+   * question ("has this order produced any document at all", used for aging and party position)
+   * and counts void ones.
+   */
+  async resolveOrderIssueOffer(orderId: string): Promise<{ kind: SalesDocumentKind; reason: string } | null> {
+    const { data: order } = await supabase
+      .from('orders')
+      .select('id, order_type, customer_company_id, customer_contact_id')
+      .eq('id', orderId)
+      .maybeSingle();
+    if (!order || (order as any).order_type !== 'sales') return null;
+
+    const { data: existing } = await supabase
+      .from('invoices')
+      .select('id')
+      .eq('order_id', orderId)
+      .neq('status', 'void')
+      .limit(1);
+    if ((existing ?? []).length > 0) return null;
+
+    const buyer = await this.getBuyerIdentity({
+      companyId: (order as any).customer_company_id,
+      contactId: (order as any).customer_contact_id,
+    });
+    return { kind: salesDocumentKindFor(buyer), reason: salesDocumentKindReason(buyer) };
+  },
+
+  /**
+   * Issue the sales document this order should produce, and return its id.
+   *
+   * Beside `resolveOrderIssueOffer` on purpose: the thing that decides WHETHER to offer and the
+   * thing that DOES it were two independent optional props before (#378 F1), which is how a
+   * surface came to offer "Issue a retail receipt (ΑΛΠ) to myDATA", record the payment, issue
+   * nothing, and show a success toast. One module owns both halves now.
+   *
+   * `p_doc_kind` forwards the operator's pick rather than letting the RPC re-derive it: the buyer
+   * rule is right by default and wrong whenever the operator knows better — a business buying for
+   * private use takes an ΑΛΠ.
+   */
+  async issueSalesDocumentForOrder(orderId: string, kind?: SalesDocumentKind): Promise<string | null> {
+    const { data, error } = await supabase.rpc('generate_invoice_from_order', {
+      p_order: orderId,
+      p_doc_kind: kind ?? null,
+    });
+    if (error) throw error;
+    return (data as string | null) ?? null;
   },
 
   /** One expense in the same enriched shape, settled or not. */

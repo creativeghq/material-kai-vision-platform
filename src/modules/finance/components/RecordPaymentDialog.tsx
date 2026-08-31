@@ -35,6 +35,7 @@ import { ordersService, type OrderBalance, type OrderListRow } from '@/modules/f
 import { PaidFromSelect } from '@/modules/finance/components/PaidFromSelect';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { salesDocumentKindLabel, type SalesDocumentKind } from '@/modules/finance/utils/salesDocumentKind';
+import { invoiceGenerationErrorMessage } from '@/modules/finance/utils/invoiceGateMessage';
 import { parseDecimal } from '@/utils/decimal';
 import { todayLocalISO } from '@/utils/datetime';
 
@@ -62,31 +63,6 @@ export const RecordPaymentDialog: React.FC<{
   /** Settle THIS expense (a `supplier_bills` id): opens on the money-out branch with the expense
    *  already selected in the picker. Prefill, not a lock — it can be changed like any other. */
   presetExpenseId?: string;
-  /**
-   * When set (order-attached, received, no invoice yet), the fiscal document can be issued in the
-   * same step.
-   *
-   * ONE PROP, because offering the document and issuing it are one capability (#378 F1). These
-   * were three independent optionals — `fiscalDocKind`, `fiscalDocReason`, `onIssueDoc` — and the
-   * kind is what puts the myDATA rows in the picker while the handler is what performs the issue:
-   *
-   *     if (issuesFiscal && onIssueDoc) { await onIssueDoc(pickedFiscalKind); }
-   *
-   * A caller that passed the kind and not the handler therefore offered "Issue a retail receipt
-   * (ΑΛΠ) to myDATA", recorded the payment, issued nothing, and showed the success toast. No
-   * error, no type failure — the props were optional because the dialog is built to degrade.
-   * Seven surfaces mount this dialog and only one passes either; today it passes both, by
-   * discipline rather than by construction. Folded so the pairing is a type error instead, the
-   * same reason `updateSupplierBillMeta` takes a nested `link` object rather than five keys.
-   */
-  issueDoc?: {
-    /** The kind the SHARED buyer rule resolved. This dialog never re-derives it. */
-    kind: SalesDocumentKind;
-    /** Why that kind — shown under the picker, e.g. the buyer has no ΑΦΜ. */
-    reason?: string;
-    /** Runs after the payment is recorded. Best-effort: a failure never rolls the money back. */
-    issue: (kind?: SalesDocumentKind) => Promise<void>;
-  };
   /** Which side of the trade this payment is. 'supplier' = money OUT to the party we're buying
    *  from (a purchase order). Defaults to 'customer' — money in from whoever we sold to. */
   side?: 'customer' | 'supplier';
@@ -104,7 +80,7 @@ export const RecordPaymentDialog: React.FC<{
    * showed Unpaid with full Outstanding forever while the cash sat in the bank ledger.
    */
   orderCurrency?: string;
-}> = ({ workspaceId, open, onOpenChange, onSaved, initialCounterparty, orderId, orderLabel, defaultAmount, presetInvoiceId, presetExpenseId, issueDoc, side = 'customer', payableBills = [], orderCurrency }) => {
+}> = ({ workspaceId, open, onOpenChange, onSaved, initialCounterparty, orderId, orderLabel, defaultAmount, presetInvoiceId, presetExpenseId, side = 'customer', payableBills = [], orderCurrency }) => {
   const { toast } = useToast();
   const [kind, setKind] = useState<Kind>('received');
   const [amount, setAmount] = useState('');
@@ -137,13 +113,13 @@ export const RecordPaymentDialog: React.FC<{
    * default and wrong whenever the operator knows better — a business buying for private use
    * takes an ΑΛΠ. They are separate rows now, and the same asymmetry as the order menu applies:
    * a buyer with no ΑΦΜ is offered the receipt only, because AADE rejects a τιμολόγιο issued to a
-   * consumer, while the reverse is legal and simply costs them the VAT deduction. `issueDoc.kind`
+   * consumer, while the reverse is legal and simply costs them the VAT deduction. `issueOffer.kind`
    * carries that fact — 'receipt' means the shared rule found no VAT identity.
    */
   type IssueChoice = 'none' | 'payment_receipt' | 'fiscal_invoice' | 'fiscal_receipt';
   const [issueChoice, setIssueChoice] = useState<IssueChoice>('payment_receipt');
   const issuesFiscal = issueChoice === 'fiscal_invoice' || issueChoice === 'fiscal_receipt';
-  /** What the picked row actually issues — the argument `issueDoc.issue` is given. */
+  /** What the picked row actually issues — the argument the issue call is given. */
   const pickedFiscalKind: SalesDocumentKind | undefined = issueChoice === 'fiscal_invoice'
     ? 'invoice' : issueChoice === 'fiscal_receipt' ? 'receipt' : undefined;
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
@@ -182,6 +158,29 @@ export const RecordPaymentDialog: React.FC<{
     ? `The order itself${orderLabel ? ` — ${orderLabel}` : ''}`
     : 'None — unallocated credit';
   const effectiveOrderId = orderId ?? (pickedOrderId || undefined);
+
+  /**
+   * Can THIS order still produce a sales document, and which one? (#378 F1)
+   *
+   * Derived here, from whichever order is effectively selected, rather than handed in by the
+   * host. It used to be two independent optional props — one that put the myDATA rows in the
+   * picker and one that performed the filing — so a caller could offer a document it had no way
+   * to issue, and only ONE of the seven surfaces that mount this dialog passed either. It could
+   * not be fixed by passing it six more times: on the generic surfaces the order is chosen INSIDE
+   * this dialog, so there is no order for a host to resolve from.
+   *
+   * Re-resolves when the operator changes the order in the "For" picker, because the answer is a
+   * property of the order and not of the screen.
+   */
+  const [issueOffer, setIssueOffer] = useState<{ kind: SalesDocumentKind; reason: string } | null>(null);
+  useEffect(() => {
+    if (!open || kind !== 'received' || !effectiveOrderId) { setIssueOffer(null); return; }
+    let cancelled = false;
+    void financeService.resolveOrderIssueOffer(effectiveOrderId)
+      .then((offer) => { if (!cancelled) setIssueOffer(offer); })
+      .catch(() => { if (!cancelled) setIssueOffer(null); });
+    return () => { cancelled = true; };
+  }, [open, kind, effectiveOrderId]);
   /**
    * Settling a cost that ALREADY exists — entered only from that cost's own row (an expense in
    * Payables, a document in the Inbox), which is why it always arrives with a target. It is NOT
@@ -521,17 +520,18 @@ export const RecordPaymentDialog: React.FC<{
        * This was `catch { }` with no toast, directly above a block that reports
        * `creditNoteFiscalError` properly. The current caller happens to show its own destructive
        * toast, so the failure is visible today; the operator just gets a success toast beside it.
-       * An empty catch is a trap for the next `issueDoc.issue` that throws instead of handling.
+       * An empty catch is a trap for the next issue call that throws instead of handling.
        *
        * Best-effort is right — the money is recorded and a doc hiccup must not roll it back. What
        * is not right is silence.
        */
       let issueDocError: string | null = null;
-      if (issuesFiscal && issueDoc) {
+      if (issuesFiscal && issueOffer && effectiveOrderId) {
         try {
-          await issueDoc.issue(pickedFiscalKind);
+          await financeService.issueSalesDocumentForOrder(effectiveOrderId, pickedFiscalKind);
         } catch (docErr) {
-          issueDocError = docErr instanceof Error ? docErr.message : String(docErr);
+          // The 0%-VAT gate refuses BY NAME, so name the lines instead of leaking raw SQL.
+          issueDocError = invoiceGenerationErrorMessage(docErr);
           console.error('[payments] the document could not be issued', docErr);
         }
       }
@@ -761,10 +761,10 @@ export const RecordPaymentDialog: React.FC<{
                       Invoice is withheld from a buyer with no ΑΦΜ — not a preference we can
                       honour, since AADE rejects that document and generate_invoice_from_order
                       refuses it too. */}
-                  {issueDoc?.kind === 'invoice' && (
+                  {issueOffer?.kind === 'invoice' && (
                     <SelectItem value="fiscal_invoice">Issue an invoice (τιμολόγιο) to myDATA</SelectItem>
                   )}
-                  {issueDoc && (
+                  {issueOffer && (
                     <SelectItem value="fiscal_receipt">Issue a retail receipt (ΑΛΠ) to myDATA</SelectItem>
                   )}
                 </SelectContent>
@@ -773,10 +773,10 @@ export const RecordPaymentDialog: React.FC<{
                 {issuesFiscal
                   ? <>
                       <strong>{salesDocumentKindLabel(pickedFiscalKind!)}</strong> is transmitted to myDATA and cannot be deleted — correcting it needs a credit note.
-                      {issueDoc?.reason ? ` ${issueDoc.reason}` : ''}
+                      {issueOffer?.reason ? ` ${issueOffer.reason}` : ''}
                       {/* Say the cost of overriding the derived kind, rather than letting a
                           silent pick take the buyer's VAT deduction away. */}
-                      {pickedFiscalKind === 'receipt' && issueDoc?.kind === 'invoice'
+                      {pickedFiscalKind === 'receipt' && issueOffer?.kind === 'invoice'
                         ? ' This buyer has a VAT number — a retail receipt is legal, but they cannot deduct the VAT.'
                         : ''}
                     </>

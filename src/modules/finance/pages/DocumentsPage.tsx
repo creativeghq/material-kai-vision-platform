@@ -23,6 +23,7 @@ import { FINANCE_BASE, FINANCE_TAB, financeTabUrl } from '@/modules/finance/rout
 import { inboundService, type InboundDocument } from '@/modules/finance/services/inboundService';
 import { deliveryNotesService, type DeliveryNote } from '@/modules/finance/services/deliveryNotesService';
 import { chequesService, type Cheque } from '@/modules/finance/services/chequesService';
+import { chequeJob, deliveryNoteJob, type DocumentJob } from '@/modules/finance/utils/documentJob';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsMenu';
 import { useInboundDocActions } from '@/modules/finance/components/useInboundDocActions';
@@ -768,6 +769,27 @@ const DocTableEmpty: React.FC<DocEmptyProps & { colSpan: number; noun: string; d
   </td></tr>
 );
 
+/**
+ * The job a document belongs to, DERIVED from its parent (#378 L5).
+ *
+ * Rendered as a link, because "which job" is only useful if you can go there. An em dash when the
+ * parent has no job — the platform's own rule for an absent value, and honest: it means nobody
+ * filed the parent against a job, not that this document is unfiled.
+ */
+const JobCell: React.FC<{ job: DocumentJob | null }> = ({ job }) => {
+  const navigate = useNavigate();
+  if (!job) return <span className="text-muted-foreground">—</span>;
+  return (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); navigate(`/projects/${job.projectId}`); }}
+      className="text-left text-xs hover:underline rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      {job.projectName ?? 'Project'}
+    </button>
+  );
+};
+
 const ChequesTable: React.FC<{ rows: Cheque[]; readOnly: boolean; onChanged: () => void } & DocEmptyProps> = ({ rows, readOnly, onChanged, ...empty }) => {
   const { toast } = useToast();
   const setStatus = async (id: string, status: Cheque['status']) => {
@@ -785,6 +807,7 @@ const ChequesTable: React.FC<{ rows: Cheque[]; readOnly: boolean; onChanged: () 
           <th className="px-4 py-2 text-left">Bank</th>
           <th className="px-4 py-2 text-left">Due</th>
           <th className="px-4 py-2 text-right">Amount</th>
+          <th className="px-4 py-2 text-left">Job</th>
           <th className="px-4 py-2 text-left">Status</th>
         </tr>
       </thead>
@@ -792,7 +815,7 @@ const ChequesTable: React.FC<{ rows: Cheque[]; readOnly: boolean; onChanged: () 
         {rows.length === 0 && (
           <DocTableEmpty
             {...empty}
-            colSpan={6}
+            colSpan={7}
             noun="cheques"
             description="Post-dated cheques you have issued or received, with the bank and due date, so they surface before they land."
             newLabel="New cheque"
@@ -805,6 +828,7 @@ const ChequesTable: React.FC<{ rows: Cheque[]; readOnly: boolean; onChanged: () 
             <td className="px-4 py-2">{c.bank ?? '—'}</td>
             <td className={`px-4 py-2 ${overdue(c) ? 'text-destructive font-medium' : ''}`}>{c.due_date ?? '—'}</td>
             <td className="px-4 py-2 text-right font-medium">{formatMoney(c.amount, c.currency)}</td>
+            <td className="px-4 py-2"><JobCell job={chequeJob(c)} /></td>
             <td className="px-4 py-2">
               {readOnly ? (
                 <span className={`text-[10px] ${statusTone(c.status)}`}>{humanizeLabel(c.status)}</span>
@@ -860,6 +884,7 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
           <th className="px-4 py-2 text-left">Number</th>
           <th className="px-4 py-2 text-left">Type</th>
           <th className="px-4 py-2 text-left">Date</th>
+          <th className="px-4 py-2 text-left">Job</th>
           <th className="px-4 py-2 text-center">Status</th>
           <th className="px-4 py-2 text-right"><span className="sr-only">Actions</span></th>
         </tr>
@@ -868,7 +893,7 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
         {rows.length === 0 && (
           <DocTableEmpty
             {...empty}
-            colSpan={5}
+            colSpan={6}
             noun="delivery notes"
             description="Goods moving in or out — a dispatch to a customer, a receipt from a supplier. A note can be turned into an invoice once it is issued."
             newLabel="New delivery note"
@@ -879,6 +904,7 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
             <td className="px-4 py-2 font-mono text-xs">{d.delivery_note_number ?? <span className="text-muted-foreground">draft</span>}</td>
             <td className="px-4 py-2"><span className="text-[10px] text-muted-foreground">{d.kind === 'receipt' ? 'Receipt' : 'Dispatch'}</span></td>
             <td className="px-4 py-2">{d.issued_at ? formatDate(d.issued_at) : formatDate(d.created_at)}</td>
+            <td className="px-4 py-2"><JobCell job={deliveryNoteJob(d)} /></td>
             <td className="px-4 py-2 text-center">
               <div className="flex items-center justify-center gap-2">
                 <span className={`text-[10px] ${statusTone(d.status)}`}>{humanizeLabel(d.status)}</span>

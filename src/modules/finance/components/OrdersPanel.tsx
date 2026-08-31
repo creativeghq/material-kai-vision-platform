@@ -4673,6 +4673,11 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
         is settled by the customer paying us, a purchase order by us paying the supplier. The dialog
         used to be hard-wired to the customer side, so "Record payment" on a purchase order offered
         "Received from customer" — the opposite side of the trade. */}
+    {/* No `issueDoc` prop any more (#378 F1). Whether this order can still produce a sales
+        document — and which one — is a property of the ORDER, so the dialog derives it from
+        whichever order is selected, including one picked inside the dialog on a screen that never
+        had an order to hand. That is what makes "take the money and file the document in one step"
+        reachable from more than this panel. */}
     {order && (
       <RecordPaymentDialog
         workspaceId={order.workspace_id}
@@ -4690,20 +4695,6 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
         payableBills={(fin?.supplierBills ?? []).filter((b) => Number(b.amount_due) > 0)}
         defaultAmount={payInOpen?.amount}
         presetInvoiceId={order.order_type === 'sales' ? (fin?.invoices ?? []).find((iv) => Number(iv.amount_due) > 0)?.id : undefined}
-        // Offered only while a SALES order has no sales document yet — once one exists, issuing a
-        // second from a payment would duplicate the filing. A purchase order issues nothing.
-        //
-        // One object, so the OFFER and the ISSUER cannot be supplied apart (#378 F1): the kind is
-        // what puts the myDATA rows in the picker, and `issue` is what performs the filing.
-        // `issue` forwards the operator's pick — dropping the argument would make the dialog's
-        // τιμολόγιο/ΑΛΠ choice decorative, issuing whatever the buyer rule derived.
-        issueDoc={order.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0
-          ? {
-            kind: salesDocKind,
-            reason: salesDocumentKindReason(buyerIdentity),
-            issue: (kind) => createSalesDocument(kind),
-          }
-          : undefined}
         onSaved={() => { setPayInOpen(null); void load(order.id); onChanged(); }}
       />
     )}

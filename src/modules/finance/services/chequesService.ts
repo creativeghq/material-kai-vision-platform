@@ -1,6 +1,9 @@
 /** Cheques — post-dated cheques in (from customers) / out (to suppliers). */
 import { supabase } from '@/integrations/supabase/client';
 
+/** The parent a cheque settles, embedded so its job can be derived on read. */
+type ChequeJobBearer = { project_id: string | null; projects?: { name: string | null } | { name: string | null }[] | null } | null;
+
 export interface Cheque {
   id: string;
   workspace_id: string;
@@ -19,13 +22,20 @@ export interface Cheque {
   payment_id: string | null;
   notes: string | null;
   created_at: string;
+  /** Embedded parents — read-only, for `chequeJob`. Never written. */
+  invoices?: ChequeJobBearer | ChequeJobBearer[];
+  supplier_bills?: ChequeJobBearer | ChequeJobBearer[];
 }
 
 export const chequesService = {
   async list(workspaceId: string): Promise<Cheque[]> {
     const { data, error } = await supabase
       .from('cheques')
-      .select('*')
+      // The job is DERIVED from the document this cheque settles (#378 L5) — `cheques` carries no
+      // `project_id` and must not, because that would be a second copy of what the parent holds.
+      // `chequeJob` picks the parent by DIRECTION; see documentJob.ts for why that is not a
+      // precedence.
+      .select('*, invoices(project_id, projects(name)), supplier_bills(project_id, projects(name))')
       .eq('workspace_id', workspaceId)
       .order('due_date', { ascending: true, nullsFirst: false });
     if (error) throw error;

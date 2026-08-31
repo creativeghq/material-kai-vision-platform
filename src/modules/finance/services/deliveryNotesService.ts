@@ -19,6 +19,8 @@ export interface DeliveryNote {
   fiscal_mark: string | null;
   fiscal_status: string | null;
   created_at: string;
+  /** Embedded order — read-only, for `deliveryNoteJob`. Never written. */
+  orders?: { project_id: string | null; projects?: { name: string | null } | { name: string | null }[] | null } | null;
 }
 
 export interface DeliveryLineInput {
@@ -68,7 +70,9 @@ export const deliveryNotesService = {
   async list(workspaceId: string): Promise<DeliveryNote[]> {
     const { data, error } = await supabase
       .from('delivery_notes')
-      .select('*')
+      // The job comes from the ORDER this note was cut from (#378 L5). No `project_id` column
+      // here on purpose — see documentJob.ts.
+      .select('*, orders(project_id, projects(name))')
       .eq('workspace_id', workspaceId)
       .order('created_at', { ascending: false });
     if (error) throw error;

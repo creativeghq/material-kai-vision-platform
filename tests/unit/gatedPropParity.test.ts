@@ -21,7 +21,10 @@
  *   • `RecordPaymentDialog` — `fiscalDocKind` OFFERED the myDATA rows and `onIssueDoc` PERFORMED
  *     the filing, as two independent optionals. Pass the first without the second and the operator
  *     picks "Issue a retail receipt (ΑΛΠ) to myDATA", the payment saves, and nothing is issued
- *     under a success toast. Folded into one `issueDoc` object, so the pair is a type error.
+ *     under a success toast. The prop is gone entirely now: the offer is a property of the ORDER,
+ *     so the dialog derives it from whichever order is selected. Folding the pair into one object
+ *     closed the latent half; deriving it closed the live one, because the generic payment screens
+ *     pick their order INSIDE the dialog and had no order for a host to resolve from.
  *   • `ContactSearchDropdown` / `CompanySearchDropdown` — `allowCreate` off on the three screens
  *     where a party that does not exist yet actually turns up. The dropdown IS the duplicate
  *     check, so its absence does not stop a create; it moves the create somewhere unchecked.
@@ -318,16 +321,52 @@ describe('a gated capability is offered by every host', () => {
     expect(stale, `EXEMPT names props that no longer exist: ${stale.join(', ')}`).toEqual([]);
   });
 
-  it('the fiscal pair travels as one object, so it cannot be half-passed', () => {
-    // #378 F1 in its permanent form: `fiscalDocKind` offered the myDATA rows and `onIssueDoc`
-    // performed the filing. Two optionals meant a caller could offer a document it could not
-    // issue. This is the shape that must not come back.
+  it('the fiscal offer is DERIVED from the order, not handed in by the host', () => {
+    /**
+     * #378 F1, in its final form. The offer (`fiscalDocKind`, which put the myDATA rows in the
+     * picker) and the issuer (`onIssueDoc`) were two independent optional props, so a caller could
+     * offer a document it had no way to issue — and only one of seven surfaces passed either.
+     *
+     * Folding them into one object made the pair a type error, which closed the latent half. It
+     * did not close the LIVE half: on the generic payment surfaces the order is chosen inside the
+     * dialog, so there is no order for a host to resolve from and nothing to hand in.
+     *
+     * So the prop is gone entirely. Whether an order can still produce a sales document — and
+     * which one — is a property of the ORDER, derived by `resolveOrderIssueOffer` beside the
+     * `issueSalesDocumentForOrder` that acts on it. There is no pair left to half-pass, on any
+     * surface, present or future.
+     */
     const dialog = SOURCES.get(join(SRC, 'modules', 'finance', 'components', 'RecordPaymentDialog.tsx'));
     expect(dialog, 'RecordPaymentDialog moved — re-point this check').toBeTruthy();
-    expect(dialog, 'the offer and the issuer are separate props again').not.toMatch(/\bfiscalDocKind\?\s*:/);
-    expect(dialog, 'the offer and the issuer are separate props again').not.toMatch(/\bonIssueDoc\?\s*:/);
-    expect(dialog!, 'issueDoc must carry BOTH the kind and the issuer').toMatch(
-      /issueDoc\?\s*:\s*\{[\s\S]*?kind:[\s\S]*?issue:[\s\S]*?\}/,
+
+    // Written as literal regexes, NOT built from a template string: inside a template literal
+    // `\b` is a backspace and `\s` is a bare `s`, so a hand-assembled `new RegExp(`\b${x}\?\s*:`)`
+    // matches nothing and the check passes on every input. It did, until this was watched to fire.
+    const PROP_DECLARATIONS: Array<[string, RegExp]> = [
+      ['fiscalDocKind', /\bfiscalDocKind\?\s*:/],
+      ['onIssueDoc', /\bonIssueDoc\?\s*:/],
+      ['issueDoc', /\bissueDoc\?\s*:/],
+    ];
+    for (const [gone, re] of PROP_DECLARATIONS) {
+      expect(
+        dialog,
+        `\`${gone}\` is a prop again. The offer must be derived from the selected order, not `
+        + 'supplied by the host — otherwise the surfaces that pick an order inside the dialog can '
+        + 'never offer it, which is how this ended up on one screen of seven.',
+      ).not.toMatch(re);
+    }
+
+    expect(dialog!, 'the dialog must resolve the offer itself').toMatch(/resolveOrderIssueOffer\(/);
+    expect(dialog!, 'the dialog must issue through the same module that offered').toMatch(
+      /issueSalesDocumentForOrder\(/,
     );
+
+    // The two halves live together, so they cannot drift apart again.
+    const svc = readFileSync(join(SRC, 'modules', 'finance', 'services', 'financeService.ts'), 'utf8');
+    expect(svc, 'resolveOrderIssueOffer must live beside the issue call').toMatch(
+      /resolveOrderIssueOffer[\s\S]{0,4000}issueSalesDocumentForOrder/,
+    );
+    // A voided document must not block a re-issue — that is the state an operator voids INTO.
+    expect(svc, 'the offer must ignore voided documents').toMatch(/neq\('status', 'void'\)/);
   });
 });
