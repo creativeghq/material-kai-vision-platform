@@ -110,4 +110,20 @@ describe('a worker with no login can have hours', () => {
       'claiming a subcontractor’s hours as your own would put them in the wrong person’s "my time"',
     ).toMatch(/user_id: entry\.employee_id \? null :/);
   });
+
+  it('a UI actually PASSES it — a service that merely accepts the field is not a writer', () => {
+    /**
+     * Caught in my own work while sweeping for exactly this shape. `time_entries.employee_id`
+     * existed, was CHECK-constrained, was accepted by `timeTrackingService.create` and was
+     * carried into the insert — and no form passed it, so the column could never hold a value.
+     * That is the dead-column shape the rest of this issue is about, one layer up: the writer
+     * looked present because the SERVICE had the parameter.
+     *
+     * The roster offered is `listTaskAssignees`, the same deduped member+employee list the task
+     * picker uses, so the two surfaces cannot disagree about who exists.
+     */
+    const form = read('src/modules/finance/tabs/TimeBillingTab.tsx');
+    expect(form, 'the log-time form must pass employee_id').toMatch(/employee_id: \w+ \|\| null/);
+    expect(form, 'the roster must come from the shared assignee list').toMatch(/listTaskAssignees\(/);
+  });
 });

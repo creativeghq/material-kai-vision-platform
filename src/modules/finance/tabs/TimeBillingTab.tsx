@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 import { formatMoney } from '@/modules/finance/services/financeService';
 import { timeTrackingService, type TimeEntry, type TimeReportUserRow, type TimeReportContactRow } from '@/modules/finance/services/timeTrackingService';
+import { projectsService } from '@/modules/projects/services/projectsService';
 import { parseDecimal } from '@/utils/decimal';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { FilterBar, optionsFromRows, useFilters, type FilterGroupDef } from '@/components/core/filters';
@@ -43,6 +44,20 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
   const [desc, setDesc] = useState('');
   const [saving, setSaving] = useState(false);
   const [projectId, setProjectId] = useState('');
+  /**
+   * Whose hours these are (#378 N1).
+   *
+   * Blank = mine, the signed-in user. Otherwise an `hr_employees` row — a fitter or a
+   * subcontractor with no platform login, who N2 already made assignable to a task. Until this
+   * existed, `time_entries.user_id` FKs `auth.users`, so the schedule could name somebody whose
+   * hours could never be recorded and who could therefore never appear on that job's labour cost.
+   *
+   * The roster comes from `listTaskAssignees`, which is the SAME deduped member+employee list the
+   * task picker uses — somebody who is both a member and an employee appears once, as the
+   * employee, so the two surfaces cannot disagree about who exists.
+   */
+  const [workerEmployeeId, setWorkerEmployeeId] = useState('');
+  const [roster, setRoster] = useState<Array<{ kind: 'employee' | 'member'; id: string; name: string }>>([]);
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -87,6 +102,17 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
     finally { setLoading(false); }
   };
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, [workspaceId]);
+
+  // The roster, for "Worked by". Failing to load it must not break logging your OWN time — the
+  // common case needs no roster at all.
+  useEffect(() => {
+    if (!workspaceId) return;
+    let cancelled = false;
+    void projectsService.listTaskAssignees(workspaceId)
+      .then((rows) => { if (!cancelled) setRoster(rows); })
+      .catch(() => { if (!cancelled) setRoster([]); });
+    return () => { cancelled = true; };
+  }, [workspaceId]);
 
   // Projects available to attribute time to. Queried directly (rather than via projectsService)
   // to keep the finance bundle from pulling in the whole projects service for two columns.
@@ -133,6 +159,7 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
         project_id: projectId || null,
         work_date: workDate, minutes: Math.round(h * 60), hourly_rate: Number.isFinite(r) ? r : 0,
         description: desc.trim(),
+        employee_id: workerEmployeeId || null,
       });
       setDesc(''); setHours('1');
       await load();
@@ -225,6 +252,22 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
                 )}
               </div>
             )}
+          </div>
+          {/* Whose hours (#378 N1). Only ROSTER rows are offered: a platform member logging their
+              own time is the default and needs no picker, while somebody with no login cannot log
+              their own and must be recorded by someone else. */}
+          <div className="space-y-1">
+            <Label className="text-xs">Worked by</Label>
+            <select
+              className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+              value={workerEmployeeId}
+              onChange={(e) => setWorkerEmployeeId(e.target.value)}
+            >
+              <option value="">Me</option>
+              {roster.filter((r2) => r2.kind === 'employee').map((r2) => (
+                <option key={r2.id} value={r2.id}>{r2.name}</option>
+              ))}
+            </select>
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Date</Label>
