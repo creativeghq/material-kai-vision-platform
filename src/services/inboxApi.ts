@@ -396,6 +396,12 @@ export const inboxApi = {
       participants: InboxParticipant[];
       messages: InboxMessage[];
       whatsapp_window: WhatsAppWindow | null;
+      /**
+       * The messages I have starred. Resolved for the CALLER rather than set on the message rows:
+       * a star is personal, and a shared inbox must not show one colleague another's bookmarks.
+       * Absent on an older API response, which reads as "none" and is correct.
+       */
+      starred_message_ids?: string[];
     }>('get_thread', { thread_id });
   },
   sendMessage(input: {
@@ -484,6 +490,33 @@ export const inboxApi = {
    */
   linkPreview(thread_id: string, url: string) {
     return call<{ preview: InboxLinkPreview }>('link_preview', { thread_id, url });
+  },
+
+  // ── Acting on one message ──
+
+  /**
+   * Put a message at the top of the conversation, for everyone reading it.
+   *
+   * Local to this inbox. WhatsApp's own pin lives on the customer's phone and Zernio exposes no
+   * way to set it, so this does not claim to have pinned anything for them.
+   */
+  pinMessage(thread_id: string, message_id: string, pinned: boolean) {
+    return call<{ ok: boolean; pinned: boolean }>('pin_message', { thread_id, message_id, pinned });
+  },
+  /** MY bookmark on a message — visible to nobody else. A pin is the conversation's; this is mine. */
+  starMessage(thread_id: string, message_id: string, starred: boolean) {
+    return call<{ ok: boolean; starred: boolean }>('star_message', { thread_id, message_id, starred });
+  },
+  /** Send what somebody said into another conversation — relayed, not just copied into our rows. */
+  forwardMessage(thread_id: string, message_id: string, to_thread_id: string) {
+    return call<{ message: InboxMessage }>('forward_message', { thread_id, message_id, to_thread_id });
+  },
+  /**
+   * Remove a message from this inbox. NOT an unsend: a delivered WhatsApp message stays on the
+   * customer's phone, because the provider gives us no way to retract it.
+   */
+  deleteMessage(thread_id: string, message_id: string) {
+    return call<{ ok: boolean; already?: boolean }>('delete_message', { thread_id, message_id });
   },
 
   // ── Labels (owner/admin manage; any member assigns) ──

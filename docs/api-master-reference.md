@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (134)
+## 1. Supabase Edge Functions (137)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -96,6 +96,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | Function | Auth | Summary |
 |---|---|---|
 | `contracts-api` | JWT / public | Contracts & e-signature - manage contracts and the public signer page |
+| `finance-assessment` | JWT | Derive the workspace's finance health signals, and optionally write the AI assessment of them |
 | `finance-customer-documents` _(GET + POST)_ | JWT | Customer self-service view of their own invoices, receipts and orders |
 | `finance-digest-aggregate` | JWT | Send finance digest emails and dispatch quote follow-up bell notifications |
 | `finance-fiscal-offline-recovery` | cron | Re-query connector for pending MARK on offline-accepted fiscal documents |
@@ -165,6 +166,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | Function | Auth | Summary |
 |---|---|---|
 | `real-estate-api` | JWT | Real Estate module — listings, leads, viewings, offers, sales, lettings, investments and deals |
+| `real-estate-assessment` | JWT | Derive one property listing's health signals, and optionally write the AI assessment of them |
 | `real-estate-buyer-digests` | cron | Daily cron — emails saved-search digests to buyers with a matching new listing |
 | `real-estate-calendar` _(GET + POST)_ | userJwt | Pushes viewings into the agent's own Google Calendar (per-user OAuth) |
 | `real-estate-feed` _(GET + POST)_ | token / public | Tokenized XML syndication feed (Kyero / OpenImmo / generic) for property portals |
@@ -339,6 +341,12 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 |---|---|---|
 | `embed-agent` _(GET + POST)_ | public | Public agent surface for the website embed SDK — allowlisted tools, no model turn |
 | `products-3d-api` _(GET + POST)_ | public | Public product + 3D model read for the website embed SDK |
+
+**Projects**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `project-assessment` | JWT | Derive a project's health signals, and optionally write the AI assessment of them |
 
 **Stock**
 

@@ -7855,6 +7855,113 @@
           }
         ],
         "response": "{ok:true, thread_id:string}"
+      },
+      {
+        "name": "link_preview",
+        "summary": "What a URL in a conversation points at — the page's own Open Graph title, description and image, fetched through the SSRF guard and cached per URL",
+        "params": [
+          {
+            "name": "thread_id",
+            "required": true,
+            "type": "string (uuid)",
+            "desc": "The conversation the URL was pasted into. The URL must appear in one of its messages — this is not a general-purpose fetch proxy"
+          },
+          {
+            "name": "url",
+            "required": true,
+            "type": "string (https url)",
+            "desc": "Max 2048 characters. https only; redirects are followed but every hop is re-validated"
+          }
+        ],
+        "response": "{preview: {url, final_url, cache_status: 'ok'|'no_metadata'|'fetch_failed'|'blocked', title, description, image_url, site_name, error}}"
+      },
+      {
+        "name": "pin_message",
+        "summary": "Pin a message to the top of the conversation for everyone, or unpin it. Local to this inbox — WhatsApp exposes no way to pin on the customer’s side",
+        "params": [
+          {
+            "name": "thread_id",
+            "required": true,
+            "type": "string (uuid)"
+          },
+          {
+            "name": "message_id",
+            "required": true,
+            "type": "string (uuid)"
+          },
+          {
+            "name": "pinned",
+            "required": false,
+            "type": "boolean",
+            "desc": "Defaults to true. Members only"
+          }
+        ],
+        "response": "{ok, pinned}"
+      },
+      {
+        "name": "star_message",
+        "summary": "Bookmark a message for the CALLER only. Invisible to everybody else — a pin is the conversation’s, a star is yours",
+        "params": [
+          {
+            "name": "thread_id",
+            "required": true,
+            "type": "string (uuid)"
+          },
+          {
+            "name": "message_id",
+            "required": true,
+            "type": "string (uuid)"
+          },
+          {
+            "name": "starred",
+            "required": false,
+            "type": "boolean",
+            "desc": "Defaults to true"
+          }
+        ],
+        "response": "{ok, starred}"
+      },
+      {
+        "name": "forward_message",
+        "summary": "Send a message into another conversation. Requires membership of BOTH threads, and relays to the channel like any other outbound message",
+        "params": [
+          {
+            "name": "thread_id",
+            "required": true,
+            "type": "string (uuid)",
+            "desc": "The conversation the message is in"
+          },
+          {
+            "name": "message_id",
+            "required": true,
+            "type": "string (uuid)"
+          },
+          {
+            "name": "to_thread_id",
+            "required": true,
+            "type": "string (uuid)",
+            "desc": "Where it goes. Subject to the WhatsApp 24h service window like any send"
+          }
+        ],
+        "response": "{message}"
+      },
+      {
+        "name": "delete_message",
+        "summary": "Remove a message from this inbox (soft, `deleted_at`). NOT an unsend: a delivered WhatsApp message stays on the recipient’s phone",
+        "params": [
+          {
+            "name": "thread_id",
+            "required": true,
+            "type": "string (uuid)"
+          },
+          {
+            "name": "message_id",
+            "required": true,
+            "type": "string (uuid)",
+            "desc": "The sender, or a workspace owner/admin"
+          }
+        ],
+        "response": "{ok, already?}"
       }
     ]
   },

@@ -148,6 +148,10 @@
       "description": "Products functions."
     },
     {
+      "name": "Projects",
+      "description": "Projects functions."
+    },
+    {
       "name": "Stock",
       "description": "Stock functions."
     },
@@ -15101,6 +15105,149 @@
                       }
                     },
                     "description": "Returns: {ok:true, thread_id:string}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "thread_id",
+                      "url"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "link_preview"
+                        ],
+                        "description": "What a URL in a conversation points at — the page's own Open Graph title, description and image, fetched through the SSRF guard and cached per URL"
+                      },
+                      "thread_id": {
+                        "type": "string",
+                        "description": "The conversation the URL was pasted into. The URL must appear in one of its messages — this is not a general-purpose fetch proxy (string (uuid))"
+                      },
+                      "url": {
+                        "type": "string",
+                        "description": "Max 2048 characters. https only; redirects are followed but every hop is re-validated (string (https url))"
+                      }
+                    },
+                    "description": "Returns: {preview: {url, final_url, cache_status: 'ok'|'no_metadata'|'fetch_failed'|'blocked', title, description, image_url, site_name, error}}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "thread_id",
+                      "message_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "pin_message"
+                        ],
+                        "description": "Pin a message to the top of the conversation for everyone, or unpin it. Local to this inbox — WhatsApp exposes no way to pin on the customer’s side"
+                      },
+                      "thread_id": {
+                        "type": "string",
+                        "description": "string (uuid)"
+                      },
+                      "message_id": {
+                        "type": "string",
+                        "description": "string (uuid)"
+                      },
+                      "pinned": {
+                        "type": "boolean",
+                        "description": "Defaults to true. Members only"
+                      }
+                    },
+                    "description": "Returns: {ok, pinned}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "thread_id",
+                      "message_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "star_message"
+                        ],
+                        "description": "Bookmark a message for the CALLER only. Invisible to everybody else — a pin is the conversation’s, a star is yours"
+                      },
+                      "thread_id": {
+                        "type": "string",
+                        "description": "string (uuid)"
+                      },
+                      "message_id": {
+                        "type": "string",
+                        "description": "string (uuid)"
+                      },
+                      "starred": {
+                        "type": "boolean",
+                        "description": "Defaults to true"
+                      }
+                    },
+                    "description": "Returns: {ok, starred}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "thread_id",
+                      "message_id",
+                      "to_thread_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "forward_message"
+                        ],
+                        "description": "Send a message into another conversation. Requires membership of BOTH threads, and relays to the channel like any other outbound message"
+                      },
+                      "thread_id": {
+                        "type": "string",
+                        "description": "The conversation the message is in (string (uuid))"
+                      },
+                      "message_id": {
+                        "type": "string",
+                        "description": "string (uuid)"
+                      },
+                      "to_thread_id": {
+                        "type": "string",
+                        "description": "Where it goes. Subject to the WhatsApp 24h service window like any send (string (uuid))"
+                      }
+                    },
+                    "description": "Returns: {message}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "thread_id",
+                      "message_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "delete_message"
+                        ],
+                        "description": "Remove a message from this inbox (soft, `deleted_at`). NOT an unsend: a delivered WhatsApp message stays on the recipient’s phone"
+                      },
+                      "thread_id": {
+                        "type": "string",
+                        "description": "string (uuid)"
+                      },
+                      "message_id": {
+                        "type": "string",
+                        "description": "The sender, or a workspace owner/admin (string (uuid))"
+                      }
+                    },
+                    "description": "Returns: {ok, already?}"
                   }
                 ],
                 "discriminator": {
@@ -25889,6 +26036,207 @@
                 ],
                 "discriminator": {
                   "propertyName": "action"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/project-assessment": {
+      "post": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "Derive a project's health signals, and optionally write the AI assessment of them",
+        "operationId": "post_project_assessment",
+        "description": "Two modes over one project. `preview` returns the SQL derivation only — the signals across six dimensions, the dimension scores and the verdict — and is free. `run` reserves credits, adds one Claude turn over those same signals to produce a headline, a narrative and a ranked action list, then settles against real token usage. The model never counts, scores or decides the verdict: every number comes from get_assessment_snapshot. Requires the `project-assessment` module and workspace membership on the target project.\n\n**Response:** (`application/json`)\n\n📖 [docs/project-ai-assessment.md](https://github.com/creativeghq/material-kai-vision-platform/blob/main/docs/project-ai-assessment.md)",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/finance-assessment": {
+      "post": {
+        "tags": [
+          "Finance"
+        ],
+        "summary": "Derive the workspace's finance health signals, and optionally write the AI assessment of them",
+        "operationId": "post_finance_assessment",
+        "description": "Same two modes as project-assessment, over the BOOKS. The subject is the caller's own workspace — there is no finance record, so no id is taken from the body. Signals cover configuration, the quote-to-invoice pipeline, margin and cash, obligations, fiscal filing and bank reconciliation, and debtors; each figure comes from the derivation that already owns it (vw_ar_aging, vw_ap_aging, get_monthly_pnl, get_order_settlements, vw_uninvoiced_sales_orders, report_cashflow_per_day). Requires the `finance-assessment` module.\n\n**Response:** (`application/json`)\n\n📖 [docs/project-ai-assessment.md](https://github.com/creativeghq/material-kai-vision-platform/blob/main/docs/project-ai-assessment.md)",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/real-estate-assessment": {
+      "post": {
+        "tags": [
+          "Real Estate"
+        ],
+        "summary": "Derive one property listing's health signals, and optionally write the AI assessment of them",
+        "operationId": "post_real_estate_assessment",
+        "description": "Same two modes as project-assessment, over ONE property. Signals cover listing completeness (photos, description, price, energy class, area), pricing against the listing's own history, returns (yield, rent arrears, deposit protection), tenancy and listing expiries, open maintenance, and whether enquiries and viewings are being answered. Market activity comes from get_property_performance and is never recounted. Requires the `real-estate-assessment` module.\n\n**Response:** (`application/json`)\n\n📖 [docs/project-ai-assessment.md](https://github.com/creativeghq/material-kai-vision-platform/blob/main/docs/project-ai-assessment.md)",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }

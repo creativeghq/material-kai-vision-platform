@@ -7,6 +7,7 @@ import {
   FileText, FolderKanban, Tag, Users, Globe, Hash, ChevronRight, BadgeCheck,
   User as UserIcon, MessagesSquare, Settings2, ArrowLeft, CheckCircle2, Wallet, EyeOff, Eye, Reply,
   Archive, ArchiveRestore, Trash2, Sparkles, Check, CheckCheck, Link2,
+  MoreHorizontal, Forward, Pin, PinOff, Star, StickyNote as StickyNoteIcon,
   ShoppingCart, AlertTriangle, ExternalLink, Image as ImageIcon, CookingPot,
   Smile, Copy, Download,
 } from 'lucide-react';
@@ -50,6 +51,10 @@ import { formatDate, formatTime } from '@/utils/datetime';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/core/ui/dialog';
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator,
+} from '@/components/core/ui/dropdown-menu';
 import {
   inboxApi, signInboxAttachment, LABEL_COLORS, labelChipClass,
   type InboxThread, type InboxMessage, type InboxParticipant, type InboxAttachment,
@@ -250,6 +255,10 @@ const InboxPage: React.FC = () => {
   const [showArchived, setShowArchived] = useState(false);
   const [statusTab, setStatusTab] = useState<InboxThreadStatus>('open');
   const [wsLabels, setWsLabels] = useState<InboxLabel[]>([]);
+  /** MY starred messages on the open thread. Personal — resolved for the caller by get_thread. */
+  const [starredIds, setStarredIds] = useState<Set<string>>(new Set());
+  /** The message being forwarded, while the destination is being chosen. */
+  const [forwarding, setForwarding] = useState<InboxMessage | null>(null);
   const [canManageLabels, setCanManageLabels] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(searchParams.get('thread'));
 
@@ -297,6 +306,8 @@ const InboxPage: React.FC = () => {
 
   const [draft, setDraft] = useState('');
   const [isNote, setIsNote] = useState(false);
+  /** Focused after "Add text to note" fills the box — the point is to type the thought next. */
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const [sending, setSending] = useState(false);
   const [attachment, setAttachment] = useState<File | null>(null);
   /** The message being answered. WhatsApp renders it as the quoted block above our reply. */
@@ -438,7 +449,7 @@ const InboxPage: React.FC = () => {
     setLoadingThread(true);
     setContext(null);
     try {
-      const { thread, participants, messages, whatsapp_window } = await inboxApi.getThread(id);
+      const { thread, participants, messages, whatsapp_window, starred_message_ids } = await inboxApi.getThread(id);
       setActiveThread(thread);
       setParticipants(participants);
       setMessages(messages);
@@ -489,6 +500,8 @@ const InboxPage: React.FC = () => {
           }).catch(() => null);
         }
       }
+
+      setStarredIds(new Set(starred_message_ids || []));
 
       const customerName = ctx?.contact?.name || thread.subject || 'Customer';
       const next = new Map<string, ParticipantLabel>();
@@ -703,6 +716,73 @@ const InboxPage: React.FC = () => {
     }
   }, [activeId, toast]);
 
+  /*
+   * The five things you can do TO one message, beyond replying to it.
+   *
+   * All five re-open the thread rather than patching a message in place. A pin, a star and a
+   * removal each change what the transcript should render, and re-reading is one request against
+   * a screen the operator is already looking at — where a hand-maintained local copy is how a
+   * pinned banner ends up disagreeing with the message it names.
+   */
+  const togglePin = useCallback(async (m: InboxMessage, pinned: boolean) => {
+    if (!activeId) return;
+    try {
+      await inboxApi.pinMessage(activeId, m.id, pinned);
+      void openThread(activeId);
+    } catch (e) { toast({ title: 'Could not pin', description: (e as Error).message, variant: 'destructive' }); }
+  }, [activeId, openThread, toast]);
+
+  const toggleStar = useCallback(async (m: InboxMessage, starred: boolean) => {
+    if (!activeId) return;
+    // Optimistic, and only here: a star is mine alone, so there is no other reader to disagree
+    // with, and a bookmark that waits for a round trip feels broken.
+    setStarredIds((prev) => {
+      const next = new Set(prev);
+      if (starred) next.add(m.id); else next.delete(m.id);
+      return next;
+    });
+    try {
+      await inboxApi.starMessage(activeId, m.id, starred);
+    } catch (e) {
+      setStarredIds((prev) => {
+        const next = new Set(prev);
+        if (starred) next.delete(m.id); else next.add(m.id);
+        return next;
+      });
+      toast({ title: 'Could not star', description: (e as Error).message, variant: 'destructive' });
+    }
+  }, [activeId, toast]);
+
+  const deleteMessage = useCallback(async (m: InboxMessage) => {
+    if (!activeId) return;
+    try {
+      await inboxApi.deleteMessage(activeId, m.id);
+      // Said plainly, because the obvious reading of "removed" is the wrong one: the customer
+      // still has it. WhatsApp gives us no unsend, and an operator who thinks they retracted
+      // something they did not will act on that belief.
+      toast({
+        title: 'Removed from this inbox',
+        description: 'It stays on the recipient\'s phone — WhatsApp gives us no way to unsend it.',
+      });
+      void openThread(activeId);
+    } catch (e) { toast({ title: 'Could not remove', description: (e as Error).message, variant: 'destructive' }); }
+  }, [activeId, openThread, toast]);
+
+  /*
+   * "Add text to note" — the message, quoted into a private note in the composer.
+   *
+   * It fills the box rather than writing the note, because the point of pulling a customer's
+   * words into a note is to say something ABOUT them. Posting the quote on its own would leave
+   * the operator with a note nobody needed and the thought still untyped.
+   */
+  const addToNote = useCallback((m: InboxMessage) => {
+    if (!m.body) return;
+    const quoted = m.body.split('\n').map((line) => `> ${line}`).join('\n');
+    setIsNote(true);
+    setDraft((d) => (d ? `${quoted}\n\n${d}` : `${quoted}\n\n`));
+    composerRef.current?.focus();
+  }, []);
+
   // Archive (soft-delete) / restore the open thread.
   const archiveActive = useCallback(async () => {
     if (!activeThread) return;
@@ -819,6 +899,24 @@ const InboxPage: React.FC = () => {
   const threadDisplayName = (t: InboxThread) => t.subject || `${inboxThreadSource(t).label} conversation`;
 
   const activeCount = participants.filter((p) => p.status === 'active').length;
+
+  /*
+   * The most recently pinned message, for the banner above the transcript.
+   *
+   * The LATEST rather than a list: a pin means "read this first", and a stack of six of them is
+   * a second inbox. Older pins keep their marker on the message itself, so nothing is lost —
+   * the banner is the one the team was asked to look at most recently.
+   */
+  const pinnedMessage = useMemo(() => {
+    const pinned = messages
+      .filter((m) => {
+        const at = (m.metadata as Record<string, unknown> | undefined)?.pinned_at;
+        return typeof at === 'string' && !!at;
+      })
+      .sort((a, b) => String((b.metadata as Record<string, unknown>).pinned_at)
+        .localeCompare(String((a.metadata as Record<string, unknown>).pinned_at)));
+    return pinned[0] ?? null;
+  }, [messages]);
 
   // The per-thread member action cluster (AI toggle, settings, add teammate,
   // status). Reused inline in the desktop header and inside the mobile details
@@ -1051,9 +1149,27 @@ const InboxPage: React.FC = () => {
                 />
               ))}
               {wsLabels.length === 0 && (
-                <div className="text-[11px] text-muted-foreground px-2.5 py-2">
-                  {canManageLabels ? 'Create labels with the + above.' : 'No labels yet.'}
-                </div>
+                canManageLabels && activeWorkspaceId ? (
+                  <LabelManagerPopover
+                    workspaceId={activeWorkspaceId}
+                    labels={wsLabels}
+                    onChanged={() => { loadLabels(); loadThreads({ silent: true }); }}
+                    trigger={(
+                      <button
+                        type="button"
+                        className="w-full flex items-center gap-1.5 px-2.5 py-2 rounded-sm text-[11px]
+                                   text-muted-foreground hover:bg-surface-hover hover:text-foreground text-left"
+                      >
+                        <Plus className="w-3 h-3 shrink-0" />
+                        Create your first label
+                      </button>
+                    )}
+                  />
+                ) : (
+                  <div className="text-[11px] text-muted-foreground px-2.5 py-2">
+                    No labels yet. Ask a workspace owner or admin to create some.
+                  </div>
+                )
               )}
             </nav>
           </div>
@@ -1309,6 +1425,42 @@ const InboxPage: React.FC = () => {
                 </Button>
               </div>
 
+              {pinnedMessage && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const el = document.getElementById(`inbox-msg-${pinnedMessage.id}`);
+                    const box = listRef.current;
+                    if (!el || !box) return;
+                    // Measured rather than `scrollIntoView`, which this file bars: the
+                    // open-at-the-bottom fix exists because a `scrollIntoView` keyed on
+                    // `messages` fought the initial scroll, and keeping the API out is what
+                    // stops that shape returning. Deltas of two rects need no positioned
+                    // ancestor and no assumption about layout.
+                    const delta = el.getBoundingClientRect().top - box.getBoundingClientRect().top;
+                    box.scrollTop += delta - 24;
+                    // Reading it counts as reading it: the operator has left the bottom
+                    // deliberately, and auto-scroll must not yank them back on the next message.
+                    stickToBottom.current = false;
+                  }}
+                  className="shrink-0 w-full text-left flex items-start gap-2 px-4 py-2
+                             border-b border-hairline bg-surface-sunken hover:bg-surface-hover
+                             transition-colors"
+                  title="Jump to the pinned message"
+                >
+                  <Pin className="w-3.5 h-3.5 mt-0.5 shrink-0 text-muted-foreground" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[10px] uppercase tracking-wide text-muted-foreground">
+                      Pinned
+                    </span>
+                    <span className="block text-xs truncate">
+                      {pinnedMessage.body
+                        || (pinnedMessage.attachments?.length ? 'Attachment' : 'Message')}
+                    </span>
+                  </span>
+                </button>
+              )}
+
               <div
                 ref={listRef}
                 className="flex-1 overflow-y-auto p-4 space-y-3"
@@ -1344,6 +1496,15 @@ const InboxPage: React.FC = () => {
                     }}
                     onPrivateReply={isCommentThread && isMember ? handlePrivateReply : undefined}
                     onToggleHidden={isCommentThread && isMember ? handleToggleHidden : undefined}
+                    // Member-only, all of them except the star: forwarding writes into another
+                    // conversation, pinning and removing change what the whole team sees. A star
+                    // is nobody else's business, so a customer on a shared thread keeps it.
+                    onForward={isMember ? (msg) => setForwarding(msg) : undefined}
+                    onTogglePin={isMember ? togglePin : undefined}
+                    onToggleStar={toggleStar}
+                    starred={starredIds.has(m.id)}
+                    onAddToNote={isMember ? addToNote : undefined}
+                    onDelete={isMember ? deleteMessage : undefined}
                   />
                 ))}
               </div>
@@ -1486,6 +1647,7 @@ const InboxPage: React.FC = () => {
                     />
                   </label>
                   <Textarea
+                    ref={composerRef}
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!waBlocked && !sending) send(); } }}
@@ -1518,6 +1680,15 @@ const InboxPage: React.FC = () => {
           onCreated={(id) => { setShowNew(false); loadThreads(); openThread(id); }}
         />
       )}
+      <ForwardDialog
+        message={forwarding}
+        threads={threads}
+        currentThreadId={activeId}
+        onClose={() => setForwarding(null)}
+        // The destination thread is where the message now IS, so it moves to the top of the
+        // list — refreshed silently, since the operator did not ask to look at a spinner.
+        onForwarded={() => { void loadThreads({ silent: true }); }}
+      />
       {showAdd && activeThread && (
         <AddParticipantDialog
           thread={activeThread}
@@ -1670,6 +1841,108 @@ const MessageBody: React.FC<{ body: string; threadId: string | null }> = ({ body
         </a>
       )}
     </>
+  );
+};
+
+/**
+ * Where does this message go?
+ *
+ * A list of the conversations already loaded rather than a search over every thread that has ever
+ * existed: forwarding is "send this to the other person I am talking to", and the mailbox in
+ * front of the operator is that set. Archived threads are excluded by the same list.
+ *
+ * The destination is picked and then SENT — no second confirm step. The action is one message
+ * into one conversation, it is visible immediately in that thread, and it can be removed there;
+ * a confirmation dialog on top of a picker is a dialog on a dialog.
+ */
+const ForwardDialog: React.FC<{
+  message: InboxMessage | null;
+  threads: InboxThread[];
+  currentThreadId: string | null;
+  onClose: () => void;
+  onForwarded: (toThreadId: string) => void;
+}> = ({ message, threads, currentThreadId, onClose, onForwarded }) => {
+  const { toast } = useToast();
+  const [query, setQuery] = useState('');
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const options = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return threads
+      .filter((t) => t.id !== currentThreadId && !t.archived_at)
+      .filter((t) => !q || (t.subject || '').toLowerCase().includes(q))
+      .slice(0, 50);
+  }, [threads, currentThreadId, query]);
+
+  const forward = async (toThreadId: string) => {
+    if (!message || !currentThreadId) return;
+    setBusy(toThreadId);
+    try {
+      await inboxApi.forwardMessage(currentThreadId, message.id, toThreadId);
+      toast({ title: 'Forwarded' });
+      onForwarded(toThreadId);
+      onClose();
+    } catch (e) {
+      toast({ title: 'Could not forward', description: (e as Error).message, variant: 'destructive' });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <Dialog open={!!message} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Forward message</DialogTitle>
+          <DialogDescription>
+            It is sent as a new message in the conversation you pick, and marked as forwarded.
+          </DialogDescription>
+        </DialogHeader>
+        {message?.body && (
+          <div className="text-xs text-muted-foreground border border-hairline rounded-sm px-3 py-2 max-h-20 overflow-y-auto whitespace-pre-wrap break-words">
+            {message.body}
+          </div>
+        )}
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search conversations…"
+          className="h-9"
+        />
+        <div className="max-h-64 overflow-y-auto -mx-1 px-1 space-y-0.5">
+          {options.length === 0 ? (
+            /* `filtered`, not `empty`: the conversations exist, this search excluded them. So it
+               offers the way BACK — never a "start a conversation", which is how you end up with
+               a second thread for a customer you already have one with. */
+            <div className="px-2 py-6 text-center space-y-2">
+              <div className="text-xs text-muted-foreground">
+                {query.trim() ? 'No conversation matches that search.' : 'No other conversation to forward to.'}
+              </div>
+              {query.trim() && (
+                <Button variant="outline" size="sm" onClick={() => setQuery('')}>Clear search</Button>
+              )}
+            </div>
+          ) : options.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              disabled={!!busy}
+              onClick={() => forward(t.id)}
+              className="w-full text-left flex items-center gap-2 px-2 py-2 rounded-sm hover:bg-surface-hover disabled:opacity-50"
+            >
+              <SourceTag source={inboxThreadSource(t)} />
+              <span className="text-sm truncate flex-1 min-w-0">
+                {t.subject || `${inboxThreadSource(t).label} conversation`}
+              </span>
+              {busy === t.id && <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />}
+            </button>
+          ))}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 
@@ -1934,9 +2207,31 @@ const MessageActions: React.FC<{
   onReply?: () => void;
   onReact?: (emoji: string) => void;
   onCopy?: () => void;
+  /** Send it into another conversation. Member-only, so absent for a customer. */
+  onForward?: () => void;
+  /** Top of the conversation, for everyone. `pinned` flips the label and the icon. */
+  onTogglePin?: () => void;
+  pinned?: boolean;
+  /** My own bookmark. Visible to nobody else — see `pin` for why they are different things. */
+  onToggleStar?: () => void;
+  starred?: boolean;
+  /** Quote it into a private note in the composer. */
+  onAddToNote?: () => void;
+  /** Remove from THIS inbox. Never an unsend — the copy says so. */
+  onDelete?: () => void;
   ours: boolean;
-}> = ({ onReply, onReact, onCopy, ours }) => {
+}> = ({
+  onReply, onReact, onCopy, onForward, onTogglePin, pinned, onToggleStar, starred,
+  onAddToNote, onDelete, ours,
+}) => {
   const [pickingEmoji, setPickingEmoji] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  /*
+   * Three buttons and a menu, which is the shape WhatsApp uses and for its reason: react, reply
+   * and copy are what you reach for constantly, and the rest are deliberate acts that are worth
+   * one more click and a readable label. Eight icons in a row on a 36px bar would be a puzzle.
+   */
+  const hasMenu = !!(onForward || onTogglePin || onToggleStar || onAddToNote || onDelete);
   return (
     <div
       /*
@@ -1961,7 +2256,7 @@ const MessageActions: React.FC<{
        */
       className={`absolute -top-3 ${ours ? 'left-2' : 'right-2'} z-20 items-center gap-0.5
                   rounded-full border border-hairline bg-card px-1 py-0.5 shadow-overlay
-                  ${pickingEmoji ? 'flex' : 'hidden group-hover/msg:flex group-focus-within/msg:flex'}`}
+                  ${pickingEmoji || menuOpen ? 'flex' : 'hidden group-hover/msg:flex group-focus-within/msg:flex'}`}
     >
       {onReact && (
         <Popover open={pickingEmoji} onOpenChange={setPickingEmoji}>
@@ -2000,6 +2295,51 @@ const MessageActions: React.FC<{
                 className="p-1 rounded-full hover:bg-surface-hover">
           <Copy className="w-3.5 h-3.5 text-muted-foreground" />
         </button>
+      )}
+      {hasMenu && (
+        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+          <DropdownMenuTrigger asChild>
+            <button type="button" title="More" className="p-1 rounded-full hover:bg-surface-hover">
+              <MoreHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align={ours ? 'start' : 'end'} className="w-52">
+            {onForward && (
+              <DropdownMenuItem onSelect={onForward}>
+                <Forward className="w-3.5 h-3.5 mr-2" /> Forward
+              </DropdownMenuItem>
+            )}
+            {onTogglePin && (
+              <DropdownMenuItem onSelect={onTogglePin}>
+                {pinned
+                  ? <><PinOff className="w-3.5 h-3.5 mr-2" /> Unpin</>
+                  : <><Pin className="w-3.5 h-3.5 mr-2" /> Pin to top</>}
+              </DropdownMenuItem>
+            )}
+            {onToggleStar && (
+              <DropdownMenuItem onSelect={onToggleStar}>
+                <Star className={`w-3.5 h-3.5 mr-2 ${starred ? 'fill-current' : ''}`} />
+                {starred ? 'Remove star' : 'Star'}
+              </DropdownMenuItem>
+            )}
+            {onAddToNote && (
+              <DropdownMenuItem onSelect={onAddToNote}>
+                <StickyNoteIcon className="w-3.5 h-3.5 mr-2" /> Add text to note
+              </DropdownMenuItem>
+            )}
+            {onDelete && (
+              <>
+                <DropdownMenuSeparator />
+                {/* Named for what it does. A delivered WhatsApp message stays on the customer's
+                    phone — the provider gives us no unsend — and "Delete" alone would have the
+                    operator believe they had retracted something they had not. */}
+                <DropdownMenuItem onSelect={onDelete} className="text-destructive focus:text-destructive">
+                  <Trash2 className="w-3.5 h-3.5 mr-2" /> Remove from this inbox
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       )}
     </div>
   );
@@ -2226,9 +2566,22 @@ const MessageBubble: React.FC<{
   /** Present only on a social COMMENT thread — a DM has neither affordance. */
   onPrivateReply?: (m: InboxMessage) => void;
   onToggleHidden?: (m: InboxMessage, hidden: boolean) => void;
+  /** Send it into another conversation. Member-only — absent means the menu item is not offered. */
+  onForward?: (m: InboxMessage) => void;
+  /** Pin is the CONVERSATION's ("read this first"); star is MINE. Two different things, two props. */
+  onTogglePin?: (m: InboxMessage, pinned: boolean) => void;
+  onToggleStar?: (m: InboxMessage, starred: boolean) => void;
+  starred?: boolean;
+  /** Quote it into a private note in the composer. */
+  onAddToNote?: (m: InboxMessage) => void;
+  onDelete?: (m: InboxMessage) => void;
   /** This message's own read mood, from the conversation analysis. Absent = never analysed. */
   mood?: string | null;
-}> = ({ m, info, myUserId, isCustomerThread, onAttachmentsRepaired, onReplyTo, onReact, onPrivateReply, onToggleHidden, mood }) => {
+}> = ({
+  m, info, myUserId, isCustomerThread, onAttachmentsRepaired, onReplyTo, onReact,
+  onPrivateReply, onToggleHidden, mood, onForward, onTogglePin, onToggleStar, starred,
+  onAddToNote, onDelete,
+}) => {
   const { toast } = useToast();
   const [urls, setUrls] = useState<Record<string, string>>({});
   useEffect(() => {
@@ -2263,6 +2616,10 @@ const MessageBubble: React.FC<{
   const externalAuthor = !m.sender_participant_id && typeof meta.author_handle === 'string'
     ? (meta.author_handle as string)
     : null;
+  // A pin is on the message and visible to the whole team; a star is the caller's and arrives as
+  // a prop, because it is resolved per person server-side.
+  const isPinned = typeof meta.pinned_at === 'string' && !!meta.pinned_at;
+  const isForwarded = !!meta.forwarded_from;
   const displayLabel = info?.label ?? externalAuthor ?? undefined;
 
   if (isSystem) {
@@ -2326,7 +2683,10 @@ const MessageBubble: React.FC<{
      * Long messages are unchanged: `fit-content` still resolves to the available width and
      * `max-w-[82%]` still caps it.
      */
-    <div className={`group/msg relative flex w-fit gap-2.5 max-w-[82%] ${ours ? 'ml-auto flex-row-reverse' : ''}`}>
+    <div
+      id={`inbox-msg-${m.id}`}
+      className={`group/msg relative flex w-fit gap-2.5 max-w-[82%] ${ours ? 'ml-auto flex-row-reverse' : ''}`}
+    >
       {!isSystem && (
         <MessageActions
           ours={ours}
@@ -2336,6 +2696,13 @@ const MessageBubble: React.FC<{
             void navigator.clipboard.writeText(m.body ?? '');
             toast({ title: 'Copied' });
           } : undefined}
+          onForward={onForward ? () => onForward(m) : undefined}
+          onTogglePin={onTogglePin ? () => onTogglePin(m, !isPinned) : undefined}
+          pinned={isPinned}
+          onToggleStar={onToggleStar ? () => onToggleStar(m, !starred) : undefined}
+          starred={starred}
+          onAddToNote={onAddToNote && m.body ? () => onAddToNote(m) : undefined}
+          onDelete={onDelete ? () => onDelete(m) : undefined}
         />
       )}
       {/*
@@ -2372,6 +2739,16 @@ const MessageBubble: React.FC<{
         </span>
       </div>
       <div className={`flex flex-col min-w-0 gap-1 ${ours ? 'items-end' : 'items-start'}`}>
+        {(isPinned || isForwarded || starred) && (
+          /* Stated on the message, because all three are invisible otherwise and each changes
+             how the words should be read: pinned means the team was asked to look at it,
+             forwarded means they were written to somebody else, starred means I marked it. */
+          <div className="text-[10px] text-muted-foreground px-1 flex items-center gap-2">
+            {isPinned && <span className="inline-flex items-center gap-1"><Pin className="w-2.5 h-2.5" /> Pinned</span>}
+            {isForwarded && <span className="inline-flex items-center gap-1"><Forward className="w-2.5 h-2.5" /> Forwarded</span>}
+            {starred && <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400"><Star className="w-2.5 h-2.5 fill-current" /> Starred</span>}
+          </div>
+        )}
         {displayLabel && !isNote && (
           <div className="text-[10px] text-muted-foreground mb-1 px-1 flex items-center gap-1.5">
             <span>{displayLabel}</span>
@@ -4114,7 +4491,13 @@ const LabelManagerPopover: React.FC<{
   workspaceId: string;
   labels: InboxLabel[];
   onChanged: () => void;
-}> = ({ workspaceId, labels, onChanged }) => {
+  /**
+   * What opens it. Defaults to the `+` beside the heading, which is the right control once there
+   * are labels and the wrong one when there are none — an empty surface has to OFFER the way out
+   * of being empty, not point at a 14px glyph and say "use the + above".
+   */
+  trigger?: React.ReactNode;
+}> = ({ workspaceId, labels, onChanged, trigger }) => {
   const [open, setOpen] = useState(false);
   const [newName, setNewName] = useState('');
   const [newColor, setNewColor] = useState(LABEL_COLORS[0].key);
@@ -4129,9 +4512,11 @@ const LabelManagerPopover: React.FC<{
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button className="text-muted-foreground hover:text-foreground p-0.5 rounded" title="Manage labels">
-          <Plus className="w-3.5 h-3.5" />
-        </button>
+        {trigger ?? (
+          <button className="text-muted-foreground hover:text-foreground p-0.5 rounded" title="Manage labels">
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+        )}
       </PopoverTrigger>
       <PopoverContent align="start" className="w-72 p-0">
         <div className="p-3 border-b border-border">

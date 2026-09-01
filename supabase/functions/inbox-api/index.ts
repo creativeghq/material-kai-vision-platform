@@ -2505,7 +2505,17 @@ async function handleJwtAction(
         }
       }
       const wa = thread.channel === 'whatsapp' ? await whatsappWindow(db, threadId, thread) : null;
-      return json({ thread: threadForCaller, participants: participantsForCaller, messages: messages || [], whatsapp_window: wa });
+      // MY stars on this thread's messages. Personal by construction (see `star_message`), so
+      // they are resolved for the caller rather than attached to the message rows — a shared
+      // inbox must not show one colleague another's bookmarks.
+      const messageIds = ((messages || []) as unknown as Array<{ id: string }>).map((m) => m.id);
+      let starredMessageIds: string[] = [];
+      if (messageIds.length) {
+        const { data: stars } = await db.from('inbox_message_stars')
+          .select('message_id').eq('user_id', userId).in('message_id', messageIds);
+        starredMessageIds = ((stars || []) as Array<{ message_id: string }>).map((r) => r.message_id);
+      }
+      return json({ thread: threadForCaller, participants: participantsForCaller, messages: messages || [], whatsapp_window: wa, starred_message_ids: starredMessageIds });
     }
 
     case 'create_marketplace_inquiry': {
@@ -2997,6 +3007,198 @@ async function handleJwtAction(
       // every render re-fetches somebody else's site, which is exactly what this row prevents.
       if (upErr) console.warn('[inbox-api] link_previews upsert failed:', upErr.message);
       return json({ preview: store });
+    }
+
+    /*
+     * pin_message — put one message at the top of the conversation, for everyone.
+     *
+     * A PIN is the thread's ("read this first"); a STAR, below, is one person's ("I must come
+     * back to this"). They look like the same feature and are not: two colleagues starring
+     * different messages in a shared inbox must not overwrite each other, which is exactly what
+     * one boolean on the message row would do. So a pin lives on the message and a star lives in
+     * a table keyed by the person.
+     *
+     * Local to this inbox. WhatsApp's own pin is a property of the customer's chat on their own
+     * phone and Zernio exposes no way to set it, so claiming to have pinned it for them would be
+     * a lie the operator cannot see through.
+     */
+    case 'pin_message': {
+      const threadId = String(payload.thread_id || '');
+      const messageId = String(payload.message_id || '');
+      if (!threadId || !messageId) throw new HttpError(400, 'thread_id and message_id are required');
+      const pinned = payload.pinned !== false;
+
+      const thread = await getThreadOrThrow(db, threadId);
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      assertThreadVisible(access);
+      if (!access.isMember) throw new HttpError(403, 'Only members may pin a message');
+
+      const { data: target } = await db.from('inbox_messages')
+        .select('id').eq('id', messageId).eq('thread_id', threadId).is('deleted_at', null).maybeSingle();
+      if (!target) throw new HttpError(404, 'Message not found');
+
+      const { error } = await db.rpc('inbox_message_merge_metadata', {
+        p_message_id: messageId,
+        p_patch: pinned
+          ? { pinned_at: new Date().toISOString(), pinned_by: userId }
+          : { pinned_at: null, pinned_by: null },
+      });
+      if (error) throw new HttpError(500, `Could not pin the message: ${error.message}`);
+      return json({ ok: true, pinned });
+    }
+
+    /*
+     * star_message — MY bookmark on a message. See `pin_message` for why it is a separate table.
+     *
+     * Read access is enough: a customer on a shared thread may star their own conversation's
+     * messages, and a star is visible to nobody else, so there is nothing for a narrower gate to
+     * protect. The row is keyed on the verified JWT's user id, never on a body-supplied one.
+     */
+    case 'star_message': {
+      const threadId = String(payload.thread_id || '');
+      const messageId = String(payload.message_id || '');
+      if (!threadId || !messageId) throw new HttpError(400, 'thread_id and message_id are required');
+      const starred = payload.starred !== false;
+
+      const thread = await getThreadOrThrow(db, threadId);
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      assertThreadVisible(access);
+
+      const { data: target } = await db.from('inbox_messages')
+        .select('id').eq('id', messageId).eq('thread_id', threadId).maybeSingle();
+      if (!target) throw new HttpError(404, 'Message not found');
+
+      if (starred) {
+        const { error } = await db.from('inbox_message_stars')
+          .upsert({ message_id: messageId, user_id: userId }, { onConflict: 'message_id,user_id' });
+        if (error) throw new HttpError(500, `Could not star the message: ${error.message}`);
+      } else {
+        const { error } = await db.from('inbox_message_stars')
+          .delete().eq('message_id', messageId).eq('user_id', userId);
+        if (error) throw new HttpError(500, `Could not unstar the message: ${error.message}`);
+      }
+      return json({ ok: true, starred });
+    }
+
+    /*
+     * forward_message — send what somebody said into another conversation.
+     *
+     * Membership of BOTH threads is checked, and separately. Forwarding is the one action that
+     * moves words across a tenancy boundary, so "I can read the source" is not the question —
+     * the question is whether the caller may also WRITE to the destination, and a customer
+     * participant may not.
+     *
+     * It goes through `insertMessageAndNotify` rather than an insert, because that is the
+     * function that relays to WhatsApp, re-signs attachment URLs and notifies. A forward that
+     * only wrote a row would appear in our transcript and never reach the customer.
+     */
+    case 'forward_message': {
+      const fromThreadId = String(payload.thread_id || '');
+      const messageId = String(payload.message_id || '');
+      const toThreadId = String(payload.to_thread_id || '');
+      if (!fromThreadId || !messageId || !toThreadId) {
+        throw new HttpError(400, 'thread_id, message_id and to_thread_id are required');
+      }
+      if (fromThreadId === toThreadId) throw new HttpError(400, 'That message is already in this conversation');
+
+      const fromThread = await getThreadOrThrow(db, fromThreadId);
+      const fromAccess = await resolveThreadAccess(db, userId, fromThread, operator);
+      assertThreadVisible(fromAccess);
+      if (!fromAccess.isMember) throw new HttpError(403, 'Only members may forward a message');
+
+      const toThread = await getThreadOrThrow(db, toThreadId);
+      const toAccess = await resolveThreadAccess(db, userId, toThread, operator);
+      assertThreadVisible(toAccess);
+      if (!toAccess.isMember) throw new HttpError(403, 'You are not a member of that conversation');
+
+      const { data: source } = await db.from('inbox_messages')
+        .select('id, body, attachments, message_type')
+        .eq('id', messageId).eq('thread_id', fromThreadId).is('deleted_at', null).maybeSingle();
+      if (!source) throw new HttpError(404, 'Message not found');
+      const src = source as { body: string | null; attachments: Attachment[] | null; message_type: string };
+      if (!src.body && !(src.attachments || []).length) {
+        throw new HttpError(400, 'There is nothing in that message to forward');
+      }
+
+      // The 24h window applies to a forward exactly as it applies to anything else we send — it
+      // is an outbound freeform WhatsApp message however it happened to be composed.
+      if (toThread.channel === 'whatsapp') {
+        const w = await whatsappWindow(db, toThreadId, toThread);
+        if (!w.open) {
+          throw new HttpError(409, 'WhatsApp 24h service window is closed on that conversation — an approved template is required.');
+        }
+      }
+
+      let senderParticipantId = toAccess.participant?.id ?? null;
+      if (!senderParticipantId) senderParticipantId = await ensureMemberParticipant(db, toThread, userId);
+
+      const msg = await insertMessageAndNotify(db, {
+        thread: toThread,
+        senderParticipantId,
+        body: src.body,
+        // The SAME files, not copies: an attachment row points at a stored object or an external
+        // URL, and duplicating the bytes to forward a photo would double the bucket for nothing.
+        attachments: (src.attachments || []) as Attachment[],
+        // A private note forwarded into another conversation stops being private, so it goes as
+        // an ordinary message and the operator sees it as one.
+        messageType: 'text',
+        senderUserId: userId,
+        senderLabel: 'Forwarded message',
+      });
+
+      // Marked as forwarded so the transcript can say so. WhatsApp shows the reader that tag for
+      // the same reason: words written elsewhere, to someone else, should not read as the
+      // sender's own.
+      await db.rpc('inbox_message_merge_metadata', {
+        p_message_id: String((msg as { id: string }).id),
+        p_patch: { forwarded_from: { thread_id: fromThreadId, message_id: messageId } },
+      });
+      return json({ message: msg });
+    }
+
+    /*
+     * delete_message — take a message out of THIS inbox.
+     *
+     * Named for what it does. Zernio exposes no unsend, so a message already delivered still sits
+     * on the customer's phone; calling this "delete for everyone" would be the platform claiming
+     * an effect it cannot produce — the same shape as a sent bubble for a message Meta refused.
+     * The client says "Remove from this inbox" and says why.
+     *
+     * Soft, because a conversation is a record: `deleted_at` keeps the row for anyone auditing
+     * the thread, while every reader (`get_thread`, the list previews, the agent context) already
+     * filters on `is('deleted_at', null)`.
+     */
+    case 'delete_message': {
+      const threadId = String(payload.thread_id || '');
+      const messageId = String(payload.message_id || '');
+      if (!threadId || !messageId) throw new HttpError(400, 'thread_id and message_id are required');
+
+      const thread = await getThreadOrThrow(db, threadId);
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      assertThreadVisible(access);
+      if (!access.isMember) throw new HttpError(403, 'Only members may remove a message');
+
+      const { data: target } = await db.from('inbox_messages')
+        .select('id, sender_participant_id, deleted_at')
+        .eq('id', messageId).eq('thread_id', threadId).maybeSingle();
+      if (!target) throw new HttpError(404, 'Message not found');
+      const tgt = target as { sender_participant_id: string | null; deleted_at: string | null };
+      if (tgt.deleted_at) return json({ ok: true, already: true });
+
+      // Your own message, or an owner/admin tidying the shared inbox. A member cannot remove a
+      // colleague's note or a customer's words on somebody else's behalf.
+      const mine = !!access.participant && tgt.sender_participant_id === access.participant.id;
+      if (!mine && !operator) {
+        const role = await callerRoleInWorkspace(db, userId, String(thread.workspace_id));
+        if (role !== 'owner' && role !== 'admin') {
+          throw new HttpError(403, 'Only the sender, or a workspace owner or admin, may remove a message');
+        }
+      }
+
+      const { error } = await db.from('inbox_messages')
+        .update({ deleted_at: new Date().toISOString() }).eq('id', messageId);
+      if (error) throw new HttpError(500, `Could not remove the message: ${error.message}`);
+      return json({ ok: true });
     }
 
     case 'list_labels': {
