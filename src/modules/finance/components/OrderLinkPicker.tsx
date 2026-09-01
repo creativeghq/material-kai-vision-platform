@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Search, ChevronRight, ChevronDown, Plus, FolderOpen, Building2, User, GitMerge, Link2, Loader2, Plane, Home } from 'lucide-react';
+import { Search, ChevronRight, ChevronDown, Plus, FolderOpen, Building2, User, GitMerge, Link2, Loader2, Plane, Home, Receipt } from 'lucide-react';
 
 import { Label } from '@/components/core/ui/label';
 import { Input } from '@/components/core/ui/input';
@@ -34,7 +34,7 @@ import {
  */
 /** One literal, so a new group cannot be added to the type and forgotten in a fallback. */
 const EMPTY_TARGETS: LinkTargetSearch = {
-  projects: [], customers: [], merge_targets: [], trips: [], properties: [],
+  projects: [], customers: [], merge_targets: [], trips: [], properties: [], orders: [],
 };
 
 export const OrderLinkPicker: React.FC<{
@@ -81,6 +81,15 @@ export const OrderLinkPicker: React.FC<{
    */
   allowTrip?: boolean;
   /**
+   * Offer open orders of EITHER type as a FILING target — "this cost is for that commitment"
+   * (#378 D5). A caller that turns this on MUST handle `kind: 'order'`.
+   *
+   * Distinct from every other order row here: `sales_order` sets `covers_order_id`, `merge_order`
+   * appends lines, `cost_of_order` books a supplier bill on a purchase order. None of them can say
+   * what this says, which is why the trip line kept two bare `<Select>`s.
+   */
+  allowOrder?: boolean;
+  /**
    * Offer buildings. A caller that turns this on MUST handle `kind: 'property'`. Gate it on the
    * real-estate entitlement at the call site — a permanently empty group is not a neutral default,
    * it reads as a broken search.
@@ -99,7 +108,7 @@ export const OrderLinkPicker: React.FC<{
 }> = ({
   workspaceId, value, onChange, orderType, partyCompanyId, partyContactId, currency,
   allowCustomer = true, allowProject = true, allowRaiseCustomerOrder = true, allowMerge = true, allowCostOf = false,
-  allowTrip = false, allowProperty = false,
+  allowTrip = false, allowProperty = false, allowOrder = false,
   compact = false, label = 'What is this for?', disabled, hint,
 }) => {
   const [query, setQuery] = useState('');
@@ -163,6 +172,7 @@ export const OrderLinkPicker: React.FC<{
   const mergeTargets = allowMerge ? res.merge_targets : [];
   const trips = allowTrip ? res.trips : [];
   const properties = allowProperty ? res.properties : [];
+  const filingOrders = allowOrder ? res.orders : [];
   // An order that may be MERGED into is offered as a merge and nothing else — the same row under
   // two headings, doing two different things to the same order, is how the wrong one gets picked.
   const costOfTargets = allowCostOf
@@ -385,6 +395,31 @@ export const OrderLinkPicker: React.FC<{
                   {/* Whose card it is, but only when it is not the reader's own — a finance manager
                       sees several people's cards under titles like "June expenses". */}
                   {!t.is_mine && t.owner_name ? ` · ${t.owner_name}` : ''}
+                </div>
+              </button>
+            ))}
+
+            {filingOrders.length > 0 && (
+              <GroupHeading icon={<Receipt className="h-3 w-3" />} text="Orders" />
+            )}
+            {filingOrders.map((o) => (
+              <button
+                key={`order:${o.id}`}
+                type="button"
+                className="block w-full px-3 py-2 text-left text-sm hover:bg-muted"
+                onClick={() => pick({
+                  kind: 'order',
+                  orderId: o.id,
+                  projectId: o.project_id ?? null,
+                  label: o.order_number ?? 'Order',
+                })}
+              >
+                <span className="font-medium">{o.order_number ?? 'Order'}</span>
+                <span className="text-muted-foreground"> · {o.order_type === 'purchase' ? 'purchase' : 'sales'}</span>
+                <div className="text-[10px] text-muted-foreground">
+                  {o.party_name ?? 'No party'}
+                  {o.project_name ? ` · ${o.project_name}` : ''}
+                  {' · '}{formatMoney(Number(o.total), o.currency)}
                 </div>
               </button>
             ))}

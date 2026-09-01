@@ -292,6 +292,11 @@ export interface LinkTargetSearch {
   /** Orders this order's lines may legally be APPENDED to. See `search_order_link_targets`. */
   merge_targets: Array<LinkOrderSummary & { party_name: string | null; line_count: number; covers_order_id: string | null }>;
   /**
+   * Open orders of EITHER type, as a filing target (#378 D5). Unlike `merge_targets` this carries
+   * no party or type constraint, because filing a cost against an order does not touch its lines.
+   */
+  orders: Array<LinkOrderSummary & { order_type: OrderType; party_name: string | null }>;
+  /**
    * Expense cards the CALLER may see. The RPC is SECURITY DEFINER, so it restates
    * `trip_reports_read` inline — own cards, plus everyone's for a finance manager. `is_mine` is
    * returned so a reviewer looking at four people's cards is not left guessing whose is whose.
@@ -374,7 +379,22 @@ export type OrderLinkTarget =
    * INDEPENDENT of the project: a tenancy repair or a fit-out routinely has a property and no
    * project, and routing it through one would invent a job nobody raised.
    */
-  | { kind: 'property'; propertyId: string; label: string };
+  | { kind: 'property'; propertyId: string; label: string }
+  /**
+   * FILE this against an order that already exists — e.g. `trip_expense_items.order_id` (#378 D5).
+   *
+   * Distinct from the three order kinds above, and the distinction is the whole reason it exists:
+   *   • `sales_order` sets `covers_order_id` — "who this purchase was bought FOR";
+   *   • `merge_order` APPENDS lines, so it needs the same type and party;
+   *   • `cost_of_order` books a supplier bill ON a purchase order.
+   * None of them can say "this cost belongs to that commitment", which is why the trip line kept
+   * two bare `<Select>`s and why swapping them for the picker would have deleted a capability.
+   *
+   * A filing target, never a merge target: appending a rep's hotel bill to an order would change
+   * what the order says it is for. Either order type — a rep's taxi to a supplier's factory is a
+   * cost of that purchase order even though the rep is not the supplier.
+   */
+  | { kind: 'order'; orderId: string; projectId: string | null; label: string };
 
 import { round2 as r2 } from '@/utils/decimal';
 import { productDetailService } from '@/services/productDetailService';
@@ -1071,6 +1091,7 @@ export const ordersService = {
       projects: d.projects ?? [],
       customers: d.customers ?? [],
       merge_targets: d.merge_targets ?? [],
+      orders: d.orders ?? [],
       trips: d.trips ?? [],
       properties: d.properties ?? [],
     };

@@ -11,6 +11,8 @@ import { Input } from '@/components/core/ui/input';
 import { Badge } from '@/components/core/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter , DialogDescription } from '@/components/core/ui/dialog';
+import { OrderLinkPicker } from '@/modules/finance/components/OrderLinkPicker';
+import type { OrderLinkTarget } from '@/modules/finance/services/ordersService';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { formatMoney } from '@/modules/finance/services/financeService';
@@ -864,25 +866,17 @@ const AddExpenseDialog: React.FC<{
   const [billable, setBillable] = useState(false);
   const [projectId, setProjectId] = useState('');
   const [orderId, setOrderId] = useState('');
-  const [orders, setOrders] = useState<Array<{ id: string; order_number: string | null; order_type: string }>>([]);
-  const [projects, setProjects] = useState<Array<{ id: string; name: string | null }>>([]);
+  // The picker's own value shape, so the control can show what is chosen. The ids above stay the
+  // things WRITTEN — one column each, and a control that wrote both would be answering two
+  // questions with one answer.
+  const [projectLink, setProjectLink] = useState<OrderLinkTarget>({ kind: 'none' });
+  const [orderLink, setOrderLink] = useState<OrderLinkTarget>({ kind: 'none' });
   const [saving, setSaving] = useState(false);
 
-  // Projects, so any expense can be tagged to the job it belongs to. Note this is INDEPENDENT of
-  // `billable`: the project says which job bears the cost, `billable` says whether we on-charge it.
-  // Tying them together hid every absorbed cost — our own travel to site — from that job's margin.
-  useEffect(() => {
-    if (!open || !workspaceId) return;
-    void supabase.from('projects').select('id, name').eq('workspace_id', workspaceId).order('created_at', { ascending: false }).limit(200)
-      .then(({ data }) => setProjects((data as any[]) ?? []));
-    // Open orders, so a cost incurred FOR a commitment lands against it (#378 L6). Separate
-    // from the job: an order may have no project, and a project has many orders — deriving
-    // one from the other would attribute the cost to a commitment nobody chose.
-    void supabase.from('orders').select('id, order_number, order_type')
-      .eq('workspace_id', workspaceId).in('status', ['draft', 'confirmed', 'partially_fulfilled'])
-      .order('created_at', { ascending: false }).limit(200)
-      .then(({ data }) => setOrders((data as any[]) ?? []));
-  }, [open, workspaceId]);
+  // The two lists this dialog used to fetch itself are gone: `OrderLinkPicker` searches through
+  // `search_order_link_targets`, which already scopes to the workspace, excludes archived projects
+  // and applies the legality rules. Fetching them here was a second, thinner copy of that — and
+  // the copy is what let these two controls drift away from the rest of Finance.
 
   const save = async () => {
     const amt = parseDecimal(amount);
@@ -955,41 +949,62 @@ const AddExpenseDialog: React.FC<{
             <span className="text-xs">Billable to client <span className="text-muted-foreground">— on-charge this cost to a project's client</span></span>
             <Checkbox checked={billable} onCheckedChange={(v) => setBillable(v === true)} className="h-4 w-4"  />
           </label>
-          {/* Always offered, billable or not — an absorbed cost still belongs to a job. */}
+          {/*
+            What this cost is for — ONE control, the same one the rest of Finance uses (#378 D5).
+
+            This was two bare `<Select>`s, and L6 proposed swapping them for `OrderLinkPicker`. That
+            would have DELETED a capability: the picker's order rows all answered other questions
+            (`covers_order_id`, merge, cost-of-a-purchase-order) and none of them could say "this
+            cost is for that commitment". `search_order_link_targets` gained a filing `orders` group
+            first, so the swap adds reach instead of removing it — and the picker's legality rules,
+            its workspace scoping and its search come with it.
+
+            Project and order stay SEPARATE answers, deliberately: a job says which margin bears the
+            cost, an order says which commitment it lands against. An order may have no project and
+            a project has many orders, so deriving either from the other would attribute the cost to
+            something nobody chose.
+          */}
           <div className="space-y-1">
-            <label htmlFor="tripexpensespanel-project" className="text-xs text-muted-foreground">
+            <span className="text-xs text-muted-foreground">
               Project <span className="text-muted-foreground">— which job bears this cost</span>
-            </label>
-            <Select value={projectId || '__none__'} onValueChange={(v) => setProjectId(v === '__none__' ? '' : v)}>
-              <SelectTrigger id="tripexpensespanel-project"><SelectValue placeholder="Pick the project this cost belongs to" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">— No project —</SelectItem>
-                {projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name || p.id.slice(0, 8)}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            </span>
+            <OrderLinkPicker
+              workspaceId={workspaceId}
+              value={projectLink}
+              onChange={(v) => {
+                if (v.kind === 'project') { setProjectLink(v); setProjectId(v.projectId); return; }
+                if (v.kind === 'none') { setProjectLink(v); setProjectId(''); }
+              }}
+              allowProject
+              allowCustomer={false}
+              allowMerge={false}
+              allowRaiseCustomerOrder={false}
+              label=""
+              compact
+            />
             <p className="text-[11px] text-muted-foreground">
               Counts towards the project&apos;s cost once approved.
             </p>
           </div>
-          {/* The order, separately (#378 L6). A job says which margin bears the cost; an order says
-              which commitment it lands against, and the two are not the same question — an order
-              may have no project, and a project has many orders. Without this the trip cost reached
-              the job and never the order's Expenses tab, its three-way match, or committed-vs-actual. */}
           <div className="space-y-1">
-            <label htmlFor="tripexpensespanel-order" className="text-xs text-muted-foreground">
+            <span className="text-xs text-muted-foreground">
               Order <span className="text-muted-foreground">— which commitment this cost is against</span>
-            </label>
-            <Select value={orderId || '__none__'} onValueChange={(v) => setOrderId(v === '__none__' ? '' : v)}>
-              <SelectTrigger id="tripexpensespanel-order"><SelectValue placeholder="Pick the order this cost is for" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">— No order —</SelectItem>
-                {orders.map((o) => (
-                  <SelectItem key={o.id} value={o.id}>
-                    {o.order_number || o.id.slice(0, 8)} · {o.order_type === 'purchase' ? 'purchase' : 'sales'}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            </span>
+            <OrderLinkPicker
+              workspaceId={workspaceId}
+              value={orderLink}
+              onChange={(v) => {
+                if (v.kind === 'order') { setOrderLink(v); setOrderId(v.orderId); return; }
+                if (v.kind === 'none') { setOrderLink(v); setOrderId(''); }
+              }}
+              allowOrder
+              allowProject={false}
+              allowCustomer={false}
+              allowMerge={false}
+              allowRaiseCustomerOrder={false}
+              label=""
+              compact
+            />
           </div>
         </div>
         <DialogFooter>

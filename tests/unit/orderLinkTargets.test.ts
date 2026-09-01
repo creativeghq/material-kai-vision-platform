@@ -184,7 +184,38 @@ describe('every offered link kind is handled by its call site', () => {
     { prop: 'allowCostOf', kind: 'cost_of_order' },
     { prop: 'allowTrip', kind: 'trip' },
     { prop: 'allowProperty', kind: 'property' },
+    // Open orders of either type, as a FILING target — "this cost is for that commitment"
+    // (#378 D5). Distinct from every other order row the picker offers: `sales_order` sets
+    // `covers_order_id`, `merge_order` appends lines, `cost_of_order` books a bill on a purchase
+    // order. None of them could say this, which is why the trip line kept two bare `<Select>`s.
+    { prop: 'allowOrder', kind: 'order' },
   ];
+
+  /**
+   * This list is HAND-KEPT, and the previous version of this comment claimed the rule was
+   * "generalised over the opt-in groups so a future one inherits it". It was not: adding
+   * `allowOrder` to the picker and deleting its handler left every case here green, because a
+   * group the list does not name is a group this file cannot see.
+   *
+   * So the list is now checked against the component. A new `allowX` prop must be added here in
+   * the same change, which is the two-line edit the comment above assumed — and if it is
+   * forgotten, this fails instead of quietly covering three groups out of four.
+   */
+  it('the opt-in list names every opt-in prop the picker actually has', () => {
+    const picker = read(join(ROOT, 'src/modules/finance/components/OrderLinkPicker.tsx'));
+    const declared = [...picker.matchAll(/^\s{2}(allow[A-Z]\w*)\?: boolean;/gm)].map((m) => m[1]);
+    // `allowProject`, `allowCustomer`, `allowMerge` and `allowRaiseCustomerOrder` default to ON or
+    // are covered by the always-on kinds; only the ones defaulting to false are opt-in.
+    const optIn = declared.filter((d) => new RegExp(`${d} = false`).test(picker));
+    const named = new Set(OPT_IN_GROUPS.map((g) => g.prop));
+    const missing = optIn.filter((d) => !named.has(d));
+    expect(
+      missing,
+      `OPT_IN_GROUPS does not name: ${missing.join(', ')}. A group this list does not know about `
+      + 'is a group whose callers are never checked for handling its kind — which is exactly how '
+      + 'an unhandled row ships.',
+    ).toEqual([]);
+  });
 
   it('a caller that turns on an opt-in group handles the kind that group emits', () => {
     const offenders: string[] = [];
