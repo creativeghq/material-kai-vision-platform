@@ -1605,6 +1605,16 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
   // Track previous agent to detect actual agent switches
   const previousAgentRef = useRef<string | null>(null);
+  /**
+   * The agent selected BECAUSE a conversation of its own was opened.
+   *
+   * The list effect below reads any agent change as "the user switched agents" and
+   * clears the thread — which, for an adoption, would throw away the very thread the
+   * click was for. Cleared as soon as it is read, so it can never excuse a real switch.
+   */
+  const adoptedConversationAgentRef = useRef<string | null>(null);
+  /** The `?conversation=` id already honoured — see the deep-link effect below. */
+  const loadedConversationParamRef = useRef<string | null>(null);
   // Ref to latest handleSendMessage for use in effects (avoids stale closures)
   const handleSendMessageRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const initialPromptSent = useRef(false);
@@ -1691,6 +1701,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     // Check if this is an actual agent switch (not initial load)
     const isAgentSwitch = previousAgentRef.current !== null && previousAgentRef.current !== selectedAgent;
     previousAgentRef.current = selectedAgent;
+    // …and not the agent being adopted from a conversation we are opening: the thread
+    // is the REASON for that change, so clearing it would discard what was clicked.
+    const adoptedForConversation = adoptedConversationAgentRef.current === selectedAgent;
+    adoptedConversationAgentRef.current = null;
 
     // Track if this effect is still active (for cleanup)
     let isActive = true;
@@ -1727,7 +1741,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
       // ONLY reset conversation when actually switching agents, not on initial load
       // This prevents race condition where user starts chatting before effect completes
-      if (isAgentSwitch) {
+      if (isAgentSwitch && !adoptedForConversation) {
         setCurrentConversationId(null);
         setMessages([]);
       }
@@ -2372,7 +2386,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           // still saving the user message → races with saveMessage → wipes the
           // freshly-added user bubble from local state. Result: user's message
           // appears to "disappear" until the page is refreshed.
-          initialConvLoaded.current = true;
+          loadedConversationParamRef.current = conversationId;
           setCurrentConversationId(conversationId);
           onConversationChange?.(conversationId);
           newConversation = conversation;
@@ -4094,23 +4108,40 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
   const handleLoadConversation = useCallback(
     async (conversationId: string) => {
+      // This load IS the answer to `?conversation=<this id>`, however it was reached —
+      // so the URL update below does not bounce back through the deep-link effect.
+      loadedConversationParamRef.current = conversationId;
       setCurrentConversationId(conversationId);
       onConversationChange?.(conversationId);
+      // The ROW, not the in-memory list: `conversations` only ever holds the
+      // SELECTED agent's conversations, and the one being opened may well belong
+      // to another agent — which is the whole reason the agent is adopted below.
+      const convo = await agentChatHistoryService.getConversation(conversationId);
       // Hydrate the conversation's saved toolkit set so resuming a chat
       // restores its toolset. Always merges in the always-on Core. Suppress
       // the onboarding card on hydration (the user isn't enabling anything
       // new — they're loading an existing conversation).
-      const convoMeta = conversations.find((c) => c.id === conversationId);
-      if (convoMeta?.toolkits && convoMeta.toolkits.length > 0) {
-        const merged = new Set<string>([...convoMeta.toolkits, ...ALWAYS_ON_TOOLKIT_IDS]);
+      if (convo?.toolkits && convo.toolkits.length > 0) {
+        const merged = new Set<string>([...convo.toolkits, ...ALWAYS_ON_TOOLKIT_IDS]);
         setActiveToolkits([...merged]);
-      } else {
-        // Fallback: fetch the conversation row directly
-        const fetched = await agentChatHistoryService.getConversation(conversationId);
-        if (fetched?.toolkits) {
-          const merged = new Set<string>([...fetched.toolkits, ...ALWAYS_ON_TOOLKIT_IDS]);
-          setActiveToolkits([...merged]);
-        }
+      }
+      /**
+       * A conversation BELONGS to an agent, so opening one selects that agent.
+       *
+       * Nothing did this, and the picker kept whatever was last active — so the daily
+       * job digest's bell notification (`/agent-hub?conversation=…`, a `kai` thread)
+       * opened its findings under Vision: the header, the avatar and the model were
+       * the wrong agent's, and the first follow-up about a job listing was sent to the
+       * interior designer. The stored `agent_id` is the answer; it does not need to be
+       * restated on the link.
+       *
+       * An id no agent claims any more leaves the picker alone rather than pointing it
+       * at an agent that no longer exists.
+       */
+      const ownerAgent = convo?.agentId && AGENTS.some((a) => a.id === convo.agentId) ? convo.agentId : null;
+      if (ownerAgent) {
+        adoptedConversationAgentRef.current = ownerAgent;
+        setSelectedAgent(ownerAgent);
       }
       setJustEnabledToolkitId(null);
       const msgs = await agentChatHistoryService.getConversationMessages(conversationId);
@@ -4180,19 +4211,29 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     [],
   );
 
-  // Load a specific conversation when navigated with ?conversation=
-  const initialConvLoaded = useRef(false);
+  /**
+   * Load a specific conversation when navigated with `?conversation=`.
+   *
+   * Which id has been honoured, NOT a "have we loaded one yet" flag: the flag went true on
+   * the first deep link and stayed true, so a second notification click — a different
+   * conversation, same mounted Hub — changed the URL and nothing else. The bell said one
+   * thing and the screen showed the previous thread. Recording the id honours each new one
+   * while still ignoring the id the Hub itself just put in the URL, which is what the flag
+   * was protecting: re-fetching mid-turn races the save and wipes the user's own bubble.
+   */
   useEffect(() => {
-    if (initialConversationId && !initialConvLoaded.current) {
-      initialConvLoaded.current = true;
-      handleLoadConversation(initialConversationId);
-    }
+    if (!initialConversationId) return;
+    if (loadedConversationParamRef.current === initialConversationId) return;
+    handleLoadConversation(initialConversationId);
   }, [initialConversationId, handleLoadConversation]);
 
   const handleNewConversation = useCallback(() => {
     setCurrentConversationId(null);
     setMessages([]);
     setHiddenArtifactIds([]);
+    // Nothing is open, so nothing has been honoured: clicking the notification for the
+    // conversation just left must reopen it rather than read as "already there".
+    loadedConversationParamRef.current = null;
     onConversationChange?.(null);
     setJustEnabledToolkitId(null);
     // Clear transient per-turn state so a new conversation starts truly blank — no
@@ -6735,8 +6776,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       </div>
                       <DropdownMenuSeparator />
                       {availableAgents.map((agent) => {
-                        const isActive = selectedAgent === agent.id;
                         const isOrchestrator = agent.id === 'orchestrator';
+                        // `kai` is the hidden generalist behind JARVIS and has no row of its own,
+                        // so a kai thread (every cron-posted digest is one) left the whole menu
+                        // looking unselected while the header above it read JARVIS. Both ARE JARVIS.
+                        const isActive = selectedAgent === agent.id || (isOrchestrator && selectedAgent === 'kai');
                         return (
                           <DropdownMenuItem
                             key={agent.id}
