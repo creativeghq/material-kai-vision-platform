@@ -94,6 +94,57 @@ describe('the surfaces feature keeps its two invariants', () => {
 });
 
 /**
+ * One room model, by LINKING — and one measurement (#378 N8).
+ *
+ * `project_rooms` is the room OF RECORD (8 inbound foreign keys); `room_layouts` is an ARRANGEMENT
+ * of products inside a room. The issue proposed folding the second into the first, which read as a
+ * merge would delete nine capabilities — placement items, derived footprints, the six-face surface
+ * areas, `add_layout_to_quote`, the lighting preset, the canvases, the Client View embed, the
+ * public `/embed/planner`, and existence with no project at all.
+ *
+ * So they are LINKED, and `project_room_id` is NULLABLE: a NOT NULL kills the embed planner (an
+ * anonymous visitor has no project) and the showroom layout.
+ *
+ * THE COLLISION THIS GUARDS. The two tables measured the same room in different units —
+ * `project_rooms` in integer MILLIMETRES, `room_layouts` in numeric METRES — and surface area, the
+ * number a tiling order is placed against, derives from the metres. Two stored copies of one
+ * measurement is this codebase's oldest bug shape. The link therefore had to avoid CREATING it:
+ * a linked layout takes the room's dimensions, resolved once in SQL, and both the plan and its
+ * areas read the SAME view. Drawn at 6m and ordered at 5m is the failure being prevented.
+ */
+describe('a plan and its tile order use one set of dimensions', () => {
+  it('the planner reads the RESOLVED view, never the raw table', () => {
+    const svc = read('src/services/roomPlannerService.ts');
+    expect(svc, 'listLayouts must read room_layouts_resolved').toMatch(/from\('room_layouts_resolved'/);
+    expect(svc, 'the resolved dimensions must be exposed').toMatch(/effective_width_m/);
+  });
+
+  it('the canvas, the 3D scene and the area all draw from the resolved dimensions', () => {
+    const panel = read('src/components/features/roomplanner/RoomPlannerPanel.tsx');
+    // A single `layout.room_width_m` left behind is a surface drawing the room at one size while
+    // the tile order is placed at another.
+    expect(panel, 'a raw room_width_m survives in the panel').not.toMatch(/layout\.room_width_m/);
+    expect(panel, 'a raw room_depth_m survives in the panel').not.toMatch(/layout\.room_depth_m/);
+    expect(panel).toMatch(/effective_width_m/);
+  });
+
+  it('the dimensions cannot be edited on a plan whose room states them', () => {
+    // Editing them there writes a second copy of a measurement the room already holds.
+    const panel = read('src/components/features/roomplanner/RoomPlannerPanel.tsx');
+    expect(panel).toMatch(/disabled=\{layout\.dimension_source === 'room'\}/);
+  });
+
+  it('the link has a writer and stays optional', () => {
+    const svc = read('src/services/roomPlannerService.ts');
+    expect(svc, 'a column nothing can set is dead schema').toMatch(/setProjectRoom/);
+    expect(read('src/components/features/roomplanner/RoomPlannerPanel.tsx'),
+      'the picker is the writer').toMatch(/attachRoom\(/);
+    // Detaching must be offered: a plan attached to the wrong room is worse than an unattached one.
+    expect(read('src/components/features/roomplanner/RoomPlannerPanel.tsx')).toMatch(/__none/);
+  });
+});
+
+/**
  * Lighting presets, everywhere (#335).
  *
  * The catalogue — natural daylight, golden hour, overcast, showroom spots, warm evening, night —

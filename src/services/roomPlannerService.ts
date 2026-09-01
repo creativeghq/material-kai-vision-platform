@@ -26,6 +26,27 @@ export type RoomLayout = Tables<'room_layouts'> & {
   room_height_m: number;
   /** Which LIGHTING_PRESETS key lights the 3D view (#335). */
   lighting_preset: string;
+  /**
+   * The room of record this arrangement is OF (#378 N8). Null for a showroom layout and for the
+   * public `/embed/planner`, where there is no project — which is why the column is nullable.
+   */
+  project_room_id: string | null;
+  /**
+   * THE dimensions, in metres. Read these, never `room_width_m` and friends.
+   *
+   * `project_rooms` measures in integer MILLIMETRES and this table in numeric METRES. A linked
+   * layout takes the room's, converted once in SQL; an unlinked one keeps its own. Two stored
+   * copies of one measurement is this codebase's oldest bug shape — resize the room and the plan
+   * would quote last week's floor — so the resolution happens in `room_layouts_resolved` and the
+   * surface areas read the same view.
+   */
+  effective_width_m: number;
+  effective_depth_m: number;
+  effective_height_m: number;
+  /** 'room' when the measurement came from `project_rooms`, 'layout' when it is the plan's own. */
+  dimension_source: 'room' | 'layout';
+  project_id: string | null;
+  room_name: string | null;
 };
 
 /** The six faces of a rectangular room. Fixed, because the area maths keys off them. */
@@ -69,7 +90,10 @@ export interface ResolvedLayoutItem {
 export const roomPlannerService = {
   async listLayouts(workspaceId: string): Promise<RoomLayout[]> {
     const { data, error } = await supabase
-      .from('room_layouts')
+      // The RESOLVED view, so the dimensions a plan is drawn at are the same ones its surface
+      // areas are ordered against (#378 N8). Reading the base table here would reintroduce the
+      // split the link exists to close.
+      .from('room_layouts_resolved' as never)
       .select('*')
       .eq('workspace_id', workspaceId)
       .order('updated_at', { ascending: false });
@@ -159,6 +183,36 @@ export const roomPlannerService = {
       id: q.id,
       name: q.name ?? 'Untitled quote',
     }));
+  },
+
+  /**
+   * Attach the plan to a room of record, or detach it (#378 N8).
+   *
+   * The room's mm become the source of the dimensions from that moment — nothing is copied, so
+   * there is nothing to keep in step.
+   */
+  async setProjectRoom(layoutId: string, projectRoomId: string | null): Promise<void> {
+    const { error } = await supabase
+      .from('room_layouts')
+      .update({ project_room_id: projectRoomId, updated_at: new Date().toISOString() } as never)
+      .eq('id', layoutId);
+    if (error) throw error;
+  },
+
+  /** Rooms of record a plan can be attached to, newest project first. */
+  async listAttachableRooms(workspaceId: string): Promise<Array<{ id: string; label: string }>> {
+    const { data, error } = await supabase
+      .from('project_rooms')
+      .select('id, name, projects!inner(name, workspace_id)')
+      .eq('projects.workspace_id', workspaceId)
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (error) throw error;
+    return (data ?? []).map((r) => {
+      const row = r as { id: string; name: string | null; projects?: { name: string | null } | { name: string | null }[] };
+      const proj = Array.isArray(row.projects) ? row.projects[0] : row.projects;
+      return { id: row.id, label: `${proj?.name ?? 'Project'} · ${row.name ?? 'Room'}` };
+    });
   },
 
   async createLayout(workspaceId: string, name: string): Promise<RoomLayout> {

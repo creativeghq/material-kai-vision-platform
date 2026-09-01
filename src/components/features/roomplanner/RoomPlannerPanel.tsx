@@ -198,7 +198,7 @@ export const RoomPlannerPanel: React.FC = () => {
         }
         await roomPlannerService.addItem(
           activeWorkspaceId, target.id, pendingProduct,
-          { xM: Number(target.room_width_m) / 2, yM: Number(target.room_depth_m) / 2 },
+          { xM: Number(target.effective_width_m) / 2, yM: Number(target.effective_depth_m) / 2 },
           items.length,
         );
         if (cancelled) return;
@@ -272,7 +272,7 @@ export const RoomPlannerPanel: React.FC = () => {
       // where things get lost under the room outline.
       await roomPlannerService.addItem(
         activeWorkspaceId, layoutId, productId,
-        { xM: Number(layout.room_width_m) / 2, yM: Number(layout.room_depth_m) / 2 },
+        { xM: Number(layout.effective_width_m) / 2, yM: Number(layout.effective_depth_m) / 2 },
         items.length,
       );
       await loadItems();
@@ -314,6 +314,35 @@ export const RoomPlannerPanel: React.FC = () => {
     } catch { void loadItems(); }
   };
 
+  /** Rooms of record this plan could be attached to. Empty is fine — the link is optional. */
+  const [attachableRooms, setAttachableRooms] = useState<Array<{ id: string; label: string }>>([]);
+  useEffect(() => {
+    if (!activeWorkspaceId) return;
+    let cancelled = false;
+    void roomPlannerService.listAttachableRooms(activeWorkspaceId)
+      .then((r) => { if (!cancelled) setAttachableRooms(r); })
+      .catch(() => { if (!cancelled) setAttachableRooms([]); });
+    return () => { cancelled = true; };
+  }, [activeWorkspaceId]);
+
+  /**
+   * Attach the plan to a room, or detach it. Reloads rather than patching state locally: the
+   * dimensions are DERIVED from the room, so the authoritative values come back from the view.
+   */
+  const attachRoom = async (projectRoomId: string | null) => {
+    if (!layout) return;
+    try {
+      await roomPlannerService.setProjectRoom(layout.id, projectRoomId);
+      await loadLayouts();
+    } catch (err) {
+      toast({
+        title: 'Could not attach the room',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const resize = async (patch: { room_width_m?: number; room_depth_m?: number }) => {
     if (!layout) return;
     setLayouts((ls) => ls.map((l) => (l.id === layout.id ? { ...l, ...patch } : l)));
@@ -348,7 +377,7 @@ export const RoomPlannerPanel: React.FC = () => {
     xM: Number(i.x_m), yM: Number(i.y_m), rotationDeg: Number(i.rotation_deg),
     widthM: Number(i.effective_width_m), depthM: Number(i.effective_depth_m),
   })));
-  const roomArea = layout ? Number(layout.room_width_m) * Number(layout.room_depth_m) : 0;
+  const roomArea = layout ? Number(layout.effective_width_m) * Number(layout.effective_depth_m) : 0;
 
   if (!activeWorkspaceId) {
     return <p className="text-sm text-muted-foreground">Select a workspace to plan a room.</p>;
@@ -438,18 +467,48 @@ export const RoomPlannerPanel: React.FC = () => {
             </Button>
           )}
 
+          {/* Which ROOM this plan is of (#378 N8). Optional on purpose: a showroom arrangement and
+              the public /embed/planner have no project, which is why the column is nullable. Once
+              attached, the room states the dimensions and this plan stops carrying its own. */}
+          {layout && (
+            <div className="w-56">
+              <Label className="text-xs">Room</Label>
+              <Select
+                value={layout.project_room_id ?? '__none'}
+                onValueChange={(v) => void attachRoom(v === '__none' ? null : v)}
+              >
+                <SelectTrigger className="h-9"><SelectValue placeholder="Not attached" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none">Not attached to a project room</SelectItem>
+                  {attachableRooms.map((r) => <SelectItem key={r.id} value={r.id}>{r.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {layout && (
             <>
+              {/* When the plan is attached to a room of record, the ROOM states the dimensions
+                  (in mm) and these are derived from it (#378 N8). Editing them here would write a
+                  second copy of one measurement, which is how a plan comes to be drawn at 6m and
+                  ordered at 5m. Detach, or change the room. */}
               <div className="w-24">
                 <Label className="text-xs">Width (m)</Label>
-                <MoneyInput displayDecimals={null} value={Number(layout.room_width_m)}
+                <MoneyInput displayDecimals={null} value={Number(layout.effective_width_m)}
+                  disabled={layout.dimension_source === 'room'}
                   onValueChange={(v) => resize({ room_width_m: v || 1 })} />
               </div>
               <div className="w-24">
                 <Label className="text-xs">Depth (m)</Label>
-                <MoneyInput displayDecimals={null} value={Number(layout.room_depth_m)}
+                <MoneyInput displayDecimals={null} value={Number(layout.effective_depth_m)}
+                  disabled={layout.dimension_source === 'room'}
                   onValueChange={(v) => resize({ room_depth_m: v || 1 })} />
               </div>
+              {layout.dimension_source === 'room' && (
+                <p className="self-end pb-2 text-[11px] text-muted-foreground">
+                  Measured from {layout.room_name ?? 'the room'}.
+                </p>
+              )}
             </>
           )}
         </div>
@@ -465,7 +524,7 @@ export const RoomPlannerPanel: React.FC = () => {
             {view === '2d' ? (
               <RoomPlannerCanvas
                   imageUrls={imageUrls}
-                room={{ widthM: Number(layout.room_width_m), depthM: Number(layout.room_depth_m) }}
+                room={{ widthM: Number(layout.effective_width_m), depthM: Number(layout.effective_depth_m) }}
                 items={items}
                 selectedId={selectedId}
                 onSelect={setSelectedId}
@@ -482,8 +541,8 @@ export const RoomPlannerPanel: React.FC = () => {
                     <Canvas
                       camera={{
                         position: roomCameraPosition({
-                          widthM: Number(layout.room_width_m),
-                          depthM: Number(layout.room_depth_m),
+                          widthM: Number(layout.effective_width_m),
+                          depthM: Number(layout.effective_depth_m),
                         }),
                         fov: 50,
                       }}
@@ -492,7 +551,7 @@ export const RoomPlannerPanel: React.FC = () => {
                     >
                       <RoomScene3D
                       lighting={(layout?.lighting_preset as PresetKey) ?? DEFAULT_PRESET}
-                        room={{ widthM: Number(layout.room_width_m), depthM: Number(layout.room_depth_m) }}
+                        room={{ widthM: Number(layout.effective_width_m), depthM: Number(layout.effective_depth_m) }}
                         items={sceneItems}
                         selectedId={selectedId}
                         onSelect={setSelectedId}
