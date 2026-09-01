@@ -19,6 +19,10 @@ Before Projects, moodboards and quotes were standalone objects scoped to one use
 - `/projects/invite/:token` — public landing for invitees (no auth)
 - `/projects/accept-invite?token=…` — post-OTP redirect target
 
+**Categories:** the *Categories* button in the `/projects` header opens the category manager
+(also reachable from the New Project modal, where you are most likely to notice a kind is
+missing). It is a dialog, not a route.
+
 **Top-level nav:** between Agent Hub and MoodBoards. Module-gated on `projects` (default-enabled).
 
 **Module folder:** [`src/modules/projects/`](../src/modules/projects/) — manifest, ModuleDefinition, service, pages, components.
@@ -31,7 +35,10 @@ how much of a quote is already invoiced. Both `create_project_progress_invoice` 
 dialog reads the same function to show the remainder and bound the input — so the two cannot
 disagree. Void an invoice to release its share; a credit note does not release it.
 
-**JARVIS agent surface:** four tools on the `kai` + `interior-designer` agents — `create_project`, `list_my_projects`, `find_project`, `add_task`. See [supabase/functions/_shared/tools/project-tools.ts](../supabase/functions/_shared/tools/project-tools.ts).
+**JARVIS agent surface:** four tools on the `kai` + `interior-designer` agents — `create_project`
+(takes `category` by NAME, since the vocabulary is per workspace and cannot be a `z.enum`; an
+unknown name is refused with the real options rather than dropped), `list_my_projects` (reports
+each project's category), `find_project`, `add_task`. See [supabase/functions/_shared/tools/project-tools.ts](../supabase/functions/_shared/tools/project-tools.ts).
 
 ---
 
@@ -71,6 +78,7 @@ All four tables landed across migrations `projects_module_phase_1` → `projects
 | `status` | text | `planning` / `in_progress` / `on_hold` / `completed` / `archived`. |
 | `client_company_id` | uuid FK crm_companies | XOR with `client_contact_id`. Both nullable (no client yet). |
 | `client_contact_id` | uuid FK crm_contacts | XOR with `client_company_id`. |
+| `category_id` | uuid FK project_categories | Optional — the KIND of work. `ON DELETE RESTRICT`. |
 | `deadline` | date | Optional. |
 | `budget_amount` | numeric(12,2) | Optional. |
 | `budget_currency` | text | Default `EUR`. |
@@ -86,6 +94,32 @@ All four tables landed across migrations `projects_module_phase_1` → `projects
 `(id, project_id, name, room_type, sort_order, budget_amount, deadline, notes, created_at, updated_at)` — `room_type` is constrained to the enum `bedroom / bathroom / kitchen / living / dining / office / outdoor / hallway / other`.
 
 Optional — single-space projects skip this table. The UI hides the room column when count = 0.
+
+### `project_categories`
+
+`(id, workspace_id, key, label, sort, is_active, created_by, created_at, updated_at)` — the answer
+to "what KIND of job is this", which `projects` had no way to express: `status` is a lifecycle, and
+the list could be narrowed by client, budget and deadline but never by the dimension an operator
+actually thinks in.
+
+**Two tiers, and the distinction is the whole point** — the shape is copied from `crm_deal_types`
+because it is the same problem:
+
+| `workspace_id` | Meaning |
+|---|---|
+| `NULL` | A **platform default**, shared by every tenant and read-only to them. Seeded: **Renovation, Trip, Warehouse, Real Estate**. |
+| a workspace | That tenant's own, added from the category manager. |
+
+There is **no per-workspace copy of the defaults**. That is deliberate: a copy means a fix to a
+default stops reaching the workspaces that already forked it, and one workspace renaming "Trip"
+would rename it for everyone. A tenant that wants different wording adds its own.
+
+- **`key` is derived by a DB trigger, never sent by the client** (`_project_categories_derive_key`). A Greek or emoji label slugifies to the empty string, so the fallback is a hash, and a collision appends a counter — a client-side slugifier reintroduces both cases. `label` is what humans pick from; `key` is for code.
+- **`ON DELETE RESTRICT` from `projects.category_id`**, so deleting a category still in use is refused with a sentence the admin can act on rather than silently blanking the kind on every project that had it. Surfaced by `projectCategoriesService` as "That category is still used by projects."
+- **Cross-tenant binding is enforced in `_assert_project_client_same_workspace`**, alongside the client company/contact checks: a project may reference a platform default or its own workspace's category and nothing else. Without it, "two ids each individually valid, never checked against each other" (#358 PQ-4) leaks another tenant's label into this one's UI.
+- Uniqueness: `(workspace_id, key)` and `(workspace_id, lower(label))` for a tenant's own; `(key)` alone for the defaults — NULLs are distinct in a plain UNIQUE, so the global tier needs its own partial index or a default could be seeded twice.
+
+Guarded by [tests/unit/projectCategories.test.ts](../tests/unit/projectCategories.test.ts).
 
 ### `project_tasks`
 
@@ -142,6 +176,18 @@ EXISTS (
 ```
 
 Tasks add the extra `visibility = 'client_visible'` filter so internal tasks stay hidden.
+
+**`project_categories`** is scoped separately, one policy per command (a permissive `FOR ALL`
+would also grant SELECT and OR away the read rule that deliberately exposes the defaults):
+
+| Command | Predicate |
+|---|---|
+| SELECT | `workspace_id IS NULL OR is_workspace_member(workspace_id) OR is_platform_operator()` |
+| INSERT / UPDATE / DELETE | `(workspace_id IS NOT NULL AND is_workspace_admin(workspace_id)) OR is_platform_operator()` |
+
+So every member can *pick* a category, only an owner/admin can *change the list*, and nobody but a
+platform operator can touch a default. The manager UI hides the write controls for non-admins, but
+that is UX — the policies are the boundary.
 
 **Note**: `quote_items` is intentionally **not** in the collaborator-read set. Collaborators can see that a quote exists (`name`, `status`, `grand_total`) but not its line items. That keeps the internal pricing surface hidden by default. Adjust deliberately if you need to expose it.
 

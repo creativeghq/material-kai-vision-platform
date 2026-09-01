@@ -20566,6 +20566,50 @@ export type Database = {
         }
         Relationships: []
       }
+      project_categories: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          key: string
+          label: string
+          sort: number
+          updated_at: string
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          key?: string
+          label: string
+          sort?: number
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          key?: string
+          label?: string
+          sort?: number
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_categories_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_client_views: {
         Row: {
           cover: Json
@@ -21800,6 +21844,7 @@ export type Database = {
           actual_amount: number
           budget_amount: number | null
           budget_currency: string
+          category_id: string | null
           client_address_unit_id: string | null
           client_company_id: string | null
           client_contact_id: string | null
@@ -21821,6 +21866,7 @@ export type Database = {
           actual_amount?: number
           budget_amount?: number | null
           budget_currency?: string
+          category_id?: string | null
           client_address_unit_id?: string | null
           client_company_id?: string | null
           client_contact_id?: string | null
@@ -21842,6 +21888,7 @@ export type Database = {
           actual_amount?: number
           budget_amount?: number | null
           budget_currency?: string
+          category_id?: string | null
           client_address_unit_id?: string | null
           client_company_id?: string | null
           client_contact_id?: string | null
@@ -21859,6 +21906,13 @@ export type Database = {
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "projects_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "project_categories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "projects_client_address_unit_id_fkey"
             columns: ["client_address_unit_id"]

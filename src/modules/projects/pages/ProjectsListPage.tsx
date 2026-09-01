@@ -11,6 +11,7 @@ import {
   FileText,
   AlertTriangle,
   ClipboardList,
+  Tags,
 } from 'lucide-react';
 
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -27,6 +28,8 @@ import {
   type ProjectStatus,
 } from '../services/projectsService';
 import { CreateProjectModal } from '../components/CreateProjectModal';
+import { ProjectCategoryManager } from '../components/ProjectCategoryManager';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 
 const STATUS_LABELS: Record<ProjectStatus, string> = {
   planning: 'Planning',
@@ -71,7 +74,9 @@ export const ProjectsListPage: React.FC = () => {
   const [projects, setProjects] = useState<ProjectWithClient[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [managingCategories, setManagingCategories] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
+  const { activeWorkspaceId } = useWorkspace();
 
   // App Launcher deep-link: /projects?new=project opens the New Project modal.
   useEffect(() => {
@@ -115,6 +120,12 @@ export const ProjectsListPage: React.FC = () => {
               <ClipboardList className="h-4 w-4 mr-2" />
               Blueprints
             </Button>
+            {activeWorkspaceId && (
+              <Button variant="outline" size="sm" onClick={() => setManagingCategories(true)}>
+                <Tags className="h-4 w-4 mr-2" />
+                Categories
+              </Button>
+            )}
             <Button size="sm" onClick={() => setShowCreate(true)}>
               <Plus className="h-4 w-4 mr-2" />
               New project
@@ -195,6 +206,12 @@ export const ProjectsListPage: React.FC = () => {
                       </Badge>
                     </div>
 
+                    {p.category?.label && (
+                      <Badge variant="secondary" className="text-xs">
+                        {p.category.label}
+                      </Badge>
+                    )}
+
                     {client.label && (
                       <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                         {client.kind === 'company' ? <Building2 className="h-3.5 w-3.5" /> : <UserIcon className="h-3.5 w-3.5" />}
@@ -249,6 +266,16 @@ export const ProjectsListPage: React.FC = () => {
           open={showCreate}
           onClose={() => setShowCreate(false)}
           onSuccess={(id) => navigate(`/projects/${id}`)}
+        />
+      )}
+
+      {managingCategories && activeWorkspaceId && (
+        <ProjectCategoryManager
+          workspaceId={activeWorkspaceId}
+          onClose={() => setManagingCategories(false)}
+          /* A rename or delete changes what every card and the filter facet show, so reload
+             rather than patching the rows the manager happened to touch. */
+          onChanged={() => { void load(); }}
         />
       )}
     </div>

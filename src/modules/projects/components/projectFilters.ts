@@ -5,7 +5,7 @@
  * projects — not a lone "Show archived" toggle, which leaves a designer with 40 projects no
  * way to narrow by client, budget or deadline.
  */
-import { CalendarDays, Coins, FolderKanban, UserRound, Users } from 'lucide-react';
+import { CalendarDays, Coins, FolderKanban, Tags, UserRound, Users } from 'lucide-react';
 import { NONE_VALUE, optionsFromRows, type FilterGroupDef, type FilterOption } from '@/components/core/filters';
 import type { ProjectStatus, ProjectWithClient } from '../services/projectsService';
 
@@ -30,6 +30,23 @@ const clientName = (p: ProjectWithClient): string => {
 export function buildProjectFilters(rows: ProjectWithClient[]): FilterGroupDef[] {
   const statusCounts = new Map<string, number>();
   for (const p of rows) statusCounts.set(p.status, (statusCounts.get(p.status) ?? 0) + 1);
+
+  // Built from the rows rather than from project_categories, so the facet offers exactly the
+  // kinds actually in use — a workspace with 12 categories and 3 in play gets 3 options, not 12
+  // of which 9 are dead ends. `NONE_VALUE` covers uncategorised, which is a normal state here.
+  const categories = new Map<string, FilterOption>();
+  for (const p of rows) {
+    const c = p.category;
+    if (!c?.id) continue;
+    const existing = categories.get(c.id);
+    if (existing) existing.count = (existing.count ?? 0) + 1;
+    else categories.set(c.id, { value: c.id, label: c.label, count: 1 });
+  }
+  const uncategorised = rows.filter((p) => !p.category_id).length;
+  const categoryOptions: FilterOption[] = [
+    ...(uncategorised > 0 ? [{ value: NONE_VALUE, label: 'No category', count: uncategorised }] : []),
+    ...[...categories.values()].sort((a, b) => a.label.localeCompare(b.label)),
+  ];
 
   const clients = new Map<string, FilterOption>();
   for (const p of rows) {
@@ -69,6 +86,17 @@ export function buildProjectFilters(rows: ProjectWithClient[]): FilterGroupDef[]
           description: 'Archived projects are hidden by default.',
           trueLabel: 'Archived only', falseLabel: 'Hide archived',
           accessor: (p: ProjectWithClient) => p.status === 'archived',
+        },
+      ],
+    },
+    {
+      key: 'category', label: 'Category', icon: Tags,
+      fields: [
+        {
+          key: 'category', type: 'multi', label: 'Category',
+          description: 'The kind of work — managed from Categories on the projects list.',
+          options: categoryOptions,
+          accessor: (p: ProjectWithClient) => p.category_id ?? undefined,
         },
       ],
     },

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Plus, Loader2, X, Home, Layers } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Plus, Loader2, X, Home, Layers, Tags } from 'lucide-react';
 
 import {
   Dialog,
@@ -31,6 +31,8 @@ import { TemplatePickerDialog } from '@/components/features/templates/TemplatePi
 import { entityTemplatesService } from '@/services/entityTemplatesService';
 import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
 import { useAuth } from '@/contexts/AuthContext';
+import { projectCategoriesService, type ProjectCategory } from '../services/projectCategoriesService';
+import { ProjectCategoryManager } from './ProjectCategoryManager';
 
 interface CreateProjectModalProps {
   open: boolean;
@@ -92,8 +94,21 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
       client_contact_id: initialClient.client_contact_id ?? null,
     });
   }, [open, initialClient?.client_company_id, initialClient?.client_contact_id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Reloaded on every open, and after the manager closes, so a category added a moment ago is
+  // pickable without a page refresh.
+  const workspaceId = user ? getActiveWorkspaceId(user.id) : null;
+  const loadCategories = React.useCallback(() => {
+    projectCategoriesService.list(workspaceId)
+      .then(setCategories)
+      .catch(() => setCategories([]));
+  }, [workspaceId]);
+  useEffect(() => { if (open) loadCategories(); }, [open, loadCategories]);
+
   // Chosen sub-unit address of the client (null = main address).
   const [addrUnitId, setAddrUnitId] = useState<string | null>(null);
+  const [categories, setCategories] = useState<ProjectCategory[]>([]);
+  const [categoryId, setCategoryId] = useState<string>('');
+  const [managingCategories, setManagingCategories] = useState(false);
   const [rooms, setRooms] = useState<RoomDraft[]>([]);
   const [newRoomName, setNewRoomName] = useState('');
   const [newRoomType, setNewRoomType] = useState<RoomType | ''>('');
@@ -109,6 +124,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
       client_contact_id: initialClient?.client_contact_id ?? null,
     });
     setAddrUnitId(null);
+    setCategoryId('');
     setRooms([]);
     setNewRoomName('');
     setNewRoomType('');
@@ -147,6 +163,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
         client_company_id: client.client_company_id,
         client_contact_id: client.client_contact_id,
         client_address_unit_id: addrUnitId,
+        category_id: categoryId || null,
         deadline: deadline || null,
         budget_amount: budgetAmount ? parseFloat(budgetAmount) : null,
         budget_currency: budgetCurrency,
@@ -213,6 +230,42 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                 rows={2}
                 disabled={processing}
               />
+            </div>
+
+            {/* What kind of job this is. Optional on purpose — an uncategorised project is a
+                normal state, so this never blocks creation. The "Manage" link is here because
+                the moment you discover the list is missing your kind of work is the moment you
+                are filling this form, not later on a settings page. */}
+            <div>
+              <div className="flex items-center justify-between">
+                <Label>Category (Optional)</Label>
+                {workspaceId && (
+                  <button
+                    type="button"
+                    onClick={() => setManagingCategories(true)}
+                    disabled={processing}
+                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    <Tags className="h-3 w-3" />
+                    Manage
+                  </button>
+                )}
+              </div>
+              <Select
+                value={categoryId || 'none'}
+                onValueChange={v => setCategoryId(v === 'none' ? '' : v)}
+                disabled={processing}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="No category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No category</SelectItem>
+                  {categories.map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -373,7 +426,6 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
       open={templatePickerOpen}
       onOpenChange={setTemplatePickerOpen}
       onSelect={async (tpl) => {
-        const workspaceId = getActiveWorkspaceId(user?.id);
         if (!workspaceId) { toast({ title: 'No active workspace', variant: 'destructive' }); return; }
         try {
           setProcessing(true);
@@ -392,6 +444,14 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
         }
       }}
     />
+
+    {managingCategories && workspaceId && (
+      <ProjectCategoryManager
+        workspaceId={workspaceId}
+        onClose={() => setManagingCategories(false)}
+        onChanged={loadCategories}
+      />
+    )}
     </>
   );
 };

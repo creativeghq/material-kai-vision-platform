@@ -2,7 +2,7 @@
  * Project Workspace Tools — agent-chat surface for the Projects module.
  *
  * Tools:
- *   - create_project        — new project with optional client + rooms
+ *   - create_project        — new project with optional client + rooms + category
  *   - list_my_projects      — user's active projects with budget / deadline summary
  *   - find_project          — fuzzy lookup by name (returns id + summary)
  *   - add_task              — add a task (optionally a subtask via parent_task_id)
@@ -87,7 +87,7 @@ export const createCreateProjectTool = (
   onChunk?: (chunk: any) => void,
 ) => {
   return tool(
-    async ({ name, description, deadline, budget_amount, budget_currency, rooms, client_company_id, client_contact_id, client_name }: {
+    async ({ name, description, deadline, budget_amount, budget_currency, rooms, client_company_id, client_contact_id, client_name, category }: {
       name: string;
       description?: string;
       deadline?: string;
@@ -97,6 +97,7 @@ export const createCreateProjectTool = (
       client_company_id?: string;
       client_contact_id?: string;
       client_name?: string;
+      category?: string;
     }) => {
       const denied = await moduleGate(workspaceId, MODULE_SLUG);
       if (denied) return denied;
@@ -137,6 +138,32 @@ export const createCreateProjectTool = (
         }
       }
 
+      /**
+       * The category vocabulary is per workspace (platform defaults + this tenant's own), so it
+       * cannot be a z.enum — it is resolved by name here instead. An unrecognised name is
+       * REFUSED with the real list rather than dropped: a project silently created without the
+       * kind the user named is the silent-zero shape, and the model has no way to notice.
+       */
+      let categoryId: string | null = null;
+      if (category?.trim()) {
+        const { data: cats } = await sb
+          .from('project_categories')
+          .select('id, label')
+          .or(`workspace_id.is.null,workspace_id.eq.${workspaceId}`)
+          .eq('is_active', true);
+        const wanted = category.trim().toLowerCase();
+        const hit = (cats ?? []).find((c: any) => String(c.label).toLowerCase() === wanted);
+        if (!hit) {
+          return JSON.stringify({
+            success: false,
+            error: `No project category named "${category}" in this workspace.`,
+            available_categories: (cats ?? []).map((c: any) => c.label),
+            hint: 'Use one of available_categories, omit the category, or ask the user to add it under Projects -> Categories.',
+          });
+        }
+        categoryId = (hit as any).id;
+      }
+
       onChunk?.({ type: 'tool_progress', status: `Creating project "${name}"...`, timestamp: Date.now() });
 
       const { data: project, error } = await sb
@@ -151,6 +178,7 @@ export const createCreateProjectTool = (
           budget_currency: budget_currency || 'EUR',
           client_company_id: companyId,
           client_contact_id: contactId,
+          category_id: categoryId,
         } as any)
         .select()
         .single();
@@ -206,6 +234,7 @@ export const createCreateProjectTool = (
         client_company_id: z.string().optional().describe('CRM company id of the client (drives quotes/invoices/finance). Company XOR contact.'),
         client_contact_id: z.string().optional().describe('CRM contact id of the client, if the client is a person not a company.'),
         client_name: z.string().optional().describe('Client name to resolve to an existing CRM company/contact when you don\'t have the id.'),
+        category: z.string().optional().describe('The kind of work, by NAME - e.g. "Renovation", "Trip", "Warehouse", "Real Estate". The list is per workspace; an unknown name is refused with the real options rather than guessed at.'),
       }),
     },
   );
@@ -233,7 +262,7 @@ export const createListMyProjectsTool = (
       // no way to tell which was which.
       let q = sb
         .from('projects')
-        .select('id, name, status, deadline, budget_amount, budget_currency, actual_amount, accepted_quote_count, moodboard_count, last_activity_at')
+        .select('id, name, status, deadline, budget_amount, budget_currency, actual_amount, accepted_quote_count, moodboard_count, last_activity_at, category:project_categories(label)')
         .eq('user_id', userId);
       if (workspaceId) q = q.eq('workspace_id', workspaceId);
       q = q.order('last_activity_at', { ascending: false });
@@ -247,6 +276,7 @@ export const createListMyProjectsTool = (
         id: p.id,
         name: p.name,
         status: p.status,
+        category: p.category?.label ?? null,
         deadline: p.deadline,
         budget: p.budget_amount,
         actual: Number(p.actual_amount) || 0,

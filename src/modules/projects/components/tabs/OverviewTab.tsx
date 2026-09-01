@@ -12,6 +12,7 @@ import {
   Clock,
   AlertTriangle,
   Home,
+  Tags,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -28,12 +29,20 @@ interface OverviewTabProps {
   project: ProjectWithClient;
   /** When false (collaborator viewing a shared project), hide budget + task internals. */
   isOwner?: boolean;
+  /**
+   * Patch the parent's copy of the project after an edit here. Without it the page header keeps
+   * rendering the value this tab just changed until a reload — the kind of disagreement between
+   * two views of one fact that reads as a bug.
+   */
+  onProjectPatched?: (patch: Partial<ProjectWithClient>) => void;
 }
 
 import { formatMoney } from '@/utils/decimal';
 import { useToast } from '@/hooks/use-toast';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import { PropertyLinkField } from '@/modules/finance/components/PropertyLinkField';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
+import { projectCategoriesService, type ProjectCategory } from '../../services/projectCategoriesService';
 
 /** Callers branch on `null`, so this keeps the null return rather than the canonical dash. */
 const formatDate = (d: string | null) => (d ? formatDateValue(d) : null);
@@ -46,13 +55,15 @@ const daysUntil = (date: string | null) => {
   return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 };
 
-export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = true }) => {
+export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = true, onProjectPatched }) => {
   const { toast } = useToast();
   // Buildings are only a sensible answer where the workspace actually has them. A permanently
   // empty picker reads as a broken control rather than a neutral one.
   const { isModuleAvailable } = useEntitlements();
   const realEstate = isModuleAvailable('real-estate');
   const [savingProperty, setSavingProperty] = useState(false);
+  const [categories, setCategories] = useState<ProjectCategory[]>([]);
+  const [savingCategory, setSavingCategory] = useState(false);
   const [rooms, setRooms] = useState<ProjectRoom[]>([]);
   const [roomBudget, setRoomBudget] = useState<Awaited<ReturnType<typeof projectsService.getRoomBudgetSummary>>>(
     { rooms: [], unassigned: { actual_amount: 0, item_count: 0 } },
@@ -100,8 +111,61 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
       .slice(0, 3);
   }, [tasks]);
 
+  useEffect(() => {
+    if (!isOwner) return;
+    projectCategoriesService.list(project.workspace_id)
+      .then(setCategories)
+      .catch(() => setCategories([]));
+  }, [isOwner, project.workspace_id]);
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      {/* What kind of job this is. Owner-only: a collaborator on a shared project sees the
+          delivery, not how the business files it. */}
+      {isOwner && (
+        <Card className="dashboard-card lg:col-span-3">
+          <CardContent className="p-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2">
+                <Tags className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">Category</span>
+              </div>
+              <Select
+                value={project.category_id ?? 'none'}
+                disabled={savingCategory}
+                onValueChange={async (v) => {
+                  const nextId = v === 'none' ? null : v;
+                  setSavingCategory(true);
+                  try {
+                    await projectsService.updateProject(project.id, { category_id: nextId });
+                    onProjectPatched?.({
+                      category_id: nextId,
+                      category: nextId
+                        ? (() => {
+                            const c = categories.find((x) => x.id === nextId);
+                            return c ? { id: c.id, key: c.key, label: c.label } : null;
+                          })()
+                        : null,
+                    });
+                    toast({ title: nextId ? 'Category updated' : 'Category cleared' });
+                  } catch (e) {
+                    toast({ title: 'Failed to update the category', description: (e as Error).message, variant: 'destructive' });
+                  } finally { setSavingCategory(false); }
+                }}
+              >
+                <SelectTrigger className="sm:w-64"><SelectValue placeholder="No category" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No category</SelectItem>
+                  {categories.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* The building this job is at (#378 N4). A deal could point at a property OR a project;
           the property and the project could not point at each other, so a renovation, a
           development or a fit-out -- the actual work these customers do -- could not be attached

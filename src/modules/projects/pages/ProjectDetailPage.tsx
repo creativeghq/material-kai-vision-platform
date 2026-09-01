@@ -233,6 +233,11 @@ export const ProjectDetailPage: React.FC = () => {
                 Shared with you
               </Badge>
             )}
+            {project.category?.label && (
+              <Badge variant="secondary" className="hidden sm:inline-flex">
+                {project.category.label}
+              </Badge>
+            )}
             <Badge variant="outline" className={`hidden sm:inline-flex ${STATUS_TONES[project.status]}`}>
               {STATUS_LABELS[project.status]}
             </Badge>
@@ -385,7 +390,7 @@ export const ProjectDetailPage: React.FC = () => {
             )}
           </TabsList>
 
-          <TabsContent value="overview"><OverviewTab project={project} isOwner={isOwner} /></TabsContent>
+          <TabsContent value="overview"><OverviewTab project={project} isOwner={isOwner} onProjectPatched={(patch) => setProject(prev => prev ? { ...prev, ...patch } : null)} /></TabsContent>
           <TabsContent value="rooms"><RoomsTab projectId={project.id} budgetCurrency={project.budget_currency} isOwner={isOwner} /></TabsContent>
           {isOwner && <TabsContent value="products"><ProductsTab projectId={project.id} workspaceId={project.workspace_id} /></TabsContent>}
           {isOwner && <TabsContent value="plan"><PlanTab projectId={project.id} workspaceId={project.workspace_id} currency={project.budget_currency} isOwner={isOwner} /></TabsContent>}

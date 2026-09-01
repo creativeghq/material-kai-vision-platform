@@ -46,6 +46,12 @@ export interface Project {
    * no building on file at all.
    */
   property_id: string | null;
+  /**
+   * What KIND of job this is — Renovation, Trip, Warehouse, … A platform default or one of this
+   * workspace's own (`project_categories`). Optional: an uncategorised project is a normal state,
+   * never a defect, so nothing downstream may assume a category is present.
+   */
+  category_id: string | null;
   deadline: string | null;
   budget_amount: number | null;
   budget_currency: string;
@@ -59,6 +65,8 @@ export interface Project {
 }
 
 export interface ProjectWithClient extends Project {
+  /** Resolved from `category_id` by the select below — null when uncategorised. */
+  category?: { id: string; key: string; label: string } | null;
   client_company?: { id: string; name: string } | null;
   client_contact?: { id: string; name: string | null; first_name?: string | null; last_name?: string | null; email?: string | null } | null;
   /** Set by listProjects: false for projects reached via an active collaborator grant. */
@@ -374,6 +382,7 @@ export interface CreateProjectInput {
   client_company_id?: string | null;
   client_contact_id?: string | null;
   client_address_unit_id?: string | null;
+  category_id?: string | null;
   deadline?: string | null;
   budget_amount?: number | null;
   budget_currency?: string;
@@ -388,6 +397,8 @@ export interface UpdateProjectInput {
   client_company_id?: string | null;
   client_contact_id?: string | null;
   client_address_unit_id?: string | null;
+  /** `null` clears the category. */
+  category_id?: string | null;
   deadline?: string | null;
   budget_amount?: number | null;
   budget_currency?: string;
@@ -477,6 +488,7 @@ class ProjectsService {
       .from('projects')
       .select(`
         *,
+        category:project_categories(id, key, label),
         client_company:crm_companies(id, name),
         client_contact:crm_contacts(id, name, first_name, last_name, email)
       `)
@@ -549,6 +561,7 @@ class ProjectsService {
       .from('projects')
       .select(`
         *,
+        category:project_categories(id, key, label),
         client_company:crm_companies(id, name),
         client_contact:crm_contacts(id, name, first_name, last_name, email)
       `)
@@ -566,6 +579,7 @@ class ProjectsService {
       .from('projects')
       .select(`
         *,
+        category:project_categories(id, key, label),
         client_company:crm_companies(id, name, email, phone, website),
         client_contact:crm_contacts(id, name, first_name, last_name, email, phone)
       `)
@@ -603,6 +617,7 @@ class ProjectsService {
         client_company_id: input.client_company_id ?? null,
         client_contact_id: input.client_contact_id ?? null,
         client_address_unit_id: input.client_address_unit_id ?? null,
+        category_id: input.category_id ?? null,
         deadline: input.deadline ?? null,
         budget_amount: input.budget_amount ?? null,
         budget_currency: input.budget_currency ?? 'EUR',
