@@ -199,6 +199,66 @@ export class AgentChatHistoryService {
   }
 
   /**
+   * Delete a single saved message — the canvas tab menu's "Delete entry".
+   *
+   * `message_count` is RECOUNTED rather than decremented, so a count that has
+   * already drifted (a save whose count update failed) is repaired here instead of
+   * carried further. The three outcomes are distinct on purpose: 'not_found' means
+   * the row was already gone, which is a success for the caller's view, while
+   * 'error' means it is still there and the view must NOT drop it.
+   */
+  async deleteMessage(messageId: string): Promise<'deleted' | 'not_found' | 'error'> {
+    try {
+      // RLS scopes this read to the caller's own conversations, so a row that is
+      // not ours is indistinguishable from one that does not exist — both are
+      // 'not_found', and neither gets deleted.
+      const { data: row, error: readErr } = await supabase
+        .from('agent_chat_messages')
+        .select('conversation_id')
+        .eq('id', messageId)
+        .maybeSingle();
+
+      if (readErr) {
+        throw readErr;
+      }
+      if (!row) {
+        return 'not_found';
+      }
+
+      const { error } = await supabase
+        .from('agent_chat_messages')
+        .delete()
+        .eq('id', messageId);
+
+      if (error) {
+        throw error;
+      }
+
+      const { count, error: countErr } = await supabase
+        .from('agent_chat_messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('conversation_id', row.conversation_id);
+
+      if (countErr) {
+        console.warn('Could not recount conversation messages:', countErr.message);
+      } else if (typeof count === 'number') {
+        const { error: updateErr } = await supabase
+          .from('agent_chat_conversations')
+          .update({ message_count: count, updated_at: new Date().toISOString() })
+          .eq('id', row.conversation_id);
+        if (updateErr) {
+          console.warn('Could not update conversation message_count:', updateErr.message);
+        }
+      }
+
+      return 'deleted';
+    } catch (error) {
+      console.error('Error deleting message:', error);
+      return 'error';
+    }
+  }
+
+  /**
    * Get messages for a conversation
    */
   async getConversationMessages(conversationId: string): Promise<ChatMessage[]> {

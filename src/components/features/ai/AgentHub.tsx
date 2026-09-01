@@ -55,7 +55,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
 import { resolveUploadPath } from '@/utils/storagePaths';
 import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
-import { agentChatHistoryService, ChatConversation } from '@/services/agents/agentChatHistoryService';
+import { agentChatHistoryService, ChatConversation, SaveMessageOptions } from '@/services/agents/agentChatHistoryService';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { useToast } from '@/hooks/use-toast';
 import { DemoAgentResults } from './DemoAgentResults';
@@ -495,6 +495,15 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
 
 interface Message {
   id: string;
+  /**
+   * The `agent_chat_messages` row this message was saved as.
+   *
+   * `id` is client-minted for a message created in THIS session (`msg-…`), so it
+   * addresses no row — which is why the canvas tab menu's "Delete entry" needs a
+   * second field rather than reusing it. Set from the row on load, and linked back
+   * by `saveAndLinkMessage` on save. Absent means nothing was persisted.
+   */
+  dbId?: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: Date;
@@ -984,6 +993,12 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     AGENTS.find(a => a.id === 'orchestrator')?.defaultModel || 'anthropic/claude-opus-5',
   );
   const [messages, setMessages] = useState<Message[]>([]);
+  /**
+   * Artifacts the user closed from this conversation's view (the canvas tab menu's
+   * "Close in chat"). View state only — the message stays saved and comes back on
+   * reload, which is the whole difference from "Delete entry" next to it.
+   */
+  const [hiddenArtifactIds, setHiddenArtifactIds] = useState<string[]>([]);
   const [, setActiveGenerationJobs] = useState<Map<string, any>>(new Map());
   // v0.3.2 — modal form triggered by manage_job_sites agent tool when user is vague
   const [jobSitesFormState, setJobSitesFormState] = useState<JobSitesFormState>(null);
@@ -1081,6 +1096,22 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   // Workflow runtime — keyed by run_id. Mutated by workflow_* chunks. The
   // WorkflowTracker renders one card per active run at the top of the chat.
   const [workflows, setWorkflows] = useState<Record<string, WorkflowRuntimeState>>({});
+
+  /**
+   * Persist a message AND link the saved row id back onto the local one.
+   *
+   * Every save site goes through this rather than calling the service directly: a
+   * message created in this session carries a client-minted `msg-…` id, so without
+   * the link the canvas tab menu's "Delete entry" has no row to address and would
+   * quietly delete nothing until the conversation was reloaded.
+   */
+  const saveAndLinkMessage = useCallback(async (localId: string, options: SaveMessageOptions) => {
+    const saved = await agentChatHistoryService.saveMessage(options);
+    if (saved?.id) {
+      setMessages((prev) => prev.map((m) => (m.id === localId ? { ...m, dbId: saved.id } : m)));
+    }
+    return saved;
+  }, []);
 
   /**
    * Universal pre-launch check used by EVERY quick-start click (whether it
@@ -1983,7 +2014,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
       // Save to DB
       if (currentConversationId) {
-        await agentChatHistoryService.saveMessage({
+        await saveAndLinkMessage(vrMessage.id, {
           conversationId: currentConversationId,
           role: 'assistant',
           content: vrMessage.content,
@@ -2072,7 +2103,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       setMessages(prev => [...prev, videoMessage]);
 
       if (currentConversationId) {
-        await agentChatHistoryService.saveMessage({
+        await saveAndLinkMessage(videoMessage.id, {
           conversationId: currentConversationId,
           role: 'assistant',
           content: videoMessage.content,
@@ -2149,7 +2180,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       setMessages(prev => [...prev, boardMessage]);
 
       if (currentConversationId) {
-        await agentChatHistoryService.saveMessage({
+        await saveAndLinkMessage(boardMessage.id, {
           conversationId: currentConversationId,
           role: 'assistant',
           content: boardMessage.content,
@@ -2218,7 +2249,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       setMessages(prev => [...prev, stagingMessage]);
 
       if (currentConversationId) {
-        await agentChatHistoryService.saveMessage({
+        await saveAndLinkMessage(stagingMessage.id, {
           conversationId: currentConversationId,
           role: 'assistant',
           content: stagingMessage.content,
@@ -2665,7 +2696,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
                 // Save generation message to database immediately
                 if (conversationId) {
-                  await agentChatHistoryService.saveMessage({
+                  await saveAndLinkMessage(generationMessage.id, {
                     conversationId,
                     role: 'assistant',
                     content: generationMessage.content,
@@ -2725,7 +2756,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 };
                 setMessages(prev => [...prev, vrMsg]);
                 if (conversationId) {
-                  await agentChatHistoryService.saveMessage({
+                  await saveAndLinkMessage(vrMsg.id, {
                     conversationId,
                     role: 'assistant',
                     content: vrMsg.content,
@@ -2752,7 +2783,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 };
                 setMessages(prev => [...prev, videoMsg]);
                 if (conversationId) {
-                  await agentChatHistoryService.saveMessage({
+                  await saveAndLinkMessage(videoMsg.id, {
                     conversationId,
                     role: 'assistant',
                     content: videoMsg.content,
@@ -2779,7 +2810,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 };
                 setMessages(prev => [...prev, jobsMsg]);
                 if (conversationId) {
-                  await agentChatHistoryService.saveMessage({
+                  await saveAndLinkMessage(jobsMsg.id, {
                     conversationId,
                     role: 'assistant',
                     content: jobsMsg.content,
@@ -2807,7 +2838,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 };
                 setMessages(prev => [...prev, stagingMsg]);
                 if (conversationId) {
-                  await agentChatHistoryService.saveMessage({
+                  await saveAndLinkMessage(stagingMsg.id, {
                     conversationId,
                     role: 'assistant',
                     content: stagingMsg.content,
@@ -2838,7 +2869,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 };
                 setMessages(prev => [...prev, boardMsg]);
                 if (conversationId) {
-                  await agentChatHistoryService.saveMessage({
+                  await saveAndLinkMessage(boardMsg.id, {
                     conversationId,
                     role: 'assistant',
                     content: boardMsg.content,
@@ -2875,7 +2906,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 setMessages((prev) => [...prev, articleMessage]);
 
                 if (conversationId) {
-                  await agentChatHistoryService.saveMessage({
+                  await saveAndLinkMessage(articleMessage.id, {
                     conversationId,
                     role: 'assistant',
                     content: articleMessage.content,
@@ -2920,7 +2951,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 };
                 setMessages(prev => [...prev, inspirationMsg]);
                 if (conversationId) {
-                  await agentChatHistoryService.saveMessage({
+                  await saveAndLinkMessage(inspirationMsg.id, {
                     conversationId,
                     role: 'assistant',
                     content: inspirationMsg.content,
@@ -2941,7 +2972,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 };
                 setMessages(prev => [...prev, heatPumpMsg]);
                 if (conversationId) {
-                  await agentChatHistoryService.saveMessage({
+                  await saveAndLinkMessage(heatPumpMsg.id, {
                     conversationId,
                     role: 'assistant',
                     content: heatPumpMsg.content,
@@ -2963,7 +2994,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 };
                 setMessages(prev => [...prev, heatingMsg]);
                 if (conversationId) {
-                  await agentChatHistoryService.saveMessage({
+                  await saveAndLinkMessage(heatingMsg.id, {
                     conversationId,
                     role: 'assistant',
                     content: heatingMsg.content,
@@ -2984,7 +3015,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 };
                 setMessages(prev => [...prev, kitchenMsg]);
                 if (conversationId) {
-                  await agentChatHistoryService.saveMessage({
+                  await saveAndLinkMessage(kitchenMsg.id, {
                     conversationId,
                     role: 'assistant',
                     content: kitchenMsg.content,
@@ -3028,7 +3059,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 };
                 setMessages(prev => [...prev, askMsg]);
                 if (currentConversationId) {
-                  void agentChatHistoryService.saveMessage({
+                  void saveAndLinkMessage(askMsg.id, {
                     conversationId: currentConversationId,
                     role: 'assistant',
                     content: askMsg.content,
@@ -3057,7 +3088,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 };
                 setMessages(prev => [...prev, confirmMsg]);
                 if (conversationId) {
-                  await agentChatHistoryService.saveMessage({
+                  await saveAndLinkMessage(confirmMsg.id, {
                     conversationId,
                     role: 'assistant',
                     content: confirmMsg.content,
@@ -3088,7 +3119,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 };
                 setMessages(prev => [...prev, canvasMsg]);
                 if (conversationId) {
-                  await agentChatHistoryService.saveMessage({
+                  await saveAndLinkMessage(canvasMsg.id, {
                     conversationId,
                     role: 'assistant',
                     content: canvasMsg.content,
@@ -3116,7 +3147,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 };
                 setMessages(prev => [...prev, pdfMsg]);
                 if (conversationId) {
-                  await agentChatHistoryService.saveMessage({
+                  await saveAndLinkMessage(pdfMsg.id, {
                     conversationId,
                     role: 'assistant',
                     content: pdfMsg.content,
@@ -3158,7 +3189,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 };
                 setMessages(prev => [...prev, qMsg]);
                 if (conversationId) {
-                  await agentChatHistoryService.saveMessage({
+                  await saveAndLinkMessage(qMsg.id, {
                     conversationId,
                     role: 'assistant',
                     content: qMsg.content,
@@ -3183,7 +3214,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 };
                 setMessages(prev => [...prev, m]);
                 if (conversationId) {
-                  await agentChatHistoryService.saveMessage({
+                  await saveAndLinkMessage(m.id, {
                     conversationId, role: 'assistant', content: m.content,
                     metadata: { agentId: selectedAgent, model: selectedModel, mentionSummaryData: m.mentionSummaryData },
                   });
@@ -3201,7 +3232,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 };
                 setMessages(prev => [...prev, m]);
                 if (conversationId) {
-                  await agentChatHistoryService.saveMessage({
+                  await saveAndLinkMessage(m.id, {
                     conversationId, role: 'assistant', content: m.content,
                     metadata: { agentId: selectedAgent, model: selectedModel, sourcingOptionsData: m.sourcingOptionsData },
                   });
@@ -3219,7 +3250,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 };
                 setMessages(prev => [...prev, m]);
                 if (conversationId) {
-                  await agentChatHistoryService.saveMessage({
+                  await saveAndLinkMessage(m.id, {
                     conversationId, role: 'assistant', content: m.content,
                     metadata: { agentId: selectedAgent, model: selectedModel, purchaseOrderCreatedData: m.purchaseOrderCreatedData },
                   });
@@ -3238,7 +3269,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 };
                 setMessages(prev => [...prev, m]);
                 if (conversationId) {
-                  await agentChatHistoryService.saveMessage({
+                  await saveAndLinkMessage(m.id, {
                     conversationId, role: 'assistant', content: m.content,
                     metadata: { agentId: selectedAgent, model: selectedModel, purchaseOrderSentData: m.purchaseOrderSentData },
                   });
@@ -3260,7 +3291,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 // A card carried the answer this turn — see renderedResultCardRef.
                 renderedResultCardRef.current = true;
                 if (conversationId) {
-                  await agentChatHistoryService.saveMessage({
+                  await saveAndLinkMessage(m.id, {
                     conversationId, role: 'assistant', content: m.content,
                     metadata: { agentId: selectedAgent, model: selectedModel, agentResultData: m.agentResultData },
                   });
@@ -3287,7 +3318,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 };
                 setMessages(prev => [...prev, m]);
                 if (conversationId) {
-                  await agentChatHistoryService.saveMessage({
+                  await saveAndLinkMessage(m.id, {
                     conversationId, role: 'assistant', content: m.content,
                     metadata: { agentId: selectedAgent, model: selectedModel, llmVisibilityData: m.llmVisibilityData },
                   });
@@ -3309,7 +3340,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 };
                 setMessages(prev => [...prev, m]);
                 if (conversationId) {
-                  await agentChatHistoryService.saveMessage({
+                  await saveAndLinkMessage(m.id, {
                     conversationId, role: 'assistant', content: m.content,
                     metadata: { agentId: selectedAgent, model: selectedModel, mentionFeedData: m.mentionFeedData },
                   });
@@ -3351,7 +3382,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 };
                 setMessages(prev => [...prev, m]);
                 if (conversationId) {
-                  await agentChatHistoryService.saveMessage({
+                  await saveAndLinkMessage(m.id, {
                     conversationId, role: 'assistant', content: m.content,
                     metadata: { agentId: selectedAgent, model: selectedModel, techRadarData: m.techRadarData },
                   });
@@ -3376,7 +3407,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 };
                 setMessages(prev => [...prev, m]);
                 if (conversationId) {
-                  await agentChatHistoryService.saveMessage({
+                  await saveAndLinkMessage(m.id, {
                     conversationId, role: 'assistant', content: m.content,
                     metadata: { agentId: selectedAgent, model: selectedModel, mentionTrackingStartedData: m.mentionTrackingStartedData },
                   });
@@ -3395,7 +3426,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 };
                 setMessages(prev => [...prev, m]);
                 if (conversationId) {
-                  await agentChatHistoryService.saveMessage({
+                  await saveAndLinkMessage(m.id, {
                     conversationId, role: 'assistant', content: m.content,
                     metadata: { agentId: selectedAgent, model: selectedModel, seoGenericData: m.seoGenericData },
                   });
@@ -3422,7 +3453,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 };
                 setMessages(prev => [...prev, m]);
                 if (conversationId) {
-                  await agentChatHistoryService.saveMessage({
+                  await saveAndLinkMessage(m.id, {
                     conversationId, role: 'assistant', content: m.content,
                     metadata: { agentId: selectedAgent, model: selectedModel, seoResearchData: m.seoResearchData },
                   });
@@ -3617,7 +3648,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 }
                 setMessages(prev => [...prev, m]);
                 if (conversationId) {
-                  await agentChatHistoryService.saveMessage({
+                  await saveAndLinkMessage(m.id, {
                     conversationId, role: 'assistant', content: m.content,
                     metadata: {
                       agentId: selectedAgent,
@@ -3822,7 +3853,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       // Save assistant message to database with response metrics
       if (conversationId) {
         const responseTimeMs = elapsedTimeRef.current; // Capture elapsed time before state resets
-        await agentChatHistoryService.saveMessage({
+        await saveAndLinkMessage(assistantMessage.id, {
           conversationId,
           role: 'assistant',
           content: cleanedText || 'No response from agent',
@@ -4086,6 +4117,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       setMessages(
         msgs.map((msg) => ({
           id: msg.id,
+          // A restored message IS its row, but say so explicitly rather than letting
+          // the delete path infer it from the shape of the id.
+          dbId: msg.id,
           role: msg.role,
           content: msg.content,
           timestamp: new Date(msg.createdAt),
@@ -4158,6 +4192,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const handleNewConversation = useCallback(() => {
     setCurrentConversationId(null);
     setMessages([]);
+    setHiddenArtifactIds([]);
     onConversationChange?.(null);
     setJustEnabledToolkitId(null);
     // Clear transient per-turn state so a new conversation starts truly blank — no
@@ -4286,16 +4321,68 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     return null;
   }, []);
 
-  const canvasArtifacts = useMemo(
-    () => messages.map(getCanvasArtifact).filter(Boolean) as CanvasArtifact[],
-    [messages, getCanvasArtifact],
+  /**
+   * What the conversation shows. A closed artifact drops out of BOTH the canvas
+   * tab strip and the chat stream — the chip in the stream is the same object as
+   * the tab, so closing one and leaving the other is not "closed".
+   */
+  const visibleMessages = useMemo(
+    () => (hiddenArtifactIds.length === 0 ? messages : messages.filter((m) => !hiddenArtifactIds.includes(m.id))),
+    [messages, hiddenArtifactIds],
   );
+
+  const canvasArtifacts = useMemo(
+    () => visibleMessages.map(getCanvasArtifact).filter(Boolean) as CanvasArtifact[],
+    [visibleMessages, getCanvasArtifact],
+  );
+
+  // Close an artifact from this conversation's view. The saved entry is untouched.
+  const handleCloseArtifact = useCallback((id: string) => {
+    setHiddenArtifactIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+    toast({
+      title: 'Closed in chat',
+      description: 'Still saved — it comes back when you reload this conversation.',
+    });
+  }, [toast]);
+
+  /**
+   * Delete the entry behind a canvas tab for good.
+   *
+   * The row is the thing being deleted, so it is deleted FIRST and the view follows —
+   * dropping it locally on a failed delete would show the operator a conversation the
+   * next reload contradicts.
+   */
+  const handleDeleteArtifact = useCallback(async (id: string) => {
+    const message = messages.find((m) => m.id === id);
+    if (!message) return;
+    const confirmed = window.confirm('Delete this entry permanently? It will be removed from this conversation for good.');
+    if (!confirmed) return;
+
+    // No row: this artifact was never persisted (no conversation yet, or the save
+    // failed), so dropping it from the thread IS the whole delete.
+    if (message.dbId) {
+      const result = await agentChatHistoryService.deleteMessage(message.dbId);
+      if (result === 'error') {
+        toast({
+          title: 'Could not delete',
+          description: 'The entry is still saved. Try again.',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
+    setMessages((prev) => prev.filter((m) => m.id !== id));
+    setHiddenArtifactIds((prev) => prev.filter((x) => x !== id));
+    toast({ title: 'Entry deleted' });
+  }, [messages, toast]);
 
   // Reset the canvas when switching conversations.
   useEffect(() => {
     setCanvasHidden(false);
     setChatCollapsed(false);
     setActiveCanvasId(null);
+    setHiddenArtifactIds([]);
   }, [currentConversationId]);
 
   // Keep the active tab valid; default to the newest artifact.
@@ -5245,7 +5332,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     )));
   };
 
-  const activeCanvasMessage = activeCanvasId ? messages.find((m) => m.id === activeCanvasId) : undefined;
+  const activeCanvasMessage = activeCanvasId ? visibleMessages.find((m) => m.id === activeCanvasId) : undefined;
   // The canvas is the permanent middle workspace for every agent; the chat is a
   // right rail. `canvasHidden` is an escape hatch to reclaim a full-width chat.
   const canvasShown = !canvasHidden;
@@ -5282,6 +5369,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           artifacts={canvasArtifacts}
           activeId={activeCanvasId}
           onSelect={setActiveCanvasId}
+          onCloseArtifact={handleCloseArtifact}
+          onDeleteArtifact={handleDeleteArtifact}
           singlePane={isMobile}
           // Mobile's control is "back to chat"; desktop's is "close the canvas".
           onClose={() => (isMobile ? setChatCollapsed(false) : setCanvasHidden(true))}
@@ -5289,7 +5378,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         >
           {activeCanvasMessage
             ? renderCanvasArtifact(activeCanvasMessage)
-            : renderAgentStarters(messages.length === 0)}
+            : renderAgentStarters(visibleMessages.length === 0)}
         </CanvasPanel>
       )}
 
@@ -5481,14 +5570,14 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             );
           })()}
 
-          {messages.length === 0 && Object.values(workflows).filter((wf) => wf.status !== 'aborted' && wf.status !== 'done').length === 0 ? (
+          {visibleMessages.length === 0 && Object.values(workflows).filter((wf) => wf.status !== 'aborted' && wf.status !== 'done').length === 0 ? (
             // Canvas-first: when the canvas is open it hosts the welcome +
             // starters (renderAgentStarters), so the chat rail stays clean.
             // Only render the starters here when the canvas pane isn't mounted —
             // which on mobile is the normal case (single-pane), so a fresh chat
             // still opens on the welcome + starters instead of a blank screen.
             canvasPaneVisible ? null : renderAgentStarters(true)
-          ) : messages.length === 0 ? (
+          ) : visibleMessages.length === 0 ? (
             // Wizard is active but no messages yet — wizard already renders above.
             null
           ) : (
@@ -5576,7 +5665,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     })}
                 </div>
               )}
-              {messages.map((message) => (
+              {visibleMessages.map((message) => (
                 <div
                   key={message.id}
                   className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
@@ -7073,7 +7162,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             };
             setMessages((prev) => [...prev, canvasMsg]);
             if (currentConversationId) {
-              agentChatHistoryService.saveMessage({
+              saveAndLinkMessage(canvasMsg.id, {
                 conversationId: currentConversationId, role: 'assistant', content: canvasMsg.content,
                 metadata: { agentId: selectedAgent, model: selectedModel, sheetCanvasData: canvasMsg.sheetCanvasData },
               }).catch(() => { /* non-blocking */ });
@@ -7097,7 +7186,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             };
             setMessages((prev) => [...prev, pdfMsg]);
             if (currentConversationId) {
-              agentChatHistoryService.saveMessage({
+              saveAndLinkMessage(pdfMsg.id, {
                 conversationId: currentConversationId, role: 'assistant', content: pdfMsg.content,
                 metadata: { agentId: selectedAgent, model: selectedModel, sheetPdfData: pdfMsg.sheetPdfData },
               }).catch(() => { /* non-blocking */ });
@@ -7186,10 +7275,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 credits_used: data.credits_used,
               };
               const regionContent = 'Region edit applied.';
+              const regionMessageId = `msg-${Date.now()}`;
               setMessages((prev) => [
                 ...prev,
                 {
-                  id: `msg-${Date.now()}`,
+                  id: regionMessageId,
                   role: 'assistant' as const,
                   content: regionContent,
                   timestamp: new Date(),
@@ -7202,7 +7292,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               // a 20-credit edit vanished on reload.
               const regionConversationId = conversationIdRef.current;
               if (regionConversationId) {
-                await agentChatHistoryService.saveMessage({
+                await saveAndLinkMessage(regionMessageId, {
                   conversationId: regionConversationId,
                   role: 'assistant',
                   content: regionContent,

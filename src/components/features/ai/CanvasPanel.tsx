@@ -15,8 +15,15 @@ import {
   FileText, Package, Camera, Globe, LayoutGrid, Image as ImageIcon, Video,
   PanelRightClose, ArrowLeft, ArrowUpRight, LayoutPanelLeft, Sparkles, Radar, ClipboardList,
   Briefcase, Boxes, PackageCheck, MessageSquare, Bot, TrendingUp, Images,
-  Wand2, Calculator, MessageSquareQuote,
+  Wand2, Calculator, MessageSquareQuote, MoreHorizontal, X, Trash2,
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/core/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 
 export type CanvasArtifactKind =
@@ -88,6 +95,15 @@ interface CanvasPanelProps {
   activeId: string | null;
   onSelect: (id: string) => void;
   onClose: () => void;
+  /**
+   * Per-tab menu. `onCloseArtifact` drops the artifact from this conversation's
+   * VIEW (it stays saved and returns on reload); `onDeleteArtifact` deletes the
+   * saved entry. Two different promises, so they are two separate items with
+   * their own wording — a single "×" cannot say which one it is. Omit a handler
+   * and its item is not offered.
+   */
+  onCloseArtifact?: (id: string) => void;
+  onDeleteArtifact?: (id: string) => void;
   children?: React.ReactNode;
   /** Contextual detail panel for the active artifact. */
   inspector?: React.ReactNode;
@@ -99,7 +115,8 @@ interface CanvasPanelProps {
   singlePane?: boolean;
 }
 
-export const CanvasPanel: React.FC<CanvasPanelProps> = ({ artifacts, activeId, onSelect, onClose, children, inspector, singlePane }) => {
+export const CanvasPanel: React.FC<CanvasPanelProps> = ({ artifacts, activeId, onSelect, onClose, onCloseArtifact, onDeleteArtifact, children, inspector, singlePane }) => {
+  const hasTabMenu = Boolean(onCloseArtifact || onDeleteArtifact);
   return (
     <div className={cn(
       'flex min-w-0 flex-1 flex-col bg-background',
@@ -127,20 +144,69 @@ export const CanvasPanel: React.FC<CanvasPanelProps> = ({ artifacts, activeId, o
             const Icon = KIND_ICON[a.kind];
             const active = a.id === activeId;
             return (
-              <button
+              // The tab is a container, not a button: the kebab is a second control
+              // and a button inside a button is invalid markup (and unclickable).
+              <div
                 key={a.id}
-                onClick={() => onSelect(a.id)}
                 className={cn(
-                  'flex h-9 shrink-0 items-center gap-2 rounded-lg border px-3 text-sm transition-colors',
+                  'group flex h-9 shrink-0 items-center rounded-lg border text-sm transition-colors',
+                  hasTabMenu ? 'pr-1' : '',
                   active
                     ? 'border-border bg-accent text-foreground'
                     : 'border-transparent text-muted-foreground hover:bg-accent hover:text-foreground',
                 )}
-                title={a.title}
               >
-                <Icon className="h-3.5 w-3.5 shrink-0 text-primary" />
-                <span className="max-w-[140px] truncate sm:max-w-[180px]">{a.title}</span>
-              </button>
+                <button
+                  onClick={() => onSelect(a.id)}
+                  className="flex h-9 min-w-0 items-center gap-2 rounded-lg px-3"
+                  title={a.title}
+                >
+                  <Icon className="h-3.5 w-3.5 shrink-0 text-primary" />
+                  <span className="max-w-[140px] truncate sm:max-w-[180px]">{a.title}</span>
+                </button>
+                {hasTabMenu && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        title="Tab options"
+                        aria-label={`Options for ${a.title}`}
+                        className={cn(
+                          'flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground',
+                          // Always reachable on touch (no hover there) and on the tab
+                          // you are looking at; fades in on the rest so the strip stays quiet.
+                          active ? 'opacity-100' : 'opacity-60 group-hover:opacity-100',
+                        )}
+                      >
+                        <MoreHorizontal className="h-3.5 w-3.5" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-60">
+                      {onCloseArtifact && (
+                        <DropdownMenuItem onClick={() => onCloseArtifact(a.id)}>
+                          <X className="mr-2 mt-0.5 h-4 w-4 shrink-0 self-start" />
+                          <span className="flex flex-col">
+                            <span>Close in chat</span>
+                            <span className="text-xs text-muted-foreground">Hides it here. Stays saved.</span>
+                          </span>
+                        </DropdownMenuItem>
+                      )}
+                      {onCloseArtifact && onDeleteArtifact && <DropdownMenuSeparator />}
+                      {onDeleteArtifact && (
+                        <DropdownMenuItem
+                          onClick={() => onDeleteArtifact(a.id)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="mr-2 mt-0.5 h-4 w-4 shrink-0 self-start" />
+                          <span className="flex flex-col">
+                            <span>Delete entry</span>
+                            <span className="text-xs text-muted-foreground">Removes it from this chat for good.</span>
+                          </span>
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
             );
           })}
         </div>
