@@ -114,7 +114,6 @@ async function loadLatestReport(projectId: string): Promise<{ row: any; actions:
   if (!row) return null;
   const { data: actions } = await sb
     .from('project_assessment_actions')
-    // deno-lint-ignore no-explicit-any
     .select('id, priority, title, rationale, effort, impact, dimension, destination, signal_code, state, task_id, due_hint')
     .eq('assessment_id', (row as { id: string }).id)
     .order('priority', { ascending: true });
@@ -342,6 +341,8 @@ export const createApplyAssessmentActionTool = (
       return fail('No such action on any of your projects.');
     }
 
+    const title = String((action as { title?: string }).title ?? 'this action');
+
     const { data, error } = await sb.rpc('apply_assessment_action', {
       p_action_id: action_id,
       p_due_date: /^\d{4}-\d{2}-\d{2}$/.test(due_date || '') ? due_date : null,
@@ -349,30 +350,26 @@ export const createApplyAssessmentActionTool = (
     });
     if (error) return fail(`Could not add the task: ${error.message}`);
 
-    // deno-lint-ignore no-explicit-any
-    const out = data as any;
+    const out = (data ?? {}) as { task_id?: string | null; already?: boolean };
+    const already = out.already === true;
     onChunk?.({
       type: 'project_assessment_action_applied',
       action_id,
-      // deno-lint-ignore no-explicit-any
-      title: (action as any).title,
+      title,
       project_id: owner.id,
       project_name: owner.name,
-      task_id: out?.task_id ?? null,
-      already: out?.already === true,
+      task_id: out.task_id ?? null,
+      already,
     });
     return JSON.stringify({
       success: true,
-      task_id: out?.task_id ?? null,
+      task_id: out.task_id ?? null,
       // Said out loud rather than reported as a fresh success: the second caller of a
       // double-tapped button gets the task that exists, and needs to know that is what happened.
-      already_on_the_list: out?.already === true,
-      // deno-lint-ignore no-explicit-any
-      message: out?.already === true
-        // deno-lint-ignore no-explicit-any
-        ? `"${(action as any).title}" was already on the task list.`
-        // deno-lint-ignore no-explicit-any
-        : `Added "${(action as any).title}" to ${owner.name}'s tasks.`,
+      already_on_the_list: already,
+      message: already
+        ? `"${title}" was already on the task list.`
+        : `Added "${title}" to ${owner.name}'s tasks.`,
     });
   },
   {
