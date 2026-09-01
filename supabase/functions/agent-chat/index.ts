@@ -1270,6 +1270,11 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
     tools: [
       'material_search', 'generate_3d', 'generate_gemini', 'virtual_staging', 'analyze_inspiration_url',
+      // Vision starts renders, so Vision has to be able to ask whether one finished. It was
+      // ALREADY receiving this tool — the push site fired on `generate_3d` and named no id, so it
+      // slipped past the toolkit filter and the audience clamp, both of which read this list.
+      // Declared here and gated there: the list is the boundary, and now it says what is true.
+      'check_generation_status',
       // Calculators (all users; deterministic, free, no upstream API)
       'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost',
       // Image-driven post-processing tools (require an existing room image in the conversation)
@@ -1339,6 +1344,12 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'web_search', 'web_fetch', 'web_research_validate',
       'product_provenance', 'product_price_history', 'products_by_brand', 'brand_overview',
       'related_products', 'find_products_by_spec', 'products_in_project', 'projects_using_product',
+      // The account half of the same cluster. Pepper owns knowledge-graph and bound 8 of its 12,
+      // so "Search by ΚΑΔ" — a question about companies, which is Pepper's whole subject — was
+      // offered and refused. `supplier_overview` stays admin-gated at its push site.
+      'customer_overview', 'supplier_overview', 'price_my_spec', 'search_crm_by_kad',
+      // sub-agents is four analysis agents and Pepper held two. An owner binds the cluster.
+      'research_analysis', 'analytics_analysis',
       'review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding',
       'track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites',
       'price_lookup', 'product_analysis', 'business_analysis', 'dispatch_background_task',
@@ -1369,7 +1380,9 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'seo_ai_overview', 'seo_google_maps', 'seo_gbp_info',
       'create_seo_article', 'seo_keyword_research', 'seo_article_planner', 'seo_article_writer', 'seo_content_analyzer',
       'track_product_mentions', 'get_mention_summary', 'check_llm_visibility', 'find_negative_mentions',
-      'research_analysis', 'analytics_analysis',
+      // Same cluster, other half: Edith held research + analytics and was offered
+      // "Business breakdown", which runs a tool she did not have.
+      'research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis',
       // The open web. Every SEO tool here answers about a domain from an index; none of them can
       // read the page. A competitor content question needs both.
       'web_search', 'web_fetch', 'web_research_validate',
@@ -1395,7 +1408,16 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'embed_readiness', 'embed_overview',
       'customer_overview', 'supplier_overview', 'product_price_history',
       'products_in_project', 'projects_using_product', 'price_lookup',
+      // The rest of the knowledge-graph cluster. Trinity was DECLARED an owner of it while
+      // binding half — so "Product provenance", "Brand overview" and "Search by ΚΑΔ" were
+      // offered on Trinity and answered "not available for this agent". A cluster is the unit
+      // the picker offers, so an owner binds all of it or is not an owner.
+      'product_provenance', 'products_by_brand', 'brand_overview',
+      'related_products', 'find_products_by_spec', 'search_crm_by_kad',
+      // Same for the projects cluster: an agent that can create a project and cannot put a task
+      // on it is offering "Add a task" it cannot run. Purchases are money, which is Trinity's.
       'create_project', 'list_my_projects', 'find_project',
+      'add_task', 'add_purchase_item', 'generate_purchase_sheet',
       // AI Assessment — Trinity owns the books, so it gets the finance subject as well as the
       // project one. `assess_*` is paid; the readers are DB-only.
       'assess_project', 'get_project_assessment',
@@ -2913,7 +2935,9 @@ async function executeAgent(
     }
     tools.push(createGeminiGenerationTool(userId, workspaceId, toolImages, conversationImages, onChunk, pinnedMaterialImages, generationMode, conversation_id ?? undefined));
     tools.push(createVirtualStagingTool(userId, workspaceId, conversationImages, onChunk, conversation_id ?? undefined));
-    tools.push(createGenerationStatusTool(workspaceId ?? null));
+    if (config.tools.includes('check_generation_status')) {
+      tools.push(createGenerationStatusTool(workspaceId ?? null));
+    }
   }
 
   // Lighting variants — re-render an existing room under a different lighting preset

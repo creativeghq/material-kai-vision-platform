@@ -2756,6 +2756,11 @@ export const TOOLKITS: ToolkitDefinition[] = [
     name: 'Quotes',
     description: 'Build client quotes from chat: add catalog or custom products (e.g. 75 sqm at €34/sqm), auto-price + VAT, generate the branded PDF, and open it on the canvas. Saved to the Quotes module. When the catalogue cannot price something, record it as an unpriced request instead of guessing.',
     icon: 'FileText',
+    // `quotes` is `is_addon = true, price_tier = pro` in public.modules and this cluster declared
+    // no slug at all — so the picker's module filter never applied and quote-tools asked nobody.
+    // The guard could not see it either: toolModuleGates builds its checklist FROM the declared
+    // slugs, so a missing one removes the tool from what is checked instead of failing.
+    moduleSlug: 'quotes',
     tool_ids: ['create_quote', 'generate_quote_pdf', 'list_my_quotes', 'raise_quote_request'],
     quick_starts: [
       {
@@ -3769,7 +3774,14 @@ export const TOOLKIT_AGENTS: Record<string, string[]> = {
   // while Trinity is the agent that books them.
   expenses: ['erp'], 'website-embed': ['erp'],
   // Admin/analysis helpers
-  'sub-agents': ['marketing', 'product-business'], 'admin-misc': ['marketing', 'product-business'],
+  'sub-agents': ['marketing', 'product-business'],
+  // `admin-misc` is deliberately NOT owned by a specialist. It holds the platform-ops trio
+  // (checkServerHealth / querySentry / queryDatabase — a service-role reader with no tenancy of
+  // its own) beside two utilities, and declaring Edith and Pepper its owners offered them a
+  // cluster whose tools they mostly do not bind. The honest resolution is the other direction
+  // from the clusters above: an ops grab-bag belongs to the operator, so it stays on the
+  // generalist. Pepper keeps `price_lookup` and `dispatch_background_task` as bound tools —
+  // it just is not offered a cluster it cannot run.
 };
 
 /**

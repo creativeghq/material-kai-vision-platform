@@ -47,6 +47,7 @@ const { createClient } = await import('npm:@supabase/supabase-js@2');
 
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
+import { moduleGate } from './module-gate.ts';
 import { round2 } from '../money.ts';
 import { foldForSearch, escapeLike } from '../searchFold.ts';
 
@@ -213,6 +214,11 @@ export const createCreateQuoteTool = (
       paid_upfront?: boolean;
       generate_pdf?: boolean;
     }) => {
+      // `quotes` is a paid addon (public.modules: is_addon, price_tier 'pro'). Every one of these
+      // four tools reached the quotes tables without asking — the page is behind an
+      // EntitlementGuard and the agent went around it, which is invariant #395's whole subject.
+      const denied = await moduleGate(workspaceId, 'quotes');
+      if (denied) return denied;
       const sb = svcClient();
       try {
         if (!workspaceId) {
@@ -515,6 +521,8 @@ export const createGenerateQuotePdfTool = (
 ) => {
   return tool(
     async (input: { quote_id: string; regenerate?: boolean }) => {
+      const denied = await moduleGate(workspaceId, 'quotes');
+      if (denied) return denied;
       const sb = svcClient();
       try {
         // Ownership: the quote must be in the caller's workspace (defence in depth on
@@ -568,6 +576,8 @@ export const createListMyQuotesTool = (
 ) => {
   return tool(
     async (input: { limit?: number; status?: string }) => {
+      const denied = await moduleGate(workspaceId, 'quotes');
+      if (denied) return denied;
       const sb = svcClient();
       try {
         let q = sb
@@ -653,6 +663,8 @@ export const createRaiseQuoteRequestTool = (
       notes?: string;
       items_count?: number;
     }) => {
+      const denied = await moduleGate(workspaceId, 'quotes');
+      if (denied) return denied;
       const sb = svcClient();
       try {
         if (!workspaceId) {
