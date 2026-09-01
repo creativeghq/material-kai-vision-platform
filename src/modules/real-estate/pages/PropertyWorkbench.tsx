@@ -132,6 +132,7 @@ const DocumentsTab: React.FC<{ ws: string | null; propertyId: string; canManage:
 };
 
 // Lazy: the Spark/Three splat renderer only loads when a listing actually shows a VR world.
+import { ListingSocialPostsCard } from '@/modules/real-estate/components/ListingSocialPostsCard';
 const WorldViewer = React.lazy(() => import('@/components/features/ai/WorldViewer').then((m) => ({ default: m.WorldViewer })));
 import { PROPERTY_TYPES } from '../realEstateVocabulary'; // one source (#391)
 const TRANSACTION_TYPES = ['sale', 'rent', 'short_let', 'business_transfer', 'auction'];
@@ -906,7 +907,13 @@ export default function PropertyWorkbench() {
           </TabsContent>
 
           <TabsContent value="documents"><DocumentsTab ws={ws} propertyId={id} canManage={editable} /></TabsContent>
-          <TabsContent value="performance"><ListingPerformancePanel ws={ws} propertyId={id} canManage={editable} /></TabsContent>
+          <TabsContent value="performance" className="space-y-4">
+            <ListingPerformancePanel ws={ws} propertyId={id} canManage={editable} />
+            {/* What was actually posted about this listing (#378 N6). The link was always written,
+                as a jsonb key nothing could join — which is why marketing ROI read as structurally
+                unanswerable when the data was already there. */}
+            <ListingSocialPostsCard propertyId={id} />
+          </TabsContent>
           {isShortLet && <TabsContent value="shortlet"><ShortLetTab ws={ws} propertyId={id} icalToken={property.ical_token ?? null} canManage={editable} onChanged={load} /></TabsContent>}
         </Tabs>
       </div>

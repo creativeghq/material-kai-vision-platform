@@ -67,7 +67,10 @@ serve(withApiLogging('real-estate-listing-social', async (req) => {
   const { count: existing } = await supabase.from('social_posts')
     .select('id', { count: 'exact', head: true })
     .eq('workspace_id', property.workspace_id)
-    .contains('metadata', { property_id: propertyId });
+    // The COLUMN, not `metadata` (#378 N6). The link was always recorded, as a jsonb key with no
+    // foreign key, no index and no way for any derivation to join it — which is why "marketing
+    // ROI is structurally unanswerable" was true of data that was already being written.
+    .eq('property_id', propertyId);
   if (existing) {
     return new Response(JSON.stringify({ ok: true, skipped: 'already announced', posts: 0 }), { headers: { 'Content-Type': 'application/json' } });
   }
@@ -136,8 +139,10 @@ serve(withApiLogging('real-estate-listing-social', async (req) => {
     hashtags,
     image_urls: imageUrl ? [imageUrl] : null,
     status: 'draft',
+    // The subject, as a real column with a real FK. `metadata.source` stays because it answers a
+    // different question — WHY this post exists, not what it is about.
+    property_id: propertyId,
     metadata: {
-      property_id: propertyId,
       source: 'realestate.listing_published',
       // Re-signed by zernio-api at publish time; see MEDIA_PREVIEW_TTL_SECONDS above.
       media_refs: mediaRefs,
