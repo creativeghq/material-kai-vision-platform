@@ -16,7 +16,10 @@ import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 import { marketplaceService } from '@/services/marketplaceService';
 import { messagingService } from '@/modules/messaging/services/messagingService';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
-import { castObjectFor, castSeedForThreadCounterparty, castSeedForSender } from '@/utils/characterAvatar';
+import {
+  castObjectFor, castObjectForSlot, castSlotFor, normalizeCastSlot, nameGender,
+  castSeedForThreadCounterparty, castSeedForSender,
+} from '@/utils/characterAvatar';
 import { moodStyle, urgencyLabel, urgencyIsLoud } from '@/utils/conversationMood';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useToast } from '@/hooks/use-toast';
@@ -64,6 +67,12 @@ interface ParticipantLabel {
   userId: string | null;
   /** The member's own photo. `user_profiles.avatar_url` existed all along and was never selected. */
   avatarUrl?: string | null;
+  /**
+   * Which cast character stands in when there is no photo. Server-derived for a customer
+   * (`inbox_participants.avatar_slot`), so the transcript cannot disagree with the header;
+   * read from `user_profiles.full_name` for a member, which is a single source everywhere.
+   */
+  avatarSlot?: number | null;
 }
 
 
@@ -473,9 +482,20 @@ const InboxPage: React.FC = () => {
             // the one thing it never tells anyone is which colleague replied.
             label: prof?.full_name || prof?.email || (isMe ? 'You' : 'Team member'),
             kind: 'member', userId: p.user_id, avatarUrl: prof?.avatar_url ?? channelAvatarUrl,
+            // Resolved here rather than server-side, and it is not the exception it looks like:
+            // a member's name has exactly ONE source — `user_profiles.full_name`, read in this
+            // one place — so there is no second string for a second screen to disagree with. A
+            // customer's does not, which is why theirs arrives as a number.
+            avatarSlot: castSlotFor(p.id, nameGender(prof?.full_name)),
           });
         } else if (p.participant_type === 'customer') {
-          next.set(p.id, { label: customerName, kind: 'customer', userId: p.user_id });
+          // Server-derived — see `InboxParticipant.avatar_slot`. Never re-answered from
+          // `customerName`: the header reads `thread.subject` and this reads the CRM name, and
+          // the day those two disagree about a name is the day one person gets two faces.
+          next.set(p.id, {
+            label: customerName, kind: 'customer', userId: p.user_id,
+            avatarSlot: p.avatar_slot ?? null,
+          });
         } else {
           next.set(p.id, { label: 'Assistant', kind: 'agent', userId: null });
         }
@@ -1605,13 +1625,21 @@ const DeliveryState: React.FC<{ meta: Record<string, unknown> }> = ({ meta }) =>
  * row in the thread. A signed URL would need re-minting constantly and would break mid-scroll the
  * moment one expired.
  */
-function castAvatarSrc(seed: string | null | undefined): string {
-  const { storage_bucket, storage_object_path } = castObjectFor(seed);
+function castAvatarSrc(seed: string | null | undefined, slot?: number | null): string {
+  // The SERVER'S answer wins whenever there is one. It knows the name behind the participant and
+  // resolved the pool once for all five draw sites; hashing here would re-answer it per screen
+  // off whichever of the four name strings this screen happens to hold. Hashing the seed is the
+  // floor for an internal thread, a social commenter with no participant row, and a client
+  // talking to an older deploy — all cases where nobody knows the name either.
+  const resolved = normalizeCastSlot(slot);
+  const { storage_bucket, storage_object_path } = resolved === null
+    ? castObjectFor(seed)
+    : castObjectForSlot(resolved);
   return supabase.storage.from(storage_bucket).getPublicUrl(storage_object_path).data.publicUrl;
 }
 
 const ThreadAvatar: React.FC<{
-  thread?: Pick<InboxThread, 'id' | 'metadata' | 'counterparty_participant_id'> | null;
+  thread?: Pick<InboxThread, 'id' | 'metadata' | 'counterparty_participant_id' | 'counterparty_avatar_slot'> | null;
   name: string;
   className?: string;
   fallbackClassName?: string;
@@ -1638,17 +1666,21 @@ const ThreadAvatar: React.FC<{
    * 0/516 contacts). So this is not a placeholder waiting for something better — it is the
    * avatar, and it should look like it was designed rather than like a missing image.
    *
-   * Seeded on the COUNTERPARTY'S PARTICIPANT ROW, never the name and never the thread. A name
-   * gets corrected, re-capitalised, or arrives one way from WhatsApp and another from the CRM,
-   * and seeding on it would recolour someone every time their record is tidied. The thread was
-   * the first answer and it was wrong for a quieter reason: the message rows below seed on the
-   * SENDER participant, so header and transcript hashed to different cast slots and one man was
-   * drawn as a woman at the top of his own conversation. `castSeedForThreadCounterparty` and
-   * `castSeedForSender` are now the only two places that decide, and they agree by construction.
+   * WHICH character comes from `counterparty_avatar_slot`, which inbox-api derived from the
+   * participant id (who) and their name (which half of the cast) — once, for all five places
+   * this face is drawn. Re-deriving it per screen is not a shortcut: this component is handed
+   * four different name strings depending on where it is mounted, and the first version of this
+   * feature already shipped the same class of bug one input over, seeding the header on the
+   * THREAD id while the message rows below seeded on the SENDER participant, so one man was
+   * drawn as a woman at the top of his own conversation.
+   *
+   * `castSeedForThreadCounterparty` remains the floor for a thread the server answered null for
+   * — an internal thread, or an older deploy — and it agrees with `castSeedForSender` by
+   * construction.
    */
   const generated = useMemo(
-    () => castAvatarSrc(castSeedForThreadCounterparty(thread, name)),
-    [thread?.counterparty_participant_id, thread?.id, name],
+    () => castAvatarSrc(castSeedForThreadCounterparty(thread, name), thread?.counterparty_avatar_slot),
+    [thread?.counterparty_participant_id, thread?.counterparty_avatar_slot, thread?.id, name],
   );
 
   /*
@@ -2185,7 +2217,7 @@ const MessageBubble: React.FC<{
         */}
         {!isAgent && (
           <AvatarImage
-            src={info?.avatarUrl || castAvatarSrc(castSeedForSender(m, displayLabel))}
+            src={info?.avatarUrl || castAvatarSrc(castSeedForSender(m, displayLabel), info?.avatarSlot)}
             alt={displayLabel ?? ''}
             className="object-cover"
           />

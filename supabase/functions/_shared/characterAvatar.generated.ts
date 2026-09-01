@@ -1,3 +1,7 @@
+// GENERATED MIRROR of src/utils/characterAvatar.ts — do not edit here.
+// Regenerate: npm run vocab:mirror (part of gen:all). Freshness is enforced by
+// tests/unit/vocabularyMirrors.test.ts, which fails the build on any drift.
+
 /**
  * The character avatar shown for a contact whose photo we cannot get.
  *

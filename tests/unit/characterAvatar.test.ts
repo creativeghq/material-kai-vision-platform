@@ -8,12 +8,17 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  CAST_SIZE, castSlotFor, castObjectFor, castAvatarUrl,
+  CAST, CAST_SIZE, castPool, castSlotFor, castSlotForName, castObjectFor, castObjectForSlot,
+  castAvatarUrl, normalizeCastSlot, nameGender,
   castSeedForThreadCounterparty, castSeedForSender,
 } from '../../src/utils/characterAvatar';
 
 const API = readFileSync(
   join(process.cwd(), 'supabase', 'functions', 'messaging-api', 'index.ts'), 'utf8');
+const INBOX_API = readFileSync(
+  join(process.cwd(), 'supabase', 'functions', 'inbox-api', 'index.ts'), 'utf8');
+const INBOX_PAGE = readFileSync(
+  join(process.cwd(), 'src', 'pages', 'Inbox', 'InboxPage.tsx'), 'utf8');
 
 describe('character avatar cast', () => {
   it('never points a contact at a slot that was never rendered', () => {
@@ -51,6 +56,27 @@ describe('character avatar cast', () => {
     const url = castAvatarUrl('c-1', 'https://x.supabase.co/storage/v1');
     expect(url).toMatch(/\/object\/public\/generation-images\/avatars\/cast\/\d{3}\.png$/);
     expect(url).not.toMatch(/token=/);
+  });
+
+  it('renders its prompts FROM the roster the picker reads', () => {
+    // Two lists — the generator's prompts and the picker's idea of who is in each slot — is how
+    // slot 7 gets re-rendered as a woman while assignment goes on handing it to men. Every face
+    // is still a 200, so nothing anywhere reports it.
+    expect(API).toMatch(/DEFAULT_VARIATIONS = CAST\.map\(\(c\) => c\.look\)/);
+    expect(API).toMatch(/from '\.\.\/_shared\/characterAvatar\.generated\.ts'/);
+    // And the roster is not a list of prompts with genders bolted on afterwards: the prompt has
+    // to describe the half it claims. Word-anchored deliberately — `head` contains `he` and
+    // `woman` contains `man`, so an unanchored version of this test passes on nonsense.
+    for (const c of CAST) {
+      const said = /\b(woman|women)\b/.test(c.look) ? 'female'
+        : /\b(man|men)\b/.test(c.look) ? 'male' : null;
+      expect(said, `"${c.look}" states no gender the picker could agree with`).not.toBeNull();
+      expect(said, `"${c.look}" is rostered as ${c.gender}`).toBe(c.gender);
+    }
+    // Half and half. A cast that drifted to 20 men would make "narrow to the male pool" a
+    // near-identity and give every woman in the inbox one of four faces.
+    expect(castPool('female').length).toBe(CAST_SIZE / 2);
+    expect(castPool('male').length).toBe(CAST_SIZE / 2);
   });
 
   it('generates into a fixed path per slot, so re-running replaces rather than accumulates', () => {
@@ -119,5 +145,116 @@ describe('one person is one face', () => {
     expect(EDGE).toMatch(/function counterpartyParticipantId/);
     // Both readers of a thread must attach it — list_threads for the row, get_thread for the header.
     expect(EDGE.match(/counterparty_participant_id/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+  });
+});
+
+/**
+ * WHICH HALF of the cast, from the name.
+ *
+ * The hash alone is a coin flip on a set that is half women and half men, and it loses that flip
+ * in front of the operator: `Desislava Slavova` — every token of it grammatically feminine — was
+ * drawn as slot 001, an older man with a grey beard and glasses, beside her own messages. "We do
+ * not guess" was the stated policy; a 50/50 guess was the behaviour.
+ *
+ * So the rule is narrow on purpose: answer where the answer is IN the name (an honorific, a
+ * Slavic declension, a Greek final sigma, a listed given name) and return null everywhere else,
+ * because null is the whole cast, i.e. exactly what every contact had before.
+ */
+describe('reading a gender off a name', () => {
+  it('reads the name in the screenshot', () => {
+    expect(nameGender('Desislava Slavova')).toBe('female');
+    // ...and the point of the fix: she no longer gets a man.
+    const slot = castSlotForName('7b1f2c4e-0000-4000-8000-000000000001', 'Desislava Slavova');
+    expect(CAST[slot].gender).toBe('female');
+  });
+
+  it('reads a Slavic surname in both directions', () => {
+    // `-ova` is the feminine declension of `-ov`. The pair is the whole signal: getting one and
+    // not the other would be a rule that only ever moves women.
+    expect(nameGender('Slavova')).toBe('female');
+    expect(nameGender('Ivanov')).toBe('male');
+    expect(nameGender('Kowalska')).toBe('female');
+    expect(nameGender('Kowalski')).toBe('male');
+  });
+
+  it('reads Greek, in both scripts', () => {
+    // A Greek man's name ends in a final sigma; a Greek woman's surname is the genitive of it.
+    expect(nameGender('Παπαδόπουλος')).toBe('male');
+    expect(nameGender('Ελένη Παπαδοπούλου')).toBe('female');
+    expect(nameGender('Κώστας')).toBe('male');
+    expect(nameGender('Papadopoulos')).toBe('male');
+    expect(nameGender('Papadopoulou')).toBe('female');
+    // Accents and case are how the same person arrives from WhatsApp and from a CRM import.
+    expect(nameGender('ΕΛΕΝΗ ΠΑΠΑΔΟΠΟΥΛΟΥ')).toBe('female');
+    expect(nameGender('ΚΩΣΤΑΣ')).toBe('male');
+  });
+
+  it('refuses the cases where the name does not actually say', () => {
+    // Each of these would be answered confidently and wrongly by a rule one notch broader, and a
+    // confident wrong answer is worse than the coin flip it replaced.
+    expect(nameGender('Andrea Rossi')).toBeNull();   // female almost everywhere, male in Italy
+    expect(nameGender('Nikola Ivanov')).toBe('male'); // -a, and male: the exception list
+    expect(nameGender('Παπάζογλου')).toBeNull();     // indeclinable, worn by both
+    expect(nameGender('+30 694 000 0000')).toBeNull();
+    expect(nameGender('WhatsApp conversation')).toBeNull();
+    expect(nameGender('')).toBeNull();
+    expect(nameGender(null)).toBeNull();
+    // A feminine given name against a masculine surname is one number shared by two people.
+    expect(nameGender('Maria Ivanov')).toBeNull();
+  });
+
+  it('lets an honorific outrank the morphology', () => {
+    expect(nameGender('Mrs Ivanov')).toBe('female');
+    expect(nameGender('Mr Slavova')).toBe('male');
+  });
+
+  it('narrows the pool without moving the hash', () => {
+    // The id still picks WHICH character. Only the set it picks from changes, so a contact moves
+    // when the verdict on their name changes and never when the name is merely re-capitalised.
+    const id = 'p-42';
+    expect(castSlotFor(id, 'female')).toBe(castSlotFor(id, 'female'));
+    expect(CAST[castSlotFor(id, 'female')].gender).toBe('female');
+    expect(CAST[castSlotFor(id, 'male')].gender).toBe('male');
+    // No verdict = the whole cast = the behaviour every contact had before this existed.
+    expect(castSlotFor(id, null)).toBe(castSlotFor(id));
+    // And a narrowed pool still spreads: one face for every woman would look broken.
+    const used = new Set(Array.from({ length: 400 }, (_, i) => castSlotFor(`wa-${i}`, 'female')));
+    expect(used.size).toBe(castPool('female').length);
+  });
+
+  it('is answered ONCE, server-side, and rendered as a number', () => {
+    // The client holds four different name strings for one counterparty (thread.subject in the
+    // list and header, the WhatsApp profile name in the drawer, the CRM name on message rows).
+    // Resolving the pool per screen is how one person gets two faces — the bug this file already
+    // has a regression test for, one input over. So inbox-api answers it and ships a slot.
+    expect(INBOX_API).toMatch(/function counterpartyAvatarSlot/);
+    expect(INBOX_API).toMatch(/castSlotForName/);
+    // Both readers attach it: list_threads for the mailbox row, get_thread for the header...
+    expect(INBOX_API.match(/counterparty_avatar_slot/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+    // ...and the participants carry their own, because a thread can hold two customers and the
+    // transcript draws one face per sender.
+    expect(INBOX_API).toMatch(/avatar_slot: slot/);
+
+    // The client renders the number it is given on BOTH draw paths, and never re-reads a name to
+    // pick a pool for a customer. A missing slot falls back to the plain hash, not to a guess.
+    expect(INBOX_PAGE).toMatch(/castAvatarSrc\(castSeedForThreadCounterparty\(thread, name\), thread\?\.counterparty_avatar_slot\)/);
+    expect(INBOX_PAGE).toMatch(/castAvatarSrc\(castSeedForSender\(m, displayLabel\), info\?\.avatarSlot\)/);
+    expect(INBOX_PAGE).toMatch(/avatarSlot: p\.avatar_slot \?\? null/);
+    // The ONE place the client is allowed to read a name is a MEMBER, whose name has a single
+    // source (`user_profiles.full_name`) and therefore no second string to disagree with.
+    const nameGenderCalls = INBOX_PAGE.match(/nameGender\(/g) ?? [];
+    expect(nameGenderCalls.length).toBe(1);
+    expect(INBOX_PAGE).toMatch(/avatarSlot: castSlotFor\(p\.id, nameGender\(prof\?\.full_name\)\)/);
+  });
+
+  it('survives a slot minted against a cast this build has not heard of', () => {
+    // The client and the edge functions deploy separately, so a longer cast reaches an older
+    // bundle. Wrapping beats a 404 face, which renders as nothing and reports nothing.
+    expect(normalizeCastSlot(CAST_SIZE + 3)).toBe(3);
+    expect(normalizeCastSlot(-1)).toBe(CAST_SIZE - 1);
+    expect(normalizeCastSlot(null)).toBeNull();
+    expect(normalizeCastSlot(undefined)).toBeNull();
+    expect(normalizeCastSlot(Number.NaN)).toBeNull();
+    expect(castObjectForSlot(7).storage_object_path).toBe('avatars/cast/007.png');
   });
 });

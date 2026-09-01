@@ -16,6 +16,7 @@ import type { DbClient } from '../_shared/supabase-client.ts';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
+import { castSlotForName } from '../_shared/characterAvatar.generated.ts';
 import { getTrustedClientIp } from '../_shared/client-ip.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { sha256hex } from '../_shared/hash.ts';
@@ -112,6 +113,29 @@ function counterpartyParticipantId(
     .filter((p) => p.participant_type === 'customer' && (!p.status || p.status === 'active'))
     .sort((a, b) => (a.joined_at || '').localeCompare(b.joined_at || '') || a.id.localeCompare(b.id));
   return customers[0]?.id ?? null;
+}
+
+/**
+ * Which of the 24 cast characters a customer participant wears — derived HERE, for the same
+ * reason `counterpartyParticipantId` is.
+ *
+ * The id decides which character; the NAME decides which half of the cast it is drawn from, so
+ * that a woman is not handed a bearded man by a coin flip (see `characterAvatar.ts`). The name is
+ * the catch: the client holds four different strings for one counterparty — `thread.subject` in
+ * the mailbox list and the header, the WhatsApp profile name in the drawer, `crm_contacts.name`
+ * on every message row — and a pool resolved per screen gives one person two faces the instant
+ * those disagree. That bug has already shipped once here, off a different input.
+ *
+ * So: the CRM name where the contact is filed, the thread subject where it is not, answered once
+ * and sent as a number. The client renders the number.
+ */
+function counterpartyAvatarSlot(
+  participantId: string | null,
+  contactName: string | null | undefined,
+  subject: string | null | undefined,
+): number | null {
+  if (!participantId) return null;
+  return castSlotForName(participantId, contactName || subject || null);
 }
 
 /** Global platform operator: admin/super_admin global role OR owner/admin of the root workspace. */
@@ -2261,18 +2285,53 @@ async function handleJwtAction(
       // ...and the COUNTERPARTY, from the same rows — see `counterpartyParticipantId`. The list
       // row draws that person's face, and it has to be the face the open thread draws.
       const counterpartyByThread = new Map<string, string>();
+      // ...and which cast character that person wears — see `counterpartyAvatarSlot`. Derived
+      // alongside the id, because half of the answer is the name and the list row is the FIRST
+      // place the face is drawn: resolving it here and in the header separately is how one
+      // person ends up with two faces.
+      const avatarSlotByThread = new Map<string, number>();
       if (threadIds.length) {
         const { data: parts } = await db.from('inbox_participants')
-          .select('id, thread_id, participant_type, user_id, thread_role, joined_at')
+          .select('id, thread_id, participant_type, user_id, contact_id, thread_role, joined_at')
           .in('thread_id', threadIds)
           .eq('status', 'active');
         const allRows = (parts || []) as Array<{
           id: string; thread_id: string; participant_type: string;
-          user_id: string | null; thread_role: string; joined_at: string | null;
+          user_id: string | null; contact_id: string | null; thread_role: string; joined_at: string | null;
         }>;
+        const counterpartyRowByThread = new Map<string, typeof allRows[number]>();
         for (const id of threadIds) {
           const cp = counterpartyParticipantId(allRows.filter((p) => p.thread_id === id));
-          if (cp) counterpartyByThread.set(id, cp);
+          if (cp) {
+            counterpartyByThread.set(id, cp);
+            const row = allRows.find((p) => p.id === cp);
+            if (row) counterpartyRowByThread.set(id, row);
+          }
+        }
+        // The CRM name where the number has been filed, in one round trip. A contact renamed to
+        // their real name after the thread opened is exactly the case the subject cannot answer.
+        const contactIds = [...new Set(
+          [...counterpartyRowByThread.values()].map((p) => p.contact_id).filter((c): c is string => !!c),
+        )];
+        const contactNameById = new Map<string, string>();
+        if (contactIds.length) {
+          const { data: contacts } = await db.from('crm_contacts').select('id, name').in('id', contactIds);
+          for (const c of (contacts || []) as Array<{ id: string; name: string | null }>) {
+            if (c.name) contactNameById.set(c.id, c.name);
+          }
+        }
+        const subjectByThread = new Map<string, string | null>(
+          (threads || []).map((t: Record<string, unknown>) => [
+            String(t.id), typeof t.subject === 'string' ? t.subject : null,
+          ]),
+        );
+        for (const [threadId, row] of counterpartyRowByThread) {
+          const slot = counterpartyAvatarSlot(
+            row.id,
+            row.contact_id ? contactNameById.get(row.contact_id) ?? null : null,
+            subjectByThread.get(threadId) ?? null,
+          );
+          if (slot !== null) avatarSlotByThread.set(threadId, slot);
         }
         const partRows = allRows.filter((p) => p.participant_type === 'member' && p.user_id) as
           Array<{ user_id: string; thread_id: string; thread_role: string }>;
@@ -2306,6 +2365,7 @@ async function handleJwtAction(
           labels: labelsByThread.get(id) || [],
           assignees: assigneesByThread.get(id) || [],
           counterparty_participant_id: counterpartyByThread.get(id) ?? null,
+          counterparty_avatar_slot: avatarSlotByThread.get(id) ?? null,
         };
       });
       return json({ threads: enriched });
@@ -2357,11 +2417,48 @@ async function handleJwtAction(
       // the header and the message rows must seed one person's face on one row. Derived from the
       // participants just fetched, so it costs nothing. Member-only — the customer projection
       // below is a deliberate narrowing (#359 CM-10) and nothing on that path draws a cast face.
+      //
+      // `avatar_slot` rides along on the participants for the same reason again: the transcript
+      // draws one face per SENDER, and a thread can hold two customers. Answering per row from
+      // whatever name that row happens to hold is what gives one person two faces.
+      const customerParts = ((participants || []) as unknown as Array<{
+        id: string; participant_type: string; contact_id?: string | null;
+      }>).filter((p) => p.participant_type === 'customer');
+      const partContactNames = new Map<string, string>();
+      if (isMember) {
+        const cIds = [...new Set(customerParts.map((p) => p.contact_id).filter((c): c is string => !!c))];
+        if (cIds.length) {
+          const { data: contacts } = await db.from('crm_contacts').select('id, name').in('id', cIds);
+          for (const c of (contacts || []) as Array<{ id: string; name: string | null }>) {
+            if (c.name) partContactNames.set(c.id, c.name);
+          }
+        }
+      }
+      const subject = typeof thread.subject === 'string' ? thread.subject : null;
+      const avatarSlotByParticipant = new Map<string, number>();
+      for (const p of customerParts) {
+        const slot = counterpartyAvatarSlot(
+          p.id,
+          p.contact_id ? partContactNames.get(p.contact_id) ?? null : null,
+          subject,
+        );
+        if (slot !== null) avatarSlotByParticipant.set(p.id, slot);
+      }
+      const counterpartyId = counterpartyParticipantId(
+        (participants || []) as unknown as Array<{ id: string; participant_type: string; status?: string; joined_at?: string | null }>,
+      );
+      const participantsForCaller = ((participants || []) as unknown as Array<Record<string, unknown>>)
+        .map((p) => {
+          const slot = avatarSlotByParticipant.get(String(p.id));
+          return slot === undefined ? p : { ...p, avatar_slot: slot };
+        });
+
       const threadForCaller = isMember ? {
         ...thread,
-        counterparty_participant_id: counterpartyParticipantId(
-          (participants || []) as unknown as Array<{ id: string; participant_type: string; status?: string; joined_at?: string | null }>,
-        ),
+        counterparty_participant_id: counterpartyId,
+        counterparty_avatar_slot: counterpartyId
+          ? avatarSlotByParticipant.get(counterpartyId) ?? null
+          : null,
       } : {
         id: thread.id,
         subject: thread.subject,
@@ -2405,7 +2502,7 @@ async function handleJwtAction(
         }
       }
       const wa = thread.channel === 'whatsapp' ? await whatsappWindow(db, threadId, thread) : null;
-      return json({ thread: threadForCaller, participants: participants || [], messages: messages || [], whatsapp_window: wa });
+      return json({ thread: threadForCaller, participants: participantsForCaller, messages: messages || [], whatsapp_window: wa });
     }
 
     case 'create_marketplace_inquiry': {

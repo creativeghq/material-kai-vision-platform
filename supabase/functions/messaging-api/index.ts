@@ -22,6 +22,7 @@ import {
   storeParticipantPicture,
   fetchOwnBusinessAvatar,
 } from '../_shared/inbox-media.ts';
+import { CAST } from '../_shared/characterAvatar.generated.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 import { authenticate, isAdminAccess, listUserWorkspaceIds } from '../_shared/auth.ts';
@@ -1649,32 +1650,12 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         // Diversity is spread across the CAST deliberately — it is a set of characters, and a set
         // that is all one age or one hair length just looks broken. Nothing here is derived from
         // any real contact; assignment to a person happens later, by hash of their id.
-        const DEFAULT_VARIATIONS = [
-          'young woman, long dark wavy hair, warm brown skin, small gold earrings',
-          'older man, short grey hair, neat grey beard, glasses with dark rectangular frames, light skin',
-          'young man, short black textured hair, deep brown skin, wide friendly smile',
-          'woman in her thirties, blonde shoulder-length bob, fair skin, light freckles',
-          'man in his forties, brown hair swept to one side, olive skin, clean shaven',
-          'young woman, black hair in a high bun, East Asian features, round thin-rimmed glasses',
-          'man with a shaved head, dark brown skin, short full beard, broad smile',
-          'woman with curly auburn hair, pale skin, green eyes, small silver nose stud',
-          'older woman, silver hair in a short crop, light skin, warm smile, pearl earrings',
-          'young man, red hair, freckled fair skin, big grin, no facial hair',
-          'woman wearing a deep purple headscarf, brown skin, dark eyes, subtle smile',
-          'man with long black hair tied back, tan skin, thin moustache',
-          'young woman, straight black hair with a blunt fringe, light tan skin, red lipstick',
-          'man in his fifties, receding light brown hair, ruddy skin, thick eyebrows',
-          'woman with tightly coiled black hair worn full, dark skin, round tortoiseshell glasses',
-          'young man, dark blonde undercut, fair skin, small stud earring',
-          'woman with straight brown hair past the shoulders, medium skin, hazel eyes',
-          'man with a turban, dark full beard, brown skin, calm expression',
-          'young woman, pink-dyed short hair, pale skin, cat-eye glasses',
-          'older man, bald on top with grey at the sides, light skin, moustache',
-          'woman with box braids gathered back, deep brown skin, bright smile',
-          'man with wavy dark hair, Mediterranean skin, light stubble',
-          'young woman, ash-brown ponytail, fair skin, dimples',
-          'man with short salt-and-pepper hair, medium skin, rectangular glasses',
-        ];
+        //
+        // Read off `CAST`, not written out here: the picker narrows a contact's pool by each
+        // character's `gender`, so the prompt that RENDERS slot 7 and the fact that decides WHO
+        // gets slot 7 have to be one row. They were two lists, and a re-worded prompt would have
+        // moved one without the other — silently, because every face is still a 200.
+        const DEFAULT_VARIATIONS = CAST.map((c) => c.look);
         const variations: string[] = Array.isArray(requestBody.variations) && requestBody.variations.length
           ? requestBody.variations.map((v: unknown) => String(v))
           : DEFAULT_VARIATIONS;

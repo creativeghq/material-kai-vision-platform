@@ -58,6 +58,13 @@ export interface InboxThread {
    * counterparty.
    */
   counterparty_participant_id?: string | null;
+  /**
+   * Which of the 24 cast characters that person wears, derived server-side from their id AND
+   * their name — see `counterpartyAvatarSlot` in inbox-api and the header of
+   * `src/utils/characterAvatar.ts`. Null on an internal thread, or on a client talking to an
+   * older deploy, in which case the client hashes the seed itself and gets the whole cast.
+   */
+  counterparty_avatar_slot?: number | null;
 }
 
 export interface InboxThreadAssignee {
@@ -77,6 +84,12 @@ export interface InboxParticipant {
   thread_role: 'owner' | 'agent' | 'participant';
   status: 'active' | 'left' | 'removed';
   last_read_at: string | null;
+  /**
+   * The cast character this participant wears, for a customer whose photo we will never have.
+   * Server-derived so the transcript, the header and the mailbox row cannot disagree — see
+   * `InboxThread.counterparty_avatar_slot`. Absent for members and agents, who have their own.
+   */
+  avatar_slot?: number | null;
 }
 
 export interface InboxAttachment {

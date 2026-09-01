@@ -154,6 +154,16 @@ export const VOCABULARIES = [
     'supabase/functions/_shared/calculators/heatPumpSizing.generated.ts',
   ],
   [
+    // The inbox avatar cast: the 24 rendered characters, which half of the cast each belongs
+    // to, and the name→gender reading that narrows the pool. THREE consumers, not two —
+    // `messaging-api` builds the generation prompts from `look`, `inbox-api` derives each
+    // participant's slot, and the client renders it. The roster already existed twice (the
+    // generator's prompt list and the client's `CAST_SIZE`), which is how the picker could go on
+    // handing a slot to men after the generator re-rendered it as a woman.
+    'src/utils/characterAvatar.ts',
+    'supabase/functions/_shared/characterAvatar.generated.ts',
+  ],
+  [
     // #395 — the same, and this pair had ALREADY diverged: the tool's copy hardcoded the
     // calorific values and efficiencies the canonical version accepts as overrides, so the
     // web page could be told "our oil is 10.2 kWh/L" and the agent could not.
