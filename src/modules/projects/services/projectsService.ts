@@ -656,6 +656,13 @@ class ProjectsService {
         { table: 'crm_contacts', id: input.client_contact_id, label: 'client contact' },
       ]);
     }
+    // The status BEFORE the write, so the event can say what changed and fire only on a real
+    // move. Read alongside the tenancy check above rather than as an extra round trip.
+    const previousStatus = input.status !== undefined
+      ? ((await (supabase as any).from('projects').select('status').eq('id', id).maybeSingle())
+          .data as { status: string | null } | null)?.status ?? null
+      : null;
+
     const { data, error } = await (supabase as any)
       .from('projects')
       .update(input)
@@ -663,7 +670,42 @@ class ProjectsService {
       .select()
       .single();
     if (error) throw error;
-    return data as Project;
+
+    const project = data as Project;
+
+    /**
+     * A job moved (#378 Phase 4 — project lifecycle).
+     *
+     * Projects emitted almost nothing: of the whole trigger vocabulary the only project events
+     * were two invitation ones and two request ones, so "the job is now on site" — the thing
+     * everyone downstream waits for — could not start an automation.
+     *
+     * Fired only on a REAL change: an update that resaves the same status is not a move, and a
+     * flow run is metered. `workspace_id` is in the payload because a trigger without it can
+     * never be forked by a tenant — `appointment_booked` shipped in exactly that state, and its
+     * table has no workspace column at all to put there.
+     *
+     * Best-effort: the status IS saved, and failing the update because a notification did not go
+     * out would be the worse outcome.
+     */
+    if (input.status !== undefined && project.status && project.status !== previousStatus) {
+      void flowEventService.emit('project_status_changed', {
+        workspace_id: project.workspace_id,
+        // The seeded default notifies the job's OWNER; `create_notification` reads these three
+        // straight off the payload, so a missing `user_id` is a flow that runs and tells nobody.
+        user_id: project.user_id,
+        type: 'project',
+        project_id: project.id,
+        project_name: project.name,
+        from_status: previousStatus,
+        to_status: project.status,
+        title: `Project status: ${project.name}`,
+        body: `${project.name} moved to ${project.status}.`,
+        action_url: `/projects/${project.id}`,
+      });
+    }
+
+    return project;
   }
 
   async archiveProject(id: string): Promise<void> {

@@ -167,6 +167,7 @@ export type TriggerType =
   // Project Client Views: a client approved / requested changes / commented on a deliverable
   | 'client_view_feedback_received'
   // Project Requests: a client/teammate raised a request, or the team answered one
+  | 'project_status_changed'
   | 'project_request_raised'
   | 'project_request_answered'
   // CRM: a new contact / company was created
@@ -260,6 +261,20 @@ export interface WhatsappTemplateStatusChangedTriggerConfig {}
 export interface SocialAccountConnectedTriggerConfig {}
 export interface SocialAccountDisconnectedTriggerConfig {}
 export interface ClientViewFeedbackReceivedTriggerConfig {}
+/**
+ * A job moved to a new status (#378, Phase 4 — project lifecycle).
+ *
+ * Projects emitted almost nothing: of the platform's trigger vocabulary the only project events
+ * were two invitation ones and two request ones, so "the job is now on site" — the thing everyone
+ * downstream waits for — could not start an automation.
+ *
+ * `to_status` narrows it, because "any status change" fires on every drag of every card and a flow
+ * run is metered. Empty means every change, which is the honest default for a filter.
+ */
+export interface ProjectStatusChangedTriggerConfig {
+  /** Only fire when the job moves INTO this status. Empty = any change. */
+  to_status?: string;
+}
 export interface ProjectRequestRaisedTriggerConfig {}
 export interface ProjectRequestAnsweredTriggerConfig {}
 export interface CrmContactCreatedTriggerConfig {}
@@ -548,6 +563,7 @@ export type TriggerConfigMap = {
   social_account_connected: SocialAccountConnectedTriggerConfig;
   social_account_disconnected: SocialAccountDisconnectedTriggerConfig;
   client_view_feedback_received: ClientViewFeedbackReceivedTriggerConfig;
+  project_status_changed: ProjectStatusChangedTriggerConfig;
   project_request_raised: ProjectRequestRaisedTriggerConfig;
   project_request_answered: ProjectRequestAnsweredTriggerConfig;
   crm_contact_created: CrmContactCreatedTriggerConfig;

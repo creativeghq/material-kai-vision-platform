@@ -382,6 +382,12 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'client_view_feedback_received', group: 'Projects',
     label: 'Client View Feedback', description: 'A client approved / requested changes / commented on a shared deliverable', icon: 'ClipboardCheck', color: 'emerald',
     defaultData: { label: 'Client View Feedback', category: 'trigger', triggerType: 'client_view_feedback_received', config: {} } as TriggerNodeData },
+  // Project lifecycle (#378 Phase 4). Projects emitted almost nothing: two invitation events and
+  // two request ones, so "the job is now on site" — the thing everyone downstream waits for —
+  // could not start an automation.
+  { type: 'triggerNode', category: 'trigger', subType: 'project_status_changed', group: 'Projects',
+    label: 'Project Status Changed', description: 'A job moved to a new status — optionally only when it enters one you name', icon: 'FolderKanban', color: 'emerald',
+    defaultData: { label: 'Project Status Changed', category: 'trigger', triggerType: 'project_status_changed', config: {} } as TriggerNodeData },
   // Project Requests
   { type: 'triggerNode', category: 'trigger', subType: 'project_request_raised', group: 'Projects',
     label: 'Request Raised', description: 'Someone raised a question / change request against a project or moodboard', icon: 'MessageSquarePlus', color: 'emerald',

@@ -69,8 +69,7 @@ import {
   AlarmClock,
   ShieldCheck,
   Coins, MessagesSquare, PhoneOff, Link2, Unlink,
-  EyeOff, SlidersHorizontal,
-} from 'lucide-react';
+  EyeOff, SlidersHorizontal, FolderKanban} from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Input } from '@/components/core/ui/input';
@@ -208,6 +207,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   social_account_disconnected: Unlink,
   social_post_failed: XCircle,
   client_view_feedback_received: ClipboardCheck,
+  project_status_changed: FolderKanban,
   project_request_raised: MessageSquarePlus,
   project_request_answered: MessageSquareReply,
   crm_contact_created: UserPlus,
@@ -345,6 +345,7 @@ const triggerLabels: Record<TriggerType, string> = {
   social_account_disconnected: 'Social Account Disconnected',
   social_post_failed: 'Social Post Failed',
   client_view_feedback_received: 'Client View Feedback',
+  project_status_changed: 'Project Status Changed',
   project_request_raised: 'Project Request Raised',
   project_request_answered: 'Project Request Answered',
   crm_contact_created: 'Contact Created',
