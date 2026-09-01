@@ -2536,3 +2536,68 @@ caught this way and by nothing else: `get_project_stock_holds` declaring `expect
 `timestamptz` when the column is a DATE (CREATEs clean, raises 42804 on first call), and the
 messaging party resolver matching digits-only so `00306912345678` did not match `+306912345678` —
 #359 CM-1 reproduced one table over.
+
+## Phase 4 closed — projects emit their lifecycle — 2026-09-01
+
+Nine triggers, each with all seven §8 pieces and an emitter. Before this, projects emitted four
+events (two invitations, two requests), so every automation the issue imagines — deal won → project
+from template, expense approved on a billable job → next progress invoice, asset service due →
+appointment — had no project-side event to hang on.
+
+### One payload, not nine
+
+`emitProjectLifecycle` resolves the workspace, the owner and the URL from the project; each caller
+passes an id and the wording. Every payload has to carry the same four things and each fails
+silently in its own way:
+
+- **`workspace_id` missing** → the trigger can never be forked. `fork_workspace_flow_default`
+  disables the global in the same transaction, so forking one ends with FEWER notifications and
+  nothing raising. `appointment_booked` shipped in exactly that state.
+- **`user_id` missing** → `create_notification` reads it straight off the payload, so the flow runs,
+  records a step, reports success and tells nobody.
+
+Nine hand-built payloads is how four of them end up subtly different.
+
+### Three decisions worth keeping
+
+- **A milestone is its own event, not a flag on the task one.** Different audiences: "a task
+  finished" is for the team and fires constantly, "we hit the milestone" is for the client and fires
+  rarely. Folding the second into the first as a config filter makes every milestone automation pay
+  for a run on every task, and runs are metered.
+- **An expense announces per LINE.** One card routinely spans several jobs, so announcing the card
+  against the first line's project attributes a hotel in Athens to whichever job sorted first. Only
+  on approval, because `get_project_pnl` counts a trip line as cost once approved — that is when the
+  margin actually moves, and a rejection must not announce itself as a cost.
+- **A delivery derives its job through the order and grows no column**, for the same reason L5 gave:
+  `get_project_pnl` reads the order, so a copy would not even be the number it used.
+
+### The overdue sweep, and why its marker is a DATE
+
+`project_task_overdue` is the only one no user action produces. The naive daily sweep re-announces
+the same task every morning until somebody closes it, which is how a channel gets muted and then
+ignored.
+
+`crm_meetings` stamps `reminder_sent_at` and can afford to, because its edge function AWAITS the
+send and stamps only on real delivery. `pg_net` is fire-and-forget, so a timestamp here would mean
+"we tried once" and a dropped request would silence that task forever. Recording **the due date it
+announced** is self-correcting: once per due date, and rescheduling re-arms it. It also cannot
+silence anything permanently, because the marker is data an operator can see and change.
+
+Pure SQL and a pg_cron job, not a new edge function — edge functions cannot be deleted in this
+project, so one is permanent. It RAISES when the vault has no credentials rather than returning 0,
+because a silent 0 there looks exactly like "no overdue tasks".
+
+### The guard states its own limit
+
+`projectLifecycleTrigger.test.ts` covers all nine across all seven registries plus the emitter. Two
+honesty notes are written into it rather than left implicit: the DB half (registry row, seeded
+default) is not committed source, so a green run does NOT prove they exist; and the overdue
+trigger's emitter is SQL, so its entry is `null` with the probe evidence beside it rather than an
+assertion against a file that would never contain it.
+
+Its own first cut built a RegExp from a template literal, where `\(` became a literal paren and the
+pattern failed to compile — the same backslash trap that made `gatedPropParity`'s fiscal check
+match nothing the day before. Plain string containment now. **That is twice in two days from the
+same cause**, which is worth more than a fix: assembled patterns in a test are worth avoiding
+outright, because a pattern that cannot compile and a pattern that matches everything both read as
+green.
