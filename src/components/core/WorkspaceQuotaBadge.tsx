@@ -21,9 +21,15 @@ interface Props {
    * e.g. materials exclude `item_type = 'service'` rows (enforce_material_quota).
    */
   notEq?: { column: string; value: string };
+  /**
+   * The other half of the same rule: an inclusion, for a quota counting ONE kind of row —
+   * services are `item_type = 'service'` and are capped by `max_services`, the exact
+   * complement of the materials count above.
+   */
+  eq?: { column: string; value: string };
 }
 
-export const WorkspaceQuotaBadge: React.FC<Props> = ({ table, quotaKey, label, notEq }) => {
+export const WorkspaceQuotaBadge: React.FC<Props> = ({ table, quotaKey, label, notEq, eq }) => {
   const { activeWorkspaceId } = useWorkspace();
   const [used, setUsed] = useState<number | null>(null);
   const [limit, setLimit] = useState<number | null>(null);
@@ -34,6 +40,7 @@ export const WorkspaceQuotaBadge: React.FC<Props> = ({ table, quotaKey, label, n
     void (async () => {
       let countQuery = supabase.from(table).select('*', { count: 'exact', head: true }).eq('workspace_id', activeWorkspaceId);
       if (notEq) countQuery = countQuery.neq(notEq.column, notEq.value);
+      if (eq) countQuery = countQuery.eq(eq.column, eq.value);
       const [countRes, quotaRes] = await Promise.all([
         countQuery,
         supabase.rpc('workspace_quota', { p_workspace_id: activeWorkspaceId, p_key: quotaKey }),
@@ -43,7 +50,7 @@ export const WorkspaceQuotaBadge: React.FC<Props> = ({ table, quotaKey, label, n
       setLimit(typeof quotaRes.data === 'number' ? quotaRes.data : -1);
     })();
     return () => { cancelled = true; };
-  }, [activeWorkspaceId, table, quotaKey, notEq?.column, notEq?.value]);
+  }, [activeWorkspaceId, table, quotaKey, notEq?.column, notEq?.value, eq?.column, eq?.value]);
 
   // Unlimited (or still loading) → no badge.
   if (used === null || limit === null || limit < 0) return null;

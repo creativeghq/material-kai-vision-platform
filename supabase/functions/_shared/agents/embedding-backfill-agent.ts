@@ -114,8 +114,17 @@ export class EmbeddingBackfillAgent implements AgentRunner {
     // ── 1. PRODUCT TEXT — ID-targeted + per-row stuck tracking (the live path) ──
     await heartbeat();
     try {
+      // Services are excluded, and the exclusion is the point of the cap being finite.
+      // This agent repairs what the CREATE path was supposed to embed; services are written
+      // by servicesService with no ingest-core call, so an embedding was never owed on them
+      // and nothing searches one (`search_products_by_embedding` serves RAG + product
+      // enrichment, never the services list). Repairing them anyway meant a workspace's
+      // service list could fill this tick's 100 slots while genuine products whose
+      // embedding actually failed waited behind — a repair queue starved by rows that
+      // were never broken. `item_type` is NOT NULL default 'good', so neq drops nothing else.
       let q = supabase.from('products').select('id')
         .is('text_embedding_1024', null)
+        .neq('item_type', 'service')
         .order('created_at', { ascending: false })
         .limit(maxProducts);
       if (sinceIso) q = q.gte('created_at', sinceIso);

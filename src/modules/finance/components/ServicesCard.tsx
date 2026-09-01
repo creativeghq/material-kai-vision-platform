@@ -13,16 +13,19 @@ import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { useQuotaErrorHandler } from '@/hooks/useQuotaErrorHandler';
 import { servicesService, type ServiceItem, type ServiceInput } from '@/modules/finance/services/servicesService';
 import { invoicingSetupService, type RefRow } from '@/services/invoicingSetupService';
 import { VAT_CATEGORIES } from '@/modules/finance/services/financeService';
 import { formatMoney } from '@/utils/decimal';
 import { HubEmptyState } from '@/components/core/hub';
+import { WorkspaceQuotaBadge } from '@/components/core/WorkspaceQuotaBadge';
 
 const EMPTY: ServiceInput = { name: '', description: '', unit: '', price: null, currency: 'EUR', vatCategory: 1, incType: '', incCat: '' };
 
 export const ServicesCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
   const { toast } = useToast();
+  const handleQuota = useQuotaErrorHandler();
   const [items, setItems] = useState<ServiceItem[]>([]);
   const [incTypes, setIncTypes] = useState<RefRow[]>([]);
   const [incCats, setIncCats] = useState<RefRow[]>([]);
@@ -66,7 +69,12 @@ export const ServicesCard: React.FC<{ workspaceId: string }> = ({ workspaceId })
       await load();
       toast({ title: 'Service saved' });
     } catch (err: any) {
-      toast({ title: 'Save failed', description: err?.message, variant: 'destructive' });
+      // Services now count against their own plan cap (`max_services`), raised by the
+      // products quota trigger. Route it to the upsell — as a generic "Save failed" the
+      // operator only learns the row did not save, not that the plan is the reason.
+      if (!handleQuota(err)) {
+        toast({ title: 'Save failed', description: err?.message, variant: 'destructive' });
+      }
     } finally { setBusy(false); }
   };
 
@@ -81,7 +89,11 @@ export const ServicesCard: React.FC<{ workspaceId: string }> = ({ workspaceId })
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between">
         <CardTitle className="flex items-center gap-2"><Wrench className="h-4 w-4" /> Services</CardTitle>
-        {editing === null && <Button size="sm" variant="outline" onClick={startNew}><Plus className="h-3.5 w-3.5 mr-1" /> New service</Button>}
+        <div className="flex items-center gap-2">
+          {/* Counts what the trigger counts: services only, against max_services. */}
+          <WorkspaceQuotaBadge table="products" quotaKey="max_services" label="services" eq={{ column: 'item_type', value: 'service' }} />
+          {editing === null && <Button size="sm" variant="outline" onClick={startNew}><Plus className="h-3.5 w-3.5 mr-1" /> New service</Button>}
+        </div>
       </CardHeader>
       <CardContent className="space-y-3 p-5">
         <p className="text-xs text-muted-foreground">

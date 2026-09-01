@@ -41,6 +41,11 @@ export const MODULE_DEPENDENCIES: Record<string, string[]> = {
 export const QUOTA_KEYS: { key: string; label: string }[] = [
   { key: 'max_contacts', label: 'CRM contacts' },
   { key: 'max_materials', label: 'Materials' },
+  // Services are `products` rows too and are capped separately — folding them into
+  // max_materials would shrink the material headroom every existing plan was sold.
+  // Every plan needs an explicit value: workspace_quota falls back to the FREE plan's
+  // number for a missing key, so leaving it blank caps an unlimited plan at free's.
+  { key: 'max_services', label: 'Services' },
 ];
 
 export const planAdminService = {
