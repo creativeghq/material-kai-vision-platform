@@ -54,7 +54,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import {
   TOOLKITS, renderPromptTemplate, TOOLKIT_AGENTS, TOOLKIT_HUB, GENERALIST_AGENT_ID,
-  getToolkitOwnerAgents, resolveToolkitAgent,
+  getToolkitOwnerAgents, resolveToolkitAgent, getAgentSignatureToolkits,
 } from '@/components/features/ai/agentToolsCatalog';
 import { CAPABILITIES } from '@/config/capabilities';
 import { deriveAutoFields } from '@/components/features/ai/toolAutoFields';
@@ -639,6 +639,73 @@ describe('quick-start agent resolution', () => {
       offenders,
       `A quick-start landed on the generalist while a specialist owns the toolkit:\n  ${offenders.join('\n  ')}`,
     ).toEqual([]);
+  });
+
+  /**
+   * Picking an agent from the composer dropdown must change the canvas empty state.
+   *
+   * It did not. `renderAgentStarters` built its card from `activeToolkits`, and the only
+   * thing the agent-switch effect does to that list is PRUNE it — nothing has ever seeded
+   * the newly-picked agent's clusters. On the default set (the three always-on: Core, Web
+   * Research, Calculators) Vision, Trinity, Edith, Hermes and Estate all rendered the SAME
+   * nine starters: the hero above the card swapped avatar, name and description, and the
+   * menu under it did not move. Nothing failed — a menu that describes the toolbox is a
+   * valid menu, it just was not answering the question the user had asked.
+   *
+   * Two halves, and each is silent on its own:
+   *   • the empty state must be derived from the SELECTED AGENT (AgentHub half);
+   *   • a pickable specialist must OWN at least one cluster, or there is nothing to derive
+   *     (catalog half). Estate owned none until 2026-09-01 — `real-estate` and
+   *     `appointments` are bound by `property-advisor` in agent-chat and were declared by
+   *     no one, so the picker, the command palette AND this menu all scoped her down to the
+   *     three clusters every agent carries.
+   */
+  it('every pickable specialist owns at least one toolkit of its own', () => {
+    // The composer dropdown's roster, minus the two routers. `orchestrator` and `kai` own
+    // all 45 clusters, so a signature set is meaningless for them by design (see
+    // getAgentSignatureToolkits) — and `demo` is a showcase that binds no cluster.
+    const SPECIALISTS = ['interior-designer', 'product-business', 'marketing', 'property-advisor', 'erp', 'social-media'];
+    const empty = SPECIALISTS.filter(
+      // owner/all-modules: the gap this catches is a missing DECLARATION, not an entitlement.
+      (id) => getAgentSignatureToolkits(id, 'owner', [...new Set(TOOLKITS.map((t) => t.moduleSlug).filter(Boolean) as string[])]).length === 0,
+    );
+    expect(
+      empty,
+      `These agents are offered in the dropdown and own no toolkit, so picking one leaves the `
+      + `picker and the canvas starters showing only the always-on clusters — identical to every `
+      + `other agent. Add a TOOLKIT_AGENTS entry for the clusters agent-chat already binds to `
+      + `them: ${empty.join(', ')}`,
+    ).toEqual([]);
+  });
+
+  it('a signature toolkit is never an always-on one, and never the generalist\'s', () => {
+    // Always-on clusters are carried by EVERY agent, so listing them as an agent's own would
+    // put the same three groups back at the top of every menu — the exact non-difference this
+    // is meant to remove.
+    const alwaysOn = getAgentSignatureToolkits('marketing', 'owner', ['crm', 'sales-finance']).filter((t) => t.alwaysOn);
+    expect(alwaysOn.map((t) => t.id)).toEqual([]);
+    for (const router of ['kai', 'orchestrator']) {
+      expect(
+        getAgentSignatureToolkits(router, 'owner', []).map((t) => t.id),
+        `${router} routes to every specialist, so a signature set for it is all 45 clusters — not a menu.`,
+      ).toEqual([]);
+    }
+  });
+
+  it('the canvas empty state is derived from the selected agent, not from activeToolkits alone', () => {
+    const src = sharedStripComments(AgentHubSrc);
+    expect(
+      /getAgentSignatureToolkits\(\s*selectedAgent/.test(src),
+      'renderAgentStarters must build its card from the SELECTED agent. Reading activeToolkits '
+      + 'alone is the regression: the agent-switch effect only prunes that list, so the menu '
+      + 'shows the same always-on starters for every agent in the dropdown.',
+    ).toBe(true);
+    // The memo has to recompute on switch. Without `selectedAgent` in the dep array the list
+    // is derived correctly once and then frozen — same symptom, one layer down.
+    expect(
+      /\[activeToolkits, selectedAgent, userRole, enabledModulesArray\]/.test(src),
+      'The starter memo must list selectedAgent as a dependency or it never recomputes on switch.',
+    ).toBe(true);
   });
 
   it('AgentHub resolves the target through resolveToolkitAgent, not owners[0]', () => {

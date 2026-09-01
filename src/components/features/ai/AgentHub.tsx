@@ -90,7 +90,8 @@ import { InspirationUrlModal } from './InspirationUrlModal';
 import { ToolkitPickerModal } from './ToolkitPickerModal';
 import { ActionConfirmationCard } from './ActionConfirmationCard';
 import {
-  TOOLKITS, ALWAYS_ON_TOOLKIT_IDS, getToolkitOwnerAgents, resolveToolkitAgent, buildToolInput, renderPromptTemplate,
+  TOOLKITS, ALWAYS_ON_TOOLKIT_IDS, getToolkitOwnerAgents, getAgentSignatureToolkits,
+  resolveToolkitAgent, buildToolInput, renderPromptTemplate,
   type ToolkitDefinition, type ToolkitQuickStart,
 } from './agentToolsCatalog';
 import { ToolkitOnboardingCard } from './workflows/ToolkitOnboardingCard';
@@ -5269,6 +5270,32 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     }
   };
 
+  /**
+   * The starters the canvas empty state offers — the SELECTED agent's own clusters first,
+   * then whatever is actually loaded.
+   *
+   * This used to read `activeToolkits` alone, and the agent-switch effect below only ever
+   * PRUNES that list — nothing seeds the new agent's. So on a default set (Core + Web
+   * Research + Calculators, the three always-on) picking Vision, Trinity, Edith or Hermes
+   * from the dropdown produced the identical nine starters: the hero above it
+   * changed name, avatar and description, and the menu under it did not move. The menu was
+   * describing the toolbox, and the user had just answered a question about the agent.
+   *
+   * Signature toolkits are OFFERED, not enabled: a click runs `ensureAgentAndToolkit`, which
+   * turns on the one that was launched. Seeding all of them on switch would bind Edith's ~60
+   * SEO tools the moment she is picked — the ~15k-token default the toolkit picker exists to
+   * undo. `getAgentSignatureToolkits` returns [] for JARVIS/kai, who own all 45 clusters, so
+   * the router keeps offering the loaded set.
+   */
+  const starterToolkits = useMemo(() => {
+    const active = activeToolkits
+      .map((id) => TOOLKITS.find((t) => t.id === id))
+      .filter((tk): tk is ToolkitDefinition => !!tk);
+    const signature = getAgentSignatureToolkits(selectedAgent, userRole, enabledModulesArray)
+      .filter((tk) => !activeToolkits.includes(tk.id));
+    return [...signature, ...active].filter((tk) => (tk.quick_starts?.length || 0) > 0);
+  }, [activeToolkits, selectedAgent, userRole, enabledModulesArray]);
+
   // The agent welcome + toolkit starters. This is the canvas-first empty state:
   // when the canvas is open with no artifact yet, it fills the middle workspace
   // (instead of a dead "your canvas" placeholder). When the canvas is hidden it
@@ -5295,12 +5322,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         )}
         <ToolkitOnboardingCard
           mode={showJustEnabled ? 'just_enabled' : 'empty_state'}
-          toolkits={showJustEnabled
-            ? [justTk!]
-            : activeToolkits
-                .map((id) => TOOLKITS.find((t) => t.id === id))
-                .filter((tk): tk is NonNullable<typeof tk> => !!tk)
-                .filter((tk) => (tk.quick_starts?.length || 0) > 0)}
+          toolkits={showJustEnabled ? [justTk!] : starterToolkits}
+          agentName={currentAgent?.name}
           onLaunch={launchQuickStartFromOnboarding}
           onDismiss={showJustEnabled ? () => setJustEnabledToolkitId(null) : undefined}
         />

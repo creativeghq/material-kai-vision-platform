@@ -3793,6 +3793,32 @@ export function getToolkitOwnerAgents(toolkit: ToolkitDefinition): string[] {
 }
 
 /**
+ * The clusters an agent is PICKED FOR — its own, excluding the generalist's implicit
+ * ownership of everything and excluding the always-on Core/Web/Calculators every agent
+ * carries. This is what the canvas empty state offers, so choosing Vision from the agent
+ * dropdown answers with staging/sheets/projects instead of the same three always-on
+ * clusters every other agent shows.
+ *
+ * Returns [] for the generalist and the orchestrator ON PURPOSE: they own all 45 clusters,
+ * and 45 groups of starters is not a menu. JARVIS keeps offering the active set, which is
+ * the honest answer for a router whose pitch is "just ask".
+ *
+ * OFFERING IS NOT BINDING. Nothing here is added to `activeToolkits` — a starter click goes
+ * through `ensureAgentAndToolkit`, which enables the one toolkit that was launched. Seeding
+ * the whole set on every agent switch would bind ~60 SEO tools the moment you pick Edith,
+ * which is the ~15k-token default the toolkit system exists to avoid.
+ */
+export function getAgentSignatureToolkits(
+  agentId: string,
+  role: 'viewer' | 'member' | 'admin' | 'owner' = 'member',
+  enabledModules: string[] = [],
+): ToolkitDefinition[] {
+  return getAccessibleToolkits(role, enabledModules).filter(
+    (t) => !t.alwaysOn && (TOOLKIT_AGENTS[t.id] ?? []).includes(agentId),
+  );
+}
+
+/**
  * Which agent should run a toolkit's quick-start, given who is selected right now.
  *
  * `getToolkitOwnerAgents` puts the GENERALIST first because kai owns every toolkit,
