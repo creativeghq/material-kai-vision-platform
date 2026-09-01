@@ -21,6 +21,7 @@ import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
 import { JobCostCard } from '../JobCostCard';
 import { ProjectExpensesCard } from '../ProjectExpensesCard';
 import { ProjectLabourCard } from '../ProjectLabourCard';
+import { ProjectStockCard } from '../ProjectStockCard';
 import {
   projectsService,
   type ProjectFinanceRow,
@@ -139,6 +140,10 @@ export const FinanceTab: React.FC<{ projectId: string; projectName?: string }> =
           beside the job cost because it is the half of the margin that was an estimate wearing the
           costume of an actual — and `get_project_labor` had no reader in the app at all. */}
       <ProjectLabourCard projectId={projectId} currency={summary.currencies[0] ?? null} />
+
+      {/* What material is held for the job (#378 N3) — derived from the quote and sales order that
+          hold it, because a project is not itself a reservation target. */}
+      <ProjectStockCard projectId={projectId} />
 
       {/* Costs booked straight onto the job, plus linking imported card spend to it. */}
       <ProjectExpensesCard
