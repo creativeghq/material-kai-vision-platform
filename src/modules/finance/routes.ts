@@ -50,6 +50,8 @@ export const FINANCE_TAB = {
   /** AADE's own aggregate book — a read-only mirror, deliberately not a Reports entry. */
   mydataBook: 'mydata_book',
   settings: 'settings',
+  /** The AI Assessment pane — its own paid module (`finance-assessment`). */
+  assessment: 'assessment',
 } as const;
 
 /** `?<key>=` params the finance lists read their filter bag out of (see `filterUrl`). */

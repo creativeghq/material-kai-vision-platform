@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
+import { AssessmentPanel } from '@/components/features/assessment/AssessmentPanel';
 import type { LucideIcon } from 'lucide-react';
 import {
   Building2, ArrowLeft, Save, Globe, EyeOff, Upload, Star, Trash2, Copy, ExternalLink, Sparkles,
   FileText, UserPlus, Home, Tag, MapPin, Ruler, ListChecks, Zap, Loader2, ChevronLeft, ChevronRight,
   Contact, CalendarClock, Image as ImageIcon, Gavel, Check, X, FileSignature,
-  KeyRound, Wrench, Receipt, LineChart, RotateCw, Layers,
+  KeyRound, Wrench, Receipt, LineChart, RotateCw, Layers, Gauge,
 } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -379,6 +380,9 @@ export default function PropertyWorkbench() {
     ...(canManage && isRental && pmEnabled ? ['lettings'] : []),
     ...(canManage && investEnabled ? ['investment'] : []),
     ...(canManage ? ['transaction'] : []),
+    // Gated on the permission, not the module: the pane itself carries the ModuleTabGate, so a
+    // workspace without the add-on sees what it is missing rather than a tab that is not there.
+    ...(canManage ? ['assessment'] : []),
   ];
   const requestedTab = sp.get('tab') || 'overview';
   const activeTab = availableTabs.includes(requestedTab) ? requestedTab : 'overview';
@@ -438,7 +442,26 @@ export default function PropertyWorkbench() {
             {canManage && isRental && pmEnabled && <TabsTrigger value="lettings" className={RE_TAB}><KeyRound className="h-4 w-4" /> Lettings</TabsTrigger>}
             {canManage && investEnabled && <TabsTrigger value="investment" className={RE_TAB}><LineChart className="h-4 w-4" /> Investment</TabsTrigger>}
             {canManage && <TabsTrigger value="transaction" className={RE_TAB}><FileSignature className="h-4 w-4" /> Transaction</TabsTrigger>}
+            {canManage && <TabsTrigger value="assessment" className={RE_TAB}><Gauge className="h-4 w-4" /> AI Assessment</TabsTrigger>}
           </TabsList>
+
+          {/* ── AI Assessment ── */}
+          {canManage && (
+            <TabsContent value="assessment" className="space-y-4">
+              <ModuleTabGate
+                moduleSlug="real-estate-assessment"
+                moduleName="AI Assessment — Real Estate"
+                blurb="Ask why this listing is not moving, and what to fix first."
+              >
+                <AssessmentPanel
+                  subject="real_estate"
+                  subjectId={property.id}
+                  canRun={canManage}
+                  subjectName={property.title || property.reference_code || 'This listing'}
+                />
+              </ModuleTabGate>
+            </TabsContent>
+          )}
 
           {/* ── Overview / multi-step edit form ── */}
           <TabsContent value="overview" className="space-y-4">

@@ -24,7 +24,7 @@ import {
   Boxes,
   Landmark,
   Send as SendIcon,
-  BookOpen,
+  BookOpen, Gauge,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
@@ -94,6 +94,8 @@ import { FileText, FileMinus, Banknote, Truck, FileSignature, PackageCheck, Shop
 import { HubEmptyState, HubRailSectionLabel } from '@/components/core/hub';
 import { EditSupplierBillDialog } from '@/modules/finance/components/EditSupplierBillDialog';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { ModuleTabGate } from '@/components/core/ModuleTabGate';
+import { AssessmentPanel } from '@/components/features/assessment/AssessmentPanel';
 import { usePermissions } from '@/hooks/usePermissions';
 import { entityTemplatesService } from '@/services/entityTemplatesService';
 import { buildExpensePrefill, buildInvoicePrefill, type ExpensePrefill, type InvoicePrefill } from '@/services/templates/registry';
@@ -605,6 +607,13 @@ const FinancePage: React.FC = () => {
                   <Clock className="h-4 w-4 mr-2" /> Time &amp; Billing
                 </TabsTrigger>
               )}
+              {/* AI Assessment sits above Reports on purpose: everything below is a number you
+                  read yourself, and this is the one that reads them for you and says what to do.
+                  Its own paid module, so the pane gates rather than the rail entry — a hidden
+                  entry cannot explain what it is you are not being offered. */}
+              <TabsTrigger value="assessment" className="w-full justify-start">
+                <Gauge className="h-4 w-4 mr-2" /> AI Assessment
+              </TabsTrigger>
               <TabsTrigger value="reports" className="w-full justify-start">
                 <BarChart3 className="h-4 w-4 mr-2" /> Reports
               </TabsTrigger>
@@ -634,6 +643,24 @@ const FinancePage: React.FC = () => {
           </div>
 
           <div className="min-w-0 flex-1 space-y-4">
+          {/* ─────────── AI ASSESSMENT ─────────── */}
+          <TabsContent value="assessment" className="space-y-4">
+            <ModuleTabGate
+              moduleSlug="finance-assessment"
+              moduleName="AI Assessment — Finance"
+              blurb="Ask whether the books are healthy and what to fix first."
+            >
+              {activeWorkspaceId && (
+                <AssessmentPanel
+                  subject="finance"
+                  subjectId={activeWorkspaceId}
+                  canRun={!isAccountant}
+                  subjectName="Your books"
+                />
+              )}
+            </ModuleTabGate>
+          </TabsContent>
+
           {/* ─────────── DASHBOARD ─────────── */}
           <TabsContent value="dashboard" className="space-y-6">
             {/* KPI strip */}

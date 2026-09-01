@@ -46,17 +46,23 @@ interface Props {
   /**
    * The toolkits to render starter actions for. When `mode='just_enabled'`,
    * pass the single toolkit that was just turned on. When `mode='empty_state'`,
-   * pass every active toolkit (Core + user picks) so the user can launch any.
+   * pass the SELECTED AGENT's own clusters followed by every active one — the
+   * card answers "what does this agent do", so it must move when the agent does.
    */
   toolkits: ToolkitDefinition[];
   mode: 'just_enabled' | 'empty_state';
+  /**
+   * Display name of the agent the empty state belongs to. Only naming the agent
+   * makes the header honest: the list is no longer "toolkits you have loaded".
+   */
+  agentName?: string;
   /** When the user clicks a quick-start. Receives the prompt string. */
   onLaunch: (prompt: string, quickStart: ToolkitQuickStart, toolkit: ToolkitDefinition) => void;
   /** Dismiss the just-enabled card without picking anything (sticks for empty_state). */
   onDismiss?: () => void;
 }
 
-export const ToolkitOnboardingCard: React.FC<Props> = ({ toolkits, mode, onLaunch, onDismiss }) => {
+export const ToolkitOnboardingCard: React.FC<Props> = ({ toolkits, mode, agentName, onLaunch, onDismiss }) => {
   const filtered = toolkits.filter((tk) => (tk.quick_starts?.length || 0) > 0);
   if (filtered.length === 0) return null;
 
@@ -71,12 +77,12 @@ export const ToolkitOnboardingCard: React.FC<Props> = ({ toolkits, mode, onLaunc
           <div className="text-sm font-medium">
             {mode === 'just_enabled'
               ? `${filtered[0]?.name || 'Toolkit'} loaded — what do you want to do?`
-              : 'Pick a starter to begin'}
+              : agentName ? `What ${agentName} can do` : 'Pick a starter to begin'}
           </div>
           <div className="text-[11px] text-muted-foreground">
             {mode === 'just_enabled'
               ? 'Click any starter or type your own request.'
-              : `Quick actions across ${filtered.length} active toolkit${filtered.length === 1 ? '' : 's'}.`}
+              : `Quick actions across ${filtered.length} toolkit${filtered.length === 1 ? '' : 's'}.`}
           </div>
         </div>
         {onDismiss && (

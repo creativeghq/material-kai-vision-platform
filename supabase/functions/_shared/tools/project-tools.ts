@@ -40,13 +40,13 @@ const MODULE_SLUG = 'projects';
 import { serviceClient as svcClient } from '../supabase-client.ts';
 import { moduleGate } from './module-gate.ts';
 /**
- * The workspace-scoped project resolver is SHARED with `_shared/project-assessment.ts` (#395,
+ * The workspace-scoped project resolver is SHARED with `_shared/assessment.ts` (#395,
  * invariant 1). It used to live here; it was moved when a second toolkit needed exactly the same
  * tenancy binding, because two copies of a tenancy check is how the hole #395 closed gets
  * reopened one file over. `sbResolveProjectId` takes the client explicitly — that is the only
  * difference from the version this replaced.
  */
-import { resolveProjectId as sbResolveProjectId } from '../project-assessment.ts';
+import { resolveProjectId as sbResolveProjectId } from '../assessment.ts';
 
 async function resolveProjectId(
   userId: string, workspaceId: string | null, projectId?: string, projectName?: string,

@@ -1,20 +1,23 @@
 /**
- * AI Assessment — "is this project on track, and what do I do next?" (#397).
+ * AI Assessment — one panel, three subjects (#397).
  *
  * WHAT THIS SCREEN IS. Two halves that must not be confused for each other:
  *
- *   THE SIGNALS are free and live. `preview()` re-derives them from the database every time this
- *   tab opens — 38 checks across six dimensions, plus the dimension scores and the verdict, all
- *   computed by `get_project_assessment_snapshot` in SQL. Nothing here computes a number.
+ *   THE SIGNALS are free and live. `preview()` re-derives them every time the panel opens — the
+ *   checks, the six dimension scores and the verdict, all computed by `get_assessment_snapshot`
+ *   in SQL. Nothing here computes a number.
  *
  *   THE REPORT costs credits. It is one Claude turn over those same signals, producing the
- *   headline, the narrative and the ranked actions. It is a SNAPSHOT — frozen at the moment it
- *   ran — which is why it is shown next to a live "as of" date rather than pretending to be
- *   current.
+ *   headline, the narrative and the ranked actions. It is a SNAPSHOT — frozen when it ran — which
+ *   is why it is shown next to a live "as of" date rather than pretending to be current.
  *
  * Every dimension renders every time, and one that could not be judged says so. A tile that
- * disappears when there is no data makes a broken collector pixel-identical to a clean project;
+ * disappears when there is no data makes a broken collector pixel-identical to a healthy subject;
  * a tile showing 0 is worse, because 0 is a score.
+ *
+ * Mounted three times — the project tab, the Finance hub, the property workbench — because the
+ * report is about three different things and belongs beside each of them. It is ONE component for
+ * the same reason the SQL is one system: three copies would drift on the first change.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -35,22 +38,29 @@ import {
   ASSESSMENT_DIMENSION_BLURBS,
   ASSESSMENT_VERDICT_LABELS,
   ACTION_EFFORT_LABELS,
+  type AssessmentSubject,
   type AssessmentDimension,
   type AssessmentVerdict,
   type SignalSeverity,
-} from '../../assessmentVocabulary';
+} from '@/services/assessment/assessmentVocabulary';
+import { assessmentDestinationHref } from '@/services/assessment/assessmentDestinations';
 import {
-  projectAssessmentService,
+  assessmentService,
   AssessmentBlocked,
   type AssessmentSnapshot,
   type AssessmentRecord,
   type AssessmentAction,
   type AssessmentSignal,
-} from '../../services/projectAssessmentService';
+} from '@/services/assessment/assessmentService';
 
 interface Props {
-  projectId: string;
-  isOwner: boolean;
+  subject: AssessmentSubject;
+  /** The project id, the workspace id, or the property id. Finance never shows it in a URL. */
+  subjectId: string;
+  /** Whether this viewer may spend credits and act on the result. */
+  canRun: boolean;
+  /** What the subject is called, for the empty state's copy. */
+  subjectName?: string;
 }
 
 /**
@@ -74,13 +84,28 @@ const SEVERITY_VARIANT: Record<SignalSeverity, 'error' | 'warning' | 'neutral' |
   info: 'info',
 };
 
-/** One line under the verdict badge, saying what the word means for this project. */
 const VERDICT_BLURB: Record<AssessmentVerdict, string> = {
   on_track: 'Nothing here needs attention today.',
   at_risk: 'Working, but something will bite if it is left.',
   off_track: 'Something is wrong now, not later.',
-  stalled: 'Nothing has moved on this project for over a month.',
-  not_enough_data: 'Too little is recorded to judge this project. That is a finding, not a pass.',
+  stalled: 'Nothing has moved on this for over a month.',
+  not_enough_data: 'Too little is recorded to judge this. That is a finding, not a pass.',
+};
+
+/** What the paid button offers, per subject. The copy is the only thing that differs. */
+const RUN_COPY: Record<AssessmentSubject, { first: string; again: string; empty: string }> = {
+  project: {
+    first: 'Assess this project', again: 'Re-assess',
+    empty: 'The signals above are already derived. An assessment adds the verdict in words and a ranked list of what to do first.',
+  },
+  finance: {
+    first: 'Assess the books', again: 'Re-assess',
+    empty: 'The signals above are already derived from your ledgers. An assessment adds the verdict in words and a ranked list of what to fix first.',
+  },
+  real_estate: {
+    first: 'Assess this listing', again: 'Re-assess',
+    empty: 'The signals above are already derived. An assessment adds the verdict in words and a ranked list of what to fix first.',
+  },
 };
 
 const STATUS_ICON = {
@@ -90,19 +115,18 @@ const STATUS_ICON = {
   not_applicable: CircleSlash,
 } as const;
 
-/** A destination is a project tab key; naming a place and linking to it are the same act. */
-const destinationHref = (projectId: string, tab: string | null) =>
-  tab ? `/projects/${projectId}?tab=${tab}` : null;
-
 const ScoreTile: React.FC<{
+  subject: AssessmentSubject;
   dimension: AssessmentDimension;
   score: number | null;
   attention: number;
   reason: string | null;
-}> = ({ dimension, score, attention, reason }) => (
+}> = ({ subject, dimension, score, attention, reason }) => (
   <div className="rounded-sm border border-hairline bg-card p-3">
     <div className="flex items-baseline justify-between gap-2">
-      <span className="text-xs font-semibold text-foreground">{ASSESSMENT_DIMENSION_LABELS[dimension]}</span>
+      <span className="text-xs font-semibold text-foreground">
+        {ASSESSMENT_DIMENSION_LABELS[subject][dimension]}
+      </span>
       {/* A dimension nothing could judge shows a WORD, never a 0 — a 0 is a score, and this is
           the absence of one. */}
       {score === null ? (
@@ -116,14 +140,16 @@ const ScoreTile: React.FC<{
         ? (reason ? humanizeLabel(reason) : 'Nothing measurable here yet')
         : attention > 0
           ? `${attention} thing${attention === 1 ? '' : 's'} to look at`
-          : ASSESSMENT_DIMENSION_BLURBS[dimension]}
+          : ASSESSMENT_DIMENSION_BLURBS[subject][dimension]}
     </p>
   </div>
 );
 
-const SignalRow: React.FC<{ signal: AssessmentSignal; projectId: string }> = ({ signal, projectId }) => {
+const SignalRow: React.FC<{
+  signal: AssessmentSignal; subject: AssessmentSubject; subjectId: string;
+}> = ({ signal, subject, subjectId }) => {
   const Icon = STATUS_ICON[signal.status] ?? HelpCircle;
-  const href = destinationHref(projectId, signal.destination);
+  const href = assessmentDestinationHref(subject, subjectId, signal.destination);
   const tone =
     signal.status === 'attention'
       ? (signal.severity === 'critical' || signal.severity === 'high'
@@ -141,18 +167,13 @@ const SignalRow: React.FC<{ signal: AssessmentSignal; projectId: string }> = ({ 
         </p>
       </div>
       {href && (
-        <Link
-          to={href}
-          className="shrink-0 text-xs font-medium text-primary hover:underline"
-        >
-          Open
-        </Link>
+        <Link to={href} className="shrink-0 text-xs font-medium text-primary hover:underline">Open</Link>
       )}
     </li>
   );
 };
 
-export const AssessmentTab: React.FC<Props> = ({ projectId, isOwner }) => {
+export const AssessmentPanel: React.FC<Props> = ({ subject, subjectId, canRun, subjectName }) => {
   const { toast } = useToast();
   const [snapshot, setSnapshot] = useState<AssessmentSnapshot | null>(null);
   const [report, setReport] = useState<AssessmentRecord | null>(null);
@@ -171,32 +192,32 @@ export const AssessmentTab: React.FC<Props> = ({ projectId, isOwner }) => {
       // The signals are free and live; the report is the stored snapshot. Loaded together so the
       // screen can say how far apart they are.
       const [snap, latest, past] = await Promise.all([
-        projectAssessmentService.preview(projectId).catch((e) => {
+        assessmentService.preview(subject, subjectId).catch((e) => {
           if (e instanceof AssessmentBlocked) { setBlocked(e.message); return null; }
           throw e;
         }),
-        projectAssessmentService.latest(projectId),
-        projectAssessmentService.history(projectId, 8),
+        assessmentService.latest(subject, subjectId),
+        assessmentService.history(subject, subjectId),
       ]);
       setSnapshot(snap);
       setReport(latest);
       setHistory(past);
-      setActions(latest ? await projectAssessmentService.actionsFor(latest.id) : []);
+      setActions(latest ? await assessmentService.actionsFor(latest.id) : []);
     } catch (e) {
       toast({ title: 'Could not load the assessment', description: (e as Error).message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
-  }, [projectId, toast]);
+  }, [subject, subjectId, toast]);
 
   useEffect(() => { void load(); }, [load]);
 
   const runAssessment = async () => {
     setRunning(true);
     try {
-      const out = await projectAssessmentService.run(projectId);
+      const out = await assessmentService.run(subject, subjectId);
       if (out.already_running) {
-        toast({ title: 'Already running', description: 'An assessment for this project is already in flight. Nothing was charged twice.' });
+        toast({ title: 'Already running', description: 'An assessment is already in flight. Nothing was charged twice.' });
       } else {
         toast({
           title: 'Assessment complete',
@@ -219,13 +240,16 @@ export const AssessmentTab: React.FC<Props> = ({ projectId, isOwner }) => {
   const addAsTask = async (action: AssessmentAction) => {
     setBusyAction(action.id);
     try {
-      const out = await projectAssessmentService.applyAction(action.id, action.due_hint);
+      const out = await assessmentService.applyAction(action.id, action.due_hint);
+      if (!out.ok) {
+        // `project_tasks` is the only task table there is. Saying so beats a button that appears
+        // to work and changes nothing.
+        toast({ title: 'No task list for this', description: out.error, variant: 'destructive' });
+        return;
+      }
       // Said out loud rather than reported as a fresh success: a retry after a dropped connection
       // returns the task that already exists, and the operator needs to know that is what happened.
-      toast({
-        title: out.already ? 'Already on the task list' : 'Added to tasks',
-        description: action.title,
-      });
+      toast({ title: out.already ? 'Already on the task list' : 'Added to tasks', description: action.title });
       setActions((prev) => prev.map((a) => (a.id === action.id
         ? { ...a, state: 'task_created', task_id: out.task_id } : a)));
     } catch (e) {
@@ -238,7 +262,7 @@ export const AssessmentTab: React.FC<Props> = ({ projectId, isOwner }) => {
   const setActionState = async (action: AssessmentAction, state: 'open' | 'done' | 'dismissed') => {
     setBusyAction(action.id);
     try {
-      await projectAssessmentService.resolveAction(action.id, state);
+      await assessmentService.resolveAction(action.id, state);
       setActions((prev) => prev.map((a) => (a.id === action.id ? { ...a, state } : a)));
     } catch (e) {
       toast({ title: 'Could not update the action', description: (e as Error).message, variant: 'destructive' });
@@ -255,6 +279,7 @@ export const AssessmentTab: React.FC<Props> = ({ projectId, isOwner }) => {
   );
   const verdict = (snapshot?.verdict ?? report?.verdict ?? null) as AssessmentVerdict | null;
   const openActions = actions.filter((a) => a.state === 'open');
+  const copy = RUN_COPY[subject];
 
   if (loading) {
     return (
@@ -304,7 +329,7 @@ export const AssessmentTab: React.FC<Props> = ({ projectId, isOwner }) => {
             </div>
             {verdict && <p className="mt-1 text-xs text-muted-foreground">{VERDICT_BLURB[verdict]}</p>}
           </div>
-          {isOwner && (
+          {canRun && (
             <div className="flex shrink-0 items-center gap-2">
               <Button variant="outline" size="sm" onClick={() => void load()} disabled={running}>
                 <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
@@ -312,7 +337,7 @@ export const AssessmentTab: React.FC<Props> = ({ projectId, isOwner }) => {
               </Button>
               <Button size="sm" onClick={() => void runAssessment()} disabled={running}>
                 {running ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Gauge className="mr-1.5 h-3.5 w-3.5" />}
-                {report ? 'Re-assess' : 'Assess this project'}
+                {report ? copy.again : copy.first}
               </Button>
             </div>
           )}
@@ -323,6 +348,7 @@ export const AssessmentTab: React.FC<Props> = ({ projectId, isOwner }) => {
             {ASSESSMENT_DIMENSIONS.map((d) => (
               <ScoreTile
                 key={d}
+                subject={subject}
                 dimension={d}
                 score={dimensions?.[d]?.score ?? null}
                 attention={dimensions?.[d]?.attention_signals ?? 0}
@@ -331,7 +357,7 @@ export const AssessmentTab: React.FC<Props> = ({ projectId, isOwner }) => {
             ))}
           </div>
           {/* The AI half is what costs money, and the screen says so before it is spent. */}
-          {isOwner && (
+          {canRun && (
             <p className="mt-3 text-xs text-muted-foreground">
               The scores above are derived from your data and cost nothing. Running an assessment adds
               the written verdict and the ranked plan — one AI turn, charged in credits.
@@ -364,13 +390,13 @@ export const AssessmentTab: React.FC<Props> = ({ projectId, isOwner }) => {
           <CardContent className="py-8">
             <HubEmptyState
               icon={Gauge}
-              title="No assessment has been written yet"
-              description="The signals above are already derived. An assessment adds the verdict in words and a ranked list of what to do first."
-              action={isOwner
+              title={`${subjectName ? `${subjectName} has` : 'This has'} no written assessment yet`}
+              description={copy.empty}
+              action={canRun
                 ? (
                   <Button size="sm" onClick={() => void runAssessment()} disabled={running}>
                     {running ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Gauge className="mr-1.5 h-3.5 w-3.5" />}
-                    Assess this project
+                    {copy.first}
                   </Button>
                 )
                 : undefined}
@@ -385,7 +411,8 @@ export const AssessmentTab: React.FC<Props> = ({ projectId, isOwner }) => {
           <CardHeader>
             <CardTitle className="text-base">What to do next</CardTitle>
             <p className="text-xs text-muted-foreground">
-              {openActions.length} open of {actions.length} · adding one creates a real task on this project
+              {openActions.length} open of {actions.length}
+              {subject === 'project' ? ' · adding one creates a real task on this project' : ''}
             </p>
           </CardHeader>
           <CardContent className="p-0">
@@ -398,7 +425,7 @@ export const AssessmentTab: React.FC<Props> = ({ projectId, isOwner }) => {
             ) : (
               <ul>
                 {actions.map((a) => {
-                  const href = destinationHref(projectId, a.destination);
+                  const href = assessmentDestinationHref(subject, subjectId, a.destination);
                   const resolved = a.state === 'done' || a.state === 'dismissed';
                   return (
                     <li key={a.id} className="border-b border-hairline px-4 py-3 last:border-b-0">
@@ -414,23 +441,26 @@ export const AssessmentTab: React.FC<Props> = ({ projectId, isOwner }) => {
                           </div>
                           {a.rationale && <p className="mt-1 text-xs leading-snug text-muted-foreground">{a.rationale}</p>}
                           <div className="mt-1 flex flex-wrap items-center gap-3 text-xs">
-                            <span className="text-muted-foreground">{ASSESSMENT_DIMENSION_LABELS[a.dimension]}</span>
+                            <span className="text-muted-foreground">{ASSESSMENT_DIMENSION_LABELS[subject][a.dimension]}</span>
                             {a.due_hint && <span className="text-muted-foreground">by {formatDate(a.due_hint)}</span>}
                             {href && (
                               <Link to={href} className="inline-flex items-center gap-1 font-medium text-primary hover:underline">
                                 Go there <ArrowRight className="h-3 w-3" />
                               </Link>
                             )}
-                            {a.task_id && (
-                              <Link to={`/projects/${projectId}?tab=tasks`} className="font-medium text-primary hover:underline">
+                            {a.task_id && subject === 'project' && (
+                              <Link to={`/projects/${subjectId}?tab=tasks`} className="font-medium text-primary hover:underline">
                                 On the task list
                               </Link>
                             )}
                           </div>
                         </div>
-                        {isOwner && !resolved && (
+                        {canRun && !resolved && (
                           <div className="flex shrink-0 items-center gap-1.5">
-                            {a.state === 'open' && (
+                            {/* Only a project action can become a task — there is no task table
+                                for the books or a listing, and a button that silently does
+                                nothing is worse than no button. */}
+                            {a.state === 'open' && subject === 'project' && (
                               <Button variant="outline" size="sm" disabled={busyAction === a.id} onClick={() => void addAsTask(a)}>
                                 <ListPlus className="mr-1.5 h-3.5 w-3.5" />
                                 Add as task
@@ -452,7 +482,7 @@ export const AssessmentTab: React.FC<Props> = ({ projectId, isOwner }) => {
                             </Button>
                           </div>
                         )}
-                        {resolved && isOwner && (
+                        {resolved && canRun && (
                           <Button variant="ghost" size="sm" disabled={busyAction === a.id} onClick={() => void setActionState(a, 'open')}>
                             Reopen
                           </Button>
@@ -488,7 +518,7 @@ export const AssessmentTab: React.FC<Props> = ({ projectId, isOwner }) => {
             <HubEmptyState
               icon={CheckCircle2}
               title="Every check passed"
-              description="Nothing on this project is flagged and nothing is unrecorded."
+              description="Nothing here is flagged and nothing is unrecorded."
             />
           ) : (
             ASSESSMENT_DIMENSIONS.map((d) => {
@@ -496,9 +526,13 @@ export const AssessmentTab: React.FC<Props> = ({ projectId, isOwner }) => {
               if (rows.length === 0) return null;
               return (
                 <div key={d} className="mb-4 last:mb-0">
-                  <h4 className="mb-1 text-xs font-semibold text-muted-foreground">{ASSESSMENT_DIMENSION_LABELS[d]}</h4>
+                  <h4 className="mb-1 text-xs font-semibold text-muted-foreground">
+                    {ASSESSMENT_DIMENSION_LABELS[subject][d]}
+                  </h4>
                   <ul>
-                    {rows.map((s) => <SignalRow key={s.code} signal={s} projectId={projectId} />)}
+                    {rows.map((s) => (
+                      <SignalRow key={s.code} signal={s} subject={subject} subjectId={subjectId} />
+                    ))}
                   </ul>
                 </div>
               );

@@ -149,11 +149,11 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
   },
   {
     name: 'apply_assessment_action',
-    file: 'supabase/functions/_shared/tools/project-assessment-tools.ts',
+    file: 'supabase/functions/_shared/tools/assessment-tools.ts',
     factory: 'createApplyAssessmentActionTool',
     description: 'Turn one recommended assessment action into a real task on its project.',
     params: [
-      { name: 'action_id', type: 'string', optional: false, description: 'The id of the action, from get_project_assessment or list_assessment_actions.' },
+      { name: 'action_id', type: 'string', optional: false, description: 'The id of the action, from a get_*_assessment or list_assessment_actions result.' },
       { name: 'due_date', type: 'string', optional: true, description: 'Due date as YYYY-MM-DD. Defaults to the date the assessment suggested.' },
     ],
   },
@@ -168,13 +168,33 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'assess_finance',
+    file: 'supabase/functions/_shared/tools/assessment-tools.ts',
+    factory: 'createAssessFinanceTool',
+    description: 'Run a full AI assessment of this workspace\'s BOOKS: configuration, the quote-to-invoice pipeline, profitability and cash, obligations, fiscal filing and bank reconciliation, and debtors — then produce a verdict and a …',
+    params: [
+      { name: 'today', type: 'string', optional: true, description: 'The user\'s local date as YYYY-MM-DD. Pass it so overdue is judged on their calendar day.' },
+    ],
+  },
+  {
     name: 'assess_project',
-    file: 'supabase/functions/_shared/tools/project-assessment-tools.ts',
+    file: 'supabase/functions/_shared/tools/assessment-tools.ts',
     factory: 'createAssessProjectTool',
     description: 'Run a full AI assessment of one project: derive its health across setup, commercial, financial, schedule, delivery and client signals, then produce a verdict and a ranked list of what to do next. Costs up to … credits…',
     params: [
       { name: 'project_id', type: 'string', optional: true, description: 'The project id, when you already have it.' },
       { name: 'project_name', type: 'string', optional: true, description: 'Part of the project name, e.g. "Athens loft".' },
+      { name: 'today', type: 'string', optional: true, description: 'The user\'s local date as YYYY-MM-DD. Pass it so overdue is judged on their calendar day.' },
+    ],
+  },
+  {
+    name: 'assess_property',
+    file: 'supabase/functions/_shared/tools/assessment-tools.ts',
+    factory: 'createAssessPropertyTool',
+    description: 'Run a full AI assessment of one property listing: completeness, pricing against its own history, returns, tenancy and listing expiries, condition, and whether buyer interest is being answered — then produce a verdict …',
+    params: [
+      { name: 'property_id', type: 'string', optional: true, description: 'The property id, when you already have it.' },
+      { name: 'property_query', type: 'string', optional: true, description: 'Part of the title, reference code or town, e.g. "Kavouri" or "REF-104".' },
       { name: 'today', type: 'string', optional: true, description: 'The user\'s local date as YYYY-MM-DD. Pass it so overdue is judged on their calendar day.' },
     ],
   },
@@ -727,6 +747,13 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'get_finance_assessment',
+    file: 'supabase/functions/_shared/tools/assessment-tools.ts',
+    factory: 'createGetFinanceAssessmentTool',
+    description: 'Read the most recent AI assessment of this workspace\'s books — verdict, dimension scores, findings and the actions it recommended.',
+    params: [],
+  },
+  {
     name: 'get_job_digest_preview',
     file: 'supabase/functions/_shared/tools/job-research-tools.ts',
     factory: 'createGetJobDigestPreviewTool',
@@ -758,12 +785,22 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
   },
   {
     name: 'get_project_assessment',
-    file: 'supabase/functions/_shared/tools/project-assessment-tools.ts',
+    file: 'supabase/functions/_shared/tools/assessment-tools.ts',
     factory: 'createGetProjectAssessmentTool',
-    description: 'Read the most recent AI assessment of a project — its verdict, dimension scores, findings and the actions it recommended.',
+    description: 'Read the most recent AI assessment of a project — verdict, dimension scores, findings and the actions it recommended.',
     params: [
       { name: 'project_id', type: 'string', optional: true, description: 'The project id, when you already have it.' },
       { name: 'project_name', type: 'string', optional: true, description: 'Part of the project name.' },
+    ],
+  },
+  {
+    name: 'get_property_assessment',
+    file: 'supabase/functions/_shared/tools/assessment-tools.ts',
+    factory: 'createGetPropertyAssessmentTool',
+    description: 'Read the most recent AI assessment of a property listing — verdict, dimension scores, findings and the actions it recommended.',
+    params: [
+      { name: 'property_id', type: 'string', optional: true, description: 'The property id, when you already have it.' },
+      { name: 'property_query', type: 'string', optional: true, description: 'Part of the title, reference code or town.' },
     ],
   },
   {
@@ -795,11 +832,11 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
   },
   {
     name: 'list_assessment_actions',
-    file: 'supabase/functions/_shared/tools/project-assessment-tools.ts',
+    file: 'supabase/functions/_shared/tools/assessment-tools.ts',
     factory: 'createListAssessmentActionsTool',
-    description: 'List the actions AI assessments have recommended across the projects, newest report first.',
+    description: 'List the actions AI assessments have recommended — across projects, the books and property listings, whichever assessment modules this workspace owns.',
     params: [
-      { name: 'project_name', type: 'string', optional: true, description: 'Narrow to projects whose name contains this.' },
+      { name: 'subject_type', type: 'enum', enum: ['project', 'finance', 'real_estate'], optional: true, description: 'Narrow to one kind of subject. Defaults to all of them.' },
       { name: 'state', type: 'enum', enum: ['open', 'task_created', 'done', 'dismissed'], optional: true, description: 'Which actions to list. Defaults to open.' },
       { name: 'limit', type: 'number', optional: true, description: 'Maximum actions to return (1-100, default 25).' },
     ],

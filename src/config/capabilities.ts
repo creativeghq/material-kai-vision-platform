@@ -60,7 +60,13 @@ export const CAPABILITIES: readonly CapabilityDef[] = [
   // tab inside a project, so `pageRoute` is the list the reader lands on — the report itself is
   // reached through the `project` capability's detail route, which is why the assessment result
   // chunks map to THAT one in RESULT_TYPE_CAPABILITY below.
-  { id: 'project-assessment', label: 'AI Assessment', hub: 'studio', pageRoute: '/projects', agentId: 'kai', agentTool: 'assess_project', toolkitId: 'project-assessment', recordTable: 'project_assessments', moduleSlug: 'project-assessment' },
+  { id: 'project-assessment', label: 'AI Assessment', hub: 'studio', pageRoute: '/projects', agentId: 'kai', agentTool: 'assess_project', toolkitId: 'project-assessment', recordTable: 'assessments', moduleSlug: 'project-assessment' },
+  // The other two subjects of the same system. Separate capabilities rather than fields on the
+  // one above because each is separately SOLD, has its own toolkit and its own agent owner —
+  // and because `moduleSlug` here is what tells `toolModuleGates` the agent catalog is not
+  // inventing a module no page-gating surface knows.
+  { id: 'finance-assessment', label: 'AI Assessment — Finance', hub: 'finance', openInLabel: 'Finance', pageRoute: '/finance?tab=assessment', agentId: 'erp', agentTool: 'assess_finance', toolkitId: 'finance-assessment', recordTable: 'assessments', moduleSlug: 'finance-assessment' },
+  { id: 'real-estate-assessment', label: 'AI Assessment — Real Estate', hub: 'sales', openInLabel: 'Real Estate', pageRoute: '/properties', agentId: 'property-advisor', agentTool: 'assess_property', toolkitId: 'real-estate-assessment', recordTable: 'assessments', moduleSlug: 'real-estate-assessment' },
   { id: 'catalog', label: 'Catalogs', hub: 'studio', pageRoute: '/catalogs', agentId: 'product-business', agentTool: 'create_catalog', toolkitId: 'catalogs', recordTable: 'presentation_catalogs', canvasKind: 'catalog', moduleSlug: 'presentation-catalogs' },
   // Image Studio — agent-only (no page). Shares the `generation` engine with Interior Design; the
   // nav path adds &generation_mode=image-edit to prime the image pipeline. No distinct agentTool
@@ -146,9 +152,12 @@ export const RESULT_TYPE_CAPABILITY: Record<string, string> = {
   // was: it names findings, ranks actions, and offers no way to reach the project any of it is
   // about. `project` is a DETAIL_ROUTE capability, so the handoff deep-links to /projects/:id
   // when the payload carries `project_id` — which all three of these do.
-  project_assessment_report: 'project',
-  project_assessment_actions: 'project',
-  project_assessment_action_applied: 'project',
+  // One chunk set, three subjects. `project` is a DETAIL_ROUTE capability, so a payload carrying
+  // `project_id` deep-links to /projects/:id; a finance or property payload carries none and the
+  // card falls back to the hub, which is the right landing for both.
+  assessment_report: 'project',
+  assessment_actions: 'project',
+  assessment_action_applied: 'project',
 };
 
 /**

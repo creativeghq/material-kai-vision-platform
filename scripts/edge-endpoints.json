@@ -14131,7 +14131,7 @@
     "name": "project-assessment",
     "tag": "Projects",
     "summary": "Derive a project's health signals, and optionally write the AI assessment of them",
-    "description": "Two modes over one project. `preview` returns the SQL derivation only — 38 signals across six dimensions, the dimension scores and the verdict — and is free. `run` reserves credits, adds one Claude turn over those same signals to produce a headline, a narrative and a ranked action list, then settles against real token usage. The model never counts, scores or decides the verdict: every number comes from get_project_assessment_snapshot. Requires the `project-assessment` module and workspace membership on the target project.",
+    "description": "Two modes over one project. `preview` returns the SQL derivation only — the signals across six dimensions, the dimension scores and the verdict — and is free. `run` reserves credits, adds one Claude turn over those same signals to produce a headline, a narrative and a ranked action list, then settles against real token usage. The model never counts, scores or decides the verdict: every number comes from get_assessment_snapshot. Requires the `project-assessment` module and workspace membership on the target project.",
     "security": [
       "supabaseJwt"
     ],
@@ -14145,6 +14145,180 @@
         "project_id": {
           "type": "string",
           "description": "The project to assess (uuid). Required."
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "preview",
+            "run"
+          ],
+          "default": "preview",
+          "description": "`preview` is the free derivation; `run` costs credits."
+        },
+        "today": {
+          "type": "string",
+          "description": "The operator's local calendar day as YYYY-MM-DD. Decides what counts as overdue; bounded to +/-2 days of the server date."
+        }
+      }
+    },
+    "response": {
+      "content_type": "application/json",
+      "fields": {
+        "ok": {
+          "type": "boolean"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "snapshot": {
+          "type": "object",
+          "description": "preview only — facts, counts, entitlements, pnl, signals, dimension scores, verdict."
+        },
+        "assessment_id": {
+          "type": "string",
+          "description": "run only — the stored report."
+        },
+        "already_running": {
+          "type": "boolean",
+          "description": "run only — a run was already in flight and nothing was charged twice."
+        },
+        "verdict": {
+          "type": "string",
+          "enum": [
+            "on_track",
+            "at_risk",
+            "off_track",
+            "stalled",
+            "not_enough_data"
+          ]
+        },
+        "overall_score": {
+          "type": "number"
+        },
+        "headline": {
+          "type": "string"
+        },
+        "narrative": {
+          "type": "string"
+        },
+        "actions_stored": {
+          "type": "integer"
+        },
+        "credits_used": {
+          "type": "number"
+        },
+        "unpriced_model": {
+          "type": "boolean",
+          "description": "The reserved ceiling was kept because the model has no ai_model_pricing row."
+        }
+      }
+    }
+  },
+  {
+    "name": "finance-assessment",
+    "tag": "Finance",
+    "summary": "Derive the workspace's finance health signals, and optionally write the AI assessment of them",
+    "description": "Same two modes as project-assessment, over the BOOKS. The subject is the caller's own workspace — there is no finance record, so no id is taken from the body. Signals cover configuration, the quote-to-invoice pipeline, margin and cash, obligations, fiscal filing and bank reconciliation, and debtors; each figure comes from the derivation that already owns it (vw_ar_aging, vw_ap_aging, get_monthly_pnl, get_order_settlements, vw_uninvoiced_sales_orders, report_cashflow_per_day). Requires the `finance-assessment` module.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": "docs/project-ai-assessment.md",
+    "methods": [
+      "POST"
+    ],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "subject_id": {
+          "type": "string",
+          "description": "Optional workspace id, for a caller who belongs to several. Must be one of theirs; defaults to the first."
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "preview",
+            "run"
+          ],
+          "default": "preview",
+          "description": "`preview` is the free derivation; `run` costs credits."
+        },
+        "today": {
+          "type": "string",
+          "description": "The operator's local calendar day as YYYY-MM-DD. Decides what counts as overdue; bounded to +/-2 days of the server date."
+        }
+      }
+    },
+    "response": {
+      "content_type": "application/json",
+      "fields": {
+        "ok": {
+          "type": "boolean"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "snapshot": {
+          "type": "object",
+          "description": "preview only — facts, counts, entitlements, pnl, signals, dimension scores, verdict."
+        },
+        "assessment_id": {
+          "type": "string",
+          "description": "run only — the stored report."
+        },
+        "already_running": {
+          "type": "boolean",
+          "description": "run only — a run was already in flight and nothing was charged twice."
+        },
+        "verdict": {
+          "type": "string",
+          "enum": [
+            "on_track",
+            "at_risk",
+            "off_track",
+            "stalled",
+            "not_enough_data"
+          ]
+        },
+        "overall_score": {
+          "type": "number"
+        },
+        "headline": {
+          "type": "string"
+        },
+        "narrative": {
+          "type": "string"
+        },
+        "actions_stored": {
+          "type": "integer"
+        },
+        "credits_used": {
+          "type": "number"
+        },
+        "unpriced_model": {
+          "type": "boolean",
+          "description": "The reserved ceiling was kept because the model has no ai_model_pricing row."
+        }
+      }
+    }
+  },
+  {
+    "name": "real-estate-assessment",
+    "tag": "Real Estate",
+    "summary": "Derive one property listing's health signals, and optionally write the AI assessment of them",
+    "description": "Same two modes as project-assessment, over ONE property. Signals cover listing completeness (photos, description, price, energy class, area), pricing against the listing's own history, returns (yield, rent arrears, deposit protection), tenancy and listing expiries, open maintenance, and whether enquiries and viewings are being answered. Market activity comes from get_property_performance and is never recounted. Requires the `real-estate-assessment` module.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": "docs/project-ai-assessment.md",
+    "methods": [
+      "POST"
+    ],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "property_id": {
+          "type": "string",
+          "description": "The property to assess (uuid). Required."
         },
         "mode": {
           "type": "string",

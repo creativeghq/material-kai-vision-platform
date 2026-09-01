@@ -57,7 +57,7 @@ import { TasksAndScheduleTab } from '../components/tabs/TasksAndScheduleTab';
 import { SiteTab } from '../components/tabs/SiteTab';
 import { DocumentsTab } from '../components/tabs/DocumentsTab';
 import { RequestsTab } from '../components/tabs/RequestsTab';
-import { AssessmentTab } from '../components/tabs/AssessmentTab';
+import { AssessmentPanel } from '@/components/features/assessment/AssessmentPanel';
 import { TimelineTab } from '../components/tabs/TimelineTab';
 import { SheetsTab } from '../components/tabs/SheetsTab';
 import { ClientViewTab } from '../components/tabs/ClientViewTab';
@@ -427,7 +427,7 @@ export const ProjectDetailPage: React.FC = () => {
           <TabsContent value="site"><SiteTab projectId={project.id} isOwner={isOwner} /></TabsContent>
           <TabsContent value="documents"><DocumentsTab projectId={project.id} isOwner={isOwner} /></TabsContent>
           <TabsContent value="requests"><RequestsTab projectId={project.id} isOwner={isOwner} focusRequestId={sp.get('request')} /></TabsContent>
-          {isOwner && <TabsContent value="assessment"><ModuleTabGate moduleSlug="project-assessment" moduleName="AI Assessment" blurb="Ask whether this project is on track and what to fix first."><AssessmentTab projectId={project.id} isOwner={isOwner} /></ModuleTabGate></TabsContent>}
+          {isOwner && <TabsContent value="assessment"><ModuleTabGate moduleSlug="project-assessment" moduleName="AI Assessment" blurb="Ask whether this project is on track and what to fix first."><AssessmentPanel subject="project" subjectId={project.id} canRun={isOwner} subjectName={project.name} /></ModuleTabGate></TabsContent>}
           {isOwner && <TabsContent value="timeline"><TimelineTab projectId={project.id} /></TabsContent>}
         </Tabs>
       </main>

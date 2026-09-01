@@ -1198,8 +1198,12 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // Project Workspace (all users; 0 cr — DB-only)
       'create_project', 'list_my_projects', 'find_project', 'add_task',
       'add_purchase_item', 'generate_purchase_sheet',
-      // AI Assessment (module-gated on `project-assessment`; assess_project is the only paid one)
-      'assess_project', 'get_project_assessment', 'list_assessment_actions', 'apply_assessment_action',
+      // AI Assessment — all three subjects on the generalist. Each `assess_*` is gated on its own
+      // paid module and is the only paid tool of its trio; the readers cost nothing.
+      'assess_project', 'get_project_assessment',
+      'assess_finance', 'get_finance_assessment',
+      'assess_property', 'get_property_assessment',
+      'list_assessment_actions', 'apply_assessment_action',
       // Quotes (all users; 0 cr — creates real quotes + branded PDF, opens on canvas)
       'create_quote', 'generate_quote_pdf', 'list_my_quotes', 'raise_quote_request',
       // Generation / design (so JARVIS handles 3D renders, lighting, and VR inline —
@@ -1275,7 +1279,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // Project Workspace — interior designers benefit most from the container
       'create_project', 'list_my_projects', 'find_project', 'add_task',
       'add_purchase_item', 'generate_purchase_sheet',
-      // AI Assessment (module-gated on `project-assessment`; assess_project is the only paid one)
+      // AI Assessment — the project subject only. Vision runs engagements; the books are Trinity's.
       'assess_project', 'get_project_assessment', 'list_assessment_actions', 'apply_assessment_action',
       // The ENDING. Vision is the agent a customer describes a room to, and it could take them all
       // the way to a specification and then had no way to price it or record it — so the only
@@ -1306,6 +1310,9 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // core search + calculators (all users)
       'knowledge_base_search', 'read_document_section', 'material_search', 'analyze_inspiration_url',
       'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost',
+      // AI Assessment — the real-estate subject. Estate is the agent that would be asked "why is
+      // this listing not moving", and this is the tool that answers it from the data.
+      'assess_property', 'get_property_assessment', 'list_assessment_actions', 'apply_assessment_action',
     ],
     // systemPrompt loaded from the database (prompts.category = 'property-advisor')
   },
@@ -1389,9 +1396,11 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'customer_overview', 'supplier_overview', 'product_price_history',
       'products_in_project', 'projects_using_product', 'price_lookup',
       'create_project', 'list_my_projects', 'find_project',
-      // AI Assessment — Trinity reads the money half of a project, and this is the money half
-      // with a verdict on it. `assess_project` is paid; the other three are DB reads.
-      'assess_project', 'get_project_assessment', 'list_assessment_actions', 'apply_assessment_action',
+      // AI Assessment — Trinity owns the books, so it gets the finance subject as well as the
+      // project one. `assess_*` is paid; the readers are DB-only.
+      'assess_project', 'get_project_assessment',
+      'assess_finance', 'get_finance_assessment',
+      'list_assessment_actions', 'apply_assessment_action',
       // Finance reads + confirm-gated invoice issue (Trinity is the finance agent)
       'manage_finance',
       // Business operating expenses → categorized supplier bill (Payables/AP + P&L)
@@ -2744,30 +2753,37 @@ async function executeAgent(
     tools.push(createGeneratePurchaseSheetTool(userId, workspaceId, onChunk));
   }
 
-  // AI Assessment (module-gated on `project-assessment` inside every tool). Self-contained import
-  // like the graph toolkit below: one more entry in the big Promise.all buys nothing when the
-  // whole cluster is four tools that share one module.
+  // AI Assessment — three subjects, one toolkit file. Self-contained import like the graph
+  // toolkit below: one more entry in the big Promise.all buys nothing for a cluster whose tools
+  // all share one module gate helper.
   //
-  // `assess_project` is the only paid one — it reserves credits and settles against real tokens.
-  // The three readers are DB-only, deliberately: "what should I do next" must not cost money to
-  // ask a second time.
-  if (config.tools.some((t: string) => ['assess_project', 'get_project_assessment', 'list_assessment_actions', 'apply_assessment_action'].includes(t))) {
+  // Each `assess_*` is the only paid tool of its trio — it reserves credits and settles against
+  // real tokens. The readers are DB-only, deliberately: "what should I do next" must not cost
+  // money to ask a second time.
+  const ASSESSMENT_TOOL_NAMES = [
+    'assess_project', 'get_project_assessment',
+    'assess_finance', 'get_finance_assessment',
+    'assess_property', 'get_property_assessment',
+    'list_assessment_actions', 'apply_assessment_action',
+  ];
+  if (config.tools.some((t: string) => ASSESSMENT_TOOL_NAMES.includes(t))) {
     try {
-      const assessMod = await import('../_shared/tools/project-assessment-tools.ts');
-      if (config.tools.includes('assess_project')) {
-        tools.push(assessMod.createAssessProjectTool(userId, workspaceId, onChunk));
-      }
-      if (config.tools.includes('get_project_assessment')) {
-        tools.push(assessMod.createGetProjectAssessmentTool(userId, workspaceId, onChunk));
-      }
-      if (config.tools.includes('list_assessment_actions')) {
-        tools.push(assessMod.createListAssessmentActionsTool(userId, workspaceId, onChunk));
-      }
-      if (config.tools.includes('apply_assessment_action')) {
-        tools.push(assessMod.createApplyAssessmentActionTool(userId, workspaceId, onChunk));
+      const assessMod = await import('../_shared/tools/assessment-tools.ts');
+      const factories: Record<string, (u: string, w: string, c: typeof onChunk) => unknown> = {
+        assess_project: assessMod.createAssessProjectTool,
+        get_project_assessment: assessMod.createGetProjectAssessmentTool,
+        assess_finance: assessMod.createAssessFinanceTool,
+        get_finance_assessment: assessMod.createGetFinanceAssessmentTool,
+        assess_property: assessMod.createAssessPropertyTool,
+        get_property_assessment: assessMod.createGetPropertyAssessmentTool,
+        list_assessment_actions: assessMod.createListAssessmentActionsTool,
+        apply_assessment_action: assessMod.createApplyAssessmentActionTool,
+      };
+      for (const [name, factory] of Object.entries(factories)) {
+        if (config.tools.includes(name)) tools.push(factory(userId, workspaceId, onChunk));
       }
     } catch (e) {
-      console.error('[agent-chat] project-assessment tools failed to load:', e);
+      console.error('[agent-chat] assessment tools failed to load:', e);
     }
   }
 

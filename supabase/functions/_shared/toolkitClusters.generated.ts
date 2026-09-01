@@ -125,6 +125,12 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
   'project-assessment': {
     tool_ids: ['assess_project', 'get_project_assessment', 'list_assessment_actions', 'apply_assessment_action'],
   },
+  'finance-assessment': {
+    tool_ids: ['assess_finance', 'get_finance_assessment', 'list_assessment_actions', 'apply_assessment_action'],
+  },
+  'real-estate-assessment': {
+    tool_ids: ['assess_property', 'get_property_assessment', 'list_assessment_actions', 'apply_assessment_action'],
+  },
   'quotes': {
     tool_ids: ['create_quote', 'generate_quote_pdf', 'list_my_quotes', 'raise_quote_request'],
   },

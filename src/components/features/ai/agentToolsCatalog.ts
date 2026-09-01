@@ -367,7 +367,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
     ],
   },
 
-  // ── AI Assessment (its own paid module; the reads are free) ───────────
+  // ── AI Assessment — three subjects, three paid modules, shared readers ───
   {
     id: 'assess_project', name: 'Assess Project', category: 'Projects',
     moduleSlug: 'project-assessment',
@@ -378,19 +378,47 @@ const KAI_TOOLS: AgentToolEntry[] = [
     ],
   },
   {
-    id: 'get_project_assessment', name: 'Latest Assessment', category: 'Projects',
+    id: 'get_project_assessment', name: 'Latest Project Assessment', category: 'Projects',
     moduleSlug: 'project-assessment',
     desc: 'Read the most recent assessment of a project — verdict, scores, findings and recommended actions. Free.',
+    examples: ['What did the last assessment of the Athens loft say?'],
+  },
+  {
+    id: 'assess_finance', name: 'Assess Finance', category: 'Finance',
+    moduleSlug: 'finance-assessment',
+    desc: 'Analyse the books — configuration, the quote-to-invoice pipeline, margin and cash, obligations, fiscal filing, bank reconciliation and debtors — then say what to fix first. Costs credits.',
     examples: [
-      'What did the last assessment of the Athens loft say?',
+      'How are the books doing?',
+      'Assess our finances and tell me what to fix first',
     ],
+  },
+  {
+    id: 'get_finance_assessment', name: 'Latest Finance Assessment', category: 'Finance',
+    moduleSlug: 'finance-assessment',
+    desc: 'Read the most recent assessment of the books — verdict, scores, findings and recommended actions. Free.',
+    examples: ['What did the last finance assessment say?'],
+  },
+  {
+    id: 'assess_property', name: 'Assess Property', category: 'Real Estate',
+    moduleSlug: 'real-estate-assessment',
+    desc: 'Analyse one listing — completeness, pricing against its own history, returns, expiries, condition and whether buyer interest is being answered — then say what to fix first. Costs credits.',
+    examples: [
+      'Why is the Kavouri villa not selling?',
+      'Assess listing REF-104',
+    ],
+  },
+  {
+    id: 'get_property_assessment', name: 'Latest Property Assessment', category: 'Real Estate',
+    moduleSlug: 'real-estate-assessment',
+    desc: 'Read the most recent assessment of a property listing — verdict, scores, findings and recommended actions. Free.',
+    examples: ['What did the last assessment of that listing say?'],
   },
   {
     id: 'list_assessment_actions', name: 'Outstanding Actions', category: 'Projects',
     moduleSlug: 'project-assessment',
-    desc: 'List what the assessments have recommended across your projects and what is still open. Free.',
+    desc: 'List what the AI assessments have recommended and what is still open — across projects, the books and property listings, whichever assessment modules this workspace owns. Free.',
     examples: [
-      'What do my project assessments say I should do?',
+      'What do my assessments say I should do?',
       'Show the open assessment actions',
     ],
   },
@@ -398,9 +426,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
     id: 'apply_assessment_action', name: 'Action to Task', category: 'Projects',
     moduleSlug: 'project-assessment',
     desc: 'Turn one recommended action into a real task on its project. Free, and safe to retry.',
-    examples: [
-      'Add the first recommended action to the task list',
-    ],
+    examples: ['Add the first recommended action to the task list'],
   },
 
   // ── Quotes (all users; 0 credits) ─────────────────────────────────
@@ -2668,6 +2694,64 @@ export const TOOLKITS: ToolkitDefinition[] = [
     ],
   },
   {
+    id: 'finance-assessment',
+    name: 'AI Assessment — Finance',
+    description: 'Ask whether the books are healthy and what to fix first. The signals — margin, what you are owed and owe, unbilled work, fiscal transmissions, unmatched bank lines, debtors — are derived in SQL; the AI reads them and writes the verdict and the plan. Running one costs credits; reading the last one does not.',
+    icon: 'Gauge',
+    moduleSlug: 'finance-assessment',
+    tool_ids: [
+      'assess_finance', 'get_finance_assessment', 'list_assessment_actions', 'apply_assessment_action',
+    ],
+    quick_starts: [
+      {
+        // The only paid one in this cluster, and the copy says so — a quick-start that spends
+        // credits without saying it is the shape people learn to distrust.
+        label: 'Assess the books', description: 'Full review — costs credits', icon: 'Gauge',
+        prompt: 'Assess our finances and tell me what to fix first.',
+        done: "I've assessed the books.",
+        run: { tool: 'assess_finance' },
+      },
+      {
+        label: 'Last finance review', description: 'Read the most recent report', icon: 'FileSearch',
+        prompt: 'Show the latest finance assessment.',
+        done: 'Here is the latest finance assessment.',
+        run: { tool: 'get_finance_assessment' },
+      },
+    ],
+  },
+  {
+    id: 'real-estate-assessment',
+    name: 'AI Assessment — Real Estate',
+    description: 'Ask why a listing is not moving. The signals — photos, description, energy class, price against its own history, days on market, unanswered enquiries, tenancy and listing expiries, maintenance — are derived in SQL; the AI reads them and writes the verdict and the plan. Running one costs credits; reading the last one does not.',
+    icon: 'Gauge',
+    moduleSlug: 'real-estate-assessment',
+    tool_ids: [
+      'assess_property', 'get_property_assessment', 'list_assessment_actions', 'apply_assessment_action',
+    ],
+    quick_starts: [
+      {
+        label: 'Assess a listing', description: 'Full review — costs credits', icon: 'Gauge',
+        prompt: 'Assess one of my property listings.',
+        done: "I've assessed that listing.",
+        run: { tool: 'assess_property' },
+        autoFields: true,
+        form: [
+          { key: 'property_query', label: 'Property', placeholder: 'Kavouri villa, or REF-104', kind: 'text', required: true },
+        ],
+      },
+      {
+        label: 'Last listing review', description: 'Read the most recent report', icon: 'FileSearch',
+        prompt: 'Show the latest assessment for one of my listings.',
+        done: 'Here is the latest assessment.',
+        run: { tool: 'get_property_assessment' },
+        autoFields: true,
+        form: [
+          { key: 'property_query', label: 'Property', placeholder: 'Kavouri villa, or REF-104', kind: 'text', required: true },
+        ],
+      },
+    ],
+  },
+  {
     id: 'quotes',
     name: 'Quotes',
     description: 'Build client quotes from chat: add catalog or custom products (e.g. 75 sqm at €34/sqm), auto-price + VAT, generate the branded PDF, and open it on the canvas. Saved to the Quotes module. When the catalogue cannot price something, record it as an unpriced request instead of guessing.',
@@ -3535,6 +3619,8 @@ export const TOOLKIT_HUB: Record<string, HubId> = {
   // Studio
   catalogs: 'studio', 'presentation-sheets': 'studio', projects: 'studio', generation: 'studio',
   'project-assessment': 'studio',
+  'finance-assessment': 'finance',
+  'real-estate-assessment': 'sales',
   // People
   hr: 'people', 'my-hr': 'people',
 };
@@ -3667,8 +3753,21 @@ export const TOOLKIT_AGENTS: Record<string, string[]> = {
   projects: ['interior-designer', 'erp'],
   // Same two owners as the projects cluster: Vision runs the engagement, Trinity reads its money.
   'project-assessment': ['interior-designer', 'erp'],
+  // Trinity owns the books; Estate owns the listings.
+  'finance-assessment': ['erp'],
+  'real-estate-assessment': ['property-advisor'],
   // Contracts → Trinity (finance/legal) — also on kai via the generalist
   contracts: ['erp'],
+  // Real estate + the viewings calendar → Estate. Estate is the ONLY specialist that binds
+  // `manage_real_estate` and `manage_appointments`, and it owned no cluster at all until now:
+  // the picker scopes to the selected agent, so picking Estate hid the one toolkit she exists
+  // for and left her with nothing but the three always-on clusters — the ai-visibility shape
+  // one row up, on a whole agent instead of one cluster.
+  'real-estate': ['property-advisor'], appointments: ['property-advisor'],
+  // Operating expenses + the storefront widget → Trinity. Both are bound by `erp` in full and
+  // by no other specialist; `expenses` in particular was invisible from every browse surface
+  // while Trinity is the agent that books them.
+  expenses: ['erp'], 'website-embed': ['erp'],
   // Admin/analysis helpers
   'sub-agents': ['marketing', 'product-business'], 'admin-misc': ['marketing', 'product-business'],
 };
