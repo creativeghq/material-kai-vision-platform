@@ -105,6 +105,40 @@ export async function resolveTokenPrice(
   return null;
 }
 
+/**
+ * (model, tokens) → CREDITS, through the one price derivation.
+ *
+ * Every reserve/settle site was hand-rolling these four lines — `real-estate-api/ai.ts` and
+ * `b2b-tools.ts` each carry their own copy, and one of those copies spent months multiplying by a
+ * hardcoded 15.00/75.00 while the row it wrote named a model priced at 5.00/25.00. Same shape as
+ * every other duplicated derivation here: a valid number, disagreeing.
+ *
+ * Returns `null` when the model has no `ai_model_pricing` row. That is NOT zero and must not be
+ * settled as zero — an unpriced model is a gap in the price table, and charging nothing for it is
+ * the silent-zero mistake with the sign flipped. Callers keep their reserved ceiling and say so.
+ */
+export async function creditsForTokens(
+  supabase: DbClient,
+  model: string,
+  inputTokens: number,
+  outputTokens: number,
+): Promise<{ credits: number; rawUsd: number; billedUsd: number; markup: number } | null> {
+  const price = await resolveTokenPrice(supabase, model);
+  if (!price) return null;
+  const rawUsd =
+    (Math.max(0, inputTokens) / 1_000_000) * price.input +
+    (Math.max(0, outputTokens) / 1_000_000) * price.output;
+  const billedUsd = rawUsd * price.markup;
+  return {
+    // CREDITS_PER_USD is 100 and lives in pricing-constants; expressed here as the same
+    // multiplication every other settle site performs, rounded to the cent of a credit.
+    credits: Math.round(billedUsd * 100 * 100) / 100,
+    rawUsd,
+    billedUsd,
+    markup: price.markup,
+  };
+}
+
 // ── DB-driven PER-UNIT pricing overlay ────────────────────────
 // The image and video models are not billed per token — they are billed per image or per
 // second of output, which is why `resolveTokenPrice` above has nothing to say about them and

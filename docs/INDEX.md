@@ -603,6 +603,11 @@ Complete documentation for Material Kai Vision Platform.
 - Cross-tenant `marketplace_listings` browse under Discover (first read-across-workspaces RLS surface)
 - Buyer inquiry bridged into the seller's Inbox; want-list alerts; warehouse-sourced listings + expiry cron
 
+**[project-ai-assessment.md](project-ai-assessment.md)** - AI Assessment for projects ✨ NEW (2026-09) — a paid module that answers "is this on track, and what do I do first?"
+- 38 signals across six dimensions, the dimension scores and the verdict all derived in SQL; the Claude turn only writes about them
+- Every signal is a value or a stated reason there is none — a dimension nothing could judge scores `null` and renders "Not judged", never 0
+- Ranked actions become real `project_tasks` rows (claim-then-create, so a retry cannot cut two); completing the task closes the action
+
 **[purchase-items-doors-windows.md](purchase-items-doors-windows.md)** - Project purchase items (doors/windows) ✨ NEW (2026-06)
 - `project_purchase_items` + `generate-purchase-sheet-pdf` (schedule / per-item spec sheets with door-swing & window glyphs)
 - Quote-referenced (not PO); frontend/agent wiring still pending

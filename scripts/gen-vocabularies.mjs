@@ -87,6 +87,13 @@ export const VOCABULARIES = [
     'supabase/functions/_shared/snagVocabulary.generated.ts',
   ],
   [
+    // AI Assessment (#397) — dimension, severity, signal status, verdict, run status and
+    // action state. Three consumers, not two: SQL derives them, the edge tool feeds them to a
+    // `z.enum` so the model cannot invent a sixth verdict, and the client formats them.
+    'src/modules/projects/assessmentVocabulary.ts',
+    'supabase/functions/_shared/assessmentVocabulary.generated.ts',
+  ],
+  [
     // #391 — trip-expense card type.
     'src/modules/finance/tripExpenseVocabulary.ts',
     'supabase/functions/_shared/tripExpenseVocabulary.generated.ts',

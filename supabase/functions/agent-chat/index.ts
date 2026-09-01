@@ -1198,6 +1198,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // Project Workspace (all users; 0 cr — DB-only)
       'create_project', 'list_my_projects', 'find_project', 'add_task',
       'add_purchase_item', 'generate_purchase_sheet',
+      // AI Assessment (module-gated on `project-assessment`; assess_project is the only paid one)
+      'assess_project', 'get_project_assessment', 'list_assessment_actions', 'apply_assessment_action',
       // Quotes (all users; 0 cr — creates real quotes + branded PDF, opens on canvas)
       'create_quote', 'generate_quote_pdf', 'list_my_quotes', 'raise_quote_request',
       // Generation / design (so JARVIS handles 3D renders, lighting, and VR inline —
@@ -1273,6 +1275,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // Project Workspace — interior designers benefit most from the container
       'create_project', 'list_my_projects', 'find_project', 'add_task',
       'add_purchase_item', 'generate_purchase_sheet',
+      // AI Assessment (module-gated on `project-assessment`; assess_project is the only paid one)
+      'assess_project', 'get_project_assessment', 'list_assessment_actions', 'apply_assessment_action',
       // The ENDING. Vision is the agent a customer describes a room to, and it could take them all
       // the way to a specification and then had no way to price it or record it — so the only
       // available ending was a plausible number it invented, which is the single failure the
@@ -1385,6 +1389,9 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'customer_overview', 'supplier_overview', 'product_price_history',
       'products_in_project', 'projects_using_product', 'price_lookup',
       'create_project', 'list_my_projects', 'find_project',
+      // AI Assessment — Trinity reads the money half of a project, and this is the money half
+      // with a verdict on it. `assess_project` is paid; the other three are DB reads.
+      'assess_project', 'get_project_assessment', 'list_assessment_actions', 'apply_assessment_action',
       // Finance reads + confirm-gated invoice issue (Trinity is the finance agent)
       'manage_finance',
       // Business operating expenses → categorized supplier bill (Payables/AP + P&L)
@@ -2735,6 +2742,33 @@ async function executeAgent(
   }
   if (config.tools.includes('generate_purchase_sheet') && createGeneratePurchaseSheetTool) {
     tools.push(createGeneratePurchaseSheetTool(userId, workspaceId, onChunk));
+  }
+
+  // AI Assessment (module-gated on `project-assessment` inside every tool). Self-contained import
+  // like the graph toolkit below: one more entry in the big Promise.all buys nothing when the
+  // whole cluster is four tools that share one module.
+  //
+  // `assess_project` is the only paid one — it reserves credits and settles against real tokens.
+  // The three readers are DB-only, deliberately: "what should I do next" must not cost money to
+  // ask a second time.
+  if (config.tools.some((t: string) => ['assess_project', 'get_project_assessment', 'list_assessment_actions', 'apply_assessment_action'].includes(t))) {
+    try {
+      const assessMod = await import('../_shared/tools/project-assessment-tools.ts');
+      if (config.tools.includes('assess_project')) {
+        tools.push(assessMod.createAssessProjectTool(userId, workspaceId, onChunk));
+      }
+      if (config.tools.includes('get_project_assessment')) {
+        tools.push(assessMod.createGetProjectAssessmentTool(userId, workspaceId, onChunk));
+      }
+      if (config.tools.includes('list_assessment_actions')) {
+        tools.push(assessMod.createListAssessmentActionsTool(userId, workspaceId, onChunk));
+      }
+      if (config.tools.includes('apply_assessment_action')) {
+        tools.push(assessMod.createApplyAssessmentActionTool(userId, workspaceId, onChunk));
+      }
+    } catch (e) {
+      console.error('[agent-chat] project-assessment tools failed to load:', e);
+    }
   }
 
   // Knowledge-graph traversal (all users; 0 cr — DB-only RPC reads over existing relational edges).

@@ -30,6 +30,10 @@ const read = (p: string) => stripComments(readFileSync(join(ROOT, p), 'utf8').re
 
 const catalogTools = read('supabase/functions/_shared/tools/catalog-tools.ts');
 const projectTools = read('supabase/functions/_shared/tools/project-tools.ts');
+// The workspace-scoped project resolver MOVED here when the AI Assessment toolkit needed the
+// same tenancy binding (#397). This guard follows it rather than quietly stopping: an assertion
+// pointed at a body that no longer exists passes for the wrong reason.
+const projectResolver = read('supabase/functions/_shared/project-assessment.ts');
 const expenseTools = read('supabase/functions/_shared/tools/expense-tools.ts');
 const mentionTools = read('supabase/functions/_shared/tools/mention-tools.ts');
 const jobTools = read('supabase/functions/_shared/tools/job-research-tools.ts');
@@ -92,13 +96,29 @@ describe('#395 — the catalog gate is bound to a workspace', () => {
 
 describe('#395 — a project is reached through its workspace, not just its owner', () => {
   it('the resolver takes the session workspace and filters on it', () => {
-    expect(projectTools).toMatch(
-      /async function resolveProjectId\(\s*userId: string, workspaceId: string \| null, projectId\?: string, projectName\?: string,\s*\)/,
+    expect(projectResolver).toMatch(
+      /export async function resolveProjectId\(\s*supabase: DbClient,\s*userId: string,\s*workspaceId: string \| null,/,
     );
     // Both arms — the explicit id and the fuzzy name.
-    const fn = projectTools.slice(projectTools.indexOf('async function resolveProjectId'), projectTools.indexOf('export const createCreateProjectTool'));
+    const fn = projectResolver.slice(
+      projectResolver.indexOf('export async function resolveProjectId'),
+      projectResolver.indexOf('function modelInput'));
     expect(fn.match(/if \(workspaceId\) q = q\.eq\('workspace_id', workspaceId\);/g) ?? []).toHaveLength(2);
     expect(fn, 'the owner check was dropped instead of joined').toMatch(/\.eq\('user_id', userId\)/);
+  });
+
+  it('there is exactly ONE resolver — project-tools delegates rather than keeping a copy', () => {
+    // Two copies of a tenancy check is how the hole this test closed gets reopened one file over,
+    // which is the only reason the body was allowed to move at all.
+    expect(projectTools).toContain("from '../project-assessment.ts'");
+    // The local wrapper is three lines that call the shared one. A `.from('projects')` inside its
+    // body means the query came back.
+    const at = projectTools.indexOf('async function resolveProjectId');
+    expect(at, 'project-tools.ts no longer has the delegating wrapper').toBeGreaterThan(-1);
+    const wrapper = projectTools.slice(at, projectTools.indexOf('\n}', at) + 2);
+    expect(wrapper).toContain('sbResolveProjectId(');
+    expect(wrapper.includes("from('projects')"),
+      'project-tools.ts has grown its own copy of the resolver again.').toBe(false);
   });
 
   it('the two list/search tools filter on it as well', () => {

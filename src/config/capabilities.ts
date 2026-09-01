@@ -55,6 +55,12 @@ export const CAPABILITIES: readonly CapabilityDef[] = [
   { id: 'presentation-sheet', label: 'Presentation Sheet', hub: 'studio', agentId: 'interior-designer', agentTool: 'generate_presentation_sheet', toolkitId: 'presentation-sheets', recordTable: 'moodboard_presentation_sheets', canvasKind: 'sheet' },
   { id: 'moodboard', label: 'MoodBoards', hub: 'studio', pageRoute: '/moodboard', recordTable: 'moodboards' },
   { id: 'project', label: 'Projects', hub: 'studio', pageRoute: '/projects', agentId: 'kai', agentTool: 'create_project', toolkitId: 'projects', recordTable: 'projects' },
+  // A capability of its own rather than a field on `project`: it is a separately-sold module, it
+  // has its own toolkit, and its records are their own table. Its page surface is the Assessment
+  // tab inside a project, so `pageRoute` is the list the reader lands on — the report itself is
+  // reached through the `project` capability's detail route, which is why the assessment result
+  // chunks map to THAT one in RESULT_TYPE_CAPABILITY below.
+  { id: 'project-assessment', label: 'AI Assessment', hub: 'studio', pageRoute: '/projects', agentId: 'kai', agentTool: 'assess_project', toolkitId: 'project-assessment', recordTable: 'project_assessments', moduleSlug: 'project-assessment' },
   { id: 'catalog', label: 'Catalogs', hub: 'studio', pageRoute: '/catalogs', agentId: 'product-business', agentTool: 'create_catalog', toolkitId: 'catalogs', recordTable: 'presentation_catalogs', canvasKind: 'catalog', moduleSlug: 'presentation-catalogs' },
   // Image Studio — agent-only (no page). Shares the `generation` engine with Interior Design; the
   // nav path adds &generation_mode=image-edit to prime the image pipeline. No distinct agentTool
@@ -136,6 +142,13 @@ export const RESULT_TYPE_CAPABILITY: Record<string, string> = {
   // machinery was already built; `flows_list` simply was not registered to use it.
   flows_list: 'flow',
   reviews_list: 'reviews',
+  // The AI Assessment cards. Without these the report is a dead end in exactly the way `flows_list`
+  // was: it names findings, ranks actions, and offers no way to reach the project any of it is
+  // about. `project` is a DETAIL_ROUTE capability, so the handoff deep-links to /projects/:id
+  // when the payload carries `project_id` — which all three of these do.
+  project_assessment_report: 'project',
+  project_assessment_actions: 'project',
+  project_assessment_action_applied: 'project',
 };
 
 /**

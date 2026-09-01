@@ -27,6 +27,7 @@ import {
   FileStack,
   MessageSquare,
   Layers,
+  Gauge,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -56,6 +57,7 @@ import { TasksAndScheduleTab } from '../components/tabs/TasksAndScheduleTab';
 import { SiteTab } from '../components/tabs/SiteTab';
 import { DocumentsTab } from '../components/tabs/DocumentsTab';
 import { RequestsTab } from '../components/tabs/RequestsTab';
+import { AssessmentTab } from '../components/tabs/AssessmentTab';
 import { TimelineTab } from '../components/tabs/TimelineTab';
 import { SheetsTab } from '../components/tabs/SheetsTab';
 import { ClientViewTab } from '../components/tabs/ClientViewTab';
@@ -101,13 +103,17 @@ const STATUS_TONES: Record<ProjectStatus, string> = {
 const PROJECT_TABS = [
   'overview', 'rooms', 'products', 'moodboards', 'plan', 'purchases', 'quotes', 'billing',
   'finance', 'sheets', 'client-view', 'contracts', 'handover', 'tasks', 'site', 'documents',
-  'requests', 'timeline',
+  'requests', 'assessment', 'timeline',
 ] as const;
 type ProjectTab = typeof PROJECT_TABS[number];
 
 /** Tabs only the owner sees. `finance` needs `finance.manage` on top and is handled separately. */
 const OWNER_ONLY_TABS = new Set<ProjectTab>([
   'products', 'plan', 'purchases', 'billing', 'client-view', 'contracts', 'handover', 'timeline',
+  // An assessment names margin, uncosted labour and overdue invoices. It is an internal document
+  // and a collaborator (the client) must never be handed one — which is also why the two tables
+  // carry no collaborator read policy at all.
+  'assessment',
 ]);
 
 export const ProjectDetailPage: React.FC = () => {
@@ -381,6 +387,12 @@ export const ProjectDetailPage: React.FC = () => {
               <MessageSquare className="h-3.5 w-3.5" />
               Requests
             </TabsTrigger>
+            {isOwner && (
+              <TabsTrigger value="assessment" className="flex items-center gap-2">
+                <Gauge className="h-3.5 w-3.5" />
+                Assessment
+              </TabsTrigger>
+            )}
             {/* Timeline is owner-only — it would expose internal task + status churn to clients. */}
             {isOwner && (
               <TabsTrigger value="timeline" className="flex items-center gap-2">
@@ -415,6 +427,7 @@ export const ProjectDetailPage: React.FC = () => {
           <TabsContent value="site"><SiteTab projectId={project.id} isOwner={isOwner} /></TabsContent>
           <TabsContent value="documents"><DocumentsTab projectId={project.id} isOwner={isOwner} /></TabsContent>
           <TabsContent value="requests"><RequestsTab projectId={project.id} isOwner={isOwner} focusRequestId={sp.get('request')} /></TabsContent>
+          {isOwner && <TabsContent value="assessment"><ModuleTabGate moduleSlug="project-assessment" moduleName="AI Assessment" blurb="Ask whether this project is on track and what to fix first."><AssessmentTab projectId={project.id} isOwner={isOwner} /></ModuleTabGate></TabsContent>}
           {isOwner && <TabsContent value="timeline"><TimelineTab projectId={project.id} /></TabsContent>}
         </Tabs>
       </main>

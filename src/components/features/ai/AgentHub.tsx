@@ -360,6 +360,12 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   doc_saved: 'Document saved',
   doc_suggestion_submitted: 'Edit suggested',
   contract_sent: 'Contract sent for signature',
+  // AI Assessment (#397). All four assessment tools emit one of these, and the two reader tools
+  // are direct-run quick-starts — no model turn, so there is no prose to fall back on. An
+  // unregistered chunk here is a cheerful "done" over a blank screen.
+  project_assessment_report: 'Project assessment',
+  project_assessment_actions: 'Assessment actions',
+  project_assessment_action_applied: 'Action added to the task list',
   // Customer Inbox
   inbox_threads_list: 'Customer conversations',
   inbox_reply_sent: 'Reply sent',

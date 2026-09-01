@@ -148,6 +148,16 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'apply_assessment_action',
+    file: 'supabase/functions/_shared/tools/project-assessment-tools.ts',
+    factory: 'createApplyAssessmentActionTool',
+    description: 'Turn one recommended assessment action into a real task on its project.',
+    params: [
+      { name: 'action_id', type: 'string', optional: false, description: 'The id of the action, from get_project_assessment or list_assessment_actions.' },
+      { name: 'due_date', type: 'string', optional: true, description: 'Due date as YYYY-MM-DD. Defaults to the date the assessment suggested.' },
+    ],
+  },
+  {
     name: 'apply_lighting_preset',
     file: 'supabase/functions/_shared/tools/generation-tools.ts',
     factory: 'createApplyLightingPresetTool',
@@ -155,6 +165,17 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     params: [
       { name: 'preset', type: 'enum', enum: ['golden_hour', 'bright_midday', 'soft_overcast', 'warm_evening', 'night', 'dramatic_spots'], optional: false, description: 'Lighting preset. Map natural language: sunset/sunrise→golden_hour, daylight/noon→bright_midday, cloudy/diffused→soft_overcast, evening/lamps/cosy→warm_evening, night/moonlit→night, showroom/dramatic/accent→dramatic_spots.' },
       { name: 'sourceImageUrl', type: 'string', optional: true, description: 'Public URL of the room image. If omitted, uses the most recently generated/uploaded image.' },
+    ],
+  },
+  {
+    name: 'assess_project',
+    file: 'supabase/functions/_shared/tools/project-assessment-tools.ts',
+    factory: 'createAssessProjectTool',
+    description: 'Run a full AI assessment of one project: derive its health across setup, commercial, financial, schedule, delivery and client signals, then produce a verdict and a ranked list of what to do next. Costs up to … credits…',
+    params: [
+      { name: 'project_id', type: 'string', optional: true, description: 'The project id, when you already have it.' },
+      { name: 'project_name', type: 'string', optional: true, description: 'Part of the project name, e.g. "Athens loft".' },
+      { name: 'today', type: 'string', optional: true, description: 'The user\'s local date as YYYY-MM-DD. Pass it so overdue is judged on their calendar day.' },
     ],
   },
   {
@@ -736,6 +757,16 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'get_project_assessment',
+    file: 'supabase/functions/_shared/tools/project-assessment-tools.ts',
+    factory: 'createGetProjectAssessmentTool',
+    description: 'Read the most recent AI assessment of a project — its verdict, dimension scores, findings and the actions it recommended.',
+    params: [
+      { name: 'project_id', type: 'string', optional: true, description: 'The project id, when you already have it.' },
+      { name: 'project_name', type: 'string', optional: true, description: 'Part of the project name.' },
+    ],
+  },
+  {
     name: 'industrial_facility_search',
     file: 'supabase/functions/_shared/tools/b2b-tools.ts',
     factory: 'createIndustrialFacilitySearchTool',
@@ -760,6 +791,17 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'categorySlug', type: 'string', optional: true, description: 'Restrict search to a category by slug (e.g. "pricing")' },
       { name: 'categoryId', type: 'string', optional: true, description: 'Restrict search to a category by UUID' },
       { name: 'priceDocType', type: 'enum', enum: ['price_list', 'discount_rule', 'contract_terms', 'promotion'], optional: true, description: 'When searching pricing docs, filter by sub-type' },
+    ],
+  },
+  {
+    name: 'list_assessment_actions',
+    file: 'supabase/functions/_shared/tools/project-assessment-tools.ts',
+    factory: 'createListAssessmentActionsTool',
+    description: 'List the actions AI assessments have recommended across the projects, newest report first.',
+    params: [
+      { name: 'project_name', type: 'string', optional: true, description: 'Narrow to projects whose name contains this.' },
+      { name: 'state', type: 'enum', enum: ['open', 'task_created', 'done', 'dismissed'], optional: true, description: 'Which actions to list. Defaults to open.' },
+      { name: 'limit', type: 'number', optional: true, description: 'Maximum actions to return (1-100, default 25).' },
     ],
   },
   {

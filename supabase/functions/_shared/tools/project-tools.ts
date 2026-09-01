@@ -40,41 +40,18 @@ const MODULE_SLUG = 'projects';
 import { serviceClient as svcClient } from '../supabase-client.ts';
 import { moduleGate } from './module-gate.ts';
 /**
- * Resolve project_id from either an explicit id or a fuzzy name, WITHIN THIS WORKSPACE (#395).
- *
- * `project_id` is a model-supplied argument and the client is service-role, so the only thing
- * standing between a turn and another tenant's project was `user_id` — a user identity, not a
- * tenancy binding. Someone who belongs to two workspaces reached, from a workspace-A session,
- * every project they own in workspace B: listed by `list_my_projects`, found by `find_project`,
- * and WRITTEN by `add_task` and `add_purchase_item`. `projects.workspace_id` has been the
- * tenancy column since the table was created — these tools simply never asked for it.
- *
- * Same shape as `loadCatalog` in catalog-tools.ts, and the same resolution: the workspace check
- * is added, the user check stays. Widening access to teammates is a product decision, not part
- * of closing a hole.
- *
- * When both are given, the id takes precedence.
+ * The workspace-scoped project resolver is SHARED with `_shared/project-assessment.ts` (#395,
+ * invariant 1). It used to live here; it was moved when a second toolkit needed exactly the same
+ * tenancy binding, because two copies of a tenancy check is how the hole #395 closed gets
+ * reopened one file over. `sbResolveProjectId` takes the client explicitly — that is the only
+ * difference from the version this replaced.
  */
+import { resolveProjectId as sbResolveProjectId } from '../project-assessment.ts';
+
 async function resolveProjectId(
   userId: string, workspaceId: string | null, projectId?: string, projectName?: string,
 ): Promise<string | null> {
-  const sb = svcClient();
-  if (projectId) {
-    let q = sb.from('projects').select('id').eq('id', projectId).eq('user_id', userId);
-    if (workspaceId) q = q.eq('workspace_id', workspaceId);
-    const { data } = await q.maybeSingle();
-    return (data as any)?.id || null;
-  }
-  if (projectName) {
-    let q = sb.from('projects').select('id').eq('user_id', userId);
-    if (workspaceId) q = q.eq('workspace_id', workspaceId);
-    const { data } = await q
-      .ilike('name', `%${projectName}%`)
-      .order('last_activity_at', { ascending: false })
-      .limit(1);
-    return (data && data[0]?.id) || null;
-  }
-  return null;
+  return await sbResolveProjectId(svcClient(), userId, workspaceId, projectId, projectName);
 }
 
 // ───────────────────────────────────────────────────────────────────────────

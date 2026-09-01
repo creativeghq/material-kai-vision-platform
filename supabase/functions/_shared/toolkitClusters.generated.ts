@@ -122,6 +122,9 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
   'projects': {
     tool_ids: ['create_project', 'list_my_projects', 'find_project', 'add_task', 'add_purchase_item', 'generate_purchase_sheet'],
   },
+  'project-assessment': {
+    tool_ids: ['assess_project', 'get_project_assessment', 'list_assessment_actions', 'apply_assessment_action'],
+  },
   'quotes': {
     tool_ids: ['create_quote', 'generate_quote_pdf', 'list_my_quotes', 'raise_quote_request'],
   },

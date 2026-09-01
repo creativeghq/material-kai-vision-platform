@@ -367,6 +367,42 @@ const KAI_TOOLS: AgentToolEntry[] = [
     ],
   },
 
+  // ── AI Assessment (its own paid module; the reads are free) ───────────
+  {
+    id: 'assess_project', name: 'Assess Project', category: 'Projects',
+    moduleSlug: 'project-assessment',
+    desc: 'Analyse a project across setup, commercial, financial, schedule, delivery and client health, then say whether it is on track and what to do first. Costs credits.',
+    examples: [
+      'Assess the Athens loft renovation',
+      'Is the Kavouri villa project on track?',
+    ],
+  },
+  {
+    id: 'get_project_assessment', name: 'Latest Assessment', category: 'Projects',
+    moduleSlug: 'project-assessment',
+    desc: 'Read the most recent assessment of a project — verdict, scores, findings and recommended actions. Free.',
+    examples: [
+      'What did the last assessment of the Athens loft say?',
+    ],
+  },
+  {
+    id: 'list_assessment_actions', name: 'Outstanding Actions', category: 'Projects',
+    moduleSlug: 'project-assessment',
+    desc: 'List what the assessments have recommended across your projects and what is still open. Free.',
+    examples: [
+      'What do my project assessments say I should do?',
+      'Show the open assessment actions',
+    ],
+  },
+  {
+    id: 'apply_assessment_action', name: 'Action to Task', category: 'Projects',
+    moduleSlug: 'project-assessment',
+    desc: 'Turn one recommended action into a real task on its project. Free, and safe to retry.',
+    examples: [
+      'Add the first recommended action to the task list',
+    ],
+  },
+
   // ── Quotes (all users; 0 credits) ─────────────────────────────────
   {
     id: 'create_quote', name: 'Create Quote', category: 'Quotes',
@@ -2588,6 +2624,50 @@ export const TOOLKITS: ToolkitDefinition[] = [
     ],
   },
   {
+    id: 'project-assessment',
+    name: 'AI Assessment',
+    description: 'Ask whether a project is on track and what to do first. The signals — budget, margin, overdue tasks, unbilled quotes, open snags, client requests — are derived in SQL; the AI reads them and writes the verdict and the plan. Running one costs credits; reading the last one and turning an action into a task do not.',
+    icon: 'Gauge',
+    moduleSlug: 'project-assessment',
+    tool_ids: [
+      'assess_project', 'get_project_assessment', 'list_assessment_actions', 'apply_assessment_action',
+    ],
+    quick_starts: [
+      {
+        // The only paid one in this cluster, and the copy says so — a quick-start that spends
+        // credits without saying it is the shape people learn to distrust.
+        label: 'Assess a project', description: 'Full review — costs credits', icon: 'Gauge',
+        prompt: 'Assess one of my projects.',
+        done: "I've assessed that project.",
+        run: { tool: 'assess_project' },
+        autoFields: true,
+        form: [
+          { key: 'project_name', label: 'Project', placeholder: 'Athens loft renovation', kind: 'text', required: true },
+        ],
+      },
+      {
+        label: 'Last assessment', description: 'Read the most recent report', icon: 'FileSearch',
+        prompt: 'Show the latest assessment for one of my projects.',
+        done: 'Here is the latest assessment.',
+        run: { tool: 'get_project_assessment' },
+        autoFields: true,
+        form: [
+          { key: 'project_name', label: 'Project', placeholder: 'Athens loft renovation', kind: 'text', required: true },
+        ],
+      },
+      {
+        // autoFields: `state` is a z.enum on the tool, so the select derives from the manifest
+        // rather than being mirrored here — which is how two of these ended up offering values
+        // no enum accepted.
+        label: 'What needs doing', description: 'Open actions across every project', icon: 'ListChecks',
+        prompt: 'What do my project assessments say still needs doing?',
+        done: 'Here is what is still open.',
+        run: { tool: 'list_assessment_actions' },
+        autoFields: true,
+      },
+    ],
+  },
+  {
     id: 'quotes',
     name: 'Quotes',
     description: 'Build client quotes from chat: add catalog or custom products (e.g. 75 sqm at €34/sqm), auto-price + VAT, generate the branded PDF, and open it on the canvas. Saved to the Quotes module. When the catalogue cannot price something, record it as an unpriced request instead of guessing.',
@@ -3454,6 +3534,7 @@ export const TOOLKIT_HUB: Record<string, HubId> = {
   'trip-expenses': 'finance', expenses: 'finance', 'company-assets': 'finance',
   // Studio
   catalogs: 'studio', 'presentation-sheets': 'studio', projects: 'studio', generation: 'studio',
+  'project-assessment': 'studio',
   // People
   hr: 'people', 'my-hr': 'people',
 };
@@ -3584,6 +3665,8 @@ export const TOOLKIT_AGENTS: Record<string, string[]> = {
   // Studio / interior → Vision
   generation: ['interior-designer'], 'presentation-sheets': ['interior-designer'],
   projects: ['interior-designer', 'erp'],
+  // Same two owners as the projects cluster: Vision runs the engagement, Trinity reads its money.
+  'project-assessment': ['interior-designer', 'erp'],
   // Contracts → Trinity (finance/legal) — also on kai via the generalist
   contracts: ['erp'],
   // Admin/analysis helpers
