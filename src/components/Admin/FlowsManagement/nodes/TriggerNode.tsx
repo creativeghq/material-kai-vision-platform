@@ -1,7 +1,7 @@
 import React, { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import {
-  Zap, Globe, UserPlus, Clock, FileText, Hand, Tag,
+  Zap, Globe, UserPlus, Clock, FileText, Hand, Tag, BellRing,
   LogIn, CheckCircle2, XCircle, ClipboardCheck, Image, FileCheck, Package,
   MessageSquarePlus, MessageSquareReply,
   Search, Box, Orbit,
@@ -79,6 +79,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   'inbox.message_received': Inbox,
   'inbox.thread_assigned': UserPlus,
   'inbox.thread_labeled': Tag,
+  'inbox.follow_up_due': BellRing,
   'inbox.order_intake_ready': ShoppingCart,
   review_received: Star,
   marketplace_want_match: Package,

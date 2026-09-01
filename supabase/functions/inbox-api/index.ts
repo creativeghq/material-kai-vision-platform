@@ -1069,11 +1069,23 @@ async function insertMessageAndNotify(
   const preview = (messageType === 'note' || messageType === 'system')
     ? undefined
     : (body ? body.replace(/\s+/g, ' ').slice(0, 140) : '[attachment]');
+  /*
+   * The STATUS is not set here any more, and that is the point.
+   *
+   * This line used to be `status: 'open'` unconditionally, and two other writers said the same
+   * thing in their own words — the Zernio social refresh and the inbound-email handler. Three
+   * copies of one rule, all three wrong in the same way: our OWN reply, an agent reply and even a
+   * private note reopened the conversation. Which is exactly backwards for Follow-up, because the
+   * moment you mark a thread "chase this" is right after you answered it.
+   *
+   * `inbox_message_moves_thread_state` (an AFTER INSERT trigger on `inbox_messages`) owns it now,
+   * so a fourth writer cannot get it wrong and the rule is readable in one place. Only
+   * `last_message_at` and the preview belong to the caller.
+   */
   await db
     .from('inbox_threads')
     .update({
       last_message_at: new Date().toISOString(),
-      status: 'open',
       ...(preview !== undefined ? { last_message_preview: preview } : {}),
     })
     .eq('id', threadId);
@@ -3201,6 +3213,112 @@ async function handleJwtAction(
       return json({ ok: true });
     }
 
+    /*
+     * set_follow_up — "bring this back on Thursday", and optionally "chase them if they have not
+     * replied by then".
+     *
+     * ONE mechanism for both halves of what the operator asked for. A reminder is a follow-up
+     * with no message; an automatic chase is the same row with `follow_up_message` set. "Send it
+     * if there is no reply in X days" needs no separate concept either: the customer replying is
+     * what CANCELS it, and that cancellation lives in the message trigger, so it happens whatever
+     * channel the reply came in on and whichever function wrote it.
+     *
+     * Setting one moves the thread to Follow-up, because that IS the Follow-up bucket — a status
+     * with no date was the shelf nobody walked past.
+     */
+    case 'set_follow_up': {
+      const threadId = String(payload.thread_id || '');
+      if (!threadId) throw new HttpError(400, 'thread_id is required');
+
+      const thread = await getThreadOrThrow(db, threadId);
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      assertThreadVisible(access);
+      if (!access.isMember) throw new HttpError(403, 'Only members may set a follow-up');
+
+      // Either an explicit moment or a number of days. `days` is the form the operator actually
+      // thinks in ("chase them in 3 days") and is resolved here rather than in the browser, so a
+      // client with a wrong clock cannot schedule a chase into the past.
+      let at: Date;
+      if (payload.at) {
+        at = new Date(String(payload.at));
+        if (Number.isNaN(at.getTime())) throw new HttpError(400, 'at is not a valid date');
+      } else if (payload.days != null) {
+        const days = Number(payload.days);
+        if (!Number.isFinite(days) || days <= 0 || days > 365) {
+          throw new HttpError(400, 'days must be between 1 and 365');
+        }
+        at = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+      } else {
+        throw new HttpError(400, 'at or days is required');
+      }
+      if (at.getTime() < Date.now() - 60_000) {
+        throw new HttpError(400, 'That follow-up time has already passed');
+      }
+
+      const message = typeof payload.message === 'string' && payload.message.trim()
+        ? payload.message.trim().slice(0, 4000)
+        : null;
+      const note = typeof payload.note === 'string' && payload.note.trim()
+        ? payload.note.trim().slice(0, 500)
+        : null;
+
+      const { error } = await db.from('inbox_threads').update({
+        follow_up_at: at.toISOString(),
+        follow_up_note: note,
+        follow_up_message: message,
+        follow_up_set_by: userId,
+        // Re-arming clears the previous outcome: a new follow-up has not fired and has not failed.
+        follow_up_fired_at: null,
+        follow_up_error: null,
+        status: 'snoozed',
+      }).eq('id', threadId);
+      if (error) throw new HttpError(500, `Could not set the follow-up: ${error.message}`);
+
+      /*
+       * WhatsApp will refuse an automatic send outside Meta's 24-hour service window, and a
+       * follow-up is almost always days away — so for most WhatsApp threads the chase CANNOT go
+       * out and the reminder is what actually happens.
+       *
+       * Returned as a warning at the moment of scheduling, not discovered three days later. The
+       * alternative is the operator believing a message went out that never did, which is the
+       * same shape as a sent bubble for a message Meta refused.
+       */
+      let warning: string | null = null;
+      if (message && thread.channel === 'whatsapp') {
+        const w = await whatsappWindow(db, threadId, thread);
+        const windowEndsMs = w.expires_at ? new Date(w.expires_at).getTime() : 0;
+        if (!w.open || at.getTime() > windowEndsMs) {
+          warning = 'WhatsApp only accepts a freeform message inside the 24-hour service window, '
+            + 'which will have closed by then. You will be reminded, and the message will not be '
+            + 'sent unless the customer writes again first.';
+        }
+      }
+      return json({ ok: true, follow_up_at: at.toISOString(), warning });
+    }
+
+    /* clear_follow_up — call it off. The thread goes back to Open, since Follow-up with no date
+     * is the state this whole change exists to remove. */
+    case 'clear_follow_up': {
+      const threadId = String(payload.thread_id || '');
+      if (!threadId) throw new HttpError(400, 'thread_id is required');
+      const thread = await getThreadOrThrow(db, threadId);
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      assertThreadVisible(access);
+      if (!access.isMember) throw new HttpError(403, 'Only members may clear a follow-up');
+
+      const { error } = await db.from('inbox_threads').update({
+        follow_up_at: null,
+        follow_up_note: null,
+        follow_up_message: null,
+        follow_up_set_by: null,
+        follow_up_fired_at: null,
+        follow_up_error: null,
+        ...(thread.status === 'snoozed' ? { status: 'open' } : {}),
+      }).eq('id', threadId);
+      if (error) throw new HttpError(500, `Could not clear the follow-up: ${error.message}`);
+      return json({ ok: true });
+    }
+
     case 'list_labels': {
       const workspaceId = String(payload.workspace_id || '');
       if (!workspaceId) throw new HttpError(400, 'workspace_id is required');
@@ -4688,6 +4806,61 @@ async function handler(req: Request): Promise<Response> {
   // this, every operator reply on a connected thread relayed with an empty bearer and came back
   // 401 — stored, shown in the transcript, never delivered.
   await ensureZernioSecrets(db);
+
+  /*
+   * internal_send_follow_up — the scheduled chase, sent by the cron as the person who scheduled it.
+   *
+   * A separate entry point rather than `send_message` with a borrowed identity, because
+   * `send_message` requires a real JWT and a cron has no session to present at 4am. Impersonating
+   * through the ordinary action would mean making it accept a body-supplied `user_id`, which is
+   * invariant 1 in reverse — so the impersonation lives HERE, behind the service-role bearer,
+   * where it is one narrow thing a cron does and not a field on the endpoint everybody calls.
+   *
+   * Everything else is the ordinary send path: the same 24-hour window check, the same
+   * `insertMessageAndNotify` (relay, notify, receipts). A follow-up that skipped it would be a
+   * message the operator can see and the customer never got.
+   */
+  if (action === 'internal_send_follow_up') {
+    const authHeader = req.headers.get('authorization') || '';
+    if (authHeader !== `Bearer ${SERVICE_ROLE_KEY}`) throw new HttpError(401, 'Unauthorized');
+
+    const threadId = String(payload.thread_id || '');
+    const body = String(payload.body || '').trim();
+    const senderUserId = String(payload.sender_user_id || '');
+    if (!threadId || !body || !senderUserId) {
+      throw new HttpError(400, 'thread_id, body and sender_user_id are required');
+    }
+
+    const thread = await getThreadOrThrow(db, threadId);
+
+    // The scheduler must still be on the workspace. Somebody who has left cannot be made to send
+    // a message months later, and a departed colleague's name on a fresh customer message is a
+    // worse failure than the chase not going out.
+    const role = await callerRoleInWorkspace(db, senderUserId, String(thread.workspace_id));
+    if (!role) throw new HttpError(403, 'The person who scheduled this is no longer on the workspace');
+
+    if (thread.channel === 'whatsapp') {
+      const w = await whatsappWindow(db, threadId, thread);
+      if (!w.open) {
+        // 409, and named. This is the EXPECTED outcome for most WhatsApp follow-ups — the window
+        // is 24 hours and a chase is days away — so it has to arrive at the operator as a fact
+        // about Meta's rules rather than as "something went wrong".
+        throw new HttpError(409, 'WhatsApp 24h service window is closed — a freeform follow-up cannot be sent. An approved template is required.');
+      }
+    }
+
+    const senderParticipantId = await ensureMemberParticipant(db, thread, senderUserId);
+    const msg = await insertMessageAndNotify(db, {
+      thread,
+      senderParticipantId,
+      body,
+      attachments: [],
+      messageType: 'text',
+      senderUserId,
+      senderLabel: 'Follow-up sent',
+    });
+    return json({ ok: true, message_id: (msg as { id?: string }).id ?? null });
+  }
 
   // Internal branch — function-to-function (e.g. the Zernio webhook after a WhatsApp inbound).
   // Guarded by the service-role bearer; never reachable by external callers.

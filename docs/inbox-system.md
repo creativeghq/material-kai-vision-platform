@@ -199,12 +199,66 @@ Two JWT actions let the [Surplus Marketplace](surplus-marketplace.md) cross the 
 
 ---
 
+## 7b. Status — Open / Follow-up / Done
+
+`inbox_threads.status` is `open | snoozed | closed`; the UI calls them **Open / Follow-up / Done**
+in both the setter and the tabs. (It used to say "Snoozed / Closed" in the dropdown and
+"Follow-up / Done" in the tabs beside it — one enum, two vocabularies, on one screen.)
+
+### What moves a conversation between them
+
+One implementation: the `inbox_message_moves_thread_state` trigger on `inbox_messages`. It used to
+be written out three times — inbox-api's `insertMessageAndNotify`, the Zernio social-thread
+refresh and the inbound-email handler — and all three said the same wrong thing, that any message
+forces `open`.
+
+| The message | What happens |
+|---|---|
+| A private **note**, or a **system** event | Nothing. A note is internal; a system event is not somebody talking. |
+| From the **customer** | → **Open**, from any status, and any pending follow-up is **cancelled**. They replied; there is nothing left to chase. |
+| From **us** (member or agent) | → **Open** only from **Done**. "We are talking again, so it is not finished." From Follow-up it changes nothing — we are still waiting on them, and the automatic chase must not cancel the state that scheduled it. |
+
+A sender with no participant row at all (a social commenter, a DM handle) counts as the customer:
+they are the other side by definition.
+
+### Follow-up is a moment, and optionally a message
+
+`follow_up_at` is when the conversation comes back to Open by itself. `follow_up_message`, if set,
+is sent then — which is how "chase them if they have not replied in X days" is expressed: there is
+no separate concept, because *the customer replying is what cancels it*, and that cancellation is
+in the trigger above, so it works whatever channel they answer on.
+
+- Set it with `set_follow_up` (`at` or `days`, plus `note` and `message`); `clear_follow_up` calls
+  it off and returns the thread to Open.
+- `inbox-follow-up-cron` runs every 5 minutes. `claim_due_inbox_follow_ups` stamps
+  `follow_up_fired_at` **in the same statement that selects the row** — the send half cannot be
+  rolled back, so a retry must not chase the same customer twice.
+- The chase goes through inbox-api `internal_send_follow_up` (service-role only), i.e. the
+  ordinary send path: same 24h window check, same channel relay. A cron that inserted into
+  `inbox_messages` itself would produce a message the operator can see and the customer never got.
+- The thread returns to Open **whether or not the message went**. A chase Meta refused needs
+  somebody more than one that worked, not less — and `follow_up_fired_at` is already stamped, so
+  leaving it parked would strand it having fired, never to fire again.
+
+**On WhatsApp the automatic send usually cannot happen.** Meta accepts a freeform message only
+inside 24 hours of the customer's last one, and a follow-up is normally days away. That is said at
+the moment of scheduling (`set_follow_up` returns a `warning`, and the composer repeats it beside
+the checkbox), and a refusal is recorded in `follow_up_error` and shown in the conversation —
+never swallowed.
+
+Guarded by [tests/unit/inboxFollowUp.test.ts](../tests/unit/inboxFollowUp.test.ts).
+
+---
+
 ## 8. Notifications
 
 Delivery goes through the [Flows](flows-notification-system.md) engine, not hardcoded sends:
 
 - `inbox.message_received` — bell (+ email, #224) to every **other** active participant with an account (members always; notes to members only; pure token customers get none). Carries `workspace_id` (#256) so tenant flows can scope to it, plus `action_url=/inbox?thread={id}`.
 - `inbox.thread_assigned` — fired when a user is added to a thread or a WhatsApp thread is assigned to its owner.
+- `inbox.follow_up_due` — a scheduled follow-up came due. Fires whether the chase went out or
+  not; `message_sent` and `error` on the payload separate the two, so "only tell me about the ones
+  that failed" is a condition rather than a second trigger.
 - `inbox.thread_labeled` — a label was **added** to a conversation (removals do not fire, and the
   event names only the labels that went on). Carries `label_names` / `all_label_names` as well as
   the ids: a flow condition is written by a person looking at their own labels, and a uuid in a

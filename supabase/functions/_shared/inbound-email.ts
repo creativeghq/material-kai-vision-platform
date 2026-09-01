@@ -725,8 +725,10 @@ export async function deliverToInbox(
       action_url: `/inbox?thread=${threadId}`, thread_id: threadId,
     }).catch(() => {});
   } else {
+    // `status` is the trigger's (`inbox_message_moves_thread_state`) — an inbound email is a
+    // customer message, so it reopens, but that is decided in one place for every channel.
     await db.from('inbox_threads')
-      .update({ metadata: meta, status: 'open', last_message_at: new Date().toISOString() })
+      .update({ metadata: meta, last_message_at: new Date().toISOString() })
       .eq('id', threadId);
     if (customer.contactId) {
       const { data: cp } = await db

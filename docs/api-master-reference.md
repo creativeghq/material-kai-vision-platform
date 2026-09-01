@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (137)
+## 1. Supabase Edge Functions (138)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -223,6 +223,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | Function | Auth | Summary |
 |---|---|---|
 | `inbox-api` | JWT / token / secret | Multi-tenant unified inbox: threads, participants, messages, agent takeover |
+| `inbox-follow-up-cron` | cron | Fire due inbox follow-ups: send the scheduled chase and put the conversation back in Open |
 | `messaging-api` | JWT / secret | WhatsApp messaging via Zernio — send, bulk send, channel management, and analytics. |
 | `messaging-processor` | cron | Cron-invoked processor that advances scheduled WhatsApp campaigns per-recipient. |
 

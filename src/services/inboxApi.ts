@@ -65,6 +65,23 @@ export interface InboxThread {
    * older deploy, in which case the client hashes the seed itself and gets the whole cast.
    */
   counterparty_avatar_slot?: number | null;
+  /**
+   * When this conversation comes back to Open by itself. NULL = no follow-up pending.
+   *
+   * This is what makes the Follow-up tab a queue rather than a shelf: the status alone had no
+   * date and nothing ever brought a thread back, so nobody used it.
+   */
+  follow_up_at?: string | null;
+  /** What to chase, in the operator's own words — shown on the reminder. */
+  follow_up_note?: string | null;
+  /** Sent automatically when `follow_up_at` arrives. NULL = remind me only, send nothing. */
+  follow_up_message?: string | null;
+  /**
+   * Why the automatic message did not go out — almost always Meta's 24-hour window having
+   * closed, which is not a bug and is the operator's to act on. Recorded rather than swallowed.
+   */
+  follow_up_error?: string | null;
+  follow_up_fired_at?: string | null;
 }
 
 export interface InboxThreadAssignee {
@@ -490,6 +507,39 @@ export const inboxApi = {
    */
   linkPreview(thread_id: string, url: string) {
     return call<{ preview: InboxLinkPreview }>('link_preview', { thread_id, url });
+  },
+
+  // ── Follow-up: bring this back, and optionally chase them ──
+
+  /**
+   * "Remind me on Thursday", and optionally "send this if they have not replied by then".
+   *
+   * ONE mechanism for both: a reminder is a follow-up with no `message`. "Send it if there is no
+   * reply in X days" needs no third concept either — the customer replying is what cancels it,
+   * and that cancellation lives in a database trigger, so it happens whatever channel the reply
+   * arrives on.
+   *
+   * Pass `at` (an absolute instant) rather than `days` from the browser: the client knows the
+   * operator's timezone and can offset a calendar day correctly across a DST boundary, where the
+   * server — whose session is UTC — can only add 24 hours.
+   *
+   * `warning` comes back when the chase cannot work: on WhatsApp a freeform message is only
+   * accepted inside Meta's 24-hour service window, and a follow-up is usually days away. Said at
+   * the moment of scheduling, because the alternative is believing for three days that something
+   * will be sent.
+   */
+  setFollowUp(input: {
+    thread_id: string;
+    at?: string;
+    days?: number;
+    note?: string;
+    message?: string;
+  }) {
+    return call<{ ok: boolean; follow_up_at: string; warning: string | null }>('set_follow_up', input);
+  },
+  /** Call it off. The thread returns to Open — Follow-up with no date is the state this removes. */
+  clearFollowUp(thread_id: string) {
+    return call<{ ok: boolean }>('clear_follow_up', { thread_id });
   },
 
   // ── Acting on one message ──

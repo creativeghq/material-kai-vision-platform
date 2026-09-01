@@ -97,6 +97,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'hr-checkin-cron', label: 'hr-checkin-cron', sublabel: 'Cron: fire late check-in alerts for employees who haven\'t clocked in' },
   { id: 'hr-kiosk', label: 'hr-kiosk', sublabel: 'Public attendance kiosk — VAT (+ optional PIN) clock in/out' },
   { id: 'inbox-api', label: 'inbox-api', sublabel: 'Multi-tenant unified inbox: threads, participants, messages, agent takeover' },
+  { id: 'inbox-follow-up-cron', label: 'inbox-follow-up-cron', sublabel: 'Every-5-minute cron: fire due inbox follow-ups — send the scheduled chase and return the conversation to Open' },
   { id: 'job-cleanup-cron', label: 'job-cleanup-cron', sublabel: 'Weekly cron (Sunday 03:00 UTC): purge old completed/failed jobs and logs' },
   { id: 'kb-embedding-backfill', label: 'kb-embedding-backfill', sublabel: 'Backfill Voyage embeddings for knowledge-base documents missing them' },
   { id: 'kb-generate-embedding', label: 'kb-generate-embedding', sublabel: 'Generate or regenerate a Voyage AI 1024D embedding for a kb_docs row' },

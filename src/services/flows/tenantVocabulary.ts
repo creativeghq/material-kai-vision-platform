@@ -48,7 +48,7 @@ export const TENANT_TRIGGERS = [
   'pricing_change_requested', 'pricing_change_decided',
   // Inbox
   'inbox.message_received', 'inbox.thread_assigned', 'inbox.order_intake_ready',
-  'inbox.thread_labeled',
+  'inbox.thread_labeled', 'inbox.follow_up_due',
   // CRM, deals & contracts
   'crm_contact_created', 'crm_company_created', 'contract_signed', 'review_received',
   'deal_won', 'deal_lost', 'deal_stage_changed',

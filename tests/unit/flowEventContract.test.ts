@@ -233,7 +233,7 @@ describe('tenant flow vocabulary', () => {
     'upstream_order_created', 'rfq_lines_requested', 'rfq_lines_priced', 'inventory_low_stock',
     'pricing_change_requested', 'pricing_change_decided',
     'inbox.message_received', 'inbox.thread_assigned', 'inbox.order_intake_ready',
-    'inbox.thread_labeled',
+    'inbox.thread_labeled', 'inbox.follow_up_due',
     'crm_contact_created', 'crm_company_created', 'contract_signed', 'review_received',
     'deal_won', 'deal_lost', 'deal_stage_changed',
     'hr.employee_added', 'hr.departure_recorded', 'hr.absence_requested', 'hr.absence_reviewed',

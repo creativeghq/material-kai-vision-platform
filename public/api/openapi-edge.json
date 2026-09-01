@@ -15248,6 +15248,94 @@
                       }
                     },
                     "description": "Returns: {ok, already?}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "thread_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "set_follow_up"
+                        ],
+                        "description": "Bring this conversation back to Open at a given moment, and optionally send a message then if the customer has not replied. Moves the thread to Follow-up"
+                      },
+                      "thread_id": {
+                        "type": "string",
+                        "description": "string (uuid)"
+                      },
+                      "at": {
+                        "type": "string",
+                        "description": "When it fires. Prefer this over `days` from a browser — the client knows the operator’s timezone and can offset a calendar day across DST (string (ISO 8601 instant))"
+                      },
+                      "days": {
+                        "type": "string",
+                        "description": "Alternative to `at`, resolved server-side as now + N × 24h (integer (1–365))"
+                      },
+                      "note": {
+                        "type": "string",
+                        "description": "What to chase, shown on the reminder (string (≤500))"
+                      },
+                      "message": {
+                        "type": "string",
+                        "description": "Sent automatically when it fires. Omit for a reminder only. On WhatsApp the response carries a `warning` when Meta’s 24h window will have closed by then (string (≤4000))"
+                      }
+                    },
+                    "description": "Returns: {ok, follow_up_at, warning}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "thread_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "clear_follow_up"
+                        ],
+                        "description": "Call off a pending follow-up. The thread returns to Open"
+                      },
+                      "thread_id": {
+                        "type": "string",
+                        "description": "string (uuid)"
+                      }
+                    },
+                    "description": "Returns: {ok}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "thread_id",
+                      "body",
+                      "sender_user_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "internal_send_follow_up"
+                        ],
+                        "description": "SERVICE-ROLE ONLY (inbox-follow-up-cron). Send a scheduled follow-up as the member who scheduled it, through the ordinary send path — same 24h window check, same channel relay"
+                      },
+                      "thread_id": {
+                        "type": "string",
+                        "description": "string (uuid)"
+                      },
+                      "body": {
+                        "type": "string"
+                      },
+                      "sender_user_id": {
+                        "type": "string",
+                        "description": "Must still be a member of the thread’s workspace, or 403 (string (uuid))"
+                      }
+                    },
+                    "description": "Returns: {ok, message_id} — 409 when the WhatsApp service window is closed"
                   }
                 ],
                 "discriminator": {
@@ -26188,6 +26276,73 @@
         "security": [
           {
             "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/inbox-follow-up-cron": {
+      "post": {
+        "tags": [
+          "Messaging"
+        ],
+        "summary": "Fire due inbox follow-ups: send the scheduled chase and put the conversation back in Open",
+        "operationId": "post_inbox_follow_up_cron",
+        "description": "Runs every 5 minutes (pg_cron `inbox-follow-ups-due`). Claims due rows with `claim_due_inbox_follow_ups`, which stamps `follow_up_fired_at` in the SAME statement that selects them — the send half cannot be rolled back, so a retry must not chase the same customer twice. Sends via inbox-api `internal_send_follow_up` (so the WhatsApp 24h window and the channel relay both apply), then returns the thread to Open whether or not the message went, and emits `inbox.follow_up_due`. A refused send is recorded in `inbox_threads.follow_up_error` rather than swallowed.",
+        "security": [
+          {
+            "cronSecret": []
           }
         ],
         "responses": {

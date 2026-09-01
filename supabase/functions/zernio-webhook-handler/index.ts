@@ -1215,8 +1215,11 @@ async function findOrCreateSocialThread(supabase: any, params: {
     .limit(1).maybeSingle();
 
   if (existing?.id) {
+    // No `status` here: `inbox_message_moves_thread_state` decides that from the message that
+    // is about to be inserted, so a Done thread reopens on a real comment and not on our own
+    // reply to one. This used to force `open` a beat BEFORE the message existed, which also made
+    // it fire for a message that then failed to insert.
     const { error } = await supabase.from('inbox_threads').update({
-      status: 'open',
       last_message_at: params.at,
       metadata: { ...params.metadata, external_key: params.externalKey },
     }).eq('id', existing.id);

@@ -70,6 +70,10 @@ export type TriggerType =
   // A conversation was tagged. The payload carries the label NAMES, so "tell me when something
   // is marked Urgent" is a condition on the flow rather than a config field nobody would find.
   | 'inbox.thread_labeled'
+  // A follow-up came due: the conversation is back in Open, and the chase either went out or
+  // could not. Both outcomes fire — a follow-up that WhatsApp refused needs somebody more than
+  // one that worked, not less.
+  | 'inbox.follow_up_due'
   // #342: an order was read out of a customer conversation and is waiting for approval
   | 'inbox.order_intake_ready'
   // A review was left on a connected platform profile (Google Business). A low rating is the
@@ -340,6 +344,12 @@ export interface InboxThreadAssignedTriggerConfig {}
  * vocabulary.
  */
 export interface InboxThreadLabeledTriggerConfig {}
+/**
+ * No config. The payload carries `message_sent` and `error`, so "only tell me when the chase
+ * failed" is a condition on the flow — which is also the only form that survives a new failure
+ * mode being added later.
+ */
+export interface InboxFollowUpDueTriggerConfig {}
 export interface InboxOrderIntakeReadyTriggerConfig {}
 export interface ReviewReceivedTriggerConfig {
   /**
@@ -548,6 +558,7 @@ export type TriggerConfigMap = {
   'inbox.message_received': InboxMessageReceivedTriggerConfig;
   'inbox.thread_assigned': InboxThreadAssignedTriggerConfig;
   'inbox.thread_labeled': InboxThreadLabeledTriggerConfig;
+  'inbox.follow_up_due': InboxFollowUpDueTriggerConfig;
   'inbox.order_intake_ready': InboxOrderIntakeReadyTriggerConfig;
   review_received: ReviewReceivedTriggerConfig;
   marketplace_want_match: MarketplaceWantMatchTriggerConfig;

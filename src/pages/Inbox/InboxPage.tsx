@@ -8,6 +8,7 @@ import {
   User as UserIcon, MessagesSquare, Settings2, ArrowLeft, CheckCircle2, Wallet, EyeOff, Eye, Reply,
   Archive, ArchiveRestore, Trash2, Sparkles, Check, CheckCheck, Link2,
   MoreHorizontal, Forward, Pin, PinOff, Star, StickyNote as StickyNoteIcon,
+  BellRing, CalendarClock,
   ShoppingCart, AlertTriangle, ExternalLink, Image as ImageIcon, CookingPot,
   Smile, Copy, Download,
 } from 'lucide-react';
@@ -966,6 +967,10 @@ const InboxPage: React.FC = () => {
         canManage={canManageLabels}
         onChanged={() => { loadThreads(); loadLabels(); }}
       />
+      <FollowUpButton
+        thread={activeThread}
+        onChanged={() => { void openThread(activeThread.id); loadThreads({ silent: true }); }}
+      />
       {activeThread.thread_type !== 'internal' && (
         <Button
           variant="outline" size="icon" className="h-9 w-9"
@@ -1007,9 +1012,13 @@ const InboxPage: React.FC = () => {
           setActiveThread({ ...activeThread, status });
         }}
       >
+        {/* The words the TABS use, because they are the same three values and a control that
+            names them differently from the thing you filter by is two vocabularies for one
+            enum. "Snoozed" also promised something that did not exist until follow-ups had a
+            date: a thread that comes back on its own. */}
         <option value="open">Open</option>
-        <option value="snoozed">Snoozed</option>
-        <option value="closed">Closed</option>
+        <option value="snoozed">Follow-up</option>
+        <option value="closed">Done</option>
       </select>
     </>
   ) : null;
@@ -1425,6 +1434,53 @@ const InboxPage: React.FC = () => {
                 </Button>
               </div>
 
+              {activeThread.follow_up_at && !activeThread.follow_up_fired_at && (
+                /* Above the scroller, like the pin: a follow-up you cannot see is the shelf
+                   this feature exists to replace. It states the three things that decide what
+                   to do — when, what you wrote to your future self, and whether a message is
+                   going out on its own. */
+                <div className="shrink-0 flex items-start gap-2 px-4 py-2 border-b border-hairline
+                                bg-[hsl(var(--warning-bg))] text-warning">
+                  <CalendarClock className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  <div className="min-w-0 flex-1 text-xs">
+                    <div className="font-medium">
+                      Following up {formatDate(activeThread.follow_up_at)} at {formatTime(activeThread.follow_up_at)}
+                      {activeThread.follow_up_message ? ' — sending automatically' : ''}
+                    </div>
+                    {activeThread.follow_up_note && (
+                      <div className="opacity-90 truncate">{activeThread.follow_up_note}</div>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    className="text-xs underline underline-offset-2 shrink-0"
+                    onClick={async () => {
+                      try {
+                        await inboxApi.clearFollowUp(activeThread.id);
+                        void openThread(activeThread.id);
+                        loadThreads({ silent: true });
+                      } catch (e) {
+                        toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' });
+                      }
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+              {activeThread.follow_up_error && (
+                /* The chase did NOT go out. Louder than the banner above and kept until the
+                   next follow-up is set, because the operator now has to do by hand the thing
+                   they scheduled — and the commonest reason (Meta's 24h window) is fixable
+                   only by them. */
+                <div className="shrink-0 flex items-start gap-2 px-4 py-2 border-b border-hairline
+                                bg-destructive/10 text-destructive text-xs">
+                  <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  <span className="min-w-0 flex-1">
+                    Your follow-up message was not sent — {activeThread.follow_up_error}
+                  </span>
+                </div>
+              )}
               {pinnedMessage && (
                 <button
                   type="button"
@@ -4577,6 +4633,205 @@ const LabelManagerPopover: React.FC<{
               {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
             </Button>
           </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
+/**
+ * "Bring this back on Thursday" — and, if you want, "chase them if they have not replied by then".
+ *
+ * ── Why the two are one control ──
+ * A reminder and an automatic chase are the same row: a follow-up with a message and a follow-up
+ * without one. Splitting them into two features would mean two dates, two cancel buttons and two
+ * ways for a customer's reply to fail to call the whole thing off. The reply cancels it in the
+ * database, on the message insert, so it works whatever channel they answer on.
+ *
+ * ── The offsets are calendar days, not 24-hour blocks ──
+ * `setDate(getDate() + n)` rather than `Date.now() + n * 86400000`: a DST day is 23 or 25 hours,
+ * and "in a week" landing an hour early twice a year is the kind of wrong nobody reports and
+ * everybody notices. Computed here rather than server-side for the same reason — this is the only
+ * runtime that knows the operator's timezone; the database session is UTC.
+ */
+const FOLLOW_UP_PRESETS: Array<{ label: string; days: number }> = [
+  { label: 'Tomorrow', days: 1 },
+  { label: 'In 3 days', days: 3 },
+  { label: 'In a week', days: 7 },
+  { label: 'In 2 weeks', days: 14 },
+];
+
+/** `n` calendar days from now, same time of day, correct across a DST boundary. */
+function daysFromNow(n: number): Date {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return d;
+}
+
+/** A local datetime for `<input type="datetime-local">`, which refuses anything with a zone. */
+function toLocalInputValue(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+    + `T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+const FollowUpButton: React.FC<{
+  thread: InboxThread;
+  onChanged: () => void;
+}> = ({ thread, onChanged }) => {
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [custom, setCustom] = useState('');
+  const [note, setNote] = useState('');
+  const [autoSend, setAutoSend] = useState(false);
+  const [message, setMessage] = useState('');
+  const pending = !!thread.follow_up_at && !thread.follow_up_fired_at;
+
+  const submit = async (at: Date) => {
+    setBusy(true);
+    try {
+      const res = await inboxApi.setFollowUp({
+        thread_id: thread.id,
+        at: at.toISOString(),
+        note: note.trim() || undefined,
+        message: autoSend && message.trim() ? message.trim() : undefined,
+      });
+      // The warning is the whole reason this returns anything. On WhatsApp a freeform message is
+      // only accepted inside Meta's 24-hour window, and a follow-up is usually days away — so
+      // most automatic chases on that channel CANNOT go out, and the operator has to hear it now
+      // rather than discover it on Thursday.
+      toast(res.warning
+        ? { title: 'Follow-up set — but the message will not send', description: res.warning }
+        : { title: autoSend && message.trim() ? 'Follow-up set — the message sends automatically' : 'Follow-up set' });
+      setOpen(false);
+      setNote(''); setMessage(''); setAutoSend(false); setCustom('');
+      onChanged();
+    } catch (e) {
+      toast({ title: 'Could not set the follow-up', description: (e as Error).message, variant: 'destructive' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant={pending ? 'secondary' : 'outline'}
+          size="icon"
+          className="h-9 w-9"
+          title={pending
+            ? `Following up ${formatDate(thread.follow_up_at!)} — click to change`
+            : 'Follow up later'}
+        >
+          <BellRing className="w-4 h-4" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-80 p-0">
+        <div className="p-3 border-b border-border">
+          <div className="text-sm font-medium">Follow up</div>
+          <div className="text-xs text-muted-foreground">
+            The conversation moves to Follow-up and comes back to Open on its own. A reply from
+            them cancels it.
+          </div>
+        </div>
+
+        <div className="p-3 space-y-3">
+          <div className="grid grid-cols-2 gap-1.5">
+            {FOLLOW_UP_PRESETS.map((preset) => (
+              <Button
+                key={preset.days}
+                variant="outline"
+                size="sm"
+                disabled={busy}
+                onClick={() => submit(daysFromNow(preset.days))}
+              >
+                {preset.label}
+              </Button>
+            ))}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="inbox-followup-when" className="text-xs">Or pick a time</Label>
+            <div className="flex gap-1.5">
+              <Input
+                id="inbox-followup-when"
+                type="datetime-local"
+                className="h-8 text-xs"
+                value={custom}
+                min={toLocalInputValue(new Date())}
+                onChange={(e) => setCustom(e.target.value)}
+              />
+              <Button
+                size="sm" className="h-8 shrink-0"
+                disabled={busy || !custom}
+                onClick={() => submit(new Date(custom))}
+              >
+                Set
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="inbox-followup-note" className="text-xs">What to chase (optional)</Label>
+            <Input
+              id="inbox-followup-note"
+              className="h-8 text-xs"
+              placeholder="e.g. confirm the decking quantity"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-1.5 pt-1 border-t border-hairline">
+            <label className="flex items-start gap-2 text-xs cursor-pointer pt-2">
+              <Checkbox
+                checked={autoSend}
+                onCheckedChange={(v) => setAutoSend(v === true)}
+                className="mt-0.5"
+              />
+              <span>
+                Send this message automatically if they have not replied by then
+                {thread.channel === 'whatsapp' && (
+                  /* Said before they type it, not after it fails. WhatsApp accepts a freeform
+                     message only inside 24 hours of the customer's last one, so on this channel
+                     an automatic chase usually cannot be delivered at all. */
+                  <span className="block text-muted-foreground mt-0.5">
+                    On WhatsApp this only works if they have written to you within 24 hours of
+                    that time — otherwise you will just be reminded.
+                  </span>
+                )}
+              </span>
+            </label>
+            {autoSend && (
+              <Textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Hi — just checking in on this…"
+                className="min-h-[64px] text-xs resize-none"
+              />
+            )}
+          </div>
+
+          {pending && (
+            <Button
+              variant="ghost" size="sm" className="w-full text-destructive hover:text-destructive"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  await inboxApi.clearFollowUp(thread.id);
+                  setOpen(false);
+                  onChanged();
+                } catch (e) {
+                  toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' });
+                } finally { setBusy(false); }
+              }}
+            >
+              Cancel the follow-up
+            </Button>
+          )}
         </div>
       </PopoverContent>
     </Popover>
