@@ -2462,3 +2462,77 @@ Every SQL claim here was verified by CALLING the function in a rolled-back trans
 IMPERSONATING a real workspace member via `set_config('request.jwt.claims', …)` — otherwise
 `assert_workspace_member` refuses and the probe proves the guard works while proving nothing about
 the derivation behind it. Leak counts checked after every rollback.
+
+## Class E closed — the islands, and four defects found inside my own work — 2026-09-01
+
+N1, N3, N5, N6, N7, N8, N10, D5, D6 and the first project lifecycle trigger. The pattern that
+repeated all the way through: **the link usually already existed, in a form nothing could use.**
+
+### The four shapes, in order of how well they hide
+
+1. **A column with a writer that no form reaches.** `time_entries.employee_id` was
+   CHECK-constrained, accepted by `timeTrackingService.create` and carried into the insert — and no
+   UI passed it. The writer LOOKED present because the service had the parameter. Found by sweeping
+   my own work for the shape the rest of the issue is about, an hour after shipping it.
+2. **A link stored as jsonb.** `real-estate-listing-social` always recorded which property it
+   announced, as `metadata->>'property_id'`: no FK, no index, unjoinable. "Marketing ROI is
+   structurally unanswerable" was true of data already being written.
+3. **A relationship that runs one way.** `generate-social-video` writes the finished video URL onto
+   the post and the generation row never recorded the post — so nothing could say what a video cost
+   and what it was for without parsing URLs.
+4. **A flag nothing can set.** `generation_3d.saved_to_moodboard_at` is what stops
+   `job-cleanup-cron` deleting a generation after 15 days. Its only writer had NO CALLER, and the
+   real save path takes a media URL with no generation id, so it could not have called it. Measured
+   live: 17 generations, **0** ever marked, the oldest exactly on the boundary. Saving a design to a
+   moodboard kept the image and let the generation behind it be reaped. No probe could see it —
+   the cron deletes successfully, and a flag never once written is not a metric that dropped.
+
+### Two findings that changed what the issue asked for
+
+**N3 — stock for a job.** The issue proposes widening `stock_allocations.demand_type`. Checking
+what a job can ALREADY hold changed the question: a `quote_item` reserves when the quote is built
+and an `order_item` when a SALES order is confirmed, and both carry the project — so material was
+always held and nothing joined allocations back to the job. `get_project_stock_holds` does the
+join. Purchase orders are excluded because a PO is inbound SUPPLY, which is why
+`_orders_reserve_on_status` reserves only for sales orders. A new demand type would genuinely add
+a hold for a job with no quote and no sale, and that is a different lifecycle needing its own
+design rather than a value bolted onto a vocabulary about order fulfilment.
+
+**N8 — one room model.** Read as a merge it deletes nine capabilities. Linked instead, nullable
+because a NOT NULL kills the public embed planner. The link nearly created the bug it exists to
+close: `project_rooms` measures in mm and `room_layouts` in metres, and
+`room_layout_surfaces_resolved` joined the layout DIRECTLY — so a linked plan would render at the
+room's 6000mm and order tiles against the planner's own 5.0m. Both now read one resolved view.
+
+### D6 — a detector, not a matcher
+
+A card transaction and a typed trip cost of the same amount within three days are one payment
+recorded twice, and no existing check can see it because both records are individually correct.
+Merging them automatically is the class of thing this codebase refuses elsewhere (a credit note
+does not restate a tax fact; a flow action may not insert into `payments`), and two identical fares
+on one day are routinely two taxis. So `finance.duplicate_cost_capture` surfaces the pair with
+`heal_fn` null and `can_autoheal` false. Exact amount, not a tolerance: "nearly the same" is what
+makes a matcher unusable.
+
+### The guard that was wrong about itself, again
+
+`orderLinkTargets.test.ts` claimed to be "generalised over the opt-in groups so a future one
+inherits it". It was not — `OPT_IN_GROUPS` is hand-kept, so adding `allowOrder` and deleting its
+handler left all 27 cases green, which is the exact offered-but-unhandled row the file exists to
+prevent. Watched that happen before fixing it. The list is now checked against the component's own
+`allow*` props.
+
+That is the third guard this week found to be asleep (`orderLinkTargets` on a text search,
+`gatedPropParity` passing vacuously through a NUL byte, and now this). The lesson is the same one:
+**a guard is only as good as the last time somebody watched it fail.**
+
+### Verification recipe, unchanged and worth repeating
+
+Every SQL claim above was verified by CALLING the function in a rolled-back transaction while
+impersonating a real workspace member via `set_config('request.jwt.claims', …)` — otherwise
+`assert_workspace_member` refuses and the probe proves the guard works while proving nothing about
+the derivation behind it. Leak counts checked after every rollback. Two run-time-only defects were
+caught this way and by nothing else: `get_project_stock_holds` declaring `expected_at` as
+`timestamptz` when the column is a DATE (CREATEs clean, raises 42804 on first call), and the
+messaging party resolver matching digits-only so `00306912345678` did not match `+306912345678` —
+#359 CM-1 reproduced one table over.
