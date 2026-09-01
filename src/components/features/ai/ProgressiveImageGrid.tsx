@@ -8,7 +8,7 @@ import { Button } from '@/components/core/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/core/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { mivaaApi } from '@/services/mivaaApiClient';
+import { mivaaApi, MaterialZone } from '@/services/mivaaApiClient';
 import { SegmentWithResults } from '@/hooks/useSegmentation';
 import { MaterialPickerModal, PickedMaterial, EditedImageResult, AppliedMaterial } from './MaterialPickerModal';
 import { AddToQuoteModal } from '@/modules/quotes/components/AddToQuoteModal';
@@ -145,7 +145,14 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
 
   // Per-image segmentation state (modal-scoped)
   const [modalSegments, setModalSegments] = useState<SegmentWithResults[]>([]);
+  //: "nothing on screen yet" — the full-panel spinner. Cleared by the FIRST zone.
   const [modalSegmenting, setModalSegmenting] = useState(false);
+  //: "the model is still writing zones" — stays true after the first one lands, so the
+  //: list can say more are coming. Separate from `modalSegmenting` on purpose: one
+  //: flag cannot mean both "show a spinner instead of the list" and "show a spinner
+  //: under the list", and collapsing them is how a streaming surface ends up either
+  //: hiding what it has or claiming to be finished while it is not.
+  const [modalStreaming, setModalStreaming] = useState(false);
   const [modalSegmentsLoaded, setModalSegmentsLoaded] = useState(false);
   const [modalSegmentError, setModalSegmentError] = useState<string | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
@@ -277,6 +284,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
   useEffect(() => {
     setModalSegments([]);
     setModalSegmenting(false);
+    setModalStreaming(false);
     setModalSegmentsLoaded(false);
     setModalSegmentError(null);
     segmentationInFlightRef.current = false;
@@ -306,6 +314,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
     segmentationInFlightRef.current = true;
 
     setModalSegmenting(true);
+    setModalStreaming(true);
     setModalSegmentError(null);
 
     try {
@@ -373,73 +382,50 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
         return;
       }
 
-      console.log('[ProgressiveImageGrid] Calling segmentImage, base64 length:', imageBase64.length);
-      const segRes = await mivaaApi.segmentImage({
-        image_base64: imageBase64,
-        workspace_id: workspaceId,
-      });
-      console.log('[ProgressiveImageGrid] segmentImage response:', segRes);
-
-      if (!segRes.success) {
-        setModalSegmentError(segRes.error ?? 'Segmentation API returned an error');
-        setModalSegmentsLoaded(true);
-        return;
-      }
-
-      if (!segRes.data?.zones?.length) {
-        setModalSegmentError('No material zones detected in this image');
-        setModalSegmentsLoaded(true);
-        return;
-      }
-
       const { width: imgW, height: imgH } = await getImageDimensions(selectedImage.url);
 
-      // Render EVERY zone the model returned — sorted by confidence so the
-      // most-likely ones are first, but no cap. Earlier we capped at 8 which
-      // dropped legitimate zones (glass separators, wall tiles, faucets,
-      // etc.) the user needs for the editor's zone-replace flow. Search is
-      // bounded separately below so server load stays sane.
-      const rankedZones = [...segRes.data.zones]
-        .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
-
-      // Phase A: render zones IMMEDIATELY (no matches yet) so the user sees
-      // something at the 40s segmentation mark instead of waiting another
-      // 40s+ for all RAG searches to fan in. Each zone gets its crop + label
-      // + dominant color; matches stream in as Phase B completes.
-      const initialSegments: SegmentWithResults[] = await Promise.all(
-        rankedZones.map(async (zone, i) => {
-          const cropDataUrl = await cropZone(selectedImage.url, zone.bbox, imgW, imgH);
-          return {
-            ...zone,
-            segment_index: i,
-            model_id: selectedImage.model_id,
-            source_image_url: selectedImage.url,
-            crop_data_url: cropDataUrl ?? undefined,
-            crop_storage_url: undefined,
-            search_results: [], // filled in progressively
-            // _searching is a transient render flag so the row shows
-            // "Searching catalog…" until Phase B completes for this zone
-            // (instead of misleading "No matches above 70%").
-            _searching: true,
-          } as SegmentWithResults & { _searching: boolean };
-        }),
-      );
-      setModalSegments(initialSegments);
-      setModalSegmentsLoaded(true);
-      setModalSegmenting(false);
-
-      // Phase B: per-zone search + storage upload, bounded concurrency.
-      // Many simultaneous calls to /api/rag/search swamps the SLIG endpoint
-      // and Supabase REST pool — limit to 3 in-flight so each one gets fresh
-      // capacity instead of all of them fighting for it for 40s.
+      // ── Phase A + B, interleaved ─────────────────────────────────────────
+      // Zones arrive one at a time from /api/images/segment/stream and each one
+      // starts its own catalog search the moment it lands. The old shape waited
+      // ~40s for the complete zone array before showing anything OR searching
+      // anything, so the two costs were strictly serial: 40s of blank screen,
+      // then 40s+ of matches filling in. Now the first zone is on screen in a
+      // few seconds and its search is already running while the model is still
+      // writing zone 9.
+      //
+      // Zones keep the MODEL's order, not confidence order. Ranking them would
+      // mean holding them all back — the exact wait being removed — and a row
+      // that jumps position after the user starts reading it is worse than an
+      // imperfect order. EVERY zone is rendered (no cap): an earlier cap of 8
+      // dropped legitimate zones (glass separators, wall tiles, faucets) the
+      // editor's zone-replace flow needs.
       const CONCURRENCY = 3;
-      const queue = initialSegments.map((seg, i) => ({ seg, i }));
-      let cursor = 0;
+      const searchQueue: Array<{ seg: SegmentWithResults; i: number }> = [];
+      const waiters: Array<() => void> = [];
+      let zonesFinished = false;
+      let zoneCount = 0;
 
-      const runOne = async (): Promise<void> => {
-        while (cursor < queue.length) {
-          const slot = cursor++;
-          const { seg, i } = queue[slot];
+      const wakeWorkers = () => {
+        while (waiters.length) waiters.pop()!();
+      };
+
+      const nextSearch = async (): Promise<{ seg: SegmentWithResults; i: number } | null> => {
+        for (;;) {
+          const item = searchQueue.shift();
+          if (item) return item;
+          if (zonesFinished) return null;
+          await new Promise<void>((resolve) => waiters.push(resolve));
+        }
+      };
+
+      // Many simultaneous calls to /api/rag/search swamp the SLIG endpoint and
+      // the Supabase REST pool — 3 in flight so each gets fresh capacity
+      // instead of all of them fighting for it.
+      const searchWorker = async (): Promise<void> => {
+        for (;;) {
+          const item = await nextSearch();
+          if (!item) return;
+          const { seg, i } = item;
           const cropDataUrl = seg.crop_data_url;
           if (!cropDataUrl) continue;
           const cropBase64 = cropDataUrl.split(',')[1];
@@ -470,7 +456,101 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
         }
       };
 
-      await Promise.all(Array.from({ length: CONCURRENCY }, runOne));
+      const workers = Array.from({ length: CONCURRENCY }, searchWorker);
+
+      // Crop the zone, put it on screen, and queue its search. Awaited by the
+      // stream reader in arrival order, so `i` is stable and matches the index
+      // the row is later updated by.
+      const acceptZone = async (zone: MaterialZone, i: number) => {
+        const cropDataUrl = await cropZone(selectedImage.url, zone.bbox, imgW, imgH);
+        const seg = {
+          ...zone,
+          segment_index: i,
+          model_id: selectedImage.model_id,
+          source_image_url: selectedImage.url,
+          crop_data_url: cropDataUrl ?? undefined,
+          crop_storage_url: undefined,
+          search_results: [], // filled in by the search worker
+          // _searching is a transient render flag so the row shows
+          // "Searching catalog…" until its search completes (instead of
+          // misleading "No matches above 70%").
+          _searching: true,
+        } as SegmentWithResults & { _searching: boolean };
+
+        zoneCount += 1;
+        setModalSegments((prev) => [...prev, seg]);
+        // The first zone is what replaces the spinner with a list. Everything
+        // after it appends to a surface the user is already reading.
+        setModalSegmentsLoaded(true);
+        setModalSegmenting(false);
+
+        searchQueue.push({ seg, i });
+        wakeWorkers();
+      };
+
+      // `finally`, not a trailing statement: the workers are parked on a promise
+      // that only `wakeWorkers` resolves, so anything that leaves this block by an
+      // exception would strand all three forever — and the `await Promise.all` below
+      // would never return, holding `segmentationInFlightRef` and locking the tab out
+      // of ever retrying.
+      let segRes: Awaited<ReturnType<typeof mivaaApi.streamSegmentImage>>;
+      try {
+        segRes = await mivaaApi.streamSegmentImage(
+          { image_base64: imageBase64, workspace_id: workspaceId },
+          acceptZone,
+        );
+
+        if (segRes.unsupported) {
+          // MIVAA deploys from its own repo, so a frontend that assumed the
+          // streaming route exists would render an empty Materials tab against an
+          // older backend. Fall back to the blocking call and push its zones
+          // through the same pipeline — same rendering, same searches, just all
+          // at the 40s mark as before.
+          console.info('[ProgressiveImageGrid] segment stream unavailable — falling back to /api/images/segment');
+          const blocking = await mivaaApi.segmentImage({
+            image_base64: imageBase64,
+            workspace_id: workspaceId,
+          });
+          if (blocking.success && blocking.data?.zones?.length) {
+            // With every zone in hand there is nothing to hold back, so this path
+            // keeps the confidence ranking the streaming path cannot have.
+            const ranked = [...blocking.data.zones]
+              .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
+            for (let i = 0; i < ranked.length; i++) {
+              await acceptZone(ranked[i], i);
+            }
+          }
+          segRes = blocking;
+        }
+      } finally {
+        zonesFinished = true;
+        wakeWorkers();
+        setModalStreaming(false);
+      }
+
+      if (zoneCount === 0) {
+        setModalSegmentError(
+          segRes.success
+            ? 'No material zones detected in this image'
+            : segRes.error ?? 'Segmentation API returned an error',
+        );
+        setModalSegmentsLoaded(true);
+        setModalSegmenting(false);
+        return;
+      }
+
+      // A stream that died partway has already put real zones on screen. Say so
+      // rather than either discarding them or presenting a truncated list as the
+      // complete answer — and do NOT cache it below, or the partial result
+      // becomes the permanent one.
+      const partial = !segRes.success;
+      if (partial) {
+        setModalSegmentError(
+          `${segRes.error ?? 'Segmentation stopped early'} — showing the ${zoneCount} zone${zoneCount !== 1 ? 's' : ''} detected so far`,
+        );
+      }
+
+      await Promise.all(workers);
 
       // Phase C: enrich (image_product_associations → product image URLs)
       // THEN persist. Enrichment must run before the cache write so cache
@@ -517,7 +597,11 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
       // NULL generation_id row still serves cache hits cleanly. If the
       // column is NOT NULL the insert fails gracefully and we simply
       // re-segment next time (no error surfaced to the user).
-      if (enriched.length > 0) {
+      //
+      // A PARTIAL run is never cached: caching it would make the truncated list
+      // the permanent answer for this image, and the cache read has no way to
+      // tell a 6-zone image from a 20-zone one that stopped at 6.
+      if (enriched.length > 0 && !partial) {
         const rows = enriched.map((s) => ({
           // `|| null`, not `?? null`. AgentHub renders this component with jobId="" for the
           // Gemini single-image modal, and `??` only catches null/undefined — so an empty
@@ -558,6 +642,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
       setModalSegmentsLoaded(true);
     } finally {
       setModalSegmenting(false);
+      setModalStreaming(false);
       segmentationInFlightRef.current = false;
     }
   }, [selectedImage, jobId, workspaceId, modalSegmentsLoaded, modalSegmenting]);
@@ -982,7 +1067,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                   Image
                 </TabsTrigger>
                 <TabsTrigger value="products" className="gap-1.5 text-xs rounded-md">
-                  {modalSegmenting
+                  {modalSegmenting || modalStreaming
                     ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     : <Scan className="w-3.5 h-3.5" />}
                   Materials
@@ -1385,18 +1470,24 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                   <div className="flex items-center justify-between">
                     <p className="text-xs text-muted-foreground">
                       {modalSegments.length > 0
-                        ? `${modalSegments.length} material zone${modalSegments.length !== 1 ? 's' : ''} detected`
+                        ? `${modalSegments.length} material zone${modalSegments.length !== 1 ? 's' : ''} detected${modalStreaming ? ' so far' : ''}`
                         : 'No zones detected'}
                     </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 gap-1.5 text-xs"
-                      onClick={handleRegenerate}
-                    >
-                      <RotateCcw className="w-3 h-3" />
-                      Regenerate
-                    </Button>
+                    {/* Regenerate deletes the cached rows and re-runs. Offering it
+                        mid-stream would let the user restart a run that is already
+                        putting zones on screen, against a cache the current run has
+                        not written yet. */}
+                    {!modalStreaming && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 gap-1.5 text-xs"
+                        onClick={handleRegenerate}
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        Regenerate
+                      </Button>
+                    )}
                   </div>
                 )}
 
@@ -1406,9 +1497,9 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                       <Loader2 className="w-8 h-8 animate-spin text-primary" />
                     </div>
                     <p className="font-medium text-sm text-foreground">Detecting material zones…</p>
-                    <p className="text-xs text-muted-foreground">AI vision analysis — may take up to 90 seconds on first run</p>
+                    <p className="text-xs text-muted-foreground">AI vision analysis — the first zones appear within a few seconds</p>
                   </div>
-                ) : modalSegmentError ? (
+                ) : modalSegmentError && modalSegments.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 gap-3">
                     <div className="p-3 bg-destructive/10 rounded-full">
                       <AlertCircle className="w-6 h-6 text-destructive" />
@@ -1448,6 +1539,24 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                   </div>
                 ) : modalSegments.length > 0 ? (
                   <div className="space-y-3">
+                    {/* A run that stopped early still put real zones on screen. The
+                        list is the answer; this says it is not the WHOLE answer, which
+                        is the one thing a truncated list cannot say for itself. */}
+                    {modalSegmentError && (
+                      <div className="flex items-start gap-2 px-3 py-2.5 bg-destructive/10 border border-destructive/30 rounded-lg">
+                        <AlertCircle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
+                        <p className="text-xs text-foreground flex-1">{modalSegmentError}</p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 gap-1.5 text-xs flex-shrink-0"
+                          onClick={handleRegenerate}
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                          Try again
+                        </Button>
+                      </div>
+                    )}
                     {modalSegments.map((seg, idx) => {
                       const matches = (seg.search_results ?? [])
                         .filter((r: any) => (r.score ?? r.final_score ?? 0) >= 0.7)
@@ -1673,6 +1782,16 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                         </div>
                       );
                     })}
+                    {/* The list is genuinely incomplete while this shows. Without it a
+                        stream that has delivered 6 of 20 zones is pixel-identical to a
+                        finished run that found 6 — the same "a metric is a value or a
+                        stated reason there is no value" rule, applied to a list. */}
+                    {modalStreaming && (
+                      <div className="flex items-center gap-2.5 px-3 py-3 border border-dashed border-hairline rounded-lg text-muted-foreground">
+                        <Loader2 className="w-4 h-4 animate-spin text-primary flex-shrink-0" />
+                        <p className="text-xs">Still detecting zones — more will appear here as they are found.</p>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   // Not yet loaded — shows briefly before useEffect triggers loading

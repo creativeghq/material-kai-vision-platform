@@ -739,6 +739,125 @@ export class MivaaApiClient {
   }
 
   /**
+   * The same detection as `segmentImage`, one zone at a time.
+   *
+   * `onZone` is awaited per zone, in arrival order, so a handler that crops or
+   * enqueues work cannot interleave itself and lose the index it was handed. Zones
+   * come in the MODEL's order, not sorted by confidence — sorting would mean holding
+   * them all back, which is the wait this exists to remove.
+   *
+   * Deliberately NOT wrapped in `RetryHelper`: a stream that dies after ten zones has
+   * already handed those ten to `onZone`, and replaying the request would deliver them
+   * a second time. The caller decides what a partial answer is worth.
+   *
+   * `unsupported: true` means the backend has no such route (this repo and MIVAA
+   * deploy separately, so a frontend that assumed the route exists would simply show
+   * nothing against an older backend). Fall back to `segmentImage` on it.
+   */
+  async streamSegmentImage(
+    payload: { image_url?: string; image_base64?: string; workspace_id?: string },
+    onZone: (zone: MaterialZone, index: number) => void | Promise<void>,
+  ): Promise<MivaaApiResponse<SegmentationResponse> & { unsupported?: boolean }> {
+    const zones: MaterialZone[] = [];
+    let processingTimeMs = 0;
+    let sawDone = false;
+
+    try {
+      const token = await this.getAuthToken();
+      const response = await fetch(`${this.baseUrl}/api/images/segment/stream`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.status === 404 || response.status === 405) {
+        return { success: false, error: 'Streaming segmentation not available', unsupported: true };
+      }
+
+      if (!response.ok || !response.body) {
+        const errorData = await response.json().catch(() => ({} as any));
+        const detail =
+          typeof errorData.detail === 'string' ? errorData.detail : null;
+        return {
+          success: false,
+          error: detail || errorData.error || `HTTP ${response.status}`,
+        };
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let streamError: string | null = null;
+
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        // The tail is whatever arrived after the last newline — an incomplete line.
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          let event: any;
+          try {
+            event = JSON.parse(line);
+          } catch {
+            console.warn('[mivaaApi] unparseable segment stream line:', line.slice(0, 200));
+            continue;
+          }
+
+          if (event.type === 'zone' && event.zone) {
+            const index = zones.length;
+            zones.push(event.zone as MaterialZone);
+            await onZone(event.zone as MaterialZone, index);
+          } else if (event.type === 'done') {
+            sawDone = true;
+            processingTimeMs = event.processing_time_ms ?? 0;
+          } else if (event.type === 'error') {
+            streamError = event.error ?? 'Segmentation failed';
+          }
+        }
+      }
+
+      if (streamError) {
+        return {
+          success: false,
+          error: streamError,
+          data: { zones, count: zones.length, processing_time_ms: processingTimeMs },
+        };
+      }
+
+      if (!sawDone) {
+        // Headers were already sent, so the transport could not report this as a
+        // status. A truncated list that reports success is the worse failure: the
+        // user reads a partial answer as the whole one.
+        return {
+          success: false,
+          error: 'The connection closed before segmentation finished',
+          data: { zones, count: zones.length, processing_time_ms: processingTimeMs },
+        };
+      }
+
+      return {
+        success: true,
+        data: { zones, count: zones.length, processing_time_ms: processingTimeMs },
+      };
+    } catch (error) {
+      console.error('MIVAA API Error [/api/images/segment/stream]:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        data: { zones, count: zones.length, processing_time_ms: processingTimeMs },
+      };
+    }
+  }
+
+  /**
    * Generate a binary inpainting mask from an image zone hint.
    * Returns a base64 PNG where white = replace area, black = keep area.
    * Preferred: pass `image_url` — backend uses SAM 2 (Replicate) for pixel-perfect masks.
