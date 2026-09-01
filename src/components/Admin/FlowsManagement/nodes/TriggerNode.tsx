@@ -19,7 +19,7 @@ import {
   BatteryLow,
   UserMinus,
   Timer,
-  Wrench, AlarmClock, ShieldCheck, Coins, MessagesSquare, PhoneOff, Link2, Unlink, FolderKanban} from 'lucide-react';
+  Wrench, AlarmClock, ShieldCheck, Coins, MessagesSquare, PhoneOff, Link2, Unlink, FolderKanban, FolderPlus, Flag, AlertTriangle, BadgeCheck} from 'lucide-react';
 import type { TriggerNodeData, TriggerType } from '@/services/flows/types';
 
 const triggerIcons: Record<TriggerType, React.ElementType> = {
@@ -128,6 +128,13 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   social_account_disconnected: Unlink,
   social_post_failed: XCircle,
   client_view_feedback_received: ClipboardCheck,
+  project_created: FolderPlus,
+  project_task_completed: CheckCircle2,
+  project_milestone_reached: Flag,
+  project_snag_raised: AlertTriangle,
+  project_expense_approved: BadgeCheck,
+  project_delivery_issued: Truck,
+  project_asset_registered: Wrench,
   project_status_changed: FolderKanban,
   project_request_raised: MessageSquarePlus,
   project_request_answered: MessageSquareReply,

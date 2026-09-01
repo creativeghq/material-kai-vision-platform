@@ -15,6 +15,7 @@
  * top-level `project-site/` folder, not the bucket name (docs/storage-buckets.md).
  */
 import { supabase } from '@/integrations/supabase/client';
+import { emitProjectLifecycle } from '@/modules/projects/services/projectsService';
 
 const SITE_PHOTO_BUCKET = 'pdf-documents';
 const SITE_PHOTO_PREFIX = 'project-site';
@@ -167,7 +168,18 @@ export const siteService = {
       .select()
       .single();
     if (error) throw error;
-    return data as ProjectSnag;
+
+    const snag = data as ProjectSnag;
+    // A defect was found on site (#378 Phase 4). Severity rides along so a flow can escalate the
+    // serious ones without firing on every snag — filtering in the flow beats a second trigger.
+    void emitProjectLifecycle(snag.project_id, 'project_snag_raised',
+      (name) => ({
+        title: `Snag raised: ${snag.title}`,
+        body: `A ${snag.severity ?? 'medium'} snag was raised on ${name}: ${snag.title}`,
+      }),
+      { snag_id: snag.id, severity: snag.severity, room_id: snag.room_id });
+
+    return snag;
   },
 
   async updateSnag(

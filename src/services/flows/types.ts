@@ -167,6 +167,13 @@ export type TriggerType =
   // Project Client Views: a client approved / requested changes / commented on a deliverable
   | 'client_view_feedback_received'
   // Project Requests: a client/teammate raised a request, or the team answered one
+  | 'project_created'
+  | 'project_task_completed'
+  | 'project_milestone_reached'
+  | 'project_snag_raised'
+  | 'project_expense_approved'
+  | 'project_delivery_issued'
+  | 'project_asset_registered'
   | 'project_status_changed'
   | 'project_request_raised'
   | 'project_request_answered'
@@ -271,6 +278,20 @@ export interface ClientViewFeedbackReceivedTriggerConfig {}
  * `to_status` narrows it, because "any status change" fires on every drag of every card and a flow
  * run is metered. Empty means every change, which is the honest default for a filter.
  */
+/** A new job was created. */
+export interface ProjectCreatedTriggerConfig {}
+/** A task on a job was marked done. */
+export interface ProjectTaskCompletedTriggerConfig {}
+/** A task marked as a milestone was completed. */
+export interface ProjectMilestoneReachedTriggerConfig {}
+/** A defect was raised on site. */
+export interface ProjectSnagRaisedTriggerConfig {}
+/** An expense was approved as a cost on a job. */
+export interface ProjectExpenseApprovedTriggerConfig {}
+/** A delivery note was issued on a job. */
+export interface ProjectDeliveryIssuedTriggerConfig {}
+/** A unit of installed base was registered on a job. */
+export interface ProjectAssetRegisteredTriggerConfig {}
 export interface ProjectStatusChangedTriggerConfig {
   /** Only fire when the job moves INTO this status. Empty = any change. */
   to_status?: string;
@@ -563,6 +584,13 @@ export type TriggerConfigMap = {
   social_account_connected: SocialAccountConnectedTriggerConfig;
   social_account_disconnected: SocialAccountDisconnectedTriggerConfig;
   client_view_feedback_received: ClientViewFeedbackReceivedTriggerConfig;
+  project_created: ProjectCreatedTriggerConfig;
+  project_task_completed: ProjectTaskCompletedTriggerConfig;
+  project_milestone_reached: ProjectMilestoneReachedTriggerConfig;
+  project_snag_raised: ProjectSnagRaisedTriggerConfig;
+  project_expense_approved: ProjectExpenseApprovedTriggerConfig;
+  project_delivery_issued: ProjectDeliveryIssuedTriggerConfig;
+  project_asset_registered: ProjectAssetRegisteredTriggerConfig;
   project_status_changed: ProjectStatusChangedTriggerConfig;
   project_request_raised: ProjectRequestRaisedTriggerConfig;
   project_request_answered: ProjectRequestAnsweredTriggerConfig;

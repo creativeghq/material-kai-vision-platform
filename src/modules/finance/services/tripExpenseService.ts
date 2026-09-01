@@ -12,6 +12,7 @@
 // the rep) must be able to read them.
 
 import { supabase } from '@/integrations/supabase/client';
+import { emitProjectLifecycle } from '@/modules/projects/services/projectsService';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { formatMoney } from '@/modules/finance/services/financeService';
 import { todayLocalISO } from '@/utils/datetime';
@@ -466,6 +467,42 @@ export const tripExpenseService = {
     });
     if (error) throw error;
     const report = data as TripExpenseReport;
+
+    /**
+     * An approved cost landed on a job (#378 Phase 4).
+     *
+     * Read AFTER the decision, and only for an approval: `get_project_pnl` counts a trip line as
+     * cost once it is approved, so this is the moment the job's margin actually moves. A rejected
+     * line changes nothing and must not announce itself as a cost.
+     *
+     * The line names its own job, so the event is emitted per LINE rather than per card — one
+     * card routinely spans several jobs, and announcing the card against the first line's project
+     * would attribute a hotel in Athens to whichever job happened to sort first.
+     */
+    if (decision === 'approved') {
+      try {
+        const { data: line } = await supabase
+          .from('trip_expense_items')
+          .select('id, project_id, amount, currency, description, vendor')
+          .eq('id', itemId)
+          .maybeSingle();
+        const item = line as {
+          id: string; project_id: string | null; amount: number | null;
+          currency: string | null; description: string | null; vendor: string | null;
+        } | null;
+        if (item?.project_id) {
+          const what = item.description || item.vendor || 'An expense';
+          void emitProjectLifecycle(item.project_id, 'project_expense_approved',
+            (name) => ({
+              title: `Expense approved: ${what}`,
+              body: `${formatMoney(Number(item.amount ?? 0), item.currency ?? 'EUR')} was approved as a cost on ${name}.`,
+            }),
+            { expense_item_id: item.id, amount: item.amount, currency: item.currency });
+        }
+      } catch (err) {
+        console.error('[trip expenses] could not announce the approved cost', err);
+      }
+    }
     // Once every line is decided (no pending left), tell the rep the outcome.
     if (Number(report.pending_amount) === 0 && ['approved', 'partially_approved', 'rejected'].includes(report.status)) {
       try {

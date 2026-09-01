@@ -461,6 +461,65 @@ export interface UpdateTaskInput {
 // SERVICE
 // =====================================================
 
+/**
+ * Raise a project lifecycle flow event (#378 Phase 4).
+ *
+ * ONE helper, because every one of these payloads has to carry the same four things and getting
+ * any of them wrong fails silently in its own way:
+ *
+ *   • `workspace_id` — a trigger whose emitter does not stamp it can NEVER be forked by a tenant.
+ *     `fork_workspace_flow_default` disables the global in the same transaction, so forking such a
+ *     trigger ends with FEWER notifications and nothing raising. `appointment_booked` shipped in
+ *     exactly that state.
+ *   • `user_id` — `create_notification` reads it straight off the payload, so a missing one is a
+ *     flow that runs, records a step, reports success and tells nobody.
+ *   • `title` / `body` / `action_url` — the same, and the reason the seeded defaults can be one
+ *     shape for all of them.
+ *
+ * Resolves the workspace and the job's name FROM the project rather than trusting a caller: the
+ * callers here hold a task, a snag or an asset, and each looking it up its own way is how four of
+ * them end up subtly different.
+ *
+ * Best-effort and non-blocking. The thing that happened has happened; failing the write because a
+ * notification did not go out is the worse outcome.
+ */
+export async function emitProjectLifecycle(
+  projectId: string | null | undefined,
+  type: 'project_created' | 'project_task_completed' | 'project_milestone_reached'
+      | 'project_snag_raised' | 'project_expense_approved' | 'project_delivery_issued'
+      | 'project_asset_registered',
+  say: (projectName: string) => { title: string; body: string },
+  extra: Record<string, unknown> = {},
+): Promise<void> {
+  if (!projectId) return;
+  try {
+    const { data } = await (supabase as any)
+      .from('projects')
+      .select('id, name, workspace_id, user_id')
+      .eq('id', projectId)
+      .maybeSingle();
+    const project = data as { id: string; name: string | null; workspace_id: string | null; user_id: string | null } | null;
+    // No workspace means the event could never be matched to a tenant's flows anyway — emitting it
+    // would be a run that can only ever no-op.
+    if (!project?.workspace_id) return;
+    const name = project.name ?? 'the project';
+    const { title, body } = say(name);
+    void flowEventService.emit(type, {
+      workspace_id: project.workspace_id,
+      user_id: project.user_id,
+      type: 'project',
+      project_id: project.id,
+      project_name: project.name,
+      title,
+      body,
+      action_url: `/projects/${project.id}`,
+      ...extra,
+    });
+  } catch (err) {
+    console.error(`[projects] could not emit ${type}`, err);
+  }
+}
+
 class ProjectsService {
   // ---------- PROJECTS ----------
 
@@ -639,6 +698,11 @@ class ProjectsService {
         .insert(roomRows);
       if (roomsError) throw roomsError;
     }
+
+    // A new job exists (#378 Phase 4). Emitted after the ROOMS land, so a flow that reads the
+    // project does not race a half-built one.
+    void emitProjectLifecycle((project as Project).id, 'project_created',
+      (name) => ({ title: `New project: ${name}`, body: `${name} was created.` }));
 
     return project as Project;
   }
@@ -954,6 +1018,13 @@ class ProjectsService {
   }
 
   async updateTask(id: string, input: UpdateTaskInput): Promise<ProjectTask> {
+    // The status BEFORE the write, so completion fires on a real transition. Re-saving a task that
+    // was already done is not a completion, and every flow run is metered.
+    const previousStatus = input.status !== undefined
+      ? ((await (supabase as any).from('project_tasks').select('status').eq('id', id).maybeSingle())
+          .data as { status: string | null } | null)?.status ?? null
+      : null;
+
     const { data, error } = await (supabase as any)
       .from('project_tasks')
       .update(input)
@@ -961,7 +1032,31 @@ class ProjectsService {
       .select()
       .single();
     if (error) throw error;
-    return data as ProjectTask;
+
+    const task = data as ProjectTask & { is_milestone?: boolean | null };
+
+    if (input.status !== undefined && task.status === 'done' && previousStatus !== 'done') {
+      const label = task.title || 'A task';
+      void emitProjectLifecycle(task.project_id, 'project_task_completed',
+        (name) => ({ title: `Task done: ${label}`, body: `${label} was completed on ${name}.` }),
+        { task_id: task.id, task_title: task.title });
+
+      /**
+       * A MILESTONE is a separate event, not a flag on the task one.
+       *
+       * They are different questions with different audiences: "a task finished" is for the team
+       * and fires constantly; "we hit the milestone" is for the client and fires rarely. Folding
+       * the second into the first as a config filter would make every milestone automation pay for
+       * a run on every task — and flow runs are metered.
+       */
+      if (task.is_milestone) {
+        void emitProjectLifecycle(task.project_id, 'project_milestone_reached',
+          (name) => ({ title: `Milestone reached: ${label}`, body: `${name} reached the milestone "${label}".` }),
+          { task_id: task.id, task_title: task.title });
+      }
+    }
+
+    return task as ProjectTask;
   }
 
   // ---------- TASK DEPENDENCIES (WS3 #285) ----------

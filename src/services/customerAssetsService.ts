@@ -8,6 +8,7 @@
  * to prevent. Format the server's answer; never recompute it.
  */
 import { supabase } from '@/integrations/supabase/client';
+import { emitProjectLifecycle } from '@/modules/projects/services/projectsService';
 import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
 import { toLocalISODate, todayLocalISO } from '@/utils/datetime';
 
@@ -324,7 +325,20 @@ export const customerAssetsService = {
     source_order_item_id?: string | null;
     apply_defaults?: boolean;
   }) {
-    return call<{ asset_id: string }>('register', input).then((r) => r.asset_id);
+    return call<{ asset_id: string }>('register', input).then((r) => {
+      // The job gained a piece of installed base (#378 Phase 4). This is the handover moment the
+      // recurring-service annuity hangs off — `asset.service_due` / `service_overdue` /
+      // `warranty_expiring` triggers already exist and, until C5, fired on assets nobody
+      // registered. Emitted only when the unit belongs to a job; a shop sale has no project to
+      // announce it on.
+      void emitProjectLifecycle(input.project_id ?? null, 'project_asset_registered',
+        (name) => ({
+          title: `Equipment registered: ${input.name}`,
+          body: `${input.name} was registered on ${name}.`,
+        }),
+        { asset_id: r.asset_id, asset_name: input.name, product_id: input.product_id ?? null });
+      return r.asset_id;
+    });
   },
 
   /**

@@ -4,6 +4,7 @@
  * transmitted to myDATA as a 9.3 movement document via `submitFiscal()`.
  */
 import { supabase } from '@/integrations/supabase/client';
+import { emitProjectLifecycle } from '@/modules/projects/services/projectsService';
 import { edgeError } from '@/utils/edgeError';
 
 export interface DeliveryNote {
@@ -169,6 +170,36 @@ export const deliveryNotesService = {
     const { data, error } = await supabase.rpc('issue_delivery_note', { p_id: id });
     if (error) throw error;
     const r = (data ?? {}) as any;
+
+    /**
+     * Goods went out on a job (#378 Phase 4).
+     *
+     * The job is DERIVED through the order, exactly as the Job column on this table is (#378 L5) —
+     * `delivery_notes` has no `project_id` and must not grow one, because that would be a second
+     * copy of what the order already holds.
+     */
+    try {
+      const { data: note } = await supabase
+        .from('delivery_notes')
+        .select('id, delivery_note_number, orders(project_id)')
+        .eq('id', id)
+        .maybeSingle();
+      const row = note as { id: string; delivery_note_number: string | null;
+        orders?: { project_id: string | null } | { project_id: string | null }[] | null } | null;
+      const order = Array.isArray(row?.orders) ? row?.orders[0] : row?.orders;
+      if (order?.project_id) {
+        const number = row?.delivery_note_number ?? 'A delivery note';
+        void emitProjectLifecycle(order.project_id, 'project_delivery_issued',
+          (name) => ({
+            title: `Delivery issued: ${number}`,
+            body: `${number} was issued on ${name}.`,
+          }),
+          { delivery_note_id: id, delivery_note_number: row?.delivery_note_number ?? null, moved: Number(r.moved ?? 0) });
+      }
+    } catch (err) {
+      console.error('[delivery notes] could not announce the dispatch', err);
+    }
+
     return {
       moved: Number(r.moved ?? 0),
       skipped: Number(r.skipped ?? 0),
