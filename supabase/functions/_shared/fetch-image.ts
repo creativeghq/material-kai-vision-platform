@@ -155,6 +155,76 @@ export async function fetchBinaryGuarded(
   }
 }
 
+/**
+ * Fetch a TEXT body — an HTML page, for a link preview — re-guarding every redirect hop.
+ *
+ * `fetchBinaryGuarded` refuses redirects outright, and its own comment says why: the guard
+ * validated the host it was handed, and a followed redirect moves the request to a host nothing
+ * checked. That is the correct default and it is unusable for a page a person pasted into a
+ * conversation, where `http`→`https`, apex→`www` and every link shortener are one hop each.
+ *
+ * So the hops are followed HERE, and the comment's own instruction is honoured literally: each
+ * `Location` is resolved against the URL it came from and run through `assertSafeUrl` again
+ * before it is fetched, so hop three gets exactly the DNS and address checks hop one got. A
+ * public URL that 302s to `169.254.169.254` is refused at the second hop rather than followed.
+ *
+ * Bounded three ways on purpose — hops, bytes and time. The bytes matter most: the metadata we
+ * want lives in `<head>`, so 256 KB reads it on every real page and a 4 GB "text/html" response
+ * cannot be streamed into the isolate looking for a `<title>`.
+ */
+export async function fetchTextGuarded(
+  url: string,
+  opts: {
+    maxBytes?: number;
+    timeoutMs?: number;
+    maxRedirects?: number;
+    contentTypePrefix?: string;
+    headers?: Record<string, string>;
+  } = {},
+): Promise<{ text: string; finalUrl: string; mimeType: string }> {
+  const maxBytes = opts.maxBytes ?? 256 * 1024;
+  const maxRedirects = opts.maxRedirects ?? 4;
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), opts.timeoutMs ?? 10_000);
+  try {
+    let current = await assertSafeUrl(url, { allowSchemes: ['https:'] });
+    for (let hop = 0; ; hop++) {
+      const res = await fetch(current, {
+        redirect: 'manual',
+        signal: ctl.signal,
+        ...(opts.headers ? { headers: opts.headers } : {}),
+      });
+      if (res.status >= 300 && res.status < 400) {
+        const location = res.headers.get('location');
+        await res.body?.cancel();
+        if (!location) throw new Error(`HTTP ${res.status} with no Location`);
+        if (hop >= maxRedirects) throw new Error(`Too many redirects (> ${maxRedirects})`);
+        // Resolved against the hop it came from — a bare `/en/page` is the common form — and
+        // then re-validated. Resolving without re-validating is the bypass itself.
+        current = await assertSafeUrl(new URL(location, current).toString(), {
+          allowSchemes: ['https:'],
+        });
+        continue;
+      }
+      if (!res.ok) {
+        await res.body?.cancel();
+        throw new Error(`Fetch failed: HTTP ${res.status}`);
+      }
+      const mimeType = res.headers.get('content-type')?.split(';')[0].trim() || '';
+      if (opts.contentTypePrefix && mimeType && !mimeType.startsWith(opts.contentTypePrefix)) {
+        await res.body?.cancel();
+        throw new Error(`Unexpected content-type ${mimeType} (wanted ${opts.contentTypePrefix}*)`);
+      }
+      // Capped while streaming, exactly as the binary path is: a page that keeps sending is
+      // stopped at the ceiling rather than after it.
+      const bytes = await readCapped(res, maxBytes);
+      return { text: new TextDecoder('utf-8').decode(bytes), finalUrl: current, mimeType };
+    }
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** `fetchImageGuarded`, but null instead of throwing — for the render paths where
  *  one missing image must not abandon a whole PDF. The failure is logged, never
  *  silent: a chip that renders blank because the URL was blocked and a chip that

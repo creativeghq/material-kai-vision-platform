@@ -17,6 +17,9 @@ import { jsonResponse as json } from '../_shared/http.ts';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { castSlotForName } from '../_shared/characterAvatar.generated.ts';
+import { extractLinkPreview } from '../_shared/link-preview.ts';
+import { messageUrls } from '../_shared/messageLinks.generated.ts';
+import { fetchTextGuarded, SSRFError } from '../_shared/fetch-image.ts';
 import { getTrustedClientIp } from '../_shared/client-ip.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { sha256hex } from '../_shared/hash.ts';
@@ -2902,6 +2905,98 @@ async function handleJwtAction(
         }));
 
       return json({ contact: contact || null, company, quotes: quotes || [], projects: projects || [], invoices, metrics });
+    }
+
+    /*
+     * link_preview — what a URL in this conversation actually points at.
+     *
+     * ── Why it is gated on the THREAD and not just on being signed in ──
+     * This resolves a URL server-side, which is a fetch primitive. The SSRF guard is the control
+     * that matters (https-only, DNS-validated, RFC1918/link-local refused, every redirect hop
+     * re-validated, 256 KB cap), but the reachable SET is narrowed too: the URL has to be one the
+     * caller's own thread already contains, checked with the SAME parser the bubble renders with.
+     * So this cannot be pointed at an arbitrary address by an arbitrary caller, and a URL nobody
+     * pasted is simply not previewable.
+     *
+     * ── Cached with a REASON, never with a blank ──
+     * `cache_status` distinguishes "the page states no metadata" (final) from "we could not read
+     * it" (retryable) from "the guard refused the address" (final, and not a fault). All three
+     * render as no card; only one of them is worth retrying, and without the column they are the
+     * same row. A successful fetch is not re-fetched for 30 days; a failure is retried after one
+     * hour, because the usual cause is the far side being briefly down.
+     */
+    case 'link_preview': {
+      const threadId = String(payload.thread_id || '');
+      const url = String(payload.url || '').trim();
+      if (!threadId || !url) throw new HttpError(400, 'thread_id and url are required');
+      if (url.length > 2048) throw new HttpError(400, 'That URL is too long to preview');
+
+      const { data: thread } = await db.from('inbox_threads').select('*').eq('id', threadId).maybeSingle();
+      if (!thread) throw new HttpError(404, 'Thread not found');
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      if (!access.canRead) throw new HttpError(404, 'Thread not found');
+
+      // The URL has to be one this conversation actually carries. `messageUrls` is the same
+      // module the bubble segments with, mirrored — so "the client made it a link" and "the
+      // server will resolve it" cannot disagree about where a URL ends.
+      const { data: bodies } = await db.from('inbox_messages')
+        .select('body')
+        .eq('thread_id', threadId)
+        .is('deleted_at', null)
+        .not('body', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(500);
+      const inThread = ((bodies || []) as Array<{ body: string | null }>)
+        .some((m) => messageUrls(m.body, 20).some((u) => u.toLowerCase() === url.toLowerCase()));
+      if (!inThread) throw new HttpError(404, 'That link is not in this conversation');
+
+      const urlHash = await sha256hex(url.toLowerCase());
+      const { data: cached } = await db.from('link_previews').select('*').eq('url_hash', urlHash).maybeSingle();
+      const row = cached as Record<string, unknown> | null;
+      if (row) {
+        const ageMs = Date.now() - new Date(String(row.fetched_at)).getTime();
+        const ttlMs = row.cache_status === 'fetch_failed' ? 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
+        if (ageMs < ttlMs) return json({ preview: row });
+      }
+
+      let store: Record<string, unknown>;
+      try {
+        const { text, finalUrl } = await fetchTextGuarded(url, {
+          maxBytes: 256 * 1024,
+          timeoutMs: 8000,
+          contentTypePrefix: 'text/html',
+          // Some sites serve a bare shell to an unrecognised agent and their real `<head>` to a
+          // browser. Identifying honestly as a link-preview bot is what the convention is for.
+          headers: { 'user-agent': 'MaterialsHubBot/1.0 (+link preview)', accept: 'text/html' },
+        });
+        const preview = extractLinkPreview(text, finalUrl);
+        const anything = preview.title || preview.description || preview.imageUrl;
+        store = {
+          url_hash: urlHash, url, final_url: finalUrl,
+          cache_status: anything ? 'ok' : 'no_metadata',
+          title: preview.title, description: preview.description,
+          image_url: preview.imageUrl, site_name: preview.siteName,
+          error: null, fetched_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+        };
+      } catch (err) {
+        const blocked = err instanceof SSRFError;
+        store = {
+          url_hash: urlHash, url, final_url: null,
+          cache_status: blocked ? 'blocked' : 'fetch_failed',
+          title: null, description: null, image_url: null,
+          // The host is still worth showing beside a link that would not resolve.
+          site_name: (() => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return null; } })(),
+          error: err instanceof Error ? err.message.slice(0, 300) : String(err).slice(0, 300),
+          fetched_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+        };
+      }
+
+      const { error: upErr } = await db.from('link_previews').upsert(store, { onConflict: 'url_hash' });
+      // A cache we could not write is a slower preview, not a failed one — the answer in hand is
+      // still the answer. Logged rather than swallowed: a permanently unwritable cache means
+      // every render re-fetches somebody else's site, which is exactly what this row prevents.
+      if (upErr) console.warn('[inbox-api] link_previews upsert failed:', upErr.message);
+      return json({ preview: store });
     }
 
     case 'list_labels': {

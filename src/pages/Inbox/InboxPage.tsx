@@ -6,10 +6,11 @@ import {
   StickyNote, UserPlus, X, Bot, Search, Mail, Phone, Building2, MapPin,
   FileText, FolderKanban, Tag, Users, Globe, Hash, ChevronRight, BadgeCheck,
   User as UserIcon, MessagesSquare, Settings2, ArrowLeft, CheckCircle2, Wallet, EyeOff, Eye, Reply,
-  Archive, ArchiveRestore, Trash2, Sparkles, Check, Link2,
+  Archive, ArchiveRestore, Trash2, Sparkles, Check, CheckCheck, Link2,
   ShoppingCart, AlertTriangle, ExternalLink, Image as ImageIcon, CookingPot,
   Smile, Copy, Download,
 } from 'lucide-react';
+import { splitMessageLinks, messageUrls, shortenUrlForDisplay } from '@/utils/messageLinks';
 import { projectPlansService } from '@/services/projectPlansService';
 import { supabase } from '@/integrations/supabase/client';
 import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
@@ -55,7 +56,7 @@ import {
   type WhatsAppWindow, type InboxThreadContext, type InboxAgentSettings, type InboxLabel,
   type InboxThreadStatus, type OrderIntake, type IntakeItem, type IntakeTotals,
   type IntakeConfirmation, type IntakeMatchMethod, type UserEmailAddress,
-  type ConversationSentiment,
+  type ConversationSentiment, type InboxLinkPreview,
 } from '@/services/inboxApi';
 
 interface WorkspaceMemberOption { user_id: string; label: string; }
@@ -339,8 +340,23 @@ const InboxPage: React.FC = () => {
 
   const waBlocked = activeThread?.channel === 'whatsapp' && !!waWindow && !waWindow.open && !isNote;
 
-  const loadThreads = useCallback(async () => {
-    setLoadingThreads(true);
+  /**
+   * `silent` is the difference between "the operator asked for a different list" and "something
+   * happened in the background", and it is not cosmetic.
+   *
+   * Every refresh used to raise the spinner, and the mailbox list is subscribed to `*` on
+   * `inbox_threads` — so sending a message bumped `last_message_at`, the UPDATE came straight
+   * back over the socket, and the entire list you were looking at was replaced by a centred
+   * spinner and then redrawn. You send a message; the sidebar blinks. Same on an incoming
+   * message, on an agent reply, on a label change, on read state.
+   *
+   * A background refresh keeps the rows on screen and swaps the data underneath them — the list
+   * is keyed by thread id, so nothing remounts and the only visible change is the one that
+   * actually happened. The spinner is now only for a list we do not have yet: first paint, or a
+   * filter change, where there is genuinely nothing correct to show meanwhile.
+   */
+  const loadThreads = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoadingThreads(true);
     try {
       const { threads } = await inboxApi.listThreads({
         ...(channelFilter ? { channel: channelFilter } : {}),
@@ -350,13 +366,17 @@ const InboxPage: React.FC = () => {
       });
       setThreads(threads);
     } catch (e) {
-      toast({ title: 'Could not load inbox', description: (e as Error).message, variant: 'destructive' });
+      // A background refresh that fails says nothing: the rows on screen are still the last
+      // good answer, and a toast per dropped socket event would be its own kind of blink.
+      if (!opts?.silent) {
+        toast({ title: 'Could not load inbox', description: (e as Error).message, variant: 'destructive' });
+      }
     } finally {
-      setLoadingThreads(false);
+      if (!opts?.silent) setLoadingThreads(false);
     }
   }, [channelFilter, allWorkspaces, isPlatformOperator, showArchived, labelFilter, toast]);
 
-  useEffect(() => { loadThreads(); }, [loadThreads]);
+  useEffect(() => { void loadThreads(); }, [loadThreads]);
 
   /**
    * Go and get the profile photos, once, when some thread is missing one.
@@ -386,7 +406,7 @@ const InboxPage: React.FC = () => {
     void messagingService.syncAvatars(activeWorkspaceId)
       // Reload only when something actually landed — a no-op refresh on every inbox open is
       // a wasted round trip and a visible flicker for nothing.
-      .then((r) => { if (r.stored > 0) loadThreads(); })
+      .then((r) => { if (r.stored > 0) loadThreads({ silent: true }); })
       // Never a toast: a photo failing must not interrupt reading messages. But not swallowed
       // either — a silent catch here is how "the avatars do not work" becomes unanswerable.
       .catch((e) => console.warn('[inbox] profile photo sync failed:', (e as Error).message));
@@ -558,7 +578,8 @@ const InboxPage: React.FC = () => {
   useEffect(() => {
     const ch = supabase
       .channel('inbox-threads-list')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'inbox_threads' }, () => loadThreads())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inbox_threads' },
+          () => loadThreads({ silent: true }))
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [loadThreads]);
@@ -1550,6 +1571,109 @@ const InboxPage: React.FC = () => {
 // ──────────────────────────────────────────────────────────────────────────
 
 /**
+ * A message body, with its links as links — and as the page they point at.
+ *
+ * The bubble rendered `{m.body}` into a `whitespace-pre-wrap` div, so a customer sending a
+ * product URL got 180 characters of percent-encoded Greek slug, as inert text, that could not
+ * even be clicked. The question they were actually asking ("is your decking like this one?")
+ * has its answer in that page's own photograph.
+ *
+ * Two separate jobs, and both are needed. The link is the FLOOR: it works with no network call,
+ * for every URL, immediately. The card is the answer, and it is allowed to be absent — a page
+ * that states no metadata, one we could not read, and one the SSRF guard refused all render as
+ * a plain link, which is exactly what they are.
+ *
+ * No `dangerouslySetInnerHTML` anywhere in here (invariant 11): the body is customer-written
+ * text, and it is segmented into JSX text and anchor nodes, never assembled as HTML.
+ */
+const MessageBody: React.FC<{ body: string; threadId: string | null }> = ({ body, threadId }) => {
+  const segments = useMemo(() => splitMessageLinks(body), [body]);
+  // The FIRST link only. A card per URL turns a message with five links into a wall nobody
+  // reads, and the first one is the one the sentence is about.
+  const previewUrl = useMemo(() => messageUrls(body, 1)[0] ?? null, [body]);
+  const [preview, setPreview] = useState<InboxLinkPreview | null>(null);
+
+  useEffect(() => {
+    if (!previewUrl || !threadId) { setPreview(null); return; }
+    let alive = true;
+    // Never blocks or reports: a preview is an enrichment, and a thread that cannot reach the
+    // preview endpoint must still render its messages. The reason lives on the row we cached.
+    inboxApi.linkPreview(threadId, previewUrl)
+      .then((r) => { if (alive) setPreview(r.preview); })
+      .catch(() => { if (alive) setPreview(null); });
+    return () => { alive = false; };
+  }, [previewUrl, threadId]);
+
+  const card = preview && preview.cache_status === 'ok' && (preview.title || preview.image_url)
+    ? preview
+    : null;
+
+  return (
+    <>
+      <div className="text-sm whitespace-pre-wrap break-words leading-relaxed">
+        {segments.map((seg, i) => (
+          seg.kind === 'text' ? (
+            <React.Fragment key={i}>{seg.value}</React.Fragment>
+          ) : (
+            <a
+              key={i}
+              href={seg.href}
+              target="_blank"
+              // `noopener` closes `window.opener` on a page we do not control; `nofollow` because
+              // a customer's link is not our endorsement.
+              rel="noopener noreferrer nofollow"
+              title={seg.href}
+              className="underline underline-offset-2 decoration-current/40 hover:decoration-current break-all"
+            >
+              {shortenUrlForDisplay(seg.value)}
+            </a>
+          )
+        ))}
+      </div>
+      {card && (
+        <a
+          href={preview.final_url || previewUrl || '#'}
+          target="_blank"
+          rel="noopener noreferrer nofollow"
+          className="mt-2 block overflow-hidden rounded-sm border border-hairline bg-surface-sunken
+                     no-underline hover:bg-surface-hover transition-colors"
+        >
+          {card.image_url && (
+            /* The remote image, not a copy of it. Ours to store would mean fetching, billing and
+               garbage-collecting somebody else's picture for a card; `no-referrer` keeps the
+               reader's page out of that site's logs, and an image that fails to load removes
+               itself rather than leaving a broken frame in the conversation. */
+            <img
+              src={card.image_url}
+              alt=""
+              loading="lazy"
+              referrerPolicy="no-referrer"
+              className="w-full max-h-44 object-cover bg-surface-hover"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+            />
+          )}
+          <div className="px-3 py-2 space-y-0.5">
+            {card.site_name && (
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground truncate">
+                {card.site_name}
+              </div>
+            )}
+            {card.title && (
+              <div className="text-[13px] font-medium leading-snug line-clamp-2">{card.title}</div>
+            )}
+            {card.description && (
+              <div className="text-[11px] text-muted-foreground leading-snug line-clamp-2">
+                {card.description}
+              </div>
+            )}
+          </div>
+        </a>
+      )}
+    </>
+  );
+};
+
+/**
  * Did the customer actually GET it?
  *
  * Nothing in this UI answered that, and the answer was routinely no. Measured 2026-08-24 on the
@@ -1582,10 +1706,27 @@ const DeliveryState: React.FC<{ meta: Record<string, unknown> }> = ({ meta }) =>
       </span>
     );
   }
-  if (status === 'read') return <span className="inline-flex items-center gap-1 text-primary"><CheckCircle2 className="w-2.5 h-2.5" />Read</span>;
-  if (status === 'delivered') return <span className="inline-flex items-center gap-1"><Check className="w-2.5 h-2.5" />Delivered</span>;
-  if (status === 'sent') return <span className="inline-flex items-center gap-1 opacity-80"><Check className="w-2.5 h-2.5" />Sent</span>;
-  return null;
+  /*
+   * Ticks, not words — the vocabulary every person using this already knows from the app the
+   * message is going to. One grey tick left our server, two grey ticks reached the handset, two
+   * accent ticks were opened. The word stays as the `title` and as the screen-reader text, so
+   * nothing is lost for anyone who does not read the glyph.
+   *
+   * `CheckCheck` is one glyph, not two `Check`s side by side: two overlapping icons drift apart
+   * at different font sizes and read as a rendering fault at 10px.
+   */
+  const tick = status === 'read'
+    ? { Icon: CheckCheck, cls: 'text-primary', label: 'Read' }
+    : status === 'delivered' ? { Icon: CheckCheck, cls: '', label: 'Delivered' }
+    : status === 'sent' ? { Icon: Check, cls: 'opacity-70', label: 'Sent' }
+    : null;
+  if (!tick) return null;
+  return (
+    <span className={`inline-flex items-center ${tick.cls}`} title={tick.label}>
+      <tick.Icon className="w-3 h-3" aria-hidden />
+      <span className="sr-only">{tick.label}</span>
+    </span>
+  );
 };
 
 /**
@@ -2267,7 +2408,7 @@ const MessageBubble: React.FC<{
               <span>They sent a file. It has not been retrieved yet — re-run the import for this conversation to fetch it.</span>
             </div>
           ) : (
-            <div className="text-sm whitespace-pre-wrap break-words leading-relaxed">{m.body}</div>
+            <MessageBody body={m.body} threadId={m.thread_id} />
           ))}
           {/* A public comment answered in public stays public. These are the two ways out:
               answer the person privately, or take the comment down. Both are one-shot at the

@@ -92,6 +92,18 @@ export interface InboxParticipant {
   avatar_slot?: number | null;
 }
 
+export interface InboxLinkPreview {
+  url: string;
+  final_url?: string | null;
+  /** Why there is (or is not) a card. See `linkPreview`. */
+  cache_status: 'ok' | 'no_metadata' | 'fetch_failed' | 'blocked';
+  title?: string | null;
+  description?: string | null;
+  image_url?: string | null;
+  site_name?: string | null;
+  error?: string | null;
+}
+
 export interface InboxAttachment {
   storage_bucket?: string;
   storage_object_path?: string;
@@ -458,6 +470,20 @@ export const inboxApi = {
   },
   setAgentSettings(workspace_id: string, changes: Partial<InboxAgentSettings>) {
     return call<{ settings: InboxAgentSettings }>('set_agent_settings', { workspace_id, ...changes });
+  },
+
+  /**
+   * What a URL pasted into a conversation actually points at — the page's own title, description
+   * and picture, read server-side and cached per URL.
+   *
+   * Scoped to the thread on purpose: the server refuses a URL this conversation does not contain,
+   * so the endpoint is not a general fetch-anything proxy. `preview.cache_status` is the answer
+   * even when there is no card — `no_metadata` (the page states none), `fetch_failed` (we could
+   * not read it), `blocked` (the address was refused). A caller that treats all three as "no
+   * preview" is fine; one that treats them as "the page has no picture" is wrong.
+   */
+  linkPreview(thread_id: string, url: string) {
+    return call<{ preview: InboxLinkPreview }>('link_preview', { thread_id, url });
   },
 
   // ── Labels (owner/admin manage; any member assigns) ──

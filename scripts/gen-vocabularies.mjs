@@ -154,6 +154,14 @@ export const VOCABULARIES = [
     'supabase/functions/_shared/calculators/heatPumpSizing.generated.ts',
   ],
   [
+    // What counts as a LINK in a message body. The bubble renders the segments and inbox-api
+    // checks the URL you asked to preview is one the thread actually contains — two readers of
+    // one string, so a second copy is a bubble offering a card for a fragment the other half
+    // does not consider a link.
+    'src/utils/messageLinks.ts',
+    'supabase/functions/_shared/messageLinks.generated.ts',
+  ],
+  [
     // The inbox avatar cast: the 24 rendered characters, which half of the cast each belongs
     // to, and the name→gender reading that narrows the pool. THREE consumers, not two —
     // `messaging-api` builds the generation prompts from `look`, `inbox-api` derives each
