@@ -3275,15 +3275,56 @@ async function handleJwtAction(
       if (!access.isMember) throw new HttpError(403, 'Only thread members may label conversations');
       // Validate the labels belong to the thread's workspace (no cross-tenant labels).
       let valid: string[] = [];
+      let validNames: string[] = [];
       if (labelIds.length) {
         const { data: ok } = await db.from('inbox_labels')
-          .select('id').eq('workspace_id', String(thread.workspace_id)).in('id', labelIds);
-        valid = (ok || []).map((r: { id: string }) => r.id);
+          .select('id, name').eq('workspace_id', String(thread.workspace_id)).in('id', labelIds);
+        const rows = (ok || []) as Array<{ id: string; name: string }>;
+        valid = rows.map((r) => r.id);
+        validNames = rows.map((r) => r.name);
       }
+      // What was on it BEFORE, so the event can say what was ADDED. A flow that fires on every
+      // save would run again each time somebody removes a different label from the same thread.
+      const { data: beforeRows } = await db.from('inbox_thread_labels')
+        .select('label_id').eq('thread_id', threadId);
+      const before = new Set(((beforeRows || []) as Array<{ label_id: string }>).map((r) => r.label_id));
+
       await db.from('inbox_thread_labels').delete().eq('thread_id', threadId);
       if (valid.length) {
         await db.from('inbox_thread_labels')
           .insert(valid.map((label_id) => ({ thread_id: threadId, label_id, created_by: userId })));
+      }
+
+      /*
+       * `inbox.thread_labeled` — "tell me when a conversation is marked Urgent".
+       *
+       * Only on an ADDITION, and only naming the ones added: a label is the operator's own word
+       * for "this needs somebody", and it is the moment it goes ON that anybody wants to know.
+       *
+       * The NAMES ride along, not just the ids. A flow condition is written by a person looking
+       * at their own labels, and a uuid in a condition field is a value nobody can author or
+       * read. `workspace_id` is stamped because a tenant fork matches on it — without it the
+       * fork never fires and `fork_workspace_flow_default` has already switched the default off.
+       */
+      const addedIds = valid.filter((id) => !before.has(id));
+      if (addedIds.length) {
+        const addedNames = addedIds
+          .map((id) => validNames[valid.indexOf(id)])
+          .filter((n): n is string => !!n);
+        await emitFlowEvent('inbox.thread_labeled', {
+          workspace_id: (thread as { workspace_id?: string }).workspace_id ?? null,
+          user_id: userId,
+          type: 'inbox_labeled',
+          title: `Conversation labeled ${addedNames.join(', ')}`,
+          body: (thread as { subject?: string }).subject || 'Conversation',
+          action_url: `/inbox?thread=${threadId}`,
+          thread_id: threadId,
+          label_ids: addedIds,
+          label_names: addedNames,
+          // The full set after the change, for a condition that wants "carries BOTH of these".
+          all_label_ids: valid,
+          all_label_names: validNames,
+        }).catch(() => {});
       }
       return json({ ok: true, label_ids: valid });
     }

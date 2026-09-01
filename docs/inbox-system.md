@@ -205,6 +205,29 @@ Delivery goes through the [Flows](flows-notification-system.md) engine, not hard
 
 - `inbox.message_received` — bell (+ email, #224) to every **other** active participant with an account (members always; notes to members only; pure token customers get none). Carries `workspace_id` (#256) so tenant flows can scope to it, plus `action_url=/inbox?thread={id}`.
 - `inbox.thread_assigned` — fired when a user is added to a thread or a WhatsApp thread is assigned to its owner.
+- `inbox.thread_labeled` — a label was **added** to a conversation (removals do not fire, and the
+  event names only the labels that went on). Carries `label_names` / `all_label_names` as well as
+  the ids: a flow condition is written by a person looking at their own labels, and a uuid in a
+  condition field is a value nobody can author or read. The trigger has no config for the same
+  reason — a fixed label list on it would be a second copy of `inbox_labels` that goes stale the
+  first time somebody renames one.
+
+### What labels are, and what they are not
+
+Labels are **ours**. They live in `inbox_labels` / `inbox_thread_labels`, are created per workspace
+by an owner or admin, and are readable by the agent (`manage_inbox` actions `labels` / `list` /
+`label`, all of them BY NAME) and by flows through the trigger above.
+
+They are **not** WhatsApp's labels, and cannot be. Measured 2026-09-01 against Zernio's own
+`openapi.json`: the only path containing "label" in their entire API is `/v1/ads/labels`, which is
+Meta Ads. There is no inbox or WhatsApp label endpoint to read, and the labels an operator makes in
+the WhatsApp Business app are on that device. `/v1/inbox/conversations/labels` answers 400 rather
+than 404 — that is `labels` being parsed as a `{conversationId}`, not a route.
+
+The same probe settled the other provider question this feature ran into: Zernio's `DELETE
+/v1/inbox/conversations/{id}/messages/{id}` documents its own platform support, and **WhatsApp is
+listed as not supported (returns 400)**. So `delete_message` removes a message from this inbox and
+says so; there is no unsend to offer.
 
 ---
 

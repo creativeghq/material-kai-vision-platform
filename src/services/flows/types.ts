@@ -67,6 +67,9 @@ export type TriggerType =
   // multi-tenant inbox (dotted keys; payload-only, no custom config UI)
   | 'inbox.message_received'
   | 'inbox.thread_assigned'
+  // A conversation was tagged. The payload carries the label NAMES, so "tell me when something
+  // is marked Urgent" is a condition on the flow rather than a config field nobody would find.
+  | 'inbox.thread_labeled'
   // #342: an order was read out of a customer conversation and is waiting for approval
   | 'inbox.order_intake_ready'
   // A review was left on a connected platform profile (Google Business). A low rating is the
@@ -330,6 +333,13 @@ export interface FreightQuoteRequestedTriggerConfig {}
 export interface OrderDispatchedTriggerConfig {}
 export interface InboxMessageReceivedTriggerConfig {}
 export interface InboxThreadAssignedTriggerConfig {}
+/**
+ * No config, like its siblings: the labels a workspace uses are its own and change, so a fixed
+ * list here would be a second copy of `inbox_labels` that goes stale the day somebody renames
+ * one. The event carries `label_names`, and a condition node filters on it in the tenant's own
+ * vocabulary.
+ */
+export interface InboxThreadLabeledTriggerConfig {}
 export interface InboxOrderIntakeReadyTriggerConfig {}
 export interface ReviewReceivedTriggerConfig {
   /**
@@ -537,6 +547,7 @@ export type TriggerConfigMap = {
   order_dispatched: OrderDispatchedTriggerConfig;
   'inbox.message_received': InboxMessageReceivedTriggerConfig;
   'inbox.thread_assigned': InboxThreadAssignedTriggerConfig;
+  'inbox.thread_labeled': InboxThreadLabeledTriggerConfig;
   'inbox.order_intake_ready': InboxOrderIntakeReadyTriggerConfig;
   review_received: ReviewReceivedTriggerConfig;
   marketplace_want_match: MarketplaceWantMatchTriggerConfig;
