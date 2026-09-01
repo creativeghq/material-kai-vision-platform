@@ -15,7 +15,7 @@ import {
   FileText, Package, Camera, Globe, LayoutGrid, Image as ImageIcon, Video,
   PanelRightClose, ArrowLeft, ArrowUpRight, LayoutPanelLeft, Sparkles, Radar, ClipboardList,
   Briefcase, Boxes, PackageCheck, MessageSquare, Bot, TrendingUp, Images,
-  Wand2, Calculator, MessageSquareQuote, MoreHorizontal, X, Trash2,
+  Wand2, Calculator, MessageSquareQuote, ShieldQuestion, MoreHorizontal, X, Trash2,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -30,7 +30,7 @@ export type CanvasArtifactKind =
   | 'sheet' | 'staging' | 'products' | 'world' | 'board' | 'image' | 'video' | 'render'
   | 'inspiration' | 'radar' | 'result' | 'quote'
   | 'jobs' | 'sourcing' | 'order' | 'mentions' | 'llm' | 'seo' | 'catalog'
-  | 'demo' | 'calc' | 'clarify';
+  | 'demo' | 'calc' | 'clarify' | 'confirm';
 
 export interface CanvasArtifact {
   id: string;
@@ -63,6 +63,10 @@ const KIND_ICON: Record<CanvasArtifactKind, React.ComponentType<{ className?: st
   // A pending QUESTION is an artifact too. The canvas could only ever show finished output, so
   // a follow-up had nowhere to live but the chat stream as prose (#370, Class D).
   clarify: MessageSquareQuote,
+  // The Approve/Decline gate. `clarify` became an artifact in #370 and this did not, so the one
+  // card that BLOCKS the turn was the one that stayed in the chat rail — and on a phone the rail
+  // is unmounted whenever the canvas is up.
+  confirm: ShieldQuestion,
 };
 
 const KIND_LABEL: Record<CanvasArtifactKind, string> = {
@@ -88,6 +92,7 @@ const KIND_LABEL: Record<CanvasArtifactKind, string> = {
   demo: 'Demo results',
   calc: 'Calculation',
   clarify: 'Needs your input',
+  confirm: 'Needs your approval',
 };
 
 interface CanvasPanelProps {
