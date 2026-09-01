@@ -53,6 +53,7 @@ export const SUBSCRIBABLE_EVENT_TYPES: string[] = [
   'crm_contact_created',
   'crm_company_created',
   // Projects / client-facing
+  'project_task_overdue',
   'project_created',
   'project_task_completed',
   'project_milestone_reached',

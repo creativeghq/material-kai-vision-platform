@@ -385,6 +385,9 @@ export const paletteItems: NodePaletteItem[] = [
   // Project lifecycle (#378 Phase 4). Projects emitted almost nothing: two invitation events and
   // two request ones, so "the job is now on site" — the thing everyone downstream waits for —
   // could not start an automation.
+  { type: 'triggerNode', category: 'trigger', subType: 'project_task_overdue', group: 'Projects',
+    label: 'Task Overdue', description: 'A task on a job passed its due date — announced once per due date, and again if it is rescheduled', icon: 'CalendarClock', color: 'amber',
+    defaultData: { label: 'Task Overdue', category: 'trigger', triggerType: 'project_task_overdue', config: {} } as TriggerNodeData },
   { type: 'triggerNode', category: 'trigger', subType: 'project_created', group: 'Projects',
     label: 'Project Created', description: 'A new job was created', icon: 'FolderPlus', color: 'emerald',
     defaultData: { label: 'Project Created', category: 'trigger', triggerType: 'project_created', config: {} } as TriggerNodeData },

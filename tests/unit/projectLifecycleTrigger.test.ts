@@ -55,10 +55,14 @@ const LIFECYCLE_TRIGGERS = [
   'project_expense_approved',
   'project_delivery_issued',
   'project_asset_registered',
+  'project_task_overdue',
 ] as const;
 
-/** Where each one is emitted from. A trigger with no emitter can never fire. */
-const EMITTERS: Record<(typeof LIFECYCLE_TRIGGERS)[number], string> = {
+/**
+ * Where each one is emitted from. A trigger with no emitter can never fire.
+ * `null` means the emitter is SQL — see the note on `project_task_overdue`.
+ */
+const EMITTERS: Record<(typeof LIFECYCLE_TRIGGERS)[number], string | null> = {
   project_status_changed: 'src/modules/projects/services/projectsService.ts',
   project_created: 'src/modules/projects/services/projectsService.ts',
   project_task_completed: 'src/modules/projects/services/projectsService.ts',
@@ -67,6 +71,19 @@ const EMITTERS: Record<(typeof LIFECYCLE_TRIGGERS)[number], string> = {
   project_expense_approved: 'src/modules/finance/services/tripExpenseService.ts',
   project_delivery_issued: 'src/modules/finance/services/deliveryNotesService.ts',
   project_asset_registered: 'src/services/customerAssetsService.ts',
+  /**
+   * The one lifecycle event NO user action produces: a task becomes overdue by the passage of
+   * time. Its emitter is `sweep_overdue_project_tasks`, a SQL function on a daily pg_cron job —
+   * so there is no committed source to point at, and this test says so rather than asserting on a
+   * file that would never contain it.
+   *
+   * Verified by probe instead: the sweep announces an overdue task once, skips one already
+   * announced for that due date, RE-ANNOUNCES one that was rescheduled, and skips both a done task
+   * and a future one. The marker is the due date it announced, not a "sent at" timestamp, because
+   * `pg_net` is fire-and-forget — a timestamp would mean "we tried once" and a dropped request
+   * would silence that task forever.
+   */
+  project_task_overdue: null,
 };
 
 const TYPES = 'src/services/flows/types.ts';
@@ -107,7 +124,9 @@ describe('the emitter is the part nothing else substitutes for', () => {
   it.each(LIFECYCLE_TRIGGERS)('%s is actually emitted somewhere', (trigger) => {
     // A trigger in the palette that nothing raises is a node an admin can build a flow on that can
     // never run — the same unreachability this whole issue is about, one layer up.
-    const src = read(EMITTERS[trigger]);
+    const file = EMITTERS[trigger];
+    if (file === null) return; // SQL-emitted; verified by probe, not by source text.
+    const src = read(file);
     // Plain string containment, not an assembled RegExp: building one from a template literal is
     // how `\(` became a literal paren and the pattern silently failed to compile — the same
     // backslash trap that made gatedPropParity's fiscal check match nothing.

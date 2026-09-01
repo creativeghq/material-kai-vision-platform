@@ -167,6 +167,7 @@ export type TriggerType =
   // Project Client Views: a client approved / requested changes / commented on a deliverable
   | 'client_view_feedback_received'
   // Project Requests: a client/teammate raised a request, or the team answered one
+  | 'project_task_overdue'
   | 'project_created'
   | 'project_task_completed'
   | 'project_milestone_reached'
@@ -278,6 +279,8 @@ export interface ClientViewFeedbackReceivedTriggerConfig {}
  * `to_status` narrows it, because "any status change" fires on every drag of every card and a flow
  * run is metered. Empty means every change, which is the honest default for a filter.
  */
+/** A task on a job passed its due date. Raised by a scheduled SQL sweep, not a user action — see sweep_overdue_project_tasks. */
+export interface ProjectTaskOverdueTriggerConfig {}
 /** A new job was created. */
 export interface ProjectCreatedTriggerConfig {}
 /** A task on a job was marked done. */
@@ -584,6 +587,7 @@ export type TriggerConfigMap = {
   social_account_connected: SocialAccountConnectedTriggerConfig;
   social_account_disconnected: SocialAccountDisconnectedTriggerConfig;
   client_view_feedback_received: ClientViewFeedbackReceivedTriggerConfig;
+  project_task_overdue: ProjectTaskOverdueTriggerConfig;
   project_created: ProjectCreatedTriggerConfig;
   project_task_completed: ProjectTaskCompletedTriggerConfig;
   project_milestone_reached: ProjectMilestoneReachedTriggerConfig;
