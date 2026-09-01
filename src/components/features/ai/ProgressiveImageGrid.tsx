@@ -1350,6 +1350,11 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                         mediaUrl={selectedImage.url}
                         mediaType="image"
                         mediaTitle={selectedImage.name || 'Generated Design'}
+                        // `jobId` IS the `generation_3d` id (this component polls that row by it).
+                        // Passing it is what stops job-cleanup-cron reaping a design somebody
+                        // saved (#378 N7). Empty on the direct-image modal, where there is no
+                        // generation behind the picture.
+                        generationId={jobId || null}
                       >
                         <button
                           className="flex items-center gap-1.5 px-3 py-1.5 bg-pink-50 hover:bg-pink-100 border border-pink-200 text-xs font-medium text-pink-700 transition-colors shadow-sm"

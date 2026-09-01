@@ -11,6 +11,14 @@ interface MoodboardSavePopoverProps {
   mediaUrl: string;
   mediaType: 'image' | 'video' | 'vr_world';
   mediaTitle?: string;
+  /**
+   * The `generation_3d` row this media came from, when it came from one (#378 N7).
+   *
+   * Without it, saving a generated design to a moodboard left the generation unmarked and
+   * `job-cleanup-cron` deleted it 15 days later — the image stayed on the board and the
+   * generation behind it was reaped. Optional because most media saved here is not a generation.
+   */
+  generationId?: string | null;
   /** Custom trigger element. Defaults to a rose pill button. */
   children?: React.ReactNode;
   className?: string;
@@ -20,6 +28,7 @@ export const MoodboardSavePopover: React.FC<MoodboardSavePopoverProps> = ({
   mediaUrl,
   mediaType,
   mediaTitle,
+  generationId,
   children,
   className,
 }) => {
@@ -48,6 +57,22 @@ export const MoodboardSavePopover: React.FC<MoodboardSavePopoverProps> = ({
     }
   };
 
+  /**
+   * Stamp the generation this media came from, so the cleanup cron stops reaping it (#378 N7).
+   *
+   * Best-effort: the media is already ON the board by this point, and failing the whole save
+   * because a retention stamp did not land would be the worse outcome. Logged rather than
+   * swallowed — an empty catch here is how the flag went unwritten for a fortnight unnoticed.
+   */
+  const markSavedGeneration = async (moodboardId: string) => {
+    if (!generationId) return;
+    try {
+      await moodboardAPI.markGenerationSaved(generationId, moodboardId);
+    } catch (err) {
+      console.error('[moodboard] saved the media but could not mark the generation as kept', err);
+    }
+  };
+
   const handleSave = async (moodboard: MoodBoard) => {
     try {
       setSaving(moodboard.id);
@@ -57,6 +82,7 @@ export const MoodboardSavePopover: React.FC<MoodboardSavePopoverProps> = ({
         media_type: mediaType,
         media_title: mediaTitle,
       });
+      await markSavedGeneration(moodboard.id);
       toast({ title: 'Saved!', description: `Added to "${moodboard.title}"` });
       setOpen(false);
     } catch {
@@ -77,6 +103,7 @@ export const MoodboardSavePopover: React.FC<MoodboardSavePopoverProps> = ({
         media_type: mediaType,
         media_title: mediaTitle,
       });
+      await markSavedGeneration(newMoodboard.id);
       toast({ title: 'Saved!', description: `Created "${newTitle.trim()}" and saved` });
       setOpen(false);
       setNewTitle('');

@@ -619,13 +619,25 @@ class MoodBoardAPI {
   }
 
   /**
-   * Mark a 3D generation as saved to a moodboard.
-   * This prevents it from being deleted by the cleanup cron after 15 days.
+   * Mark a 3D generation as saved to a moodboard, and record WHICH one (#378 N7).
+   *
+   * `saved_to_moodboard_at` is what stops `job-cleanup-cron` deleting the generation 15 days after
+   * it was made. This method HAD NO CALLER: the real save path takes a media URL and had no
+   * generation id to pass, so on the live database 0 of 17 generations had ever been marked and
+   * the oldest sat exactly on the deletion boundary. Saving a design to a moodboard kept the image
+   * on the board and let the generation behind it be reaped on schedule.
+   *
+   * Best-effort at the call site, deliberately: the media IS on the moodboard by the time this
+   * runs, and failing the save because the retention stamp did not land would be the worse
+   * outcome. It is not silent — the caller logs it.
    */
-  async markGenerationSaved(generationId: string): Promise<void> {
+  async markGenerationSaved(generationId: string, moodboardId: string): Promise<void> {
     const { error } = await supabase
       .from('generation_3d')
-      .update({ saved_to_moodboard_at: new Date().toISOString() })
+      .update({
+        saved_to_moodboard_at: new Date().toISOString(),
+        saved_to_moodboard_id: moodboardId,
+      } as never)
       .eq('id', generationId);
 
     if (error) throw error;
