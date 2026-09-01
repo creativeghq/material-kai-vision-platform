@@ -55,6 +55,26 @@ describe('the listing link is a column', () => {
   });
 });
 
+describe('a generated video says what it was for (#378 N7)', () => {
+  /**
+   * `generate-social-video` already validated `post_id` against the caller's workspace and wrote
+   * the finished video URL ONTO that post. The `generation_videos` row it created for async
+   * polling recorded the model, aspect ratio, duration, credits and prediction id — and not which
+   * post it was for.
+   *
+   * So the relationship ran one way. From the post you could see a video; from the generation you
+   * could not see the post, which means nothing could answer "what did this video cost and what
+   * was it for" without parsing URLs. With N6 above, the chain a listing's marketing actually
+   * forms is complete: property -> post -> video.
+   */
+  it('the generation records the post it was generated for', () => {
+    expect(
+      read('supabase/functions/generate-social-video/index.ts'),
+      'the generation_videos row must carry social_post_id',
+    ).toMatch(/social_post_id: post_id \?\? null/);
+  });
+});
+
 describe('the link has a reader, so it is not write-only', () => {
   it('the property page shows what was posted about it', () => {
     expect(read(WORKBENCH), 'the card must be mounted').toMatch(/<ListingSocialPostsCard/);

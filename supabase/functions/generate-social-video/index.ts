@@ -457,6 +457,10 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
         video_type: 'social_reel',
         model_version: replicateModel,
         replicate_prediction_id: predictionId,
+        // Which post this is FOR (#378 N7). The video URL is written onto the post on success, so
+        // the relationship existed in one direction only: from the generation there was no way
+        // back, and nothing could say what a video cost and what it was for without parsing URLs.
+        social_post_id: post_id ?? null,
       }).select('id').single();
 
       if (insertError || !videoRecord?.id) {
