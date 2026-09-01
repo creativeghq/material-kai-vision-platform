@@ -38,7 +38,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import {
   FolderKanban, Palette, Home, KeyRound, Handshake, Tag, FileText, ShoppingCart,
-  Receipt, FileSignature, Wrench, Loader2, Briefcase, Banknote, type LucideIcon,
+  Receipt, FileSignature, Wrench, Loader2, Briefcase, Banknote, MessageSquare, type LucideIcon,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -105,12 +105,18 @@ const KINDS: Record<string, {
   // and property_sale open their property. `status` already says received/sent, which is the
   // distinction that matters: the same table holds both sides of the trade.
   payment:        { label: 'Payments',        icon: Banknote,      group: GROUP_COMMERCIAL, href: (r) => (r.parent_id ? `${FINANCE_BASE}/orders/${r.parent_id}` : null) },
+  // Outbound WhatsApp/SMS (#378 N5). `messaging_logs` recorded a `to_number` as text and nothing
+  // else, so the party record could not show what had been sent to this person; the only readers
+  // were two admin dashboards counting rows. No `href` — a message has no page of its own, and
+  // offering a link that opens a list is the "button whose whole effect is to name a place"
+  // failure. The status carries what matters: delivered, failed, read.
+  message:        { label: 'Messages',        icon: MessageSquare, group: GROUP_AFTER },
 };
 
 /** Rail order. Anything the function returns that is not named here is appended, never dropped. */
 const KIND_ORDER = [
   'project', 'moodboard', 'deal', 'quote', 'order', 'invoice', 'payment', 'contract',
-  'property', 'tenancy', 'property_sale', 'property_offer', 'asset',
+  'property', 'tenancy', 'property_sale', 'property_offer', 'asset', 'message',
 ];
 const GROUP_ORDER = [GROUP_DELIVERY, GROUP_COMMERCIAL, GROUP_PROPERTY, GROUP_AFTER];
 
