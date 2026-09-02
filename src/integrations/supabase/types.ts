@@ -3556,6 +3556,63 @@ export type Database = {
           },
         ]
       }
+      cost_codes: {
+        Row: {
+          code: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          parent_id: string | null
+          sort: number
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          parent_id?: string | null
+          sort?: number
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          parent_id?: string | null
+          sort?: number
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cost_codes_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "cost_codes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cost_codes_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       credit_note_items: {
         Row: {
           created_at: string
@@ -11967,6 +12024,7 @@ export type Database = {
       invoice_items: {
         Row: {
           added_at: string
+          cost_code_id: string | null
           country_of_origin: string | null
           deductions_amount: number | null
           description: string | null
@@ -12010,6 +12068,7 @@ export type Database = {
         }
         Insert: {
           added_at?: string
+          cost_code_id?: string | null
           country_of_origin?: string | null
           deductions_amount?: number | null
           description?: string | null
@@ -12053,6 +12112,7 @@ export type Database = {
         }
         Update: {
           added_at?: string
+          cost_code_id?: string | null
           country_of_origin?: string | null
           deductions_amount?: number | null
           description?: string | null
@@ -12142,6 +12202,13 @@ export type Database = {
             columns: ["source_quote_item_id"]
             isOneToOne: false
             referencedRelation: "quote_items_with_room"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_items_cost_code_id_fkey"
+            columns: ["cost_code_id"]
+            isOneToOne: false
+            referencedRelation: "cost_codes"
             referencedColumns: ["id"]
           },
         ]
@@ -16472,6 +16539,7 @@ export type Database = {
       }
       order_items: {
         Row: {
+          cost_code_id: string | null
           country_of_origin: string | null
           created_at: string
           description: string
@@ -16505,6 +16573,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          cost_code_id?: string | null
           country_of_origin?: string | null
           created_at?: string
           description: string
@@ -16538,6 +16607,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          cost_code_id?: string | null
           country_of_origin?: string | null
           created_at?: string
           description?: string
@@ -16590,6 +16660,13 @@ export type Database = {
             columns: ["warehouse_id"]
             isOneToOne: false
             referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_cost_code_id_fkey"
+            columns: ["cost_code_id"]
+            isOneToOne: false
+            referencedRelation: "cost_codes"
             referencedColumns: ["id"]
           },
         ]
@@ -21316,6 +21393,7 @@ export type Database = {
       project_purchase_items: {
         Row: {
           category: string | null
+          cost_code_id: string | null
           created_at: string
           created_by: string | null
           currency: string
@@ -21339,6 +21417,7 @@ export type Database = {
         }
         Insert: {
           category?: string | null
+          cost_code_id?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string
@@ -21362,6 +21441,7 @@ export type Database = {
         }
         Update: {
           category?: string | null
+          cost_code_id?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string
@@ -21410,6 +21490,13 @@ export type Database = {
             columns: ["room_id"]
             isOneToOne: false
             referencedRelation: "project_rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_purchase_items_cost_code_id_fkey"
+            columns: ["cost_code_id"]
+            isOneToOne: false
+            referencedRelation: "cost_codes"
             referencedColumns: ["id"]
           },
         ]
@@ -21633,6 +21720,7 @@ export type Database = {
         Row: {
           assignee_id: string | null
           client_visible: boolean
+          cost_code_id: string | null
           created_at: string
           created_by: string | null
           description: string | null
@@ -21650,6 +21738,7 @@ export type Database = {
         Insert: {
           assignee_id?: string | null
           client_visible?: boolean
+          cost_code_id?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -21667,6 +21756,7 @@ export type Database = {
         Update: {
           assignee_id?: string | null
           client_visible?: boolean
+          cost_code_id?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -21694,6 +21784,13 @@ export type Database = {
             columns: ["room_id"]
             isOneToOne: false
             referencedRelation: "project_rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_snags_cost_code_id_fkey"
+            columns: ["cost_code_id"]
+            isOneToOne: false
+            referencedRelation: "cost_codes"
             referencedColumns: ["id"]
           },
         ]
@@ -21754,6 +21851,7 @@ export type Database = {
         Row: {
           assignee_id: string | null
           completed_at: string | null
+          cost_code_id: string | null
           created_at: string
           created_by: string | null
           description: string | null
@@ -21775,6 +21873,7 @@ export type Database = {
         Insert: {
           assignee_id?: string | null
           completed_at?: string | null
+          cost_code_id?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -21796,6 +21895,7 @@ export type Database = {
         Update: {
           assignee_id?: string | null
           completed_at?: string | null
+          cost_code_id?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -21834,6 +21934,13 @@ export type Database = {
             columns: ["room_id"]
             isOneToOne: false
             referencedRelation: "project_rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_tasks_cost_code_id_fkey"
+            columns: ["cost_code_id"]
+            isOneToOne: false
+            referencedRelation: "cost_codes"
             referencedColumns: ["id"]
           },
         ]
@@ -24577,6 +24684,7 @@ export type Database = {
         Row: {
           added_at: string
           added_from: string | null
+          cost_code_id: string | null
           cost_snapshot: number | null
           cost_snapshot_at: string | null
           cost_snapshot_currency: string | null
@@ -24612,6 +24720,7 @@ export type Database = {
         Insert: {
           added_at?: string
           added_from?: string | null
+          cost_code_id?: string | null
           cost_snapshot?: number | null
           cost_snapshot_at?: string | null
           cost_snapshot_currency?: string | null
@@ -24647,6 +24756,7 @@ export type Database = {
         Update: {
           added_at?: string
           added_from?: string | null
+          cost_code_id?: string | null
           cost_snapshot?: number | null
           cost_snapshot_at?: string | null
           cost_snapshot_currency?: string | null
@@ -24734,6 +24844,13 @@ export type Database = {
             columns: ["room_id"]
             isOneToOne: false
             referencedRelation: "project_rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_items_cost_code_id_fkey"
+            columns: ["cost_code_id"]
+            isOneToOne: false
+            referencedRelation: "cost_codes"
             referencedColumns: ["id"]
           },
         ]
@@ -27895,6 +28012,7 @@ export type Database = {
           amount_due: number | null
           amount_paid: number
           category_id: string | null
+          cost_code_id: string | null
           covers_order_id: string | null
           created_at: string
           created_by: string | null
@@ -27923,6 +28041,7 @@ export type Database = {
           amount_due?: number | null
           amount_paid?: number
           category_id?: string | null
+          cost_code_id?: string | null
           covers_order_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -27951,6 +28070,7 @@ export type Database = {
           amount_due?: number | null
           amount_paid?: number
           category_id?: string | null
+          cost_code_id?: string | null
           covers_order_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -28022,6 +28142,13 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_bills_cost_code_id_fkey"
+            columns: ["cost_code_id"]
+            isOneToOne: false
+            referencedRelation: "cost_codes"
             referencedColumns: ["id"]
           },
         ]
@@ -28769,6 +28896,7 @@ export type Database = {
         Row: {
           billed_at: string | null
           billed_invoice_id: string | null
+          cost_code_id: string | null
           created_at: string
           created_by: string | null
           customer_company_id: string | null
@@ -28788,6 +28916,7 @@ export type Database = {
         Insert: {
           billed_at?: string | null
           billed_invoice_id?: string | null
+          cost_code_id?: string | null
           created_at?: string
           created_by?: string | null
           customer_company_id?: string | null
@@ -28807,6 +28936,7 @@ export type Database = {
         Update: {
           billed_at?: string | null
           billed_invoice_id?: string | null
+          cost_code_id?: string | null
           created_at?: string
           created_by?: string | null
           customer_company_id?: string | null
@@ -28871,6 +29001,13 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_entries_cost_code_id_fkey"
+            columns: ["cost_code_id"]
+            isOneToOne: false
+            referencedRelation: "cost_codes"
             referencedColumns: ["id"]
           },
         ]
@@ -29664,6 +29801,7 @@ export type Database = {
           billed_at: string | null
           billed_invoice_id: string | null
           category: string
+          cost_code_id: string | null
           created_at: string
           currency: string
           description: string | null
@@ -29693,6 +29831,7 @@ export type Database = {
           billed_at?: string | null
           billed_invoice_id?: string | null
           category?: string
+          cost_code_id?: string | null
           created_at?: string
           currency?: string
           description?: string | null
@@ -29722,6 +29861,7 @@ export type Database = {
           billed_at?: string | null
           billed_invoice_id?: string | null
           category?: string
+          cost_code_id?: string | null
           created_at?: string
           currency?: string
           description?: string | null
@@ -29771,6 +29911,13 @@ export type Database = {
             columns: ["report_id"]
             isOneToOne: false
             referencedRelation: "trip_expense_reports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_expense_items_cost_code_id_fkey"
+            columns: ["cost_code_id"]
+            isOneToOne: false
+            referencedRelation: "cost_codes"
             referencedColumns: ["id"]
           },
         ]
@@ -35661,6 +35808,20 @@ export type Database = {
         Args: { p_terms: string; p_workspace_id: string }
         Returns: number
       }
+      get_project_cost_by_code: {
+        Args: { p_project_id: string }
+        Returns: {
+          cost_code_id: string
+          code: string
+          name: string
+          parent_id: string
+          supplier_cost: number
+          labor_cost: number
+          expense_cost: number
+          total_cost: number
+          entry_count: number
+        }[]
+      }
       get_supplier_price_break: {
         Args: {
           p_product_id: string
@@ -36380,6 +36541,7 @@ export type Database = {
         }
         Returns: string
       }
+      install_starter_cost_codes: { Args: { p_workspace_id: string }; Returns: number }
       is_admin: { Args: never; Returns: boolean }
       is_admin_user: { Args: never; Returns: boolean }
       is_business_user: { Args: never; Returns: boolean }

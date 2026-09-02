@@ -19,6 +19,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
 import { JobCostCard } from '../JobCostCard';
+import { CostByCodeCard } from '../CostByCodeCard';
 import { ProjectExpensesCard } from '../ProjectExpensesCard';
 import { ProjectLabourCard } from '../ProjectLabourCard';
 import { ProjectStockCard } from '../ProjectStockCard';
@@ -135,6 +136,10 @@ export const FinanceTab: React.FC<{ projectId: string; projectName?: string }> =
     <div className="space-y-4">
       {/* Job cost first: margin is the question this tab exists to answer. AR/AP is the detail. */}
       <JobCostCard projectId={projectId} reloadToken={costToken} workspaceId={activeWorkspaceId} />
+
+      {/* The same three cost components JobCostCard shows in total, split by code. Both read
+          derivations that share their predicates, so the two cards cannot disagree. */}
+      <CostByCodeCard projectId={projectId} currency={currency} reloadToken={costToken} />
 
       {/* Labour, at the typed rate against what payroll says it actually cost (#378 N1). Sits
           beside the job cost because it is the half of the margin that was an estimate wearing the

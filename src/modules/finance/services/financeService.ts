@@ -2202,6 +2202,13 @@ const _financeServiceCore = {
     issuedAt?: string | null;
     dueAt?: string | null;
     categoryId?: string | null;
+    /**
+     * Cost code — how this cost is classified in the job's own breakdown. Separate from
+     * `categoryId`, which is the accounting category: a plumber's invoice is category
+     * "Subcontractors" for the books and code "05.2 Plumbing & drainage" for the job, and a
+     * cost report built on either one alone answers a different question.
+     */
+    costCodeId?: string | null;
     notes?: string | null;
     /**
      * "What is this cost for?" — re-answered after the fact (#378 L1). Until this existed the
@@ -2229,6 +2236,7 @@ const _financeServiceCore = {
     if ('issuedAt' in patch) row.issued_at = patch.issuedAt || null;
     if ('dueAt' in patch) row.due_at = patch.dueAt || null;
     if ('categoryId' in patch) row.category_id = patch.categoryId || null;
+    if ('costCodeId' in patch) row.cost_code_id = patch.costCodeId || null;
     if ('notes' in patch) row.notes = patch.notes?.trim() || null;
     if (patch.link) {
       row.project_id = patch.link.projectId;

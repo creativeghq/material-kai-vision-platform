@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Save, Upload, Loader2, ImageIcon, Mail, Send, ExternalLink, Info, SlidersHorizontal, Building2, FileText, Tag, CreditCard, Wrench, Users, Tags, Store, FileSignature, Landmark } from 'lucide-react';
+import { Save, Upload, Loader2, ImageIcon, Mail, Send, ExternalLink, Info, SlidersHorizontal, Building2, FileText, Tag, CreditCard, Wrench, Users, Tags, Store, FileSignature, Landmark, Ruler } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { CostCodesPanel } from '@/components/business/costCodes/CostCodesPanel';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { MoneyInput } from '@/components/core/ui/money-input';
@@ -49,6 +50,7 @@ const SETTINGS_SECTIONS = [
   { value: 'einvoicing', label: 'e-Invoicing', icon: FileSignature },
   { value: 'pricing', label: 'Pricing', icon: Tag },
   { value: 'categories', label: 'Categories', icon: Tags },
+  { value: 'costcodes', label: 'Cost Codes', icon: Ruler },
   { value: 'services', label: 'Services', icon: Wrench },
   { value: 'team', label: 'Team', icon: Users },
   { value: 'storefront', label: 'Online Store', icon: Store },
@@ -242,6 +244,10 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
 
         <TabsContent value="categories" className="mt-0">
           <CategoriesCard workspaceId={workspaceId} />
+        </TabsContent>
+
+        <TabsContent value="costcodes" className="mt-0">
+          <CostCodesPanel workspaceId={workspaceId} />
         </TabsContent>
 
         <TabsContent value="services" className="mt-0">

@@ -22,6 +22,7 @@ import {
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
+import { CostCodePicker } from '@/components/business/costCodes/CostCodePicker';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import {
@@ -61,6 +62,7 @@ export const LogTimeDialog: React.FC<{
   const [description, setDescription] = useState('');
   const [billable, setBillable] = useState(true);
   const [task, setTask] = useState<string>(NO_TASK);
+  const [costCodeId, setCostCodeId] = useState<string | null>(null);
 
   const reset = useCallback(() => {
     // The OPERATOR's calendar day, never UTC: `new Date().toISOString().slice(0,10)` returns
@@ -98,6 +100,7 @@ export const LogTimeDialog: React.FC<{
         hourly_rate: rateValue,
         description: description.trim(),
         is_billable: billable,
+        cost_code_id: costCodeId,
       });
       toast({ title: 'Time logged', description: `${(minutes / 60).toFixed(2)}h on this project.` });
       onOpenChange(false);
@@ -139,6 +142,11 @@ export const LogTimeDialog: React.FC<{
                 {tasks.map((t) => <SelectItem key={t.id} value={t.id}>{t.title}</SelectItem>)}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Cost code <span className="text-muted-foreground">(optional)</span></Label>
+            <CostCodePicker value={costCodeId} onChange={setCostCodeId} />
           </div>
 
           <div className="space-y-1.5">

@@ -20,6 +20,8 @@ export interface TimeEntry {
   hourly_rate: number;
   description: string;
   is_billable: boolean;
+  /** Cost code — the job-breakdown classification `get_project_cost_by_code` groups labour by. */
+  cost_code_id: string | null;
   billed_invoice_id: string | null;
   billed_at: string | null;
   created_at: string;
@@ -35,6 +37,8 @@ export interface NewTimeEntry {
   hourly_rate: number;
   description: string;
   is_billable?: boolean;
+  /** How this labour is classified in the job's cost breakdown. */
+  cost_code_id?: string | null;
   /**
    * Whose hours these are when the worker has NO platform login (#378 N1) — an `hr_employees` id.
    * Mutually exclusive with the signed-in user, enforced by `time_entries_single_worker_ck`:
@@ -132,13 +136,14 @@ export const timeTrackingService = {
       hourly_rate: entry.hourly_rate,
       description: entry.description,
       is_billable: entry.is_billable ?? true,
+      cost_code_id: entry.cost_code_id ?? null,
       created_by: auth.user?.id ?? null,
     }).select().single();
     if (error) throw error;
     return data as TimeEntry;
   },
 
-  async update(id: string, patch: Partial<Pick<TimeEntry, 'work_date' | 'minutes' | 'hourly_rate' | 'description' | 'is_billable'>>): Promise<void> {
+  async update(id: string, patch: Partial<Pick<TimeEntry, 'work_date' | 'minutes' | 'hourly_rate' | 'description' | 'is_billable' | 'cost_code_id'>>): Promise<void> {
     const { error } = await supabase.from('time_entries').update(patch).eq('id', id);
     if (error) throw error;
   },

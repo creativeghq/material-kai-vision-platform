@@ -26,6 +26,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
+import { CostCodePicker } from '@/components/business/costCodes/CostCodePicker';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Loader2, Paperclip, ExternalLink } from 'lucide-react';
@@ -114,6 +115,7 @@ export const EditSupplierBillDialog: React.FC<{
   const [issuedAt, setIssuedAt] = useState('');
   const [dueAt, setDueAt] = useState('');
   const [categoryId, setCategoryId] = useState<string>(NO_CATEGORY);
+  const [costCodeId, setCostCodeId] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
   const [link, setLink] = useState<OrderLinkTarget>({ kind: 'none' });
   /**
@@ -135,7 +137,7 @@ export const EditSupplierBillDialog: React.FC<{
       // The five link columns are not on PayableExpense (the AP list has no use for them), so
       // they are read here rather than widening a type every payables row pays for.
       supabase.from('supplier_bills')
-        .select('project_id, order_id, covers_order_id, trip_report_id, property_id, receipt_path, receipt_name')
+        .select('project_id, order_id, covers_order_id, trip_report_id, property_id, receipt_path, receipt_name, cost_code_id')
         .eq('id', billId).maybeSingle(),
     ])
       .then(async ([rows, linkRow]) => {
@@ -146,7 +148,8 @@ export const EditSupplierBillDialog: React.FC<{
         setDueAt(b?.due_at?.slice(0, 10) ?? '');
         setCategoryId(b?.category_id ?? NO_CATEGORY);
         setNotes(b?.notes ?? '');
-        const rec = (linkRow.data ?? {}) as { receipt_path?: string | null; receipt_name?: string | null };
+        const rec = (linkRow.data ?? {}) as { receipt_path?: string | null; receipt_name?: string | null; cost_code_id?: string | null };
+        setCostCodeId(rec.cost_code_id ?? null);
         setReceiptName(rec.receipt_path ? (rec.receipt_name || 'Receipt') : null);
         const cols = { ...EMPTY_LINK, ...((linkRow.data ?? {}) as Partial<BillLinkColumns>) };
         const resolved = await resolveLink(cols);
@@ -170,6 +173,7 @@ export const EditSupplierBillDialog: React.FC<{
         issuedAt: issuedAt || null,
         dueAt: dueAt || null,
         categoryId: categoryId === NO_CATEGORY ? null : categoryId,
+        costCodeId,
         notes,
         ...(cols ? { link: {
           projectId: cols.project_id,
@@ -255,6 +259,14 @@ export const EditSupplierBillDialog: React.FC<{
                   {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Cost code</Label>
+              <CostCodePicker value={costCodeId} onChange={setCostCodeId} />
+              <p className="text-[11px] text-muted-foreground">
+                How this cost is classified on the job. Separate from the accounting category —
+                the project cost report groups by this.
+              </p>
             </div>
             <div className="space-y-1.5">
               <Label>Notes</Label>
