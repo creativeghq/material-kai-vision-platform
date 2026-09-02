@@ -19,7 +19,8 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
 import { JobCostCard } from '../JobCostCard';
-import { CostByCodeCard } from '../CostByCodeCard';
+import { CvrCard } from '../CvrCard';
+import { VariationsCard } from '../VariationsCard';
 import { ProjectExpensesCard } from '../ProjectExpensesCard';
 import { ProjectLabourCard } from '../ProjectLabourCard';
 import { ProjectStockCard } from '../ProjectStockCard';
@@ -41,13 +42,15 @@ const KIND_LABEL: Record<string, string> = {
 export const FinanceTab: React.FC<{ projectId: string; projectName?: string }> = ({ projectId, projectName }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { can } = usePermissions();
+  const { can, isWorkspaceManager } = usePermissions();
   const { activeWorkspaceId } = useWorkspace();
   const [summary, setSummary] = useState<ProjectFinanceSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [picker, setPicker] = useState<'receivable' | 'payable' | null>(null);
   // Bumped when an expense is booked or unlinked, so the job-cost card re-derives.
   const [costToken, setCostToken] = useState(0);
+  /** Bumped when a variation changes, so the CVR beside it reloads with the new figures. */
+  const [cvrToken, setCvrToken] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -137,9 +140,18 @@ export const FinanceTab: React.FC<{ projectId: string; projectName?: string }> =
       {/* Job cost first: margin is the question this tab exists to answer. AR/AP is the detail. */}
       <JobCostCard projectId={projectId} reloadToken={costToken} workspaceId={activeWorkspaceId} />
 
-      {/* The same three cost components JobCostCard shows in total, split by code. Both read
-          derivations that share their predicates, so the two cards cannot disagree. */}
-      <CostByCodeCard projectId={projectId} currency={currency} reloadToken={costToken} />
+      {/* The CVR supersedes the plain cost-by-code card: cost with no value beside it cannot say
+          whether the job is making money. It reads get_project_cvr, which itself selects from
+          get_project_cost_by_code, so the cost half has one derivation shared with JobCostCard. */}
+      <CvrCard projectId={projectId} currency={currency} reloadToken={cvrToken} />
+
+      <VariationsCard
+        projectId={projectId}
+        workspaceId={activeWorkspaceId}
+        currency={currency}
+        isOwner={isWorkspaceManager}
+        onChanged={() => setCvrToken((t) => t + 1)}
+      />
 
       {/* Labour, at the typed rate against what payroll says it actually cost (#378 N1). Sits
           beside the job cost because it is the half of the margin that was an estimate wearing the

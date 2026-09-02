@@ -117,7 +117,7 @@ describe('cost code coverage', () => {
   const NOT_YET_WIRED: Record<string, string> = {
     order_items: 'Order lines are coded with the commitment work, which needs the apportionment rule get_project_cost_by_code deliberately does not invent.',
     quote_items: 'Quote lines become the priced schedule in the BoQ work; coding them before that would be a second place to type the same thing.',
-    invoice_items: 'The value side of the CVR, which does not exist yet.',
+    invoice_items: 'The CVR takes value from accepted QUOTES, not invoices; coding invoice lines becomes meaningful with applications for payment.',
     project_purchase_items: 'The project shopping list is pre-commitment; it carries no money get_project_cost_by_code reads.',
     project_tasks: 'Progress-by-code needs the schedule work first.',
     project_snags: 'Snag-by-trade filtering is site work, not cost reporting.',
@@ -166,12 +166,16 @@ describe('cost code coverage', () => {
   });
 
   /**
-   * The card formats the SQL's own per-row total. It must never add the three components back up
-   * itself — that would be a second derivation of the same money, free to drift from the first.
+   * The CVR card formats the SQL's own per-row figures. It must never rebuild a row total from
+   * its components — that would be a second derivation of the same money, free to drift from the
+   * first. It superseded CostByCodeCard, which showed the cost half with no value beside it.
    */
-  it('the cost-by-code card does not re-derive a row total in TypeScript', () => {
-    const card = FILES.find((f) => f.path.endsWith('/components/CostByCodeCard.tsx'));
-    expect(card, 'CostByCodeCard.tsx should exist').toBeTruthy();
-    expect(card!.src).not.toMatch(/supplier_cost\s*\+\s*.*labor_cost/);
+  it('the CVR card does not re-derive a row total in TypeScript', () => {
+    const card = FILES.find((f) => f.path.endsWith('/components/CvrCard.tsx'));
+    expect(card, 'CvrCard.tsx should exist').toBeTruthy();
+    expect(card!.src).not.toMatch(/actual_cost\s*\+\s*.*committed_cost/);
+    expect(card!.src).not.toMatch(/contracted_value\s*\+\s*.*variation_value/);
+    // And the superseded card is gone rather than left beside it showing a different number.
+    expect(FILES.find((f) => f.path.endsWith('/components/CostByCodeCard.tsx'))).toBeFalsy();
   });
 });

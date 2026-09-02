@@ -21988,6 +21988,123 @@ export type Database = {
           },
         ]
       }
+      project_variations: {
+        Row: {
+          cost_code_id: string | null
+          counterparty_company_id: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          decided_at: string | null
+          decided_by: string | null
+          decision_note: string | null
+          description: string | null
+          direction: string
+          id: string
+          order_id: string | null
+          origin: string
+          project_id: string
+          quote_id: string | null
+          raised_on: string
+          reference: string | null
+          status: string
+          submitted_at: string | null
+          time_impact_days: number
+          title: string
+          updated_at: string
+          value: number
+          workspace_id: string
+        }
+        Insert: {
+          cost_code_id?: string | null
+          counterparty_company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_note?: string | null
+          description?: string | null
+          direction: string
+          id?: string
+          order_id?: string | null
+          origin?: string
+          project_id: string
+          quote_id?: string | null
+          raised_on?: string
+          reference?: string | null
+          status?: string
+          submitted_at?: string | null
+          time_impact_days?: number
+          title: string
+          updated_at?: string
+          value?: number
+          workspace_id: string
+        }
+        Update: {
+          cost_code_id?: string | null
+          counterparty_company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_note?: string | null
+          description?: string | null
+          direction?: string
+          id?: string
+          order_id?: string | null
+          origin?: string
+          project_id?: string
+          quote_id?: string | null
+          raised_on?: string
+          reference?: string | null
+          status?: string
+          submitted_at?: string | null
+          time_impact_days?: number
+          title?: string
+          updated_at?: string
+          value?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_variations_cost_code_id_fkey"
+            columns: ["cost_code_id"]
+            isOneToOne: false
+            referencedRelation: "cost_codes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_variations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_variations_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_variations_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_variations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           accepted_quote_count: number
@@ -35863,6 +35980,23 @@ export type Database = {
           expense_cost: number
           total_cost: number
           entry_count: number
+        }[]
+      }
+      get_project_cvr: {
+        Args: { p_project_id: string }
+        Returns: {
+          cost_code_id: string
+          code: string
+          name: string
+          contracted_value: number
+          variation_value: number
+          total_value: number
+          actual_cost: number
+          committed_cost: number
+          supplier_variation_cost: number
+          total_cost: number
+          margin: number
+          margin_pct: number
         }[]
       }
       get_supplier_price_break: {
