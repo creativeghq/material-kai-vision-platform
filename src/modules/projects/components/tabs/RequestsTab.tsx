@@ -10,13 +10,15 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Checkbox } from '@/components/core/ui/checkbox';
+import { Badge } from '@/components/core/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { humanizeLabel } from '@/utils/humanize';
 import { statusTone } from '@/utils/statusTone';
-import { formatDate } from '@/utils/datetime';
+import { formatDate, todayLocalISO } from '@/utils/datetime';
 import {
   projectRequestsService, REQUEST_KINDS, REQUEST_STATUSES, REQUEST_CLOSED_STATUSES,
+  REVIEW_DECISIONS, CLOSING_REVIEW_DECISIONS, isTeamFacing, type ReviewDecision,
   type ProjectRequestWithMessages, type RequestKind, type RequestStatus,
 } from '../../services/projectRequestsService';
 
@@ -85,6 +87,21 @@ export const RequestsTab: React.FC<{
     catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
   };
 
+  const review = async (request: ProjectRequestWithMessages, decision: ReviewDecision) => {
+    try {
+      await projectRequestsService.setReviewDecision(request, decision);
+      await load();
+      toast({
+        title: humanizeLabel(decision),
+        description: CLOSING_REVIEW_DECISIONS.includes(decision)
+          ? `${request.reference ?? 'The submittal'} is closed.`
+          : `${request.reference ?? 'The submittal'} stays open for the next revision.`,
+      });
+    } catch (err: any) {
+      toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
+    }
+  };
+
   const remove = async (request: ProjectRequestWithMessages) => {
     if (!confirm('Delete this request and its replies?')) return;
     try { await projectRequestsService.remove(request.id); await load(); }
@@ -133,8 +150,25 @@ export const RequestsTab: React.FC<{
                       onClick={() => { setOpenId(expanded ? null : r.id); setReply(''); }}
                     >
                       <div className="flex flex-wrap items-center gap-2">
+                        {/* The register number, when it has one. Team-facing kinds are numbered
+                            because an RFI has to mean the same thing to the architect who never
+                            logs in here; a client question does not. */}
+                        {r.reference && (
+                          <span className="font-mono text-xs tabular-nums text-muted-foreground">{r.reference}</span>
+                        )}
                         <p className="font-medium">{r.title}</p>
                         <span className="text-[11px] text-muted-foreground">{humanizeLabel(r.kind)}</span>
+                        {r.revision > 0 && (
+                          <span className="text-[11px] text-muted-foreground">rev {r.revision}</span>
+                        )}
+                        {r.review_decision && (
+                          <Badge variant={
+                            r.review_decision === 'rejected' ? 'error'
+                              : r.review_decision === 'revise_and_resubmit' ? 'warning' : 'success'
+                          }>
+                            {humanizeLabel(r.review_decision)}
+                          </Badge>
+                        )}
                         {r.approval_decision && (
                           <span className={`text-[11px] ${r.approval_decision === 'approved' ? 'text-emerald-700 dark:text-emerald-400' : 'text-destructive'}`}>
                             {humanizeLabel(r.approval_decision)}
@@ -146,6 +180,19 @@ export const RequestsTab: React.FC<{
                         {r.raised_by_name || 'Someone'} · {formatDate(r.created_at)}
                         {r.messages.length > 0 && ` · ${r.messages.length} repl${r.messages.length === 1 ? 'y' : 'ies'}`}
                       </p>
+                      {r.due_at && (
+                        /* Overdue is a fact about an unanswered request, so it is only said while
+                           one is still open — a resolved RFI that was late is history, not a task. */
+                        <p className={`text-xs ${
+                          !REQUEST_CLOSED_STATUSES.includes(r.status) && r.due_at < todayLocalISO()
+                            ? 'text-destructive'
+                            : 'text-muted-foreground'
+                        }`}>
+                          {!REQUEST_CLOSED_STATUSES.includes(r.status) && r.due_at < todayLocalISO()
+                            ? `Answer was needed by ${formatDate(r.due_at)}`
+                            : `Answer needed by ${formatDate(r.due_at)}`}
+                        </p>
+                      )}
                     </button>
                     <div className="flex shrink-0 items-center gap-2">
                       {isOwner ? (
@@ -194,6 +241,26 @@ export const RequestsTab: React.FC<{
                         </div>
                       )}
 
+                      {/* A submittal is closed by RECORDING THE VERDICT, never by the status
+                          dropdown: the database refuses a resolved submittal with no decision, and
+                          the verdict is the only thing anybody needs from it later — whether the
+                          thing may be installed. `revise_and_resubmit` reopens and bumps the
+                          revision rather than closing, which is the state worth chasing. */}
+                      {isOwner && r.kind === 'submittal' && (
+                        <div className="flex flex-wrap gap-2">
+                          {REVIEW_DECISIONS.map((d) => (
+                            <Button
+                              key={d}
+                              size="sm"
+                              variant={r.review_decision === d ? 'secondary' : 'outline'}
+                              onClick={() => void review(r, d)}
+                            >
+                              {humanizeLabel(d)}
+                            </Button>
+                          ))}
+                        </div>
+                      )}
+
                       <div className="flex gap-2">
                         <Input
                           value={reply} onChange={(e) => setReply(e.target.value)}
@@ -234,11 +301,18 @@ const NewRequestDialog: React.FC<{
   const [body, setBody] = useState('');
   const [kind, setKind] = useState<RequestKind>('question');
   const [clientVisible, setClientVisible] = useState(true);
+  const [dueAt, setDueAt] = useState('');
   const [saving, setSaving] = useState(false);
 
   // A collaborator cannot open an approval request — the DB insert policy refuses it, so it is
-  // not offered either.
-  const kinds = isOwner ? REQUEST_KINDS : REQUEST_KINDS.filter((k) => k !== 'approval_request');
+  // not offered either. RFIs and submittals are withheld from them for a different reason: those
+  // go UP to the design team on the project's behalf, and a client raising one would put a
+  // numbered commitment into the register that nobody on the team agreed to.
+  const kinds = isOwner
+    ? REQUEST_KINDS
+    : REQUEST_KINDS.filter((k) => k !== 'approval_request' && !isTeamFacing(k));
+
+  const teamFacing = isTeamFacing(kind);
 
   const save = async () => {
     if (!title.trim()) { toast({ title: 'Title required', variant: 'destructive' }); return; }
@@ -249,7 +323,11 @@ const NewRequestDialog: React.FC<{
         title: title.trim(),
         body: body.trim() || null,
         kind,
-        client_visible: isOwner ? clientVisible : true,
+        // A team-facing request is internal by default and the checkbox is not offered for it —
+        // an RFI is a question about a problem in the architect's information, and publishing the
+        // project's open problems to the customer is not what raising one means.
+        client_visible: teamFacing ? false : (isOwner ? clientVisible : true),
+        due_at: dueAt || null,
       });
       onSaved();
     } catch (err: any) {
@@ -281,7 +359,17 @@ const NewRequestDialog: React.FC<{
               {kinds.map((k) => <option key={k} value={k}>{humanizeLabel(k)}</option>)}
             </select>
           </div>
-          {isOwner && (
+          {teamFacing && (
+            <div className="space-y-1">
+              <Label className="text-xs">Answer needed by</Label>
+              <Input type="date" value={dueAt} onChange={(e) => setDueAt(e.target.value)} />
+              <p className="text-[11px] text-muted-foreground">
+                Optional, but it is what turns this from a question into something somebody can be
+                late on. {kind === 'rfi' ? 'The number is assigned when you raise it.' : ''}
+              </p>
+            </div>
+          )}
+          {isOwner && !teamFacing && (
             <label className="flex items-center gap-2 text-sm">
               <Checkbox checked={clientVisible} onCheckedChange={(v) => setClientVisible(!!v)} />
               {clientVisible

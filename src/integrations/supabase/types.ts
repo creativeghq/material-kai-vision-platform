@@ -21577,12 +21577,16 @@ export type Database = {
           body: string | null
           client_visible: boolean
           created_at: string
+          due_at: string | null
           id: string
           kind: string
           project_id: string
           raised_by: string | null
           raised_by_name: string | null
+          reference: string | null
           resolved_at: string | null
+          review_decision: string | null
+          revision: number
           status: string
           target_id: string | null
           target_type: string
@@ -21595,12 +21599,16 @@ export type Database = {
           body?: string | null
           client_visible?: boolean
           created_at?: string
+          due_at?: string | null
           id?: string
           kind?: string
           project_id: string
           raised_by?: string | null
           raised_by_name?: string | null
+          reference?: string | null
           resolved_at?: string | null
+          review_decision?: string | null
+          revision?: number
           status?: string
           target_id?: string | null
           target_type?: string
@@ -21613,12 +21621,16 @@ export type Database = {
           body?: string | null
           client_visible?: boolean
           created_at?: string
+          due_at?: string | null
           id?: string
           kind?: string
           project_id?: string
           raised_by?: string | null
           raised_by_name?: string | null
+          reference?: string | null
           resolved_at?: string | null
+          review_decision?: string | null
+          revision?: number
           status?: string
           target_id?: string | null
           target_type?: string

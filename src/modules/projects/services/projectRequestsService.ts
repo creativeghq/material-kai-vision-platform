@@ -10,15 +10,25 @@
 import { supabase } from '@/integrations/supabase/client';
 import { flowEventService } from '@/services/flows/flowEventService';
 
-export type RequestTargetType = 'project' | 'moodboard' | 'client_view' | 'room' | 'sheet' | 'product';
-export type RequestKind = 'question' | 'change_request' | 'approval_request' | 'info_request';
-export type RequestStatus = 'open' | 'answered' | 'resolved' | 'wont_do';
+// The value-sets live in an import-free module so they can be tested without a Supabase client
+// (this file constructs one at module load). Re-exported so existing imports keep working.
+export {
+  REQUEST_KINDS,
+  REQUEST_STATUSES,
+  REQUEST_CLOSED_STATUSES,
+  REVIEW_DECISIONS,
+  TEAM_FACING_KINDS,
+  CLOSING_REVIEW_DECISIONS,
+  isTeamFacing,
+} from '../requestVocabulary';
+export type {
+  RequestTargetType, RequestKind, RequestStatus, ReviewDecision,
+} from '../requestVocabulary';
 
-export const REQUEST_KINDS: RequestKind[] = ['question', 'change_request', 'approval_request', 'info_request'];
-export const REQUEST_STATUSES: RequestStatus[] = ['open', 'answered', 'resolved', 'wont_do'];
-
-/** Statuses that mean the request no longer needs a reply. Mirrors the SQL trigger. */
-export const REQUEST_CLOSED_STATUSES: RequestStatus[] = ['resolved', 'wont_do'];
+import {
+  isTeamFacing, CLOSING_REVIEW_DECISIONS, REQUEST_CLOSED_STATUSES,
+  type RequestTargetType, type RequestKind, type RequestStatus, type ReviewDecision,
+} from '../requestVocabulary';
 
 export interface ProjectRequest {
   id: string;
@@ -30,6 +40,14 @@ export interface ProjectRequest {
   body: string | null;
   status: RequestStatus;
   approval_decision: 'approved' | 'declined' | null;
+  /** Register number — 'RFI-003'. Assigned by the DB for team-facing kinds, null for the rest. */
+  reference: string | null;
+  /** When the answer is needed. An RFI without one is just a question. */
+  due_at: string | null;
+  /** Submittals only, pinned there by `project_requests_review_only_on_submittal`. */
+  review_decision: ReviewDecision | null;
+  /** Submittal resubmissions. Rev 0 is the first issue. */
+  revision: number;
   assignee_id: string | null;
   client_visible: boolean;
   raised_by: string | null;
@@ -62,6 +80,7 @@ export interface NewRequest {
   body?: string | null;
   client_visible?: boolean;
   assignee_id?: string | null;
+  due_at?: string | null;
 }
 
 /**
@@ -111,8 +130,14 @@ export const projectRequestsService = {
         kind: input.kind ?? 'question',
         title: input.title,
         body: input.body ?? null,
-        client_visible: input.client_visible ?? true,
+        // Team-facing kinds default to INTERNAL. An RFI is a question to the architect about a
+        // problem in their information; defaulting it visible would publish the project's open
+        // problems to the customer, which is what `client_visible ?? true` would have done.
+        client_visible: input.client_visible ?? !isTeamFacing(input.kind ?? 'question'),
         assignee_id: input.assignee_id ?? null,
+        due_at: input.due_at ?? null,
+        // `reference` is deliberately absent: the DB assigns it inside the same statement, so
+        // there is no create-then-number pair a retry could run twice.
         raised_by: user?.id ?? null,
         raised_by_name: raiserName,
       })
@@ -216,6 +241,39 @@ export const projectRequestsService = {
         project_id: request.project_id,
       });
     }
+  },
+
+  /**
+   * Record a submittal's verdict, and move the status with it in ONE write.
+   *
+   * The two belong together: `project_requests_submittal_resolved_needs_decision` refuses a
+   * resolved submittal with no verdict, so setting them separately means a first write that the
+   * database rejects or a window where the register shows a closed submittal nobody decided.
+   *
+   * `revise_and_resubmit` is NOT a closing verdict — it reopens and bumps the revision, because
+   * the whole point of tracking submittals is knowing which ones are still going round.
+   */
+  async setReviewDecision(request: ProjectRequest, decision: ReviewDecision): Promise<void> {
+    if (request.kind !== 'submittal') {
+      throw new Error('Only a submittal carries a review decision.');
+    }
+    const closing = CLOSING_REVIEW_DECISIONS.includes(decision);
+    const { error } = await (supabase as any)
+      .from('project_requests')
+      .update({
+        review_decision: decision,
+        status: closing ? 'resolved' : 'open',
+        revision: closing ? request.revision : request.revision + 1,
+      })
+      .eq('id', request.id);
+    if (error) throw error;
+  },
+
+  /** The date an answer is needed by. Cleared with null. */
+  async setDueAt(requestId: string, dueAt: string | null): Promise<void> {
+    const { error } = await (supabase as any)
+      .from('project_requests').update({ due_at: dueAt || null }).eq('id', requestId);
+    if (error) throw error;
   },
 
   async setAssignee(requestId: string, assigneeId: string | null): Promise<void> {
