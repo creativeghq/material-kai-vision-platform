@@ -14613,5 +14613,34 @@
       }
     ],
     "response": "{ success, status: 'read'|'unreadable', fields: { drawing_number, title, revision, discipline, purpose, scale, sheet_size, issued_at, issuer, notes }, unmapped, confidence }"
+  },
+  {
+    "name": "structure-site-note",
+    "tag": "Projects",
+    "summary": "Turn a dictated site walk into a diary entry and the defects it described",
+    "description": "One site walk normally produces two kinds of record at once — a diary entry about the day and several distinct defects — so this returns both, with each defect as its own record because they get assigned and closed separately. The reader is a forced Anthropic tool call over the transcript; credits are debited BEFORE the model runs and the prompt is loaded from the database with no code fallback. The workspace is derived from the PROJECT row rather than the body. Rooms are read server-side and a returned room_id is validated against them, because a room list supplied by the caller could name another project's rooms and the id is written onto a defect. It writes NOTHING: a transcription mishears, and a defect filed straight off a mishearing is a job somebody gets sent to do, so the caller confirms and siteService does the writes. Everything heard but not placed comes back under `unclear`, `dropped` or `room_unmatched` rather than being discarded.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "project_id",
+        "type": "string (uuid)",
+        "required": true,
+        "desc": "The project the records belong to. Its workspace is what the caller is checked against; a project in another workspace reports as not found."
+      },
+      {
+        "name": "transcript",
+        "type": "string",
+        "required": true,
+        "desc": "What was dictated. Capped at 20,000 characters — a long walk is a few hundred words."
+      }
+    ],
+    "response": "{ success, status, log: { notes, weather, attendance } | null, snags: [{ title, description, severity, room_id, room_unmatched }], unclear, dropped, severities }"
   }
 ]

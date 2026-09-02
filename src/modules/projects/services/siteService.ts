@@ -147,6 +147,38 @@ export const siteService = {
     return (data || []) as ProjectSnag[];
   },
 
+  /**
+   * Turn a dictated site walk into the records it described. Returns a PROPOSAL; writes nothing.
+   *
+   * One walk normally produces a diary entry AND several defects — "quiet day, plasterers in, and
+   * the ensuite tile is cracked" is one sentence and three records. They come back separately
+   * because they are assigned and closed separately, and the person confirms them before anything
+   * is created: a transcription mishears, and a defect written straight to the list off a
+   * mishearing is a job somebody gets sent to do.
+   */
+  async structureDictation(projectId: string, transcript: string): Promise<{
+    log: { notes: string; weather: string | null; attendance: string | null } | null;
+    snags: Array<{
+      title: string;
+      description: string | null;
+      severity: SnagSeverity | null;
+      room_id: string | null;
+      /** A room the dictation named that no room on this project matched. */
+      room_unmatched: string | null;
+    }>;
+    /** Heard but not placed — the person reads this and fixes it. */
+    unclear: string | null;
+    /** Defects that arrived with no usable title, named rather than silently discarded. */
+    dropped: string[];
+  }> {
+    const { data, error } = await supabase.functions.invoke('structure-site-note', {
+      body: { project_id: projectId, transcript },
+    });
+    if (error) throw new Error(error.message || 'The dictation could not be read.');
+    if (!data?.success) throw new Error(data?.error || 'The dictation could not be turned into records.');
+    return data;
+  },
+
   async createSnag(input: NewSnag, photos: File[] = []): Promise<ProjectSnag> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');

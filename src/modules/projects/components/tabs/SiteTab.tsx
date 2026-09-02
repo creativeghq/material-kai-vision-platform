@@ -7,7 +7,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Loader2, Plus, Trash2, ClipboardList, CalendarDays, ImagePlus, Eye, EyeOff,
+  Loader2, Plus, Trash2, ClipboardList, CalendarDays, ImagePlus, Eye, EyeOff, Mic,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -25,6 +25,7 @@ import {
   type ProjectSnag, type ProjectSiteLog, type SnagStatus, type SnagSeverity,
 } from '../../services/siteService';
 import { HubEmptyState } from '@/components/core/hub';
+import { DictateSiteWalkDialog } from '../DictateSiteWalkDialog';
 
 type View = 'snags' | 'log';
 
@@ -68,6 +69,9 @@ const severityTone = (s: SnagSeverity) =>
 
 export const SiteTab: React.FC<{ projectId: string; isOwner: boolean }> = ({ projectId, isOwner }) => {
   const [view, setView] = useState<View>('snags');
+  const [dictating, setDictating] = useState(false);
+  /** Bumped after a dictation so both views reload — one walk writes into both of them. */
+  const [reloadToken, setReloadToken] = useState(0);
 
   const Toggle: React.FC<{ value: View; icon: React.ReactNode; label: string }> = ({ value, icon, label }) => (
     <button
@@ -83,15 +87,30 @@ export const SiteTab: React.FC<{ projectId: string; isOwner: boolean }> = ({ pro
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {/* Dictation sits ABOVE the two views rather than inside either, because one site walk
+            writes into both — the day goes in the log and the faults become snags. */}
+        {isOwner && (
+          <Button size="sm" variant="secondary" onClick={() => setDictating(true)}>
+            <Mic className="h-3.5 w-3.5 mr-1" /> Dictate a walk
+          </Button>
+        )}
         <div className="flex rounded-md border border-border/60 p-0.5">
           <Toggle value="snags" icon={<ClipboardList className="h-3.5 w-3.5" />} label="Snags" />
           <Toggle value="log" icon={<CalendarDays className="h-3.5 w-3.5" />} label="Site log" />
         </div>
       </div>
       {view === 'snags'
-        ? <SnagsView projectId={projectId} isOwner={isOwner} />
-        : <SiteLogView projectId={projectId} isOwner={isOwner} />}
+        ? <SnagsView key={`snags-${reloadToken}`} projectId={projectId} isOwner={isOwner} />
+        : <SiteLogView key={`log-${reloadToken}`} projectId={projectId} isOwner={isOwner} />}
+
+      {dictating && (
+        <DictateSiteWalkDialog
+          projectId={projectId}
+          onClose={() => setDictating(false)}
+          onSaved={() => { setDictating(false); setReloadToken((t) => t + 1); }}
+        />
+      )}
     </div>
   );
 };
