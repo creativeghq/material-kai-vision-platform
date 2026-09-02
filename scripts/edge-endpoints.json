@@ -14578,5 +14578,40 @@
       "POST"
     ],
     "actions": []
+  },
+  {
+    "name": "scan-drawing-title-block",
+    "tag": "Projects",
+    "summary": "Read a drawing's title block into project drawing-register fields",
+    "description": "Turns a PDF or image of a drawing sheet into the fields a register entry needs: drawing number, title, revision, discipline, scale, sheet size, issue date and the purpose it was issued for. The reader is a forced Anthropic tool call over the sheet; credits are debited BEFORE the model runs, and the prompt is loaded from the database with no code fallback. The workspace is derived from the PROJECT row rather than the body, so naming a workspace you belong to does not grant a scan against a project you do not own. It deliberately writes nothing: a scanner that also created register entries would file a whole drawing set off a model's reading, and a wrong drawing number stays invisible until somebody builds from the wrong sheet. discipline and purpose are snapped onto the controlled vocabularies the register offers, and anything that could not be placed is returned under unmapped rather than dropped. An unreadable issue date comes back null, never defaulted to today, because a drawing stamped with today shows as issued on time.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "project_id",
+        "type": "string (uuid)",
+        "required": true,
+        "desc": "The register's project. Its workspace is what the caller is checked against; a project in another workspace reports as not found."
+      },
+      {
+        "name": "content_type",
+        "type": "string",
+        "required": true,
+        "desc": "application/pdf or image/jpeg|png|webp|gif|heic|heif"
+      },
+      {
+        "name": "data_base64",
+        "type": "string",
+        "required": true,
+        "desc": "The sheet, base64 or a data URL. Capped at about 4 MB so a credit is never spent on a call the provider would reject."
+      }
+    ],
+    "response": "{ success, status: 'read'|'unreadable', fields: { drawing_number, title, revision, discipline, purpose, scale, sheet_size, issued_at, issuer, notes }, unmapped, confidence }"
   }
 ]

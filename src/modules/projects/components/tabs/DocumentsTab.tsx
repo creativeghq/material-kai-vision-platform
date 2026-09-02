@@ -3,14 +3,27 @@
  *
  * A document is a named slot; revisions stack under it and exactly one is current. Clients see
  * only the current revision of `client_visible` documents — enforced by RLS, not by this UI.
+ *
+ * What makes it a REGISTER rather than a file list is the drawing number (the sheet's own
+ * identity, unique per project) and, per revision, the issue date and the purpose it was issued
+ * for. `for_construction` is the only status somebody may build from, so a current revision that
+ * is anything else is called out here rather than left for the reader to notice.
+ *
+ * The title-block scanner PREFILLS this form and writes nothing. A scanner that also created the
+ * register entry would file a whole drawing set off a model's reading, and a wrong drawing number
+ * stays invisible until somebody builds from the wrong sheet.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { Loader2, Plus, FileStack, Download, Trash2, Eye, EyeOff, Upload, History, FileText } from 'lucide-react';
+import { Loader2, Plus, FileStack, Download, Trash2, Eye, EyeOff, Upload, History, FileText, ScanLine } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Checkbox } from '@/components/core/ui/checkbox';
+import { Badge } from '@/components/core/ui/badge';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/core/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/utils/datetime';
@@ -19,6 +32,11 @@ import {
   type ProjectDocumentWithRevisions, type ProjectDocumentRevision,
 } from '../../services/projectDocumentsService';
 import { HubEmptyState } from '@/components/core/hub';
+import { humanizeLabel } from '@/utils/humanize';
+import {
+  DOCUMENT_KINDS, DISCIPLINES, DRAWING_PURPOSES, BUILDABLE_PURPOSES,
+  type DocumentKind, type DrawingPurpose,
+} from '../../drawingVocabulary';
 
 export const DocumentsTab: React.FC<{ projectId: string; isOwner: boolean }> = ({ projectId, isOwner }) => {
   const { toast } = useToast();
@@ -102,12 +120,28 @@ export const DocumentsTab: React.FC<{ projectId: string; isOwner: boolean }> = (
                 <div className="flex items-start gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
+                      {d.drawing_number && (
+                        <span className="font-mono text-xs tabular-nums text-muted-foreground">{d.drawing_number}</span>
+                      )}
                       <p className="font-medium">{d.title}</p>
-                      {d.discipline && <span className="text-[11px] text-muted-foreground">· {d.discipline}</span>}
+                      {d.discipline && <span className="text-[11px] text-muted-foreground">· {humanizeLabel(d.discipline)}</span>}
                       {d.current
                         ? <span className="text-[11px] text-primary">Rev {d.current.rev_label}</span>
                         : <span className="text-[11px] text-amber-800 dark:text-amber-400">No revision uploaded</span>}
+                      {d.current?.purpose && (
+                        <Badge variant={BUILDABLE_PURPOSES.includes(d.current.purpose) ? 'success' : 'warning'}>
+                          {humanizeLabel(d.current.purpose)}
+                        </Badge>
+                      )}
                     </div>
+                    {(d.current?.issued_at || d.scale) && (
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        {d.current?.issued_at && <>Issued {formatDate(d.current.issued_at)}</>}
+                        {d.current?.issued_at && d.scale && ' · '}
+                        {d.scale}
+                        {d.sheet_size && ` · ${d.sheet_size}`}
+                      </p>
+                    )}
                     {d.current?.notes && <p className="mt-1 text-sm text-muted-foreground">{d.current.notes}</p>}
                     {d.revisions.length > 1 && (
                       <button
@@ -125,7 +159,12 @@ export const DocumentsTab: React.FC<{ projectId: string; isOwner: boolean }> = (
                           <div key={r.id} className="flex items-center gap-2 px-3 py-1.5 text-sm">
                             <span className="w-14 shrink-0 text-xs text-muted-foreground">Rev {r.rev_label}</span>
                             <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-                              {formatDate(r.created_at)}{r.notes ? ` · ${r.notes}` : ''}
+                              {/* The issue date when the sheet carries one — `created_at` is when
+                                  it was uploaded here, which is a different fact and usually later. */}
+                              {formatDate(r.issued_at ?? r.created_at)}
+                              {r.purpose ? ` · ${humanizeLabel(r.purpose)}` : ''}
+                              {r.superseded_at ? ` · superseded ${formatDate(r.superseded_at)}` : ''}
+                              {r.notes ? ` · ${r.notes}` : ''}
                             </span>
                             <button type="button" className="text-muted-foreground hover:text-foreground" title="Open" onClick={() => open(r)}>
                               <Download className="h-3.5 w-3.5" />
@@ -198,9 +237,53 @@ const NewDocumentDialog: React.FC<{ projectId: string; onClose: () => void; onSa
 }) => {
   const { toast } = useToast();
   const [title, setTitle] = useState('');
+  const [drawingNumber, setDrawingNumber] = useState('');
+  const [kind, setKind] = useState<DocumentKind>('drawing');
   const [discipline, setDiscipline] = useState('');
+  const [scale, setScale] = useState('');
+  const [sheetSize, setSheetSize] = useState('');
   const [clientVisible, setClientVisible] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [scanning, setScanning] = useState(false);
+
+  /**
+   * Read a sheet's title block and prefill the form. Nothing is written, and a field the sheet
+   * does not state leaves whatever is already typed rather than blanking it.
+   */
+  const scan = async (file: File) => {
+    setScanning(true);
+    try {
+      const res = await projectDocumentsService.scanTitleBlock(projectId, file);
+      if (res.status === 'unreadable') {
+        toast({
+          title: 'Could not read the title block',
+          description: 'Try a sharper scan, or fill the fields in by hand.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      const f = res.fields;
+      if (f.drawing_number) setDrawingNumber(f.drawing_number);
+      if (f.title) setTitle(f.title);
+      if (f.discipline) setDiscipline(f.discipline);
+      if (f.scale) setScale(f.scale);
+      if (f.sheet_size) setSheetSize(f.sheet_size);
+
+      // What the sheet said that the controlled lists could not accept. Told to the operator
+      // rather than dropped: a silent blank looks like a title block that omitted the field.
+      const unmapped = Object.entries(res.unmapped ?? {});
+      toast({
+        title: 'Title block read',
+        description: unmapped.length
+          ? `Check the fields. The sheet says ${unmapped.map(([k, v]) => `${k} "${v}"`).join(', ')}, which is not one of the options.`
+          : 'Check the fields before creating the entry.',
+      });
+    } catch (err: any) {
+      toast({ title: 'Scan failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setScanning(false);
+    }
+  };
 
   const save = async () => {
     if (!title.trim()) { toast({ title: 'Title required', variant: 'destructive' }); return; }
@@ -208,12 +291,21 @@ const NewDocumentDialog: React.FC<{ projectId: string; onClose: () => void; onSa
     try {
       await projectDocumentsService.createDocument(projectId, {
         title: title.trim(),
-        discipline: discipline.trim() || null,
+        drawing_number: drawingNumber,
+        kind,
+        discipline: discipline || null,
+        scale,
+        sheet_size: sheetSize,
         client_visible: clientVisible,
       });
       onSaved();
     } catch (err: any) {
-      toast({ title: 'Failed to create', description: err?.message, variant: 'destructive' });
+      const dup = /already uses that drawing number|duplicate key|unique/i.test(err?.message ?? '');
+      toast({
+        title: dup ? 'That drawing number is taken' : 'Failed to create',
+        description: dup ? 'Another document in this project already uses it.' : err?.message,
+        variant: 'destructive',
+      });
       setSaving(false);
     }
   };
@@ -223,14 +315,65 @@ const NewDocumentDialog: React.FC<{ projectId: string; onClose: () => void; onSa
       <DialogContent className="max-w-md">
         <DialogHeader><DialogTitle>New document</DialogTitle></DialogHeader>
         <div className="space-y-3">
-          <div className="space-y-1">
-            <Label className="text-xs">Title</Label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Kitchen elevations" />
+          <div className="rounded-sm border border-hairline bg-surface-sunken p-3">
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              {scanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanLine className="h-4 w-4 text-primary" />}
+              <span>{scanning ? 'Reading the title block…' : 'Read the title block from a sheet'}</span>
+              <input
+                type="file" className="hidden" accept="application/pdf,image/*" disabled={scanning}
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) void scan(f); e.target.value = ''; }}
+              />
+            </label>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Fills the fields below so you can check them. Nothing is saved until you press Create,
+              and the file is still uploaded as the first revision afterwards.
+            </p>
           </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Discipline</Label>
-            <Input value={discipline} onChange={(e) => setDiscipline(e.target.value)} placeholder="e.g. Joinery, Electrical (optional)" />
+
+          <div className="grid grid-cols-3 gap-2">
+            <div className="space-y-1">
+              <Label className="text-xs">Number</Label>
+              <Input value={drawingNumber} onChange={(e) => setDrawingNumber(e.target.value)} placeholder="A-101" />
+            </div>
+            <div className="col-span-2 space-y-1">
+              <Label className="text-xs">Title</Label>
+              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Ground Floor Plan" />
+            </div>
           </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label className="text-xs">Kind</Label>
+              <Select value={kind} onValueChange={(v) => setKind(v as DocumentKind)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {DOCUMENT_KINDS.map((k) => <SelectItem key={k} value={k}>{humanizeLabel(k)}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Discipline</Label>
+              <Select value={discipline || 'none'} onValueChange={(v) => setDiscipline(v === 'none' ? '' : v)}>
+                <SelectTrigger><SelectValue placeholder="Not stated" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Not stated</SelectItem>
+                  {DISCIPLINES.map((d) => <SelectItem key={d} value={d}>{humanizeLabel(d)}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label className="text-xs">Scale</Label>
+              <Input value={scale} onChange={(e) => setScale(e.target.value)} placeholder="1:50 (optional)" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Sheet size</Label>
+              <Input value={sheetSize} onChange={(e) => setSheetSize(e.target.value)} placeholder="A1 (optional)" />
+            </div>
+          </div>
+
           <label className="flex items-center gap-2 text-sm">
             <Checkbox checked={clientVisible} onCheckedChange={(v) => setClientVisible(!!v)} />
             Show the current revision to the client
@@ -261,6 +404,8 @@ const UploadRevisionDialog: React.FC<{
 
   const [rev, setRev] = useState(suggested);
   const [notes, setNotes] = useState('');
+  const [issuedAt, setIssuedAt] = useState('');
+  const [purpose, setPurpose] = useState<DrawingPurpose | ''>('');
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -269,7 +414,13 @@ const UploadRevisionDialog: React.FC<{
     if (!file) { toast({ title: 'Choose a file', variant: 'destructive' }); return; }
     setSaving(true);
     try {
-      await projectDocumentsService.uploadRevision(doc.id, projectId, rev.trim(), file, notes.trim() || null);
+      await projectDocumentsService.uploadRevision(doc.id, projectId, rev.trim(), file, {
+        notes: notes.trim() || null,
+        // Deliberately not defaulted to today: an issue date nobody typed must stay blank, or the
+        // register shows a drawing issued late as issued on time.
+        issued_at: issuedAt || null,
+        purpose: purpose || null,
+      });
       onSaved();
     } catch (err: any) {
       // The unique (document_id, rev_label) constraint is the likely cause; say so plainly.
@@ -295,6 +446,23 @@ const UploadRevisionDialog: React.FC<{
           <div className="space-y-1">
             <Label className="text-xs">File</Label>
             <input type="file" className="text-xs" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label className="text-xs">Issued on</Label>
+              <Input type="date" value={issuedAt} onChange={(e) => setIssuedAt(e.target.value)} />
+              <p className="text-[11px] text-muted-foreground">The date printed on the sheet.</p>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Issued for</Label>
+              <Select value={purpose || 'none'} onValueChange={(v) => setPurpose(v === 'none' ? '' : v as DrawingPurpose)}>
+                <SelectTrigger><SelectValue placeholder="Not stated" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Not stated</SelectItem>
+                  {DRAWING_PURPOSES.map((pp) => <SelectItem key={pp} value={pp}>{humanizeLabel(pp)}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="space-y-1">
             <Label className="text-xs">What changed</Label>

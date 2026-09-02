@@ -58,6 +58,15 @@ export const VOCABULARIES = [
     'supabase/functions/_shared/contractVocabulary.generated.ts',
   ],
   [
+    // The drawing register's value-sets. `scan-drawing-title-block` snaps what it reads off a
+    // title block onto the same lists the register's pickers offer — a model answers
+    // "FOR CONSTRUCTION" / "Construction Issue" / "Issued for Construction" for one status, and a
+    // register storing all three cannot be filtered. `project_documents_kind_check` and
+    // `project_document_revisions_purpose_check` are the enforcers for two of the three.
+    'src/modules/projects/drawingVocabulary.ts',
+    'supabase/functions/_shared/drawingVocabulary.generated.ts',
+  ],
+  [
     // #391 — `property_type`, four copies in four different SHAPES (array, array, union,
     // Set). `properties_property_type_check` is the enforcer.
     'src/modules/real-estate/realEstateVocabulary.ts',

@@ -20872,10 +20872,14 @@ export type Database = {
           document_id: string
           id: string
           is_current: boolean
+          issued_at: string | null
           notes: string | null
+          purpose: string | null
           rev_label: string
           storage_bucket: string
           storage_object_path: string
+          superseded_at: string | null
+          superseded_by: string | null
           uploaded_by: string | null
         }
         Insert: {
@@ -20883,10 +20887,14 @@ export type Database = {
           document_id: string
           id?: string
           is_current?: boolean
+          issued_at?: string | null
           notes?: string | null
+          purpose?: string | null
           rev_label: string
           storage_bucket?: string
           storage_object_path: string
+          superseded_at?: string | null
+          superseded_by?: string | null
           uploaded_by?: string | null
         }
         Update: {
@@ -20894,10 +20902,14 @@ export type Database = {
           document_id?: string
           id?: string
           is_current?: boolean
+          issued_at?: string | null
           notes?: string | null
+          purpose?: string | null
           rev_label?: string
           storage_bucket?: string
           storage_object_path?: string
+          superseded_at?: string | null
+          superseded_by?: string | null
           uploaded_by?: string | null
         }
         Relationships: [
@@ -20908,6 +20920,13 @@ export type Database = {
             referencedRelation: "project_documents"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "project_document_revisions_superseded_by_fkey"
+            columns: ["superseded_by"]
+            isOneToOne: false
+            referencedRelation: "project_document_revisions"
+            referencedColumns: ["id"]
+          },
         ]
       }
       project_documents: {
@@ -20916,8 +20935,12 @@ export type Database = {
           created_at: string
           created_by: string | null
           discipline: string | null
+          drawing_number: string | null
           id: string
+          kind: string
           project_id: string
+          scale: string | null
+          sheet_size: string | null
           title: string
           updated_at: string
         }
@@ -20926,8 +20949,12 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           discipline?: string | null
+          drawing_number?: string | null
           id?: string
+          kind?: string
           project_id: string
+          scale?: string | null
+          sheet_size?: string | null
           title: string
           updated_at?: string
         }
@@ -20936,8 +20963,12 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           discipline?: string | null
+          drawing_number?: string | null
           id?: string
+          kind?: string
           project_id?: string
+          scale?: string | null
+          sheet_size?: string | null
           title?: string
           updated_at?: string
         }

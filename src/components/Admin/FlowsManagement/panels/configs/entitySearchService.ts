@@ -143,6 +143,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'revolut-webhooks', label: 'revolut-webhooks', sublabel: 'Revolut Business webhooks v2 receiver — signed transaction events, per-workspace secret' },
   { id: 'role-upgrade-requests', label: 'role-upgrade-requests', sublabel: 'Dealer/factory role promotion workflow — submit, approve, and reject requests.' },
   { id: 'scheduled-import-runner', label: 'scheduled-import-runner', sublabel: 'Cron runner that fetches due scheduled XML imports and re-invokes xml-import-orchestrator.' },
+  { id: 'scan-drawing-title-block', label: 'scan-drawing-title-block', sublabel: 'Read a drawing title block into register fields — number, revision, discipline, scale, issue date and purpose' },
   { id: 'scan-receipt', label: 'scan-receipt', sublabel: 'Read a photographed receipt into expense fields; attach and sign the image on a supplier bill' },
   { id: 'send-quote-email', label: 'send-quote-email', sublabel: 'Email a quote to a recipient with a public share link' },
   { id: 'seo-api', label: 'seo-api', sublabel: 'Unified SEO API — action-discriminated keyword research, planning, writing, analysis, and toolkit.' },
