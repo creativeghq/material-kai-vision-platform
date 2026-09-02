@@ -82,6 +82,19 @@ export const CAPABILITIES: readonly CapabilityDef[] = [
   { id: 'flow', label: 'Automations', hub: 'marketing', openInLabel: 'Automations', pageRoute: '/automations', agentId: 'kai', agentTool: 'manage_flows', toolkitId: 'flows-toolkit', recordTable: 'flows', moduleSlug: 'flows-toolkit' },
   { id: 'seo-article', label: 'SEO Article', hub: 'marketing', agentId: 'marketing', agentTool: 'create_seo_article', toolkitId: 'seo-article', canvasKind: 'seo' },
   { id: 'seo-research', label: 'SEO Research', hub: 'marketing', agentId: 'marketing', agentTool: 'seo_research_keyword', toolkitId: 'seo-research', canvasKind: 'seo' },
+  // The other six SEO clusters Edith owns. They existed in TOOLKITS and in the picker and were
+  // reachable from NO menu — `?capability=` is the only deep-link that primes a toolkit without
+  // firing one of its quick-starts (`initialToolkitId` is derived from this registry and nowhere
+  // else), so a launcher chip for them was impossible until they were declared here. Agent-only,
+  // like the two above: `pageRoute` stays undefined because none of them has a page.
+  // `moduleSlug` mirrors the SEO & Content nav tile — the seo-api handlers refuse a workspace that
+  // does not own `seo-toolkit`, so the launcher must not offer the chip to one that doesn't.
+  { id: 'seo-domain', label: 'SEO Domain Intel', hub: 'marketing', agentId: 'marketing', agentTool: 'seo_domain_snapshot', toolkitId: 'seo-domain', canvasKind: 'seo', moduleSlug: 'seo-toolkit' },
+  { id: 'seo-backlinks', label: 'SEO Backlinks', hub: 'marketing', agentId: 'marketing', agentTool: 'seo_backlinks_summary', toolkitId: 'seo-backlinks', canvasKind: 'seo', moduleSlug: 'seo-toolkit' },
+  { id: 'seo-content', label: 'SEO Content & Tech', hub: 'marketing', agentId: 'marketing', agentTool: 'seo_site_crawl_start', toolkitId: 'seo-content', canvasKind: 'seo', moduleSlug: 'seo-toolkit' },
+  { id: 'seo-multi-engine', label: 'SEO Multi-Engine', hub: 'marketing', agentId: 'marketing', agentTool: 'seo_google_trends', toolkitId: 'seo-multi-engine', canvasKind: 'seo', moduleSlug: 'seo-toolkit' },
+  { id: 'seo-composite', label: 'SEO Composite Audits', hub: 'marketing', agentId: 'marketing', agentTool: 'seo_site_review', toolkitId: 'seo-composite', canvasKind: 'seo', moduleSlug: 'seo-toolkit' },
+  { id: 'ai-visibility', label: 'AI Search Visibility', hub: 'marketing', agentId: 'marketing', agentTool: 'check_llm_visibility', toolkitId: 'ai-visibility', canvasKind: 'seo', moduleSlug: 'seo-toolkit' },
   { id: 'mention-monitoring', label: 'Mention Monitoring', hub: 'marketing', pageRoute: '/mention-monitoring', agentId: 'kai', agentTool: 'track_product_mentions', toolkitId: 'mentions', recordTable: 'tracked_mentions', canvasKind: 'mentions', moduleSlug: 'mention-monitoring' },
   { id: 'price-monitoring', label: 'Price Monitoring', hub: 'sales', pageRoute: '/admin/monitoring', agentId: 'kai', agentTool: 'track_product_prices', toolkitId: 'price-monitoring', recordTable: 'tracked_queries', canvasKind: 'result', moduleSlug: 'price-monitoring' },
   { id: 'messaging', label: 'WhatsApp', hub: 'service', pageRoute: '/messaging', agentId: 'social-media', agentTool: 'manage_messaging', toolkitId: 'messaging', recordTable: 'messaging_channels', moduleSlug: 'messaging' },

@@ -5277,7 +5277,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
    * This used to read `activeToolkits` alone, and the agent-switch effect below only ever
    * PRUNES that list — nothing seeds the new agent's. So on a default set (Core + Web
    * Research + Calculators, the three always-on) picking Vision, Trinity, Edith or Hermes
-   * from the dropdown produced the identical nine starters: the hero above it
+   * from the dropdown produced the identical nine starters every time: the hero above it
    * changed name, avatar and description, and the menu under it did not move. The menu was
    * describing the toolbox, and the user had just answered a question about the agent.
    *

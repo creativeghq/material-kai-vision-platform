@@ -1,9 +1,13 @@
 {
   "version": "5",
   "specifiers": {
-    "npm:@ai-sdk/anthropic@3": "3.0.111_zod@3.25.76",
+    "npm:@ai-sdk/alibaba@1": "1.0.51_zod@3.25.76",
+    "npm:@ai-sdk/anthropic@3": "3.0.114_zod@3.25.76",
+    "npm:@ai-sdk/bytedance@1": "1.0.38_zod@3.25.76",
     "npm:@ai-sdk/google@3": "3.0.110_zod@3.25.76",
+    "npm:@ai-sdk/klingai@3": "3.0.41_zod@3.25.76",
     "npm:@ai-sdk/klingai@4": "4.0.30_zod@3.25.76",
+    "npm:@ai-sdk/minimax@2": "2.0.11_zod@3.25.76",
     "npm:@langchain/anthropic@1.5.6": "1.5.6_@langchain+core@1.2.9__openai@6.49.0___zod@3.25.76",
     "npm:@langchain/core@1.2.9": "1.2.9_openai@6.49.0__zod@3.25.76",
     "npm:@langchain/google-genai@2.3.0": "2.3.0_@langchain+core@1.2.9__openai@6.49.0___zod@3.25.76",
@@ -15,11 +19,28 @@
     "npm:zod@3.25.76": "3.25.76"
   },
   "npm": {
-    "@ai-sdk/anthropic@3.0.111_zod@3.25.76": {
-      "integrity": "sha512-atgBW8jZPr/KuaKX5FvDIHuXBI8VCol6kVeoD4P0657+VXR73QsLogXQVN/Zt5FHtq9WzpdIZseCJiXPqkgwwA==",
+    "@ai-sdk/alibaba@1.0.51_zod@3.25.76": {
+      "integrity": "sha512-CHlzMHXarTVRygI7kzb+Zz3ayAuaY7g0+S6TE7Qtcsw11sDbScghMd9xOoQ7PttgGTA7qNv1L6YUAd58wrNeaQ==",
+      "dependencies": [
+        "@ai-sdk/openai-compatible",
+        "@ai-sdk/provider@3.0.15",
+        "@ai-sdk/provider-utils@4.0.49_zod@3.25.76",
+        "zod"
+      ]
+    },
+    "@ai-sdk/anthropic@3.0.114_zod@3.25.76": {
+      "integrity": "sha512-s5v/uquB91JcL6b8vKQ4nQP6CkZHcSNsDbBLOKGmVRRSKjrySOgZS6sW3cbL5pHzFDNVXe9w8hTpxUMSdV/4Zg==",
       "dependencies": [
         "@ai-sdk/provider@3.0.15",
-        "@ai-sdk/provider-utils@4.0.46_zod@3.25.76",
+        "@ai-sdk/provider-utils@4.0.49_zod@3.25.76",
+        "zod"
+      ]
+    },
+    "@ai-sdk/bytedance@1.0.38_zod@3.25.76": {
+      "integrity": "sha512-+rV+slsouQlVBA4O75BZJ8IUIy0XwYJd4vQ8HRDDKuN7yu+j9eFvqjlqKB4F64RTj3cQ/KKaQfH0iPRFxSw8ow==",
+      "dependencies": [
+        "@ai-sdk/provider@3.0.15",
+        "@ai-sdk/provider-utils@4.0.49_zod@3.25.76",
         "zod"
       ]
     },
@@ -40,6 +61,14 @@
         "zod"
       ]
     },
+    "@ai-sdk/klingai@3.0.41_zod@3.25.76": {
+      "integrity": "sha512-x8/zTInFriquBkJKkwRf1N4qlaRWRKLbGsAcSVeZu8yaZU+iqK38ldYE069EcKK4B198+kpBPWmeYCypHqki7A==",
+      "dependencies": [
+        "@ai-sdk/provider@3.0.15",
+        "@ai-sdk/provider-utils@4.0.49_zod@3.25.76",
+        "zod"
+      ]
+    },
     "@ai-sdk/klingai@4.0.30_zod@3.25.76": {
       "integrity": "sha512-9vX1HsxqGUg3XDzZ2f3q0fEvVA2dz+iYuLdhR9MRovt/N9u/OUGfbQcfQiWL//kk7RYuf+oGhp4K4uBhJURizw==",
       "dependencies": [
@@ -48,8 +77,35 @@
         "zod"
       ]
     },
+    "@ai-sdk/minimax@2.0.11_zod@3.25.76": {
+      "integrity": "sha512-HoJu+amoJFooa5ze44lQoWOY4V/Yik+26NTTUIjg0NJTTtGnXiFccXKAM0EdRvytODl41vFcTaWWYcxSyV4Cjg==",
+      "dependencies": [
+        "@ai-sdk/anthropic",
+        "@ai-sdk/provider@3.0.15",
+        "@ai-sdk/provider-utils@4.0.49_zod@3.25.76",
+        "zod"
+      ]
+    },
+    "@ai-sdk/openai-compatible@2.0.73_zod@3.25.76": {
+      "integrity": "sha512-nScN1KXSarMnBMUCxMRFTwTKx+Yd+rwtve1/upYGuxVI5XefaGAQ3QwGwQL5T0KuHVDIaddIxQCFeh1AKHMhUg==",
+      "dependencies": [
+        "@ai-sdk/provider@3.0.15",
+        "@ai-sdk/provider-utils@4.0.49_zod@3.25.76",
+        "zod"
+      ]
+    },
     "@ai-sdk/provider-utils@4.0.46_zod@3.25.76": {
       "integrity": "sha512-tEtld97plCFiYevsJuOkGkeuhQndeMWFBVrJS4AjnbD5AqrNSXRCe0p+BZ3Cju/sxDeeZ9ym3q9YUV8fASA7aQ==",
+      "dependencies": [
+        "@ai-sdk/provider@3.0.15",
+        "@standard-schema/spec",
+        "eventsource-parser",
+        "undici@6.28.0",
+        "zod"
+      ]
+    },
+    "@ai-sdk/provider-utils@4.0.49_zod@3.25.76": {
+      "integrity": "sha512-8e7pd+82bobqrFOaD5dG/PiEuvLYr5olaE3I56ch0jipR0H7sGD6ohwTUynv6k8O8QidWiyIbEsZCtr/2dyXIA==",
       "dependencies": [
         "@ai-sdk/provider@3.0.15",
         "@standard-schema/spec",
