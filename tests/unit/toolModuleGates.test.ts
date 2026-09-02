@@ -161,3 +161,61 @@ describe('#395 — a paid module is enforced in the tool, not in the nav', () =>
     ).toEqual([]);
   });
 });
+
+/**
+ * The two halves of a paid module have to name each other.
+ *
+ * `moduleSlug` on the catalog cluster is what makes the PICKER hide a module this workspace has
+ * not bought; `moduleGate(workspaceId, slug)` in the tool is what makes the REFUSAL real. The
+ * checks above walk the declared slugs, which is exactly the wrong direction for the failure
+ * that actually happened: the Quotes cluster declared NO slug, so `quotes` — `is_addon`,
+ * `price_tier: 'pro'` — was absent from the checklist rather than failing it, and
+ * `quote-tools.ts` asked nobody. A guard that derives what to check from the thing that is
+ * missing reports clean by construction.
+ *
+ * So this reads the OTHER side: what the tool files actually gate on. A file that calls
+ * `moduleGate(_, 'x')` says its feature is paid; the cluster holding its tools must say the same
+ * slug, or the picker offers a paid cluster to a workspace the tool will then refuse — a starter
+ * that exists only to return `not_entitled`.
+ */
+describe('a paid module is named on BOTH sides', () => {
+  const EXEMPT: Record<string, string> = {
+    // The seven SEO clusters gate on `seo-toolkit` inside dataforseo-spend-gate.ts and declare no
+    // slug, so today they are offered to workspaces that cannot use them. Adding the slug flips
+    // visibility for seven clusters at once and belongs in its own change with its own check of
+    // who is entitled — recorded here so it cannot be forgotten, and so nothing NEW joins it.
+    // SHRINK-ONLY: entries come off this list, they do not go on.
+    'seo-toolkit': 'the seven seo-* clusters — see #395 follow-up',
+  };
+
+  it('every slug a tool gates on is declared by the cluster that offers it', () => {
+    const gatedBy = new Map<string, Set<string>>(); // slug -> files
+    for (const [tool, file] of toolFiles()) {
+      void tool;
+      if (!existsSync(join(ROOT, file))) continue;
+      for (const m of read(file).matchAll(/moduleGate\(\s*[a-zA-Z_.]+\s*,\s*'([a-z0-9-]+)'/g)) {
+        if (!gatedBy.has(m[1])) gatedBy.set(m[1], new Set());
+        gatedBy.get(m[1])!.add(file);
+      }
+    }
+    expect(gatedBy.size, 'found no moduleGate calls at all — this guard is reading the wrong files').toBeGreaterThan(3);
+
+    const declared = new Set([...slugsIn(catalogSrc)]);
+    const undeclared = [...gatedBy.keys()].filter((s) => !declared.has(s) && !(s in EXEMPT)).sort();
+    expect(
+      undeclared,
+      'A tool refuses on these modules and no cluster declares them, so the picker offers a paid '
+      + 'cluster the tool will refuse — and the checks above cannot see it, because they walk the '
+      + 'declared slugs: ' + undeclared.join(', '),
+    ).toEqual([]);
+  });
+
+  it('the exemption list only shrinks', () => {
+    const declared = new Set([...slugsIn(catalogSrc)]);
+    const stale = Object.keys(EXEMPT).filter((s) => declared.has(s));
+    expect(
+      stale,
+      'These are now declared by a cluster, so their exemption is dead — delete it: ' + stale.join(', '),
+    ).toEqual([]);
+  });
+});

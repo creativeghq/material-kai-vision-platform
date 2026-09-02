@@ -3410,7 +3410,12 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 const m: Message = {
                   id: `msg-mention-track-${Date.now()}`,
                   role: 'assistant',
-                  content: `Mention tracking enabled for "${chunk.product_name}". First refresh in progress — open the product's Mentions tab to view results.`,
+                  // Naming a place is LINKING to it. This sentence named the Mentions tab and left
+                  // the reader to go find it — and `linkifyDestinations` could not help, because a
+                  // per-product tab has no static route to register in `appDestinations`. The id is
+                  // right here in the chunk, so the link is written directly, the same href the
+                  // mention-summary card already uses.
+                  content: `Mention tracking enabled for "${chunk.product_name}". First refresh in progress — [open its Mentions tab](/admin/materials-data?productId=${chunk.product_id}) to view results.`,
                   timestamp: new Date(),
                   agentId: selectedAgent,
                   model: selectedModel,
@@ -4330,6 +4335,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     if (m.demoData) return { id: m.id, kind: 'demo', title: 'Demo results' };
     if (m.heatPumpData) return { id: m.id, kind: 'calc', title: 'Heat-pump sizing' };
     if (m.heatingCostData) return { id: m.id, kind: 'calc', title: 'Heating cost comparison' };
+    // The third calculator. `renderCanvasArtifact` has drawn a KitchenCostResultCard since the day
+    // the canvas shipped, and nothing could ever reach it: the canvas only renders a message that
+    // got a TAB here, and this branch was missing. Two registries, and the complete-looking one
+    // was the decorative one.
+    if (m.kitchenCostData) return { id: m.id, kind: 'calc', title: 'Kitchen cost' };
     if (m.sheetPdfData) return { id: m.id, kind: 'sheet', title: m.sheetPdfData.title || 'Presentation sheet' };
     if (m.sheetCanvasData) return { id: m.id, kind: 'sheet', title: m.sheetCanvasData.title || 'Presentation sheet' };
     if (m.quoteData) return { id: m.id, kind: 'quote', title: m.quoteData.quote_number ? `Quote ${m.quoteData.quote_number}` : (m.quoteData.name || 'Quote') };
@@ -4360,6 +4370,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     // A pending question is an artifact. Every branch above is a FINISHED result, which is why a
     // follow-up had nowhere to go but the chat stream (#370, Class D).
     if (m.inputRequestData) return { id: m.id, kind: 'clarify', title: m.inputRequestData.title || 'Needs your input' };
+    // …and so is a pending APPROVAL. This one blocks the turn until it is answered, so leaving it
+    // in the chat stream alone meant that on a phone — where `canvasPaneVisible` unmounts the chat
+    // — the gate the user has to act on was the one thing they could not see.
+    if (m.actionConfirmationData) return { id: m.id, kind: 'confirm', title: m.actionConfirmationData.title || 'Needs your approval' };
     return null;
   }, []);
 
@@ -5026,6 +5040,36 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
           onGenerateVideo={(imageUrl) => handleGenerateVideo(imageUrl, message)}
           onUseIn3DScene={handleUseProductIn3DScene}
+        />
+      );
+    }
+    /**
+     * The question and the gate, drawn where their tabs point.
+     *
+     * `clarify` got an artifact kind, a tab and a chat-stream chip in #370 — and no renderer.
+     * `ClarifyCard` had exactly ONE call site, inside the stream's `canvasShown ? chip : card`
+     * ternary, so with the canvas open (the default) the chip said "Needs your input", the tab
+     * appeared, and clicking it opened a BLANK pane. Nothing failed: the fallback below returns
+     * null for a field it does not know, which renders as an empty canvas rather than an error.
+     */
+    if (message.inputRequestData) {
+      return (
+        <ClarifyCard
+          data={message.inputRequestData}
+          onSubmit={(sentence, answers) => handleClarifySubmit(message.id, sentence, answers)}
+          onDismiss={(sentence) => handleClarifyDismiss(message.id, sentence)}
+        />
+      );
+    }
+    if (message.actionConfirmationData) {
+      return (
+        <ActionConfirmationCard
+          title={message.actionConfirmationData.title}
+          summary={message.actionConfirmationData.summary}
+          danger={message.actionConfirmationData.danger}
+          status={message.actionConfirmationData.status}
+          onApprove={() => handleActionApprove(message.id, message.actionConfirmationData!)}
+          onDecline={() => handleActionDecline(message.id)}
         />
       );
     }
@@ -5858,14 +5902,26 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                         />
                       )
                     ) : message.actionConfirmationData ? (
-                      <ActionConfirmationCard
-                        title={message.actionConfirmationData.title}
-                        summary={message.actionConfirmationData.summary}
-                        danger={message.actionConfirmationData.danger}
-                        status={message.actionConfirmationData.status}
-                        onApprove={() => handleActionApprove(message.id, message.actionConfirmationData!)}
-                        onDecline={() => handleActionDecline(message.id)}
-                      />
+                      // Same rule as the question above: one card, in one place. With the canvas
+                      // up it lives THERE and the stream keeps a chip, so the gate is never drawn
+                      // twice and never drawn only where the viewport is not.
+                      canvasShown ? (
+                        <ArtifactChip
+                          kind="confirm"
+                          title={message.actionConfirmationData.title || 'Needs your approval'}
+                          active={activeCanvasId === message.id}
+                          onOpen={() => focusCanvas(message.id)}
+                        />
+                      ) : (
+                        <ActionConfirmationCard
+                          title={message.actionConfirmationData.title}
+                          summary={message.actionConfirmationData.summary}
+                          danger={message.actionConfirmationData.danger}
+                          status={message.actionConfirmationData.status}
+                          onApprove={() => handleActionApprove(message.id, message.actionConfirmationData!)}
+                          onDecline={() => handleActionDecline(message.id)}
+                        />
+                      )
                     ) : message.agentResultData ? (
                       <div className="space-y-3">
                         {canvasShown ? (
@@ -6782,11 +6838,48 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       >
                         <AgentAvatar agentId={currentAgent?.id} className={cn('h-4 w-4', currentAgent?.color)} />
                         <span>{currentAgent?.name || 'JARVIS'}</span>
-                        {selectedAgent === 'orchestrator' && (
-                          <span className="ml-0.5 rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-                            Auto-assign
-                          </span>
-                        )}
+                        {selectedAgent === 'orchestrator' && (() => {
+                          /*
+                           * WHILE a routed turn is running, say who is running it.
+                           *
+                           * `routingTo` existed and was rendered in exactly one place — the pulsing
+                           * avatar beside the reasoning block — which disappears the moment the turn
+                           * ends. Beside it the composer went on reading "JARVIS · Auto-assign", so
+                           * the operator watching Vision generate an image had nothing anywhere near
+                           * the input saying Vision was doing it. Reported from that exact screen.
+                           *
+                           * The picker itself still says JARVIS, and still SENDS as JARVIS: routing
+                           * is per turn, and repointing `selectedAgent` would pin the conversation
+                           * to this specialist so the follow-up could no longer be routed. That is
+                           * what the badge is for — it states the handoff without making it sticky.
+                           *
+                           * Gated on `isLoading` for the same reason. The composer describes what
+                           * the NEXT message will do, and the next message is auto-assigned again;
+                           * leaving "→ Vision" up after the turn would promise otherwise. Once the
+                           * answer lands, the MESSAGE carries the specialist's face and the "routed
+                           * by JARVIS" label, which is where that fact belongs afterwards.
+                           */
+                          const live = isLoading && routingTo
+                            ? (AGENTS.find((a) => a.id === routingTo.id) ?? { id: routingTo.id, name: routingTo.name, color: undefined })
+                            : null;
+                          if (!live) {
+                            return (
+                              <span className="ml-0.5 rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                                Auto-assign
+                              </span>
+                            );
+                          }
+                          return (
+                            <span
+                              className="ml-0.5 inline-flex items-center gap-1 rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary"
+                              title={`JARVIS routed this turn to ${live.name}. Your next message is auto-assigned again.`}
+                            >
+                              <span aria-hidden>→</span>
+                              <AgentAvatar agentId={live.id} className={cn('h-3 w-3', live.color)} />
+                              {live.name}
+                            </span>
+                          );
+                        })()}
                         <ChevronDown className="h-3.5 w-3.5 opacity-60" />
                       </button>
                     </DropdownMenuTrigger>

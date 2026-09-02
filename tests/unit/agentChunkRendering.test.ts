@@ -120,3 +120,77 @@ describe('#395 — a tool chunk is never dropped in silence', () => {
     ).toEqual([]);
   });
 });
+
+/**
+ * The canvas has TWO registries and they have to agree.
+ *
+ * `getCanvasArtifact` decides which messages get a canvas TAB; `renderCanvasArtifact` decides
+ * what is DRAWN for the active one, falling back to `renderDataCardBody`. The canvas only ever
+ * renders a message that got a tab, so the two can disagree in both directions and neither
+ * throws:
+ *
+ *   • a renderer with no tab is DEAD CODE. `KitchenCostResultCard` had a branch in
+ *     `renderCanvasArtifact` from the day the canvas shipped and no entry in `getCanvasArtifact`,
+ *     so the kitchen calculator was the one of three that could never open full-width. Reading
+ *     `renderCanvasArtifact` alone, it looked handled.
+ *
+ *   • a tab with no renderer opens a BLANK PANE. `inputRequestData` got an artifact kind, a tab
+ *     and a chat-stream chip in #370 — and `ClarifyCard` had exactly one call site, inside the
+ *     stream's `canvasShown ? chip : card` ternary. So with the canvas open (the default) every
+ *     agent follow-up question showed a chip saying "Needs your input", opened an empty canvas,
+ *     and could not be answered. The fallback returns null for a field it does not know, which
+ *     renders as nothing rather than as an error.
+ *
+ * Both directions, because each looks like coverage from the other side.
+ */
+describe('the canvas tab registry and the canvas renderer agree', () => {
+  // A field that HEADS its own branch — `if (message.x)`. A field mentioned INSIDE another
+  // branch is a companion, not an artifact: `searchSpec` rides along with the products it
+  // explains, and demanding a tab for it would be a finding nobody can act on.
+  const FIELD = /if \((?:message|m)\.([a-zA-Z_][a-zA-Z0-9_]*)/g;
+  const INTERESTING = /Data$|^generation_job$|^searchSpec$/;
+
+  /** The body of one `const <name> = ` in AgentHub, up to the next top-level const. */
+  function fnBody(name: string): string {
+    const at = hub.indexOf('const ' + name + ' = ');
+    expect(at, 'AgentHub has no ' + name + ' — this guard is reading the wrong shape').toBeGreaterThan(-1);
+    const rest = hub.slice(at + 10);
+    const next = rest.search(new RegExp(String.fromCharCode(10) + '  const [a-zA-Z]'));
+    return rest.slice(0, next === -1 ? rest.length : next);
+  }
+
+  function fieldsIn(name: string): Set<string> {
+    const out = new Set<string>();
+    for (const m of fnBody(name).matchAll(FIELD)) if (INTERESTING.test(m[1])) out.add(m[1]);
+    return out;
+  }
+
+  const tabbed = fieldsIn('getCanvasArtifact');
+  const drawn = fieldsIn('renderCanvasArtifact');
+  const fallback = fieldsIn('renderDataCardBody');
+
+  it('reads both registries', () => {
+    expect(tabbed.size, 'parsed no fields from getCanvasArtifact').toBeGreaterThan(15);
+    expect(drawn.size, 'parsed no fields from renderCanvasArtifact').toBeGreaterThan(10);
+    expect(fallback.size, 'parsed no fields from renderDataCardBody').toBeGreaterThan(5);
+  });
+
+  it('every canvas renderer is reachable — it has a tab', () => {
+    const dead = [...drawn].filter((f) => !tabbed.has(f)).sort();
+    expect(
+      dead,
+      'These have a branch in renderCanvasArtifact and no entry in getCanvasArtifact, so the '
+      + 'canvas can never reach them — the branch reads as coverage and has never run. Add the '
+      + 'artifact, or delete the branch: ' + dead.join(', '),
+    ).toEqual([]);
+  });
+
+  it('every canvas tab draws something — it is not a blank pane', () => {
+    const blank = [...tabbed].filter((f) => !drawn.has(f) && !fallback.has(f)).sort();
+    expect(
+      blank,
+      'These get a canvas tab and neither renderCanvasArtifact nor its renderDataCardBody '
+      + 'fallback draws them, so clicking the tab opens an empty canvas: ' + blank.join(', '),
+    ).toEqual([]);
+  });
+});

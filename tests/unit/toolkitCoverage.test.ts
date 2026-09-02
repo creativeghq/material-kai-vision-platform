@@ -68,7 +68,40 @@ const AGENT_CHAT = join(ROOT, 'supabase/functions/agent-chat/index.ts');
 const MANIFEST_FILE = join(ROOT, 'src/components/features/ai/toolManifest.generated.ts');
 const CLUSTERS_FILE = join(ROOT, 'supabase/functions/_shared/toolkitClusters.generated.ts');
 
+/** A literal newline. Written once so no regex-in-a-string below has to escape it. */
+const NL = String.fromCharCode(10);
+
 const read = (p: string) => readFileSync(p, 'utf8').replace(/\r\n/g, '\n');
+
+/**
+ * agent id → the tool ids that agent declares in agent-chat's AGENT_CONFIGS.
+ *
+ * Keyed on the OUTER OBJECT KEY, not on the `id:` field inside. Three legacy aliases
+ * (`search`, `insights`, `seo`) carry `id: 'kai'` with `tools: []`, so a parser keyed on `id:`
+ * silently overwrites the generalist's 180-tool set with an empty one — and every check built on
+ * it then passes by having nothing to compare.
+ */
+function parseAgentConfigTools(): Map<string, Set<string>> {
+  const body = (() => {
+    const src = read(AGENT_CHAT);
+    const at = src.indexOf('const AGENT_CONFIGS');
+    return src.slice(at, src.indexOf(NL + '};', at));
+  })();
+  const marks: { id: string; idx: number }[] = [];
+  for (const m of body.matchAll(/^ {2}'?([a-z-]+)'?: \{$/gm)) marks.push({ id: m[1], idx: m.index! });
+  const out = new Map<string, Set<string>>();
+  for (let i = 0; i < marks.length; i++) {
+    const seg = body.slice(marks[i].idx, i + 1 < marks.length ? marks[i + 1].idx : body.length);
+    const t = seg.indexOf('tools: [');
+    if (t < 0) { out.set(marks[i].id, new Set()); continue; }
+    const ids = [...seg.slice(t + 8, seg.indexOf(NL + '    ]', t)).matchAll(/'([a-zA-Z_][a-zA-Z0-9_]*)'/g)].map((x) => x[1]);
+    out.set(marks[i].id, new Set(ids));
+  }
+  // Without this the whole guard passes vacuously the day the file is reformatted.
+  expect(out.size, 'parsed suspiciously few agent configs — the AGENT_CONFIGS slice is wrong').toBeGreaterThan(5);
+  expect((out.get('kai') ?? new Set()).size, 'parsed no tools for the generalist — the slice is wrong').toBeGreaterThan(100);
+  return out;
+}
 
 /** The identifiers registered in a component's `const ICON_MAP = {...}`. */
 function iconMapKeys(relPath: string): Set<string> {
@@ -624,6 +657,40 @@ describe('quick-start agent resolution', () => {
     ).toEqual([]);
   });
 
+  /**
+   * A cluster is the unit the picker offers, so an owner binds all of it or is not an owner.
+   *
+   * `TOOLKIT_AGENTS` says who owns a cluster; `AGENT_CONFIGS` says what each agent binds. Nothing
+   * held the two together, and eight pairs had drifted into partial ownership — ten quick-starts
+   * offered on an agent that does not have the tool they run. The click resolves to that agent
+   * (`resolveToolkitAgent` keeps the current one when it owns the cluster), the tool is not in its
+   * set, and the deterministic run answers `Tool "add_task" is not available for this agent or
+   * your role.` Nothing throws: that message is the honest report of a state nothing forbade.
+   *
+   * Measured 2026-09-01, before the fix: projects→erp missing 3, knowledge-graph→erp missing 6,
+   * knowledge-graph→product-business missing 4, sub-agents missing 2 on each of its two owners,
+   * admin-misc missing 5 on marketing and 4 on product-business, generation→interior-designer
+   * missing 1.
+   */
+  it('a declared owner binds every tool in the cluster it owns', () => {
+    const agentTools = parseAgentConfigTools();
+    const offenders: string[] = [];
+    for (const tk of TOOLKITS) {
+      for (const owner of TOOLKIT_AGENTS[tk.id] ?? []) {
+        const bound = agentTools.get(owner);
+        if (!bound) { offenders.push(`${tk.id}: owner '${owner}' is not an AGENT_CONFIGS id`); continue; }
+        const missing = tk.tool_ids.filter((t) => !bound.has(t));
+        if (missing.length) offenders.push(`${tk.id} → ${owner}: does not bind ${missing.join(', ')}`);
+      }
+    }
+    expect(
+      offenders,
+      `A toolkit is OFFERED on an agent that cannot run all of it, so its quick-starts answer `
+      + `"not available for this agent". Bind the tools in AGENT_CONFIGS, or drop the agent from `
+      + `TOOLKIT_AGENTS:` + NL + '  ' + offenders.join(NL + '  '),
+    ).toEqual([]);
+  });
+
   it('prefers the SPECIALIST over the generalist when the agent must change', () => {
     const offenders: string[] = [];
     for (const tk of TOOLKITS) {
@@ -1120,6 +1187,36 @@ describe('a routed turn shows which specialist answered', () => {
       /wasRoutedMessage\(message\) &&/.test(hub) && /routed by JARVIS/.test(hub),
       'a routed message must carry a visible label naming the specialist',
     ).toBe(true);
+  });
+
+  it('the COMPOSER says who is handling the turn while it runs', () => {
+    /*
+     * The reported gap. `routingTo` was set from `agent_routed` and rendered in exactly one
+     * place — the pulsing avatar beside the reasoning block — which disappears when the turn
+     * ends. The agent selector two inches below it went on reading "JARVIS · Auto-assign" the
+     * whole time, so an operator watching Vision generate an image had nothing near the input
+     * saying Vision was doing it.
+     *
+     * Asserted on the TRIGGER specifically, because the avatar alone already passed the tests
+     * above while the badge beside it still said Auto-assign.
+     */
+    const from = hub.indexOf('title="Switch agent"');
+    // Searched FORWARD from the trigger: the first 'DropdownMenuContent' in the file is the
+    // import, and slicing to that gives an empty span that passes nothing and proves nothing.
+    const trigger = hub.slice(from, hub.indexOf('<DropdownMenuContent', from));
+    expect(
+      /routingTo/.test(trigger),
+      'the agent picker trigger must read routingTo — the badge is the only thing near the ' +
+        'composer that can name the specialist mid-turn',
+    ).toBe(true);
+    // Gated on the turn being in flight: the composer describes what the NEXT message will do,
+    // and the next message is auto-assigned again. A badge left up afterwards promises otherwise.
+    expect(
+      /isLoading && routingTo/.test(trigger),
+      'the routed badge must be gated on isLoading, or it outlives the turn it describes',
+    ).toBe(true);
+    // ...and "Auto-assign" is still what it says when nothing was routed.
+    expect(/Auto-assign/.test(trigger), 'the un-routed state must still read Auto-assign').toBe(true);
   });
 
   it('routing does NOT repoint the agent picker', () => {
