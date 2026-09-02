@@ -1189,6 +1189,36 @@ describe('a routed turn shows which specialist answered', () => {
     ).toBe(true);
   });
 
+  it('the COMPOSER says who is handling the turn while it runs', () => {
+    /*
+     * The reported gap. `routingTo` was set from `agent_routed` and rendered in exactly one
+     * place — the pulsing avatar beside the reasoning block — which disappears when the turn
+     * ends. The agent selector two inches below it went on reading "JARVIS · Auto-assign" the
+     * whole time, so an operator watching Vision generate an image had nothing near the input
+     * saying Vision was doing it.
+     *
+     * Asserted on the TRIGGER specifically, because the avatar alone already passed the tests
+     * above while the badge beside it still said Auto-assign.
+     */
+    const from = hub.indexOf('title="Switch agent"');
+    // Searched FORWARD from the trigger: the first 'DropdownMenuContent' in the file is the
+    // import, and slicing to that gives an empty span that passes nothing and proves nothing.
+    const trigger = hub.slice(from, hub.indexOf('<DropdownMenuContent', from));
+    expect(
+      /routingTo/.test(trigger),
+      'the agent picker trigger must read routingTo — the badge is the only thing near the ' +
+        'composer that can name the specialist mid-turn',
+    ).toBe(true);
+    // Gated on the turn being in flight: the composer describes what the NEXT message will do,
+    // and the next message is auto-assigned again. A badge left up afterwards promises otherwise.
+    expect(
+      /isLoading && routingTo/.test(trigger),
+      'the routed badge must be gated on isLoading, or it outlives the turn it describes',
+    ).toBe(true);
+    // ...and "Auto-assign" is still what it says when nothing was routed.
+    expect(/Auto-assign/.test(trigger), 'the un-routed state must still read Auto-assign').toBe(true);
+  });
+
   it('routing does NOT repoint the agent picker', () => {
     // `selectedAgent` is what the NEXT turn is sent as. Repointing it would pin the conversation
     // to this specialist and stop the orchestrator routing the follow-up — a design question after

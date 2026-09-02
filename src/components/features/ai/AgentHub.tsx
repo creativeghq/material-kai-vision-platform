@@ -6838,11 +6838,48 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       >
                         <AgentAvatar agentId={currentAgent?.id} className={cn('h-4 w-4', currentAgent?.color)} />
                         <span>{currentAgent?.name || 'JARVIS'}</span>
-                        {selectedAgent === 'orchestrator' && (
-                          <span className="ml-0.5 rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-                            Auto-assign
-                          </span>
-                        )}
+                        {selectedAgent === 'orchestrator' && (() => {
+                          /*
+                           * WHILE a routed turn is running, say who is running it.
+                           *
+                           * `routingTo` existed and was rendered in exactly one place — the pulsing
+                           * avatar beside the reasoning block — which disappears the moment the turn
+                           * ends. Beside it the composer went on reading "JARVIS · Auto-assign", so
+                           * the operator watching Vision generate an image had nothing anywhere near
+                           * the input saying Vision was doing it. Reported from that exact screen.
+                           *
+                           * The picker itself still says JARVIS, and still SENDS as JARVIS: routing
+                           * is per turn, and repointing `selectedAgent` would pin the conversation
+                           * to this specialist so the follow-up could no longer be routed. That is
+                           * what the badge is for — it states the handoff without making it sticky.
+                           *
+                           * Gated on `isLoading` for the same reason. The composer describes what
+                           * the NEXT message will do, and the next message is auto-assigned again;
+                           * leaving "→ Vision" up after the turn would promise otherwise. Once the
+                           * answer lands, the MESSAGE carries the specialist's face and the "routed
+                           * by JARVIS" label, which is where that fact belongs afterwards.
+                           */
+                          const live = isLoading && routingTo
+                            ? (AGENTS.find((a) => a.id === routingTo.id) ?? { id: routingTo.id, name: routingTo.name, color: undefined })
+                            : null;
+                          if (!live) {
+                            return (
+                              <span className="ml-0.5 rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                                Auto-assign
+                              </span>
+                            );
+                          }
+                          return (
+                            <span
+                              className="ml-0.5 inline-flex items-center gap-1 rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary"
+                              title={`JARVIS routed this turn to ${live.name}. Your next message is auto-assigned again.`}
+                            >
+                              <span aria-hidden>→</span>
+                              <AgentAvatar agentId={live.id} className={cn('h-3 w-3', live.color)} />
+                              {live.name}
+                            </span>
+                          );
+                        })()}
                         <ChevronDown className="h-3.5 w-3.5 opacity-60" />
                       </button>
                     </DropdownMenuTrigger>
