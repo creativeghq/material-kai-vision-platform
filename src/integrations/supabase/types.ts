@@ -20643,6 +20643,97 @@ export type Database = {
         }
         Relationships: []
       }
+      project_applications: {
+        Row: {
+          certified_amount: number | null
+          certified_at: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          due_on: string | null
+          gross_valuation: number
+          id: string
+          invoice_id: string | null
+          notes: string | null
+          paid_at: string | null
+          period_to: string
+          project_id: string
+          reference: string | null
+          retention_cap_percent: number
+          retention_percent: number
+          status: string
+          submitted_at: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          certified_amount?: number | null
+          certified_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          due_on?: string | null
+          gross_valuation?: number
+          id?: string
+          invoice_id?: string | null
+          notes?: string | null
+          paid_at?: string | null
+          period_to: string
+          project_id: string
+          reference?: string | null
+          retention_cap_percent?: number
+          retention_percent?: number
+          status?: string
+          submitted_at?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          certified_amount?: number | null
+          certified_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          due_on?: string | null
+          gross_valuation?: number
+          id?: string
+          invoice_id?: string | null
+          notes?: string | null
+          paid_at?: string | null
+          period_to?: string
+          project_id?: string
+          reference?: string | null
+          retention_cap_percent?: number
+          retention_percent?: number
+          status?: string
+          submitted_at?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_applications_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_applications_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_applications_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_categories: {
         Row: {
           created_at: string
@@ -22118,11 +22209,15 @@ export type Database = {
           cover_image_url: string | null
           created_at: string
           deadline: string | null
+          defects_period_months: number
           description: string | null
           id: string
           last_activity_at: string
           moodboard_count: number
           name: string
+          practical_completion_on: string | null
+          retention_cap_percent: number
+          retention_percent: number
           status: string
           updated_at: string
           user_id: string
@@ -22140,11 +22235,15 @@ export type Database = {
           cover_image_url?: string | null
           created_at?: string
           deadline?: string | null
+          defects_period_months?: number
           description?: string | null
           id?: string
           last_activity_at?: string
           moodboard_count?: number
           name: string
+          practical_completion_on?: string | null
+          retention_cap_percent?: number
+          retention_percent?: number
           status?: string
           updated_at?: string
           user_id: string
@@ -22162,11 +22261,15 @@ export type Database = {
           cover_image_url?: string | null
           created_at?: string
           deadline?: string | null
+          defects_period_months?: number
           description?: string | null
           id?: string
           last_activity_at?: string
           moodboard_count?: number
           name?: string
+          practical_completion_on?: string | null
+          retention_cap_percent?: number
+          retention_percent?: number
           status?: string
           updated_at?: string
           user_id?: string
@@ -35967,6 +36070,25 @@ export type Database = {
       get_payment_terms_discount_pct: {
         Args: { p_terms: string; p_workspace_id: string }
         Returns: number
+      }
+      get_project_applications: {
+        Args: { p_project_id: string }
+        Returns: {
+          id: string
+          reference: string
+          period_to: string
+          status: string
+          currency: string
+          gross_valuation: number
+          certified_amount: number
+          retention_this_app: number
+          retention_cumulative: number
+          previously_certified: number
+          net_due: number
+          variance: number
+          due_on: string
+          invoice_id: string
+        }[]
       }
       get_project_cost_by_code: {
         Args: { p_project_id: string }

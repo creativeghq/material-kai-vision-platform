@@ -21,6 +21,7 @@ import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
 import { JobCostCard } from '../JobCostCard';
 import { CvrCard } from '../CvrCard';
 import { VariationsCard } from '../VariationsCard';
+import { ApplicationsCard } from '../ApplicationsCard';
 import { ProjectExpensesCard } from '../ProjectExpensesCard';
 import { ProjectLabourCard } from '../ProjectLabourCard';
 import { ProjectStockCard } from '../ProjectStockCard';
@@ -151,6 +152,13 @@ export const FinanceTab: React.FC<{ projectId: string; projectName?: string }> =
         currency={currency}
         isOwner={isWorkspaceManager}
         onChanged={() => setCvrToken((t) => t + 1)}
+      />
+
+      <ApplicationsCard
+        projectId={projectId}
+        workspaceId={activeWorkspaceId}
+        currency={currency}
+        isOwner={isWorkspaceManager}
       />
 
       {/* Labour, at the typed rate against what payroll says it actually cost (#378 N1). Sits
