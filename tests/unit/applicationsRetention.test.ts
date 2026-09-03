@@ -123,6 +123,21 @@ describe('the applications card', () => {
     expect(CARD).toContain('invoiced');
   });
 
+  it('shows the retention position and its releases', () => {
+    // Retention was accrued but never let go before this: the money sat withheld for ever on
+    // screen. `expected_amount` is derived per tranche because the held figure grows with every
+    // valuation, so a stored expectation goes stale silently.
+    expect(CARD).toContain('retention.outstanding');
+    expect(CARD).toContain('t.expected_amount');
+    expect(CARD).toContain('releaseTranche');
+  });
+
+  it('takes the held figure from the retention derivation, not a second read', () => {
+    // `get_project_retention` reads the same cumulative retention `get_project_applications`
+    // derives AND knows what has been released, so preferring it keeps one answer on screen.
+    expect(CARD).toContain('retention ? n(retention.held)');
+  });
+
   it('dates a new application on the operator local day', () => {
     expect(CARD).toContain('todayLocalISO()');
     expect(CARD).not.toMatch(/toISOString\(\)\.slice\(0,\s*10\)/);

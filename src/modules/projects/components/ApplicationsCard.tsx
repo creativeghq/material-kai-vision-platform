@@ -29,7 +29,7 @@ import { formatMoney } from '@/utils/decimal';
 import { formatDate, todayLocalISO } from '@/utils/datetime';
 import {
   applicationsService, isApplicationSettled,
-  type ApplicationRow, type ApplicationStatus, type RetentionTerms,
+  type ApplicationRow, type ApplicationStatus, type RetentionTerms, type RetentionPosition,
 } from '../services/applicationsService';
 
 interface Props {
@@ -50,18 +50,21 @@ export const ApplicationsCard: React.FC<Props> = ({ projectId, workspaceId, curr
   const { toast } = useToast();
   const [rows, setRows] = useState<ApplicationRow[] | null>(null);
   const [terms, setTerms] = useState<RetentionTerms | null>(null);
+  const [retention, setRetention] = useState<RetentionPosition | null>(null);
   const [busy, setBusy] = useState(false);
   const [creating, setCreating] = useState(false);
   const [certifying, setCertifying] = useState<ApplicationRow | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [derived, t] = await Promise.all([
+      const [derived, t, ret] = await Promise.all([
         applicationsService.derived(projectId),
         applicationsService.getRetentionTerms(projectId).catch(() => null),
+        applicationsService.retention(projectId).catch(() => null),
       ]);
       setRows(derived);
       setTerms(t);
+      setRetention(ret);
     } catch (e) {
       toast({ title: 'Failed to load applications', description: (e as Error).message, variant: 'destructive' });
       setRows([]);
@@ -88,12 +91,14 @@ export const ApplicationsCard: React.FC<Props> = ({ projectId, workspaceId, curr
     const latest = list[list.length - 1];
     return {
       certifiedToDate: list.reduce((s, r) => s + n(r.certified_amount), 0),
-      retentionHeld: latest ? n(latest.retention_cumulative) : 0,
+      // From the retention position when it loaded — `get_project_retention` reads the same
+      // cumulative figure and also knows what has been released, so preferring it keeps one answer.
+      retentionHeld: retention ? n(retention.held) : (latest ? n(latest.retention_cumulative) : 0),
       outstanding: list
         .filter((r) => !isApplicationSettled(r.status))
         .reduce((s, r) => s + (r.certified_amount === null ? n(r.net_due) : n(r.certified_amount)), 0),
     };
-  }, [rows]);
+  }, [rows, retention]);
 
   return (
     <Card>
@@ -221,15 +226,74 @@ export const ApplicationsCard: React.FC<Props> = ({ projectId, workspaceId, curr
             <span className="text-muted-foreground">
               Outstanding <span className="font-medium tabular-nums text-foreground">{money(summary.outstanding)}</span>
             </span>
-            {terms?.practical_completion_on && (
+            {retention && n(retention.released) > 0 && (
               <span className="text-muted-foreground">
-                Half the retention releases at practical completion ({formatDate(terms.practical_completion_on)}),
-                the rest {n(terms.defects_period_months)} months later.
+                Retention released <span className="font-medium tabular-nums text-foreground">{money(retention.released)}</span>
               </span>
             )}
           </div>
         )}
       </CardContent>
+
+      {retention && (
+        <div className="border-t border-border/60 px-5 py-3">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <p className="text-sm font-medium">Retention release</p>
+            <span className="text-xs text-muted-foreground">
+              {money(retention.outstanding)} still held
+            </span>
+            {isOwner && workspaceId && retention.tranches.length === 0 && (
+              <Button
+                size="sm" variant="outline" className="ml-auto" disabled={busy}
+                onClick={() => void act('Could not set up the releases',
+                  () => applicationsService.createStandardTranches(projectId, workspaceId))}
+              >
+                <Plus className="h-3.5 w-3.5" /> Set up the two standard releases
+              </Button>
+            )}
+          </div>
+
+          {retention.tranches.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              {terms?.practical_completion_on
+                ? 'Half at practical completion, half when the defects period ends — the usual split.'
+                : 'Set a practical completion date on the project and the release dates follow from it.'}
+            </p>
+          ) : (
+            <div className="divide-y divide-border/60 rounded-sm border border-hairline">
+              {retention.tranches.map((t) => (
+                <div key={t.id} className="flex flex-wrap items-center gap-3 px-3 py-2 text-sm">
+                  <span className="min-w-0 flex-1">
+                    {humanizeLabel(t.tranche)}
+                    {t.due_on && (
+                      <span className="ml-2 text-xs text-muted-foreground">due {formatDate(t.due_on)}</span>
+                    )}
+                  </span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {t.status === 'released'
+                      ? money(t.amount)
+                      /* What it is worth at today's held figure — derived, because the held
+                         amount grows with every valuation and a stored expectation goes stale. */
+                      : `${money(t.expected_amount)} expected`}
+                  </span>
+                  <Badge variant={t.status === 'released' ? 'success' : t.status === 'disputed' ? 'error' : 'neutral'}>
+                    {humanizeLabel(t.status)}
+                  </Badge>
+                  {isOwner && t.status !== 'released' && (
+                    <Button
+                      size="sm" variant="ghost" disabled={busy}
+                      onClick={() => void act('Could not record the release',
+                        () => applicationsService.releaseTranche(t.id, n(t.expected_amount)))}
+                    >
+                      <Check className="h-3.5 w-3.5" /> Release
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {creating && workspaceId && (
         <NewApplicationDialog

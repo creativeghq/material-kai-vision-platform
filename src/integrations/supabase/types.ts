@@ -21738,6 +21738,79 @@ export type Database = {
           },
         ]
       }
+      project_retention_releases: {
+        Row: {
+          amount: number | null
+          created_at: string
+          created_by: string | null
+          due_on: string | null
+          id: string
+          invoice_id: string | null
+          notes: string | null
+          percent: number
+          project_id: string
+          released_at: string | null
+          status: string
+          tranche: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          amount?: number | null
+          created_at?: string
+          created_by?: string | null
+          due_on?: string | null
+          id?: string
+          invoice_id?: string | null
+          notes?: string | null
+          percent?: number
+          project_id: string
+          released_at?: string | null
+          status?: string
+          tranche: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          amount?: number | null
+          created_at?: string
+          created_by?: string | null
+          due_on?: string | null
+          id?: string
+          invoice_id?: string | null
+          notes?: string | null
+          percent?: number
+          project_id?: string
+          released_at?: string | null
+          status?: string
+          tranche?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_retention_releases_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_retention_releases_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_retention_releases_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_rooms: {
         Row: {
           budget_amount: number | null
@@ -36537,6 +36610,7 @@ export type Database = {
           margin_pct: number
         }[]
       }
+      get_project_retention: { Args: { p_project_id: string }; Returns: Json }
       get_supplier_price_break: {
         Args: {
           p_product_id: string

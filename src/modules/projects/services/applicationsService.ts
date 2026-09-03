@@ -70,6 +70,29 @@ export interface ApplicationRow {
   invoice_id: string | null;
 }
 
+/** One release tranche, with what it is worth at today's held figure. */
+export interface RetentionTranche {
+  id: string;
+  tranche: 'practical_completion' | 'defects_end' | 'other';
+  due_on: string | null;
+  percent: number;
+  /** What was actually released. Null until it is. */
+  amount: number | null;
+  status: 'pending' | 'released' | 'disputed';
+  released_at: string | null;
+  invoice_id: string | null;
+  notes: string | null;
+  /** DERIVED from the held figure, never stored — the held amount grows with every valuation. */
+  expected_amount: number;
+}
+
+export interface RetentionPosition {
+  held: number;
+  released: number;
+  outstanding: number;
+  tranches: RetentionTranche[];
+}
+
 export interface RetentionTerms {
   retention_percent: number;
   retention_cap_percent: number;
@@ -171,6 +194,62 @@ export const applicationsService = {
 
   async remove(id: string): Promise<void> {
     const { error } = await supabase.from('project_applications').delete().eq('id', id);
+    if (error) throw readable(error);
+  },
+
+  /**
+   * The retention position: held, released, still out, and the release tranches.
+   *
+   * `held` is NOT stored — `get_project_retention` reads it from the latest application's
+   * cumulative retention, which `get_project_applications` already derives. One derivation: a
+   * second retention calculation would be free to disagree with the figure on the applications
+   * table the operator is looking at.
+   */
+  async retention(projectId: string): Promise<RetentionPosition> {
+    const { data, error } = await supabase.rpc('get_project_retention', { p_project_id: projectId });
+    if (error) throw readable(error);
+    return data as unknown as RetentionPosition;
+  },
+
+  /**
+   * Create the two conventional tranches: half at practical completion, half when the defects
+   * period ends. Dates are derived from the project's terms ONCE, here, and then stored — so a
+   * negotiated release date survives somebody later correcting the practical completion date.
+   */
+  async createStandardTranches(projectId: string, workspaceId: string): Promise<void> {
+    const terms = await this.getRetentionTerms(projectId);
+    if (!terms.practical_completion_on) {
+      throw new Error('Set the practical completion date first — the release dates come from it.');
+    }
+    const pc = new Date(`${terms.practical_completion_on}T00:00:00Z`);
+    const defects = new Date(pc);
+    defects.setUTCMonth(defects.getUTCMonth() + (terms.defects_period_months || 0));
+
+    const { error } = await supabase.from('project_retention_releases').insert([
+      {
+        workspace_id: workspaceId,
+        project_id: projectId,
+        tranche: 'practical_completion',
+        due_on: terms.practical_completion_on,
+        percent: 50,
+      },
+      {
+        workspace_id: workspaceId,
+        project_id: projectId,
+        tranche: 'defects_end',
+        due_on: defects.toISOString().slice(0, 10),
+        percent: 50,
+      },
+    ]);
+    if (error) throw readable(error);
+  },
+
+  /** Record a release. Amount and status move together — the DB refuses one without the other. */
+  async releaseTranche(id: string, amount: number): Promise<void> {
+    const { error } = await supabase
+      .from('project_retention_releases')
+      .update({ amount, status: 'released' })
+      .eq('id', id);
     if (error) throw readable(error);
   },
 
