@@ -368,7 +368,7 @@ const BidRateGrid: React.FC<{
 }> = ({ bidId, items, currency, companyName, isReceived, onClose, onSaved }) => {
   const { toast } = useToast();
   const [lines, setLines] = useState<Array<{
-    id: string; package_item_id: string; quantity: number | null; rate: number | null; amount: number;
+    id: string; package_item_id: string; quantity: number | null; rate: number | null; amount: number | null;
   }> | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);

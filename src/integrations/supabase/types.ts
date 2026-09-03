@@ -21878,7 +21878,7 @@ export type Database = {
       }
       project_schedule_items: {
         Row: {
-          amount: number
+          amount: number | null
           cost_code_id: string | null
           created_at: string
           description: string
@@ -29357,7 +29357,7 @@ export type Database = {
       }
       tender_bid_items: {
         Row: {
-          amount: number
+          amount: number | null
           bid_id: string
           created_at: string
           id: string

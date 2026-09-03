@@ -117,6 +117,16 @@ export const TenderPackagesCard: React.FC<Props> = ({
   const bidTotal = (bidId: string) =>
     rows.filter((r) => r.bid_id === bidId).reduce((s, r) => s + n(r.amount), 0);
 
+  /**
+   * How many lines a bidder left unpriced.
+   *
+   * Their total silently excludes those lines, so the bid with the most omissions looks cheapest —
+   * which is the trap this whole comparison exists to avoid. The count sits beside the total so
+   * the two are never read apart.
+   */
+  const unpricedCount = (bidId: string) =>
+    rows.filter((r) => r.bid_id === bidId && r.amount === null).length;
+
   const createPackage = async () => {
     if (!workspaceId || !newName.trim()) return;
     await act('Could not create the package', async () => {
@@ -264,11 +274,19 @@ export const TenderPackagesCard: React.FC<Props> = ({
                     ))}
                     <tr className="border-t border-border/60 bg-surface-sunken font-medium">
                       <td className="px-5 py-2" colSpan={3}>Total</td>
-                      {bidders.map((b) => (
-                        <td key={b.bid_id} className="px-3 py-2 text-right tabular-nums">
-                          {money(bidTotal(b.bid_id))}
-                        </td>
-                      ))}
+                      {bidders.map((b) => {
+                        const missing = unpricedCount(b.bid_id);
+                        return (
+                          <td key={b.bid_id} className="px-3 py-2 text-right tabular-nums">
+                            {money(bidTotal(b.bid_id))}
+                            {missing > 0 && (
+                              <span className="block text-[11px] font-normal text-amber-800 dark:text-amber-300">
+                                {missing} line{missing === 1 ? '' : 's'} not priced
+                              </span>
+                            )}
+                          </td>
+                        );
+                      })}
                     </tr>
                     {isOwner && active?.status !== 'awarded' && (
                       <tr className="border-t border-border/60">

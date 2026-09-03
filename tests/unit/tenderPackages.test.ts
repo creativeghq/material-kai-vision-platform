@@ -146,6 +146,30 @@ describe('the comparison', () => {
     expect(CARD).toContain('c?.amount === null');
   });
 
+  /**
+   * The regression this guard exists for, found by running a whole project through the chain.
+   *
+   * `amount` was generated as `round(coalesce(quantity,0) * coalesce(rate,0), 2)`, so a line
+   * nobody priced came back as 0.00 rather than NULL — and 0 is the minimum, so the OMISSION was
+   * marked as the cheapest bid on its line. The UI check above could never fire, because the
+   * column never produced a null. NULL now means not priced and 0 means quoted as zero.
+   */
+  it('treats an unpriced amount as absent, not as the cheapest', () => {
+    const types = readFileSync(resolve(ROOT, 'src/integrations/supabase/types.ts'), 'utf8');
+    const block = types.slice(types.indexOf('\n      tender_bid_items: {'));
+    const row = block.slice(0, block.indexOf('Insert: {'));
+    expect(row).toContain('amount: number | null');
+    // The service type must admit null too, or no component can test for it.
+    expect(SERVICE).toMatch(/amount: number \| null/);
+  });
+
+  it('says how many lines each bidder left unpriced, beside their total', () => {
+    // A total silently excludes unpriced lines, so the bid with the most omissions looks
+    // cheapest. The count sits with the total so the two are never read apart.
+    expect(CARD).toContain('unpricedCount');
+    expect(CARD).toContain('not priced');
+  });
+
   it('excludes bids that are not received', () => {
     expect(CARD).toContain('isBidComparable(r.bid_status)');
   });

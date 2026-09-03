@@ -274,7 +274,7 @@ export const tendersService = {
 
   /** Every bid line on a package, so the rate grid can be filled in per bidder. */
   async bidItems(bidId: string): Promise<Array<{
-    id: string; package_item_id: string; quantity: number | null; rate: number | null; amount: number;
+    id: string; package_item_id: string; quantity: number | null; rate: number | null; amount: number | null;
   }>> {
     const { data, error } = await supabase
       .from('tender_bid_items')
@@ -282,7 +282,7 @@ export const tendersService = {
       .eq('bid_id', bidId);
     if (error) throw readable(error);
     return (data ?? []) as Array<{
-      id: string; package_item_id: string; quantity: number | null; rate: number | null; amount: number;
+      id: string; package_item_id: string; quantity: number | null; rate: number | null; amount: number | null;
     }>;
   },
 

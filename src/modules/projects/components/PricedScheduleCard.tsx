@@ -252,7 +252,13 @@ export const PricedScheduleCard: React.FC<Props> = ({
                       <td className="px-3 py-2 text-xs text-muted-foreground">{i.unit ?? '—'}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{i.quantity ?? '—'}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{i.rate === null ? '—' : money(i.rate)}</td>
-                      <td className="px-3 py-2 text-right font-medium tabular-nums">{money(i.amount)}</td>
+                      <td className="px-3 py-2 text-right font-medium tabular-nums">
+                        {/* NULL means no rate yet. Showing 0.00 would read as "free" rather than
+                            "not priced", which is a different fact to somebody pricing a job. */}
+                        {i.amount === null
+                          ? <span className="text-muted-foreground">&mdash;</span>
+                          : money(i.amount)}
+                      </td>
                       <td className="px-5 py-2 text-right">
                         {isOwner && (
                           <Button size="sm" variant="ghost" disabled={busy}
