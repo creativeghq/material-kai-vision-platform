@@ -23,6 +23,7 @@ import { PricedScheduleCard } from '../PricedScheduleCard';
 import { CvrCard } from '../CvrCard';
 import { VariationsCard } from '../VariationsCard';
 import { ApplicationsCard } from '../ApplicationsCard';
+import { TenderPackagesCard } from '../TenderPackagesCard';
 import { ProjectExpensesCard } from '../ProjectExpensesCard';
 import { ProjectLabourCard } from '../ProjectLabourCard';
 import { ProjectStockCard } from '../ProjectStockCard';
@@ -170,6 +171,16 @@ export const FinanceTab: React.FC<{ projectId: string; projectName?: string }> =
         workspaceId={activeWorkspaceId}
         currency={currency}
         isOwner={isWorkspaceManager}
+      />
+
+      {/* Tendering sits after the money views because awarding a package writes into them: the
+          subcontract is a purchase order, so it lands in the CVR as committed cost. */}
+      <TenderPackagesCard
+        projectId={projectId}
+        workspaceId={activeWorkspaceId}
+        currency={currency}
+        isOwner={isWorkspaceManager}
+        onChanged={() => setCvrToken((t) => t + 1)}
       />
 
       {/* Labour, at the typed rate against what payroll says it actually cost (#378 N1). Sits

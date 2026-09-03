@@ -29282,6 +29282,274 @@ export type Database = {
         }
         Relationships: []
       }
+      tender_bid_items: {
+        Row: {
+          amount: number
+          bid_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          package_item_id: string
+          quantity: number | null
+          rate: number | null
+          workspace_id: string
+        }
+        Insert: {
+          bid_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          package_item_id: string
+          quantity?: number | null
+          rate?: number | null
+          workspace_id: string
+        }
+        Update: {
+          bid_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          package_item_id?: string
+          quantity?: number | null
+          rate?: number | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tender_bid_items_bid_id_fkey"
+            columns: ["bid_id"]
+            isOneToOne: false
+            referencedRelation: "tender_bids"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tender_bid_items_package_item_id_fkey"
+            columns: ["package_item_id"]
+            isOneToOne: false
+            referencedRelation: "tender_package_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tender_bid_items_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tender_bids: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          package_id: string
+          status: string
+          submitted_at: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          package_id: string
+          status?: string
+          submitted_at?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          package_id?: string
+          status?: string
+          submitted_at?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tender_bids_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "tender_packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tender_bids_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tender_bids_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "crm_companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tender_package_items: {
+        Row: {
+          cost_code_id: string | null
+          created_at: string
+          description: string
+          id: string
+          item_ref: string | null
+          package_id: string
+          quantity: number | null
+          sort: number
+          unit: string | null
+          workspace_id: string
+        }
+        Insert: {
+          cost_code_id?: string | null
+          created_at?: string
+          description: string
+          id?: string
+          item_ref?: string | null
+          package_id: string
+          quantity?: number | null
+          sort?: number
+          unit?: string | null
+          workspace_id: string
+        }
+        Update: {
+          cost_code_id?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          item_ref?: string | null
+          package_id?: string
+          quantity?: number | null
+          sort?: number
+          unit?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tender_package_items_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "tender_packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tender_package_items_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tender_package_items_cost_code_id_fkey"
+            columns: ["cost_code_id"]
+            isOneToOne: false
+            referencedRelation: "cost_codes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tender_packages: {
+        Row: {
+          awarded_bid_id: string | null
+          awarded_order_id: string | null
+          cost_code_id: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          due_at: string | null
+          id: string
+          issued_at: string | null
+          name: string
+          project_id: string
+          reference: string | null
+          scope: string | null
+          status: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          awarded_bid_id?: string | null
+          awarded_order_id?: string | null
+          cost_code_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          due_at?: string | null
+          id?: string
+          issued_at?: string | null
+          name: string
+          project_id: string
+          reference?: string | null
+          scope?: string | null
+          status?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          awarded_bid_id?: string | null
+          awarded_order_id?: string | null
+          cost_code_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          due_at?: string | null
+          id?: string
+          issued_at?: string | null
+          name?: string
+          project_id?: string
+          reference?: string | null
+          scope?: string | null
+          status?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tender_packages_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tender_packages_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tender_packages_cost_code_id_fkey"
+            columns: ["cost_code_id"]
+            isOneToOne: false
+            referencedRelation: "cost_codes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tender_packages_awarded_order_id_fkey"
+            columns: ["awarded_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tender_packages_awarded_bid_id_fkey"
+            columns: ["awarded_bid_id"]
+            isOneToOne: false
+            referencedRelation: "tender_bids"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       time_entries: {
         Row: {
           billed_at: string | null
@@ -34398,6 +34666,10 @@ export type Database = {
         Args: { p_doc_ids: string[]; p_workspace_id: string }
         Returns: number
       }
+      award_tender_package: {
+        Args: { p_package_id: string; p_bid_id: string }
+        Returns: string
+      }
       backfill_brand_company_ids: {
         Args: { p_limit?: number; p_workspace_id: string }
         Returns: Json
@@ -36192,6 +36464,23 @@ export type Database = {
           markup: number
           model_key: string
           output_price: number
+        }[]
+      }
+      get_package_bid_comparison: {
+        Args: { p_package_id: string }
+        Returns: {
+          package_item_id: string
+          item_ref: string
+          description: string
+          unit: string
+          quantity: number
+          bid_id: string
+          company_id: string
+          company_name: string
+          bid_status: string
+          rate: number
+          amount: number
+          is_lowest: boolean
         }[]
       }
       get_payment_terms_discount_pct: {
