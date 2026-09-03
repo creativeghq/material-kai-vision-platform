@@ -19,6 +19,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
 import { JobCostCard } from '../JobCostCard';
+import { PricedScheduleCard } from '../PricedScheduleCard';
 import { CvrCard } from '../CvrCard';
 import { VariationsCard } from '../VariationsCard';
 import { ApplicationsCard } from '../ApplicationsCard';
@@ -140,6 +141,16 @@ export const FinanceTab: React.FC<{ projectId: string; projectName?: string }> =
     <div className="space-y-4">
       {/* Job cost first: margin is the question this tab exists to answer. AR/AP is the detail. */}
       <JobCostCard projectId={projectId} reloadToken={costToken} workspaceId={activeWorkspaceId} />
+
+      {/* The priced schedule sits above the CVR because it is the value side the CVR reconciles
+          against — an accepted contract schedule IS the contract sum. */}
+      <PricedScheduleCard
+        projectId={projectId}
+        workspaceId={activeWorkspaceId}
+        currency={currency}
+        isOwner={isWorkspaceManager}
+        onChanged={() => setCvrToken((t) => t + 1)}
+      />
 
       {/* The CVR supersedes the plain cost-by-code card: cost with no value beside it cannot say
           whether the job is making money. It reads get_project_cvr, which itself selects from

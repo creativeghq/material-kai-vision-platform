@@ -21803,6 +21803,133 @@ export type Database = {
           },
         ]
       }
+      project_schedule_items: {
+        Row: {
+          amount: number
+          cost_code_id: string | null
+          created_at: string
+          description: string
+          id: string
+          is_provisional: boolean
+          item_ref: string | null
+          notes: string | null
+          quantity: number | null
+          rate: number | null
+          schedule_id: string
+          sort: number
+          unit: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          cost_code_id?: string | null
+          created_at?: string
+          description: string
+          id?: string
+          is_provisional?: boolean
+          item_ref?: string | null
+          notes?: string | null
+          quantity?: number | null
+          rate?: number | null
+          schedule_id: string
+          sort?: number
+          unit?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          cost_code_id?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          is_provisional?: boolean
+          item_ref?: string | null
+          notes?: string | null
+          quantity?: number | null
+          rate?: number | null
+          schedule_id?: string
+          sort?: number
+          unit?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_schedule_items_cost_code_id_fkey"
+            columns: ["cost_code_id"]
+            isOneToOne: false
+            referencedRelation: "cost_codes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_schedule_items_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "project_schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_schedules: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          currency: string
+          id: string
+          is_contract: boolean
+          name: string
+          notes: string | null
+          project_id: string
+          status: string
+          updated_at: string
+          version: number
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          id?: string
+          is_contract?: boolean
+          name: string
+          notes?: string | null
+          project_id: string
+          status?: string
+          updated_at?: string
+          version?: number
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          id?: string
+          is_contract?: boolean
+          name?: string
+          notes?: string | null
+          project_id?: string
+          status?: string
+          updated_at?: string
+          version?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_schedules_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_schedules_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_site_logs: {
         Row: {
           attendance: string | null
