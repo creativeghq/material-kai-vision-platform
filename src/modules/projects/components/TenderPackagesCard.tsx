@@ -29,6 +29,7 @@ import {
   tendersService, isBidComparable,
   type TenderPackage, type ComparisonRow, type PackageStatus,
 } from '../services/tendersService';
+import { TenderPackageWorkspace } from './TenderPackageWorkspace';
 
 interface Props {
   projectId: string;
@@ -202,13 +203,24 @@ export const TenderPackagesCard: React.FC<Props> = ({
               </div>
             )}
 
+            {active && workspaceId && isOwner && (
+              <TenderPackageWorkspace
+                projectId={projectId}
+                workspaceId={workspaceId}
+                packageId={active.id}
+                currency={active.currency ?? currency}
+                locked={active.status === 'awarded'}
+                onChanged={() => { void loadComparison(); onChanged?.(); }}
+              />
+            )}
+
             {lines.length === 0 ? (
-              <div className="px-5 py-6 text-center text-sm text-muted-foreground">
-                Nothing in this package yet — add the items of work you want priced.
+              <div className="border-t border-border/60 px-5 py-6 text-center text-sm text-muted-foreground">
+                Nothing to compare yet — the package has no items.
               </div>
             ) : bidders.length === 0 ? (
-              <div className="px-5 py-6 text-center text-sm text-muted-foreground">
-                {lines.length} item{lines.length === 1 ? '' : 's'} ready to send. No bids received yet.
+              <div className="border-t border-border/60 px-5 py-6 text-center text-sm text-muted-foreground">
+                {lines.length} item{lines.length === 1 ? '' : 's'} ready to send. No bids marked received yet.
               </div>
             ) : (
               <div className="table-scroll">

@@ -261,6 +261,47 @@ export const tendersService = {
     return data as string;
   },
 
+  /** Candidate subcontractors: the workspace's CRM companies. */
+  async listCompanies(workspaceId: string): Promise<Array<{ id: string; name: string }>> {
+    const { data, error } = await supabase
+      .from('crm_companies')
+      .select('id, name')
+      .eq('workspace_id', workspaceId)
+      .order('name');
+    if (error) throw readable(error);
+    return (data ?? []) as Array<{ id: string; name: string }>;
+  },
+
+  /** Every bid line on a package, so the rate grid can be filled in per bidder. */
+  async bidItems(bidId: string): Promise<Array<{
+    id: string; package_item_id: string; quantity: number | null; rate: number | null; amount: number;
+  }>> {
+    const { data, error } = await supabase
+      .from('tender_bid_items')
+      .select('id, package_item_id, quantity, rate, amount')
+      .eq('bid_id', bidId);
+    if (error) throw readable(error);
+    return (data ?? []) as Array<{
+      id: string; package_item_id: string; quantity: number | null; rate: number | null; amount: number;
+    }>;
+  },
+
+  /**
+   * Un-invite a subcontractor. Their bid lines go with them (ON DELETE CASCADE).
+   *
+   * The way out of a bid invited before the package had any items: it has no lines to price, and
+   * re-inviting after the items exist seeds them properly.
+   */
+  async removeBid(id: string): Promise<void> {
+    const { error } = await supabase.from('tender_bids').delete().eq('id', id);
+    if (error) throw readable(error);
+  },
+
+  async removeItem(id: string): Promise<void> {
+    const { error } = await supabase.from('tender_package_items').delete().eq('id', id);
+    if (error) throw readable(error);
+  },
+
   async removePackage(id: string): Promise<void> {
     const { error } = await supabase.from('tender_packages').delete().eq('id', id);
     if (error) throw readable(error);
