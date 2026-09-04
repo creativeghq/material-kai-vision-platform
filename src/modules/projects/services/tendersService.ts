@@ -56,6 +56,8 @@ export interface TenderBid {
   status: BidStatus;
   submitted_at: string | null;
   notes: string | null;
+  /** When the enquiry link was last issued. Null means they have never been sent anything. */
+  sent_at: string | null;
 }
 
 /** One cell of the comparison: what a bidder put against one package line. */
@@ -186,7 +188,7 @@ export const tendersService = {
   async bids(packageId: string): Promise<TenderBid[]> {
     const { data, error } = await supabase
       .from('tender_bids')
-      .select('id, package_id, company_id, status, submitted_at, notes')
+      .select('id, package_id, company_id, status, submitted_at, notes, sent_at')
       .eq('package_id', packageId);
     if (error) throw readable(error);
     return (data ?? []) as unknown as TenderBid[];
@@ -201,7 +203,7 @@ export const tendersService = {
     const { data, error } = await supabase
       .from('tender_bids')
       .insert({ workspace_id: workspaceId, package_id: packageId, company_id: companyId })
-      .select('id, package_id, company_id, status, submitted_at, notes')
+      .select('id, package_id, company_id, status, submitted_at, notes, sent_at')
       .single();
     if (error) throw readable(error);
     const bid = data as unknown as TenderBid;
@@ -259,6 +261,26 @@ export const tendersService = {
     });
     if (error) throw readable(error);
     return data as string;
+  },
+
+  /**
+   * Issue the enquiry to one subcontractor: mints their private link, emails it, returns it.
+   *
+   * The link is PER BID. It resolves to that subcontractor's own lines and nothing else, so a
+   * forwarded link cannot show anybody what a competitor quoted — which is the one thing a tender
+   * must never do. Re-sending keeps the same token, so somebody part-way through pricing does not
+   * lose their link because the buyer pressed send twice.
+   *
+   * The link comes back whether or not the email went out: a company with no email on file is
+   * ordinary, and the buyer can paste it into their own message.
+   */
+  async sendEnquiry(bidId: string): Promise<{ link: string; emailed: boolean; has_email: boolean }> {
+    const { data, error } = await supabase.functions.invoke('tender-bid-portal', {
+      body: { action: 'send', bid_id: bidId },
+    });
+    if (error) throw new Error(error.message || 'Could not send the enquiry.');
+    if (!data?.ok) throw new Error(data?.error || 'Could not send the enquiry.');
+    return data;
   },
 
   /** Candidate subcontractors: the workspace's CRM companies. */

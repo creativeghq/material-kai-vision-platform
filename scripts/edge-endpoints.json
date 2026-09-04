@@ -14642,5 +14642,71 @@
       }
     ],
     "response": "{ success, status, log: { notes, weather, attendance } | null, snags: [{ title, description, severity, room_id, room_unmatched }], unclear, dropped, severities }"
+  },
+  {
+    "name": "tender-bid-portal",
+    "tag": "Projects",
+    "summary": "Issue a trade package to a subcontractor and take their priced return",
+    "description": "Makes a tender sendable. `send` (authenticated) mints a private link for one bid, emails it to the subcontractor's CRM address and returns the link either way, since a company with no email on file is ordinary. `resolve_token` and `submit` are PUBLIC and token-authenticated: the subcontractor never needs an account. THE TOKEN IS PER BID, which is the security model — it resolves to one subcontractor's own lines, so a forwarded link cannot reveal what a competitor quoted. Re-sending keeps the same token so somebody part-way through pricing does not lose their link. `submit` never spreads the request body into a write: each rate is matched against a line that token owns and anything else is discarded, and a blank rate is stored as NULL rather than 0, because 'not priced' and 'free' are different answers. An expired or withdrawn link is indistinguishable from a wrong one.",
+    "security": [
+      "public",
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "name": "resolve_token",
+        "summary": "Public: open an enquiry by its token and read this bidder's own lines",
+        "params": [
+          {
+            "name": "token",
+            "type": "string",
+            "required": true,
+            "desc": "The per-bid access token from the emailed link"
+          }
+        ]
+      },
+      {
+        "name": "submit",
+        "summary": "Public: send the rates back and mark the bid received",
+        "params": [
+          {
+            "name": "token",
+            "type": "string",
+            "required": true,
+            "desc": "The per-bid access token"
+          },
+          {
+            "name": "rates",
+            "type": "array",
+            "required": false,
+            "desc": "[{bid_item_id, rate}] — a null or omitted rate means NOT priced, never zero"
+          },
+          {
+            "name": "notes",
+            "type": "string",
+            "required": false,
+            "desc": "Exclusions and qualifications, read alongside the figures"
+          }
+        ]
+      },
+      {
+        "name": "send",
+        "summary": "Issue or re-issue the enquiry link for one bid, and email it",
+        "params": [
+          {
+            "name": "bid_id",
+            "type": "string (uuid)",
+            "required": true,
+            "desc": "Checked against the caller's workspace membership via the bid's row"
+          }
+        ]
+      }
+    ],
+    "request": [],
+    "response": "{ ok, link, emailed, has_email } for send; { ok, package, items, lines, submitted, notes } for resolve_token; { ok, lines_priced } for submit"
   }
 ]

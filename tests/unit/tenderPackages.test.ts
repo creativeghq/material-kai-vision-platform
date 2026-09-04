@@ -139,6 +139,92 @@ describe('every tender operation is reachable from a screen', () => {
   });
 });
 
+/**
+ * Issuing the enquiry. A tender you cannot send is not a tender — until this existed a package was
+ * assembled and compared entirely inside our own office, with somebody typing the subcontractor's
+ * prices in themselves.
+ */
+describe('the enquiry portal', () => {
+  const EDGE = readFileSync(
+    resolve(ROOT, 'supabase/functions/tender-bid-portal/index.ts'), 'utf8',
+  );
+  const PAGE = readFileSync(resolve(ROOT, 'src/pages/PublicBidPage.tsx'), 'utf8');
+
+  /**
+   * The security model in one assertion. The token is per BID, so it resolves to one
+   * subcontractor's own lines — a package-level token would hand every bidder the competition's
+   * prices, which is the one thing a tender must never do.
+   */
+  it('resolves a token to one bid and reads only that bid lines', () => {
+    const code = stripComments(EDGE);
+    expect(code).toMatch(/from\('tender_bids'\)[\s\S]{0,200}eq\('access_token', token\)/);
+    expect(code).toMatch(/from\('tender_bid_items'\)[\s\S]{0,200}eq\('bid_id', bid\.id\)/);
+    // No read that could span bids.
+    expect(code).not.toMatch(/from\('tender_bid_items'\)[\s\S]{0,200}eq\('package_id'/);
+  });
+
+  it('never trusts an id from the body on the public actions', () => {
+    // Invariant 1. The public half is reachable without a session, so a body-supplied id would be
+    // the whole boundary gone.
+    const code = stripComments(EDGE);
+    const publicHalf = code.slice(code.indexOf("action === 'resolve_token'"), code.indexOf("action !== 'send'"));
+    expect(publicHalf).not.toMatch(/eq\('id', body\./);
+    expect(publicHalf).not.toMatch(/body\.(package_id|company_id|workspace_id)/);
+  });
+
+  it('matches submitted rates against lines the token owns', () => {
+    // Invariant 8: the payload is never spread into a write.
+    const code = stripComments(EDGE);
+    expect(code).toContain('ownIds.has(id)');
+    expect(code).not.toMatch(/\.update\(\s*\{\s*\.\.\.body/);
+  });
+
+  it('stores a blank rate as null, never zero', () => {
+    // "Not priced" and "free" are different answers, and treating the first as the second is how a
+    // bid wins on what it left out.
+    expect(EDGE).toMatch(/rate >= 0 \? r\.rate : null/);
+    expect(PAGE).toMatch(/raw === '' \|\| raw === undefined \? null/);
+  });
+
+  it('makes an expired link indistinguishable from a wrong one', () => {
+    // Saying "expired" confirms the token was real.
+    const code = stripComments(EDGE);
+    expect(code).toMatch(/if \(expired \|\| bid\.status === 'withdrawn'\) return json\(\{ not_found: true \}\)/);
+  });
+
+  it('keeps the same token when the enquiry is re-sent', () => {
+    // Somebody part-way through pricing must not lose their link because send was pressed twice.
+    expect(EDGE).toContain('bid.access_token ?? mintToken()');
+  });
+
+  it('checks the caller workspace on the authenticated half', () => {
+    expect(EDGE).toContain('userCanAccessWorkspace');
+  });
+
+  it('escapes everything it interpolates into the invitation HTML', () => {
+    // Invariant 11 — the package name and company name are user-supplied.
+    //
+    // Scoped to the HTML string, not the whole file: the email SUBJECT is plain text and must NOT
+    // be escaped, or it would arrive reading "Enquiry: Smith &amp; Sons". `escapeHtml` is
+    // HTML-only by contract, and asserting over the whole function would demand it in a context
+    // where it is wrong.
+    const code = stripComments(EDGE);
+    const html = code.slice(code.indexOf('const html ='), code.indexOf('const resp = await fetch'));
+    expect(html).toContain('escapeHtml');
+    const interpolations = [...html.matchAll(/\$\{([^}]*)\}/g)].map((m) => m[1].trim());
+    const unescaped = interpolations.filter(
+      (x) => !x.startsWith('escapeHtml(') && !/^(name|due) \?/.test(x) && x !== 'TOKEN_TTL_DAYS',
+    );
+    expect(unescaped).toEqual([]);
+  });
+
+  it('is reachable from the buyer screen', () => {
+    const workspace = readFileSync(
+      resolve(ROOT, 'src/modules/projects/components/TenderPackageWorkspace.tsx'), 'utf8');
+    expect(workspace).toContain('tendersService.sendEnquiry(');
+  });
+});
+
 describe('the comparison', () => {
   it('never renders an unpriced line as zero', () => {
     // A bid that wins on what it omitted is the classic way a subcontract goes wrong.

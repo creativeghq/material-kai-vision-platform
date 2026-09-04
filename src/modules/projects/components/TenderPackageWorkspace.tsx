@@ -15,7 +15,7 @@
  * date happen in one write, because the database refuses one without the other.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Plus, Trash2, UserPlus, Download, Check, ListOrdered, Users } from 'lucide-react';
+import { Loader2, Plus, Trash2, UserPlus, Download, Check, ListOrdered, Users, Send } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -247,8 +247,28 @@ export const TenderPackageWorkspace: React.FC<Props> = ({
                 }>
                   {humanizeLabel(b.status)}
                 </Badge>
+                {b.sent_at && (
+                  <span className="text-[11px] text-muted-foreground">enquiry sent</span>
+                )}
                 {!locked && (
                   <div className="flex gap-1">
+                    <Button
+                      size="sm" variant={b.sent_at ? 'ghost' : 'secondary'} disabled={busy}
+                      title="Email them a private link to price this themselves"
+                      onClick={() => void act('Could not send the enquiry', async () => {
+                        const res = await tendersService.sendEnquiry(b.id);
+                        toast({
+                          title: res.emailed ? 'Enquiry sent' : 'Link ready',
+                          description: res.emailed
+                            ? `${companyName(b.company_id)} has been emailed their pricing link.`
+                            : res.has_email
+                              ? `Email could not go out — send this link yourself: ${res.link}`
+                              : `No email address on file. Send this link yourself: ${res.link}`,
+                        });
+                      })}
+                    >
+                      <Send className="h-3.5 w-3.5" /> {b.sent_at ? 'Resend' : 'Send enquiry'}
+                    </Button>
                     <Button size="sm" variant="ghost" disabled={busy}
                       onClick={() => setPricing(pricing === b.id ? null : b.id)}>
                       {pricing === b.id ? 'Close' : 'Enter prices'}
