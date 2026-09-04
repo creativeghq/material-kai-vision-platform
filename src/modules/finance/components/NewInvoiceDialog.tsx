@@ -29,7 +29,10 @@ import { financeCategoriesService, type FinanceCategory } from '@/modules/financ
 import { servicesService, type ServiceItem } from '@/modules/finance/services/servicesService';
 import { financeService, formatMoney, VAT_CATEGORIES, vatPctForCat, extractNet } from '@/modules/finance/services/financeService';
 import { vatOfRaw, round2 } from '@/modules/finance/lib/vatMath';
-import { buyerIsConsumer as isConsumerBuyer } from '@/modules/finance/utils/salesDocumentKind';
+import {
+  buyerIsConsumer as isConsumerBuyer, supplyKindOf, mydataSalesDocumentType,
+  mydataSalesDocumentReason,
+} from '@/modules/finance/utils/salesDocumentKind';
 import { DEFAULT_TEMPLATE_ID, resolveColors, getTemplateSpec, buildInvoiceRenderData } from '@/modules/finance/invoice-templates';
 import { InvoiceDocument } from '@/modules/finance/components/InvoiceDocument';
 import { MYDATA_TYPE_FAMILY } from '@/modules/finance/components/mydataTypes';
@@ -89,6 +92,9 @@ interface LineItem {
   /** myDATA invoiceDetailType — '1' clearance / '2' fee. Only offered on doc type 1.5. */
   invoice_detail_type: string;
   product_id?: string | null;
+  /** `products.item_type` for the picked product. Absent on a hand-typed line, which votes
+   *  for NOTHING when the document type is proposed — "we do not know" is not "goods". */
+  item_type?: string | null;
   expanded?: boolean;
   advancedOpen?: boolean;
 }
@@ -558,6 +564,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     } catch { /* price optional */ }
     update(idx, {
       product_id: p.id,
+      item_type: (p as { item_type?: string | null }).item_type ?? 'good',
       description: p.name ?? '',
       sku: p.sku ?? '',
       unit: meta.unit ?? '',
@@ -573,6 +580,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const pickService = (idx: number, s: ServiceItem) => {
     update(idx, {
       product_id: s.id,
+      item_type: 'service',
       description: s.name,
       unit_price: s.list_price != null ? String(s.list_price) : '0',
       vat_category: s.vat_category != null ? String(s.vat_category) : '',
@@ -734,11 +742,32 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     return isConsumerBuyer({ isCompany: false, vatNumber: a?.vat_number, contactType: a?.contact_type });
   }, [customer, customerAddr]);
 
-  // A consumer can only be issued retail receipts (11.x) or movement docs (9.x).
-  // Steer the doc type to a retail receipt the moment the buyer resolves to a consumer.
+  /**
+   * PROPOSE the myDATA document type from both axes: who the buyer is, and what the lines supply.
+   *
+   * Only the buyer axis used to be steered — a consumer was pushed to 11.1 — so a services
+   * document went out as a sale of goods whoever it was for. All four codes are valid and AADE
+   * returns a MARK for any of them, which is why nothing ever complained.
+   *
+   * It only ever moves BETWEEN the four codes it owns. An operator who has deliberately chosen a
+   * 9.3 delivery note or a 1.6 supplemental keeps it: proposing is not overriding.
+   */
+  const supplyKind = useMemo(() => supplyKindOf(lines), [lines]);
+  const proposedDocType = useMemo(
+    // `buyerIsConsumer` above is the shared rule already applied to this buyer. Passing it back in
+    // as an identity keeps ONE answer to "is this a consumer" on this screen.
+    () => mydataSalesDocumentType(
+      buyerIsConsumer ? { isCompany: false } : { isCompany: true },
+      supplyKind,
+    ),
+    [buyerIsConsumer, supplyKind],
+  );
+  const AUTO_DOC_CODES = ['1.1', '2.1', '11.1', '11.2'];
+
   useEffect(() => {
-    if (buyerIsConsumer && !documentType.startsWith('11')) setDocumentType('11.1');
-  }, [buyerIsConsumer]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!AUTO_DOC_CODES.includes(documentType)) return;
+    if (documentType !== proposedDocType) setDocumentType(proposedDocType);
+  }, [proposedDocType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Withholding tax is a service-invoice concept (myDATA doc family 2.x — Παροχή
   // Υπηρεσιών). It is only offered/applied on service invoices; switching to a
@@ -1181,10 +1210,13 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 <Label className="text-xs">Document type</Label>
                 {/* One control: common types as chips + the long myDATA tail in a "More types" dropdown.
                     For a private individual (no VAT) only retail receipts (11.x) + movement docs (9.x)
-                    are offered — AADE rejects an invoice (1.x/2.x) issued to a VAT-less buyer. */}
+                    are offered — AADE rejects an invoice (1.x/2.x) issued to a VAT-less buyer.
+                    11.2 (ΑΠΥ, service rendered) sits beside 11.1 because a consumer buying a
+                    SERVICE gets that one, and leaving it out is how every retail service went out
+                    as a sale of goods. */}
                 <div className="flex flex-wrap items-center gap-2">
                   {((buyerIsConsumer
-                      ? [['11.1', 'Receipt'], ['9.3', 'Delivery note']]
+                      ? [['11.1', 'Receipt'], ['11.2', 'Service receipt'], ['9.3', 'Delivery note']]
                       : [['1.1', 'Sales invoice'], ['2.1', 'Service invoice'], ['11.1', 'Receipt'], ['9.3', 'Delivery note']]) as ReadonlyArray<readonly [string, string]>)
                     .filter(([code]) => docTypes.some((t) => t.code === code))
                     .map(([code, label]) => (
@@ -1224,6 +1256,19 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 {buyerIsConsumer && (
                   <p className="text-[11px] text-amber-600 dark:text-amber-400">
                     Private individual (no VAT) — issued as a retail receipt. Invoices require a business VAT number.
+                  </p>
+                )}
+                {/* WHY this code, not just which. The type is transmitted to AADE and cannot be
+                    changed afterwards without a credit note, so the reasoning belongs on screen
+                    rather than in a rule nobody can see. Shown only while the proposal stands: once
+                    the operator picks something outside the four codes it owns, this is no longer
+                    an explanation of what is selected. */}
+                {documentType === proposedDocType && (
+                  <p className="text-[11px] text-muted-foreground">
+                    {mydataSalesDocumentReason(
+                      buyerIsConsumer ? { isCompany: false } : { isCompany: true },
+                      supplyKind,
+                    )}
                   </p>
                 )}
                 <p className="text-[11px] text-muted-foreground">

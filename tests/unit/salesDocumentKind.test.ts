@@ -118,3 +118,82 @@ describe('nobody re-derives the rule', () => {
     ).toEqual([]);
   });
 });
+
+/**
+ * The SECOND axis: what is being supplied.
+ *
+ * The myDATA sales type is a 2×2, and only the buyer half was ever implemented. Every one of the
+ * 16 documents this platform had issued was 1.1 or 11.1 — the goods column — because
+ * `generate_invoice_from_order` hardcoded it. A commission, a design fee, an installation, a
+ * construction valuation: all transmitted to AADE as a SALE OF GOODS.
+ *
+ * Nothing raised and nothing could. All four codes are valid, the envelope validates, the MARK
+ * comes back. It is the payment-code rotation again — a plausible value in the right range, wrong.
+ */
+import {
+  supplyKindOf, mydataSalesDocumentType, mydataSalesDocumentReason,
+} from '@/modules/finance/utils/salesDocumentKind';
+
+const BUSINESS = { isCompany: true };
+const CONSUMER = { isCompany: false, vatNumber: null, contactType: 'private' };
+
+describe('what the lines are supplying', () => {
+  it('reads services, goods and mixed off the lines', () => {
+    expect(supplyKindOf([{ item_type: 'service' }])).toBe('services');
+    expect(supplyKindOf([{ item_type: 'good' }])).toBe('goods');
+    expect(supplyKindOf([{ item_type: 'good' }, { item_type: 'service' }])).toBe('mixed');
+  });
+
+  it('a line with no product votes for NOTHING', () => {
+    // "We do not know" and "it is goods" are different states, and only the first should change
+    // when somebody attaches a product later. Every order line in this workspace is a custom
+    // line today, so reading them as goods would look identical to knowing.
+    expect(supplyKindOf([{}])).toBe('unknown');
+    expect(supplyKindOf([{ item_type: null }, { item_type: '' }])).toBe('unknown');
+    expect(supplyKindOf([])).toBe('unknown');
+    expect(supplyKindOf(null)).toBe('unknown');
+    // One known line among unknowns still decides.
+    expect(supplyKindOf([{}, { item_type: 'service' }])).toBe('services');
+  });
+});
+
+describe('the 2x2 that decides the document code', () => {
+  it('fills every cell', () => {
+    expect(mydataSalesDocumentType(BUSINESS, 'goods')).toBe('1.1');
+    expect(mydataSalesDocumentType(BUSINESS, 'services')).toBe('2.1');
+    expect(mydataSalesDocumentType(CONSUMER, 'goods')).toBe('11.1');
+    expect(mydataSalesDocumentType(CONSUMER, 'services')).toBe('11.2');
+  });
+
+  it('mixed and unknown take the goods code, on purpose', () => {
+    // A sales invoice carrying a service line is ordinary; a services invoice carrying goods is
+    // the questionable direction.
+    for (const supply of ['mixed', 'unknown'] as const) {
+      expect(mydataSalesDocumentType(BUSINESS, supply)).toBe('1.1');
+      expect(mydataSalesDocumentType(CONSUMER, supply)).toBe('11.1');
+    }
+  });
+
+  it('an unresolved buyer is a business, matching buyerIsConsumer', () => {
+    // Silently restricting a business to a retail receipt is the expensive way to be wrong.
+    expect(mydataSalesDocumentType(null, 'services')).toBe('2.1');
+    expect(mydataSalesDocumentType(undefined, 'goods')).toBe('1.1');
+  });
+
+  it('only ever returns a code myDATA defines', () => {
+    const valid = new Set(['1.1', '2.1', '11.1', '11.2']);
+    for (const buyer of [BUSINESS, CONSUMER, null]) {
+      for (const supply of ['goods', 'services', 'mixed', 'unknown'] as const) {
+        expect(valid.has(mydataSalesDocumentType(buyer, supply))).toBe(true);
+      }
+    }
+  });
+
+  it('says why, in words that name the reason', () => {
+    // The code is transmitted and cannot be changed without a credit note, so the reasoning has
+    // to be on screen rather than in a rule nobody can see.
+    expect(mydataSalesDocumentReason(BUSINESS, 'services')).toMatch(/service/i);
+    expect(mydataSalesDocumentReason(CONSUMER, 'goods')).toMatch(/consumer/i);
+    expect(mydataSalesDocumentReason(BUSINESS, 'unknown')).toMatch(/cannot be read/i);
+  });
+});

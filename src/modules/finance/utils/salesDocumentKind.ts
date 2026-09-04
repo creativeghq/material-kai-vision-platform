@@ -63,3 +63,85 @@ export function salesDocumentKindReason(buyer: BuyerIdentity | null | undefined)
   if (String(buyer.vatNumber ?? '').trim()) return `Contact has a VAT number (${String(buyer.vatNumber).trim()}).`;
   return 'Contact has no VAT number — a consumer can only be issued a retail receipt (ΑΛΠ).';
 }
+
+// ---------------------------------------------------------------------------
+// The SECOND axis: what is being supplied.
+//
+// The document type is a 2×2, and only the buyer half was ever implemented:
+//
+//                    goods      services
+//   business          1.1         2.1
+//   consumer         11.1        11.2
+//
+// `generate_invoice_from_order` hardcoded the goods column, so every services invoice this
+// platform has issued — a commission, a design fee, an installation, a construction valuation —
+// went to AADE as a SALE OF GOODS. All four codes are valid, the envelope validates and the MARK
+// comes back, so nothing raised: the same shape as a payment-method code in the wrong rotation.
+//
+// The SQL side resolves this through `mydata_sales_document_type`. This is the mirror, so the
+// dialog can propose the code the RPC would pick rather than defaulting to 1.1 and hoping.
+
+/** What a document is supplying. `unknown` is a real answer, not a synonym for goods. */
+export type SupplyKind = 'goods' | 'services' | 'mixed' | 'unknown';
+
+/** A line, only as far as this question needs it. */
+export interface SupplyLine {
+  /** `products.item_type` for the line's product, or null/undefined for a custom line. */
+  item_type?: string | null;
+}
+
+/**
+ * What a set of lines is supplying.
+ *
+ * A line with no product attached votes for NOTHING. It cannot be read as goods just because the
+ * goods code is the fallback: "we do not know" and "it is goods" are different states, and only
+ * the first should be revisited when somebody attaches a product later.
+ */
+export function supplyKindOf(lines: readonly SupplyLine[] | null | undefined): SupplyKind {
+  let goods = false;
+  let services = false;
+  for (const l of lines ?? []) {
+    const t = String(l.item_type ?? '').trim();
+    if (!t) continue;
+    if (t === 'service') services = true; else goods = true;
+  }
+  if (goods && services) return 'mixed';
+  if (services) return 'services';
+  if (goods) return 'goods';
+  return 'unknown';
+}
+
+/**
+ * The myDATA sales document code for a buyer and a supply.
+ *
+ * MIXED AND UNKNOWN BOTH TAKE THE GOODS CODE, deliberately. A sales invoice carrying a service
+ * line is ordinary; a services invoice carrying goods is the questionable direction. And an
+ * unresolved buyer counts as a business, matching `buyerIsConsumer` — restricting a business to a
+ * retail receipt is the expensive way to be wrong.
+ */
+export function mydataSalesDocumentType(
+  buyer: BuyerIdentity | null | undefined,
+  supply: SupplyKind,
+): string {
+  const consumer = buyerIsConsumer(buyer);
+  if (supply === 'services') return consumer ? '11.2' : '2.1';
+  return consumer ? '11.1' : '1.1';
+}
+
+/** Why that code, so an operator can see the reasoning before transmitting it. */
+export function mydataSalesDocumentReason(
+  buyer: BuyerIdentity | null | undefined,
+  supply: SupplyKind,
+): string {
+  const who = buyerIsConsumer(buyer) ? 'a consumer' : 'a business';
+  switch (supply) {
+    case 'services':
+      return `Every priced line is a service, to ${who}.`;
+    case 'goods':
+      return `Every priced line is a product, to ${who}.`;
+    case 'mixed':
+      return `Products and services on one document, to ${who} — a sales invoice may carry a service line.`;
+    default:
+      return `No line names a catalogue product, so the supply cannot be read — proposing the sales document for ${who}.`;
+  }
+}
