@@ -243,29 +243,27 @@ export const tendersService = {
    * stands now. Re-measuring the package afterwards must not restate what somebody was asked to
    * price, let alone what they offered.
    */
-  async invite(workspaceId: string, packageId: string, companyId: string): Promise<TenderBid> {
-    const { data, error } = await supabase
-      .from('tender_bids')
-      .insert({ workspace_id: workspaceId, package_id: packageId, company_id: companyId })
-      .select('id, package_id, company_id, status, submitted_at, notes, sent_at')
-      .single();
+  async invite(_workspaceId: string, packageId: string, companyId: string): Promise<TenderBid> {
+    // ONE transaction: the bid and every package line copied onto it, or nothing. This was an
+    // insert followed by a second insert of the lines; when the second failed the package had an
+    // invited bidder with no lines — off the "uninvited" list, sendable, and the subcontractor
+    // opened a pricing link with nothing on it. The RPC also REPAIRS a bid the old path left
+    // half-made, and derives the workspace from the package rather than trusting this argument.
+    const { data, error } = await (supabase as any).rpc('invite_tender_bidder', {
+      p_package_id: packageId,
+      p_company_id: companyId,
+    });
     if (error) throw readable(error);
-    const bid = data as unknown as TenderBid;
-
-    const items = await this.items(packageId);
-    if (items.length) {
-      const { error: itemErr } = await supabase.from('tender_bid_items').insert(
-        items.map((i) => ({
-          workspace_id: workspaceId,
-          bid_id: bid.id,
-          package_item_id: i.id,
-          quantity: i.quantity,
-          // No rate: that is what we are asking them for.
-        })),
-      );
-      if (itemErr) throw readable(itemErr);
-    }
-    return bid;
+    const row = data as Record<string, unknown>;
+    return {
+      id: row.id,
+      package_id: row.package_id,
+      company_id: row.company_id,
+      status: row.status,
+      submitted_at: row.submitted_at ?? null,
+      notes: row.notes ?? null,
+      sent_at: row.sent_at ?? null,
+    } as unknown as TenderBid;
   },
 
   async setRate(bidItemId: string, rate: number | null): Promise<void> {

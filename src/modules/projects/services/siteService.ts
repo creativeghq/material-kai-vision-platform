@@ -263,6 +263,27 @@ export const siteService = {
     return (data || []) as ProjectSiteLog[];
   },
 
+  /**
+   * A dictated site walk — one log entry and its defects — recorded in ONE transaction.
+   *
+   * Not a loop over createSiteLog/createSnag: that loop committed the log, failed on a defect,
+   * and the retry wrote a second identical log entry. `record_site_walk` derives the workspace
+   * from the project and checks each room belongs to it, so nothing here is trusted from the form.
+   */
+  async recordSiteWalk(input: {
+    project_id: string;
+    log: { log_date: string; notes?: string | null; weather?: string | null; attendance?: string | null } | null;
+    snags: Array<{ title: string; description?: string | null; severity?: string | null; room_id?: string | null }>;
+  }): Promise<{ log_id: string | null; snag_ids: string[] }> {
+    const { data, error } = await (supabase as any).rpc('record_site_walk', {
+      p_project_id: input.project_id,
+      p_log: input.log,
+      p_snags: input.snags,
+    });
+    if (error) throw new Error(error.message);
+    return data as { log_id: string | null; snag_ids: string[] };
+  },
+
   async createSiteLog(input: NewSiteLog, photos: File[] = []): Promise<ProjectSiteLog> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');

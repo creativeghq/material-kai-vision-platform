@@ -101,7 +101,13 @@ describe('the dictation dialog', () => {
     expect(read).toContain('structureDictation');
     expect(read).not.toContain('createSnag');
     expect(read).not.toContain('createSiteLog');
-    expect(DIALOG).toMatch(/const save =[\s\S]*createSnag/);
+    expect(read).not.toContain('recordSiteWalk');
+    // ONE write, in save: `record_site_walk` creates the log entry and its defects atomically.
+    // The loop of createSiteLog + createSnag it replaced committed the log, failed on a defect,
+    // and duplicated the log on retry (anti-regression rule 4).
+    expect(DIALOG).toMatch(/const save =[\s\S]*recordSiteWalk/);
+    expect(DIALOG).not.toContain('createSnag(');
+    expect(DIALOG).not.toContain('createSiteLog(');
   });
 
   it('lets the transcript be corrected before it is read', () => {

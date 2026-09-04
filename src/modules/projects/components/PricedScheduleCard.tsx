@@ -96,6 +96,13 @@ export const PricedScheduleCard: React.FC<Props> = ({
 
   /** The sum of what the database returned. Never a re-multiplication of quantity by rate. */
   const total = useMemo(() => items.reduce((s, i) => s + n(i.amount), 0), [items]);
+  /**
+   * Lines with no rate yet. `amount` is NULL for them (never 0), and `n()` folds NULL into the
+   * total as 0 — so a schedule with unpriced lines summed to a confident, understated figure and
+   * could be ACCEPTED as the contract sum the cost report reconciles against. An omission is not
+   * a price: the count sits beside the total, and Accept waits until it is zero.
+   */
+  const unpricedCount = useMemo(() => items.filter((i) => i.amount == null).length, [items]);
   const provisional = useMemo(
     () => items.filter((i) => i.is_provisional).reduce((s, i) => s + n(i.amount), 0),
     [items],
@@ -195,7 +202,10 @@ export const PricedScheduleCard: React.FC<Props> = ({
                 </span>
                 <div className="ml-auto flex gap-2">
                   {!isScheduleLive(active.status) && (
-                    <Button size="sm" variant="secondary" disabled={busy}
+                    <Button size="sm" variant="secondary" disabled={busy || unpricedCount > 0}
+                      title={unpricedCount > 0
+                        ? `${unpricedCount} line${unpricedCount === 1 ? '' : 's'} not priced — a schedule becomes the contract sum only once every line has a rate`
+                        : undefined}
                       onClick={() => void act('Could not accept', () => schedulesService.setStatus(active.id, 'accepted'), true)}>
                       <Check className="h-3.5 w-3.5" /> Accept
                     </Button>
@@ -276,6 +286,11 @@ export const PricedScheduleCard: React.FC<Props> = ({
                         {provisional > 0 && (
                           <span className="ml-2 text-[11px] font-normal text-muted-foreground">
                             includes {money(provisional)} provisional
+                          </span>
+                        )}
+                        {unpricedCount > 0 && (
+                          <span className="ml-2 text-[11px] font-normal text-amber-800 dark:text-amber-300">
+                            {unpricedCount} line{unpricedCount === 1 ? '' : 's'} not priced — total is incomplete
                           </span>
                         )}
                       </td>

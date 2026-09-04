@@ -222,8 +222,19 @@ export const applicationsService = {
       throw new Error('Set the practical completion date first — the release dates come from it.');
     }
     const pc = new Date(`${terms.practical_completion_on}T00:00:00Z`);
-    const defects = new Date(pc);
-    defects.setUTCMonth(defects.getUTCMonth() + (terms.defects_period_months || 0));
+    // Month arithmetic that cannot overflow. `setUTCMonth(+n)` keeps the day-of-month, so a
+    // practical completion on 31 January with a 1-month defects period landed on 3 March — the
+    // release date drifted past the end of the period, on the one tranche a contractor waits for.
+    // Clamp to the last day of the target month instead (31 Jan + 1 month = 28/29 Feb).
+    const months = terms.defects_period_months || 0;
+    const targetMonthStart = new Date(Date.UTC(pc.getUTCFullYear(), pc.getUTCMonth() + months, 1));
+    const lastDayOfTarget = new Date(Date.UTC(
+      targetMonthStart.getUTCFullYear(), targetMonthStart.getUTCMonth() + 1, 0,
+    )).getUTCDate();
+    const defects = new Date(Date.UTC(
+      targetMonthStart.getUTCFullYear(), targetMonthStart.getUTCMonth(),
+      Math.min(pc.getUTCDate(), lastDayOfTarget),
+    ));
 
     const { error } = await supabase.from('project_retention_releases').insert([
       {

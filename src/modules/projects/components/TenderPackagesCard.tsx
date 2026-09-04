@@ -293,7 +293,15 @@ export const TenderPackagesCard: React.FC<Props> = ({
                         <td className="px-5 py-2" colSpan={3} />
                         {bidders.map((b) => (
                           <td key={b.bid_id} className="px-3 py-2 text-right">
-                            <Button size="sm" variant="outline" disabled={busy}
+                            {/* An omission is not a price. The caption above says "N lines not priced";
+                                until now the button beneath it still raised a purchase order for a
+                                total that silently excluded them. The RPC refuses too — this is the
+                                offer matching the gate, not the gate. */}
+                            <Button size="sm" variant="outline"
+                              disabled={busy || unpricedCount(b.bid_id) > 0}
+                              title={unpricedCount(b.bid_id) > 0
+                                ? `${unpricedCount(b.bid_id)} line${unpricedCount(b.bid_id) === 1 ? '' : 's'} not priced — ask the bidder to complete the bid before awarding`
+                                : undefined}
                               onClick={() => void act('Could not award', async () => {
                                 await tendersService.award(active!.id, b.bid_id);
                                 toast({

@@ -116,29 +116,30 @@ export const DictateSiteWalkDialog: React.FC<Props> = ({ projectId, onClose, onS
     }
     setSaving(true);
     try {
-      // Written one at a time, deliberately. There is no RPC that creates a log entry and its
-      // defects together, and inventing a half-atomic loop here would be worse than honest
-      // sequential writes: if one fails the person sees exactly what was and was not created,
-      // with the rest of the proposal still on screen to retry.
-      if (wantLog && proposal.log) {
-        await siteService.createSiteLog({
-          project_id: projectId,
-          log_date: logDate,
-          notes: proposal.log.notes,
-          weather: proposal.log.weather,
-          attendance: proposal.log.attendance,
-        });
-      }
-      for (const s of snags) {
-        await siteService.createSnag({
-          project_id: projectId,
+      // ONE statement. This used to be a log insert followed by one insert per defect, on the
+      // argument that honest sequential writes beat a half-atomic loop. True — but the choice was
+      // never between those two. When the log committed and the first defect failed, Save
+      // re-armed with the same proposal and the retry wrote a SECOND identical log entry before
+      // trying the defects again. `record_site_walk` creates everything or nothing, so a retry
+      // is safe and "Some records were not created" is now literally true when it appears.
+      await siteService.recordSiteWalk({
+        project_id: projectId,
+        log: wantLog && proposal.log
+          ? {
+              log_date: logDate,
+              notes: proposal.log.notes,
+              weather: proposal.log.weather,
+              attendance: proposal.log.attendance,
+            }
+          : null,
+        snags: snags.map((s) => ({
           title: s.title,
           description: s.description,
           // A severity the person did not indicate stays unset so the create default stands.
           ...(s.severity ? { severity: s.severity } : {}),
-          room_id: s.room_id,
-        });
-      }
+          room_id: s.room_id ?? null,
+        })),
+      });
       toast({
         title: 'Recorded',
         description: [
