@@ -218,11 +218,15 @@ export const MydataBookTab: React.FC<Props> = ({ workspaceId }) => {
         <CardContent className="flex flex-col gap-3 p-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-start gap-2 text-sm text-muted-foreground">
             <BookOpen className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>
-              AADE's own aggregate book (Συνοπτικό Βιβλίο), exactly as myAADE reports it. These
-              figures are never mixed with the platform's — hold them up against{' '}
-              <span className="text-foreground">Reports → VAT</span> to see whether the two agree.
-            </span>
+            {/* Two sentences, two lines: what the book IS, then what to do with it. Reflowed as
+                one paragraph they read as a single caveat and the instruction gets skimmed. */}
+            <div>
+              <div>AADE's own aggregate book (Συνοπτικό Βιβλίο), exactly as myAADE reports it.</div>
+              <div>
+                These figures are never mixed with the platform's — hold them up against{' '}
+                <span className="text-foreground">Reports → VAT</span> to see whether the two agree.
+              </div>
+            </div>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
@@ -298,11 +302,11 @@ export const MydataBookTab: React.FC<Props> = ({ workspaceId }) => {
                   dropping the phrase — a book with no stated confirmation date reads as current. */}
               {sync?.last_success_at ? (
                 <>
-                  {' · last confirmed against AADE on '}
+                  {' · Last confirmed against AADE on '}
                   <span className="text-foreground">{formatDate(sync.last_success_at)}</span>
                 </>
               ) : (
-                ' · never confirmed against AADE'
+                ' · Never confirmed against AADE'
               )}
             </CardDescription>
           </div>
