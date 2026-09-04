@@ -304,7 +304,7 @@ export const CatalogBuilderPage: React.FC = () => {
                 <div className="font-medium">No sections yet</div>
                 <p className="text-sm text-muted-foreground">Upload a source PDF and extract products in the Sources tab, or let the KAI agent build it for you.</p>
                 <div className="flex gap-2 justify-center pt-1">
-                  <Button onClick={() => setActiveTab('sources')}><FileText className="mr-2 h-4 w-4" /> Go to sources</Button>
+                  <Button onClick={() => setActiveTab('sources')}><FileText className="mr-2 h-4 w-4" /> Go to Sources</Button>
                   <Button variant="outline" onClick={handleOpenAgent}><MessageSquare className="mr-2 h-4 w-4" /> Open in KAI</Button>
                 </div>
               </CardContent>

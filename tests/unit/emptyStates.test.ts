@@ -134,6 +134,17 @@ if (process.env.WRITE_EMPTY_STATE_BASELINE === '1') {
 describe('empty states offer the action that fills them', () => {
   const offenders = findOffenders();
 
+  it('the offer renders at the standard button size, whatever the caller passed', () => {
+    // Billing's "Go to quotes" sat at size="sm" (32px, 12px text) on the same project page as a
+    // Quotes tab whose hand-rolled empty state used the standard 36px button, so the two read as
+    // different sizes of the same thing. A hundred call sites had copied `size="sm"` from the doc
+    // example, so the size is set ONCE, in the component's action slot, rather than per caller.
+    const src = readFileSync(join(ROOT, 'src/components/core/hub/HubEmptyState.tsx'), 'utf8');
+    for (const cls of ['[&_button]:h-9', '[&_button]:text-sm', '[&_a]:h-9']) {
+      expect(src, `HubEmptyState no longer normalises its action slot (${cls})`).toContain(cls);
+    }
+  });
+
   it('the baseline exists', () => {
     expect(
       existsSync(BASELINE),
@@ -155,7 +166,7 @@ describe('empty states offer the action that fills them', () => {
         '    icon={Foo}\n' +
         '    title="No widgets yet"\n' +
         '    description="One sentence on what a widget is for."\n' +
-        '    action={<Button size="sm" onClick={openCreate}><Plus /> New widget</Button>}\n' +
+        '    action={<Button onClick={openCreate}><Plus /> New widget</Button>}\n' +
         '  />\n\n' +
         'If the list is empty because of FILTERS, use variant="filtered" and offer "Clear ' +
         'filters" — never the create button. Offering "New contact" to somebody with 4,000 ' +

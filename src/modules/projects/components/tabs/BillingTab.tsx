@@ -18,6 +18,7 @@ import { statusTone } from '@/utils/statusTone';
 import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/hooks/usePermissions';
 import { projectsService, type QuoteBillingProgress } from '../../services/projectsService';
+import { goToSectionLabel, projectSectionPath } from '../../projectSections';
 import { formatDate } from '@/utils/datetime';
 import { HubEmptyState } from '@/components/core/hub';
 
@@ -124,8 +125,8 @@ export const BillingTab: React.FC<{ projectId: string }> = ({ projectId }) => {
             title="No accepted quotes to invoice yet"
             description="Billing starts from an accepted quote — once one is accepted you can invoice it in full, or by progress percentage as the job runs."
             action={
-              <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${projectId}?tab=quotes`)}>
-                Go to quotes
+              <Button variant="outline" onClick={() => navigate(projectSectionPath(projectId, 'quotes'))}>
+                {goToSectionLabel('quotes')}
               </Button>
             }
           />

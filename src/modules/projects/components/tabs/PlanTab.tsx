@@ -4,8 +4,9 @@ import {
   Loader2, Plus, ClipboardList, FileText, Save, History, LayoutTemplate, Trash2, Sparkles, RefreshCw, Package,
 } from 'lucide-react';
 
-import { Card, CardContent } from '@/components/core/ui/card';
+import { Card } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
+import { HubEmptyState } from '@/components/core/hub';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -308,26 +309,22 @@ export function PlanTab({ projectId, workspaceId, currency }: PlanTabProps) {
   if (!plan) {
     return (
       <>
-        <Card className="dashboard-card">
-          <CardContent className="p-10 flex flex-col items-center text-center gap-3">
-            <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-              <ClipboardList className="h-6 w-6 text-muted-foreground" />
-            </div>
-            <div className="text-lg font-medium">Build a project plan</div>
-            <p className="text-sm text-muted-foreground max-w-md">
-              Start from a reusable blueprint — a structured scope of works. Enter a few measurements
-              and it prices itself; then turn it into a quote in one click.
-            </p>
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <Button onClick={() => setPickerOpen(true)}>
-                <Plus className="h-4 w-4 mr-1" /> Import a blueprint
-              </Button>
-              <Button variant="outline" disabled={busy} onClick={startBlankPlan}>
-                <ClipboardList className="h-4 w-4 mr-1" /> Start a blank plan
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">A blank plan lets you add only the sections you need from the library.</p>
-          </CardContent>
+        <Card className="dashboard-card p-0">
+          <HubEmptyState
+            icon={ClipboardList}
+            title="Build a project plan"
+            description="Start from a reusable blueprint — a structured scope of works. Enter a few measurements and it prices itself; then turn it into a quote in one click. A blank plan lets you add only the sections you need from the library."
+            action={(
+              <>
+                <Button onClick={() => setPickerOpen(true)}>
+                  <Plus className="h-4 w-4 mr-1" /> Import a blueprint
+                </Button>
+                <Button variant="outline" disabled={busy} onClick={startBlankPlan}>
+                  <ClipboardList className="h-4 w-4 mr-1" /> Start a blank plan
+                </Button>
+              </>
+            )}
+          />
         </Card>
         <BlueprintPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} workspaceId={workspaceId} onPick={importBlueprint} />
       </>

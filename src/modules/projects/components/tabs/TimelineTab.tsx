@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 
 import { Card, CardContent } from '@/components/core/ui/card';
+import { Button } from '@/components/core/ui/button';
+import { HubEmptyState } from '@/components/core/hub';
 import { useToast } from '@/hooks/use-toast';
 import { FilterBar, useFilters } from '@/components/core/filters';
 import { buildTimelineFilters } from './timelineFilters';
@@ -93,7 +95,7 @@ export const TimelineTab: React.FC<TimelineTabProps> = ({ projectId }) => {
   const [loading, setLoading] = useState(true);
 
   const filterGroups = useMemo(() => buildTimelineFilters(events, describe), [events]);
-  const { values: filterValues, setValues: setFilterValues, filtered: visible, previewCount } =
+  const { values: filterValues, setValues: setFilterValues, filtered: visible, previewCount, reset: resetFilters } =
     useFilters<ProjectEvent>(events, filterGroups);
 
   const load = useCallback(async () => {
@@ -126,13 +128,22 @@ export const TimelineTab: React.FC<TimelineTabProps> = ({ projectId }) => {
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
         </div>
       ) : visible.length === 0 ? (
-        <Card className="dashboard-card">
-          <CardContent className="py-12 text-center text-sm text-muted-foreground">
-            <Activity className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-            {events.length === 0
-              ? 'No activity yet. Events will appear here as you work.'
-              : 'No events match the active filter.'}
-          </CardContent>
+        <Card className="dashboard-card p-0">
+          {events.length === 0 ? (
+            <HubEmptyState
+              icon={Activity}
+              title="No activity yet"
+              description="Events appear here as you work — rooms, quotes, tasks and status changes, in order."
+            />
+          ) : (
+            <HubEmptyState
+              variant="filtered"
+              icon={Activity}
+              title="No events match the active filter"
+              description="Widen the search or clear a filter to see the rest."
+              action={<Button variant="outline" onClick={resetFilters}>Clear filters</Button>}
+            />
+          )}
         </Card>
       ) : (
         <Card className="dashboard-card">

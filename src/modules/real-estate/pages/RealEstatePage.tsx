@@ -982,7 +982,7 @@ const SalesPanel: React.FC<{ ws: string | null; canManage: boolean }> = ({ ws, c
         icon={Handshake}
         title="No completed sales yet"
         description="A sale is recorded when you close an accepted offer — open a listing, go to its Offers tab, and use “Complete sale & commission”."
-        action={<Button size="sm" onClick={() => setSearchParams((p) => { const n = new URLSearchParams(p); n.set('tab', 'listings'); return n; }, { replace: true })}>Go to listings</Button>}
+        action={<Button size="sm" onClick={() => setSearchParams((p) => { const n = new URLSearchParams(p); n.set('tab', 'listings'); return n; }, { replace: true })}>Go to Listings</Button>}
       />
     </CardContent></Card>
   );

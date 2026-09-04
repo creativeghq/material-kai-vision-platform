@@ -19,6 +19,7 @@ import { roomPlannerService } from '@/services/roomPlannerService';
 import { supabase } from '@/integrations/supabase/client';
 
 import { projectsService } from '../../services/projectsService';
+import { goToSectionLabel, projectSectionPath } from '../../projectSections';
 import {
   clientViewsService,
   type ClientView,
@@ -371,8 +372,8 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
                   title="No sheets yet"
                   description="A client view is built from presentation sheets. Make them on this project's moodboards first — the Sheets tab, or ask the agent."
                   action={(
-                    <Button variant="outline" size="sm" onClick={() => navigate(`/projects/${projectId}?tab=sheets`)}>
-                      <FileImage className="h-4 w-4 mr-1" /> Go to Sheets
+                    <Button variant="outline" onClick={() => navigate(projectSectionPath(projectId, 'sheets'))}>
+                      <FileImage className="h-4 w-4 mr-1" /> {goToSectionLabel('sheets')}
                     </Button>
                   )}
                 />

@@ -25,13 +25,18 @@ const ROOT = join(__dirname, '..', '..');
 const PAGE = 'src/modules/projects/pages/ProjectDetailPage.tsx';
 const pageSrc = readFileSync(join(ROOT, PAGE), 'utf8');
 
-/** The tabs the page declares — the one list the render and the URL both read. */
+/**
+ * The tabs the registry declares — the one list the page's render, the URL and every "Go to …"
+ * button read (`projectSections.ts`; the page imports it, pinned by destinationLabels.test.ts).
+ */
+const REGISTRY = 'src/modules/projects/projectSections.ts';
 function declaredTabs(): string[] {
-  const at = pageSrc.indexOf('const PROJECT_TABS = [');
-  expect(at, `${PAGE} no longer declares PROJECT_TABS — this guard is pointed at nothing`)
+  const src = readFileSync(join(ROOT, REGISTRY), 'utf8');
+  const at = src.indexOf('export const PROJECT_TABS = [');
+  expect(at, `${REGISTRY} no longer declares PROJECT_TABS — this guard is pointed at nothing`)
     .toBeGreaterThan(-1);
-  const end = pageSrc.indexOf('] as const', at);
-  return [...pageSrc.slice(at, end).matchAll(/'([a-z-]+)'/g)].map((m) => m[1]);
+  const end = src.indexOf('] as const', at);
+  return [...src.slice(at, end).matchAll(/'([a-z-]+)'/g)].map((m) => m[1]);
 }
 
 /**

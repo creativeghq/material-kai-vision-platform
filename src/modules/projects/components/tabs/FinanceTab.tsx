@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
+import { HubEmptyState } from '@/components/core/hub';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -107,7 +108,13 @@ export const FinanceTab: React.FC<{ projectId: string; projectName?: string }> =
           </div>
         </div>
         {rows.length === 0 ? (
-          <div className="py-8 text-center text-sm text-muted-foreground">Nothing attached yet.</div>
+          <HubEmptyState
+            title={`No ${title.toLowerCase()} attached yet`}
+            description={kind === 'receivable'
+              ? 'Invoices for this client that belong to the job. Attaching one stamps the project on it; the document itself is untouched.'
+              : 'Supplier bills that belong to the job. Attaching one stamps the project on it; the document itself is untouched.'}
+            action={<Button variant="outline" onClick={() => setPicker(kind)}><Plus className="h-4 w-4 mr-1" /> Attach</Button>}
+          />
         ) : (
           <div className="divide-y divide-hairline">
             {rows.map((r) => (
@@ -281,9 +288,12 @@ const AttachDialog: React.FC<{
         {loading ? (
           <div className="flex items-center justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
         ) : candidates.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">
-            No unattached {direction === 'receivable' ? 'invoices / receivables for this client' : 'supplier bills / payables'} found.
-          </p>
+          <HubEmptyState
+            title={`No unattached ${direction === 'receivable' ? 'receivables' : 'payables'} found`}
+            description={direction === 'receivable'
+              ? 'Every invoice for this client is already on a project.'
+              : 'Every supplier bill in this workspace is already on a project.'}
+          />
         ) : (
           <div className="max-h-72 overflow-auto rounded-md border border-white/10 divide-y divide-hairline">
             {candidates.map((c, i) => (

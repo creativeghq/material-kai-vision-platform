@@ -4,6 +4,7 @@ import { Palette, Loader2, ArrowRight, Plus } from 'lucide-react';
 
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
+import { HubEmptyState } from '@/components/core/hub';
 import { useToast } from '@/hooks/use-toast';
 import { projectsService } from '../../services/projectsService';
 import { moodboardAPI } from '@/services/moodboardAPI';
@@ -66,17 +67,20 @@ export const MoodboardsTab: React.FC<MoodboardsTabProps> = ({ projectId }) => {
 
   if (moodboards.length === 0) {
     return (
-      <Card className="dashboard-card">
-        <CardContent className="py-12 text-center">
-          <Palette className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground mb-3">No moodboards attached to this project yet.</p>
-          <div className="flex items-center justify-center gap-2">
-            <Button onClick={handleCreate} disabled={creating}>
-              {creating ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />} New moodboard
-            </Button>
-            <Button variant="outline" onClick={() => navigate('/moodboard')}>Go to Moodboards</Button>
-          </div>
-        </CardContent>
+      <Card className="dashboard-card p-0">
+        <HubEmptyState
+          icon={Palette}
+          title="No moodboards attached to this project yet"
+          description="A moodboard collects the materials and references for a room; presentation sheets and the client view are built from it."
+          action={(
+            <>
+              <Button onClick={handleCreate} disabled={creating}>
+                {creating ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />} New moodboard
+              </Button>
+              <Button variant="outline" onClick={() => navigate('/moodboard')}>Go to Moodboards</Button>
+            </>
+          )}
+        />
       </Card>
     );
   }

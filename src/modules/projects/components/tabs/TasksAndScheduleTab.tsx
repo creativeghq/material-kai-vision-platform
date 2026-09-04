@@ -39,7 +39,7 @@ export const TasksAndScheduleTab: React.FC<{ projectId: string; isOwner: boolean
       {/* Both are mounted lazily by choice: the Gantt fetches dependencies the list does not need. */}
       {view === 'list'
         ? <TasksTab projectId={projectId} isOwner={isOwner} />
-        : <ScheduleTab projectId={projectId} isOwner={isOwner} />}
+        : <ScheduleTab projectId={projectId} isOwner={isOwner} onShowList={() => setView('list')} />}
     </div>
   );
 };

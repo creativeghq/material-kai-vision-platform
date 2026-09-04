@@ -6,6 +6,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, Plus, MessageSquare, Send, Trash2, Check, X, Eye, EyeOff, FileText, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { HubEmptyState } from '@/components/core/hub';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -133,9 +134,22 @@ export const RequestsTab: React.FC<{
       </CardHeader>
       <CardContent className="p-0">
         {visible.length === 0 ? (
-          <p className="py-12 text-center text-sm text-muted-foreground">
-            {requests.length === 0 ? 'No requests yet.' : 'Nothing open — tick "Show closed" to see the rest.'}
-          </p>
+          requests.length === 0 ? (
+            <HubEmptyState
+              icon={MessageSquare}
+              title="No requests yet"
+              description="A request is a question, a change or an approval raised on this project, with its replies kept in one thread."
+              action={<Button onClick={() => setCreating(true)}><Plus className="h-4 w-4 mr-1" /> Raise request</Button>}
+            />
+          ) : (
+            <HubEmptyState
+              variant="filtered"
+              icon={MessageSquare}
+              title="Nothing open"
+              description="Every request on this project is closed."
+              action={<Button variant="outline" onClick={() => setShowClosed(true)}>Show closed</Button>}
+            />
+          )
         ) : (
           <div className="divide-y divide-hairline">
             {visible.map((r) => {

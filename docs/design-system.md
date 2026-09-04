@@ -342,18 +342,27 @@ There are three kinds of empty, and they need three different offers:
       icon={FileSignature}
       title="No contracts match your filters"
       description="Widen the search or clear a filter to see the rest."
-      action={<Button size="sm" variant="outline" onClick={resetFilters}>Clear filters</Button>}
+      action={<Button variant="outline" onClick={resetFilters}>Clear filters</Button>}
     />
   ) : (
     <HubEmptyState
       icon={FileSignature}
       title="No contracts yet"
       description="One sentence on what a contract is FOR — not what the button does."
-      action={canCreate ? <Button size="sm" onClick={openCreate}><Plus /> New contract</Button> : undefined}
+      action={canCreate ? <Button onClick={openCreate}><Plus /> New contract</Button> : undefined}
     />
   )
 ) : ( … )}
 ```
+
+**One size, and it is set in the component.** The action slot normalises every button inside it to
+the standard 36px / 14px button, whatever `size` the caller passed. Billing's `size="sm"`
+"Go to quotes" sat on the same project page as a Quotes tab whose hand-rolled empty state used the
+standard button, and the page showed two sizes of the same offer. Do not pass `size="sm"` — it is
+overridden, and it reads as intent. A button that opens a **project section** takes its label from
+`goToSectionLabel(tab)` (`src/modules/projects/projectSections.ts`), the registry the page's strip
+renders from; everywhere else a "Go to …" is title-cased, because a destination is a name
+([tests/unit/destinationLabels.test.ts](../tests/unit/destinationLabels.test.ts)).
 
 Write the `description` as *what the thing is for*, not *how to make one*. "Contracts are signable
 agreements — draft one, send a signing link, and the signed PDF is stored against the record" tells

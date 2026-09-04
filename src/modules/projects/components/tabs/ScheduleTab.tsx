@@ -10,6 +10,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, GanttChartSquare, Diamond, Link2, Trash2, Plus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { HubEmptyState } from '@/components/core/hub';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -40,7 +41,12 @@ const toScheduleTask = (t: ProjectTask): ScheduleTask => ({
   baseline_end_date: t.baseline_end_date ?? null,
 });
 
-export const ScheduleTab: React.FC<{ projectId: string; isOwner: boolean }> = ({ projectId, isOwner }) => {
+export const ScheduleTab: React.FC<{
+  projectId: string;
+  isOwner: boolean;
+  /** Switches the parent to the list view, where tasks are created. Absent when mounted alone. */
+  onShowList?: () => void;
+}> = ({ projectId, isOwner, onShowList }) => {
   const { toast } = useToast();
   const [tasks, setTasks] = useState<ProjectTask[]>([]);
   const [deps, setDeps] = useState<ProjectTaskDependency[]>([]);
@@ -266,9 +272,12 @@ export const ScheduleTab: React.FC<{ projectId: string; isOwner: boolean }> = ({
 
         <CardContent className="p-0">
           {tasks.length === 0 ? (
-            <p className="py-12 text-center text-sm text-muted-foreground">
-              No tasks yet. Add them in the Tasks tab, then give them dates here.
-            </p>
+            <HubEmptyState
+              icon={GanttChartSquare}
+              title="No tasks to schedule yet"
+              description="Add tasks in the list view, then give them dates and dependencies here."
+              action={onShowList ? <Button variant="outline" onClick={onShowList}>Open the task list</Button> : undefined}
+            />
           ) : (
             <div className="flex">
               {/* Task names — fixed, so they stay readable while the timeline scrolls. */}

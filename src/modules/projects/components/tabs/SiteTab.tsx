@@ -243,9 +243,26 @@ const SnagsView: React.FC<{ projectId: string; isOwner: boolean }> = ({ projectI
       </CardHeader>
       <CardContent className="p-0">
         {visible.length === 0 ? (
-          <p className="py-12 text-center text-sm text-muted-foreground">
-            {snags.length === 0 ? 'No snags raised.' : 'Nothing matches the filter.'}
-          </p>
+          snags.length === 0 ? (
+            <HubEmptyState
+              icon={ClipboardList}
+              title="No snags raised"
+              description="A snag is a defect found on site, tied to a room and a trade, and closed when it is put right. The ones marked client-visible make the handover list."
+              action={isOwner ? <Button onClick={() => setAdding(true)}><Plus className="h-4 w-4 mr-1" /> Raise snag</Button> : undefined}
+            />
+          ) : (
+            <HubEmptyState
+              variant="filtered"
+              icon={ClipboardList}
+              title="Nothing matches the filter"
+              description="Clear the room, trade or closed filter to see the rest."
+              action={(
+                <Button variant="outline" onClick={() => { setRoomFilter(''); setTradeFilter(''); setShowClosed(true); }}>
+                  Clear filters
+                </Button>
+              )}
+            />
+          )
         ) : (
           <div className="divide-y divide-hairline">
             {visible.map((s) => (

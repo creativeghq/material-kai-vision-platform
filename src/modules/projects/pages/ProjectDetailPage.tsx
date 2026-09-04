@@ -54,6 +54,7 @@ import {
   type ProjectWithClient,
   type ProjectStatus,
 } from '../services/projectsService';
+import { PROJECT_TABS, PROJECT_SECTION_LABELS, type ProjectTab } from '../projectSections';
 
 import { OverviewTab } from '../components/tabs/OverviewTab';
 import { RoomsTab } from '../components/tabs/RoomsTab';
@@ -97,22 +98,18 @@ const STATUS_TONES: Record<ProjectStatus, string> = {
 };
 
 /**
- * Every section this page can render. `availableTabs` below filters it by the SAME conditions the
- * triggers and the contents are written with, so a `?tab=` naming a section this viewer cannot see
- * falls back to Overview instead of rendering a blank panel — the trap
- * `PropertyWorkbench.availableTabs` exists to close, on the page that had no equivalent.
+ * `PROJECT_TABS` (../projectSections) is every section this page can render, and the same file
+ * holds each section's title, so a button elsewhere that links here reads exactly what the tab
+ * reads. `availableTabs` below filters it by the SAME conditions the contents are written with,
+ * so a `?tab=` naming a section this viewer cannot see falls back to Overview instead of rendering
+ * a blank panel — the trap `PropertyWorkbench.availableTabs` exists to close, on the page that had
+ * no equivalent.
  *
- * Until this existed the page ignored `?tab=` entirely, so `BillingTab`'s own "see the quotes"
+ * Until this existed the page ignored `?tab=` entirely, so `BillingTab`'s own "Go to Quotes"
  * button and all four `project_request_*` notification `action_url`s
  * (`/projects/:id?tab=requests&request=…`) landed the reader on Overview with no hint of where to
  * go next. Guarded by tests/unit/projectTabLinks.test.ts.
  */
-const PROJECT_TABS = [
-  'overview', 'rooms', 'products', 'moodboards', 'plan', 'purchases', 'quotes', 'billing',
-  'finance', 'sheets', 'client-view', 'contracts', 'handover', 'tasks', 'site', 'documents',
-  'requests', 'assessment', 'timeline',
-] as const;
-type ProjectTab = typeof PROJECT_TABS[number];
 
 /** Tabs only the owner sees. `finance` needs `finance.manage` on top and is handled separately. */
 const OWNER_ONLY_TABS = new Set<ProjectTab>([
@@ -149,35 +146,35 @@ const TAB_GROUPS: ReadonlyArray<{ id: ProjectStage; label: string; icon: LucideI
   { id: 'review', label: 'Review', icon: BarChart3, tabs: ['assessment', 'timeline'] },
 ];
 
-/** Label + glyph per section, declared once and read by both strips. */
-const TAB_META: Record<ProjectTab, { label: string; icon: LucideIcon }> = {
-  overview: { label: 'Overview', icon: LayoutDashboard },
-  rooms: { label: 'Rooms', icon: Home },
-  products: { label: 'Products', icon: Package },
-  moodboards: { label: 'Moodboards', icon: Palette },
-  plan: { label: 'Plan', icon: ClipboardList },
-  purchases: { label: 'Purchases', icon: Hammer },
-  quotes: { label: 'Quotes', icon: FileText },
-  billing: { label: 'Billing', icon: Receipt },
-  finance: { label: 'Finance', icon: Wallet },
-  sheets: { label: 'Sheets', icon: FileImage },
-  'client-view': { label: 'Client View', icon: Presentation },
-  contracts: { label: 'Contracts', icon: FileSignature },
+/** Glyph per section. The LABEL is `PROJECT_SECTION_LABELS`, shared with every link that points here. */
+const TAB_ICONS: Record<ProjectTab, LucideIcon> = {
+  overview: LayoutDashboard,
+  rooms: Home,
+  products: Package,
+  moodboards: Palette,
+  plan: ClipboardList,
+  purchases: Hammer,
+  quotes: FileText,
+  billing: Receipt,
+  finance: Wallet,
+  sheets: FileImage,
+  'client-view': Presentation,
+  contracts: FileSignature,
   // What was INSTALLED here, and what it is still covered by (#378 C5). customer_assets.project_id
   // and register_customer_asset have carried a project since the installed base shipped, and the
   // panel has always taken a projectId. It was mounted on the CRM company and contact only, so the
   // place equipment is actually fitted had no way to record it, and asset.service_due /
   // warranty_expiring fired on assets nobody registered.
-  handover: { label: 'Handover', icon: ShieldCheck },
-  tasks: { label: 'Tasks', icon: CheckSquare },
+  handover: ShieldCheck,
+  tasks: CheckSquare,
   // Snags + site log. Client-visible snags surface on the client view at handover.
-  site: { label: 'Site', icon: ClipboardList },
-  documents: { label: 'Documents', icon: FileStack },
+  site: ClipboardList,
+  documents: FileStack,
   // Requests are client-facing by design, so collaborators get this section too.
-  requests: { label: 'Requests', icon: MessageSquare },
-  assessment: { label: 'Assessment', icon: Gauge },
+  requests: MessageSquare,
+  assessment: Gauge,
   // Timeline is owner-only — it would expose internal task + status churn to clients.
-  timeline: { label: 'Timeline', icon: Activity },
+  timeline: Activity,
 };
 
 export const ProjectDetailPage: React.FC = () => {
@@ -386,11 +383,11 @@ export const ProjectDetailPage: React.FC = () => {
             {stages.map((g) => {
               // A stage with one visible section IS that section.
               const solo = g.tabs.length === 1 ? g.tabs[0] : null;
-              const Icon = solo ? TAB_META[solo].icon : g.icon;
+              const Icon = solo ? TAB_ICONS[solo] : g.icon;
               return (
                 <TabsTrigger key={g.id} value={g.id} className="flex items-center gap-2">
                   <Icon className="h-3.5 w-3.5" />
-                  {solo ? TAB_META[solo].label : g.label}
+                  {solo ? PROJECT_SECTION_LABELS[solo] : g.label}
                   {solo && countBadge(solo)}
                 </TabsTrigger>
               );
@@ -403,11 +400,11 @@ export const ProjectDetailPage: React.FC = () => {
               {stage.tabs.length > 1 && (
                 <TabsList aria-label={`${stage.label} sections`} className="mt-4 h-8 w-auto gap-0 text-xs">
                   {stage.tabs.map((t) => {
-                    const Icon = TAB_META[t].icon;
+                    const Icon = TAB_ICONS[t];
                     return (
                       <TabsTrigger key={t} value={t} className="min-h-8 gap-1.5 px-3 py-1 text-xs md:min-h-8">
                         <Icon className="h-3.5 w-3.5" />
-                        {TAB_META[t].label}
+                        {PROJECT_SECTION_LABELS[t]}
                         {countBadge(t)}
                       </TabsTrigger>
                     );

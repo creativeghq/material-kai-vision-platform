@@ -130,7 +130,7 @@ export default function PublicMoodBoardPage() {
             This moodboard is private or doesn't exist. Ask the owner to make it public and share the link again.
           </p>
           <Button className="gap-2" onClick={() => navigate('/')}>
-            Go to platform
+            Go to Dashboard
             <ArrowRight className="h-4 w-4" />
           </Button>
         </div>

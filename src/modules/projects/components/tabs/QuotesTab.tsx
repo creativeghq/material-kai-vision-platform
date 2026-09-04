@@ -5,6 +5,7 @@ import { FileText, Loader2, ArrowRight, GitBranch } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
+import { HubEmptyState } from '@/components/core/hub';
 import { useToast } from '@/hooks/use-toast';
 import { projectsService } from '../../services/projectsService';
 import { humanizeLabel } from '@/utils/humanize';
@@ -90,17 +91,13 @@ export const QuotesTab: React.FC<QuotesTabProps> = ({ projectId }) => {
 
   if (quotes.length === 0) {
     return (
-      <Card className="dashboard-card">
-        <CardContent className="py-12 text-center">
-          <FileText className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground mb-3">No quotes attached to this project yet.</p>
-          <p className="text-xs text-muted-foreground mb-4">
-            Create a quote and pick this project to start tracking budget vs. actual.
-          </p>
-          <Button variant="outline" onClick={() => navigate('/quotes')}>
-            Go to Quotes
-          </Button>
-        </CardContent>
+      <Card className="dashboard-card p-0">
+        <HubEmptyState
+          icon={FileText}
+          title="No quotes attached to this project yet"
+          description="Create a quote and pick this project to start tracking budget against actual."
+          action={<Button variant="outline" onClick={() => navigate('/quotes')}>Go to Quotes</Button>}
+        />
       </Card>
     );
   }
