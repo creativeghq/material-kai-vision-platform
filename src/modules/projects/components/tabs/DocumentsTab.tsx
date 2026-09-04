@@ -36,6 +36,7 @@ import {
 } from '../../services/projectDocumentsService';
 import { HubEmptyState } from '@/components/core/hub';
 import { DrawingMarkupDialog } from '../DrawingMarkupDialog';
+import { DrawingTakeoffDialog } from '../DrawingTakeoffDialog';
 import { humanizeLabel } from '@/utils/humanize';
 import {
   DOCUMENT_KINDS, DISCIPLINES, DRAWING_PURPOSES, BUILDABLE_PURPOSES,
@@ -65,6 +66,15 @@ export const DocumentsTab: React.FC<{ projectId: string; isOwner: boolean }> = (
    */
   const [markup, setMarkup] = useState<{
     rev: ProjectDocumentRevision; url: string; label: string;
+  } | null>(null);
+
+  /**
+   * The revision whose printed schedules are being read into a takeoff. No URL: the reader is
+   * given the revision id and fetches the file server-side from the row's own bucket and path, so
+   * a URL in the request body can never point it somewhere else (invariant 7).
+   */
+  const [takeoff, setTakeoff] = useState<{
+    rev: ProjectDocumentRevision; label: string;
   } | null>(null);
 
   const openMarkup = async (doc: ProjectDocumentWithRevisions, rev: ProjectDocumentRevision) => {
@@ -219,6 +229,18 @@ export const DocumentsTab: React.FC<{ projectId: string; isOwner: boolean }> = (
                         <PenLine className="h-4 w-4" />
                       </Button>
                     )}
+                    {/* Reads the schedules PRINTED on the sheet. Owner only, because it costs a
+                        credit and it proposes lines for a priced schedule. */}
+                    {isOwner && d.current && d.kind === 'drawing' && (
+                      <Button
+                        size="sm" variant="ghost" title="Read printed schedules"
+                        onClick={() => setTakeoff({
+                          rev: d.current!, label: d.drawing_number || d.title,
+                        })}
+                      >
+                        <ScanLine className="h-4 w-4" />
+                      </Button>
+                    )}
                     {isOwner && (
                       <>
                         <Button size="sm" variant="ghost" title="Upload revision" onClick={() => setUploadFor(d)}>
@@ -261,6 +283,16 @@ export const DocumentsTab: React.FC<{ projectId: string; isOwner: boolean }> = (
           isOwner={isOwner}
           onClose={() => setMarkup(null)}
           onRfiRaised={() => { void load(); }}
+        />
+      )}
+
+      {takeoff && (
+        <DrawingTakeoffDialog
+          revisionId={takeoff.rev.id}
+          projectId={projectId}
+          drawingLabel={takeoff.label}
+          revLabel={takeoff.rev.rev_label}
+          onClose={() => setTakeoff(null)}
         />
       )}
 
