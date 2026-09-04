@@ -7,14 +7,7 @@ import { PartyWorkTab } from '@/modules/crm/components/PartyWorkTab';
 import { WarrantiesTab } from '@/components/business/crm/WarrantiesTab';
 import { resolveRecordTab } from '@/modules/crm/recordTabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
-import {
-  CustomerAccountOverview,
-  CustomerTopItemsCard,
-  PartyPaymentsCard,
-} from '@/modules/finance/components/CustomerFinanceTabs';
-import { PartyInboundDocsCard } from '@/modules/finance/components/PartyInboundDocsCard';
-import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
-import { CustomerFinanceRulesCard } from '@/modules/finance/components/CustomerFinanceRulesCard';
+import { PartyAccountTabs } from '@/modules/finance/components/PartyAccountTabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { TemplatePickerDialog } from '@/components/features/templates/TemplatePickerDialog';
@@ -1229,32 +1222,19 @@ export const CompanyDetailPage: React.FC = () => {
             <ModuleTabGate moduleSlug="sales-finance" moduleName="Sales & Finance"
               blurb="Track this company's orders, invoices, payments and balance.">
               {company.id ? (
-                <>
-                  {/* 1 — Money summary up top: orders count + value, owed (invoiced & on orders),
-                         paid, net position, AR aging (or AP / "we owe" for a supplier). */}
-                  <CustomerAccountOverview companyId={company.id} customerName={company.name} isSupplier={!!company.is_supplier} ledgerHref={`/finance?tab=parties&party=company:${company.id}`} />
-                  {/* 2 — The orders themselves (customer + supplier orders). Click an order to manage
-                         its receivables/payables, invoices, supplier bills, payments and dispatch. */}
-                  <OrdersPanel workspaceId={activeWorkspaceId ?? ''} companyId={company.id} partyRoles={{ customer: !!company.is_customer, supplier: !!company.is_supplier }} />
-                  {/* 2b — Itemised cash movements across all their orders (money in & out), so the
-                         payments made to / received from this party are visible at the party level. */}
-                  <PartyPaymentsCard companyId={company.id} customerName={company.name} roles={{ customer: !!company.is_customer, supplier: !!company.is_supplier }} />
-                  {/* 2c — What this supplier filed against us on myDATA. Matched live by ΑΦΜ, so
-                         it appears the moment the CRM record exists — including documents polled
-                         long before it. Rows that aren't in Expenses yet say so: they are not in
-                         Payables or the P&L until they are. */}
-                  {company.is_supplier && activeWorkspaceId && (
-                    <PartyInboundDocsCard
-                      workspaceId={activeWorkspaceId}
-                      companyId={company.id}
-                      vatNumber={company.vat_number}
-                      inboxHref="/finance?tab=doc_expenses"
-                    />
-                  )}
-                  {/* 3 + 4 — Customer-only: repeat-buy suggestions + finance/pricing rules. */}
-                  {showCommercial && <CustomerTopItemsCard companyId={company.id} />}
-                  {showCommercial && <CustomerFinanceRulesCard companyId={company.id} />}
-                </>
+                /* The money summary stays pinned; Orders / Payments / Invoices (the supplier's
+                   myDATA filings) / Top items / Payment rules are sections of one tab strip —
+                   they were five stacked tables, so reading the second meant scrolling past all
+                   of the first. Shared with the contact record so the two cannot drift. */
+                <PartyAccountTabs
+                  workspaceId={activeWorkspaceId ?? ''}
+                  companyId={company.id}
+                  partyName={company.name}
+                  roles={{ customer: !!company.is_customer, supplier: !!company.is_supplier }}
+                  showCommercial={showCommercial}
+                  ledgerHref={`/finance?tab=parties&party=company:${company.id}`}
+                  vatNumber={company.vat_number}
+                />
               ) : (
                 <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Save this company first to see its account &amp; orders.</CardContent></Card>
               )}

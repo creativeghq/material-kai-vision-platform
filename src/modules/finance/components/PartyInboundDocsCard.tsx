@@ -41,16 +41,39 @@ export const PartyInboundDocsCard: React.FC<{
   /** Deep link into the Expenses Inbox, for everything this card doesn't do. */
   inboxHref: string;
   readOnly?: boolean;
-}> = ({ workspaceId, companyId, vatNumber, inboxHref, readOnly }) => {
+  /**
+   * Whether "nothing to show" means "render nothing".
+   *
+   * TRUE (the default) is the STACKED reading: the card sits among other cards, so removing
+   * itself costs the reader nothing. FALSE is the TAB reading — the section is the whole pane,
+   * and a pane that renders nothing is a tab you can click into and land on blank page. There
+   * the absence has to be SAID, not performed (CLAUDE.md anti-regression rule 3: a metric is a
+   * value or a stated reason there is no value, never a hidden row).
+   */
+  hideWhenEmpty?: boolean;
+}> = ({ workspaceId, companyId, vatNumber, inboxHref, readOnly, hideWhenEmpty = true }) => {
   /** Null until the first load reports — the subtitle stays silent rather than guessing a zero. */
   const [counts, setCounts] = useState<SupplierInboundCounts | null>(null);
 
   // Nothing to say when this party has no VAT number — they can't be matched to any document.
-  if (!vatNumber) return null;
+  if (!vatNumber) {
+    if (hideWhenEmpty) return null;
+    return (
+      <Card>
+        <CardHeader className="border-b border-border/60 px-5 py-3">
+          <CardTitle className="flex items-center gap-2"><InboxIcon className="h-4 w-4" /> Invoices</CardTitle>
+        </CardHeader>
+        <CardContent className="p-6 text-center text-sm text-muted-foreground">
+          This company has no VAT number, and a received document is matched to a supplier by ΑΦΜ
+          alone — so nothing here can be tied to them yet. Add it under Details → Tax &amp; VAT.
+        </CardContent>
+      </Card>
+    );
+  }
   // A supplier who has filed nothing gets no panel about their filings. NOT while a date window
   // is in force, though: narrowing to a quiet month would otherwise delete the panel — and with
   // it the only control that could widen the window again.
-  if (counts && counts.total === 0 && !counts.windowed) return null;
+  if (hideWhenEmpty && counts && counts.total === 0 && !counts.windowed) return null;
 
   return (
     <Card>

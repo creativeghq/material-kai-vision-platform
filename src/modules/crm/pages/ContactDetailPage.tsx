@@ -2,9 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Link as LinkIcon, Unlink, UserPlus, Receipt, Percent, Tag, Tags, Send, Wallet, Clock, MessageSquare, MessageCircle, X, ChevronDown, Sparkles, Loader2, RefreshCw, FolderKanban , Wrench, Home } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
-import { CustomerAccountOverview, CustomerTopItemsCard, PartyPaymentsCard } from '@/modules/finance/components/CustomerFinanceTabs';
-import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
-import { CustomerFinanceRulesCard } from '@/modules/finance/components/CustomerFinanceRulesCard';
+import { PartyAccountTabs } from '@/modules/finance/components/PartyAccountTabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -1129,13 +1127,17 @@ export const ContactDetailPage: React.FC = () => {
                   <ModuleTabGate moduleSlug="sales-finance" moduleName="Sales & Finance"
                     blurb="Track this customer's orders, invoices, payments and balance.">
                     {contact.id ? (
-                      <>
-                        <CustomerAccountOverview contactId={contact.id} customerName={contact.name} isSupplier={!!contact.is_supplier} ledgerHref={`/finance?tab=parties&party=contact:${contact.id}`} />
-                        <OrdersPanel workspaceId={activeWorkspaceId ?? ''} contactId={contact.id} partyRoles={{ customer: !!contact.is_client, supplier: !!contact.is_supplier }} />
-                        <PartyPaymentsCard contactId={contact.id} customerName={contact.name} roles={{ customer: !!contact.is_client, supplier: !!contact.is_supplier }} />
-                        <CustomerTopItemsCard contactId={contact.id} />
-                        <CustomerFinanceRulesCard contactId={contact.id} />
-                      </>
+                      /* Same tab strip as the company record — see PartyAccountTabs. Mounted from
+                         one component so the two record pages cannot drift on what an account
+                         contains. No Invoices section: a myDATA received document names a
+                         business, matched by ΑΦΜ. */
+                      <PartyAccountTabs
+                        workspaceId={activeWorkspaceId ?? ''}
+                        contactId={contact.id}
+                        partyName={contact.name}
+                        roles={{ customer: !!contact.is_client, supplier: !!contact.is_supplier }}
+                        ledgerHref={`/finance?tab=parties&party=contact:${contact.id}`}
+                      />
                     ) : (
                       <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Save this contact first to see their account &amp; orders.</CardContent></Card>
                     )}
