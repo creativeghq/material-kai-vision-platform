@@ -119,6 +119,9 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
     adminOnly: true,
     tool_ids: ['review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding'],
   },
+  'construction': {
+    tool_ids: ['project_cvr', 'project_applications', 'list_variations', 'tender_status'],
+  },
   'projects': {
     tool_ids: ['create_project', 'list_my_projects', 'find_project', 'add_task', 'add_purchase_item', 'generate_purchase_sheet'],
   },

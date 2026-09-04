@@ -1197,6 +1197,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'web_search', 'web_fetch', 'web_research_validate',
       // Project Workspace (all users; 0 cr — DB-only)
       'create_project', 'list_my_projects', 'find_project', 'add_task',
+      'project_cvr', 'project_applications', 'list_variations', 'tender_status',
       'add_purchase_item', 'generate_purchase_sheet',
       // AI Assessment — all three subjects on the generalist. Each `assess_*` is gated on its own
       // paid module and is the only paid tool of its trio; the readers cost nothing.
@@ -1283,6 +1284,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'generate_presentation_sheet',
       // Project Workspace — interior designers benefit most from the container
       'create_project', 'list_my_projects', 'find_project', 'add_task',
+      'project_cvr', 'project_applications', 'list_variations', 'tender_status',
       'add_purchase_item', 'generate_purchase_sheet',
       // AI Assessment — the project subject only. Vision runs engagements; the books are Trinity's.
       'assess_project', 'get_project_assessment', 'list_assessment_actions', 'apply_assessment_action',
@@ -1417,6 +1419,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // Same for the projects cluster: an agent that can create a project and cannot put a task
       // on it is offering "Add a task" it cannot run. Purchases are money, which is Trinity's.
       'create_project', 'list_my_projects', 'find_project',
+      'project_cvr', 'project_applications', 'list_variations', 'tender_status',
       'add_task', 'add_purchase_item', 'generate_purchase_sheet',
       // AI Assessment — Trinity owns the books, so it gets the finance subject as well as the
       // project one. `assess_*` is paid; the readers are DB-only.
@@ -2139,7 +2142,9 @@ async function executeAgent(
   const needsReviews = config.tools.includes('manage_reviews');
   const needsAppointments = config.tools.includes('manage_appointments');
   const needsJobResearch = config.tools.some((t: string) => ['track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites'].includes(t));
-  const needsProjects = config.tools.some((t: string) => ['create_project', 'list_my_projects', 'find_project', 'add_task', 'add_purchase_item', 'generate_purchase_sheet'].includes(t));
+  const needsProjects = config.tools.some((t: string) => ['create_project', 'list_my_projects', 'find_project', 'add_task',
+      'project_cvr', 'project_applications', 'list_variations', 'tender_status', 'add_purchase_item', 'generate_purchase_sheet'].includes(t));
+  const needsConstruction = config.tools.some((t: string) => ['project_cvr', 'project_applications', 'list_variations', 'tender_status'].includes(t));
   const needsSourcing = config.tools.some((t: string) => ['source_product', 'create_purchase_order', 'send_purchase_order'].includes(t));
   const needsFlows = config.tools.includes('manage_flows');
   const needsHr = config.tools.includes('manage_hr');
@@ -2159,7 +2164,7 @@ async function executeAgent(
   ];
   const needsCatalog = isAdmin && config.tools.some((t: string) => CATALOG_TOOL_NAMES.includes(t));
 
-  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, matScrapeMod, webResearchMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod, flowsMod, hrToolsMod, myHrToolsMod, stockToolsMod, realEstateToolsMod, crmToolsMod, quotesMod, socialMod, priceMonitoringMod, emailMarketingMod, financeMod, messagingMod, contractsMod, inboxMod, reviewsMod, appointmentsMod, recordSearchMod]: any[] = await Promise.all([
+  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, matScrapeMod, webResearchMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod, flowsMod, hrToolsMod, myHrToolsMod, stockToolsMod, realEstateToolsMod, crmToolsMod, quotesMod, socialMod, priceMonitoringMod, emailMarketingMod, financeMod, messagingMod, contractsMod, inboxMod, reviewsMod, appointmentsMod, recordSearchMod, constructionMod]: any[] = await Promise.all([
     needsSearch       ? import('../_shared/tools/search-tools.ts') : null,
     needsGen          ? import('../_shared/tools/generation-tools.ts') : null,
     needsOps          ? import('../_shared/tools/ops-tools.ts') : null,
@@ -2197,6 +2202,7 @@ async function executeAgent(
     needsReviews ? import('../_shared/tools/reviews-tools.ts') : null,
     needsAppointments ? import('../_shared/tools/appointments-tools.ts') : null,
     needsRecordSearch ? import('../_shared/tools/record-search-tools.ts') : null,
+    needsConstruction ? import('../_shared/tools/construction-tools.ts') : null,
   ]);
 
   const createDocsSearchTool = docsMod?.createDocsSearchTool;
@@ -2327,6 +2333,10 @@ async function executeAgent(
   const createSourceProductTool = sourcingMod?.createSourceProductTool;
   const createCreatePurchaseOrderTool = sourcingMod?.createCreatePurchaseOrderTool;
   const createSendPurchaseOrderTool = sourcingMod?.createSendPurchaseOrderTool;
+  const createProjectCvrTool = constructionMod?.createProjectCvrTool;
+  const createProjectApplicationsTool = constructionMod?.createProjectApplicationsTool;
+  const createListVariationsTool = constructionMod?.createListVariationsTool;
+  const createTenderStatusTool = constructionMod?.createTenderStatusTool;
   const createCreateProjectTool = projectsMod?.createCreateProjectTool;
   const createListMyProjectsTool = projectsMod?.createListMyProjectsTool;
   const createFindProjectTool = projectsMod?.createFindProjectTool;
@@ -2761,6 +2771,18 @@ async function executeAgent(
   }
   if (config.tools.includes('list_my_projects') && createListMyProjectsTool) {
     tools.push(createListMyProjectsTool(userId, workspaceId, onChunk));
+  }
+  if (config.tools.includes('project_cvr') && createProjectCvrTool) {
+    tools.push(createProjectCvrTool(userId, workspaceId, onChunk));
+  }
+  if (config.tools.includes('project_applications') && createProjectApplicationsTool) {
+    tools.push(createProjectApplicationsTool(userId, workspaceId, onChunk));
+  }
+  if (config.tools.includes('list_variations') && createListVariationsTool) {
+    tools.push(createListVariationsTool(userId, workspaceId, onChunk));
+  }
+  if (config.tools.includes('tender_status') && createTenderStatusTool) {
+    tools.push(createTenderStatusTool(userId, workspaceId, onChunk));
   }
   if (config.tools.includes('find_project') && createFindProjectTool) {
     tools.push(createFindProjectTool(userId, workspaceId, onChunk));

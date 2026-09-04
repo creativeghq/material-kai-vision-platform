@@ -915,6 +915,17 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'list_variations',
+    file: 'supabase/functions/_shared/tools/construction-tools.ts',
+    factory: 'createListVariationsTool',
+    description: 'Variations on a construction project: agreed changes to the scope, in both directions.',
+    params: [
+      { name: 'project_id', type: 'string', optional: true, description: 'The project id, when you already have it' },
+      { name: 'project_name', type: 'string', optional: true, description: 'The project name, if you do not have the id' },
+      { name: 'only_undecided', type: 'boolean', optional: true, description: 'Only those still draft or submitted — the ones needing a decision' },
+    ],
+  },
+  {
     name: 'load_skill',
     file: 'supabase/functions/_shared/tools/skills-tools.ts',
     factory: 'createLoadSkillTool',
@@ -1354,6 +1365,26 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     params: [
       { name: 'project_id', type: 'string', optional: true, description: 'Project UUID' },
       { name: 'project_name', type: 'string', optional: true, description: 'Project name fragment (fuzzy resolved)' },
+    ],
+  },
+  {
+    name: 'project_applications',
+    file: 'supabase/functions/_shared/tools/construction-tools.ts',
+    factory: 'createProjectApplicationsTool',
+    description: 'Applications for payment on a construction project, with retention.',
+    params: [
+      { name: 'project_id', type: 'string', optional: true, description: 'The project id, when you already have it' },
+      { name: 'project_name', type: 'string', optional: true, description: 'The project name, if you do not have the id' },
+    ],
+  },
+  {
+    name: 'project_cvr',
+    file: 'supabase/functions/_shared/tools/construction-tools.ts',
+    factory: 'createProjectCvrTool',
+    description: 'Cost value reconciliation for one construction project: contracted value plus approved client variations against actual cost, open commitments and approved subcontractor variations, broken down by cost code with the m…',
+    params: [
+      { name: 'project_id', type: 'string', optional: true, description: 'The project id, when you already have it' },
+      { name: 'project_name', type: 'string', optional: true, description: 'The project name, if you do not have the id' },
     ],
   },
   {
@@ -2200,6 +2231,16 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     params: [
       { name: 'company_id', type: 'string', optional: true, description: 'CRM company UUID' },
       { name: 'company_name', type: 'string', optional: true, description: 'Company name fragment (fuzzy resolved)' },
+    ],
+  },
+  {
+    name: 'tender_status',
+    file: 'supabase/functions/_shared/tools/construction-tools.ts',
+    factory: 'createTenderStatusTool',
+    description: 'Tender packages on a construction project: what is out to subcontractors, who has been asked, who has replied, and what has been awarded.',
+    params: [
+      { name: 'project_id', type: 'string', optional: true, description: 'The project id, when you already have it' },
+      { name: 'project_name', type: 'string', optional: true, description: 'The project name, if you do not have the id' },
     ],
   },
   {

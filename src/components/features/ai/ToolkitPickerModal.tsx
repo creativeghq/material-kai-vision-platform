@@ -26,6 +26,7 @@ import {
   X, Check, Sparkles, Compass, BookOpen, Megaphone, LayoutTemplate, Search, Globe,
   Link2, FileSearch, Layers, BadgeCheck, Newspaper, Building2, Bot, Wrench, Lock,
   AlertCircle, Coins, RotateCcw, Briefcase, FolderKanban,
+  HardHat, Gavel, GitPullRequestArrow, Receipt, Scale,
   Users, CalendarOff, CalendarPlus, CalendarClock, CalendarDays, LayoutDashboard, ListChecks,
   Package, PackagePlus, AlertTriangle,
   Network, Workflow, Share2, Radar, Plus, FileText, Grid3x3, Mail, Palette,
@@ -52,6 +53,7 @@ import { formatNumber } from '@/utils/decimal';
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   Compass, BookOpen, Megaphone, LayoutTemplate, Sparkles, Search, Globe, Link2,
   FileSearch, Layers, BadgeCheck, Newspaper, Building2, Bot, Wrench, Briefcase, FolderKanban,
+  HardHat, Gavel, GitPullRequestArrow, Receipt, Scale,
   Users, CalendarOff, CalendarPlus, CalendarClock, CalendarDays, LayoutDashboard, ListChecks,
   Package, PackagePlus, AlertTriangle,
   Network, Workflow, Share2, Radar, Plus, FileText, Grid3x3, Mail, Palette,
