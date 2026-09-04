@@ -10,11 +10,18 @@
  * was certified before it, and a second implementation of that subtraction is how the same money
  * ends up with two answers.
  *
- * The last column says whether a claim has become a fiscal document yet. That transition is the
- * one open question on this feature and it is deliberately visible rather than implied.
+ * The last column says whether a claim has become a fiscal document yet, and ISSUING IS AN ACT,
+ * not a side effect of reaching a status. An application is a commercial document — it declares
+ * nothing to AADE — exactly as an order does not until `generate_invoice_from_order` runs. So
+ * there is a button, offered only once the amount has been agreed: invoicing a figure nobody has
+ * certified means crediting it when the customer cuts it, against a document already transmitted.
+ *
+ * What remains for an accountant is narrower than "is this fiscal": the myDATA document TYPE
+ * (2.1, treating building work as a service) and whether a given contract is reverse-charged.
+ * Both are single expressions in `issue_invoice_from_application`.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Plus, Receipt, Trash2, Check } from 'lucide-react';
+import { Loader2, Plus, Receipt, Trash2, Check, FileText } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -193,6 +200,19 @@ export const ApplicationsCard: React.FC<Props> = ({ projectId, workspaceId, curr
                             <Button size="sm" variant="ghost" title="Record what was certified"
                               disabled={busy} onClick={() => setCertifying(r)}>
                               <Check className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                          {/* Issuing is a separate, explicit act — no status transition mints a
+                              fiscal document. Offered only on a certified valuation that has not
+                              already been invoiced; the RPC replays rather than numbering twice,
+                              so the button does not have to be disarmed to be safe. */}
+                          {r.status === 'certified' && !r.invoice_id && (
+                            <Button size="sm" variant="ghost" title="Issue an invoice for this valuation"
+                              disabled={busy}
+                              onClick={() => void act('Could not issue the invoice', async () => {
+                                await applicationsService.issueInvoice(r.id);
+                              })}>
+                              <FileText className="h-3.5 w-3.5" />
                             </Button>
                           )}
                           {r.status === 'certified' && (

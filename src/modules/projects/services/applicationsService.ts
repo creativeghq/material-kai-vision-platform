@@ -112,6 +112,20 @@ function readable(error: { code?: string; message: string }): Error {
     return new Error('Say how much was certified before marking it certified.');
   }
   if (error.code === '23514') return new Error(error.message);
+  // The issue-invoice refusals. Each is a decision the operator can act on, and a raw
+  // `application_not_certified: APP-002 is draft.` is a message about our code, not about theirs.
+  if (/application_not_certified/.test(error.message)) {
+    return new Error('Certify the agreed amount first — an invoice for a figure nobody has agreed has to be credited if it changes.');
+  }
+  if (/nothing_to_invoice/.test(error.message)) {
+    return new Error('This valuation adds nothing since the last one. A negative movement is a credit note, not an invoice.');
+  }
+  if (/no_client_on_project/.test(error.message)) {
+    return new Error('Name the client on the project before invoicing a valuation.');
+  }
+  if (/invoice_requires_vat_id/.test(error.message)) {
+    return new Error('This client has no VAT number. AADE rejects an invoice issued to a consumer, and a construction valuation is invoiced to a business.');
+  }
   return new Error(error.message);
 }
 
@@ -190,6 +204,24 @@ export const applicationsService = {
   async setStatus(id: string, status: ApplicationStatus): Promise<void> {
     const { error } = await supabase.from('project_applications').update({ status }).eq('id', id);
     if (error) throw readable(error);
+  },
+
+  /**
+   * Turn a certified valuation into an invoice. Returns the invoice id.
+   *
+   * An application is a COMMERCIAL document — it declares nothing to AADE, exactly as an order
+   * does not until `generate_invoice_from_order` runs. Issuing is a separate, explicit act, which
+   * is why no status transition does it silently.
+   *
+   * ONE call: the invoice takes a fiscal number the moment it exists, so a second press after a
+   * dropped connection would take a second number for one valuation — and unpicking that costs a
+   * credit note, not a delete. The RPC replays the stored invoice instead.
+   */
+  async issueInvoice(applicationId: string): Promise<string> {
+    const { data, error } = await (supabase as any)
+      .rpc('issue_invoice_from_application', { p_application_id: applicationId });
+    if (error) throw readable(error);
+    return data as string;
   },
 
   async remove(id: string): Promise<void> {

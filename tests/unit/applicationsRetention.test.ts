@@ -95,7 +95,12 @@ describe('the applications service', () => {
     const code = stripComments(SERVICE);
     expect(code).not.toMatch(/from\('invoices'\)/);
     expect(code).not.toMatch(/functions\.invoke\(/);
-    expect(code).not.toMatch(/fiscal|mydata|aade/i);
+    // String literals are stripped as well as comments before the word match. The words are a
+    // proxy for machinery, and once `issueInvoice` gained an operator-facing message explaining
+    // that AADE rejects an invoice to a consumer, matching raw text convicted a SENTENCE — which
+    // is the guard failing on the thing it exists to permit. What must not appear is fiscal work.
+    const operations = code.replace(/'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`/g, "''");
+    expect(operations).not.toMatch(/fiscal|mydata|aade/i);
   });
 });
 
@@ -141,5 +146,64 @@ describe('the applications card', () => {
   it('dates a new application on the operator local day', () => {
     expect(CARD).toContain('todayLocalISO()');
     expect(CARD).not.toMatch(/toISOString\(\)\.slice\(0,\s*10\)/);
+  });
+});
+
+/**
+ * Issuing an invoice from a valuation.
+ *
+ * The question this settles had been sitting open as "is a Greek progress valuation a fiscal
+ * document, and when?" — and the codebase had already answered it for orders:
+ * `generate_invoice_from_order` says an order "is a commercial document and declares nothing", and
+ * generating the invoice "is the step that turns the rate into a fiscal claim". An application is
+ * the same kind of thing, so no status transition mints a document; somebody issues one.
+ *
+ * Two rules, both silent when broken:
+ *
+ *  - It is ONE call. The invoice takes a fiscal NUMBER the moment it exists, so a second press
+ *    after a dropped connection takes a second number for one valuation — and unpicking a
+ *    transmitted document costs a credit note, not a delete.
+ *  - The amount is READ from the derivation. An application is cumulative: invoicing the gross
+ *    claim instead of the movement bills the whole job again every month, and both figures are
+ *    valid numbers.
+ */
+describe('a valuation becomes an invoice by an explicit act', () => {
+  it('goes through the RPC that creates and stamps together', () => {
+    const code = stripComments(SERVICE);
+    const fn = code.slice(code.indexOf('async issueInvoice('));
+    const body = fn.slice(0, fn.indexOf('\n  },'));
+    expect(body).toContain("rpc('issue_invoice_from_application'");
+    // A client-side invoice insert followed by an update of the application is the exact
+    // create-then-stamp pair, and here the first half mints a fiscal number.
+    expect(body).not.toMatch(/from\('invoices'\)/);
+    expect(body).not.toMatch(/invoice_id:/);
+  });
+
+  it('never computes the amount to invoice', () => {
+    // `net_due` is derived by get_project_applications. A subtraction here would be a second
+    // implementation of the cumulative rule, and the two would disagree the month a certification
+    // is revised.
+    const code = stripComments(SERVICE);
+    const fn = code.slice(code.indexOf('async issueInvoice('));
+    const body = fn.slice(0, fn.indexOf('\n  },'));
+    expect(body).not.toMatch(/net_due|certified_amount|gross_valuation/);
+    expect(body).not.toMatch(/[-+*]\s*previously_certified/);
+  });
+
+  it('is offered only on a certified valuation that is not already invoiced', () => {
+    const card = stripComments(CARD);
+    expect(card).toContain("r.status === 'certified' && !r.invoice_id");
+  });
+
+  it('translates each refusal into something the operator can act on', () => {
+    // A raw `application_not_certified: APP-002 is draft.` is a message about our code. Each of
+    // these is a decision somebody can make.
+    const code = stripComments(SERVICE);
+    for (const err of [
+      'application_not_certified', 'nothing_to_invoice',
+      'no_client_on_project', 'invoice_requires_vat_id',
+    ]) {
+      expect(code, `${err} is not translated`).toContain(err);
+    }
   });
 });
