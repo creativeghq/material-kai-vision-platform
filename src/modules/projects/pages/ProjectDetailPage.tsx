@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
+  type LucideIcon,
   FolderKanban,
   Loader2,
   ChevronLeft,
@@ -28,6 +29,12 @@ import {
   MessageSquare,
   Layers,
   Gauge,
+  PenTool,
+  Ruler,
+  Briefcase,
+  HardHat,
+  Users,
+  BarChart3,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -90,9 +97,9 @@ const STATUS_TONES: Record<ProjectStatus, string> = {
 };
 
 /**
- * Every tab this page can render, in trigger order. `availableTabs` below filters it by the SAME
- * conditions the triggers and the contents are written with, so a `?tab=` naming a tab this viewer
- * cannot see falls back to Overview instead of rendering a blank panel — the trap
+ * Every section this page can render. `availableTabs` below filters it by the SAME conditions the
+ * triggers and the contents are written with, so a `?tab=` naming a section this viewer cannot see
+ * falls back to Overview instead of rendering a blank panel — the trap
  * `PropertyWorkbench.availableTabs` exists to close, on the page that had no equivalent.
  *
  * Until this existed the page ignored `?tab=` entirely, so `BillingTab`'s own "see the quotes"
@@ -115,6 +122,63 @@ const OWNER_ONLY_TABS = new Set<ProjectTab>([
   // carry no collaborator read policy at all.
   'assessment',
 ]);
+
+/**
+ * The strip is ONE line. Nineteen sections wrapped onto two rows, and a second row of tabs is the
+ * first row's problem twice over: nothing says which row is primary, and which section falls onto
+ * the second row is a different one at every width. So the strip shows the STAGES of a project —
+ * design it, specify it, sell it, build it, hand it over, review it — and the selected stage opens
+ * its own sections in a smaller strip beneath.
+ *
+ * `?tab=` still names the SECTION, never the stage. The stage is derived from the section, so the
+ * four `project_request_*` notifications, the sheet-share mail, `BillingTab`'s "see the quotes",
+ * the construction tools' `?tab=finance` and every other deep link land exactly where they did.
+ * A stage this viewer can see only ONE section of renders AS that section — a collaborator gets a
+ * "Quotes" tab, not a "Commercial" tab with one thing under it.
+ *
+ * Every section belongs to exactly one stage — guarded by tests/unit/projectTabLinks.test.ts.
+ */
+type ProjectStage = 'overview' | 'design' | 'specification' | 'commercial' | 'delivery' | 'client' | 'review';
+const TAB_GROUPS: ReadonlyArray<{ id: ProjectStage; label: string; icon: LucideIcon; tabs: readonly ProjectTab[] }> = [
+  { id: 'overview', label: 'Overview', icon: LayoutDashboard, tabs: ['overview'] },
+  { id: 'design', label: 'Design', icon: PenTool, tabs: ['rooms', 'moodboards', 'sheets'] },
+  { id: 'specification', label: 'Specification', icon: Ruler, tabs: ['products', 'plan', 'purchases'] },
+  { id: 'commercial', label: 'Commercial', icon: Briefcase, tabs: ['quotes', 'contracts', 'billing', 'finance'] },
+  { id: 'delivery', label: 'Delivery', icon: HardHat, tabs: ['tasks', 'site', 'documents'] },
+  { id: 'client', label: 'Client', icon: Users, tabs: ['client-view', 'requests', 'handover'] },
+  { id: 'review', label: 'Review', icon: BarChart3, tabs: ['assessment', 'timeline'] },
+];
+
+/** Label + glyph per section, declared once and read by both strips. */
+const TAB_META: Record<ProjectTab, { label: string; icon: LucideIcon }> = {
+  overview: { label: 'Overview', icon: LayoutDashboard },
+  rooms: { label: 'Rooms', icon: Home },
+  products: { label: 'Products', icon: Package },
+  moodboards: { label: 'Moodboards', icon: Palette },
+  plan: { label: 'Plan', icon: ClipboardList },
+  purchases: { label: 'Purchases', icon: Hammer },
+  quotes: { label: 'Quotes', icon: FileText },
+  billing: { label: 'Billing', icon: Receipt },
+  finance: { label: 'Finance', icon: Wallet },
+  sheets: { label: 'Sheets', icon: FileImage },
+  'client-view': { label: 'Client View', icon: Presentation },
+  contracts: { label: 'Contracts', icon: FileSignature },
+  // What was INSTALLED here, and what it is still covered by (#378 C5). customer_assets.project_id
+  // and register_customer_asset have carried a project since the installed base shipped, and the
+  // panel has always taken a projectId. It was mounted on the CRM company and contact only, so the
+  // place equipment is actually fitted had no way to record it, and asset.service_due /
+  // warranty_expiring fired on assets nobody registered.
+  handover: { label: 'Handover', icon: ShieldCheck },
+  tasks: { label: 'Tasks', icon: CheckSquare },
+  // Snags + site log. Client-visible snags surface on the client view at handover.
+  site: { label: 'Site', icon: ClipboardList },
+  documents: { label: 'Documents', icon: FileStack },
+  // Requests are client-facing by design, so collaborators get this section too.
+  requests: { label: 'Requests', icon: MessageSquare },
+  assessment: { label: 'Assessment', icon: Gauge },
+  // Timeline is owner-only — it would expose internal task + status churn to clients.
+  timeline: { label: 'Timeline', icon: Activity },
+};
 
 export const ProjectDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -159,6 +223,23 @@ export const ProjectDetailPage: React.FC = () => {
       return p;
     }, { replace: true });
   }, [setSp]);
+
+  // The stage strip is DERIVED from the section, never stored: a `?tab=` deep link picks its stage
+  // by itself, and a stage this viewer can see nothing of is not offered at all.
+  const stages = TAB_GROUPS
+    .map((g) => ({ ...g, tabs: g.tabs.filter((t) => availableTabs.includes(t)) }))
+    .filter((g) => g.tabs.length > 0);
+  const stage = stages.find((g) => g.tabs.includes(tab)) ?? stages[0];
+  // Coming back to a stage reopens the section you left it on — Commercial returns to Finance if
+  // that is where you were, not to Quotes every time.
+  const lastSection = useRef<Partial<Record<ProjectStage, ProjectTab>>>({});
+  useEffect(() => { lastSection.current[stage.id] = tab; }, [stage.id, tab]);
+  const selectStage = (id: string) => {
+    const next = stages.find((g) => g.id === id);
+    if (!next) return;
+    const remembered = lastSection.current[next.id];
+    setTab(remembered && next.tabs.includes(remembered) ? remembered : next.tabs[0]);
+  };
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -225,6 +306,14 @@ export const ProjectDetailPage: React.FC = () => {
 
   if (!project) return null;
 
+  // The two counts the strip carries. `0` renders nothing — an empty count is noise.
+  const sectionCount = (t: ProjectTab): number =>
+    t === 'moodboards' ? project.moodboard_count : t === 'quotes' ? project.accepted_quote_count : 0;
+  const countBadge = (t: ProjectTab) => {
+    const n = sectionCount(t);
+    return n > 0 ? <Badge variant="outline" className="ml-1 text-xs h-5">{n}</Badge> : null;
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <PageHeader
@@ -288,119 +377,43 @@ export const ProjectDetailPage: React.FC = () => {
       />
 
       <main className="px-4 sm:px-6 py-6">
-        <Tabs value={tab} onValueChange={setTab} className="space-y-5">
-          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-            <TabsTrigger value="overview" className="flex items-center gap-2">
-              <LayoutDashboard className="h-3.5 w-3.5" />
-              Overview
-            </TabsTrigger>
-            <TabsTrigger value="rooms" className="flex items-center gap-2">
-              <Home className="h-3.5 w-3.5" />
-              Rooms
-            </TabsTrigger>
-            {isOwner && (
-              <TabsTrigger value="products" className="flex items-center gap-2">
-                <Package className="h-3.5 w-3.5" />
-                Products
-              </TabsTrigger>
-            )}
-            <TabsTrigger value="moodboards" className="flex items-center gap-2">
-              <Palette className="h-3.5 w-3.5" />
-              Moodboards
-              {project.moodboard_count > 0 && (
-                <Badge variant="outline" className="ml-1 text-xs h-5">{project.moodboard_count}</Badge>
-              )}
-            </TabsTrigger>
-            {isOwner && (
-              <TabsTrigger value="plan" className="flex items-center gap-2">
-                <ClipboardList className="h-3.5 w-3.5" />
-                Plan
-              </TabsTrigger>
-            )}
-            {isOwner && (
-              <TabsTrigger value="purchases" className="flex items-center gap-2">
-                <Hammer className="h-3.5 w-3.5" />
-                Purchases
-              </TabsTrigger>
-            )}
-            <TabsTrigger value="quotes" className="flex items-center gap-2">
-              <FileText className="h-3.5 w-3.5" />
-              Quotes
-              {project.accepted_quote_count > 0 && (
-                <Badge variant="outline" className="ml-1 text-xs h-5">{project.accepted_quote_count}</Badge>
-              )}
-            </TabsTrigger>
-            {isOwner && (
-              <TabsTrigger value="billing" className="flex items-center gap-2">
-                <Receipt className="h-3.5 w-3.5" />
-                Billing
-              </TabsTrigger>
-            )}
-            {canFinance && (
-              <TabsTrigger value="finance" className="flex items-center gap-2">
-                <Wallet className="h-3.5 w-3.5" />
-                Finance
-              </TabsTrigger>
-            )}
-            <TabsTrigger value="sheets" className="flex items-center gap-2">
-              <FileImage className="h-3.5 w-3.5" />
-              Sheets
-            </TabsTrigger>
-            {isOwner && (
-              <TabsTrigger value="client-view" className="flex items-center gap-2">
-                <Presentation className="h-3.5 w-3.5" />
-                Client View
-              </TabsTrigger>
-            )}
-            {isOwner && (
-              <TabsTrigger value="contracts" className="flex items-center gap-2">
-                <FileSignature className="h-4 w-4" /> Contracts
-              </TabsTrigger>
-            )}
-            {/* What was INSTALLED here, and what it is still covered by (#378 C5).
-                customer_assets.project_id and register_customer_asset have carried a project since
-                the installed base shipped, and this panel has always taken a projectId -- its own
-                prop comment says "used from the project workbench". It was mounted on the CRM
-                company and contact only, so the place equipment is actually fitted had no way to
-                record it, and asset.service_due / warranty_expiring fired on assets nobody
-                registered. */}
-            {isOwner && (
-              <TabsTrigger value="handover" className="flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4" /> Handover
-              </TabsTrigger>
-            )}
-            <TabsTrigger value="tasks" className="flex items-center gap-2">
-              <CheckSquare className="h-3.5 w-3.5" />
-              Tasks
-            </TabsTrigger>
-            {/* Snags + site log. Client-visible snags surface on the client view at handover. */}
-            <TabsTrigger value="site" className="flex items-center gap-2">
-              <ClipboardList className="h-3.5 w-3.5" />
-              Site
-            </TabsTrigger>
-            <TabsTrigger value="documents" className="flex items-center gap-2">
-              <FileStack className="h-3.5 w-3.5" />
-              Docs
-            </TabsTrigger>
-            {/* Requests are client-facing by design, so collaborators get this tab too. */}
-            <TabsTrigger value="requests" className="flex items-center gap-2">
-              <MessageSquare className="h-3.5 w-3.5" />
-              Requests
-            </TabsTrigger>
-            {isOwner && (
-              <TabsTrigger value="assessment" className="flex items-center gap-2">
-                <Gauge className="h-3.5 w-3.5" />
-                Assessment
-              </TabsTrigger>
-            )}
-            {/* Timeline is owner-only — it would expose internal task + status churn to clients. */}
-            {isOwner && (
-              <TabsTrigger value="timeline" className="flex items-center gap-2">
-                <Activity className="h-3.5 w-3.5" />
-                Timeline
-              </TabsTrigger>
-            )}
+        {/* Stage strip: one line at every width — it scrolls on a narrow screen rather than wrapping. */}
+        <Tabs value={stage.id} onValueChange={selectStage}>
+          <TabsList
+            aria-label="Project stages"
+            className="w-full justify-start gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {stages.map((g) => {
+              // A stage with one visible section IS that section.
+              const solo = g.tabs.length === 1 ? g.tabs[0] : null;
+              const Icon = solo ? TAB_META[solo].icon : g.icon;
+              return (
+                <TabsTrigger key={g.id} value={g.id} className="flex items-center gap-2">
+                  <Icon className="h-3.5 w-3.5" />
+                  {solo ? TAB_META[solo].label : g.label}
+                  {solo && countBadge(solo)}
+                </TabsTrigger>
+              );
+            })}
           </TabsList>
+
+          <TabsContent value={stage.id} className="mt-0">
+            {/* Section strip: the stage's own sections, one size down. `?tab=` names one of these. */}
+            <Tabs value={tab} onValueChange={setTab}>
+              {stage.tabs.length > 1 && (
+                <TabsList aria-label={`${stage.label} sections`} className="mt-4 h-8 w-auto gap-0 text-xs">
+                  {stage.tabs.map((t) => {
+                    const Icon = TAB_META[t].icon;
+                    return (
+                      <TabsTrigger key={t} value={t} className="min-h-8 gap-1.5 px-3 py-1 text-xs md:min-h-8">
+                        <Icon className="h-3.5 w-3.5" />
+                        {TAB_META[t].label}
+                        {countBadge(t)}
+                      </TabsTrigger>
+                    );
+                  })}
+                </TabsList>
+              )}
 
           <TabsContent value="overview"><OverviewTab project={project} isOwner={isOwner} onProjectPatched={(patch) => setProject(prev => prev ? { ...prev, ...patch } : null)} /></TabsContent>
           <TabsContent value="rooms"><RoomsTab projectId={project.id} budgetCurrency={project.budget_currency} isOwner={isOwner} /></TabsContent>
@@ -429,6 +442,8 @@ export const ProjectDetailPage: React.FC = () => {
           <TabsContent value="requests"><RequestsTab projectId={project.id} isOwner={isOwner} focusRequestId={sp.get('request')} /></TabsContent>
           {isOwner && <TabsContent value="assessment"><ModuleTabGate moduleSlug="project-assessment" moduleName="AI Assessment" blurb="Ask whether this project is on track and what to fix first."><AssessmentPanel subject="project" subjectId={project.id} canRun={isOwner} subjectName={project.name} /></ModuleTabGate></TabsContent>}
           {isOwner && <TabsContent value="timeline"><TimelineTab projectId={project.id} /></TabsContent>}
+            </Tabs>
+          </TabsContent>
         </Tabs>
       </main>
 

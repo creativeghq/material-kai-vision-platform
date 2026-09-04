@@ -34,11 +34,20 @@ function declaredTabs(): string[] {
   return [...pageSrc.slice(at, end).matchAll(/'([a-z-]+)'/g)].map((m) => m[1]);
 }
 
-/** The tabs the page actually renders, from the JSX. */
+/**
+ * The tabs the page actually renders. Triggers are no longer literal: the strip is built from
+ * `TAB_GROUPS` (one line of stages, each opening its sections), so a section is reachable exactly
+ * when some stage lists it. Contents are still one literal `<TabsContent>` per section.
+ */
 function renderedTabs(): { triggers: string[]; contents: string[] } {
-  const grab = (tag: string) =>
-    [...pageSrc.matchAll(new RegExp(`<${tag} value="([a-z-]+)"`, 'g'))].map((m) => m[1]);
-  return { triggers: grab('TabsTrigger'), contents: grab('TabsContent') };
+  const at = pageSrc.indexOf('const TAB_GROUPS');
+  expect(at, `${PAGE} no longer declares TAB_GROUPS — the strip has lost its source`)
+    .toBeGreaterThan(-1);
+  const block = pageSrc.slice(at, pageSrc.indexOf('];', at));
+  const triggers = [...block.matchAll(/tabs: \[([^\]]*)\]/g)]
+    .flatMap((m) => [...m[1].matchAll(/'([a-z-]+)'/g)].map((x) => x[1]));
+  const contents = [...pageSrc.matchAll(/<TabsContent value="([a-z-]+)"/g)].map((m) => m[1]);
+  return { triggers, contents };
 }
 
 /** Every `/projects/…?tab=x` in the repo, with the file that writes it. */
@@ -93,9 +102,13 @@ describe('a project tab link lands on that tab', () => {
     // Both directions. A trigger with no entry is a tab no link can reach; an entry with no
     // trigger is a `?tab=` the page accepts and then renders nothing for.
     expect([...new Set(triggers)].filter((t) => !declared.includes(t)),
-      'rendered <TabsTrigger> with no PROJECT_TABS entry').toEqual([]);
+      'a stage in TAB_GROUPS lists a section with no PROJECT_TABS entry').toEqual([]);
     expect(declared.filter((t) => !triggers.includes(t)),
-      'PROJECT_TABS entry with no <TabsTrigger>').toEqual([]);
+      'PROJECT_TABS entry no stage lists — no trigger, so no link can reach it').toEqual([]);
+    // Exactly one stage each. Listed twice, the section would render under whichever stage the
+    // derivation finds first and be a dead trigger under the other.
+    expect(triggers.filter((t, i) => triggers.indexOf(t) !== i),
+      'a section listed by more than one stage').toEqual([]);
     expect([...new Set(contents)].filter((t) => !declared.includes(t)),
       'rendered <TabsContent> with no PROJECT_TABS entry').toEqual([]);
     expect(declared.filter((t) => !contents.includes(t)),

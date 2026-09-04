@@ -10,8 +10,8 @@ Before Projects, moodboards and quotes were standalone objects scoped to one use
 
 **Routes:**
 - `/projects` — list of the user's active projects (card grid)
-- `/projects/:id` — project detail (7 tabs: Overview / Rooms / Moodboards / Quotes / Sheets / Tasks / Timeline)
-- `/projects/:id?tab=<tab>` — every tab is deep-linkable, and `?tab=requests&request=<id>` opens
+- `/projects/:id` — project detail. One line of STAGES (Overview / Design / Specification / Commercial / Delivery / Client / Review); the selected stage opens its sections in a smaller strip beneath. A stage the viewer can see only one section of renders as that section.
+- `/projects/:id?tab=<section>` — every SECTION is deep-linkable (the stage is derived from it, never in the URL), and `?tab=requests&request=<id>` opens
   that thread (un-hiding it if it has been closed). The page validates the tab against what it
   renders **for this viewer**, so a link to an owner-only tab falls back to Overview instead of a
   blank panel. Guarded by [tests/unit/projectTabLinks.test.ts](../tests/unit/projectTabLinks.test.ts) —
@@ -281,14 +281,14 @@ A JARVIS prompt addendum (idempotent block `--BEGIN_PROJECT_WORKSPACE_ADDENDUM--
 | File | Purpose |
 |---|---|
 | [pages/ProjectsListPage.tsx](../src/modules/projects/pages/ProjectsListPage.tsx) | Card grid with budget bar + deadline countdown. |
-| [pages/ProjectDetailPage.tsx](../src/modules/projects/pages/ProjectDetailPage.tsx) | 7 tabs. `isOwner` check switches between owner UX and collaborator UX. |
+| [pages/ProjectDetailPage.tsx](../src/modules/projects/pages/ProjectDetailPage.tsx) | 19 sections grouped into 7 stages (`TAB_GROUPS`). `isOwner` check switches between owner UX and collaborator UX. |
 | [pages/InviteLandingPage.tsx](../src/modules/projects/pages/InviteLandingPage.tsx) | Public, no auth. Pre-auth invitation preview + email entry. |
 | [pages/AcceptInvitePage.tsx](../src/modules/projects/pages/AcceptInvitePage.tsx) | Magic-link redirect target. Calls `accept_project_invitation`. |
 | [components/CreateProjectModal.tsx](../src/modules/projects/components/CreateProjectModal.tsx) | Wizard: name + client + rooms + deadline + budget. Calls `useUserRole()` to switch the client picker between admin/simple modes. |
 | [components/ClientPicker.tsx](../src/modules/projects/components/ClientPicker.tsx) | Admin mode: B2B/B2C tabs over full CRM. Simple mode: contact-only, scoped to user's own contacts, with inline "+ Add new client" form. |
 | [components/ProjectPickerInline.tsx](../src/modules/projects/components/ProjectPickerInline.tsx) | Reusable picker embedded in `CreateQuoteModal` + `AddToMoodboardModal` so existing flows can attach to a project. |
 | [components/InviteCollaboratorsModal.tsx](../src/modules/projects/components/InviteCollaboratorsModal.tsx) | Owner-only invite/list/revoke/resend/copy-link. |
-| [components/tabs/](../src/modules/projects/components/tabs/) | Seven tab components: Overview / Rooms / Moodboards / Quotes / Sheets / Tasks / Timeline. Each accepts `isOwner` for collaborator-aware rendering. |
+| [components/tabs/](../src/modules/projects/components/tabs/) | One component per section. Each accepts `isOwner` for collaborator-aware rendering. |
 
 ---
 
