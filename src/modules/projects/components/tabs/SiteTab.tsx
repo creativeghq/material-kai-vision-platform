@@ -9,8 +9,9 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { CostCodePicker } from '@/components/business/costCodes/CostCodePicker';
 import { useCostCodes } from '@/hooks/useCostCodes';
 import { costCodeLabel } from '@/services/costCodesService';
+import { InspectionsPanel } from '../InspectionsPanel';
 import {
-  Loader2, Plus, Trash2, ClipboardList, CalendarDays, ImagePlus, Eye, EyeOff, Mic,
+  Loader2, Plus, Trash2, ClipboardList, ClipboardCheck, CalendarDays, ImagePlus, Eye, EyeOff, Mic,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -30,7 +31,7 @@ import {
 import { HubEmptyState } from '@/components/core/hub';
 import { DictateSiteWalkDialog } from '../DictateSiteWalkDialog';
 
-type View = 'snags' | 'log';
+type View = 'snags' | 'log' | 'inspections';
 
 /**
  * Site photos live in a PRIVATE bucket now (#358 PQ-9), so a render needs a signed URL rather
@@ -100,12 +101,20 @@ export const SiteTab: React.FC<{ projectId: string; isOwner: boolean }> = ({ pro
         )}
         <div className="flex rounded-md border border-border/60 p-0.5">
           <Toggle value="snags" icon={<ClipboardList className="h-3.5 w-3.5" />} label="Snags" />
+          <Toggle value="inspections" icon={<ClipboardCheck className="h-3.5 w-3.5" />} label="Inspections" />
           <Toggle value="log" icon={<CalendarDays className="h-3.5 w-3.5" />} label="Site log" />
         </div>
       </div>
-      {view === 'snags'
-        ? <SnagsView key={`snags-${reloadToken}`} projectId={projectId} isOwner={isOwner} />
-        : <SiteLogView key={`log-${reloadToken}`} projectId={projectId} isOwner={isOwner} />}
+      {/* Inspections sit beside snags rather than inside them because the relationship runs one
+          way: a failed check BECOMES a snag, and the snag then lives its own life on the defect
+          list. Nesting them would hide every defect that was found by walking a checklist. */}
+      {view === 'snags' ? (
+        <SnagsView key={`snags-${reloadToken}`} projectId={projectId} isOwner={isOwner} />
+      ) : view === 'inspections' ? (
+        <InspectionsPanel key={`insp-${reloadToken}`} projectId={projectId} isOwner={isOwner} />
+      ) : (
+        <SiteLogView key={`log-${reloadToken}`} projectId={projectId} isOwner={isOwner} />
+      )}
 
       {dictating && (
         <DictateSiteWalkDialog

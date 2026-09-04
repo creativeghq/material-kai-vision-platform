@@ -21814,6 +21814,127 @@ export type Database = {
           },
         ]
       }
+      project_inspections: {
+        Row: {
+          client_visible: boolean
+          created_at: string
+          created_by: string | null
+          id: string
+          inspection_date: string | null
+          notes: string | null
+          project_id: string
+          room_id: string | null
+          signed_off_at: string | null
+          signed_off_by: string | null
+          signed_off_name: string | null
+          status: string
+          template_id: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          client_visible?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          inspection_date?: string | null
+          notes?: string | null
+          project_id: string
+          room_id?: string | null
+          signed_off_at?: string | null
+          signed_off_by?: string | null
+          signed_off_name?: string | null
+          status?: string
+          template_id?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          client_visible?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          inspection_date?: string | null
+          notes?: string | null
+          project_id?: string
+          room_id?: string | null
+          signed_off_at?: string | null
+          signed_off_by?: string | null
+          signed_off_name?: string | null
+          status?: string
+          template_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_inspections_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_inspection_items: {
+        Row: {
+          answered_at: string | null
+          answered_by: string | null
+          cost_code_id: string | null
+          created_at: string
+          guidance: string | null
+          id: string
+          inspection_id: string
+          note: string | null
+          photo_paths: string[]
+          result: string | null
+          sequence: number
+          snag_id: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          answered_at?: string | null
+          answered_by?: string | null
+          cost_code_id?: string | null
+          created_at?: string
+          guidance?: string | null
+          id?: string
+          inspection_id: string
+          note?: string | null
+          photo_paths?: string[]
+          result?: string | null
+          sequence?: number
+          snag_id?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          answered_at?: string | null
+          answered_by?: string | null
+          cost_code_id?: string | null
+          created_at?: string
+          guidance?: string | null
+          id?: string
+          inspection_id?: string
+          note?: string | null
+          photo_paths?: string[]
+          result?: string | null
+          sequence?: number
+          snag_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_inspection_items_inspection_id_fkey"
+            columns: ["inspection_id"]
+            isOneToOne: false
+            referencedRelation: "project_inspections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_rooms: {
         Row: {
           budget_amount: number | null

@@ -778,3 +778,72 @@ export const crmCompanyAdapter: TemplateAdapter<CrmCompanyTemplatePayload> = {
     return out.length ? out : ['No terms set'];
   },
 };
+
+// ---------------------------------------------------------------------------
+
+export interface InspectionTemplatePayload {
+  title?: string | null;
+  notes?: string | null;
+}
+
+/**
+ * An inspection template — the checklist you walk the site with, run again on every plot.
+ *
+ * What it carries is the QUESTIONS. What it must never carry is the ANSWERS: `result`, `note`,
+ * `photo_paths`, `snag_id`, `signed_off_*`. A checklist that arrives pre-ticked is not a
+ * checklist, it is a record claiming a stage was inspected when nobody walked it — and unlike a
+ * wrong figure, it is the kind of claim somebody builds over.
+ *
+ * The header and its items are created by ONE RPC. Two calls would leave a header with no items
+ * on a dropped connection, and an inspection with no items derives as `empty` — which reads on a
+ * list as a stage that was checked and found clean.
+ */
+export const inspectionAdapter: TemplateAdapter<InspectionTemplatePayload> = {
+  type: 'inspection',
+  icon: ClipboardCheck,
+  ...TEMPLATE_SCHEMAS.inspection,
+  capture: (sourceId) => captureRecord<InspectionTemplatePayload>(inspectionAdapter, sourceId),
+  async apply(payload, ctx): Promise<TemplateApplyResult> {
+    // An inspection belongs to a project. Applied from the generic library with none chosen, the
+    // honest answer is to send the person to pick one rather than to invent a home for it.
+    if (!ctx.projectId) {
+      return {
+        kind: 'prefill',
+        route: `/projects?template=${ctx.templateId}`,
+        message: 'Open a project and start the inspection from its Site tab.',
+      };
+    }
+
+    const items = childRows(payload as never, 'project_inspection_items')
+      .map((r, i) => ({
+        title: str(r.title) ?? '',
+        guidance: str(r.guidance),
+        sequence: num(r.sequence, i),
+        cost_code_id: str(r.cost_code_id),
+      }))
+      .filter((r) => r.title.trim().length > 0);
+
+    const { data, error } = await (supabase as any).rpc('create_inspection_from_template', {
+      p_project_id: ctx.projectId,
+      p_title: ctx.title ?? str(payload.title) ?? 'Inspection',
+      p_items: items,
+      p_template_id: ctx.templateId,
+      p_notes: str(payload.notes),
+    });
+    if (error) throw error;
+
+    const id = data as string;
+    return {
+      kind: 'created',
+      id,
+      route: `/projects/${ctx.projectId}?tab=site&view=inspections&inspection=${id}`,
+      message: `Inspection started with ${items.length} item${items.length === 1 ? '' : 's'}.`,
+    };
+  },
+  summary(payload) {
+    const items = childRows(payload as never, 'project_inspection_items').length;
+    // "0 items" is said rather than hidden: a checklist with nothing on it is the one shape that
+    // reads as a completed inspection while containing no question at all.
+    return [`${items} item${items === 1 ? '' : 's'}`];
+  },
+};

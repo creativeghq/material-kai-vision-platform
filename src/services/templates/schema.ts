@@ -17,13 +17,13 @@ import type { TemplateChildSpec, TemplateEditableField, TemplateEntityType } fro
  */
 export const TEMPLATE_ENTITY_TYPES = [
   'invoice', 'quote', 'project', 'moodboard', 'order',
-  'contract', 'expense', 'hr_onboarding', 'crm_company', 'property_listing',
+  'contract', 'expense', 'hr_onboarding', 'crm_company', 'property_listing', 'inspection',
 ] as const satisfies readonly TemplateEntityType[];
 
 /** Types with a shipped adapter. */
 export const LIVE_TEMPLATE_TYPES = [
   'invoice', 'quote', 'project', 'moodboard', 'order', 'contract', 'expense',
-  'hr_onboarding', 'property_listing', 'crm_company',
+  'hr_onboarding', 'property_listing', 'crm_company', 'inspection',
 ] as const;
 export type LiveTemplateEntityType = (typeof LIVE_TEMPLATE_TYPES)[number];
 
@@ -305,6 +305,31 @@ export const TEMPLATE_SCHEMAS: Record<LiveTemplateEntityType, TemplateSchema> = 
       { key: 'prices_vat_inclusive', label: 'Show prices VAT-inclusive', kind: 'boolean' },
     ],
   },
+  inspection: {
+    label: 'Inspection',
+    plural: 'Inspections',
+    description: 'A checklist you walk the site with — the same items, every plot, every stage.',
+    sourceTable: 'project_inspections',
+    moduleSlug: 'projects',
+    // Deliberately absent, and this is the whole allowlist argument in one line: `status`,
+    // `signed_off_*` and every per-item `result`. A checklist that arrives pre-ticked is not a
+    // checklist — it is a record claiming a stage was inspected when nobody walked it.
+    captureFields: ['title', 'notes'],
+    captureChildren: [{
+      table: 'project_inspection_items',
+      fk: 'inspection_id',
+      // `result`, `note`, `photo_paths`, `snag_id` and `answered_*` are ANSWERS, not the question,
+      // and they belong to the walk that produced them rather than to the template.
+      fields: ['title', 'guidance', 'sequence', 'cost_code_id'],
+      orderBy: 'sequence',
+      label: 'Checklist items',
+    }],
+    editableFields: [
+      { key: 'title', label: 'Default inspection name', kind: 'text' },
+      { key: 'notes', label: 'Notes', kind: 'textarea' },
+    ],
+  },
+
 };
 
 /**

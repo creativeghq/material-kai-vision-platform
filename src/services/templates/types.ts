@@ -27,7 +27,8 @@ export type TemplateEntityType =
   | 'expense'
   | 'hr_onboarding'
   | 'crm_company'
-  | 'property_listing';
+  | 'property_listing'
+  | 'inspection';
 
 /**
  * Field-name fragments a template payload must NEVER carry, whatever the entity.

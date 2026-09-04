@@ -33,13 +33,13 @@ const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8').replace
 
 /**
  * The live values of `entity_templates_entity_type_check`, transcribed from the applied migration
- * `entity_templates_engine`. Verify with:
+ * `entity_templates_engine`, then widened by `entity_templates_inspection_type`. Verify with:
  *   select pg_get_constraintdef(oid) from pg_constraint
  *    where conname = 'entity_templates_entity_type_check';
  */
 const DB_ALLOWED_ENTITY_TYPES = [
   'invoice', 'quote', 'project', 'moodboard', 'order',
-  'contract', 'expense', 'hr_onboarding', 'crm_company', 'property_listing',
+  'contract', 'expense', 'hr_onboarding', 'crm_company', 'property_listing', 'inspection',
 ];
 
 describe('template entity types ↔ DB CHECK constraint', () => {
