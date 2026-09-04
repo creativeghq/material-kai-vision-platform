@@ -61,6 +61,8 @@ import {
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
+import { AudienceSection } from '@/components/marketing/AudienceSection';
+import { PricingSection } from '@/components/marketing/PricingSection';
 
 interface Feature {
   icon: LucideIcon;
@@ -332,6 +334,9 @@ export default function HomePage() {
             <Link to="/changelog">
               <Button variant="ghost" size="sm" className="hidden md:inline-flex">What's new</Button>
             </Link>
+            <a href="#pricing">
+              <Button variant="ghost" size="sm" className="hidden sm:inline-flex">Pricing</Button>
+            </a>
             <Link to="/auth">
               <Button variant="ghost" size="sm" className="gap-2">
                 <LogIn className="h-4 w-4" />
@@ -340,7 +345,7 @@ export default function HomePage() {
             </Link>
             <Link to="/auth?mode=signup">
               <Button size="sm" className="gap-2">
-                Get started
+                Start free
                 <ArrowRight className="h-4 w-4" />
               </Button>
             </Link>
@@ -377,15 +382,15 @@ export default function HomePage() {
           </h1>
 
           <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10">
-            For design, construction and materials businesses: AI visual search and catalog
-            extraction at the front, room planning, configuration and quoting in the middle, and
-            CRM, projects, warehouse and finance behind it — one platform, start to finish.
+            Contractors, design studios and materials suppliers run the whole job here — the
+            catalogue, the quote, the site, the valuation and the books. Greek fiscal filing
+            included, not bolted on.
           </p>
 
           <div className="flex flex-wrap items-center justify-center gap-3">
             <Link to="/auth?mode=signup">
               <Button size="lg" className="gap-2">
-                Create free account
+                Start free — no card
                 <ArrowRight className="h-4 w-4" />
               </Button>
             </Link>
@@ -396,6 +401,12 @@ export default function HomePage() {
               </Button>
             </Link>
           </div>
+
+          {/* The price, in the hero. Burying it costs more visits than it saves: somebody who
+              will not pay €25 leaves either way, and somebody who will should not have to hunt. */}
+          <p className="mt-5 text-sm text-muted-foreground">
+            Free to start · <a href="#pricing" className="underline hover:text-foreground">See what Pro costs</a>
+          </p>
         </div>
       </section>
 
@@ -460,6 +471,10 @@ export default function HomePage() {
       </section>
 
       {/* Integrations */}
+      <AudienceSection />
+
+      <PricingSection />
+
       <section className="container mx-auto max-w-4xl px-4 pb-16 text-center">
         <h2 className="font-display text-2xl font-semibold tracking-tight mb-3">
           Connected to the systems you already use
@@ -515,11 +530,12 @@ export default function HomePage() {
           Ready to organise your materials?
         </h2>
         <p className="text-muted-foreground mb-8 max-w-xl mx-auto">
-          Create a free MaterialsHub account and start sourcing, specifying and quoting in minutes.
+          An email and a password is the whole sign-up. No card, no call, no demo booked three
+          weeks out.
         </p>
         <Link to="/auth?mode=signup">
           <Button size="lg" className="gap-2">
-            Get started free
+            Start free — no card
             <ArrowRight className="h-4 w-4" />
           </Button>
         </Link>
