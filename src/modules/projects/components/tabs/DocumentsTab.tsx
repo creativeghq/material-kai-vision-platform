@@ -14,7 +14,10 @@
  * stays invisible until somebody builds from the wrong sheet.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { Loader2, Plus, FileStack, Download, Trash2, Eye, EyeOff, Upload, History, FileText, ScanLine } from 'lucide-react';
+import {
+  Loader2, Plus, FileStack, Download, Trash2, Eye, EyeOff, Upload, History, FileText, ScanLine,
+  PenLine,
+} from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -32,6 +35,7 @@ import {
   type ProjectDocumentWithRevisions, type ProjectDocumentRevision,
 } from '../../services/projectDocumentsService';
 import { HubEmptyState } from '@/components/core/hub';
+import { DrawingMarkupDialog } from '../DrawingMarkupDialog';
 import { humanizeLabel } from '@/utils/humanize';
 import {
   DOCUMENT_KINDS, DISCIPLINES, DRAWING_PURPOSES, BUILDABLE_PURPOSES,
@@ -52,6 +56,25 @@ export const DocumentsTab: React.FC<{ projectId: string; isOwner: boolean }> = (
     finally { setLoading(false); }
   }, [projectId, toast]);
   useEffect(() => { void load(); }, [load]);
+
+  /**
+   * The revision open in the markup viewer, with the signed URL it was opened with.
+   *
+   * The URL is minted here and held in state rather than stored on the row: signed URLs expire,
+   * and a persisted one is a link that works today and 404s in a week (storage convention 7).
+   */
+  const [markup, setMarkup] = useState<{
+    rev: ProjectDocumentRevision; url: string; label: string;
+  } | null>(null);
+
+  const openMarkup = async (doc: ProjectDocumentWithRevisions, rev: ProjectDocumentRevision) => {
+    try {
+      const url = await projectDocumentsService.downloadUrl(rev);
+      setMarkup({ rev, url, label: doc.drawing_number || doc.title });
+    } catch (err: any) {
+      toast({ title: 'Could not open the drawing', description: err?.message, variant: 'destructive' });
+    }
+  };
 
   const open = async (rev: ProjectDocumentRevision) => {
     try {
@@ -185,6 +208,17 @@ export const DocumentsTab: React.FC<{ projectId: string; isOwner: boolean }> = (
                         <Download className="h-3.5 w-3.5 mr-1" /> Open
                       </Button>
                     )}
+                    {/* Markup is offered on DRAWINGS only. A cloud round a paragraph of a
+                        specification is a comment on a document, and the measuring half of this
+                        viewer means nothing there. */}
+                    {d.current && d.kind === 'drawing' && (
+                      <Button
+                        size="sm" variant="ghost" title="Mark up"
+                        onClick={() => void openMarkup(d, d.current!)}
+                      >
+                        <PenLine className="h-4 w-4" />
+                      </Button>
+                    )}
                     {isOwner && (
                       <>
                         <Button size="sm" variant="ghost" title="Upload revision" onClick={() => setUploadFor(d)}>
@@ -218,6 +252,18 @@ export const DocumentsTab: React.FC<{ projectId: string; isOwner: boolean }> = (
           onSaved={() => { setCreating(false); void load(); }}
         />
       )}
+      {markup && (
+        <DrawingMarkupDialog
+          revisionId={markup.rev.id}
+          fileUrl={markup.url}
+          drawingLabel={markup.label}
+          revLabel={markup.rev.rev_label}
+          isOwner={isOwner}
+          onClose={() => setMarkup(null)}
+          onRfiRaised={() => { void load(); }}
+        />
+      )}
+
       {uploadFor && (
         <UploadRevisionDialog
           doc={uploadFor}

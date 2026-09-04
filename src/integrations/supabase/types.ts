@@ -20973,6 +20973,9 @@ export type Database = {
           notes: string | null
           purpose: string | null
           rev_label: string
+          scale_set_at: string | null
+          scale_unit: string | null
+          scale_units_per_unit: number | null
           storage_bucket: string
           storage_object_path: string
           superseded_at: string | null
@@ -20988,6 +20991,9 @@ export type Database = {
           notes?: string | null
           purpose?: string | null
           rev_label: string
+          scale_set_at?: string | null
+          scale_unit?: string | null
+          scale_units_per_unit?: number | null
           storage_bucket?: string
           storage_object_path: string
           superseded_at?: string | null
@@ -21003,6 +21009,9 @@ export type Database = {
           notes?: string | null
           purpose?: string | null
           rev_label?: string
+          scale_set_at?: string | null
+          scale_unit?: string | null
+          scale_units_per_unit?: number | null
           storage_bucket?: string
           storage_object_path?: string
           superseded_at?: string | null
@@ -21020,6 +21029,62 @@ export type Database = {
           {
             foreignKeyName: "project_document_revisions_superseded_by_fkey"
             columns: ["superseded_by"]
+            isOneToOne: false
+            referencedRelation: "project_document_revisions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_drawing_markups: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          geometry: Json
+          id: string
+          kind: string
+          measured_unit: string | null
+          measured_value: number | null
+          note: string | null
+          page: number
+          page_aspect: number | null
+          request_id: string | null
+          revision_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          geometry: Json
+          id?: string
+          kind: string
+          measured_unit?: string | null
+          measured_value?: number | null
+          note?: string | null
+          page?: number
+          page_aspect?: number | null
+          request_id?: string | null
+          revision_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          geometry?: Json
+          id?: string
+          kind?: string
+          measured_unit?: string | null
+          measured_value?: number | null
+          note?: string | null
+          page?: number
+          page_aspect?: number | null
+          request_id?: string | null
+          revision_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_drawing_markups_revision_id_fkey"
+            columns: ["revision_id"]
             isOneToOne: false
             referencedRelation: "project_document_revisions"
             referencedColumns: ["id"]
