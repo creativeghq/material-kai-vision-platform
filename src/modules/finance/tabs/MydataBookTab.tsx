@@ -22,7 +22,6 @@ import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { HubEmptyState } from '@/components/core/hub';
 import { Input } from '@/components/core/ui/input';
-import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { useToast } from '@/hooks/use-toast';
@@ -187,6 +186,11 @@ export const MydataBookTab: React.FC<Props> = ({ workspaceId }) => {
   const notConnected = rows.length > 0 && rows.every((r) => r.status === 'not_connected');
   const neverCollected = rows.length > 0 && rows.every((r) => r.status === 'not_collected');
 
+  const unknownSubtypes = Array.isArray(sync?.source_errors?.unknown_subtypes)
+    ? (sync.source_errors.unknown_subtypes as string[])
+    : [];
+  const hasUnknownSubtypes = unknownSubtypes.length > 0;
+
   const exportCsv = () => {
     const head = ['month', 'direction', ...MONEY_COLUMNS.map((c) => String(c.key)), 'doc_count', 'balance', 'status'];
     const body = rows.map((r) => [
@@ -207,25 +211,22 @@ export const MydataBookTab: React.FC<Props> = ({ workspaceId }) => {
 
   return (
     <div className="space-y-4">
-      {/* What this is, said plainly — the whole value of the surface is that it is NOT ours. */}
+      {/* What this is, said plainly — the whole value of the surface is that it is NOT ours —
+          and the controls that scope it, on the same line. Two stacked cards for one sentence
+          and one dropdown pushed the book itself below the fold. */}
       <Card>
-        <CardContent className="flex items-start gap-2 p-4 text-sm text-muted-foreground">
-          <BookOpen className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>
-            AADE's own aggregate book (Συνοπτικό Βιβλίο), exactly as myAADE reports it. These
-            figures are never mixed with the platform's — hold them up against{' '}
-            <span className="text-foreground">Reports → VAT</span> to see whether the two agree.
-          </span>
-        </CardContent>
-      </Card>
-
-      {/* Filter bar */}
-      <Card>
-        <CardContent className="grid grid-cols-1 gap-3 p-4 md:grid-cols-4">
-          <div className="space-y-1">
-            <Label className="text-xs">Period</Label>
+        <CardContent className="flex flex-col gap-3 p-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-start gap-2 text-sm text-muted-foreground">
+            <BookOpen className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              AADE's own aggregate book (Συνοπτικό Βιβλίο), exactly as myAADE reports it. These
+              figures are never mixed with the platform's — hold them up against{' '}
+              <span className="text-foreground">Reports → VAT</span> to see whether the two agree.
+            </span>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
             <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-9 w-[168px]" aria-label="Period"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="this_year">This year</SelectItem>
                 <SelectItem value="last_quarter">Last 3 months</SelectItem>
@@ -233,20 +234,26 @@ export const MydataBookTab: React.FC<Props> = ({ workspaceId }) => {
                 <SelectItem value="custom">Custom range</SelectItem>
               </SelectContent>
             </Select>
-          </div>
-          {period === 'custom' && (
-            <>
-              <div className="space-y-1">
-                <Label className="text-xs">From</Label>
-                <Input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">To</Label>
-                <Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} />
-              </div>
-            </>
-          )}
-          <div className="flex items-end gap-2">
+            {period === 'custom' && (
+              <>
+                <Input
+                  type="date"
+                  aria-label="From"
+                  title="From"
+                  className="h-9 w-[148px]"
+                  value={customFrom}
+                  onChange={(e) => setCustomFrom(e.target.value)}
+                />
+                <Input
+                  type="date"
+                  aria-label="To"
+                  title="To"
+                  className="h-9 w-[148px]"
+                  value={customTo}
+                  onChange={(e) => setCustomTo(e.target.value)}
+                />
+              </>
+            )}
             <Button size="sm" variant="secondary" onClick={refresh} disabled={refreshing || loading}>
               {refreshing ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1 h-3.5 w-3.5" />}
               Refresh from AADE
@@ -256,16 +263,12 @@ export const MydataBookTab: React.FC<Props> = ({ workspaceId }) => {
       </Card>
 
       {/* Freshness. Stale-but-real figures stay on screen and say they are stale — blanking
-          them would lose the last thing AADE actually told us. */}
-      {sync && (
+          them would lose the last thing AADE actually told us. The date itself rides in the
+          book's own subtitle; this band exists only when something actually went wrong, so a
+          healthy mirror costs no vertical space at all. */}
+      {sync && (sync.last_status === 'collector_failed' || hasUnknownSubtypes) && (
         <Card>
           <CardContent className="flex flex-wrap items-center gap-x-4 gap-y-1 p-3 text-xs">
-            <span className="text-muted-foreground">
-              Last confirmed against AADE:{' '}
-              <span className="text-foreground">
-                {sync.last_success_at ? formatDate(sync.last_success_at) : 'never'}
-              </span>
-            </span>
             {sync.last_status === 'collector_failed' && (
               <span className="flex items-center gap-1 text-red-500 dark:text-red-400">
                 <AlertTriangle className="h-3.5 w-3.5" />
@@ -274,10 +277,10 @@ export const MydataBookTab: React.FC<Props> = ({ workspaceId }) => {
                 {typeof sync.source_errors?.error === 'string' ? ` (${sync.source_errors.error})` : ''}
               </span>
             )}
-            {Array.isArray(sync.source_errors?.unknown_subtypes) && sync.source_errors.unknown_subtypes.length > 0 && (
+            {hasUnknownSubtypes && (
               <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
                 <AlertTriangle className="h-3.5 w-3.5" />
-                Unrecognised AADE document type(s): {(sync.source_errors.unknown_subtypes as string[]).join(', ')} — counted at face value
+                Unrecognised AADE document type(s): {unknownSubtypes.join(', ')} — counted at face value
               </span>
             )}
           </CardContent>
@@ -291,6 +294,16 @@ export const MydataBookTab: React.FC<Props> = ({ workspaceId }) => {
             <CardDescription>
               {formatDate(range.from)} — {formatDate(range.to)} · {totals.incomeDocs.toLocaleString()} income and{' '}
               {totals.expenseDocs.toLocaleString()} expense documents filed with AADE
+              {/* Freshness sits with the figures it qualifies. Absent state says so rather than
+                  dropping the phrase — a book with no stated confirmation date reads as current. */}
+              {sync?.last_success_at ? (
+                <>
+                  {' · last confirmed against AADE on '}
+                  <span className="text-foreground">{formatDate(sync.last_success_at)}</span>
+                </>
+              ) : (
+                ' · never confirmed against AADE'
+              )}
             </CardDescription>
           </div>
           <Button size="sm" variant="outline" className="h-7 text-xs" disabled={rows.length === 0} onClick={exportCsv}>
