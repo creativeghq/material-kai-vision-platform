@@ -4,7 +4,7 @@
  * Notifications go out via Flows from the service; nothing here sends anything directly.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Plus, MessageSquare, Send, Trash2, Check, X, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Plus, MessageSquare, Send, Trash2, Check, X, Eye, EyeOff, FileText, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -19,8 +19,11 @@ import { formatDate, todayLocalISO } from '@/utils/datetime';
 import {
   projectRequestsService, REQUEST_KINDS, REQUEST_STATUSES, REQUEST_CLOSED_STATUSES,
   REVIEW_DECISIONS, CLOSING_REVIEW_DECISIONS, isTeamFacing, type ReviewDecision,
-  type ProjectRequestWithMessages, type RequestKind, type RequestStatus,
+  type ProjectRequestWithMessages, type RequestKind, type RequestStatus, type SimilarRequest,
 } from '../../services/projectRequestsService';
+import {
+  projectDocumentsService, type ProjectDocumentWithRevisions,
+} from '../../services/projectDocumentsService';
 
 export const RequestsTab: React.FC<{
   projectId: string;
@@ -180,6 +183,23 @@ export const RequestsTab: React.FC<{
                         {r.raised_by_name || 'Someone'} · {formatDate(r.created_at)}
                         {r.messages.length > 0 && ` · ${r.messages.length} repl${r.messages.length === 1 ? 'y' : 'ies'}`}
                       </p>
+                      {/* The sheet the question is about. `is_current` is the load-bearing half:
+                          an answer given against a superseded drawing may be an answer about the
+                          wrong drawing, and the reader can only know that if we say so. */}
+                      {r.drawing && (
+                        <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                          <FileText className="h-3 w-3 shrink-0" />
+                          <span className="font-mono tabular-nums">
+                            {r.drawing.drawing_number || r.drawing.title}
+                          </span>
+                          <span>rev {r.drawing.rev_label}</span>
+                          {!r.drawing.is_current && (
+                            <span className="flex items-center gap-1 text-amber-800 dark:text-amber-400">
+                              <AlertTriangle className="h-3 w-3" /> superseded since
+                            </span>
+                          )}
+                        </p>
+                      )}
                       {r.due_at && (
                         /* Overdue is a fact about an unanswered request, so it is only said while
                            one is still open — a resolved RFI that was late is history, not a task. */
@@ -303,6 +323,38 @@ const NewRequestDialog: React.FC<{
   const [clientVisible, setClientVisible] = useState(true);
   const [dueAt, setDueAt] = useState('');
   const [saving, setSaving] = useState(false);
+  const [revisionId, setRevisionId] = useState('');
+  const [docs, setDocs] = useState<ProjectDocumentWithRevisions[]>([]);
+  const [similar, setSimilar] = useState<SimilarRequest[]>([]);
+  const [dismissed, setDismissed] = useState(false);
+
+  // The drawing register, for the citation picker. Best-effort: a project with no drawings, or a
+  // failed read, simply does not offer one — it must never stop somebody raising the question.
+  useEffect(() => {
+    let alive = true;
+    projectDocumentsService.list(projectId)
+      .then((d) => { if (alive) setDocs(d); })
+      .catch(() => { if (alive) setDocs([]); });
+    return () => { alive = false; };
+  }, [projectId]);
+
+  /**
+   * Look for the same question already on the register, as the title is typed.
+   *
+   * Debounced, and only once there is enough of a title to mean anything — running on every
+   * keystroke would rank against two characters and show five unrelated hits, which trains people
+   * to ignore the panel entirely. It is advisory: nothing here can stop the save.
+   */
+  useEffect(() => {
+    const q = title.trim();
+    if (q.length < 6) { setSimilar([]); return; }
+    let alive = true;
+    const t = setTimeout(() => {
+      void projectRequestsService.findSimilar(projectId, q, revisionId || null)
+        .then((rows) => { if (alive) setSimilar(rows); });
+    }, 400);
+    return () => { alive = false; clearTimeout(t); };
+  }, [projectId, title, revisionId]);
 
   // A collaborator cannot open an approval request — the DB insert policy refuses it, so it is
   // not offered either. RFIs and submittals are withheld from them for a different reason: those
@@ -328,6 +380,7 @@ const NewRequestDialog: React.FC<{
         // project's open problems to the customer is not what raising one means.
         client_visible: teamFacing ? false : (isOwner ? clientVisible : true),
         due_at: dueAt || null,
+        drawing_revision_id: revisionId || null,
       });
       onSaved();
     } catch (err: any) {
@@ -359,6 +412,75 @@ const NewRequestDialog: React.FC<{
               {kinds.map((k) => <option key={k} value={k}>{humanizeLabel(k)}</option>)}
             </select>
           </div>
+
+          {/* The sheet the question is about. Offered only when the register has one — an empty
+              picker is a control that teaches people it does nothing. */}
+          {docs.length > 0 && (
+            <div className="space-y-1">
+              <Label className="text-xs">About which drawing</Label>
+              <select
+                className="h-9 w-full rounded-md border border-border/60 bg-background px-2 text-sm"
+                value={revisionId} onChange={(e) => setRevisionId(e.target.value)}
+              >
+                <option value="">Not about a specific drawing</option>
+                {docs.map((d) => (
+                  <optgroup key={d.id} label={`${d.drawing_number ? `${d.drawing_number} — ` : ''}${d.title}`}>
+                    {/* Every issue, not just the current one: a question is asked against the sheet
+                        in somebody's hand, which on site is regularly not the latest. */}
+                    {(d.revisions || []).map((rev) => (
+                      <option key={rev.id} value={rev.id}>
+                        rev {rev.rev_label}{rev.is_current ? ' (current)' : ' — superseded'}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Already asked? Advisory, dismissible, and never in the way of the button. The commonest
+              real duplicate is the same problem in different words by someone holding the same
+              sheet, which is why naming a drawing widens the search rather than narrowing it. */}
+          {similar.length > 0 && !dismissed && (
+            <div className="rounded-md border border-amber-800/30 bg-amber-500/[0.08] p-3 dark:border-amber-400/25">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-800 dark:text-amber-400" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium text-amber-900 dark:text-amber-300">
+                    {similar.length === 1 ? 'This may already have been asked' : 'These may already have been asked'}
+                  </p>
+                  <ul className="mt-2 space-y-2">
+                    {similar.map((h) => (
+                      <li key={h.id} className="text-xs">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {h.reference && (
+                            <span className="font-mono tabular-nums text-muted-foreground">{h.reference}</span>
+                          )}
+                          <span className="font-medium">{h.title}</span>
+                          <span className={statusTone(h.status)}>{humanizeLabel(h.status)}</span>
+                          {h.same_drawing && h.drawing_number && (
+                            <span className="text-muted-foreground">· {h.drawing_number} rev {h.rev_label}</span>
+                          )}
+                        </div>
+                        {/* On a resolved hit the last reply IS the answer being asked for again,
+                            so it is shown here rather than behind a click. */}
+                        {h.last_answer && (
+                          <p className="mt-0.5 line-clamp-2 text-muted-foreground">{h.last_answer}</p>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    type="button"
+                    className="mt-2 text-xs underline text-muted-foreground hover:text-foreground"
+                    onClick={() => setDismissed(true)}
+                  >
+                    Mine is a different question
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           {teamFacing && (
             <div className="space-y-1">
               <Label className="text-xs">Answer needed by</Label>

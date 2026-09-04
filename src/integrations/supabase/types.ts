@@ -21668,6 +21668,7 @@ export type Database = {
           body: string | null
           client_visible: boolean
           created_at: string
+          drawing_revision_id: string | null
           due_at: string | null
           id: string
           kind: string
@@ -21690,6 +21691,7 @@ export type Database = {
           body?: string | null
           client_visible?: boolean
           created_at?: string
+          drawing_revision_id?: string | null
           due_at?: string | null
           id?: string
           kind?: string
@@ -21712,6 +21714,7 @@ export type Database = {
           body?: string | null
           client_visible?: boolean
           created_at?: string
+          drawing_revision_id?: string | null
           due_at?: string | null
           id?: string
           kind?: string

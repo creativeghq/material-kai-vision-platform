@@ -48,6 +48,16 @@ export interface ProjectRequest {
   review_decision: ReviewDecision | null;
   /** Submittal resubmissions. Rev 0 is the first issue. */
   revision: number;
+  /**
+   * The drawing REVISION this request is about, when it is about one.
+   *
+   * The revision rather than the document, so the question keeps meaning what it meant when it was
+   * asked: pointing at the document would silently re-aim every open RFI at whatever was issued
+   * since, and nobody would have edited a thing.
+   */
+  drawing_revision_id: string | null;
+  /** Joined for display — which sheet, which issue, and whether it is still the current one. */
+  drawing?: RequestDrawingCitation | null;
   assignee_id: string | null;
   client_visible: boolean;
   raised_by: string | null;
@@ -55,6 +65,38 @@ export interface ProjectRequest {
   created_at: string;
   updated_at: string;
   resolved_at: string | null;
+}
+
+/**
+ * What the register needs to SHOW about a cited drawing. `is_current` is the load-bearing one: an
+ * RFI answered against a superseded sheet may have been answered about the wrong drawing, and that
+ * is a fact worth putting on the screen rather than leaving the reader to cross-check the register.
+ */
+export interface RequestDrawingCitation {
+  id: string;
+  rev_label: string;
+  is_current: boolean;
+  drawing_number: string | null;
+  title: string;
+}
+
+/** One candidate duplicate, as `find_similar_project_requests` derives it. */
+export interface SimilarRequest {
+  id: string;
+  reference: string | null;
+  kind: RequestKind;
+  title: string;
+  status: RequestStatus;
+  created_at: string;
+  resolved_at: string | null;
+  /** Trigram similarity of the titles, 0–1. Ranking only — never a verdict. */
+  score: number;
+  /** True when both name the same SHEET (any issue of it), which is most of the evidence. */
+  same_drawing: boolean;
+  drawing_number: string | null;
+  rev_label: string | null;
+  /** The last reply on the hit. On a resolved one this IS the answer being asked for again. */
+  last_answer: string | null;
 }
 
 export interface ProjectRequestMessage {
@@ -81,6 +123,7 @@ export interface NewRequest {
   client_visible?: boolean;
   assignee_id?: string | null;
   due_at?: string | null;
+  drawing_revision_id?: string | null;
 }
 
 /**
@@ -105,12 +148,27 @@ export const projectRequestsService = {
   async list(projectId: string): Promise<ProjectRequestWithMessages[]> {
     const { data, error } = await (supabase as any)
       .from('project_requests')
-      .select('*, messages:project_request_messages(*)')
+      // The cited sheet comes back with the row rather than as a second read: the register renders
+      // "A-201 rev C" beside the question, and a per-row lookup would make that N+1 requests for a
+      // string that is already one join away.
+      .select(
+        '*, messages:project_request_messages(*), '
+        + 'drawing:project_document_revisions(id, rev_label, is_current, document:project_documents(drawing_number, title))',
+      )
       .eq('project_id', projectId)
       .order('created_at', { ascending: false });
     if (error) throw error;
     return ((data || []) as any[]).map((r) => ({
       ...r,
+      drawing: r.drawing
+        ? {
+            id: r.drawing.id,
+            rev_label: r.drawing.rev_label,
+            is_current: r.drawing.is_current,
+            drawing_number: r.drawing.document?.drawing_number ?? null,
+            title: r.drawing.document?.title ?? '',
+          }
+        : null,
       messages: ((r.messages || []) as ProjectRequestMessage[])
         .slice()
         .sort((a, b) => a.created_at.localeCompare(b.created_at)),
@@ -136,6 +194,7 @@ export const projectRequestsService = {
         client_visible: input.client_visible ?? !isTeamFacing(input.kind ?? 'question'),
         assignee_id: input.assignee_id ?? null,
         due_at: input.due_at ?? null,
+        drawing_revision_id: input.drawing_revision_id ?? null,
         // `reference` is deliberately absent: the DB assigns it inside the same statement, so
         // there is no create-then-number pair a retry could run twice.
         raised_by: user?.id ?? null,
@@ -266,6 +325,45 @@ export const projectRequestsService = {
         revision: closing ? request.revision : request.revision + 1,
       })
       .eq('id', request.id);
+    if (error) throw error;
+  },
+
+  /**
+   * Requests on this project that look like the same question.
+   *
+   * ADVISORY, always. It returns candidates for a person to judge and never blocks the write —
+   * a check that refused would eventually suppress a real question on a Friday afternoon, and an
+   * unasked RFI costs far more than a duplicate one. The ranking rule lives in SQL so the offer
+   * and any later report cannot disagree about what "similar" means.
+   *
+   * Failing this lookup must never cost the request: a duplicate check that throws would stop
+   * somebody raising a question, which is the exact outcome it exists to avoid.
+   */
+  async findSimilar(
+    projectId: string,
+    title: string,
+    drawingRevisionId?: string | null,
+    excludeId?: string | null,
+  ): Promise<SimilarRequest[]> {
+    if (!title.trim()) return [];
+    try {
+      const { data, error } = await (supabase as any).rpc('find_similar_project_requests', {
+        p_project_id: projectId,
+        p_title: title.trim(),
+        p_drawing_revision_id: drawingRevisionId ?? null,
+        p_exclude_id: excludeId ?? null,
+      });
+      if (error) throw error;
+      return (data || []) as SimilarRequest[];
+    } catch {
+      return [];
+    }
+  },
+
+  /** Point an existing request at a drawing revision, or clear the citation with null. */
+  async setDrawingRevision(requestId: string, revisionId: string | null): Promise<void> {
+    const { error } = await (supabase as any)
+      .from('project_requests').update({ drawing_revision_id: revisionId }).eq('id', requestId);
     if (error) throw error;
   },
 

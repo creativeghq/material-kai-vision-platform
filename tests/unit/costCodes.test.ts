@@ -120,7 +120,6 @@ describe('cost code coverage', () => {
     invoice_items: 'The CVR takes value from accepted QUOTES, not invoices; coding invoice lines becomes meaningful with applications for payment.',
     project_purchase_items: 'The project shopping list is pre-commitment; it carries no money get_project_cost_by_code reads.',
     project_tasks: 'Progress-by-code needs the schedule work first.',
-    project_snags: 'Snag-by-trade filtering is site work, not cost reporting.',
   };
 
   /**

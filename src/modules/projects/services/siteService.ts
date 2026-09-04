@@ -51,6 +51,15 @@ export interface ProjectSnag {
   photo_paths: string[];
   client_visible: boolean;
   due_date: string | null;
+  /**
+   * Which trade owns the defect — the same code the money is booked to.
+   *
+   * It is NOT a second place cost is counted, and nothing derives money from it. A snag carries no
+   * figure of its own; the money arrives when somebody books time or a bill against the SAME code,
+   * which is exactly what makes "what has rework cost us on plastering" answerable from
+   * `get_project_cost_by_code` rather than from a number typed on a defect.
+   */
+  cost_code_id: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -79,6 +88,7 @@ export interface NewSnag {
   assignee_id?: string | null;
   client_visible?: boolean;
   due_date?: string | null;
+  cost_code_id?: string | null;
 }
 
 export interface NewSiteLog {
@@ -194,6 +204,7 @@ export const siteService = {
         assignee_id: input.assignee_id ?? null,
         client_visible: input.client_visible ?? false,
         due_date: input.due_date ?? null,
+        cost_code_id: input.cost_code_id ?? null,
         photo_paths,
         created_by: user.id,
       })

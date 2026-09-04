@@ -6,6 +6,9 @@
  * client sees; the site log is internal only and has no collaborator read policy at all.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { CostCodePicker } from '@/components/business/costCodes/CostCodePicker';
+import { useCostCodes } from '@/hooks/useCostCodes';
+import { costCodeLabel } from '@/services/costCodesService';
 import {
   Loader2, Plus, Trash2, ClipboardList, CalendarDays, ImagePlus, Eye, EyeOff, Mic,
 } from 'lucide-react';
@@ -124,7 +127,9 @@ const SnagsView: React.FC<{ projectId: string; isOwner: boolean }> = ({ projectI
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [roomFilter, setRoomFilter] = useState('');
+  const [tradeFilter, setTradeFilter] = useState('');
   const [showClosed, setShowClosed] = useState(false);
+  const { ordered: costCodes } = useCostCodes();
 
   const load = useCallback(async () => {
     try {
@@ -142,12 +147,20 @@ const SnagsView: React.FC<{ projectId: string; isOwner: boolean }> = ({ projectI
   useEffect(() => { void load(); }, [load]);
 
   const roomName = useMemo(() => new Map(rooms.map((r) => [r.id, r.name])), [rooms]);
+  const tradeName = useMemo(
+    () => new Map(costCodes.map(({ code }) => [code.id, costCodeLabel(code)])),
+    [costCodes],
+  );
 
   const visible = useMemo(() => snags.filter((s) => {
     if (roomFilter && s.room_id !== roomFilter) return false;
+    // Coding a snag is only worth doing if the list can then be cut by it: "every open electrical
+    // defect" is the handover list somebody walks the site with, and without this the field is a
+    // box people fill in that nothing ever reads.
+    if (tradeFilter && s.cost_code_id !== tradeFilter) return false;
     if (!showClosed && SNAG_CLOSED_STATUSES.includes(s.status)) return false;
     return true;
-  }), [snags, roomFilter, showClosed]);
+  }), [snags, roomFilter, tradeFilter, showClosed]);
 
   const openCount = snags.filter((s) => !SNAG_CLOSED_STATUSES.includes(s.status)).length;
   const photoUrls = useSignedPhotos(useMemo(() => visible.flatMap((s) => s.photo_paths ?? []), [visible]));
@@ -198,6 +211,17 @@ const SnagsView: React.FC<{ projectId: string; isOwner: boolean }> = ({ projectI
               {rooms.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
             </select>
           )}
+          {costCodes.length > 0 && (
+            <select
+              className="h-8 rounded-md border border-border/60 bg-background px-2 text-xs"
+              value={tradeFilter} onChange={(e) => setTradeFilter(e.target.value)}
+            >
+              <option value="">All trades</option>
+              {costCodes.map(({ code }) => (
+                <option key={code.id} value={code.id}>{costCodeLabel(code)}</option>
+              ))}
+            </select>
+          )}
           <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Checkbox checked={showClosed} onCheckedChange={(v) => setShowClosed(!!v)} /> Show closed
           </label>
@@ -223,6 +247,11 @@ const SnagsView: React.FC<{ projectId: string; isOwner: boolean }> = ({ projectI
                       <p className="font-medium">{s.title}</p>
                       <span className={`text-[11px] capitalize ${severityTone(s.severity)}`}>{s.severity}</span>
                       {s.room_id && <span className="text-[11px] text-muted-foreground">· {roomName.get(s.room_id) ?? 'Room'}</span>}
+                      {s.cost_code_id && (
+                        <span className="text-[11px] text-muted-foreground">
+                          · {tradeName.get(s.cost_code_id) ?? 'Trade'}
+                        </span>
+                      )}
                       {s.due_date && <span className="text-[11px] text-muted-foreground">· due {s.due_date}</span>}
                     </div>
                     {s.description && <p className="mt-1 text-sm text-muted-foreground">{s.description}</p>}
@@ -289,6 +318,7 @@ const AddSnagDialog: React.FC<{
   const [clientVisible, setClientVisible] = useState(false);
   const [photos, setPhotos] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
+  const [costCodeId, setCostCodeId] = useState<string | null>(null);
 
   const save = async () => {
     if (!title.trim()) { toast({ title: 'Title required', variant: 'destructive' }); return; }
@@ -302,6 +332,7 @@ const AddSnagDialog: React.FC<{
         room_id: roomId || null,
         due_date: dueDate || null,
         client_visible: clientVisible,
+        cost_code_id: costCodeId,
       }, photos);
       onSaved();
     } catch (err: any) {
@@ -339,6 +370,14 @@ const AddSnagDialog: React.FC<{
                 {rooms.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
               </select>
             </div>
+          </div>
+          {/* Which trade owns the defect. It carries no money of its own — the cost of rework
+              arrives when somebody books time or a supplier bill against the SAME code, which is
+              what makes "what has rework cost us on plastering" answerable from the cost report
+              rather than from a figure typed on a defect. */}
+          <div className="space-y-1">
+            <Label className="text-xs">Trade</Label>
+            <CostCodePicker value={costCodeId} onChange={setCostCodeId} placeholder="No trade" />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Due date</Label>
