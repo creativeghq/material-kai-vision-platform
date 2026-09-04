@@ -352,10 +352,13 @@ export function filterNavItems(
 }
 
 /**
- * Importance ranking that drives the ENTIRE mobile nav order (bottom bar + "More" sheet).
- * MobileBottomNav sorts every gated item by this list: the first BAR_SLOTS (4) entitled entries
- * fill the visible bottom bar, and the remainder flow into the "More" sheet in this same order.
- * IDs not listed here fall back after these, in raw SIDEBAR_NAV_ITEMS order — so keep this complete.
+ * Importance ranking that decides which destinations get a cell in the mobile BOTTOM BAR.
+ * MobileBottomNav sorts every gated item by this list and the first BAR_SLOTS (4) entitled entries
+ * fill the bar; everything else is reached through the fifth cell, Apps, which opens the mobile
+ * Apps panel (MobileAppsMenu). That panel is grouped by Hub exactly like the desktop launcher and
+ * does NOT read this list, so ranking only matters for who makes the bar. IDs not listed here fall
+ * back after these, in raw SIDEBAR_NAV_ITEMS order — keep it complete anyway, so an entitled tile
+ * never loses a bar slot to one ranked below it by accident.
  * This is the ONE place to re-rank mobile importance; it does NOT affect the desktop nav/launcher.
  * Grouped by how central each surface is to running the business day-to-day.
  */

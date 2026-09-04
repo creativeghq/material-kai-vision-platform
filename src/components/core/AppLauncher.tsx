@@ -14,23 +14,12 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/core/ui/po
 import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useLauncherApps, groupAppsByHub, type LauncherApp } from '@/hooks/useLauncherApps';
-import { useEntitlements } from '@/hooks/useEntitlements';
-import { usePermissions } from '@/hooks/usePermissions';
-import { LAUNCHER_SECTIONS, LAUNCHER_SHORTCUTS, LAUNCHER_HUB_SHORTCUTS, LAUNCHER_ACTIONS, type LauncherSection } from '@/config/launcher-sections';
-import type { HubId } from '@/config/nav-items';
-import { getCapability } from '@/config/capabilities';
-import { TOOLKITS } from '@/components/features/ai/agentToolsCatalog';
-
-const RECENT_KEY = 'launcher.recent.v1';
-
-function readRecent(): string[] {
-  try { return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); } catch { return []; }
-}
-function pushRecent(id: string): string[] {
-  const next = [id, ...readRecent().filter((x) => x !== id)].slice(0, 4);
-  try { localStorage.setItem(RECENT_KEY, JSON.stringify(next)); } catch { /* ignore */ }
-  return next;
-}
+// The inner links (sections · create actions · quick-starts · per-hub shortcuts) and the recent
+// list are SHARED with the mobile Apps panel — one derivation, one localStorage key — so the two
+// surfaces cannot drift. Guarded by tests/unit/launcherLinksSingleSource.test.ts.
+import { useLauncherLinks } from '@/hooks/useLauncherLinks';
+import { readRecentApps, pushRecentApp } from '@/services/launcherRecent';
+import type { LauncherSection } from '@/config/launcher-sections';
 
 export const AppLauncher: React.FC = () => {
   const navigate = useNavigate();
@@ -41,56 +30,28 @@ export const AppLauncher: React.FC = () => {
   const [recent, setRecent] = useState<string[]>([]);
   const { active, available, canManage, enabling, enable, loading } = useLauncherApps();
   // A section chip can sit behind a DIFFERENT add-on than the card it hangs under — Real Estate's
-  // Property Mgmt / Investments, CRM's Pipeline. Gate per chip so an owner keeps the shortcut and a
-  // non-owner is not sent to an upsell.
-  const { isModuleAvailable } = useEntitlements();
-  // ...and a rail shortcut can point at a route wrapped in a CapabilityGuard, which is a gate on the
-  // PERSON rather than on the purchase. Both filters run, for the same reason: never offer a click
-  // whose destination will refuse it.
-  const { can, isWorkspaceManager } = usePermissions();
+  // Property Mgmt / Investments, CRM's Pipeline — and a rail shortcut can point at a route wrapped
+  // in a CapabilityGuard, a gate on the PERSON rather than on the purchase. `appLinks` applies every
+  // gate per link, for the one reason: never offer a click whose destination will refuse it.
+  const { appLinks, hubShortcuts: hubShortcutsFor } = useLauncherLinks();
 
-  useEffect(() => { if (open) setRecent(readRecent()); }, [open]);
+  useEffect(() => { if (open) setRecent(readRecentApps()); }, [open]);
 
   // All apps (active + available-to-add). Inactive apps stay visible in their Hub with a lock →
   // Enable/Request inline (upsell → revenue).
   const allApps = useMemo(() => [...active, ...available], [active, available]);
 
-  const capabilityQuickStarts = (app: LauncherApp) => {
-    const capId = new URLSearchParams(app.path.split('?')[1] || '').get('capability');
-    const cap = capId ? getCapability(capId) : undefined;
-    const tk = cap?.toolkitId ? TOOLKITS.find((t) => t.id === cap.toolkitId) : undefined;
-    return { capId, toolkitId: cap?.toolkitId, quickStarts: tk?.quick_starts ?? [] };
-  };
-
-  /**
-   * The inner links a card would show. Shared by the card renderer and the "Jump to" rail so the
-   * two can never disagree about which apps are link-less — the rail exists precisely to give those
-   * apps a one-click home, and an app appearing in both places would be the duplicate all over again.
-   */
-  const appLinks = (app: LauncherApp) => {
-    // All three gates, for the one reason: never offer a click whose destination will refuse it.
-    // Only the module gate ran here before — `requireAnyCapability` was declared on the type,
-    // documented as the person-gate, and then never read on this path (the rail below applied it).
-    const sections = (LAUNCHER_SECTIONS[app.id] ?? [])
-      .filter((s) => !s.moduleSlug || isModuleAvailable(s.moduleSlug))
-      .filter((s) => !s.requireAnyCapability || s.requireAnyCapability.some(can))
-      .filter((s) => !s.requireWorkspaceAdmin || isWorkspaceManager);
-    const actions = app.active ? (LAUNCHER_ACTIONS[app.id] ?? []) : [];
-    const cap = (sections.length === 0 && actions.length === 0 && app.active) ? capabilityQuickStarts(app) : null;
-    const quickStarts = cap?.quickStarts ?? [];
-    return { sections, actions, cap, quickStarts, hasLinks: app.active && (sections.length + actions.length + quickStarts.length) > 0 };
-  };
-
   /**
    * Active apps with nothing to expand — POS, Supplier Portal, Page Monitoring, Room Planner. Their
    * card is a name and an arrow, which is a lot of hub real estate for "click here". They get
    * promoted to the top of the Jump-to rail in the primary colour instead, so the one thing you can
-   * do with them is the thing the menu offers first.
+   * do with them is the thing the menu offers first. `appLinks` is the same derivation the card
+   * renderer uses, so the card and the rail can never disagree about which apps are link-less — an
+   * app appearing in both places would be the duplicate all over again.
    */
   const directApps = useMemo(
     () => active.filter((a) => !appLinks(a).hasLinks).sort((a, b) => a.label.localeCompare(b.label)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [active, isModuleAvailable],
+    [active, appLinks],
   );
   const promotedIds = useMemo(() => new Set(directApps.map((a) => a.id)), [directApps]);
 
@@ -127,16 +88,11 @@ export const AppLauncher: React.FC = () => {
 
   // Tier two: this hub's cross-cutting shortcuts. The catch-all "More" group has no hub of its own
   // (Templates and registry modules cut across all of them), so it falls back to the global trio.
-  const hubShortcuts = useMemo(() => {
-    const set = (activeHubKey && LAUNCHER_HUB_SHORTCUTS[activeHubKey as HubId]) || LAUNCHER_SHORTCUTS;
-    return set.filter((sc) => (!sc.moduleSlug || isModuleAvailable(sc.moduleSlug))
-      && (!sc.requireAnyCapability || sc.requireAnyCapability.some(can)));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeHubKey, isModuleAvailable, can]);
+  const hubShortcuts = useMemo(() => hubShortcutsFor(activeHubKey), [activeHubKey, hubShortcutsFor]);
 
   const go = (path: string, moduleId?: string) => {
     setOpen(false);
-    if (moduleId) setRecent(pushRecent(moduleId));
+    if (moduleId) setRecent(pushRecentApp(moduleId));
     navigate(path);
   };
 
@@ -166,7 +122,7 @@ export const AppLauncher: React.FC = () => {
   // One app "card" in the middle: header (icon · name · Open/Enable) + its inner links (sections +
   // create actions, else agent quick-starts).
   const renderAppCard = (app: LauncherApp) => {
-    const { sections, actions, cap, quickStarts, hasLinks } = appLinks(app);
+    const { sections, actions, quickStarts, hasLinks } = appLinks(app);
 
     return (
       <div key={app.id} className="py-1">
@@ -219,12 +175,12 @@ export const AppLauncher: React.FC = () => {
                 <s.icon className="h-3.5 w-3.5 text-primary/80" /> {s.label}
               </button>
             ))}
-            {cap && quickStarts.map((qs) => (
+            {quickStarts.map((qs) => (
               <button
-                key={qs.label}
+                key={qs.to}
                 type="button"
                 title={qs.description}
-                onClick={() => go(`/agent-hub?capability=${cap.capId}&quickstart=${cap.toolkitId}:${encodeURIComponent(qs.label)}`, app.id)}
+                onClick={() => go(qs.to, app.id)}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-muted/60 px-2 py-1 text-[12px] text-primary hover:bg-accent/60 transition-colors"
               >
                 <Sparkles className="h-3.5 w-3.5" /> {qs.label}

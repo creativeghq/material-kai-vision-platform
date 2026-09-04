@@ -142,7 +142,12 @@ export function useLauncherApps(): LauncherApi {
         label: i.label,
         icon: i.icon,
         path: i.path,
-        description: cat?.summary || cat?.description || i.description || undefined,
+        // The TILE's own description first; the catalog row is per MODULE, and two tiles can share
+        // one module — Finance and POS both sit on `sales-finance`, so the module summary described
+        // the cash register as "Profit tracking, invoicing, payments…". The desktop card only shows
+        // this line for a link-less card, which is why it went unnoticed; the mobile panel shows it
+        // under every app.
+        description: i.description || cat?.summary || cat?.description || undefined,
         active,
         isAddon: cat?.is_addon,
         priceLabel: cat?.is_addon ? (formatAddonPrice(cat.addon_price_cents, cat.addon_currency, cat.billing_interval) || undefined) : undefined,

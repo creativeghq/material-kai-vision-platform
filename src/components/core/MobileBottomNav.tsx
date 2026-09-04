@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { MoreHorizontal, User } from 'lucide-react';
+import { LayoutGrid } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useFactoryRole } from '@/hooks/useFactoryRole';
@@ -12,19 +12,19 @@ import {
   filterNavItems,
   type SidebarNavItem,
 } from '@/config/nav-items';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/core/ui/sheet';
-import { MobileInstallButton } from './MobileInstallButton';
+import { MobileAppsMenu } from './MobileAppsMenu';
 
-/** Number of destinations shown directly in the bar; the rest fall under "More". */
+/** Number of destinations shown directly in the bar; everything else is reached through Apps. */
 const BAR_SLOTS = 4;
 
 /**
  * Native-style mobile bottom tab bar (mobile only — hidden ≥ md).
  *
- * Surfaces the highest-priority destinations within thumb reach and routes the
- * long tail through a "More" bottom sheet. Gating is identical to the desktop
- * top nav and the drawer (shared {@link filterNavItems}), so all three surfaces
- * always agree on what the active persona can see.
+ * Surfaces the highest-priority destinations within thumb reach; the fifth cell opens the Apps
+ * panel (MobileAppsMenu), which is the phone's version of the desktop Apps launcher — the same
+ * hubs, the same apps, the same inner links. Gating is identical to the desktop top nav (shared
+ * {@link filterNavItems}), so the bar, the panel and the desktop always agree on what the active
+ * persona can see.
  */
 export const MobileBottomNav: React.FC = () => {
   const location = useLocation();
@@ -32,19 +32,16 @@ export const MobileBottomNav: React.FC = () => {
   const { isAdmin, isPlatformOperator, isSupplierWorkspace } = useFactoryRole();
   const { can, isAccountant, isSalesRep, isRealEstateAgent } = usePermissions();
   const { isModuleAvailable } = useEntitlements();
-  const [moreOpen, setMoreOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
-  // Close the More sheet whenever the route changes.
+  // Close the panel whenever the route changes — including a query-only change, since a section
+  // link inside one app (?tab=ar → ?tab=ap) is a navigation too.
   useEffect(() => {
-    setMoreOpen(false);
-  }, [location.pathname]);
+    setMenuOpen(false);
+  }, [location.pathname, location.search]);
 
   const navItems = useMemo(
     () =>
-      // Every gated destination (universal top-bar surfaces + the workspace's entitled
-      // apps) lives in the bottom bar on mobile: the priority set fills the bar, the rest
-      // — including surface:'app' modules — fall under "More". The mobile top bar keeps no
-      // hamburger/App Launcher, so this is the single mobile navigation surface.
       filterNavItems(SIDEBAR_NAV_ITEMS, {
         isAdmin,
         isPlatformOperator,
@@ -58,7 +55,7 @@ export const MobileBottomNav: React.FC = () => {
     [isAdmin, isPlatformOperator, isSupplierWorkspace, isAccountant, isSalesRep, isRealEstateAgent, isModuleAvailable, can],
   );
 
-  // Order the visible items by bottom-nav priority, then split into bar + overflow.
+  // Order the visible items by bottom-nav priority; the first BAR_SLOTS fill the bar.
   const ordered = useMemo(() => {
     const byId = new Map(navItems.map((i) => [i.id, i]));
     const ranked: SidebarNavItem[] = [];
@@ -82,9 +79,12 @@ export const MobileBottomNav: React.FC = () => {
     return location.pathname.startsWith(path);
   };
 
-  // "More" is highlighted when the current route lives behind it (overflow or profile).
-  const moreActive =
-    overflowItems.some((i) => isActive(i.path)) || location.pathname.startsWith('/profile');
+  // "Apps" lights up when the current route lives behind it and NOT in the bar. The second half
+  // matters: six launcher apps live on /agent-hub?capability=…, whose pathname is the bar's own
+  // Agent Hub cell, so a prefix test alone lit both cells on every studio page.
+  const barHit = barItems.some((i) => isActive(i.path));
+  const menuActive =
+    !barHit && (overflowItems.some((i) => isActive(i.path)) || location.pathname.startsWith('/profile'));
 
   if (!user) return null;
 
@@ -135,21 +135,21 @@ export const MobileBottomNav: React.FC = () => {
           <li className="min-w-0">
             <button
               type="button"
-              onClick={() => setMoreOpen(true)}
+              onClick={() => setMenuOpen(true)}
               aria-haspopup="dialog"
-              aria-expanded={moreOpen}
+              aria-expanded={menuOpen}
               className={`flex h-full w-full min-w-0 flex-col items-center justify-center gap-1 px-0.5 transition-colors ${
-                moreActive ? 'text-primary' : 'text-muted-foreground'
+                menuActive ? 'text-primary' : 'text-muted-foreground'
               }`}
             >
               <span
                 className={`flex h-6 w-12 items-center justify-center rounded-full transition-colors ${
-                  moreActive ? 'bg-primary/15' : 'bg-transparent'
+                  menuActive ? 'bg-primary/15' : 'bg-transparent'
                 }`}
               >
-                <MoreHorizontal className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={moreActive ? 2.2 : 1.8} />
+                <LayoutGrid className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={menuActive ? 2.2 : 1.8} />
               </span>
-              <span className={`text-[10px] leading-none ${moreActive ? 'font-normal' : 'font-light'}`}>More</span>
+              <span className={`text-[10px] leading-none ${menuActive ? 'font-normal' : 'font-light'}`}>Apps</span>
             </button>
           </li>
         </ul>
@@ -157,55 +157,7 @@ export const MobileBottomNav: React.FC = () => {
         <div className="mobile-safe-bottom" />
       </nav>
 
-      <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
-        {/* The overflow list is unbounded (every entitled app lands here), so the
-            sheet scrolls rather than growing past the viewport. 3 columns at
-            390px = ~118px cells, enough for two-word labels ("Email Marketing",
-            "Interior Design") that were being mangled in 4 columns. */}
-        <SheetContent
-          side="bottom"
-          className="max-h-[80vh] overflow-y-auto rounded-t-2xl bg-sidebar border-t border-hairline pb-[max(1.5rem,env(safe-area-inset-bottom))]"
-        >
-          <SheetHeader className="text-left">
-            <SheetTitle className="font-light">Menu</SheetTitle>
-          </SheetHeader>
-          <div className="grid grid-cols-3 gap-1.5 pt-2 sm:grid-cols-4">
-            {overflowItems.map((item) => {
-              const active = isActive(item.path);
-              return (
-                <Link
-                  key={item.id}
-                  to={item.path}
-                  onClick={() => setMoreOpen(false)}
-                  aria-current={active ? 'page' : undefined}
-                  className={`flex min-h-[76px] min-w-0 flex-col items-center justify-start gap-1.5 rounded-xl px-1 py-3 text-center transition-colors ${
-                    active
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-muted-foreground hover:bg-white/5 hover:text-foreground'
-                  }`}
-                >
-                  <item.icon className="w-5 h-5 flex-shrink-0" />
-                  <span className="line-clamp-2 text-[11px] leading-tight font-light break-words">{item.label}</span>
-                </Link>
-              );
-            })}
-            <Link
-              to="/profile"
-              onClick={() => setMoreOpen(false)}
-              aria-current={location.pathname.startsWith('/profile') ? 'page' : undefined}
-              className={`flex min-h-[76px] min-w-0 flex-col items-center justify-start gap-1.5 rounded-xl px-1 py-3 text-center transition-colors ${
-                location.pathname.startsWith('/profile')
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted-foreground hover:bg-white/5 hover:text-foreground'
-              }`}
-            >
-              <User className="w-5 h-5 flex-shrink-0" />
-              <span className="line-clamp-2 text-[11px] leading-tight font-light break-words">Profile</span>
-            </Link>
-          </div>
-          <MobileInstallButton onDone={() => setMoreOpen(false)} />
-        </SheetContent>
-      </Sheet>
+      <MobileAppsMenu open={menuOpen} onOpenChange={setMenuOpen} />
     </>
   );
 };
