@@ -87,10 +87,16 @@ describe('the tenders service', () => {
 
   it('freezes the quantity onto a bid when the subcontractor is invited', () => {
     // Re-measuring the package later must not restate what somebody was asked to price.
+    //
+    // The copy now happens inside `invite_tender_bidder` (one transaction: the bid and every
+    // package line's quantity, or nothing — the two-insert version left invited bidders with no
+    // lines when the second write failed). The client's job is to call that RPC and to send no
+    // rate: the rate is the answer we are waiting for, never something the invite states.
     const code = stripComments(SERVICE);
     const fn = code.slice(code.indexOf('async invite('));
     const body = fn.slice(0, fn.indexOf('\n  },'));
-    expect(body).toContain('quantity: i.quantity');
+    expect(body).toContain("rpc('invite_tender_bidder'");
+    expect(body).not.toMatch(/from\('tender_bid_items'\)/);
     expect(body).not.toMatch(/rate:/);
   });
 

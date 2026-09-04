@@ -13,7 +13,7 @@
  * register entry would file a whole drawing set off a model's reading, and a wrong drawing number
  * stays invisible until somebody builds from the wrong sheet.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Loader2, Plus, FileStack, Download, Trash2, Eye, EyeOff, Upload, History, FileText, ScanLine,
   PenLine,
@@ -323,12 +323,28 @@ const NewDocumentDialog: React.FC<{ projectId: string; onClose: () => void; onSa
   const [clientVisible, setClientVisible] = useState(false);
   const [saving, setSaving] = useState(false);
   const [scanning, setScanning] = useState(false);
+  /**
+   * The sheet the operator scanned. It used to be dropped the moment the title block was read —
+   * `e.target.value = ''` and nothing held the File — while the help text beneath promised it
+   * would be uploaded as the first revision. Kept here so Create can keep that promise, whether
+   * or not the title block was readable.
+   */
+  const [scannedFile, setScannedFile] = useState<File | null>(null);
+  /**
+   * Create is two legs — the register entry, then the revision upload — and the second can fail
+   * after the first committed. Remembering the entry makes a retry resume at the upload instead
+   * of creating a second entry (anti-regression rule 4: resumable, and honest about which half
+   * failed).
+   */
+  const createdRef = useRef<{ id: string } | null>(null);
 
   /**
    * Read a sheet's title block and prefill the form. Nothing is written, and a field the sheet
    * does not state leaves whatever is already typed rather than blanking it.
    */
   const scan = async (file: File) => {
+    // Held before the read, not after: an unreadable title block is still the sheet to file.
+    setScannedFile(file);
     setScanning(true);
     try {
       const res = await projectDocumentsService.scanTitleBlock(projectId, file);
@@ -366,26 +382,49 @@ const NewDocumentDialog: React.FC<{ projectId: string; onClose: () => void; onSa
   const save = async () => {
     if (!title.trim()) { toast({ title: 'Title required', variant: 'destructive' }); return; }
     setSaving(true);
-    try {
-      await projectDocumentsService.createDocument(projectId, {
-        title: title.trim(),
-        drawing_number: drawingNumber,
-        kind,
-        discipline: discipline || null,
-        scale,
-        sheet_size: sheetSize,
-        client_visible: clientVisible,
-      });
-      onSaved();
-    } catch (err: any) {
-      const dup = /already uses that drawing number|duplicate key|unique/i.test(err?.message ?? '');
-      toast({
-        title: dup ? 'That drawing number is taken' : 'Failed to create',
-        description: dup ? 'Another document in this project already uses it.' : err?.message,
-        variant: 'destructive',
-      });
-      setSaving(false);
+    // Leg 1 — the register entry. Skipped on a retry that already has one, so a failed upload
+    // below never turns into a second entry (or a "drawing number is taken" error against the
+    // entry this same click created).
+    if (!createdRef.current) {
+      try {
+        createdRef.current = await projectDocumentsService.createDocument(projectId, {
+          title: title.trim(),
+          drawing_number: drawingNumber,
+          kind,
+          discipline: discipline || null,
+          scale,
+          sheet_size: sheetSize,
+          client_visible: clientVisible,
+        });
+      } catch (err: any) {
+        const dup = /already uses that drawing number|duplicate key|unique/i.test(err?.message ?? '');
+        toast({
+          title: dup ? 'That drawing number is taken' : 'Failed to create',
+          description: dup ? 'Another document in this project already uses it.' : err?.message,
+          variant: 'destructive',
+        });
+        setSaving(false);
+        return;
+      }
     }
+    // Leg 2 — the scanned sheet as revision A, which the help text above has promised since the
+    // scan shipped and nothing delivered. 'A' is the register's own first-revision default (see
+    // the upload dialog's suggestion logic). Named as the half that failed if it fails: the entry
+    // exists, and Create again resumes here.
+    if (scannedFile) {
+      try {
+        await projectDocumentsService.uploadRevision(createdRef.current.id, projectId, 'A', scannedFile);
+      } catch (err: any) {
+        toast({
+          title: 'Entry created — sheet NOT attached',
+          description: `The register entry exists, but uploading the scanned sheet failed: ${err?.message ?? 'upload failed'}. Press Create again to retry the upload only.`,
+          variant: 'destructive',
+        });
+        setSaving(false);
+        return;
+      }
+    }
+    onSaved();
   };
 
   return (
@@ -406,6 +445,15 @@ const NewDocumentDialog: React.FC<{ projectId: string; onClose: () => void; onSa
               Fills the fields below so you can check them. Nothing is saved until you press Create,
               and the file is still uploaded as the first revision afterwards.
             </p>
+            {scannedFile && (
+              <p className="mt-1 flex items-center gap-2 text-[11px]">
+                <span className="truncate">Will be filed as the first revision: <span className="font-medium">{scannedFile.name}</span></span>
+                <button type="button" className="ml-auto shrink-0 text-muted-foreground underline"
+                  onClick={() => setScannedFile(null)} disabled={saving}>
+                  Don&apos;t attach
+                </button>
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-3 gap-2">
