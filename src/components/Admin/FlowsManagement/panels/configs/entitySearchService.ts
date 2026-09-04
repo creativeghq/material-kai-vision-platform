@@ -162,6 +162,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'supplier-orders-api', label: 'supplier-orders-api', sublabel: 'Partner/ERP API for a claimed supplier to read inbound POs across all buyers and post status back' },
   { id: 'taric-classify', label: 'taric-classify', sublabel: 'Propose a TARIC commodity code for catalog products' },
   { id: 'taric-reference-sync', label: 'taric-reference-sync', sublabel: 'Import the EU TARIC goods nomenclature (Greek extract) into the reference table' },
+  { id: 'takeoff-from-drawing', label: 'takeoff-from-drawing', sublabel: 'Transcribe the schedules printed on a drawing into proposed bill-of-quantities lines — never measured, always cited' },
   { id: 'trigger-factory-enrichment', label: 'trigger-factory-enrichment', sublabel: 'Propagate factory fields within a scope and queue a factory-enrichment agent if needed' },
   { id: 'trip-expense-ops', label: 'trip-expense-ops', sublabel: 'Sales trip-expense receipts: upload, sign, and render the expense PDF' },
   { id: 'vies-validate', label: 'vies-validate', sublabel: 'Server-side EU VAT validation via the VIES REST API with optional crm_companies cache write.' },
