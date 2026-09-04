@@ -8927,6 +8927,8 @@ export type Database = {
           connector_slug: string
           created_at: string
           credits_alerted_at: string | null
+          document_id: string | null
+          document_table: string | null
           error_code: string | null
           error_message: string | null
           fiscal_invoice_type: string | null
@@ -8953,6 +8955,8 @@ export type Database = {
           connector_slug: string
           created_at?: string
           credits_alerted_at?: string | null
+          document_id?: string | null
+          document_table?: string | null
           error_code?: string | null
           error_message?: string | null
           fiscal_invoice_type?: string | null
@@ -8979,6 +8983,8 @@ export type Database = {
           connector_slug?: string
           created_at?: string
           credits_alerted_at?: string | null
+          document_id?: string | null
+          document_table?: string | null
           error_code?: string | null
           error_message?: string | null
           fiscal_invoice_type?: string | null

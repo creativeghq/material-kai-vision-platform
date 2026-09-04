@@ -260,6 +260,10 @@ Deno.serve(withApiLogging('finance-fiscal-offline-recovery', async (req) => {
           await supabase.from('fiscal_submissions').insert({
             workspace_id: r.workspace_id,
             invoice_id: table === 'invoices' ? r.id : null,
+            // Which document this verdict is ABOUT. `invoice_id` alone cannot say it for a credit
+            // note or a delivery note, and the replay guard in finance-issue-invoice reads this pair.
+            document_table: table,
+            document_id: r.id,
             connector_slug: conn.slug ?? 'novus',
             capability: 'legal_invoice',
             status: 'rejected',

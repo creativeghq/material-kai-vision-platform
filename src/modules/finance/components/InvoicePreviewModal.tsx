@@ -103,9 +103,13 @@ export function InvoicePreviewModal({
         // AADE authentication code — issued with the MARK, stored on the submission row.
         let authCode: string | null = null;
         if (invoice.fiscal_mark) {
+          // Keyed on the document itself: `invoice_id` on a credit note's submission row is the
+          // CORRELATED source invoice, so matching on it would let a credit note's code print
+          // on the invoice it corrects.
           const { data } = await supabase.from('fiscal_submissions')
             .select('authentication_code, created_at')
-            .eq('invoice_id', invoice.id)
+            .eq('document_table', 'invoices')
+            .eq('document_id', invoice.id)
             .not('authentication_code', 'is', null)
             .order('created_at', { ascending: false })
             .limit(1).maybeSingle();

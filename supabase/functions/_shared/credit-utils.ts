@@ -623,10 +623,19 @@ export async function recordExternalServiceOutcome(
 ): Promise<void> {
   if (!usageLogId) return;
   try {
-    const { data: row } = await supabase
+    // Supabase resolves with `{ error }` rather than throwing, so the try/catch alone saw
+    // nothing. A refused read left `meta` empty and the update then OVERWROTE the row's
+    // metadata with just `{success}`; a refused update left `success` unset while the caller
+    // believed the outcome was recorded — which is exactly the state the provider-failure
+    // probe cannot distinguish from a quiet week.
+    const { data: row, error: readErr } = await supabase
       .from('ai_usage_logs').select('metadata').eq('id', usageLogId).maybeSingle();
+    if (readErr) {
+      console.warn('[credit-utils] could not read usage row to stamp outcome:', { usageLogId, error: readErr.message });
+      return;
+    }
     const meta = ((row as { metadata?: Record<string, unknown> } | null)?.metadata ?? {}) as Record<string, unknown>;
-    await supabase
+    const { error: writeErr } = await supabase
       .from('ai_usage_logs')
       .update({
         metadata: {
@@ -636,6 +645,9 @@ export async function recordExternalServiceOutcome(
         },
       })
       .eq('id', usageLogId);
+    if (writeErr) {
+      console.warn('[credit-utils] could not stamp service outcome:', { usageLogId, ok, error: writeErr.message });
+    }
   } catch (e) {
     console.warn('[credit-utils] could not record service outcome (non-fatal):', (e as Error)?.message);
   }

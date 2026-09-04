@@ -46,6 +46,7 @@ import { authenticate, listUserWorkspaceIds } from '../_shared/auth.ts';
 import { isWorkspaceEntitled } from '../_shared/entitlement.ts';
 import { pickTag, pickAllTagBlocks } from '../_shared/aade/soap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
+import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -303,6 +304,32 @@ Deno.serve(withApiLogging('finance-mydata-book', async (req) => {
     if (!auth.success) throw new HttpError(401, 'unauthorized');
     allowedWorkspaceIds = await listUserWorkspaceIds(supabase, auth.userId);
     if (allowedWorkspaceIds.length === 0) return json({ ok: true, skipped: 'no_member_workspaces' });
+
+    // `authenticate(allowedRoles)` passes if the caller holds a finance role ANYWHERE, but
+    // membership is not a finance role: a user who is `finance` in workspace A and a plain
+    // `member` in workspace B would otherwise trigger B's AADE pull and read its outcome —
+    // another tenant's tax position, through a service-role query filtered only by membership.
+    // A platform admin legitimately sees everything; everyone else is narrowed to the
+    // workspaces where they actually hold the finance capability.
+    const { data: prof } = await supabase
+      .from('user_profiles')
+      .select('roles!user_profiles_role_id_fkey(name)')
+      .eq('user_id', auth.userId)
+      .maybeSingle();
+    const globalRole = (prof as { roles?: { name?: string } } | null)?.roles?.name;
+    if (!globalRole || !['admin', 'super_admin'].includes(globalRole)) {
+      const { data: memberships, error: memErr } = await supabase
+        .from('workspace_members')
+        .select('workspace_id, role')
+        .eq('user_id', auth.userId)
+        .eq('status', 'active')
+        .in('role', ['owner', 'admin', 'accountant'])
+        .in('workspace_id', allowedWorkspaceIds);
+      // Fail closed: an unreadable membership list is not "no restrictions".
+      if (memErr) throw new HttpError(503, 'Could not verify your finance access for these workspaces.');
+      allowedWorkspaceIds = (memberships ?? []).map((m) => m.workspace_id as string);
+      if (allowedWorkspaceIds.length === 0) return json({ ok: true, skipped: 'no_finance_workspaces' });
+    }
   }
 
   // Window. The cron refreshes the current year to date; a manual refresh names its own.
@@ -330,9 +357,16 @@ Deno.serve(withApiLogging('finance-mydata-book', async (req) => {
     .not('aade_user_id', 'is', null)
     .not('subscription_key', 'is', null);
   if (allowedWorkspaceIds) credsQuery = credsQuery.in('workspace_id', allowedWorkspaceIds);
-  const { data: creds } = await credsQuery;
+  const { data: creds, error: credsErr } = await credsQuery;
 
-  if (!creds || creds.length === 0) {
+  // A FAILED read is not an empty one. Ignoring `error` here turned an RLS denial, a schema
+  // change or a transient PostgREST fault into "AADE codes not set" — an explicit, confident,
+  // wrong reason that nobody investigates, over a collector that never ran.
+  if (credsErr) {
+    throw new HttpError(503, `Could not read the myDATA connection settings: ${credsErr.message}`);
+  }
+
+  if (creds.length === 0) {
     // "Not connected" is a stated reason, not an empty success — the UI renders it as such.
     return json({ ok: true, skipped: 'not_connected', workspaces: [] });
   }
@@ -363,7 +397,29 @@ Deno.serve(withApiLogging('finance-mydata-book', async (req) => {
     }
 
     const attemptAt = new Date().toISOString();
-    const baseUrl = (c.base_url as string | null) || defaultBase;
+    // `base_url` is tenant-writable (Profile → Keys, BYOK), and this function runs under the
+    // service role, so an unchecked value is a server-side fetch of a user-supplied URL —
+    // invariant 7. https-only, and the guard resolves DNS and refuses RFC1918 / loopback /
+    // link-local / 169.254.169.254. A refused URL is a COLLECTOR FAILURE for that workspace,
+    // never a silent skip and never a zeroed month.
+    const rawBase = (c.base_url as string | null) || defaultBase;
+    let baseUrl: string;
+    try {
+      baseUrl = await assertSafeUrl(rawBase, { allowSchemes: ['https:'] });
+    } catch (e) {
+      const reason = `Refused to fetch the configured myDATA endpoint: ${(e as Error).message}`;
+      // Same verdict shape as any other collector failure: the stored figures stay untouched and
+      // the state says WHY, so this can never read as a month with nothing in it.
+      await writeSyncState({
+        workspace_id: workspaceId,
+        last_attempt_at: attemptAt,
+        last_status: 'collector_failed',
+        source_errors: { error: reason },
+        updated_at: attemptAt,
+      });
+      summary.push({ workspaceId, error: reason });
+      continue;
+    }
     const result = await collectBook(baseUrl, { aade_user_id: c.aade_user_id, subscription_key: c.subscription_key }, dateFrom, dateTo);
 
     if (!result.ok) {

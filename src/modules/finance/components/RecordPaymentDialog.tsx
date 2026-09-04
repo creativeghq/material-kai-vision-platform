@@ -173,6 +173,23 @@ export const RecordPaymentDialog: React.FC<{
    * property of the order and not of the screen.
    */
   const [issueOffer, setIssueOffer] = useState<{ kind: SalesDocumentKind; reason: string } | null>(null);
+
+  // The fiscal choice is only meaningful while there is an order to issue against and an offer
+  // saying which document it can be. `issueChoice` used to survive re-picking "For" to `None` or
+  // to a target with no offer: the select still read "Issue an invoice", the copy still promised
+  // a myDATA transmission, and submit — gated on `issueOffer && effectiveOrderId` — quietly
+  // recorded the payment alone under the plain success toast. Drop back to the safe default the
+  // moment the choice stops being backed by anything.
+  useEffect(() => {
+    if (!issuesFiscal) return;
+    const unsupported =
+      !issueOffer || !effectiveOrderId
+      // A receipt can be downgraded from an invoice offer; an invoice cannot be conjured from a
+      // receipt-only one.
+      || (issueChoice === 'fiscal_invoice' && issueOffer.kind !== 'invoice');
+    if (unsupported) setIssueChoice('payment_receipt');
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reacts to the offer/target, not to its own reset
+  }, [issueOffer, effectiveOrderId]);
   useEffect(() => {
     if (!open || kind !== 'received' || !effectiveOrderId) { setIssueOffer(null); return; }
     let cancelled = false;
@@ -526,6 +543,12 @@ export const RecordPaymentDialog: React.FC<{
        * is not right is silence.
        */
       let issueDocError: string | null = null;
+      // Fail closed if the screen still promises a fiscal document the state cannot deliver. The
+      // effect above should make this unreachable; if it is reached, the honest outcome is the
+      // NOT-issued toast below, never a clean "Payment recorded".
+      if (issuesFiscal && !(issueOffer && effectiveOrderId)) {
+        issueDocError = 'No order is selected to issue the document against. The payment was recorded; the document was not issued.';
+      }
       if (issuesFiscal && issueOffer && effectiveOrderId) {
         try {
           await financeService.issueSalesDocumentForOrder(effectiveOrderId, pickedFiscalKind);

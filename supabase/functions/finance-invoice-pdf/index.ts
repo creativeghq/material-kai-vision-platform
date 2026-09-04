@@ -180,7 +180,7 @@ const LABELS: Record<Lang, Record<string, string>> = {
 import {
   type PaymentMethod, isPaymentMethod, mydataPaymentLabel,
 } from '../_shared/paymentVocabulary.generated.ts';
-import { movePurposeLabel } from '../_shared/fiscal/fiscalVocabulary.generated.ts';
+import { movePurposeLabel, MYDATA_MOVE_PURPOSE_OTHER } from '../_shared/fiscal/fiscalVocabulary.generated.ts';
 
 const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   bank_transfer: 'Bank transfer', cash: 'Cash', card: 'Card', check: 'Check', iris: 'IRIS', other: 'Other',
@@ -505,9 +505,14 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
     // It belongs on the printed document: it is what verifies the document off-line.
     let authCode: string | null = null;
     if (inv.fiscal_mark && kind !== 'delivery_note') {
+      // Keyed on the document ITSELF, not on the correlated source invoice. Keying on
+      // `invoice_id` meant a credit note and the invoice it corrects shared one lookup: after
+      // issuing invoice I and credit notes C1 and C2 against it, this returned the newest
+      // submission for I — so I could print C2's authentication code beside I's own MARK.
       const { data } = await supabase.from('fiscal_submissions')
         .select('authentication_code, created_at')
-        .eq('invoice_id', kind === 'credit_note' ? (row as any).invoice_id ?? docId : docId)
+        .eq('document_table', kind === 'credit_note' ? 'credit_notes' : 'invoices')
+        .eq('document_id', docId)
         .not('authentication_code', 'is', null)
         .order('created_at', { ascending: false })
         .limit(1).maybeSingle();
@@ -618,6 +623,22 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; add
   const { inv, items, fs, customer, addressUnit, authCode, branch, lang, logo, spec, colors, priorBalance, payUrl, rfCode } = d;
   const L = LABELS[lang];
   const isCommercial = spec.headerStyle === 'commercial';
+
+  /**
+   * The movement purpose as the customer's copy must state it — ONE builder for both layouts.
+   * Two things were wrong: the commercial layout printed no purpose at all (only the
+   * non-commercial block did), and neither printed the free text behind code 19, so a document
+   * transmitted to AADE as "19 — Loan for use to subcontractor" read "Other transfers" on paper.
+   * The printed document states what the transmitted one states, whichever template was picked.
+   */
+  const movePurposeLine = (): string => {
+    if (!inv.move_purpose) return '';
+    const label = movePurposeLabel(inv.move_purpose, lang);
+    const other = Number(inv.move_purpose) === MYDATA_MOVE_PURPOSE_OTHER
+      ? String(inv.other_move_purpose_title ?? '').trim()
+      : '';
+    return `${L.purpose}: ${other ? `${label} — ${other}` : label}`;
+  };
   // Effective notes: the invoice's own notes, else the workspace default footer
   // (finance_settings.default_invoice_notes) — so documents created outside the
   // New Invoice dialog (POS, order→invoice, storefront) still print the footer.
@@ -818,6 +839,7 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; add
             inv.ship_to ? `${L.deliveryPlace}: ${inv.ship_to}` : '',
             inv.ship_from ? `${L.loadingPlace}: ${inv.ship_from}` : '',
             inv.vehicle_number ? `${L.vehicle}: ${inv.vehicle_number}` : '',
+            movePurposeLine(),
           ].filter(Boolean)
         : custLines;
     const columns: [BadgeGlyph, string, string, string[]][] = [
@@ -1311,8 +1333,9 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; add
       inv.ship_from ? `${L.loadingPlace}: ${inv.ship_from}` : '',
       inv.ship_to ? `${L.deliveryPlace}: ${inv.ship_to}` : '',
       inv.vehicle_number ? `${L.vehicle}: ${inv.vehicle_number}` : '',
-      // The NAME, not the bare code — the twin of the same line in renderData.ts.
-      inv.move_purpose ? `${L.purpose}: ${movePurposeLabel(inv.move_purpose, lang)}` : '',
+      // The NAME, not the bare code, plus the free text behind code 19 — the twin of the same
+      // line in renderData.ts.
+      movePurposeLine(),
     ].filter(Boolean);
     for (const m of mv) { text(m, M, y, 8.5, font, MUTED); y -= 11; }
     y -= 4;

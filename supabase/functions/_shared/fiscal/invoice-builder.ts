@@ -645,7 +645,18 @@ export async function buildCreditNoteInputFromDb(
       totalStampDutyAmount: sumLines((l) => l.stampDutyAmount),
       totalOtherTaxesAmount: sumLines((l) => l.otherTaxesAmount),
       totalDeductionsAmount: sumLines((l) => l.deductionsAmount),
-      totalGrossValue: round2(totalNet + totalVat),
+      // The same formula the invoice path uses, over the same summed lines. It was net + VAT,
+      // which contradicted the five component totals declared immediately above it: a credit note
+      // reversing a line with withholding transmitted a gross nobody could reconstruct from its
+      // own rows. A credit note is the invoice it corrects, in reverse — including this sum.
+      totalGrossValue: round2(
+        totalNet + totalVat
+        + sumLines((l) => l.feesAmount)
+        + sumLines((l) => l.stampDutyAmount)
+        + sumLines((l) => l.otherTaxesAmount)
+        - sumLines((l) => l.withheldAmount)
+        - sumLines((l) => l.deductionsAmount),
+      ),
       incomeClassificationType: defaultIncType,
       incomeClassificationCategory: defaultIncCat,
     },

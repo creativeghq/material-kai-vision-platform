@@ -45,9 +45,17 @@ export const ProjectCategoryManager: React.FC<Props> = ({ workspaceId, onClose, 
   const [renaming, setRenaming] = useState<{ id: string; label: string } | null>(null);
 
   const load = useCallback(async () => {
-    const rows = await projectCategoriesService.list(workspaceId).catch(() => [] as ProjectCategory[]);
-    setCategories(rows);
-  }, [workspaceId]);
+    // A failed read is not an empty list. `.catch(() => [])` rendered an RLS refusal, a network
+    // fault or a broken query as "this workspace has no categories", and the operator then
+    // reasoned against a set that was never loaded. `null` keeps the loading state; the toast
+    // says what actually happened.
+    try {
+      setCategories(await projectCategoriesService.list(workspaceId));
+    } catch (e) {
+      setCategories(null);
+      toast({ title: 'Could not load categories', description: (e as Error).message, variant: 'destructive' });
+    }
+  }, [workspaceId, toast]);
 
   useEffect(() => { void load(); }, [load]);
 

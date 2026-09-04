@@ -11,7 +11,7 @@ import { resolvePrintedCounterparty, applyAddressUnit, partyAddressLines } from 
 import { round2 as r2 } from '@/utils/decimal';
 import { vatOf } from '@/modules/finance/lib/vatMath';
 import { mydataExemptionLabel } from '@/lib/mydataExemptionCategories';
-import { movePurposeLabel } from '@/services/fiscal/fiscalVocabulary';
+import { movePurposeLabel, MYDATA_MOVE_PURPOSE_OTHER } from '@/services/fiscal/fiscalVocabulary';
 
 export interface BuildRenderInput {
   invoice: Record<string, any>;
@@ -247,7 +247,16 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
       inv.vehicle_number ? `${L.vehicle}: ${inv.vehicle_number}` : '',
       // The NAME, not the bare code. "Purpose: 7" tells the reader of a movement document
       // nothing; the driver and the inspector holding it need the words.
-      inv.move_purpose ? `${L.purpose}: ${movePurposeLabel(inv.move_purpose, lang)}` : '',
+      // The name, plus the free text behind code 19 — twin of movePurposeLine() in the PDF edge
+      // function. Purpose 19 is transmitted WITH `otherMovePurposeTitle`; printing only the
+      // generic label made the paper say less than the envelope.
+      inv.move_purpose
+        ? `${L.purpose}: ${movePurposeLabel(inv.move_purpose, lang)}${
+          Number(inv.move_purpose) === MYDATA_MOVE_PURPOSE_OTHER && String(inv.other_move_purpose_title ?? '').trim()
+            ? ` — ${String(inv.other_move_purpose_title).trim()}`
+            : ''
+        }`
+        : '',
     ].filter(Boolean) as string[];
     if (sr.length) shipping = { rows: sr };
   }

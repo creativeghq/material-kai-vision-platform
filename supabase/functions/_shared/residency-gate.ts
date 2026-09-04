@@ -150,10 +150,25 @@ export function assertTransferAllowed(
   };
 }
 
-/** True when the configured endpoint is one of Alibaba's EU-scoped hosts. */
+/** Alibaba's EU-scoped host. Frankfurt workspaces are `{workspaceId}.<this>`. */
+const EEA_HOST = 'eu-central-1.maas.aliyuncs.com';
+
+/**
+ * True when the configured endpoint is one of Alibaba's EU-scoped hosts.
+ *
+ * Compares the parsed HOSTNAME, never the raw string. The previous test ran the region pattern
+ * against the whole URL, so `https://x.eu-central-1.maas.aliyuncs.com.evil.example/v1` — and
+ * equally a query string mentioning the region — was read as EEA, and personal data that should
+ * have been blocked was sent to whoever owned that domain. A URL that will not parse is not
+ * an EEA endpoint: this gate fails closed, because the caller uses `false` to mean "block".
+ */
 export function isEeaEndpoint(baseUrl: string | undefined | null): boolean {
   if (!baseUrl) return false;
-  // Frankfurt workspaces are `{workspaceId}.eu-central-1.maas.aliyuncs.com`. Matching
-  // on the REGION segment rather than a full host, because the workspace id varies.
-  return /(^|\.)eu-central-1\.maas\.aliyuncs\.com/i.test(baseUrl);
+  let host: string;
+  try {
+    host = new URL(baseUrl).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  return host === EEA_HOST || host.endsWith(`.${EEA_HOST}`);
 }

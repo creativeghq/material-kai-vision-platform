@@ -22,6 +22,7 @@ import { messageUrls } from '../_shared/messageLinks.generated.ts';
 import { fetchTextGuarded, SSRFError } from '../_shared/fetch-image.ts';
 import { getTrustedClientIp } from '../_shared/client-ip.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
+import { addCalendarDays } from '../_shared/calendar.ts';
 import { sha256hex } from '../_shared/hash.ts';
 import { wrapUntrusted } from '../_shared/untrusted.ts';
 import {
@@ -3247,7 +3248,11 @@ async function handleJwtAction(
         if (!Number.isFinite(days) || days <= 0 || days > 365) {
           throw new HttpError(400, 'days must be between 1 and 365');
         }
-        at = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+        // A calendar-day step, not `days * 86_400_000`: a DST day is 23 or 25 hours, so the
+        // millisecond form lands "same time in 3 days" an hour off across the change. Stepped in
+        // the operator's timezone (Europe/Athens for every workspace today — there is no
+        // per-workspace business timezone yet, and a UTC step would be the same defect renamed).
+        at = addCalendarDays(new Date(), Math.round(days), 'Europe/Athens');
       } else {
         throw new HttpError(400, 'at or days is required');
       }

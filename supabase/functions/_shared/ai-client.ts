@@ -1617,6 +1617,18 @@ export async function generateVideoWithSeedance(
     throw new Error('ARK_API_KEY is not configured — cannot generate with Seedance 2.5');
   }
 
+  // The same floor Wan applies to the same kind of input. A video prompt is free text a user
+  // typed, and SEEDANCE_BASE_URL is BytePlus Singapore — hardcoded, so unlike Wan there is no
+  // configuration under which this destination is inside the EEA. Wan blocked a prompt carrying
+  // an email/IBAN/phone and this path sent it; identical data, two different answers.
+  const seedanceVerdict = assertTransferAllowed([prompt], {
+    destinationIsEea: false,
+    providerLabel: 'Seedance 2.5 (BytePlus, Singapore)',
+  });
+  if (!seedanceVerdict.allowed) {
+    throw new Error(seedanceVerdict.message ?? 'Blocked: personal data may not leave the EEA.');
+  }
+
   const bytedance = createByteDance({ apiKey, baseURL: SEEDANCE_BASE_URL });
 
   // Ark accepts a public URL verbatim (the SDK only data-URI-encodes bytes), so the source

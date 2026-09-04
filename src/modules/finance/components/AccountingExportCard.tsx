@@ -61,8 +61,10 @@ export const AccountingExportCard: React.FC<{ workspaceId: string }> = ({ worksp
         ]);
         const summary = accountingExportService.summarize(sales, purchases);
         if (!summary.length) { toast({ title: 'No documents in this period' }); return; }
-        const csv = toCsv(['Section', 'VAT rate', 'Net', 'VAT', 'Documents'],
-          summary.map((s) => [s.section, s.rate, s.net.toFixed(2), s.vat.toFixed(2), s.docs]));
+        // Currency is a column, not a footnote: the summary is grouped by it, so a two-currency
+        // period exports two rows per rate rather than one figure nobody can reconcile.
+        const csv = toCsv(['Section', 'VAT rate', 'Currency', 'Net', 'VAT', 'Documents'],
+          summary.map((s) => [s.section, s.rate, s.currency, s.net.toFixed(2), s.vat.toFixed(2), s.docs]));
         downloadCsv(`mydata-vat-summary_${tag}.csv`, csv);
         toast({ title: 'VAT summary exported' });
       }

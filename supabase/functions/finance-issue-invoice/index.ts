@@ -320,6 +320,68 @@ async function isFinanceManagerForQuote(
   return wsManager || globalManager;
 }
 
+export type DocumentTable = 'invoices' | 'credit_notes' | 'delivery_notes';
+
+interface AcceptedSubmission {
+  status: string;
+  mark: string | null;
+  uid: string | null;
+  qr_url: string | null;
+  invoice_url: string | null;
+  connector_slug: string | null;
+  is_offline: boolean | null;
+}
+
+/**
+ * Has this EXACT document already been accepted by the authority?
+ *
+ * Keyed on (document_table, document_id), not on `invoice_id`: a credit note stores the SOURCE
+ * invoice's id there, so keying on it would let one invoice's submission answer for its credit
+ * note and vice versa.
+ *
+ * `failed` is deliberately distinct from "no row". A read that errored means we do not KNOW
+ * whether the document was sent, and a caller must treat that as "do not send" — the whole point
+ * of the guard is that transmitting twice cannot be undone.
+ */
+async function findAcceptedSubmission(
+  supabase: DbClient,
+  documentTable: DocumentTable,
+  documentId: string,
+): Promise<{ row: AcceptedSubmission | null; failed: boolean }> {
+  const { data, error } = await supabase
+    .from('fiscal_submissions')
+    .select('status, mark, uid, qr_url, invoice_url, connector_slug, is_offline')
+    .eq('document_table', documentTable)
+    .eq('document_id', documentId)
+    .in('status', ['accepted', 'offline'])
+    .order('created_at', { ascending: false })
+    .limit(1);
+  if (error) return { row: null, failed: true };
+  return { row: (data?.[0] as AcceptedSubmission | undefined) ?? null, failed: false };
+}
+
+/**
+ * Put the MARK back on a document whose transmission succeeded but whose stamp write was lost.
+ * Reads from the durable submission row, so it cannot invent a fiscal fact.
+ */
+async function stampInvoiceFromSubmission(
+  supabase: DbClient,
+  invoiceId: string,
+  sub: AcceptedSubmission,
+): Promise<void> {
+  await supabase
+    .from('invoices')
+    .update({
+      fiscal_status: sub.status,
+      fiscal_mark: sub.mark,
+      fiscal_uid: sub.uid,
+      fiscal_qr_url: sub.qr_url,
+      fiscal_connector_slug: sub.connector_slug,
+      fiscal_error: null,
+    })
+    .eq('id', invoiceId);
+}
+
 Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
@@ -438,6 +500,8 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
         await supabase.from('fiscal_submissions').insert({
           workspace_id: (sig as any).workspace_id,
           invoice_id: (sig as any).invoice_id,
+          document_table: 'invoices',
+          document_id: (sig as any).invoice_id,
           connector_slug: resolved.resolved.slug,
           capability: 'legal_invoice',
           status: completion.ok ? 'accepted' : 'error',
@@ -477,7 +541,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
     // here we transmit it to the legal_invoice connector and stamp the MARK back.
     if (body.credit_note_id) {
       const { data: cnRow } = await supabase
-        .from('credit_notes').select('workspace_id, fiscal_status, invoice_id')
+        .from('credit_notes').select('id, workspace_id, fiscal_status, invoice_id')
         .eq('id', body.credit_note_id).maybeSingle();
       if (!cnRow) return json({ error: 'credit note not found' }, 404);
       if (!(await userCanAccessWorkspace(supabase, auth.userId, cnRow.workspace_id))) {
@@ -486,6 +550,24 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
 
       if (cnRow.fiscal_status === 'accepted') {
         return json({ ok: true, credit_note_id: body.credit_note_id, fiscal: { ok: true, skipped: true, reason: 'already_accepted' } });
+      }
+
+      // Same claim as the invoice path: the SUBMISSION is the record of what ΑΑΔΕ was told, and
+      // `credit_notes.fiscal_status` is written after the connector returns. A credit note reverses
+      // a real document — sending it twice credits the customer twice.
+      const cnPrior = await findAcceptedSubmission(supabase, 'credit_notes', cnRow.id);
+      if (cnPrior.failed) {
+        return json({ ok: false, code: 'submission_history_unavailable',
+          error: 'Could not read the transmission history for this credit note, so it was not re-sent. Try again.' }, 503);
+      }
+      if (cnPrior.row) {
+        await supabase.from('credit_notes').update({
+          fiscal_status: cnPrior.row.status,
+          fiscal_mark: cnPrior.row.mark,
+          fiscal_uid: cnPrior.row.uid,
+        }).eq('id', body.credit_note_id);
+        return json({ ok: true, credit_note_id: body.credit_note_id,
+          fiscal: { ok: true, skipped: true, reason: 'already_transmitted_stamp_repaired', mark: cnPrior.row.mark } });
       }
 
       const { data: entitled } = await supabase.rpc('is_workspace_entitled', {
@@ -512,6 +594,12 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
         await supabase.from('fiscal_submissions').insert({
           workspace_id: cnRow.workspace_id,
           invoice_id: cnRow.invoice_id, // correlated source invoice, for audit linkage
+          // ...and this is the document that was actually transmitted. Without the pair, the PDF's
+          // authentication-code lookup could hand invoice I the code belonging to its credit note.
+          document_table: 'credit_notes',
+          // The loaded row's id, not the body's: cnRow was fetched by that id and its workspace was
+          // ownership-checked above, so this is the verified value (sameWorkspaceFkSweep).
+          document_id: cnRow.id,
           connector_slug: resolved.resolved.slug,
           capability: 'legal_invoice',
           status: result.status,
@@ -562,7 +650,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
     // transmit the movement document and stamp the MARK back onto delivery_notes.
     if (body.delivery_note_id) {
       const { data: dnRow } = await supabase
-        .from('delivery_notes').select('workspace_id, fiscal_status')
+        .from('delivery_notes').select('id, workspace_id, fiscal_status')
         .eq('id', body.delivery_note_id).maybeSingle();
       if (!dnRow) return json({ error: 'delivery note not found' }, 404);
       if (!(await userCanAccessWorkspace(supabase, auth.userId, dnRow.workspace_id))) {
@@ -571,6 +659,22 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
 
       if (dnRow.fiscal_status === 'accepted') {
         return json({ ok: true, delivery_note_id: body.delivery_note_id, fiscal: { ok: true, skipped: true, reason: 'already_accepted' } });
+      }
+
+      // A movement document transmitted twice is two movements on the record for one lorry.
+      const dnPrior = await findAcceptedSubmission(supabase, 'delivery_notes', dnRow.id);
+      if (dnPrior.failed) {
+        return json({ ok: false, code: 'submission_history_unavailable',
+          error: 'Could not read the transmission history for this delivery note, so it was not re-sent. Try again.' }, 503);
+      }
+      if (dnPrior.row) {
+        await supabase.from('delivery_notes').update({
+          fiscal_status: dnPrior.row.status,
+          fiscal_mark: dnPrior.row.mark,
+          fiscal_uid: dnPrior.row.uid,
+        }).eq('id', body.delivery_note_id);
+        return json({ ok: true, delivery_note_id: body.delivery_note_id,
+          fiscal: { ok: true, skipped: true, reason: 'already_transmitted_stamp_repaired', mark: dnPrior.row.mark } });
       }
 
       const { data: entitled } = await supabase.rpc('is_workspace_entitled', {
@@ -596,6 +700,8 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
 
         await supabase.from('fiscal_submissions').insert({
           workspace_id: dnRow.workspace_id,
+          document_table: 'delivery_notes',
+          document_id: dnRow.id,
           connector_slug: resolved.resolved.slug,
           capability: 'legal_invoice',
           status: result.status,
@@ -716,8 +822,37 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
         p_module_slug: 'sales-finance',
       });
 
-      if (invRow?.fiscal_status === 'accepted') {
+      // The claim is the SUBMISSION, not the document's status column.
+      //
+      // `invoices.fiscal_status` is written AFTER the connector returns. If that write is lost —
+      // RLS, a dropped connection, a transient PostgREST failure — the document still reads
+      // "not accepted" while ΑΑΔΕ holds a MARK for it, and the operator, told it failed, presses
+      // the button again. That mints a SECOND legal document for one sale. Anti-regression rule 4:
+      // the duplicate guard reads the row written on the SUCCESS path, never the status column
+      // written after it.
+      const prior = await findAcceptedSubmission(supabase, 'invoices', invoiceId);
+      if (prior.failed) {
+        // Cannot prove the document was NOT already sent. Refusing is the only safe answer:
+        // the cost of a wrong "no" is a retry, the cost of a wrong "yes" is a duplicate filing.
+        fiscalResult = {
+          ok: false,
+          code: 'submission_history_unavailable',
+          error: 'Could not read this document\'s transmission history, so it was not re-sent. Try again.',
+        };
+      } else if (invRow?.fiscal_status === 'accepted') {
         fiscalResult = { ok: true, skipped: true, reason: 'already_accepted' };
+      } else if (prior.row) {
+        // Transmitted, but the stamp never landed. Repair the document from the durable record
+        // instead of calling ΑΑΔΕ again, and say so rather than reporting a fresh success.
+        await stampInvoiceFromSubmission(supabase, invoiceId, prior.row);
+        fiscalResult = {
+          ok: true,
+          skipped: true,
+          reason: 'already_transmitted_stamp_repaired',
+          status: prior.row.status,
+          mark: prior.row.mark,
+          uid: prior.row.uid,
+        };
       } else if (!entitled) {
         fiscalResult = {
           ok: false,
@@ -756,6 +891,8 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
             await supabase.from('fiscal_submissions').insert({
               workspace_id: invRow!.workspace_id,
               invoice_id: invoiceId,
+              document_table: 'invoices',
+              document_id: invoiceId,
               connector_slug: resolved.resolved.slug,
               capability: 'legal_invoice',
               status: result.status,
@@ -804,7 +941,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
 
             const accepted = result.status === 'accepted' || result.status === 'offline';
             if (accepted) {
-              await supabase
+              const { error: stampErr } = await supabase
                 .from('invoices')
                 .update({
                   fiscal_status: result.status,
@@ -816,6 +953,22 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
                   fiscal_error: null,
                 })
                 .eq('id', invoiceId);
+              // The document IS transmitted; ΑΑΔΕ holds a MARK for it whatever this row says.
+              // Report the stamp failure rather than swallowing it, and say plainly that the
+              // document was sent — the submission row above is the durable record, and the
+              // retry guard reads it, so pressing the button again repairs instead of re-sending.
+              if (stampErr) {
+                console.error('fiscal stamp write FAILED after a successful transmission', {
+                  invoiceId, mark: result.mark, stampErr,
+                });
+                fiscalResult = {
+                  ok: true,
+                  ...result,
+                  stamp_failed: true,
+                  warning: 'The document was transmitted and accepted, but recording the MARK on it failed. '
+                    + 'It has NOT been sent twice — re-issuing will repair the record.',
+                };
+              }
             } else {
               // Keep the refusal reason ON the document, not only in fiscal_submissions —
               // otherwise the invoice page can say "rejected" but never why.
@@ -831,7 +984,9 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
             // the document did not transmit.
             if (!accepted) await reserve!.refund();
 
-            fiscalResult = { ok: true, ...result };
+            // Preserve a stamp_failed verdict set above: overwriting it here would report a
+            // clean success for a document whose record is knowingly incomplete.
+            fiscalResult = fiscalResult?.stamp_failed ? fiscalResult : { ok: true, ...result };
             } // end non-awaiting_payment branch
           } catch (err: any) {
             await reserve!.refund();

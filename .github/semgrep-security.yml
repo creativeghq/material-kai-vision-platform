@@ -374,6 +374,12 @@ rules:
         - "/src/**"
       exclude:
         - "/src/utils/datetime.ts"
+    # Deliberately narrow, and it stays narrow. The defect is reading the UTC calendar day of
+    # NOW; it is not `toISOString().slice(0,10)` in general. Date-only arithmetic that anchors on
+    # `...T00:00:00Z` and steps with setUTC* is CORRECT to serialise this way, and four such sites
+    # exist in src/ today (nextRecurrenceDate, dueFromTerms, toDayString, createStandardTranches).
+    # Widening `new Date()` to `$D` convicts all four and teaches people to add nosemgrep to
+    # correct code, which is worse than the gap it closes.
     pattern-either:
       - pattern: new Date().toISOString().slice(0, 10)
       - pattern: new Date().toISOString().substring(0, 10)

@@ -347,6 +347,17 @@ const PosPage: React.FC = () => {
     const override = parseFloat(display);
     const usePrice = Number.isFinite(override) && override > 0 ? round2(override) : it.unit_price;
     const qty = pendingQty ?? 1;
+    // One receipt, one currency. `currency` below is taken from cart[0] and the whole basket is
+    // issued under it, so a EUR line followed by a USD line would print and file the USD price
+    // as EUR — a wrong total that is a perfectly valid number. Refuse the line instead.
+    if (cart.length > 0 && it.currency && it.currency !== currency) {
+      toast({
+        title: 'Different currency',
+        description: `This basket is in ${currency}. Finish or clear it before selling a ${it.currency} item.`,
+        variant: 'destructive',
+      });
+      return;
+    }
     setCart((c) => {
       if (!Number.isFinite(override) || override <= 0) {
         const ex = c.find((l) => l.id === it.id);
@@ -407,6 +418,18 @@ const PosPage: React.FC = () => {
   const issue = async () => {
     if (!activeWorkspaceId || cart.length === 0) return;
     if (issuingRef.current) return;
+    // Fail closed at the point of issue, not only where lines are added. `p_currency` below is a
+    // single value for every line, so a basket that somehow holds two currencies would file a
+    // legal receipt stating the wrong one — and a fiscal document cannot be taken back.
+    const basketCurrencies = new Set(cart.map((l) => l.currency).filter(Boolean));
+    if (basketCurrencies.size > 1) {
+      toast({
+        title: 'Mixed currencies in this basket',
+        description: `A receipt states one currency, and this basket holds ${[...basketCurrencies].join(' and ')}. Split it into one sale per currency.`,
+        variant: 'destructive',
+      });
+      return;
+    }
     issuingRef.current = true;
     setIssuing(true);
     try {

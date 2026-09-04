@@ -23,6 +23,9 @@ export interface JournalRow {
   net: number;
   vat: number;
   total: number;
+  /** The document's own currency. A VAT summary that groups without it adds EUR to USD and
+   *  reports one currencyless figure to the accountant. */
+  currency: string;
   rate: number | null;     // effective VAT rate (vat/net) for the summary
   mark: string;            // myDATA MARK / external mark
   status: string;
@@ -79,11 +82,11 @@ export const accountingExportService = {
      */
     const [invRes, cnRes] = await Promise.all([
       supabase.from('invoices')
-        .select('document_type, internal_number, legal_number, series, customer_company_id, customer_contact_id, subtotal_net, vat_amount, total, fiscal_mark, fiscal_status, status, issued_at')
+        .select('document_type, internal_number, legal_number, series, customer_company_id, customer_contact_id, subtotal_net, vat_amount, total, currency, fiscal_mark, fiscal_status, status, issued_at')
         .eq('workspace_id', workspaceId).not('issued_at', 'is', null)
         .gte('issued_at', r.gte).lte('issued_at', r.lte),
       supabase.from('credit_notes')
-        .select('document_type, credit_note_number, series, invoice_id, subtotal_net, vat_amount, total, amount, fiscal_mark, fiscal_status, status, issued_at')
+        .select('document_type, credit_note_number, series, invoice_id, subtotal_net, vat_amount, total, amount, currency, fiscal_mark, fiscal_status, status, issued_at')
         .eq('workspace_id', workspaceId).not('issued_at', 'is', null)
         .gte('issued_at', r.gte).lte('issued_at', r.lte),
     ]);
@@ -117,6 +120,7 @@ export const accountingExportService = {
         date: day(i.issued_at), kind: 'Invoice', doc_type: i.document_type ?? '',
         number: i.legal_number || i.internal_number || '', series: i.series ?? '',
         counterpart: p.name, counterpart_vat: p.vat, net, vat, total: num(i.total),
+        currency: i.currency ?? 'EUR',
         rate: effRate(net, vat), mark: i.fiscal_mark ?? '', status: i.fiscal_status || i.status || '',
       });
     }
@@ -129,6 +133,7 @@ export const accountingExportService = {
         date: day(c.issued_at), kind: 'Credit note', doc_type: c.document_type ?? '5.1',
         number: c.credit_note_number ?? '', series: c.series ?? '',
         counterpart: p.name, counterpart_vat: p.vat, net: -net, vat: -vat, total: -total,
+        currency: c.currency ?? 'EUR',
         rate: effRate(net, vat), mark: c.fiscal_mark ?? '', status: c.fiscal_status || c.status || '',
       });
     }
@@ -142,11 +147,11 @@ export const accountingExportService = {
     // VAT return missing its input tax.
     const [billRes, scnRes] = await Promise.all([
       supabase.from('supplier_bills')
-        .select('supplier_bill_number, supplier_company_id, supplier_contact_id, subtotal_net, vat_amount, total, status, issued_at')
+        .select('supplier_bill_number, supplier_company_id, supplier_contact_id, subtotal_net, vat_amount, total, currency, status, issued_at')
         .eq('workspace_id', workspaceId).not('issued_at', 'is', null)
         .gte('issued_at', r.gte).lte('issued_at', r.lte),
       supabase.from('supplier_credit_notes')
-        .select('supplier_credit_note_number, supplier_company_id, supplier_contact_id, subtotal_net, vat_amount, total, external_mark, status, issued_at')
+        .select('supplier_credit_note_number, supplier_company_id, supplier_contact_id, subtotal_net, vat_amount, total, currency, external_mark, status, issued_at')
         .eq('workspace_id', workspaceId).not('issued_at', 'is', null)
         .gte('issued_at', r.gte).lte('issued_at', r.lte),
     ]);
@@ -166,6 +171,7 @@ export const accountingExportService = {
       rows.push({
         date: day(x.issued_at), kind: 'Supplier bill', doc_type: '', number: x.supplier_bill_number ?? '', series: '',
         counterpart: p.name, counterpart_vat: p.vat, net, vat, total: num(x.total),
+        currency: x.currency ?? 'EUR',
         rate: effRate(net, vat), mark: '', status: x.status ?? '',
       });
     }
@@ -175,20 +181,25 @@ export const accountingExportService = {
       rows.push({
         date: day(x.issued_at), kind: 'Supplier credit note', doc_type: '', number: x.supplier_credit_note_number ?? '', series: '',
         counterpart: p.name, counterpart_vat: p.vat, net: -net, vat: -vat, total: -num(x.total),
+        currency: x.currency ?? 'EUR',
         rate: effRate(net, vat), mark: x.external_mark ?? '', status: x.status ?? '',
       });
     }
     return rows.sort((a, b2) => a.date.localeCompare(b2.date));
   },
 
-  /** myDATA-classification summary — net + VAT grouped by section × effective rate. */
-  summarize(sales: JournalRow[], purchases: JournalRow[]): { section: string; rate: string; net: number; vat: number; docs: number }[] {
-    const acc = new Map<string, { section: string; rate: string; net: number; vat: number; docs: number }>();
+  /** myDATA-classification summary — net + VAT grouped by section × effective rate × CURRENCY.
+   *  Currency is part of the key, not decoration: without it a period holding a EUR invoice and a
+   *  USD invoice at 24% emitted one "Sales (output), 24%" line whose net was the two nominal
+   *  amounts added together, with nothing on the row to say so. */
+  summarize(sales: JournalRow[], purchases: JournalRow[]): { section: string; rate: string; currency: string; net: number; vat: number; docs: number }[] {
+    const acc = new Map<string, { section: string; rate: string; currency: string; net: number; vat: number; docs: number }>();
     const add = (section: string, rows: JournalRow[]) => {
       for (const row of rows) {
         const rate = row.rate == null ? 'mixed/0' : `${row.rate}%`;
-        const key = `${section}|${rate}`;
-        const e = acc.get(key) ?? { section, rate, net: 0, vat: 0, docs: 0 };
+        const currency = row.currency || 'EUR';
+        const key = `${section}|${rate}|${currency}`;
+        const e = acc.get(key) ?? { section, rate, currency, net: 0, vat: 0, docs: 0 };
         e.net += row.net; e.vat += row.vat; e.docs += 1;
         acc.set(key, e);
       }
@@ -221,8 +232,8 @@ export function downloadCsv(filename: string, csv: string): void {
 
 export function journalToCsv(rows: JournalRow[]): string {
   return toCsv(
-    ['Date', 'Kind', 'myDATA type', 'Number', 'Series', 'Counterpart', 'VAT No', 'Net', 'VAT', 'Total', 'Rate %', 'MARK', 'Status'],
-    rows.map((r) => [r.date, r.kind, r.doc_type, r.number, r.series, r.counterpart, r.counterpart_vat,
+    ['Date', 'Kind', 'myDATA type', 'Number', 'Series', 'Counterpart', 'VAT No', 'Currency', 'Net', 'VAT', 'Total', 'Rate %', 'MARK', 'Status'],
+    rows.map((r) => [r.date, r.kind, r.doc_type, r.number, r.series, r.counterpart, r.counterpart_vat, r.currency,
       r.net.toFixed(2), r.vat.toFixed(2), r.total.toFixed(2), r.rate ?? '', r.mark, r.status]),
   );
 }
