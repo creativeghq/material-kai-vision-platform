@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Construction: Drawings & Markup | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="construction.html">Construction</a> / Drawings &amp; markup</div>
+  <h1>Construction · Drawings &amp; Markup</h1>
+  <div class="routes"><span class="badge route">/projects/:id?tab=documents</span> <span class="badge gated">owner (write)</span></div>
+  <p class="lead">The <strong>Drawings &amp; documents</strong> register is a <em>controlled</em> drawing register — not a folder of files. Each drawing is a numbered slot; revisions stack under it and exactly one is marked <strong>current</strong>, so a client (or a trade on site) is only ever shown the <strong>current revision, never an older one</strong>. From a drawing you can also <strong>mark it up</strong> — cloud the bit that's wrong, measure it, and raise it as an <a href="construction-requests.html">RFI</a> in one step.</p>
+
+  <div class="callout"><p><strong>Where:</strong> open a construction <a href="projects.html">project</a> → the <strong>Delivery</strong> stage → the <strong>Drawings &amp; documents</strong> section (<span class="badge route">?tab=documents</span>). Adding, revising and marking up are owner-only; collaborators and clients see the current revision of the sheets you've made visible.</p></div>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/construction/drawings.png" alt="The Drawings & documents register">
+    <figcaption>Drawings &amp; documents — each row is a drawing number, title, discipline and current revision, with a buildable/for-info purpose badge. <em>“Clients always see the current revision — never an older one.”</em></figcaption>
+  </figure>
+
+  <h2>The register</h2>
+  <p>Each row shows the <strong>drawing number</strong> (unique in the project, e.g. <code>A-101</code>), title, discipline, and the <strong>current revision</strong> (or an amber <em>“No revision uploaded”</em>). A purpose badge is <strong>green when the sheet is buildable</strong> (issued <em>for construction</em> or <em>as-built</em>) and amber otherwise — so an information-only or superseded sheet can't be mistaken for one you can build from. Expand a row to see its earlier revisions; the owner can <strong>Make current</strong> on any of them.</p>
+
+  <h2>Adding a drawing</h2>
+  <p><strong>New document</strong> opens the dialog with two ways to fill it:</p>
+  <ul class="feat">
+    <li><strong>Scan the title block</strong> — drop in a sheet and it reads the title block and <strong>pre-fills</strong> the number, title, scale, discipline and sheet size (snapping to the platform's controlled lists; anything it can't map is reported, not silently dropped). It writes nothing until you confirm.</li>
+    <li><strong>Type it</strong> — number, title, kind, discipline, scale, sheet size, and whether the current revision is shown to the client.</li>
+  </ul>
+  <p>A scanned sheet is filed as <strong>revision A</strong> automatically. Creating is resumable: if the register entry saves but the file upload fails, the entry survives and pressing <strong>Create</strong> again just re-attaches the sheet.</p>
+
+  <h2>Revisions</h2>
+  <p><strong>Upload revision</strong> suggests the next letter/number and asks for the file, the <strong>date printed on the sheet</strong> (“Issued on” — deliberately <em>not</em> defaulted to today, because it's the sheet's own date), what it was <strong>issued for</strong>, and what changed. The new one becomes current; <strong>the previous revision is kept and stays viewable</strong>. That's the whole point of a register: history is never lost, and everyone downstream sees the same current sheet.</p>
+
+  <h2>Marking up a drawing → an RFI</h2>
+  <p><strong>What it is —</strong> the <strong>Mark up</strong> action on a drawing opens a viewer where you can <strong>cloud</strong>, box, arrow, add a note, and <strong>measure</strong> — then raise the marked region as an <a href="construction-requests.html">RFI</a>. <strong>Why it matters —</strong> “this dimension doesn't work” is far clearer as a cloud on the exact spot than as a sentence.</p>
+  <ol>
+    <li>Pick the <strong>Cloud</strong> tool and outline the problem area (double-click to close the cloud).</li>
+    <li>To measure, first <strong>Set scale</strong>: click the two ends of something whose real length you know and type that length — the printed title-block scale is deliberately <em>not</em> trusted. Until you've calibrated, the sheet shows <em>“Not to scale — measurements unavailable”</em> and any measurement reads <strong>“not measured”</strong> rather than a made-up number.</li>
+    <li>Select your markup, add a <em>“What is wrong with this?”</em> note, and <strong>Raise as RFI</strong>. It's idempotent — pressing it again returns the same RFI, never a second numbered question — and the drawing then shows an <em>“RFI raised”</em> badge. You can also <strong>Export</strong> the marked-up sheet as a PDF.</li>
+  </ol>
+
+  <div class="callout tip"><p><strong>Worked example.</strong> A subcontractor flags a clash. Open the current architectural sheet → <strong>Mark up</strong> → cloud the clash, set the scale off a known 3000&nbsp;mm grid line, measure the overlap → add the note and <strong>Raise as RFI</strong>. It lands in the project's <a href="construction-requests.html">Requests</a> register as a numbered RFI, tied to that sheet, with the marked-up PDF attached.</p></div>
+
+  <div class="callout"><p><strong>From chat:</strong> the drawing register and markup are UI tools — the assistant doesn't operate them.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

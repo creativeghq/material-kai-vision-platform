@@ -19,6 +19,7 @@
         { file: "agent-tools.html", title: "Tools & Capabilities" },
       ]},
       { file: "knowledge-base.html", title: "Knowledge Base", icon: "📚" },
+      { file: "ai-assessment.html", title: "AI Assessment", icon: "📈" },
     ]},
     { title: "Workspace", items: [
       { file: "moodboards.html", title: "MoodBoards", icon: "🎨", children: [
@@ -92,6 +93,16 @@
       { file: "pos.html", title: "Point of Sale", icon: "🧮" },
       { file: "client-portal.html", title: "Client Portal", icon: "🪪" },
       { file: "inbox.html", title: "Inbox", icon: "✉️" },
+    ]},
+    { title: "Construction", items: [
+      { file: "construction.html", title: "Overview", icon: "🏗️", children: [
+        { file: "construction-commercial.html", title: "Commercial & cost control" },
+        { file: "construction-tenders.html", title: "Tenders & subcontracts" },
+        { file: "construction-programme.html", title: "Programme & baseline" },
+        { file: "construction-drawings.html", title: "Drawings & markup" },
+        { file: "construction-requests.html", title: "RFIs & submittals" },
+        { file: "construction-site.html", title: "Site: diary, inspections & snags" },
+      ]},
     ]},
     { title: "Network & Tools", items: [
       { file: "discover.html", title: "Discover & Network", icon: "🌐", children: [

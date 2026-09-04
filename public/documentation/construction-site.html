@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Construction: Site Diary, Inspections & Snags | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="construction.html">Construction</a> / Site</div>
+  <h1>Construction · Site — Diary, Inspections &amp; Snags</h1>
+  <div class="routes"><span class="badge route">/projects/:id?tab=site</span> <span class="badge gated">owner</span></div>
+  <p class="lead">The <strong>Site</strong> section is what you use on the job: a dated <strong>site diary</strong>, <strong>inspection</strong> checklists you walk with, and the <strong>snag</strong> (defect) list. It has one time-saving shortcut — you can <strong>dictate a site walk</strong> out loud and it becomes a diary entry plus the snags you described. And it enforces one honest rule throughout: a failed inspection item has to <strong>become a snag</strong>, so a failure can't quietly disappear.</p>
+
+  <div class="callout"><p><strong>Where:</strong> a <a href="projects.html">project</a> → the <strong>Delivery</strong> stage → the <strong>Site</strong> section (<span class="badge route">?tab=site</span>), with a <strong>Snags / Inspections / Site log</strong> toggle and a <strong>Dictate a walk</strong> button above it. Owner-only; site photos are private (signed links).</p></div>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/construction/site.png" alt="The Site section — snags, inspections, site log">
+    <figcaption>Site — one section with three views (Snags, Inspections, Site log) and a <strong>Dictate a walk</strong> shortcut that writes into the log and the snag list at once.</figcaption>
+  </figure>
+
+  <h2>Dictating a site walk</h2>
+  <p><strong>What it is —</strong> talk through a walk of the site and the platform turns it into records. <strong>Why it matters —</strong> a walk names a dozen defects in two minutes of speech; typing them up later is where they get lost.</p>
+  <ol>
+    <li><strong>Dictate a walk</strong> → <strong>Start talking</strong> (English or Ελληνικά), then <strong>Stop</strong>. The transcript is editable.</li>
+    <li><strong>Read it</strong> turns the transcript into a <strong>proposal</strong>: a <strong>site-log entry</strong> (with an editable date) plus a list of <strong>defects</strong> it heard (each with a title and severity, and an amber flag where the room you named matched nothing). Anything unclear goes in a <em>“heard but not recorded”</em> box rather than being silently dropped.</li>
+    <li>Tick what to keep and <strong>Create records</strong> — one atomic step, so a retry can't double-write. <strong>Nothing is saved until you've checked what it heard</strong>, because transcription mishears.</li>
+  </ol>
+
+  <h2>Inspections — a checklist where a failure becomes a snag</h2>
+  <p><strong>New inspection</strong> builds a checklist: a name (e.g. <em>“Pre-plaster — Plot 4”</em>), a date, and a list of things to check — each with optional <em>“what good looks like”</em> guidance and a <strong>trade</strong> (a <a href="construction-commercial.html">cost code</a>) that rides along. Walking it, each item is <strong>Pass / Fail / N/A</strong>. A <strong>Fail with no snag yet</strong> shows a <strong>Raise snag</strong> button — and the snag is created already <strong>coded to that trade</strong>. You can <strong>Sign off</strong> even a failed walk (it says so plainly); the verdict (Passed / Failed / In progress …) is derived, and unanswered items are counted separately, never counted as a pass.</p>
+  <div class="callout"><p><strong>The guard:</strong> the section tracks failed items that have <strong>no snag raised</strong> — shown per inspection and as a project total — so a failure can't be signed off and forgotten.</p></div>
+
+  <h2>Snags (the defect list)</h2>
+  <p>The <strong>Snags</strong> view is the punch list: <strong>Raise a snag</strong> with a title, description, <strong>severity</strong> (low / medium / high / critical), room, <strong>trade</strong> (cost code), due date, photos, and whether to <strong>show it to the client</strong>. Filter by room, trade or <em>Show closed</em>. Snags marked client-visible are what make the <strong>handover list</strong>. Raising a snag from a failed inspection item is idempotent — press it twice and you get the one snag, linked back to the item.</p>
+
+  <h2>Site log (the diary)</h2>
+  <p>The <strong>Site log</strong> is the dated diary — <em>“internal, never shown to the client.”</em> <strong>Log a site visit</strong> records the date, notes, who attended, the weather and photos. It's the running record of what happened on site, day by day.</p>
+
+  <div class="callout tip"><p><strong>Worked example.</strong> Walk the site dictating as you go — <em>“kitchen, cracked tile by the window, medium; hallway, paint runs, low…”</em>. <strong>Read it</strong>, confirm the two defects and the log entry, <strong>Create records</strong>. Later run the <em>Pre-plaster</em> inspection; the one item that fails becomes a snag coded to <em>Plastering</em>. Mark the client-visible snags and they roll into the handover list.</p></div>
+
+  <div class="callout"><p><strong>From chat:</strong> the Site tools are UI-only — the assistant doesn't run inspections or raise snags.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

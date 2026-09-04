@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Assessment | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / AI Assessment</div>
+  <h1>AI Assessment <span class="badge gated">Pro add-on</span></h1>
+  <div class="routes"><span class="badge route">/projects/:id?tab=assessment</span> <span class="badge route">/finance?tab=assessment</span> <span class="badge route">/properties/:id?tab=assessment</span></div>
+  <p class="lead">AI Assessment gives you an <strong>at-a-glance health verdict</strong> of something you're running — a <strong>project</strong>, your <strong>books</strong>, or a <strong>property listing</strong> — plus a written report and a <strong>ranked list of what to do next</strong>. It's deliberately <strong>one system serving three subjects</strong>, not three separate features. And it's built on a strict rule: <strong>the AI reads the numbers, it doesn't count them</strong> — the signals, the scores and the verdict are all worked out by the platform, and the model only writes <em>about</em> them. So the figures are trustworthy and the narrative is what the AI adds.</p>
+
+  <div class="callout"><p><strong>Where:</strong> the <strong>Assessment</strong> tab on a <a href="projects.html">project</a> (<span class="badge route">/projects/:id?tab=assessment</span>), the <strong>AI Assessment</strong> tab in <a href="finance.html">Finance</a> (<span class="badge route">/finance?tab=assessment</span>), and the <strong>AI Assessment</strong> tab on a <a href="real-estate.html">property</a> (<span class="badge route">/properties/:id?tab=assessment</span>). Each is a separately-purchasable <strong>Pro add-on</strong>.</p></div>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/assessment/assessment.png" alt="An AI Assessment panel">
+    <figcaption>An AI Assessment — a verdict and score, the six dimension tiles, the written report, and a ranked <strong>What to do next</strong>. Each signal is a value or a stated reason there isn't one.</figcaption>
+  </figure>
+
+  <h2>The rule: the AI reads, it doesn't count</h2>
+  <p>This is what makes the numbers safe to act on. The platform derives — in the database, from your real data — the <strong>signals</strong> it checked, the <strong>six dimension scores</strong>, and the overall <strong>verdict</strong>. The <strong>Claude</strong> turn is then handed those results and writes only the <strong>headline, the narrative and the ranked actions</strong>. It never invents a score or a figure; it explains the ones the platform computed. Opening the tab re-derives the signals live and shows them for <strong>free</strong>; running the AI write-up is the only part that costs credits.</p>
+
+  <h2>What you see</h2>
+  <ul class="feat">
+    <li><strong>A verdict</strong> — a badge and a score out of 100: <strong>On track</strong>, <strong>At risk</strong>, <strong>Off track</strong>, <strong>Stalled</strong>, or <strong>Not enough data</strong> — with a plain-English line and “{n} of 6 areas judged · signals as of {date}”.</li>
+    <li><strong>Six dimensions</strong> — always shown, even if one couldn't be judged (it reads <em>Not judged</em>, never <code>0</code>). They're the same six structural slots across subjects, labelled for each domain:</li>
+  </ul>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Slot</th><th>Project</th><th>Finance</th><th>Real Estate</th></tr></thead>
+    <tbody>
+      <tr><td>setup</td><td>Setup &amp; alignment</td><td>Configuration</td><td>Listing completeness</td></tr>
+      <tr><td>commercial</td><td>Commercial</td><td>Pipeline</td><td>Pricing &amp; offers</td></tr>
+      <tr><td>financial</td><td>Financial</td><td>Profitability &amp; cash</td><td>Returns</td></tr>
+      <tr><td>schedule</td><td>Schedule</td><td>Obligations</td><td>Dates &amp; expiries</td></tr>
+      <tr><td>delivery</td><td>Delivery</td><td>Filing &amp; reconciliation</td><td>Condition</td></tr>
+      <tr><td>client</td><td>Client</td><td>Debtors</td><td>Interest &amp; follow-up</td></tr>
+    </tbody>
+  </table></div>
+  <ul class="feat">
+    <li><strong>Signals</strong> — the individual checks, grouped by dimension. Each is a value or a <strong>stated reason there isn't one</strong>: <em>needs attention</em>, <em>fine</em>, <em>not recorded</em> (no data) or <em>not applicable</em>. Only <em>needs attention</em> affects the score; “no data” and “not applicable” are excluded rather than scored as zero. The default view is “only what matters”, with a toggle to show them all, and each has an <strong>Open</strong> deep-link to where you'd fix it.</li>
+    <li><strong>The narrative</strong> — the written report card the AI produced, with the model used and the credits it cost.</li>
+  </ul>
+
+  <h2>Running one</h2>
+  <p>Opening the tab shows the current signals and verdict immediately (free — <strong>Refresh signals</strong> re-derives them any time). To generate the written verdict and the ranked plan, press the run button — its wording matches the subject: <strong>Assess this project</strong>, <strong>Assess the books</strong>, or <strong>Assess this listing</strong> (and <strong>Re-assess</strong> after). That's one AI turn, charged in credits (typically ~9), and the panel tells you it's a paid step before you press it. Who can run it depends on the subject: a project's <strong>owner</strong>; in Finance, anyone except an <strong>accountant</strong>; on a property, anyone who can <strong>manage</strong> it.</p>
+
+  <h2>What to do next — the actions</h2>
+  <p>Every assessment ends with a priority-ordered <strong>What to do next</strong> list. Each action names a real <strong>signal the report raised</strong> (so it's never a vague suggestion), with an impact and effort badge (<em>Quick / Moderate / Significant</em>), a short rationale, and a <strong>Go there</strong> link to the exact place to act.</p>
+  <div class="callout"><p><strong>Only a project action can become a task.</strong> On a <strong>project</strong>, an action has an <strong>Add as task</strong> button that drops it onto the project's task list (and completing that task marks the action done). Finance and real-estate actions have no task list to go to, so instead of pretending, they offer <strong>Done</strong> / <strong>Dismiss</strong> (and <strong>Reopen</strong>) — the same close-out every subject gets. It's an honest asymmetry, not a missing feature.</p></div>
+
+  <h2>From the assistant</h2>
+  <p>The <a href="agent-hub.html">assistant</a> can run and read assessments too: ask it to <em>assess this project / the books / this listing</em> (a paid run), or to read the latest assessment and its open actions, and it can mark a project action onto the task list — all under your own permissions.</p>
+
+  <h2>Gating &amp; cost</h2>
+  <ul class="feat">
+    <li><strong>Three Pro add-ons</strong> — <em>project</em>, <em>finance</em> and <em>real-estate</em> assessment are enabled independently per workspace; where one isn't enabled, the tab shows an <em>“not available here”</em> upsell.</li>
+    <li><strong>Free to read, paid to write.</strong> Viewing the signals/verdict and acting on an action are free; only pressing <em>Assess</em> spends credits (a ceiling is reserved and the unused part refunded; an unpriced model isn't charged).</li>
+  </ul>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

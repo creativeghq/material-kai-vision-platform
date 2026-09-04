@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Construction: Commercial & Cost Control | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="construction.html">Construction</a> / Commercial &amp; cost control</div>
+  <h1>Construction · Commercial &amp; Cost Control</h1>
+  <div class="routes"><span class="badge route">/projects/:id?tab=finance</span> <span class="badge gated">owner · finance.manage</span></div>
+  <p class="lead">The <strong>Finance</strong> section of a project's <strong>Commercial</strong> stage is the contractor's cost desk: the priced <strong>bill of quantities</strong> that becomes the contract sum, <strong>variations</strong> and the <strong>cost-value reconciliation</strong> that reads them, <strong>applications for payment</strong> with <strong>retention</strong>, <strong>job cost</strong> and <strong>labour</strong> against the plan, and <strong>stock held</strong> for the job. Every figure on this screen is derived by the platform from your real data — the cards format and total, they never re-multiply — so the numbers reconcile by construction. (<a href="construction-tenders.html">Tenders → subcontracts</a> live here too and have their own page.)</p>
+
+  <div class="callout"><p><strong>Where:</strong> a <a href="projects.html">project</a> → the <strong>Commercial</strong> stage → the <strong>Finance</strong> section (<span class="badge route">?tab=finance</span>). It needs the project <strong>owner</strong> plus <strong>finance access</strong> (the <a href="finance.html">Finance</a> module + <code>finance.manage</code>).</p></div>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/construction/commercial.png" alt="The project Finance section — construction cost tools">
+    <figcaption>The Finance section stacks the cost tools — Job cost, the Priced schedule (BoQ), CVR, Variations, Applications for payment, Tender packages, Labour and Stock — each figure derived, never re-multiplied.</figcaption>
+  </figure>
+
+  <h2>Bill of Quantities (the priced schedule)</h2>
+  <p><strong>What it is —</strong> a schedule of described items, each with a unit, quantity and rate; the line amount is computed by the platform, never typed. <strong>The one rule that matters:</strong> a project has <strong>at most one contract schedule</strong>, and once it's <strong>accepted it IS the contract sum</strong> — from then on the <a href="#cvr">CVR</a> measures against it and ignores accepted quotes. You build it from typed lines and/or the <a href="#takeoff">takeoff</a>.</p>
+  <ul class="feat">
+    <li>An <strong>unpriced line</strong> shows <em>“—”</em>, never <code>0.00</code> (which would understate the sum), and <strong>Accept is disabled until every line is priced</strong>.</li>
+    <li><strong>Provisional sums</strong> are flagged and totalled separately, so a guess isn't mistaken for a firm price.</li>
+    <li>Lifecycle: draft → issued → accepted → superseded, plus <strong>Make contract</strong> to mark which schedule is the contract one.</li>
+  </ul>
+
+  <h2 id="takeoff">Takeoff — from a drawing's printed schedules</h2>
+  <p><strong>Takeoff</strong> reads the schedules a <a href="construction-drawings.html">drawing</a> <em>already prints</em> (door schedules, window schedules, finishes) into proposed BoQ lines. Its defining rule: it <strong>transcribes, never measures</strong> — every proposed row cites the schedule row it came from, and it will <em>refuse</em> to measure geometry off a plan. Proposed rows arrive <strong>unticked</strong>; you tick the ones you've checked against the sheet and add them to a schedule. A quantity the sheet didn't state stays <strong>“not stated”</strong> (never 0), and the rate comes in blank — so a takeoff lands in the BoQ as an honest, unpriced gap to close. It's reached from a drawing's <strong>Read printed schedules</strong> action (Delivery → Documents) and costs a credit.</p>
+
+  <h2>Cost codes — the trade classification</h2>
+  <p><strong>Cost codes</strong> are the workspace's trade taxonomy that every cost and priced line hangs off. There's <strong>no platform default</strong> — you seed yours with <strong>Install starter library</strong> or type your own; codes form a hierarchy and are <strong>archived, not deleted</strong> (so history holds). A code is attached on priced-schedule lines, tender items, variations, supplier bills, expenses and timesheets — and the project's <strong>Cost by code</strong> report (and the CVR below) group by it. Manage them in <strong>Finance → Settings → Cost Codes</strong> (workspace-level, owner/admin).</p>
+
+  <h2>Job cost &amp; labour</h2>
+  <p><strong>Job cost</strong> shows what the job has cost <em>by cost code</em>, with margin. <strong>Labour</strong> compares two numbers honestly:</p>
+  <ul class="feat">
+    <li><strong>At the typed rate</strong> — hours logged × the rate on the time entry.</li>
+    <li><strong>Payroll actual</strong> — what payroll says those people actually cost (gross + employer contributions).</li>
+    <li><strong>Variance</strong> — the difference.</li>
+  </ul>
+  <p>Where a worker on the job <strong>can't be costed</strong> (not on the HR roster, or payroll hasn't run yet), the actual and variance read <strong>“Not comparable”</strong>, never €0 — and the card states its <strong>coverage</strong> (<em>“covers Xh of Yh; Zh could not be costed”</em>) with the reason. The payroll actual is an allocation, so it never overwrites the estimate and this card doesn't feed the P&amp;L.</p>
+
+  <h2 id="cvr">Variations &amp; CVR (cost-value reconciliation)</h2>
+  <p><strong>Variations</strong> are scope changes, kept in one register but <strong>never netted</strong>: a <strong>client</strong> variation is money in, a <strong>subcontractor</strong> variation is money out, and the value is <strong>signed</strong> — a negative is an omission (work taken out), stored as-is. Only <strong>approved</strong> variations reach the CVR; pending ones are called out as <em>“not yet decided, so not in the CVR.”</em></p>
+  <p>The <strong>CVR</strong> reconciles, per cost code, what a job is <em>worth</em> against what it has <em>cost</em>: columns for <strong>Contracted</strong>, <strong>Variations</strong>, <strong>Value</strong>, <strong>Actual</strong> (cost), <strong>Committed</strong> (open orders/subcontracts) and <strong>Margin</strong>. Because every figure comes from one derivation, the reconciliation <strong>cannot disagree</strong> with the cards it draws from; an uncoded bucket is explained rather than hidden, and a null margin reads as no-percentage (distinct from 0%).</p>
+
+  <h2>Applications for payment &amp; retention</h2>
+  <p><strong>Applications</strong> are interim <strong>valuations</strong>: each states the <strong>cumulative</strong> value of work done to date, and what's due is the difference from what was certified before. You raise one with a <em>valued-to</em> date and the cumulative figure, then <strong>record what was certified</strong> (the payer's answer — the variance is recorded, not hidden), then <strong>Mark paid</strong>. A <strong>certified</strong> amount counts as <em>outstanding</em>, not settled.</p>
+  <ul class="feat">
+    <li><strong>Retention</strong> — the percentage and its <strong>cap</strong> are frozen when an application is raised. What's <strong>held</strong> is derived from the latest application (one source, so one answer).</li>
+    <li><strong>Release</strong> — “retention is let go of, not just held”: set up the two standard tranches — <strong>half at practical completion, half at the end of the defects period</strong> (dates derived from the project's terms) — and <strong>Release</strong> each when due. The footer keeps a running <em>Certified to date / Retention held / Outstanding / Retention released</em>.</li>
+  </ul>
+  <div class="callout"><p><strong>One fiscal boundary.</strong> An application is a <em>commercial</em> claim; a myDATA tax document is a <em>fiscal</em> act. The two meet at a single, explicit point (an application can be marked <strong>invoiced</strong>) — there's no second path and no netting, keeping the contract ledger and the fiscal ledger cleanly separate.</p></div>
+
+  <h2>Stock held for the job</h2>
+  <p>The <strong>stock held</strong> card shows the material reserved for this job — <strong>derived</strong> from the job's quote and sales order rather than being a new kind of reservation you maintain by hand.</p>
+
+  <div class="callout"><p><strong>From chat:</strong> the assistant can <em>read</em> this cost picture — the <a href="construction-tenders.html">CVR, applications and variations</a> — but it never raises a variation, certifies a valuation or releases retention. Those stay human decisions.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

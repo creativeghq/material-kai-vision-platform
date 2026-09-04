@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Construction: Tenders & Subcontracts | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="construction.html">Construction</a> / Tenders &amp; subcontracts</div>
+  <h1>Construction · Tenders &amp; Subcontracts</h1>
+  <div class="routes"><span class="badge route">/projects/:id?tab=finance</span> <span class="badge route">/bid/:token</span> <span class="badge public">bid page</span> <span class="badge gated">owner · finance.manage</span></div>
+  <p class="lead">Tendering bundles a trade into a <strong>package</strong>, sends it to subcontractors to price, lets you <strong>compare bids fairly</strong>, and <strong>awards</strong> it — where <strong>the award IS the subcontract</strong>: it raises a purchase order and the commitment lands in your cost report. The comparison is built so a subcontractor who <em>omits</em> a line can't come out looking cheapest.</p>
+
+  <div class="callout"><p><strong>Where:</strong> a <a href="projects.html">project</a> → <strong>Commercial</strong> → <strong>Finance</strong> → the <strong>Tender packages</strong> card (<span class="badge route">?tab=finance</span>; owner + finance access). Subcontractors price it on a public page at <span class="badge route">/bid/:token</span> — no account needed.</p></div>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/construction/tenders.png" alt="A tender package with bids compared">
+    <figcaption>A tender package — items to price, the subcontractors invited, and the bid comparison ranked on a <strong>comparable total</strong> (with unpriced lines flagged).</figcaption>
+  </figure>
+
+  <h2>The flow</h2>
+  <ol>
+    <li><strong>Create a package</strong> — name the trade/scope.</li>
+    <li><strong>Add items to price</strong> — pull them <em>from the schedule</em> (it brings the description, unit, quantity and cost code but <strong>never your rate</strong> — sending your price would answer the question you're asking), or type them.</li>
+    <li><strong>Invite subcontractors</strong> — pick CRM companies; each gets a bid with the quantities <strong>frozen</strong>, so everyone prices the same scope.</li>
+    <li><strong>Send the enquiry</strong> — this mints a <strong>private link per bidder</strong> and emails it (the link is returned even without an email, so you can paste it into WhatsApp).</li>
+    <li><strong>They price it</strong> — on the public <span class="badge route">/bid/:token</span> page they see the scope and due date, fill in <em>their rates</em>, and <strong>Send my prices</strong>; a blank line is submitted as <strong>null, never 0</strong>, and they can revise until you decide. (You can also key rates in yourself and <em>Mark received</em>.)</li>
+    <li><strong>Compare</strong> — the grid highlights the lowest <em>priced</em> rate per line and shows a bid analysis (below).</li>
+    <li><strong>Award</strong> — one click raises the <strong>subcontract as a purchase order</strong>, writes its lines, withdraws the losing bids and puts the commitment into the <a href="construction-commercial.html#cvr">cost report</a> — all in one transaction.</li>
+  </ol>
+
+  <h2>Why the cheapest bid isn't always the cheapest offer</h2>
+  <p>Bids are ranked on a <strong>comparable total</strong>, not on whatever number a bidder typed at the bottom. The comparison separates:</p>
+  <ul class="feat">
+    <li><strong>As submitted</strong> — the total of what they actually priced.</li>
+    <li><strong>Not priced</strong> — the lines they left blank, <strong>valued at everyone else's rates</strong> so an omission is costed, not ignored.</li>
+    <li><strong>Comparable</strong> — submitted + the valued omissions. This is the column the “lowest” badge sits on.</li>
+  </ul>
+  <p>An unpriced line shows <strong>“not priced”</strong> (never 0), so a bid that quietly drops a line can't rank as the cheapest — and <strong>Award is disabled while any line is unpriced</strong> (the platform refuses it too). Only <em>received</em> bids enter the comparison.</p>
+
+  <h2>The award is the subcontract</h2>
+  <p>There's no separate “create a subcontract” step: <strong>awarding a package IS the subcontract</strong>, expressed as a <a href="finance-doc-orders.html">purchase order</a>. From that moment it's a committed cost in the <a href="construction-commercial.html#cvr">CVR</a>, an awarded package is locked read-only, and paying the subcontractor runs through the normal payables path.</p>
+
+  <div class="callout"><p><strong>From chat:</strong> the assistant can read <strong>tender status</strong> (who was invited / replied / awarded) and run a <strong>bid analysis</strong> that ranks on the comparable total and flags unpriced lines and outliers — but <strong>awarding stays a human decision</strong>.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

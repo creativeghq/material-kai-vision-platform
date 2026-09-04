@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Construction: RFIs & Submittals | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="construction.html">Construction</a> / Requests (RFIs &amp; submittals)</div>
+  <h1>Construction · Requests — RFIs &amp; Submittals</h1>
+  <div class="routes"><span class="badge route">/projects/:id?tab=requests</span></div>
+  <p class="lead">The <strong>Requests</strong> register is one threaded place for everything that needs an answer or a decision on a job — client questions and change requests, and the two team-facing contract instruments: <strong>RFIs</strong> (requests for information) and <strong>submittals</strong> (materials/shop-drawings sent for approval). RFIs and submittals are <strong>numbered</strong> and <strong>due-dated</strong>, can cite the exact drawing they're about, and the register warns you if the same question has <strong>already been asked</strong>.</p>
+
+  <div class="callout"><p><strong>Where:</strong> a <a href="projects.html">project</a> → the <strong>Client</strong> stage → the <strong>Requests</strong> section (<span class="badge route">?tab=requests</span>). A notification link opens the exact thread. RFIs and submittals are internal/team-facing by default; client-facing kinds can be shown to the client.</p></div>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/construction/requests.png" alt="The Requests register">
+    <figcaption>The Requests register — questions, change requests, RFIs and submittals in one list; team-facing ones carry a reference like <strong>RFI-003</strong> and an answer-by date.</figcaption>
+  </figure>
+
+  <h2>Kinds &amp; numbering</h2>
+  <p>A request is one of: <strong>question</strong>, <strong>change request</strong>, <strong>approval request</strong>, <strong>info request</strong>, <strong>RFI</strong>, or <strong>submittal</strong>. The last two are <strong>team-facing</strong>, so they're <strong>numbered</strong> — a reference like <strong>RFI-003</strong> is assigned by the platform when you raise it (client-facing kinds get no number). The number is stated as being assigned on raise, so you never pick it yourself.</p>
+
+  <h2>Raising an RFI</h2>
+  <ol>
+    <li><strong>Raise request</strong> → set the title, details and type.</li>
+    <li>Optionally pick <strong>which drawing</strong> it's about — the picker lists every revision, each tagged <em>(current)</em> or <em>— superseded</em>, because on site people often hold the wrong sheet.</li>
+    <li>For a team-facing kind, set <strong>Answer needed by</strong>. Raise it — the reference is assigned.</li>
+  </ol>
+  <div class="callout"><p><strong>“Has this already been asked?”</strong> As you type the title, the register quietly searches for similar existing requests and shows an advisory panel — reference, title, status, and for a resolved one the <strong>last answer inline</strong>. It never blocks you (dismiss it with <em>“mine is a different question”</em>), and naming a drawing <strong>widens</strong> the search rather than narrowing it. It's there to stop the same RFI being raised twice.</p></div>
+
+  <h2>Tracking answers &amp; due dates</h2>
+  <p>Each request is a thread. An owner's reply flips it from <strong>open</strong> to <strong>answered</strong>; statuses run open → answered → resolved (or <em>won't do</em>). An overdue open request shows <em>“Answer was needed by …”</em> in red. A request that cites a drawing shows an amber warning if that sheet has since been superseded — so an answer is never read against the wrong revision. Closed requests are hidden unless you tick <em>Show closed</em>.</p>
+
+  <h2>Submittals — closed by a verdict</h2>
+  <p>A <strong>submittal</strong> isn't closed with the ordinary status dropdown — you <strong>record a verdict</strong>: <strong>Approved</strong>, <strong>Approved as noted</strong>, <strong>Revise &amp; resubmit</strong>, or <strong>Rejected</strong>. <em>Revise &amp; resubmit</em> deliberately <strong>reopens</strong> the submittal and bumps its revision rather than closing it, so the back-and-forth is tracked properly. (Approval requests get a simple Approve / Decline.)</p>
+
+  <div class="callout tip"><p><strong>Worked example.</strong> A dimension on the current architectural sheet doesn't work. From the <a href="construction-drawings.html">drawing markup</a> you cloud it and <strong>Raise as RFI</strong> — it lands here as <strong>RFI-004</strong>, tied to that revision, with an answer-by date. If someone had already asked it, the dedup panel shows their thread and its answer, so you close yours as a duplicate instead of chasing it again.</p></div>
+
+  <div class="callout"><p><strong>From chat:</strong> the Requests register is a UI tool — the assistant doesn't raise or answer RFIs.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

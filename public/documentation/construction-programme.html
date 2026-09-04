@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Construction: Programme & Baseline | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="construction.html">Construction</a> / Programme &amp; baseline</div>
+  <h1>Construction · Programme &amp; Baseline</h1>
+  <div class="routes"><span class="badge route">/projects/:id?tab=tasks</span> (Schedule view) <span class="badge gated">owner (edit)</span></div>
+  <p class="lead">The <strong>Programme</strong> is a Gantt view of the project's tasks with a <strong>real critical path</strong> — it works out which tasks have slack (float) and which don't, draws the dependencies between them, and lets you freeze a <strong>baseline</strong> so you can measure slippage against the plan rather than letting drifted dates quietly become the new plan.</p>
+
+  <div class="callout"><p><strong>Where:</strong> a <a href="projects.html">project</a> → the <strong>Delivery</strong> stage → the <strong>Tasks</strong> section (<span class="badge route">?tab=tasks</span>), then switch the <strong>List / Schedule</strong> toggle to <strong>Schedule</strong>. You create tasks in <em>List</em>; you set dates, dependencies and the baseline in <em>Schedule</em>. Editing is owner-only; collaborators view it read-only.</p></div>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/construction/programme.png" alt="The project programme Gantt">
+    <figcaption>The Programme — a Gantt with dependency arrows, milestone diamonds, a Today line, the critical path highlighted, and each non-critical task's float shown as “+Nd”.</figcaption>
+  </figure>
+
+  <h2>The Gantt</h2>
+  <p>Tasks (and their subtasks) appear as bars against a month timeline, with a <strong>Today</strong> line, elbow <strong>dependency arrows</strong>, progress-fill on each bar, and <strong>milestone diamonds</strong>. The header states <em>“N of M tasks scheduled · K on the critical path”</em> and the overall <strong>completion %</strong>.</p>
+  <ul class="feat">
+    <li><strong>Critical path</strong> — the tasks with no slack are highlighted; if any of them slips, the finish slips. Non-critical tasks print their <strong>float</strong> beside the name (e.g. <em>“+3d”</em>); critical tasks show none, because zero float <em>is</em> what makes them critical.</li>
+    <li><strong>Reschedule</strong> — an owner drags a bar to move it, or clicks it to edit: mark it a milestone, set start/end and progress, and manage <strong>“Runs after”</strong> predecessors. A dependency that would create a loop is refused.</li>
+  </ul>
+  <div class="callout"><p><strong>Float and the critical path always agree</strong> — they come from the same calculation, so a highlighted bar and its printed float can never contradict each other.</p></div>
+
+  <h2>The baseline — measuring slippage</h2>
+  <p><strong>What it is —</strong> a frozen snapshot of the planned dates. <strong>Why it matters —</strong> without one, when tasks slip their new dates silently <em>become</em> the plan and the slippage is invisible.</p>
+  <ul class="feat">
+    <li><strong>Set baseline</strong> freezes every task's start/end as “the plan” (it tells you how many tasks it froze).</li>
+    <li>After that, the strip reads either <em>“Against the baseline: nothing late”</em> or <em>“N tasks late, worst X days”</em> — plus <em>“· Y not measured”</em> for any task added since (a task with no baseline is reported as <strong>not measured</strong>, never as on-time).</li>
+    <li><strong>Re-baseline</strong> or <strong>Clear</strong> when the plan is formally reset.</li>
+  </ul>
+
+  <div class="callout tip"><p><strong>Worked example.</strong> Build the task list, open <strong>Schedule</strong>, set each task's dates and its <em>Runs after</em> links, then <strong>Set baseline</strong>. Two weeks in, a delayed delivery pushes a critical task; the Gantt re-flows, the strip reports <em>“3 tasks late, worst 5 days”</em>, and the highlighted critical path shows exactly what's driving the finish date.</p></div>
+
+  <div class="callout"><p><strong>From chat:</strong> the assistant can <strong>add a task</strong> (which then appears as a schedulable row here), but it doesn't set dates, dependencies or the baseline — those are done in the Schedule view.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>
