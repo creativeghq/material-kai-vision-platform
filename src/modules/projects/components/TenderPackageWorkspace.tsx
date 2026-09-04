@@ -15,7 +15,10 @@
  * date happen in one write, because the database refuses one without the other.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Plus, Trash2, UserPlus, Download, Check, ListOrdered, Users, Send } from 'lucide-react';
+import {
+  Loader2, Plus, Trash2, UserPlus, Download, Check, ListOrdered, Users, Send,
+  AlertTriangle, Copy, Scale,
+} from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -32,8 +35,9 @@ import { formatMoney } from '@/utils/decimal';
 import { UNITS } from '@/lib/units';
 import {
   tendersService, isBidComparable,
-  type PackageItem, type TenderBid,
+  type PackageItem, type TenderBid, type BidAnalysisRow, type BidSummaryRow,
 } from '../services/tendersService';
+import { bidClarifications, clarificationsAsText } from '../lib/bidClarifications';
 import { schedulesService } from '../services/schedulesService';
 
 const n = (v: number | string | null | undefined) => Number(v ?? 0);
@@ -59,15 +63,19 @@ export const TenderPackageWorkspace: React.FC<Props> = ({
   const [adding, setAdding] = useState(false);
   const [inviteId, setInviteId] = useState<string>('');
   const [pricing, setPricing] = useState<string | null>(null);
+  const [analysis, setAnalysis] = useState<BidAnalysisRow[]>([]);
+  const [summary, setSummary] = useState<BidSummaryRow[]>([]);
 
   const load = useCallback(async () => {
     try {
-      const [i, b, c] = await Promise.all([
+      const [i, b, c, a, sm] = await Promise.all([
         tendersService.items(packageId),
         tendersService.bids(packageId),
         tendersService.listCompanies(workspaceId),
+        tendersService.analysis(packageId),
+        tendersService.bidSummary(packageId),
       ]);
-      setItems(i); setBids(b); setCompanies(c);
+      setItems(i); setBids(b); setCompanies(c); setAnalysis(a); setSummary(sm);
     } catch (e) {
       toast({ title: 'Failed to load the package', description: (e as Error).message, variant: 'destructive' });
     }
@@ -299,7 +307,143 @@ export const TenderPackageWorkspace: React.FC<Props> = ({
           />
         )}
       </section>
+
+      {/* ---- what the bids actually say ----------------------------------------------------- */}
+      {summary.length > 0 && (
+        <BidAnalysisSection summary={summary} analysis={analysis} currency={currency} />
+      )}
     </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+
+/**
+ * The comparison, ranked on the figure that can be compared.
+ *
+ * `submitted_total` is whatever the bidder chose to price; `comparable_total` is that plus what
+ * they left out, valued at what everybody else charged. Ranking on the first is how the bid with
+ * the biggest gaps wins, and the gaps arrive later as variations at a rate nobody competed on.
+ * Both are shown, because hiding the submitted figure would be its own kind of dishonesty when
+ * the operator has the paper bid in front of them.
+ */
+const BidAnalysisSection: React.FC<{
+  summary: BidSummaryRow[]; analysis: BidAnalysisRow[]; currency: string;
+}> = ({ summary, analysis, currency }) => {
+  const { toast } = useToast();
+  const clarifications = useMemo(() => bidClarifications(analysis, currency), [analysis, currency]);
+  const cheapestComparable = summary[0]?.comparable_total ?? null;
+
+  const copy = async (text: string, who: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({ title: 'Copied', description: `Clarifications for ${who}.` });
+    } catch {
+      toast({ title: 'Could not copy', variant: 'destructive' });
+    }
+  };
+
+  return (
+    <section className="space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <h4 className="flex items-center gap-1.5 text-sm font-medium">
+          <Scale className="h-3.5 w-3.5 text-primary" /> Bid analysis
+        </h4>
+        <span className="text-xs text-muted-foreground">
+          {summary.length} comparable {summary.length === 1 ? 'bid' : 'bids'}
+        </span>
+      </div>
+
+      <div className="table-scroll">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-surface-sunken text-[11px] font-semibold text-muted-foreground">
+              <th className="px-3 py-1.5 text-left">Subcontractor</th>
+              <th className="px-3 py-1.5 text-right">As submitted</th>
+              <th className="px-3 py-1.5 text-right">Not priced</th>
+              <th className="px-3 py-1.5 text-right">Comparable</th>
+              <th className="px-3 py-1.5 text-left">Flags</th>
+            </tr>
+          </thead>
+          <tbody>
+            {summary.map((b) => (
+              <tr key={b.bid_id} className="border-t border-hairline">
+                <td className="px-3 py-1.5">{b.company_name ?? 'Unnamed'}</td>
+                <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">
+                  {formatMoney(b.submitted_total, currency)}
+                </td>
+                <td className="px-3 py-1.5 text-right tabular-nums">
+                  {/* An estimate standing in for a price, labelled as one. The dash means nothing
+                      is missing, which is a different thing from a gap worth zero. */}
+                  {b.lines_unpriced === 0 ? (
+                    <span className="text-muted-foreground">&mdash;</span>
+                  ) : (
+                    <span className="text-amber-800 dark:text-amber-400">
+                      +{formatMoney(b.unpriced_value ?? 0, currency)}
+                      <span className="ml-1 text-[11px]">
+                        ({b.lines_unpriced} line{b.lines_unpriced === 1 ? '' : 's'})
+                      </span>
+                    </span>
+                  )}
+                </td>
+                <td className="px-3 py-1.5 text-right font-medium tabular-nums">
+                  {formatMoney(b.comparable_total, currency)}
+                  {b.comparable_total === cheapestComparable && (
+                    <Badge variant="success" className="ml-2">lowest</Badge>
+                  )}
+                </td>
+                <td className="px-3 py-1.5">
+                  <div className="flex flex-wrap gap-1">
+                    {b.lines_low_outlier > 0 && (
+                      <Badge variant="warning">{b.lines_low_outlier} well under</Badge>
+                    )}
+                    {b.lines_high_outlier > 0 && (
+                      <Badge variant="neutral">{b.lines_high_outlier} well over</Badge>
+                    )}
+                    {b.is_complete && b.lines_low_outlier === 0 && b.lines_high_outlier === 0 && (
+                      <span className="text-xs text-muted-foreground">nothing to query</span>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Every question below names a line the analysis flagged. There is no path to a question
+          without a finding &mdash; a query nothing supports teaches people the list is padding, and
+          the two that matter get skimmed with the rest. */}
+      {clarifications.length > 0 && (
+        <div className="space-y-2 pt-1">
+          <p className="text-xs text-muted-foreground">
+            Questions these numbers raise &mdash; each one names the line it came from.
+          </p>
+          {clarifications.map((c) => (
+            <div key={c.bidId} className="rounded-sm border border-hairline bg-surface-sunken p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-800 dark:text-amber-400" />
+                <span className="text-sm font-medium">{c.companyName ?? 'Unnamed'}</span>
+                <span className="text-xs text-muted-foreground">{c.items.length} to ask</span>
+                <Button
+                  size="sm" variant="ghost" className="ml-auto"
+                  onClick={() => void copy(clarificationsAsText(c), c.companyName ?? 'this bidder')}
+                >
+                  <Copy className="h-3.5 w-3.5 mr-1" /> Copy
+                </Button>
+              </div>
+              <ul className="mt-2 space-y-1.5">
+                {c.items.map((q, i) => (
+                  <li key={`${c.bidId}-${i}`} className="text-xs text-muted-foreground">
+                    {q.question}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 };
 

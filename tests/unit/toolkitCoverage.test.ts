@@ -1262,6 +1262,27 @@ describe('a routed turn shows which specialist answered', () => {
  * the defect itself, so "a handler exists" is the wrong question — "something reaches the
  * screen" is the right one.
  */
+/**
+ * Direct-run tools that put NOTHING on screen — measured 2026-09-04, and SHRINK-ONLY.
+ *
+ * Each of these is called by a quick-start deterministically, with no model turn, and emits no
+ * display chunk: the user presses the button, reads the quick-start's `done` copy and sees no
+ * data at all. It is the same defect the construction tools shipped with, and the reason the
+ * check above exists.
+ *
+ * They are listed rather than fixed here because fixing twenty-one tools across nine files is a
+ * different piece of work from the one that found them. The list is what stops a TWENTY-SECOND
+ * arriving, and the test below fails when an entry is fixed — so it can only ever get shorter.
+ * Do not add to it.
+ */
+const SILENT_DIRECT_RUNS = new Set([
+  'add_task', 'analytics_analysis', 'assess_finance', 'assess_project', 'assess_property',
+  'business_analysis', 'company_enrichment', 'contact_discovery', 'find_project',
+  'get_finance_assessment', 'get_project_assessment', 'get_property_assessment',
+  'knowledge_base_search', 'list_my_projects', 'manage_hr', 'manage_social', 'research_analysis',
+  'scrape_materials_from_url', 'seo_keyword_research', 'web_fetch', 'web_search',
+]);
+
 describe('a direct-run quick-start renders its tool output', () => {
   const hub = read(join(ROOT, 'src/components/features/ai/AgentHub.tsx'));
 
@@ -1307,8 +1328,49 @@ describe('a direct-run quick-start renders its tool output', () => {
       })),
   );
 
+  /** Chunks a factory body emits that are meant for the SCREEN — not status, not a form signal. */
+  const renderableChunksOf = (_tool: string, factoryBody: string): string[] => {
+    const emitted = new Set<string>();
+    for (const m of factoryBody.matchAll(/onChunk[^\n]{0,40}\(\s*\{/g)) {
+      const t = /\btype:\s*'([a-z0-9_]+)'/.exec(factoryBody.slice(m.index!, m.index! + 600));
+      if (t) emitted.add(t[1]);
+    }
+    return [...emitted].filter((t) => t !== 'tool_progress' && !t.endsWith('_form_open'));
+  };
+
   it('there are direct-run quick-starts to check', () => {
     expect(runStarts.length).toBeGreaterThan(40);
+  });
+
+  it('the silent-run list only shrinks — a fixed tool must be removed from it', () => {
+    // Without this the list is a place things go to be forgotten. A tool that has since learned to
+    // render is no longer an exception, and leaving it listed would let it silently regress.
+    //
+    // It narrows to the pinned action exactly as the per-quick-start check does. Scanning the whole
+    // factory instead reported `manage_hr` and `manage_social` as fixed on the strength of chunks
+    // emitted by branches their quick-start can never reach — two guards disagreeing about the
+    // same question, which is how one of them ends up ignored.
+    const stillSilent = new Set<string>();
+    for (const { tool, action } of runStarts) {
+      const entry = byName.get(tool);
+      if (!entry) continue;
+      const src = read(join(ROOT, entry.file));
+      const start = src.indexOf(`export const ${entry.factory}`);
+      if (start === -1) continue;
+      const after = src.indexOf('\nexport const create', start + 1);
+      let body = src.slice(start, after === -1 ? src.length : after);
+      if (action) {
+        const branchAt = body.indexOf(`action === '${action}'`);
+        if (branchAt !== -1) {
+          const nextAction = body.indexOf("action === '", branchAt + 20);
+          body = body.slice(branchAt, nextAction === -1 ? body.length : nextAction);
+        }
+      }
+      if (renderableChunksOf(tool, body).length === 0) stillSilent.add(tool);
+    }
+    const fixed = [...SILENT_DIRECT_RUNS].filter((t) => !stillSilent.has(t));
+    expect(fixed, `these now render and must come off SILENT_DIRECT_RUNS: ${fixed.join(', ')}`)
+      .toEqual([]);
   });
 
   it.each(runStarts)('$toolkit → "$label" renders every chunk $tool emits', ({ tool, label, action }) => {
@@ -1336,6 +1398,23 @@ describe('a direct-run quick-start renders its tool output', () => {
       // Scan forward from the emit for this object literal's `type:`.
       const t = /\btype:\s*'([a-z0-9_]+)'/.exec(factoryBody.slice(m.index!, m.index! + 600));
       if (t) emitted.add(t[1]);
+    }
+
+    // The hole this closes: `tool_progress` is skipped below (rightly — it is a status line, not
+    // a result), so a tool that emits ONLY progress had no chunk left for the loop to check and
+    // passed with nothing to render. All five construction tools shipped in exactly that state,
+    // four of them with a `run:` quick-start: the user pressed the button, read the quick-start's
+    // cheerful `done` copy and saw no numbers at all. Emitting nothing is the worst case here, not
+    // the empty one.
+    const renderable = renderableChunksOf(tool, factoryBody);
+    if (!SILENT_DIRECT_RUNS.has(tool)) {
+      expect(
+        renderable.length > 0,
+        `"${label}" runs ${tool} deterministically — no model turn, so nothing narrates the ` +
+          `result — and ${tool} emits no display chunk at all. The user gets the quick-start's ` +
+          `"done" copy over an empty screen. Emit a result chunk and register it in ` +
+          `AGENT_RESULT_TITLES.`,
+      ).toBe(true);
     }
 
     for (const t of emitted) {

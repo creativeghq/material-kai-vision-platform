@@ -99,7 +99,7 @@ export const createProjectCvrTool = (
       );
       const uncoded = rows.find((r) => r.cost_code_id === null);
 
-      return JSON.stringify({
+      const payload = {
         success: true,
         project_id: id,
         url: `/projects/${id}?tab=finance`,
@@ -121,7 +121,16 @@ export const createProjectCvrTool = (
           // Null means there is no value to take a percentage of — a different fact from 0%.
           margin_pct: r.margin_pct === null ? null : Number(r.margin_pct),
         })),
-      });
+      };
+
+      // The DISPLAY chunk. A `run:` quick-start calls this tool deterministically with no
+      // model turn, so nothing narrates the answer — without this the user gets the
+      // quick-start's cheerful "done" line over an empty screen.
+      try {
+        onChunk?.({ type: 'construction_cvr', ...payload, timestamp: Date.now() });
+      } catch { /* stream may be closed */ }
+
+      return JSON.stringify(payload);
     },
     {
       name: 'project_cvr',
@@ -169,7 +178,7 @@ export const createProjectApplicationsTool = (
       const rows = (apps ?? []) as Array<Record<string, unknown>>;
       const retention = (ret ?? {}) as Record<string, unknown>;
 
-      return JSON.stringify({
+      const payload = {
         success: true,
         project_id: id,
         url: `/projects/${id}?tab=finance`,
@@ -193,7 +202,16 @@ export const createProjectApplicationsTool = (
           variance: r.variance === null ? null : money(r.variance),
           due_on: r.due_on,
         })),
-      });
+      };
+
+      // The DISPLAY chunk. A `run:` quick-start calls this tool deterministically with no
+      // model turn, so nothing narrates the answer — without this the user gets the
+      // quick-start's cheerful "done" line over an empty screen.
+      try {
+        onChunk?.({ type: 'construction_applications', ...payload, timestamp: Date.now() });
+      } catch { /* stream may be closed */ }
+
+      return JSON.stringify(payload);
     },
     {
       name: 'project_applications',
@@ -245,7 +263,7 @@ export const createListVariationsTool = (
       const rows = (data ?? []) as Array<Record<string, unknown>>;
       const approved = rows.filter((r) => r.status === 'approved');
 
-      return JSON.stringify({
+      const payload = {
         success: true,
         project_id: id,
         url: `/projects/${id}?tab=finance`,
@@ -266,7 +284,16 @@ export const createListVariationsTool = (
           raised_on: r.raised_on,
           decided_at: r.decided_at,
         })),
-      });
+      };
+
+      // The DISPLAY chunk. A `run:` quick-start calls this tool deterministically with no
+      // model turn, so nothing narrates the answer — without this the user gets the
+      // quick-start's cheerful "done" line over an empty screen.
+      try {
+        onChunk?.({ type: 'construction_variations', ...payload, timestamp: Date.now() });
+      } catch { /* stream may be closed */ }
+
+      return JSON.stringify(payload);
     },
     {
       name: 'list_variations',
@@ -329,7 +356,7 @@ export const createTenderStatusTool = (
         byPackage.set(k, [...(byPackage.get(k) ?? []), b]);
       }
 
-      return JSON.stringify({
+      const payload = {
         success: true,
         project_id: id,
         url: `/projects/${id}?tab=finance`,
@@ -356,7 +383,16 @@ export const createTenderStatusTool = (
             })),
           };
         }),
-      });
+      };
+
+      // The DISPLAY chunk. A `run:` quick-start calls this tool deterministically with no
+      // model turn, so nothing narrates the answer — without this the user gets the
+      // quick-start's cheerful "done" line over an empty screen.
+      try {
+        onChunk?.({ type: 'construction_tenders', ...payload, timestamp: Date.now() });
+      } catch { /* stream may be closed */ }
+
+      return JSON.stringify(payload);
     },
     {
       name: 'tender_status',
@@ -367,6 +403,149 @@ export const createTenderStatusTool = (
         + 'separately whether an enquiry has actually been SENT versus merely invited, because a '
         + 'subcontractor who was never emailed is not late.',
       schema: z.object({
+        project_id: z.string().optional().describe('The project id, when you already have it'),
+        project_name: z.string().optional().describe('The project name, if you do not have the id'),
+      }),
+    },
+  );
+};
+
+
+/**
+ * Bid analysis — the numbers a package's bids actually say, so the model can talk about them
+ * without ever producing one.
+ *
+ * Every figure here comes from `get_tender_bid_analysis` / `get_tender_bid_summary`. The model is
+ * given the derivation and asked to write about it; the moment it is allowed to add up a column
+ * itself, its arithmetic and the ledger's start to disagree and nothing raises.
+ *
+ * The one thing worth saying out loud to a model: rank on `comparable_total`, never on
+ * `submitted_total`. Two bids compare only once they cover the same scope, and the cheapest
+ * submitted figure is regularly the one with a hole in it.
+ */
+export const createBidAnalysisTool = (
+  userId: string,
+  workspaceId: string | null,
+  onChunk?: (chunk: any) => void,
+) => {
+  return tool(
+    async (
+      { package_reference, package_name, project_id, project_name }:
+      { package_reference?: string; package_name?: string; project_id?: string; project_name?: string },
+    ) => {
+      const denied = await moduleGate(workspaceId, MODULE_SLUG);
+      if (denied) return denied;
+
+      const id = await resolveProject(userId, workspaceId, project_id, project_name);
+      if (!id) return notFound(project_name);
+
+      onChunk?.({ type: 'tool_progress', status: 'Comparing the bids…', timestamp: Date.now() });
+
+      const sb = svcClient();
+      const { data: packages, error } = await sb
+        .from('tender_packages')
+        .select('id, reference, name, status, currency')
+        .eq('project_id', id)
+        .order('reference');
+      if (error) return JSON.stringify({ success: false, error: error.message });
+
+      let pkgs = (packages ?? []) as Array<Record<string, unknown>>;
+      const needle = (package_reference ?? package_name ?? '').trim().toLowerCase();
+      if (needle) {
+        pkgs = pkgs.filter((p) =>
+          String(p.reference ?? '').toLowerCase() === needle
+          || String(p.name ?? '').toLowerCase().includes(needle));
+      }
+      if (pkgs.length === 0) {
+        return JSON.stringify({
+          success: true, project_id: id, packages: [], count: 0,
+          note: needle
+            ? `No tender package on this project matches "${package_reference ?? package_name}".`
+            : 'This project has no tender packages yet.',
+        });
+      }
+
+      const out: Array<Record<string, unknown>> = [];
+      for (const p of pkgs.slice(0, 6)) {
+        const pid = String(p.id);
+        const [{ data: summary }, { data: lines }] = await Promise.all([
+          sb.rpc('get_tender_bid_summary', { p_package_id: pid }),
+          sb.rpc('get_tender_bid_analysis', { p_package_id: pid }),
+        ]);
+        const rows = (summary ?? []) as Array<Record<string, unknown>>;
+        const flagged = ((lines ?? []) as Array<Record<string, unknown>>)
+          .filter((l) => l.flag !== 'ok');
+
+        out.push({
+          reference: p.reference,
+          name: p.name,
+          status: p.status,
+          currency: p.currency,
+          comparable_bids: rows.length,
+          // Said explicitly rather than left to be inferred from an empty list: "nobody has come
+          // back yet" and "everybody came back at the same price" are different situations, and an
+          // empty array reads as neither.
+          note: rows.length === 0
+            ? 'No bids have been received on this package yet, so there is nothing to compare.'
+            : undefined,
+          bids: rows.map((b) => ({
+            subcontractor: b.company_name,
+            submitted_total: b.submitted_total,
+            unpriced_lines: b.lines_unpriced,
+            unpriced_value_at_others_rates: b.unpriced_value,
+            comparable_total: b.comparable_total,
+            covers_the_whole_scope: b.is_complete,
+            lines_well_under_the_others: b.lines_low_outlier,
+            lines_well_over_the_others: b.lines_high_outlier,
+          })),
+          queries: flagged.slice(0, 25).map((l) => ({
+            subcontractor: l.company_name,
+            item: l.item_ref ? `${l.item_ref} ${l.description}` : l.description,
+            issue: l.flag,
+            their_amount: l.amount,
+            median_of_the_others: l.median_amount,
+            variance_pct: l.variance_pct,
+            priced_by: l.bidders_priced,
+          })),
+        });
+      }
+
+      const payload = {
+        success: true,
+        project_id: id,
+        url: `/projects/${id}?tab=finance`,
+        count: out.length,
+        packages: out,
+        how_to_read_this:
+          'Rank on comparable_total, never on submitted_total: a bid is only comparable once it '
+          + 'covers the same scope, and unpriced_value_at_others_rates is what a bidder left out '
+          + 'valued at what everybody else charged. An unpriced line is an omission, never a zero. '
+          + 'Every figure here is already derived — report them, do not recompute or total them.',
+      };
+
+      // The DISPLAY chunk. A `run:` quick-start calls this tool deterministically with no
+      // model turn, so nothing narrates the answer — without this the user gets the
+      // quick-start's cheerful "done" line over an empty screen.
+      try {
+        onChunk?.({ type: 'construction_bid_analysis', ...payload, timestamp: Date.now() });
+      } catch { /* stream may be closed */ }
+
+      return JSON.stringify(payload);
+    },
+    {
+      name: 'tender_bid_analysis',
+      description:
+        'Compare the bids on a construction tender package: what each subcontractor submitted, '
+        + 'what they left unpriced and what that omission is worth at the other bidders\' rates, '
+        + 'and which line prices are well under or well over the rest. Use for "which groundworks '
+        + 'bid should we take", "is the cheapest bid actually the cheapest", "what should I ask '
+        + 'them before we award". Reports a COMPARABLE total alongside the submitted one, because '
+        + 'the lowest submitted figure is regularly the one with a hole in it.',
+      schema: z.object({
+        package_reference: z.string().optional()
+          .describe('The package reference, e.g. PKG-003, when you know it'),
+        package_name: z.string().optional()
+          .describe('Part of the package name, e.g. "groundworks". Omit both to compare every package.'),
         project_id: z.string().optional().describe('The project id, when you already have it'),
         project_name: z.string().optional().describe('The project name, if you do not have the id'),
       }),

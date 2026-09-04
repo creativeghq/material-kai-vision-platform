@@ -2592,7 +2592,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     description: 'The contractor money chain: cost report, payment applications and retention, the variation register, and where each tender package has got to.',
     icon: 'HardHat',
     moduleSlug: 'projects',
-    tool_ids: ['project_cvr', 'project_applications', 'list_variations', 'tender_status'],
+    tool_ids: ['project_cvr', 'project_applications', 'list_variations', 'tender_status', 'tender_bid_analysis'],
     quick_starts: [
       {
         label: 'How is this job doing?', description: 'Value against cost, by cost code', icon: 'Scale',
@@ -2624,6 +2624,15 @@ export const TOOLKITS: ToolkitDefinition[] = [
         done: 'Here is where each package stands.',
         promptTemplate: 'Show the tender packages on the project "{{project_name}}".',
         run: { tool: 'tender_status' },
+        autoFields: true,
+      },
+      {
+        label: 'Is the cheapest bid cheapest?', description: 'Comparable totals and what to query',
+        icon: 'Scale',
+        prompt: 'Compare the bids on this project.',
+        done: 'Here is how the bids actually compare.',
+        promptTemplate: 'Compare the tender bids on the project "{{project_name}}".',
+        run: { tool: 'tender_bid_analysis' },
         autoFields: true,
       },
     ],

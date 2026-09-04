@@ -2234,6 +2234,18 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'tender_bid_analysis',
+    file: 'supabase/functions/_shared/tools/construction-tools.ts',
+    factory: 'createBidAnalysisTool',
+    description: 'Compare the bids on a construction tender package: what each subcontractor submitted, what they left unpriced and what that omission is worth at the other bidders\' rates, and which line prices are well under or well o…',
+    params: [
+      { name: 'package_reference', type: 'string', optional: true, description: 'The package reference, e.g. PKG-003, when you know it' },
+      { name: 'package_name', type: 'string', optional: true, description: 'Part of the package name, e.g. "groundworks". Omit both to compare every package.' },
+      { name: 'project_id', type: 'string', optional: true, description: 'The project id, when you already have it' },
+      { name: 'project_name', type: 'string', optional: true, description: 'The project name, if you do not have the id' },
+    ],
+  },
+  {
     name: 'tender_status',
     file: 'supabase/functions/_shared/tools/construction-tools.ts',
     factory: 'createTenderStatusTool',

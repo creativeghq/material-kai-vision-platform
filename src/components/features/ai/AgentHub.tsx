@@ -302,6 +302,16 @@ const REASONING_STEP_TONE: Record<'thinking' | 'tool_call' | 'tool_result' | 'it
 // Chunk types that were emitted but rendered as plain text. Routed
 // through one generic AgentResultCard (title + structured payload).
 const AGENT_RESULT_TITLES: Record<string, string> = {
+  // Construction. All five carry a `run:` quick-start — a deterministic call with NO model turn,
+  // so nothing narrates the answer. They shipped emitting only `tool_progress`, which meant the
+  // user pressed "How is this job doing?", read the quick-start's cheerful done line and saw no
+  // numbers whatsoever. The coverage guard skips `tool_progress` (rightly — it is a status line,
+  // not a result), so with no other chunk there was nothing for it to object to.
+  construction_cvr: 'Cost report',
+  construction_applications: 'Payment applications',
+  construction_variations: 'Variations',
+  construction_tenders: 'Tender packages',
+  construction_bid_analysis: 'Bid analysis',
   // Cross-entity record lookup. The "Find a record" quick-start is a DIRECT run (no model turn),
   // so this card is the only thing that puts the matches on screen.
   record_search_results: 'Records found',

@@ -77,6 +77,50 @@ export interface ComparisonRow {
   is_lowest: boolean;
 }
 
+/**
+ * One bid line with the derivation on it. `flag` and `variance_pct` come from SQL — nothing here
+ * decides what counts as an outlier, so the screen and any later report cannot disagree.
+ */
+export interface BidAnalysisRow {
+  package_item_id: string;
+  item_ref: string | null;
+  description: string;
+  unit: string | null;
+  quantity: number | null;
+  bid_id: string;
+  company_name: string | null;
+  amount: number | null;
+  median_amount: number | null;
+  variance_pct: number | null;
+  bidders_priced: number;
+  flag: 'unpriced' | 'low_outlier' | 'high_outlier' | 'ok';
+}
+
+/**
+ * The per-bid answer. `comparable_total` is the only figure worth ranking on: two bids compare
+ * only once they cover the same scope, and `submitted_total` is whatever the bidder chose to
+ * price. `unpriced_value` stays separate rather than folded in silently — an estimate standing in
+ * for a price is a different KIND of number, and whoever awards has to see how much of the
+ * comparison is one.
+ */
+export interface BidSummaryRow {
+  bid_id: string;
+  company_id: string | null;
+  company_name: string | null;
+  status: BidStatus;
+  submitted_at: string | null;
+  lines_total: number;
+  lines_priced: number;
+  lines_unpriced: number;
+  lines_low_outlier: number;
+  lines_high_outlier: number;
+  submitted_total: number;
+  unpriced_value: number | null;
+  comparable_total: number;
+  /** True only when nothing is missing — i.e. the submitted figure IS the comparable one. */
+  is_complete: boolean;
+}
+
 const PKG_COLUMNS =
   'id, workspace_id, project_id, reference, name, scope, status, cost_code_id, currency, ' +
   'due_at, issued_at, awarded_bid_id, awarded_order_id';
@@ -246,6 +290,27 @@ export const tendersService = {
     const { data, error } = await supabase.rpc('get_package_bid_comparison', { p_package_id: packageId });
     if (error) throw readable(error);
     return (data ?? []) as ComparisonRow[];
+  },
+
+  /**
+   * The per-line analysis: what each bidder charged against what the others did.
+   *
+   * The comparison table already refuses to call an unpriced line the cheapest. This says what the
+   * omission is WORTH, which is the difference between "Alpha, €2,600" and "Alpha, €2,600 plus a
+   * line nobody priced, ~€1,850 at the others' rates" — two offers that look the same on a screen
+   * and are not the same offer.
+   */
+  async analysis(packageId: string): Promise<BidAnalysisRow[]> {
+    const { data, error } = await supabase.rpc('get_tender_bid_analysis', { p_package_id: packageId });
+    if (error) throw readable(error);
+    return (data ?? []) as BidAnalysisRow[];
+  },
+
+  /** Per bid, ranked by the COMPARABLE total rather than the submitted one. */
+  async bidSummary(packageId: string): Promise<BidSummaryRow[]> {
+    const { data, error } = await supabase.rpc('get_tender_bid_summary', { p_package_id: packageId });
+    if (error) throw readable(error);
+    return (data ?? []) as BidSummaryRow[];
   },
 
   /**
