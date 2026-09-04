@@ -125,6 +125,9 @@ export interface ProjectTask {
   completed_at: string | null;
   /** WS3 #285 scheduling. `due_date` is kept — it is the deadline, these are the planned span. */
   start_date: string | null;
+  /** What the programme said when the baseline was taken. Null until one is set. */
+  baseline_start_date?: string | null;
+  baseline_end_date?: string | null;
   end_date: string | null;
   progress_pct: number;
   is_milestone: boolean;
@@ -950,6 +953,27 @@ class ProjectsService {
       .rpc('list_project_task_assignees', { p_workspace_id: workspaceId });
     if (error) throw error;
     return (data ?? []) as any[];
+  }
+
+  /**
+   * Freeze the current dates as the baseline. ONE statement in the database, so a project can
+   * never be half-baselined — a partial snapshot reports slippage on the tasks it copied and none
+   * on the tasks it did not, which is worse than having no baseline at all.
+   */
+  async setBaseline(projectId: string, note?: string): Promise<number> {
+    const { data, error } = await supabase.rpc('set_project_baseline', {
+      p_project_id: projectId,
+      ...(note ? { p_note: note } : {}),
+    });
+    if (error) throw error;
+    return (data as number) ?? 0;
+  }
+
+  /** Clears BOTH halves: a project stamped as baselined whose tasks carry no baseline dates
+   *  would report every task as on time for ever. */
+  async clearBaseline(projectId: string): Promise<void> {
+    const { error } = await supabase.rpc('clear_project_baseline', { p_project_id: projectId });
+    if (error) throw error;
   }
 
   async listTasks(projectId: string): Promise<ProjectTaskWithSubtasks[]> {

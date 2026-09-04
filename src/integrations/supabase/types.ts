@@ -22184,6 +22184,8 @@ export type Database = {
       project_tasks: {
         Row: {
           assignee_id: string | null
+          baseline_end_date: string | null
+          baseline_start_date: string | null
           completed_at: string | null
           cost_code_id: string | null
           created_at: string
@@ -22206,6 +22208,8 @@ export type Database = {
         }
         Insert: {
           assignee_id?: string | null
+          baseline_end_date?: string | null
+          baseline_start_date?: string | null
           completed_at?: string | null
           cost_code_id?: string | null
           created_at?: string
@@ -22228,6 +22232,8 @@ export type Database = {
         }
         Update: {
           assignee_id?: string | null
+          baseline_end_date?: string | null
+          baseline_start_date?: string | null
           completed_at?: string | null
           cost_code_id?: string | null
           created_at?: string
@@ -22400,6 +22406,8 @@ export type Database = {
         Row: {
           accepted_quote_count: number
           actual_amount: number
+          baseline_note: string | null
+          baseline_set_at: string | null
           budget_amount: number | null
           budget_currency: string
           category_id: string | null
@@ -22426,6 +22434,8 @@ export type Database = {
         Insert: {
           accepted_quote_count?: number
           actual_amount?: number
+          baseline_note?: string | null
+          baseline_set_at?: string | null
           budget_amount?: number | null
           budget_currency?: string
           category_id?: string | null
@@ -22452,6 +22462,8 @@ export type Database = {
         Update: {
           accepted_quote_count?: number
           actual_amount?: number
+          baseline_note?: string | null
+          baseline_set_at?: string | null
           budget_amount?: number | null
           budget_currency?: string
           category_id?: string | null
@@ -34885,6 +34897,7 @@ export type Database = {
         Args: { p_dry_run?: boolean; p_min_age_minutes?: number }
         Returns: Json
       }
+      clear_project_baseline: { Args: { p_project_id: string }; Returns: undefined }
       close_expired_job_postings: { Args: never; Returns: number }
       close_pos_session: {
         Args: { p_counted_cash?: number; p_session_id: string }
@@ -39184,6 +39197,7 @@ export type Database = {
         Args: { p_channel_id: string }
         Returns: undefined
       }
+      set_project_baseline: { Args: { p_project_id: string; p_note?: string }; Returns: number }
       set_quote_public_share: {
         Args: { p_enabled: boolean; p_quote_id: string }
         Returns: {

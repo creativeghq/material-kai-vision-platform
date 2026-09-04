@@ -20,7 +20,8 @@ import {
   projectsService, type ProjectTask, type ProjectTaskDependency,
 } from '../../services/projectsService';
 import {
-  criticalPathIds, rollupProgress, scheduleWindow, barGeometry, shiftTask,
+  criticalPathIds, computeNetwork, baselineVarianceDays,
+  rollupProgress, scheduleWindow, barGeometry, shiftTask,
   parseDay, type ScheduleTask,
 } from '../../lib/schedule';
 import { todayLocalISO } from '@/utils/datetime';
@@ -33,6 +34,10 @@ const toScheduleTask = (t: ProjectTask): ScheduleTask => ({
   id: t.id, title: t.title,
   start_date: t.start_date, end_date: t.end_date,
   progress_pct: t.progress_pct ?? 0, is_milestone: t.is_milestone ?? false,
+  // Carried so slippage can be measured against what the programme SAID, not just shown as
+  // wherever the dates have drifted to.
+  baseline_start_date: t.baseline_start_date ?? null,
+  baseline_end_date: t.baseline_end_date ?? null,
 });
 
 export const ScheduleTab: React.FC<{ projectId: string; isOwner: boolean }> = ({ projectId, isOwner }) => {
@@ -42,6 +47,7 @@ export const ScheduleTab: React.FC<{ projectId: string; isOwner: boolean }> = ({
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<ProjectTask | null>(null);
   const [drag, setDrag] = useState<{ id: string; startX: number; deltaDays: number } | null>(null);
+  const [baselineBusy, setBaselineBusy] = useState(false);
   const timelineRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -66,9 +72,44 @@ export const ScheduleTab: React.FC<{ projectId: string; isOwner: boolean }> = ({
   }, [projectId, toast]);
   useEffect(() => { void load(); }, [load]);
 
+  const saveBaseline = async () => {
+    setBaselineBusy(true);
+    try {
+      const n = await projectsService.setBaseline(projectId);
+      await load();
+      toast({ title: 'Baseline set', description: `${n} task${n === 1 ? '' : 's'} frozen as the plan.` });
+    } catch (err: any) {
+      toast({ title: 'Could not set the baseline', description: err?.message, variant: 'destructive' });
+    } finally { setBaselineBusy(false); }
+  };
+
+  const dropBaseline = async () => {
+    setBaselineBusy(true);
+    try {
+      await projectsService.clearBaseline(projectId);
+      await load();
+      toast({ title: 'Baseline cleared' });
+    } catch (err: any) {
+      toast({ title: 'Could not clear the baseline', description: err?.message, variant: 'destructive' });
+    } finally { setBaselineBusy(false); }
+  };
+
   const scheduleTasks = useMemo(() => tasks.map(toScheduleTask), [tasks]);
   const win = useMemo(() => scheduleWindow(scheduleTasks), [scheduleTasks]);
   const critical = useMemo(() => criticalPathIds(scheduleTasks, deps), [scheduleTasks, deps]);
+  /**
+   * The float on every task, from the same pass that decides what is critical — so a bar
+   * highlighted as critical and the slack printed beside it can never disagree.
+   */
+  const network = useMemo(() => computeNetwork(scheduleTasks, deps), [scheduleTasks, deps]);
+  /** How far the programme has moved since it was baselined. Null-safe: no baseline, no claim. */
+  const slippage = useMemo(() => {
+    const measured = scheduleTasks
+      .map(baselineVarianceDays)
+      .filter((v): v is number => v !== null);
+    if (measured.length === 0) return null;
+    return { worst: Math.max(...measured), late: measured.filter((v) => v > 0).length, measured: measured.length };
+  }, [scheduleTasks]);
   const completion = useMemo(() => rollupProgress(scheduleTasks), [scheduleTasks]);
   const timelineWidth = win.days * PX_PER_DAY;
   const rowIndex = useMemo(() => new Map(tasks.map((t, i) => [t.id, i])), [tasks]);
@@ -166,7 +207,7 @@ export const ScheduleTab: React.FC<{ projectId: string; isOwner: boolean }> = ({
             </CardTitle>
             <p className="text-xs text-muted-foreground">
               {scheduled.length} of {tasks.length} tasks scheduled
-              {critical.size > 0 && <> · longest chain highlighted</>}
+              {critical.size > 0 && <> · {critical.size} on the critical path</>}
             </p>
           </div>
           <div className="text-right">
@@ -174,6 +215,55 @@ export const ScheduleTab: React.FC<{ projectId: string; isOwner: boolean }> = ({
             <p className="text-xl font-medium">{completion}%</p>
           </div>
         </CardHeader>
+
+        {/* The baseline. Without one a Gantt only shows where things are NOW, so slippage is
+            invisible — the dates quietly become the new plan. */}
+        {isOwner && (
+          <div className="flex flex-wrap items-center gap-3 border-b border-hairline bg-surface-sunken px-5 py-2 text-xs">
+            {slippage === null ? (
+              <>
+                <span className="text-muted-foreground">
+                  No baseline set — nothing to measure slippage against.
+                </span>
+                <Button
+                  size="sm" variant="outline" className="ml-auto" disabled={baselineBusy || scheduled.length === 0}
+                  onClick={() => void saveBaseline()}
+                >
+                  {baselineBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                  Set baseline
+                </Button>
+              </>
+            ) : (
+              <>
+                <span className="text-muted-foreground">
+                  Against the baseline:{' '}
+                  {slippage.late === 0 ? (
+                    <span className="font-medium text-emerald-700 dark:text-emerald-400">nothing late</span>
+                  ) : (
+                    <span className="font-medium text-destructive">
+                      {slippage.late} task{slippage.late === 1 ? '' : 's'} late, worst {slippage.worst} day
+                      {slippage.worst === 1 ? '' : 's'}
+                    </span>
+                  )}
+                  {/* Said explicitly: a task with no baseline has not been measured, and counting
+                      it as on time is how a half-baselined programme looks healthy. */}
+                  {slippage.measured < scheduled.length && (
+                    <> · {scheduled.length - slippage.measured} not measured</>
+                  )}
+                </span>
+                <div className="ml-auto flex gap-2">
+                  <Button size="sm" variant="ghost" disabled={baselineBusy} onClick={() => void saveBaseline()}>
+                    Re-baseline
+                  </Button>
+                  <Button size="sm" variant="ghost" disabled={baselineBusy} onClick={() => void dropBaseline()}>
+                    Clear
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
         <CardContent className="p-0">
           {tasks.length === 0 ? (
             <p className="py-12 text-center text-sm text-muted-foreground">
@@ -195,6 +285,18 @@ export const ScheduleTab: React.FC<{ projectId: string; isOwner: boolean }> = ({
                   >
                     {t.is_milestone && <Diamond className="h-3 w-3 shrink-0 text-amber-800 dark:text-amber-400" />}
                     <span className={`truncate ${t.parent_task_id ? 'pl-3 text-muted-foreground' : ''}`}>{t.title}</span>
+                    {/* Slack, from the same pass that decides what is critical — so a highlighted
+                        bar and the float printed beside it can never disagree. Critical tasks show
+                        nothing rather than "0d": zero float IS being critical, said twice. */}
+                    {(() => {
+                      const n = network?.get(t.id);
+                      if (!n || n.isCritical || n.totalFloat <= 0) return null;
+                      return (
+                        <span className="ml-auto shrink-0 text-[10px] tabular-nums text-muted-foreground">
+                          +{n.totalFloat}d
+                        </span>
+                      );
+                    })()}
                   </button>
                 ))}
               </div>

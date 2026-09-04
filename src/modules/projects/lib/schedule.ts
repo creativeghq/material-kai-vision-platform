@@ -13,6 +13,9 @@ export interface ScheduleTask {
   end_date: string | null;
   progress_pct: number;
   is_milestone: boolean;
+  /** What the programme said when the baseline was taken. Null until one is set. */
+  baseline_start_date?: string | null;
+  baseline_end_date?: string | null;
 }
 
 export interface ScheduleEdge {
@@ -75,48 +78,126 @@ export function topologicalOrder(tasks: ScheduleTask[], edges: ScheduleEdge[]): 
   return order.length === tasks.length ? order : null;
 }
 
+/** One task's place in the network: when it can run, when it must run, and the slack between. */
+export interface TaskNetworkNode {
+  id: string;
+  /** Day offsets from the start of the network, in duration days. */
+  earlyStart: number;
+  earlyFinish: number;
+  lateStart: number;
+  lateFinish: number;
+  /** Days this task can slip without moving the end of the project. */
+  totalFloat: number;
+  /** Zero float — moving it moves the completion date. */
+  isCritical: boolean;
+}
+
 /**
- * The longest chain by duration — the naive critical path. Returns the set of task ids on it.
+ * The critical path method: a forward pass for the earliest each task can run, a backward pass for
+ * the latest it can run without delaying the project, and the float between them.
  *
- * "Critical" here means "on the longest dependency chain", not "has zero float against a deadline";
- * without a project finish date those are different questions and only the first is answerable.
+ * This replaced a longest-single-chain heuristic. Two things were wrong with that: it reported ONE
+ * chain when a real programme routinely has several equally critical ones, and it produced no
+ * FLOAT — which is the number a site manager actually uses, because "this has four days of slack"
+ * is what decides whether a late delivery matters.
+ *
+ * Still deliberately NOT a full planning engine: no calendars, no resource levelling, no lag, and
+ * only finish-to-start is treated as a real constraint. Those change what a date MEANS, and
+ * inventing them here would produce confident dates nobody agreed to.
+ *
+ * Returns null when the edges contain a cycle — the DB rejects those at write time, so null means
+ * the data is already inconsistent and a caller should fall back rather than loop.
  */
-export function criticalPathIds(tasks: ScheduleTask[], edges: ScheduleEdge[]): Set<string> {
+export function computeNetwork(
+  tasks: ScheduleTask[],
+  edges: ScheduleEdge[],
+): Map<string, TaskNetworkNode> | null {
   const order = topologicalOrder(tasks, edges);
-  if (!order || order.length === 0) return new Set();
+  if (!order) return null;
 
   const byId = new Map(tasks.map((t) => [t.id, t]));
   const ids = new Set(tasks.map((t) => t.id));
   const preds = new Map<string, string[]>();
-  for (const t of tasks) preds.set(t.id, []);
+  const succs = new Map<string, string[]>();
+  for (const t of tasks) { preds.set(t.id, []); succs.set(t.id, []); }
   for (const e of edges) {
+    // An edge naming a task that is not in this view is ignored rather than treated as a missing
+    // dependency — filtering the list must not silently change the critical path.
     if (!ids.has(e.predecessor_id) || !ids.has(e.successor_id)) continue;
     preds.get(e.successor_id)!.push(e.predecessor_id);
+    succs.get(e.predecessor_id)!.push(e.successor_id);
   }
 
-  const dist = new Map<string, number>();
-  const cameFrom = new Map<string, string | null>();
+  const dur = (id: string) => durationDays(byId.get(id)!);
+
+  // Forward pass — the earliest anything can happen.
+  const es = new Map<string, number>();
+  const ef = new Map<string, number>();
   for (const id of order) {
-    const own = durationDays(byId.get(id)!);
-    let best = 0;
-    let bestFrom: string | null = null;
-    for (const p of preds.get(id) ?? []) {
-      const d = dist.get(p) ?? 0;
-      if (d > best) { best = d; bestFrom = p; }
-    }
-    dist.set(id, best + own);
-    cameFrom.set(id, bestFrom);
+    const start = Math.max(0, ...(preds.get(id) ?? []).map((p) => ef.get(p) ?? 0));
+    es.set(id, start);
+    ef.set(id, start + dur(id));
   }
 
-  let tail: string | null = null;
-  let max = -1;
-  for (const [id, d] of dist) if (d > max) { max = d; tail = id; }
-  if (tail == null || max <= 0) return new Set();
+  const projectEnd = Math.max(0, ...order.map((id) => ef.get(id) ?? 0));
 
-  const path = new Set<string>();
-  let cur: string | null = tail;
-  while (cur) { path.add(cur); cur = cameFrom.get(cur) ?? null; }
-  return path;
+  // A network with no duration at all has no critical path to speak of — every task would come
+  // back with zero float, marking the whole programme critical, which tells nobody anything.
+  if (projectEnd <= 0) return new Map();
+
+  // Backward pass — the latest anything can happen without moving the end.
+  const lf = new Map<string, number>();
+  const ls = new Map<string, number>();
+  for (const id of [...order].reverse()) {
+    const successors = succs.get(id) ?? [];
+    const finish = successors.length === 0
+      ? projectEnd
+      : Math.min(...successors.map((sx) => ls.get(sx) ?? projectEnd));
+    lf.set(id, finish);
+    ls.set(id, finish - dur(id));
+  }
+
+  const out = new Map<string, TaskNetworkNode>();
+  for (const id of order) {
+    const totalFloat = (ls.get(id) ?? 0) - (es.get(id) ?? 0);
+    out.set(id, {
+      id,
+      earlyStart: es.get(id) ?? 0,
+      earlyFinish: ef.get(id) ?? 0,
+      lateStart: ls.get(id) ?? 0,
+      lateFinish: lf.get(id) ?? 0,
+      totalFloat,
+      isCritical: totalFloat === 0,
+    });
+  }
+  return out;
+}
+
+/**
+ * The critical tasks: every one with zero float, not merely the longest chain.
+ *
+ * Derived from `computeNetwork` rather than computed separately, so the highlighted bars and any
+ * float shown beside them can never disagree about which tasks are critical.
+ */
+export function criticalPathIds(tasks: ScheduleTask[], edges: ScheduleEdge[]): Set<string> {
+  const net = computeNetwork(tasks, edges);
+  if (!net) return new Set();
+  const out = new Set<string>();
+  for (const n of net.values()) if (n.isCritical) out.add(n.id);
+  return out;
+}
+
+/**
+ * Days later than the baseline said, or null when there is no baseline to compare against.
+ *
+ * Negative means early. Null is NOT zero: a task with no baseline has not been measured, and
+ * reporting it as on time is how a project with no baseline looks perfectly on track.
+ */
+export function baselineVarianceDays(t: ScheduleTask): number | null {
+  const planned = parseDay(t.baseline_end_date ?? null);
+  const actual = parseDay(t.end_date);
+  if (planned == null || actual == null) return null;
+  return Math.round((actual - planned) / DAY_MS);
 }
 
 /**
