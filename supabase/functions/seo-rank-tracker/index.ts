@@ -31,6 +31,19 @@ const CRON_SECRET = () => Deno.env.get('CRON_SECRET') || '';
 /** Per invocation. A run that would exceed this rotates instead of billing for it. */
 const MAX_PER_RUN = 60;
 
+/**
+ * SERP calls in flight at once. Measured 2026-09-04: one keyword takes ~19 s end to
+ * end (a 7–15 s live SERP call per `ai_usage_logs.metadata.latency_ms`, plus two
+ * writes), so checking the 60-keyword cap one at a time needs ~19 minutes, and the
+ * edge gateway cuts the request off at 150 s with a 504 `IDLE_TIMEOUT` — well before
+ * pg_net's 280 s. A sweep over a 129-keyword set checked TEN, so each keyword came
+ * round every ~13 days under a panel that said "checked daily". Nothing raised:
+ * every keyword that WAS checked was checked correctly. Twelve in flight puts the
+ * cap at ~5 rounds, ~100 s, with margin under the ceiling; DataForSEO's live
+ * endpoint has no concurrency limit at this scale and MIVAA's dispatcher adds none.
+ */
+const CONCURRENCY = 12;
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret',
@@ -108,7 +121,7 @@ async function trackWebsite(
     .limit(limit);
 
   let checked = 0, ranking = 0, failed = 0;
-  for (const kw of keywords || []) {
+  const checkOne = async (kw: any): Promise<void> => {
     let row: Record<string, unknown>;
     try {
       const r = await serp(kw.keyword, kw.country_code, kw.language_code, userId);
@@ -143,7 +156,14 @@ async function trackWebsite(
     // stay first in the rotation forever and starve every keyword behind it.
     await supabase.from('seo_tracked_keywords')
       .update({ last_checked_at: new Date().toISOString() }).eq('id', kw.id);
-  }
+  };
+
+  // A pool, not batches: a slow SERP holds up one slot, not the eleven beside it.
+  // Each worker pulls the next keyword off the shared queue until it is empty.
+  const queue: any[] = [...(keywords || [])];
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, async () => {
+    for (let kw = queue.shift(); kw; kw = queue.shift()) await checkOne(kw);
+  }));
 
   return { checked, ranking, failed };
 }

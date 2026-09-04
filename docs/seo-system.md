@@ -88,6 +88,16 @@ oldest-checked-first, so a large set becomes a slower rotation rather than a lar
 `last_checked_at` is stamped **even on failure**, or one broken keyword sits at the head of the
 queue forever and starves everything behind it.
 
+**Time is the other constraint, and it was the binding one.** One keyword takes ~19 s end to
+end (a 7–15 s live SERP call per `ai_usage_logs.metadata.latency_ms`, plus two writes), so
+checking 60 one after another needs ~19 minutes — and the edge gateway cuts the request off at
+**150 s** with a 504 `IDLE_TIMEOUT`, well before pg_net's 280 s. Measured 2026-09-04 on a
+129-keyword set: the sweep checked **10**, so each keyword came round every ~13 days under a
+panel that said "checked daily". The shape is the silent-rotation one: every keyword that WAS
+checked was checked correctly, so nothing raised. The loop is now a pool of **12 in flight**
+(`CONCURRENCY`), which puts the 60-cap at ~5 rounds, ~100 s. With 129 keywords the set still
+rotates over ~2 days; that is the cap doing its job, not a defect.
+
 **Alerts fire on leaving the top 10 only**, through the existing `seo.ranking_movement` flow
 trigger — not a new near-duplicate one. A tracker that alerts on every wobble gets muted, and a
 muted alert cannot warn about anything. (The first cut emitted `seo.rank_drop`, which is in no
