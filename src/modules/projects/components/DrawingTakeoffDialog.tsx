@@ -169,6 +169,9 @@ export const DrawingTakeoffDialog: React.FC<Props> = ({
             // Not a failure and not an invitation to measure the plan instead — said plainly, so
             // nobody re-runs it hoping for a different answer.
             description="This drawing carries no tabular schedule. Quantities are only taken from schedules the design team printed — nothing here measures a plan."
+            // The way out is genuinely to leave: nothing anybody can press will put a schedule on
+            // this sheet, and a "Try again" would only invite a second credit for the same answer.
+            action={<Button size="sm" variant="outline" onClick={onClose}>Close</Button>}
           />
         )}
 
@@ -246,7 +249,11 @@ export const DrawingTakeoffDialog: React.FC<Props> = ({
                 <Label className="text-xs">Add to</Label>
                 <Select value={scheduleId} onValueChange={setScheduleId}>
                   <SelectTrigger className="h-8 w-64">
-                    <SelectValue placeholder={schedules.length ? 'Pick a schedule' : 'No priced schedule yet'} />
+                    {/* When there is nowhere to put the lines, the placeholder says what to do
+                        about it rather than only that the list is empty. */}
+                    <SelectValue
+                      placeholder={schedules.length ? 'Pick a schedule' : 'Set up a priced schedule first'}
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     {schedules.map((s) => (

@@ -14615,6 +14615,29 @@
     "response": "{ success, status: 'read'|'unreadable', fields: { drawing_number, title, revision, discipline, purpose, scale, sheet_size, issued_at, issuer, notes }, unmapped, confidence }"
   },
   {
+    "name": "takeoff-from-drawing",
+    "tag": "Projects",
+    "summary": "Transcribe the schedules printed on a drawing into proposed bill-of-quantities lines",
+    "description": "Reads the tabular schedules a design team PRINTED on a drawing sheet — door, window, room, finishes — and returns them as proposed schedule-of-works lines. It transcribes; it never measures. A quantity worked out from the geometry of a plan is a guess indistinguishable from a fact, and somebody orders materials against it, so the tool schema offers no area or length field and every returned row must carry the schedule and row it was read from. A row that printed no quantity comes back null, never zero. The reader is a forced Anthropic tool call; credits are debited BEFORE the model runs and the prompt is a database row with no code fallback. Only a revision id is accepted — the file is fetched server-side from that row's own bucket and object path, so no URL in a request body can redirect it. The workspace comes from the project that owns the revision; a drawing in another workspace reports as not found. It writes nothing: the caller confirms the rows and adds them by the normal path.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "revision_id",
+        "type": "string (uuid)",
+        "required": true,
+        "desc": "The drawing revision to read. Its file location and its workspace are both taken from this row; nothing about which bytes are read comes from the body."
+      }
+    ],
+    "response": "{ success, status: 'read'|'no_schedules'|'failed', drawing: { revision_id, rev_label, drawing_number, title, project_id }, items: [{ description, item_ref, quantity, unit, schedule, source, notes }], truncated, without_quantity, confidence, notes }"
+  },
+  {
     "name": "structure-site-note",
     "tag": "Projects",
     "summary": "Turn a dictated site walk into a diary entry and the defects it described",
