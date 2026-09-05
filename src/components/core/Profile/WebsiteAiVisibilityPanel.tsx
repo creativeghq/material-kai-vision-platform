@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import {
   userWebsitesService,
+  type AiAnswers,
   type AiMonitoringState,
   type AiVisibility,
   type UserWebsite,
@@ -155,17 +156,22 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
     return () => { cancelled = true; };
   }, []);
 
+  const [answers, setAnswers] = useState<AiAnswers | null>(null);
+  const [openAnswer, setOpenAnswer] = useState<Record<string, boolean>>({});
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
       // `allSettled`: the monitoring state is the thing that EXPLAINS an empty or
       // stale report, so it must still render when the report itself fails.
-      const [v, m] = await Promise.allSettled([
+      const [v, m, a] = await Promise.allSettled([
         userWebsitesService.aiVisibility(website.id, 90),
         userWebsitesService.aiMonitoringState(website.id),
+        userWebsitesService.aiAnswers(website.id, 90),
       ]);
       setData(v.status === 'fulfilled' ? v.value : null);
       setState(m.status === 'fulfilled' ? m.value : null);
+      setAnswers(a.status === 'fulfilled' ? a.value : null);
     } finally {
       setLoading(false);
     }
@@ -669,27 +675,86 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
             )}
           </CardHeader>
           <CardContent>
-            {data.prompts.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">No prompts recorded.</p>
-            ) : (
-              <div className="space-y-3">
-                {data.prompts.map((p) => (
-                  <div key={p.template_key} className="border-b border-hairline pb-3 last:border-0 last:pb-0">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <span className="text-xs font-medium text-foreground">{p.template_key}</span>
-                      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                        {p.share_of_voice != null ? `${p.share_of_voice}%` : 'No verdict'}
-                      </span>
+            {(() => {
+              const questions = answers?.questions ?? [];
+              if (questions.length === 0) {
+                return <p className="py-6 text-center text-sm text-muted-foreground">No prompts recorded.</p>;
+              }
+              // Every assistant the tier asks for gets a row on every question, so an
+              // assistant that never ran (no key, unfunded) is a visible gap next to the
+              // ones that answered — not a column that quietly does not exist.
+              const rosterModels = (roster?.tiers?.cheap ?? []).map((m) => m.model);
+              const seenModels = Array.from(new Set(questions.flatMap((q) => q.answers.map((a) => a.model))));
+              const allModels = Array.from(new Set([...rosterModels, ...seenModels]));
+              return (
+                <div className="space-y-4">
+                  {questions.map((q) => (
+                    <div key={`${q.subject}:${q.template_key}`} className="rounded-sm border border-hairline p-3">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <p className="text-xs font-medium leading-snug text-foreground">{q.prompt_text}</p>
+                        <span className="shrink-0 text-[11px] text-muted-foreground" title={q.template_key}>
+                          asked {timeAgo(q.asked_at)}
+                        </span>
+                      </div>
+                      <div className="mt-2 space-y-1.5">
+                        {allModels.map((model) => {
+                          const a = q.answers.find((x) => x.model === model);
+                          const rosterEntry = roster?.tiers?.cheap?.find((m) => m.model === model);
+                          const key = `${q.subject}:${q.template_key}:${model}`;
+                          const open = !!openAnswer[key];
+                          return (
+                            <div key={model} className="rounded-sm bg-surface-sunken px-2.5 py-1.5">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="w-24 shrink-0 text-xs font-medium text-foreground">{modelLabel(model)}</span>
+                                {!a ? (
+                                  <Badge variant="warning">
+                                    {rosterEntry && !rosterEntry.enabled ? 'not run — no key configured' : 'not run'}
+                                  </Badge>
+                                ) : a.error ? (
+                                  <Badge variant="warning" title={a.error}>failed — {a.error.slice(0, 40)}</Badge>
+                                ) : a.mentioned ? (
+                                  <Badge variant="success">named you{a.position != null ? ` · #${a.position}` : ''}{a.brand_cited ? ' · linked' : ''}</Badge>
+                                ) : (
+                                  <Badge variant="neutral">did not name you</Badge>
+                                )}
+                                {a && !a.error && a.competitors.length > 0 && (
+                                  <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground" title={a.competitors.join(', ')}>
+                                    named: {a.competitors.slice(0, 6).join(', ')}{a.competitors.length > 6 ? ` +${a.competitors.length - 6}` : ''}
+                                  </span>
+                                )}
+                                {a && !a.error && a.answer && (
+                                  <button
+                                    type="button"
+                                    className="ml-auto shrink-0 text-[11px] text-primary hover:underline"
+                                    onClick={() => setOpenAnswer((s) => ({ ...s, [key]: !open }))}
+                                  >
+                                    {open ? 'Hide answer' : 'Show answer'}
+                                  </button>
+                                )}
+                              </div>
+                              {a && !a.error && open && (
+                                <div className="mt-2 border-t border-hairline pt-2">
+                                  <p className="whitespace-pre-wrap text-[11px] leading-relaxed text-foreground">
+                                    {a.answer}{a.answer_truncated ? ' …' : ''}
+                                  </p>
+                                  {a.cited_urls.length > 0 && (
+                                    <p className="mt-1.5 text-[11px] text-muted-foreground">
+                                      Cited: {a.cited_urls.slice(0, 5).map((u, i) => (
+                                        <a key={i} href={u} target="_blank" rel="noopener noreferrer" className="mr-2 text-primary hover:underline">{u.replace(/^https?:\/\//, '').slice(0, 40)}</a>
+                                      ))}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                    {p.prompt_text && (
-                      <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
-                        {p.prompt_text}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
       </div>

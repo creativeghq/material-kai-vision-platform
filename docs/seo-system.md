@@ -247,6 +247,15 @@ Perplexity's key resolves but the account answers 401 (unfunded). `GET
 "no key configured" on the missing ones, because a two-row table otherwise reads as a
 two-assistant design.
 
+**Every question is asked to every assistant, and the panel shows each reply.** A probe run
+asks each prompt to every model in the tier that has a key. `get_website_ai_answers(website,
+days)` returns the matrix behind the visibility figures: per subject × question (the newest
+wording), the latest reply of each assistant — mention verdict, rank, whether it linked the
+site, the brands it named instead, cited URLs and the answer text (bounded to 1,500 chars).
+"Questions we asked" renders one row per assistant per question, including a "not run — no key
+configured" row for a roster model with no reply, so a missing provider is a visible gap on
+every question rather than a column that does not exist.
+
 **Keyword Research feeds the tracker and starts from the site's own pages.** A research row, the
 detail header and each cluster carry a Track action (`addTrackedKeywords`, GR/el). "Suggested
 from your pages" lists page titles (brand suffix stripped) that are neither tracked nor

@@ -540,6 +540,35 @@ export interface AiVisibilityModelRow {
   note: string | null;
 }
 
+/** One assistant's latest reply to one question. `mentioned`/`brand_cited` are null when the call failed. */
+export interface AiAnswer {
+  model: string;
+  run_at: string;
+  error: string | null;
+  mentioned: boolean | null;
+  position: number | null;
+  brand_cited: boolean | null;
+  sentiment: string | null;
+  competitors: string[];
+  cited_urls: string[];
+  context: string | null;
+  answer: string | null;
+  answer_truncated: boolean;
+}
+
+export interface AiQuestion {
+  subject: string;
+  template_key: string;
+  prompt_text: string;
+  asked_at: string;
+  answers: AiAnswer[];
+}
+
+export interface AiAnswers {
+  window_days: number;
+  questions: AiQuestion[];
+}
+
 export interface AiVisibility {
   status: string;
   window_days: number;
@@ -1289,6 +1318,16 @@ export const userWebsitesService = {
     );
     if (error) throw error;
     return (data as AiVisibility) ?? null;
+  },
+
+  /** The matrix behind the visibility figures: every assistant's latest reply to every question. */
+  async aiAnswers(websiteId: string, days = 90): Promise<AiAnswers | null> {
+    const { data, error } = await supabase.rpc(
+      'get_website_ai_answers' as any,
+      { p_website_id: websiteId, p_days: days } as any,
+    );
+    if (error) throw error;
+    return (data as AiAnswers) ?? null;
   },
 
   async domainTrackRun(websiteId: string): Promise<void> {
