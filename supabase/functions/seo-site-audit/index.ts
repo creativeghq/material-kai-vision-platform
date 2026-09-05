@@ -130,9 +130,16 @@ const ISSUE_SECTIONS: Array<{
 ];
 
 
-/** Best-effort URL off whatever shape a given OnPage section returns. */
+/**
+ * Best-effort URL off whatever shape a given OnPage section returns. A redirect
+ * chain has no URL of its own — the page that starts it is `chain[0].link_from`;
+ * a duplicate-content group names its first page under `pages[0].page.url`.
+ */
 function issueUrl(item: any): string | null {
-  return item?.url || item?.page_address || item?.from_url || item?.link_from || item?.address || null;
+  return item?.url || item?.page_address || item?.from_url || item?.link_from || item?.address
+    || item?.chain?.[0]?.link_from
+    || item?.pages?.[0]?.page?.url || item?.pages?.[0]?.url
+    || null;
 }
 
 /**
@@ -180,7 +187,17 @@ async function syncCrawl(supabase: any, crawl: any, userId: string | null): Prom
     try {
       // Only the params this endpoint declares — see ISSUE_SECTIONS.
       const r = await dfs(section.kind, { task_id: crawl.task_id, ...(section.params || {}) }, userId);
-      const all: any[] = r.items || [];
+      // An OnPage section answers with a task envelope — `{crawl_progress, items_count,
+      // items: [...]}` — and when the section is EMPTY the dispatcher hands that envelope
+      // back as the one item (`items: null`). Stored as an issue it became "Cannot be
+      // indexed: 1" with no URL and nothing to fix; two of those sat on materialshub.gr
+      // for a week. An envelope is unwrapped to its inner items, and an empty one is
+      // nothing found.
+      const all: any[] = (r.items || []).flatMap((it: any) =>
+        it && typeof it === 'object' && ('crawl_progress' in it || 'items_count' in it)
+          ? (Array.isArray(it.items) ? it.items : [])
+          : [it],
+      );
       // A client-side filter narrows a general endpoint to the issue we asked about.
       // `no_data` still means the SECTION answered: 200 links of which none are broken
       // is a real "no broken links", not an absent check.

@@ -4,7 +4,7 @@ import { timeAgo } from '@/utils/datetime';
 import {
   ArrowLeft, Globe, ExternalLink, RefreshCw, Loader2, FileText, Search,
   FlaskConical, Radar, AlertTriangle, LineChart, Gauge, TrendingUp, CalendarClock, Check, Bot,
-  LayoutDashboard, Sparkles, Swords, Plus, Target, FileBarChart,
+  LayoutDashboard, Sparkles, Swords, Plus, Target, FileBarChart, Trash2,
 } from 'lucide-react';
 import { WebsiteGscPanel } from '@/components/core/Profile/WebsiteGscPanel';
 import { WebsiteLlmsTxtPanel } from '@/components/core/Profile/WebsiteLlmsTxtPanel';
@@ -115,6 +115,20 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [website.id]);
+
+  const [deletingResearchId, setDeletingResearchId] = useState<string | null>(null);
+  const deleteResearch = async (r: SeoKeywordResearchRow) => {
+    if (!confirm(`Delete the research for "${r.target_keyword}"? The captured results page goes with it.`)) return;
+    setDeletingResearchId(r.id);
+    try {
+      await userWebsitesService.deleteKeywordResearch(r.id);
+      setResearch((rows) => rows.filter((x) => x.id !== r.id));
+    } catch (e: any) {
+      toast({ title: 'Could not delete it', description: e.message, variant: 'destructive' });
+    } finally {
+      setDeletingResearchId(null);
+    }
+  };
 
   const [trackingDomain, setTrackingDomain] = useState(false);
   /**
@@ -451,32 +465,72 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
                   }
                 />
               ) : (
+                <div className="table-scroll">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Target keyword</TableHead>
                       <TableHead>Topic</TableHead>
-                      <TableHead className="text-right">Keywords</TableHead>
                       <TableHead className="text-right">Volume</TableHead>
+                      <TableHead className="text-right">Difficulty</TableHead>
+                      <TableHead className="text-right">CPC</TableHead>
+                      <TableHead className="text-right">Competition</TableHead>
+                      <TableHead className="text-right">Opportunity</TableHead>
+                      <TableHead>Trend</TableHead>
+                      <TableHead className="text-right">Related</TableHead>
+                      <TableHead className="text-right">Addressable</TableHead>
                       <TableHead>Created</TableHead>
+                      <TableHead className="w-10" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
+                    {/* Figures are the researched keyword's own (recommendedPrimary); "Related" and
+                        "Addressable" describe the expanded set the run found around it. A dash is
+                        "the source did not return it" — difficulty is unscored for many Greek terms —
+                        never a zero. */}
                     {research.map((r) => (
                       <TableRow
                         key={r.id}
                         onClick={() => setOpenResearchId(r.id)}
                         className="cursor-pointer"
                       >
-                        <TableCell className="font-medium max-w-[220px] truncate">{r.target_keyword}</TableCell>
-                        <TableCell className="text-muted-foreground max-w-[220px] truncate">{r.topic}</TableCell>
-                        <TableCell className="text-right">{formatNumber(r.total_keywords_found)}</TableCell>
-                        <TableCell className="text-right">{formatNumber(r.total_addressable_volume)}</TableCell>
+                        <TableCell className="font-medium max-w-[220px] truncate">
+                          {r.target_keyword}
+                          {r.language_code ? <span className="ml-1 text-[11px] text-muted-foreground">{r.language_code}</span> : null}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground max-w-[200px] truncate">{r.topic}</TableCell>
+                        <TableCell className="text-right tabular-nums">{r.primary?.search_volume != null ? formatNumber(r.primary.search_volume) : '—'}</TableCell>
+                        <TableCell className="text-right tabular-nums">{r.primary?.difficulty != null ? r.primary.difficulty : '—'}</TableCell>
+                        <TableCell className="text-right tabular-nums">{r.primary?.cpc != null ? `$${r.primary.cpc.toFixed(2)}` : '—'}</TableCell>
+                        <TableCell className="text-right tabular-nums">{r.primary?.competition != null ? `${Math.round(r.primary.competition * 100)}%` : '—'}</TableCell>
+                        <TableCell className="text-right tabular-nums">{r.primary?.opportunity != null ? r.primary.opportunity : '—'}</TableCell>
+                        <TableCell>
+                          {r.primary?.trend
+                            ? (
+                              <Badge variant={r.primary.trend === 'up' ? 'success' : r.primary.trend === 'down' ? 'warning' : 'neutral'}>
+                                {r.primary.trend}{r.primary.trend_delta != null ? ` ${r.primary.trend_delta > 0 ? '+' : ''}${r.primary.trend_delta}%` : ''}
+                              </Badge>
+                            )
+                            : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">{formatNumber(r.total_keywords_found)}</TableCell>
+                        <TableCell className="text-right tabular-nums">{formatNumber(r.total_addressable_volume)}</TableCell>
                         <TableCell className="text-muted-foreground">{timeAgo(r.created_at)}</TableCell>
+                        <TableCell>
+                          <Button size="icon" variant="ghost" className="h-7 w-7"
+                            aria-label={`Delete research for ${r.target_keyword}`}
+                            onClick={(e) => { e.stopPropagation(); void deleteResearch(r); }}
+                            disabled={deletingResearchId === r.id}>
+                            {deletingResearchId === r.id
+                              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              : <Trash2 className="h-3.5 w-3.5 text-destructive" />}
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -545,7 +599,10 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
             <CardHeader className="flex flex-row items-start justify-between gap-3">
               <div>
               <CardTitle>Domain Audits</CardTitle>
-              <CardDescription>Scheduled domain-rank tracking for this website's domain.</CardDescription>
+              <CardDescription>
+                Scheduled domain-rank tracking for this website's own domain. Rival domains are followed
+                under the Competitors tab, measured on the same weekly run in the same market.
+              </CardDescription>
               </div>
               {!loading && domains.length === 0 && (
                 <Button size="sm" variant="outline" className="shrink-0"

@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { useToast } from '@/hooks/use-toast';
 import { timeAgo } from '@/utils/datetime';
-import { userWebsitesService, type CrawlReport, type UserWebsite } from '@/services/userWebsitesService';
+import { userWebsitesService, type CrawlIssueDetail, type CrawlReport, type UserWebsite } from '@/services/userWebsitesService';
 import { compact } from './seo/seoMetrics';
 
 /**
@@ -27,31 +27,110 @@ import { compact } from './seo/seoMetrics';
 
 const SEVERITY_ORDER: Array<'error' | 'warning' | 'notice'> = ['error', 'warning', 'notice'];
 
-const ISSUE_COPY: Record<string, { label: string; why: string }> = {
+const ISSUE_COPY: Record<string, { label: string; why: string; fix: string }> = {
   non_indexable: {
     label: 'Cannot be indexed',
     why: 'Google is being told not to list these pages. If that is not deliberate, they cannot rank at all.',
+    fix: 'Find the instruction named per page below and remove it: the Disallow line in robots.txt, the <meta name="robots" content="noindex"> tag, the X-Robots-Tag response header, or the rel="nofollow"/noindex attribute. Keep it only where the page really should stay out of search (cart, account, internal search).',
   },
   broken_link: {
     label: 'Broken links',
     why: 'Links pointing at pages that no longer resolve. They waste crawl budget and dead-end real visitors.',
+    fix: 'On each source page, point the link at the page that replaced the target, or remove it. If the target should exist, restore it or 301-redirect the old URL.',
   },
   redirect_chain: {
     label: 'Redirect chains',
     why: 'A page redirecting to a page that redirects again. Each hop loses a little ranking signal and adds latency.',
+    fix: 'Make the first URL redirect straight to the final one (a single 301), then update internal links, the sitemap and canonical tags to use the final URL so nothing goes through the chain at all. A loop must be broken by hand.',
   },
   duplicate_tags: {
     label: 'Duplicate titles or descriptions',
     why: 'Two pages claiming the same title compete with each other, and Google picks one — not necessarily the one you want.',
+    fix: 'Give each listed page its own title and description that name what is different about it (the city, the product line, the use). If two pages are really the same thing, canonicalise one to the other or merge them.',
   },
   duplicate_content: {
     label: 'Duplicate content',
     why: 'Near-identical pages split the ranking signal that should have gone to one of them.',
+    fix: 'Pick the page that should rank, add <link rel="canonical"> on the others pointing at it, and rewrite the ones that need to exist in their own right so they say something the canonical does not.',
   },
+  error_page: {
+    label: 'Pages returning an error',
+    why: 'The crawler received a 4xx or 5xx status for these URLs, so they cannot be indexed and any link to them is a dead end.',
+    fix: 'For a 404, restore the page or 301 it to its replacement and remove links to it. For a 5xx, read the server or application log for that URL — it is a crash, not a content problem.',
+  },
+};
+
+/** DataForSEO's `reason` values for a non-indexable page, in plain words. */
+const NON_INDEXABLE_REASON: Record<string, string> = {
+  robots_txt: 'blocked by robots.txt',
+  meta_tag: 'meta robots noindex on the page',
+  http_header: 'X-Robots-Tag noindex response header',
+  attribute: 'a nofollow / noindex attribute',
+  too_many_redirects: 'too many redirects to reach it',
 };
 
 function severityTone(s: string): 'error' | 'warning' | 'neutral' {
   return s === 'error' ? 'error' : s === 'warning' ? 'warning' : 'neutral';
+}
+
+function pageUrl(p: string | { url: string | null; similarity: number | null }): string | null {
+  return typeof p === 'string' ? p : p?.url ?? null;
+}
+
+/** The provider's detail for one issue, said in words — what is wrong on THIS page. */
+function IssueDetailLine({ type, detail }: { type: string; detail: CrawlIssueDetail | null | undefined }) {
+  if (!detail) return null;
+  switch (type) {
+    case 'non_indexable':
+      return detail.reason
+        ? <p className="text-[11px] text-muted-foreground">Reason: {NON_INDEXABLE_REASON[detail.reason] ?? detail.reason.replace(/_/g, ' ')}</p>
+        : null;
+    case 'redirect_chain': {
+      const hops = detail.hops ?? [];
+      if (hops.length === 0) return null;
+      const path = [hops[0]?.from, ...hops.map((h) => h.to)].filter(Boolean) as string[];
+      return (
+        <p className="break-all text-[11px] text-muted-foreground">
+          {detail.is_redirect_loop ? <Badge variant="error">loop</Badge> : null}
+          {detail.is_redirect_loop ? ' ' : ''}
+          {path.length} URLs: {path.join(' → ')}
+        </p>
+      );
+    }
+    case 'duplicate_tags':
+      return (
+        <div className="text-[11px] text-muted-foreground">
+          {detail.accumulator ? <p className="truncate">Shared text: “{detail.accumulator}”</p> : null}
+          {(detail.pages?.length ?? 0) > 0 && (
+            <p className="truncate">
+              {detail.total_count ?? detail.pages!.length} pages: {detail.pages!.map(pageUrl).filter(Boolean).join(', ')}
+            </p>
+          )}
+        </div>
+      );
+    case 'duplicate_content':
+      return (detail.pages?.length ?? 0) > 0
+        ? (
+          <p className="truncate text-[11px] text-muted-foreground">
+            Near-identical to {detail.pages!.map((p) => {
+              const u = pageUrl(p);
+              const sim = typeof p === 'object' && p?.similarity != null ? ` (${p.similarity}/10)` : '';
+              return u ? `${u}${sim}` : null;
+            }).filter(Boolean).join(', ')}
+          </p>
+        )
+        : null;
+    case 'broken_link':
+      return (
+        <p className="break-all text-[11px] text-muted-foreground">
+          Links to {detail.link_to ?? '—'}{detail.status_code ? ` (HTTP ${detail.status_code})` : ''}
+        </p>
+      );
+    case 'error_page':
+      return detail.status_code ? <p className="text-[11px] text-muted-foreground">HTTP {detail.status_code}</p> : null;
+    default:
+      return null;
+  }
 }
 
 export const WebsiteCrawlPanel: React.FC<{ website: UserWebsite }> = ({ website }) => {
@@ -59,6 +138,7 @@ export const WebsiteCrawlPanel: React.FC<{ website: UserWebsite }> = ({ website 
   const [report, setReport] = useState<CrawlReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -230,17 +310,50 @@ export const WebsiteCrawlPanel: React.FC<{ website: UserWebsite }> = ({ website 
                         <span className="text-sm font-semibold tabular-nums text-foreground">{compact(g.count)}</span>
                       </div>
                       {copy?.why && <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{copy.why}</p>}
-                      {g.sample.length > 0 && (
-                        <ul className="mt-2 space-y-1">
-                          {g.sample.filter((sm) => sm.url).slice(0, 4).map((sm, i) => (
-                            <li key={i} className="truncate text-[11px] text-muted-foreground">
-                              <a href={sm.url!} target="_blank" rel="noopener noreferrer" className="hover:text-primary hover:underline">
-                                {sm.url}
-                              </a>
-                            </li>
-                          ))}
-                        </ul>
+                      {copy?.fix && (
+                        <p className="mt-1 text-[11px] leading-snug text-foreground">
+                          <span className="font-semibold">Fix: </span>{copy.fix}
+                        </p>
                       )}
+                      {(() => {
+                        // Every row carries something to act on: the URL where the provider
+                        // gave one, and the detail either way. Rows with neither are the
+                        // envelope bug and are filtered by the collector now.
+                        const rows = g.sample.filter((sm) => sm.url || sm.detail);
+                        if (rows.length === 0) return null;
+                        const open = !!expanded[g.issue_type];
+                        const shown = open ? rows : rows.slice(0, 4);
+                        return (
+                          <>
+                            <ul className="mt-2 space-y-1.5">
+                              {shown.map((sm, i) => (
+                                <li key={i} className="min-w-0 text-[11px]">
+                                  {sm.url ? (
+                                    <a href={sm.url} target="_blank" rel="noopener noreferrer" className="block truncate text-foreground hover:text-primary hover:underline">
+                                      {sm.url}
+                                    </a>
+                                  ) : null}
+                                  <IssueDetailLine type={g.issue_type} detail={sm.detail} />
+                                </li>
+                              ))}
+                            </ul>
+                            {rows.length > 4 && (
+                              <button
+                                type="button"
+                                className="mt-1.5 text-[11px] text-primary hover:underline"
+                                onClick={() => setExpanded((e) => ({ ...e, [g.issue_type]: !open }))}
+                              >
+                                {open ? 'Show fewer' : `Show all ${rows.length}${g.count > rows.length ? ` of ${g.count}` : ''}`}
+                              </button>
+                            )}
+                            {open && g.count > rows.length && (
+                              <p className="mt-1 text-[11px] text-muted-foreground">
+                                The first {rows.length} of {g.count} are listed; the rest are in the crawl record.
+                              </p>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   );
                 })}

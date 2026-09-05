@@ -112,6 +112,70 @@ export const ON_PAGE_CHECKS: OnPageCheck[] = [
   { key: 'broken_resources', label: 'No broken resources', group: 'links', goodWhenTrue: false, cost: 'Images, scripts or styles that fail to load — the page renders wrong for everyone.' },
 ];
 
+/**
+ * What to DO about a failing check. `cost` says why it matters; this says what to
+ * change. The provider returns a boolean and nothing else, so the remedy has to be
+ * stated here — a list of red rows with no next step is a list nobody works through.
+ * One sentence, concrete, aimed at whoever edits the site.
+ */
+export const CHECK_FIXES: Record<string, string> = {
+  is_4xx_code: 'Restore the page or 301-redirect the URL to its replacement, and remove links pointing at it.',
+  is_5xx_code: 'Check the server or application logs for this URL; a 5xx is a crash, not a content problem.',
+  is_broken: 'Open the URL in a browser: if it fails, fix hosting or DNS; if it loads, the crawler was blocked — check robots.txt and firewall rules.',
+  is_redirect: 'Link to the final URL directly, and make the redirect a single 301 hop.',
+  has_meta_refresh_redirect: 'Replace the <meta http-equiv="refresh"> with a server-side 301 redirect.',
+  canonical: 'Add <link rel="canonical" href="…"> in <head> pointing at the URL you want indexed.',
+  from_sitemap: 'Add the URL to sitemap.xml (or make sure the CMS includes it) and resubmit in Search Console.',
+  seo_friendly_url: 'Use short, lowercase, hyphen-separated words that describe the page; redirect the old URL.',
+  seo_friendly_url_characters_check: 'Remove spaces, uppercase and special characters from the slug; use hyphens between words.',
+  seo_friendly_url_dynamic_check: 'Serve the page at a clean path instead of ?query parameters, or canonicalise the parameterised versions.',
+  seo_friendly_url_keywords_check: 'Put the page’s main term in the slug (e.g. /plakakia-mpaniou), not an id or a date.',
+  seo_friendly_url_relative_length_check: 'Shorten the slug to the words that matter; drop stop-words and repeated folders.',
+  is_www: 'Pick www or non-www, 301 the other to it, and use the chosen host everywhere (links, sitemap, canonical).',
+  no_title: 'Add a <title> of 50–60 characters naming the page’s subject and the site.',
+  title_too_long: 'Trim the <title> to about 60 characters so it is not cut off in results.',
+  title_too_short: 'Extend the <title> to say what the page is about and for whom; aim for 50–60 characters.',
+  no_description: 'Add a <meta name="description"> of 120–155 characters that says what the reader gets on this page.',
+  no_h1_tag: 'Add one <h1> stating the page’s subject; keep other headings at h2–h4.',
+  has_meta_title: 'Add a <title> element in <head>.',
+  irrelevant_title: 'Rewrite the <title> to describe what is actually on the page, using the terms in the body copy.',
+  irrelevant_description: 'Rewrite the meta description to summarise this page’s content, not the site in general.',
+  irrelevant_meta_keywords: 'Remove the meta keywords tag or make it match the page; search engines ignore it either way.',
+  low_content_rate: 'Add real body text; trim boilerplate markup, inline scripts and hidden blocks.',
+  high_content_rate: 'Usually nothing — check that the page is not a raw text dump without structure.',
+  low_character_count: 'Write enough to answer the query fully: specs, sizes, prices, use cases, FAQs.',
+  high_character_count: 'Split the page by subject if it covers several; long is fine if it is one topic.',
+  low_readability_rate: 'Shorter sentences, subheadings every few paragraphs, lists for specs.',
+  lorem_ipsum: 'Replace the placeholder text with the final copy before this page is linked or indexed.',
+  no_image_alt: 'Give every meaningful image an alt attribute describing what it shows (product, material, finish).',
+  no_image_title: 'Optional: add title attributes to images where a hover caption helps.',
+  duplicate_title_tag: 'Give each page its own <title>; if two pages are the same thing, canonicalise or merge them.',
+  duplicate_description: 'Write a distinct meta description per page, or drop it on the one that should not rank.',
+  duplicate_meta_tags: 'Remove the repeated meta tag so each appears once in <head>.',
+  high_loading_time: 'Compress and resize images, defer non-critical scripts, and enable caching and a CDN.',
+  high_waiting_time: 'Reduce server time to first byte: caching, a faster host, or fewer database calls on this route.',
+  has_render_blocking_resources: 'Add defer/async to scripts, inline critical CSS and load the rest asynchronously.',
+  large_page_size: 'Resize images to their displayed size, serve WebP/AVIF, and remove unused scripts and fonts.',
+  size_greater_than_3mb: 'Find the images over ~300 KB and re-export them; that is almost always the whole 3 MB.',
+  small_page_size: 'Make sure the HTML contains the content; if it only loads via JavaScript, pre-render or server-render it.',
+  no_content_encoding: 'Enable gzip or Brotli compression on the web server or CDN for HTML, CSS and JS.',
+  is_https: 'Install a TLS certificate, serve the site on https://, and 301 every http:// URL to it.',
+  is_http: 'Serve the page over HTTPS and redirect the HTTP version.',
+  https_to_http_links: 'Change links and embedded resources to https:// URLs, or remove the ones that have no secure version.',
+  has_html_doctype: 'Add <!DOCTYPE html> as the first line of the document.',
+  no_doctype: 'Add <!DOCTYPE html> as the first line of the document.',
+  has_micromarkup: 'Add JSON-LD schema (Organization, Product, LocalBusiness, BreadcrumbList) in <head>.',
+  has_micromarkup_errors: 'Validate the schema at validator.schema.org or Google’s Rich Results Test and fix the flagged fields.',
+  no_favicon: 'Add a favicon (a 48×48 PNG or SVG) and reference it with <link rel="icon">.',
+  no_encoding_meta_tag: 'Add <meta charset="utf-8"> as the first element in <head>.',
+  meta_charset_consistency: 'Make the meta charset and the Content-Type header agree (utf-8 for both).',
+  deprecated_html_tags: 'Replace <font>, <center>, <marquee> and similar with CSS.',
+  flash: 'Remove the Flash embed; replace with HTML5 video or an image.',
+  frame: 'Replace the frame or iframe layout with normal page content so it can be indexed.',
+  broken_links: 'Fix or remove the dead links; the full crawl lists each one with its target.',
+  broken_resources: 'Fix the paths of the images, scripts or stylesheets that 404; the full crawl lists them.',
+};
+
 const BY_KEY = new Map(ON_PAGE_CHECKS.map((c) => [c.key, c]));
 
 export interface CheckVerdict {

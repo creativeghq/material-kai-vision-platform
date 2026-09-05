@@ -139,9 +139,24 @@ export interface SeoKeywordResearchRow {
   id: string;
   topic: string;
   target_keyword: string;
+  language_code: string | null;
   total_keywords_found: number | null;
   total_addressable_volume: number | null;
   created_at: string;
+  /**
+   * The researched keyword's own figures, lifted from `research_data.recommendedPrimary`
+   * so the list can show them without loading every run's blob. NULL = the source did
+   * not return it (keyword difficulty is unscored for many Greek terms), never 0.
+   */
+  primary: {
+    search_volume: number | null;
+    cpc: number | null;
+    competition: number | null;
+    difficulty: number | null;
+    opportunity: number | null;
+    trend: string | null;
+    trend_delta: number | null;
+  } | null;
 }
 
 export interface SeoResearchRunRow {
@@ -401,11 +416,31 @@ export interface RankSummary {
   visibility_trend?: { date: string; v: number }[];
 }
 
+/** The part of the provider's item a reader acts on, projected per issue type by the report RPC. */
+export interface CrawlIssueDetail {
+  /** non_indexable: robots_txt | meta_tag | http_header | attribute | too_many_redirects */
+  reason?: string | null;
+  /** redirect_chain */
+  is_redirect_loop?: boolean | null;
+  hop_count?: number | null;
+  hops?: { from: string | null; to: string | null }[] | null;
+  /** duplicate_tags: the duplicated title/description text and the pages sharing it */
+  accumulator?: string | null;
+  total_count?: number | null;
+  pages?: (string | { url: string | null; similarity: number | null })[] | null;
+  /** broken_link */
+  link_from?: string | null;
+  link_to?: string | null;
+  /** broken_link (target) / error_page */
+  status_code?: number | null;
+}
+
 export interface CrawlIssueGroup {
   issue_type: string;
   severity: 'error' | 'warning' | 'notice';
   count: number;
-  sample: { url: string | null; title: string | null }[];
+  /** Up to 25 per type; `count` says how many there are in all. */
+  sample: { url: string | null; title: string | null; detail?: CrawlIssueDetail | null }[];
 }
 
 export interface CrawlReport {
@@ -725,12 +760,32 @@ export const userWebsitesService = {
   async keywordResearch(websiteId: string, limit = 50): Promise<SeoKeywordResearchRow[]> {
     const { data, error } = await supabase
       .from('seo_keyword_research')
-      .select('id, topic, target_keyword, total_keywords_found, total_addressable_volume, created_at')
+      .select('id, topic, target_keyword, language_code, total_keywords_found, total_addressable_volume, created_at, primary:research_data->recommendedPrimary')
       .eq('website_id', websiteId)
       .order('created_at', { ascending: false })
       .limit(limit);
     if (error) throw error;
-    return (data as SeoKeywordResearchRow[]) || [];
+    const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+    return ((data as any[]) || []).map((r) => {
+      const p = r.primary && typeof r.primary === 'object' ? r.primary : null;
+      return {
+        id: r.id, topic: r.topic, target_keyword: r.target_keyword, language_code: r.language_code ?? null,
+        total_keywords_found: r.total_keywords_found, total_addressable_volume: r.total_addressable_volume,
+        created_at: r.created_at,
+        primary: p ? {
+          search_volume: num(p.searchVolume), cpc: num(p.cpc), competition: num(p.competition),
+          difficulty: num(p.keywordDifficulty), opportunity: num(p.opportunityScore),
+          trend: typeof p.trend === 'string' ? p.trend : null, trend_delta: num(p.trendDelta),
+        } : null,
+      } as SeoKeywordResearchRow;
+    });
+  },
+
+  /** Owner-only by RLS (`seo_keyword_research_owner`); a member who did not run it gets a refusal, not a silent no-op. */
+  async deleteKeywordResearch(id: string): Promise<void> {
+    const { data, error } = await supabase.from('seo_keyword_research').delete().eq('id', id).select('id');
+    if (error) throw error;
+    if (!data?.length) throw new Error('Only the person who ran this research can delete it.');
   },
 
   async toolkitRuns(websiteId: string, limit = 50): Promise<SeoResearchRunRow[]> {

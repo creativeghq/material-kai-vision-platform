@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { userWebsitesService, type UserWebsite, type WebsiteHealth } from '@/services/userWebsitesService';
 import { Badge } from '@/components/core/ui/badge';
-import { CHECK_GROUPS, buildCheckInventory, type CheckGroup } from './seo/onPageChecks';
+import { CHECK_FIXES, CHECK_GROUPS, buildCheckInventory, type CheckGroup } from './seo/onPageChecks';
 
 
 const scoreColor = (s: number | null) =>
@@ -168,6 +168,13 @@ export const WebsiteHealthPanel: React.FC<{ website: UserWebsite }> = ({ website
                             </p>
                             {!passed && check.cost && (
                               <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{check.cost}</p>
+                            )}
+                            {/* The provider returns a boolean; the remedy is ours to state, or the
+                                row is a red mark with no next step. */}
+                            {!passed && CHECK_FIXES[check.key] && (
+                              <p className="mt-1 text-[11px] leading-snug text-foreground">
+                                <span className="font-semibold">Fix: </span>{CHECK_FIXES[check.key]}
+                              </p>
                             )}
                           </div>
                         </div>

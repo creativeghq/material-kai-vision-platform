@@ -141,6 +141,36 @@ counts `page_count` as active pages WITH content; and returns `pages_with_conten
 on the crawler's rate limit — the crawl continues automatically every 6 hours"). At ten a minute
 a fresh 82-page site fills in over about two cron cycles; a bigger Firecrawl plan lifts that.
 
+**An empty OnPage section is nothing found, not one finding.** DataForSEO answers every OnPage
+section with a task envelope — `{crawl_progress, items_count, items: [...]}` — and when the
+section has nothing to report, `items` is `null`. MIVAA's `_call` normaliser treated a falsy
+`items` as "data inline" and handed the envelope back as the one item; `seo-site-audit` stored it
+as an issue. materialshub.gr showed "Cannot be indexed: 1" and "Redirect chains: 1" for a week
+with no URL and nothing to fix, on a crawl that had found neither. Fixed at both ends: the
+normaliser tests for the KEY (`"items" in r`), and the collector unwraps any envelope it is
+handed and treats an empty one as no data. The two phantom rows were deleted.
+
+**A crawl issue is a URL, the provider's reason, and the remedy.** `website_crawl_issues.detail`
+has always held the whole OnPage item. `get_website_crawl_report` now projects the part a reader
+acts on into each sample row (25 per type): the non-indexable `reason` (robots.txt / meta tag /
+X-Robots-Tag / attribute / too many redirects), a redirect chain's hops and loop flag, the
+duplicated title text and the pages sharing it, the near-duplicate pages with similarity, a
+broken link's target and status. `WebsiteCrawlPanel` prints that per row with a "Show all N"
+control and a **Fix** line per issue type; `WebsiteHealthPanel` prints a Fix line per failing
+homepage check from `CHECK_FIXES` in `seo/onPageChecks.ts`. The provider returns booleans and
+lists; the remedy is ours to state, or a red row is a red row.
+
+**Keyword Research lists the researched keyword's own figures and can be deleted.** The list
+showed keyword, topic, count, volume and date; `recommendedPrimary` in the blob holds volume,
+CPC, competition, difficulty, opportunity and trend for the researched term, so the row shows
+them (a dash is "not returned", never 0 — difficulty is unscored for most Greek terms). Delete is
+owner-only by RLS (`seo_keyword_research_owner`); a member who did not run it gets a refusal.
+
+**Rival domains live under Competitors, not Domain Audits.** Domain Audits is the site's own
+domain (weekly rank + backlink audit). Competitors takes any domain, measures it on the same
+weekly `seo-domain-tracker` run in the same market (`seo_competitor_snapshots`), and plots it
+beside the site. The admin toolkit at /admin/seo tracks arbitrary domains for the operator.
+
 **Alerts fire on leaving the top 10 only**, through the existing `seo.ranking_movement` flow
 trigger — not a new near-duplicate one. A tracker that alerts on every wobble gets muted, and a
 muted alert cannot warn about anything. (The first cut emitted `seo.rank_drop`, which is in no
