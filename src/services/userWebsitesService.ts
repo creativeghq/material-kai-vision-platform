@@ -407,6 +407,8 @@ export interface TrackedKeywordRow {
   captured_at: string | null;
   /** Non-organic blocks on the page that cite or show us (featured_snippet, ai_overview, people_also_ask, local_pack…). */
   owned_features: string[];
+  /** How deep the results page was read: 100 normally, 50 when the deep pages could not be fetched. */
+  depth_checked?: number | null;
   /** NULL = not in the top 100. Never a sentinel rank. */
   position: number | null;
   found: boolean;

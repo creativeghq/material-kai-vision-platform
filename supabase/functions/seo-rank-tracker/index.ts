@@ -66,14 +66,14 @@ function hostOf(url: string): string {
  * unknown. The caller accepts a partial set only on its last attempt, so a full page
  * set is still preferred when a retry can get one.
  */
-async function serp(keyword: string, country: string, language: string, userId: string | null, acceptPartial = false): Promise<any> {
+async function serp(keyword: string, country: string, language: string, userId: string | null, acceptPartial = false, depth = 100): Promise<any> {
   const resp = await fetch(`${MIVAA_GATEWAY_URL()}/api/v1/seo-agent/dataforseo/serp_google_organic`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET() },
     // `country_code`, NOT `location_code` — the client maps the former to the latter
     // itself, and passing the mapped name is a hard 400 on an unexpected kwarg.
     body: JSON.stringify({
-      params: { keyword, country_code: country, language_code: language, depth: 100 },
+      params: { keyword, country_code: country, language_code: language, depth },
       attribution: { user_id: userId },
     }),
   });
@@ -99,7 +99,7 @@ async function serp(keyword: string, country: string, language: string, userId: 
   if (!Array.isArray(data.items) || data.items.length === 0) {
     throw new Error('upstream returned an empty SERP');
   }
-  return data;
+  return { ...data, depth };
 }
 
 /**
@@ -234,12 +234,22 @@ async function trackWebsite(
   const checkOne = async (kw: any): Promise<void> => {
     let row: Record<string, unknown>;
     try {
-      const r = await serpWithRetry(kw.keyword, kw.country_code, kw.language_code, userId);
-      const items: any[] = r.items || [];
-      const { position, url } = findPosition(items, host);
+      let r = await serpWithRetry(kw.keyword, kw.country_code, kw.language_code, userId);
+      let items: any[] = r.items || [];
+      let { position, url } = findPosition(items, host);
       // A partial page set that does not contain us says nothing about the pages that
-      // did not load — unknown, never "not in top 100".
-      if (r.partial && position == null) throw new Error(String(r.partial_error || 'partial results'));
+      // did not load. Before giving up as unknown, read the top 50 — half the pages,
+      // which DataForSEO fetches reliably where the deep Greek pages fail — and record
+      // the depth so the panel says "not in top 50", not "not in top 100".
+      if (r.partial && position == null) {
+        try {
+          r = await serp(kw.keyword, kw.country_code, kw.language_code, userId, false, 50);
+          items = r.items || [];
+          ({ position, url } = findPosition(items, host));
+        } catch (fallbackErr) {
+          throw new Error(String(r.partial_error || (fallbackErr instanceof Error ? fallbackErr.message : 'partial results')));
+        }
+      }
       // Every distinct block type on the page, so "we lost the featured snippet"
       // is answerable later without re-fetching.
       const features = [...new Set(items.map((i: any) => i?.type).filter(Boolean))] as string[];
@@ -248,6 +258,7 @@ async function trackWebsite(
         captured_at: today,
         position, found: position != null, url,
         serp_features: features, owned_features: ownedFeatures(items, host), error: null,
+        depth_checked: Number(r.depth) || 100,
       };
       if (position != null) ranking++;
     } catch (e) {

@@ -425,7 +425,7 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
                           ? <span className="text-xs text-amber-800 dark:text-amber-300">?</span>
                           : r.position != null
                             ? <span className="font-semibold">{r.position}</span>
-                            : <span className="text-xs text-muted-foreground">not in top 100</span>}
+                            : <span className="text-xs text-muted-foreground">not in top {r.depth_checked ?? 100}</span>}
                       </TableCell>
                       <TableCell className="text-right"><Change row={r} /></TableCell>
                       <TableCell>

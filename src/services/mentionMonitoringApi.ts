@@ -446,6 +446,20 @@ export interface ProbeRunOutcome {
   failed_calls?: number;
 }
 
+export interface ProbeProviderRoster {
+  tiers: Record<string, { model: string; provider: string; key_source: string; enabled: boolean }[]>;
+  key_sources: Record<string, string>;
+}
+
+/** Which assistants each probe tier asks, and which this deployment can run (no secret values). */
+export async function getProbeProviders(): Promise<ProbeProviderRoster> {
+  const res = await api<{ success: boolean; data: ProbeProviderRoster }>(
+    '/api/v1/mention-monitoring/probe-providers',
+    { method: 'GET' },
+  );
+  return res.data;
+}
+
 export async function probeSubjectLlm(
   ref: MentionSubjectRef,
   models?: string[],

@@ -16,8 +16,10 @@ import {
 } from '@/services/userWebsitesService';
 import {
   createTrackedMention,
+  getProbeProviders,
   probeSubjectLlm,
   updateTrackedMention,
+  type ProbeProviderRoster,
 } from '@/services/mentionMonitoringApi';
 import { Button } from '@/components/core/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -144,6 +146,14 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
   const [state, setState] = useState<AiMonitoringState | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  // What the tier ASKS for versus what can run. A model dropped for a missing key leaves
+  // no row anywhere, so "By assistant" showing two rows read as a two-assistant design.
+  const [roster, setRoster] = useState<ProbeProviderRoster | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    getProbeProviders().then((r) => { if (!cancelled) setRoster(r); }).catch(() => { /* stated below as unknown */ });
+    return () => { cancelled = true; };
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -241,8 +251,8 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
   // the measurement; they have to be editable where the answers are read.
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState<{ prompts: string; aliases: string; languages: string; countries: string }>({
-    prompts: '', aliases: '', languages: '', countries: '',
+  const [form, setForm] = useState<{ prompts: string; aliases: string; languages: string; countries: string; includeDefaults: boolean }>({
+    prompts: '', aliases: '', languages: '', countries: '', includeDefaults: true,
   });
   const openEditor = async () => {
     const id = state?.own_brand_subject_id;
@@ -259,6 +269,8 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
       aliases: ((data as any)?.aliases ?? []).join(', '),
       languages: ((data as any)?.language_codes ?? []).join(', '),
       countries: ((data as any)?.country_codes ?? []).join(', '),
+      // Absent means ON (an existing subject must not silently lose its baseline); only an explicit false is off.
+      includeDefaults: cfg.include_default_probes !== false,
     });
     setEditing(true);
   };
@@ -273,7 +285,10 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
         aliases: list(form.aliases),
         language_codes: list(form.languages).map((l) => l.toLowerCase()),
         country_codes: list(form.countries).map((c) => c.toUpperCase()),
-        source_config: { custom_probes: prompts.map((prompt, i) => ({ key: `custom_${i + 1}`, prompt })) },
+        source_config: {
+          custom_probes: prompts.map((prompt, i) => ({ key: `custom_${i + 1}`, prompt })),
+          include_default_probes: form.includeDefaults,
+        },
       });
       toast({ title: 'Questions saved', description: 'The next probe run asks these. Run probes now to see the change today.' });
       setEditing(false);
@@ -316,10 +331,19 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
                 onChange={(e) => setForm((f) => ({ ...f, countries: e.target.value }))} />
             </div>
           </div>
-          <p className="text-[11px] text-muted-foreground">
-            The four stock questions stay alongside yours. Brands named in the answers become "who they name instead",
-            so a generic question produces a generic competitive set.
-          </p>
+          <label className="flex items-start gap-2 text-[11px] text-muted-foreground">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={form.includeDefaults}
+              onChange={(e) => setForm((f) => ({ ...f, includeDefaults: e.target.checked }))}
+            />
+            <span>
+              Also ask the four stock questions (best brands, use case, compare with alternatives, tell me about).
+              They are rendered from the subject's product type; the comparison one invites the assistant to invent
+              rivals for a brand it does not know. Brands named in any answer become "who they name instead".
+            </span>
+          </label>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
@@ -389,6 +413,17 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
             {compact(t.answered)} answered probes across {data.models.length} assistants, over the last{' '}
             {data.window_days} days · last run {timeAgo(t.last_run_at)}
           </CardDescription>
+          {/* Always offered, not only inside the diagnosis banner: after the questions are
+              edited, the numbers on this screen are answers to the OLD questions until a run
+              happens, and the nightly one is at 03:00 UTC. */}
+          {state?.own_brand_subject_id && !state.own_brand_inactive && (
+            <div className="mt-2">
+              <Button size="sm" variant="outline" disabled={!!busy} onClick={() => runNow(state.own_brand_subject_id!)}>
+                {busy === 'run' ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Play className="mr-1 h-3.5 w-3.5" />}
+                Run probes now
+              </Button>
+            </div>
+          )}
         </CardHeader>
         <CardContent className="space-y-4">
           {state && (
@@ -464,6 +499,27 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
             Each assistant is a different audience with a different answer. A row with no verdict had no
             successful probe — that is a broken feed, not an absence of mentions.
           </CardDescription>
+          {(() => {
+            // The default ("cheap") tier is what every subject runs unless switched to
+            // frontier in Mention Monitoring; that roster is the one to explain here.
+            const wanted = roster?.tiers?.cheap ?? [];
+            const missing = wanted.filter((m) => !m.enabled);
+            if (!roster || wanted.length === 0) return null;
+            return (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {wanted.map((m) => (
+                  <Badge key={m.model} variant={m.enabled ? 'neutral' : 'warning'} title={`${m.provider} key: ${m.key_source}`}>
+                    {modelLabel(m.model)}{m.enabled ? '' : ' — no key configured'}
+                  </Badge>
+                ))}
+                {missing.length > 0 && (
+                  <span className="self-center text-[11px] text-muted-foreground">
+                    A missing key drops the assistant from the run entirely. Add it under Admin → Platform Secrets.
+                  </span>
+                )}
+              </div>
+            );
+          })()}
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">

@@ -122,7 +122,13 @@ read "checked 10h ago" at ten in the morning) and the note names the source's er
 fetch; MIVAA's `_call` passes those items through with `ok=False`, and the tracker accepts them
 on its LAST attempt only: a position found in the fetched pages is real, "not found in a partial
 set" stays unknown. Three Greek queries failed 40106 on every one of three attempts on
-2026-09-05, which is what this is for.
+2026-09-05, which is what this is for. **And then the top 50 is read.** The partial sets vary per
+attempt for the same keyword (81 items, then 32; 13, then 61), so this is the provider's deep-page
+scraping failing on Greek SERPs, not "fewer results exist" — and a 50-deep read of the same
+keyword came back complete (57 items). When the partial set does not contain us, the tracker
+reads depth 50 and records `seo_keyword_positions.depth_checked = 50`; the panel says "not in top
+50", which is a different, honest sentence from "not in top 100". Unknown is now reserved for a
+keyword the provider could not read at all.
 
 **An upstream failure inside a 200 envelope is UNKNOWN, never "not in top 100".** MIVAA's
 dispatcher answers HTTP 200 with `success:false` and `data.error` when DataForSEO itself fails
@@ -216,7 +222,30 @@ questions are the measurement: the panel now has **Edit questions** (custom prom
 languages, countries → `updateTrackedMention`), and this subject was given a product type,
 `el`+`en`, `GR` and five Greek/English questions about sourcing tiles, sanitary ware and marble
 in Thessaloniki and for hotel projects. Perplexity (`sonar`) probes return HTTP 401 because that
-account is unfunded; the panel reports it as No verdict, not 0%.
+account is unfunded; the panel reports it as No verdict, not 0%. **Changing the questions restarts
+the measurement**: the 90-day window would otherwise keep reporting answers to the OLD questions
+(and their brands) beside the new ones, so the eight probes that asked "best products brands"
+were deleted and the panel carries a permanent **Run probes now** button (it was only inside the
+diagnosis banner, which does not show on a healthy subject). The nightly run is 03:00 UTC; MIVAA's
+`cron-probe-llm` (x-cron-secret) takes subjects whose `next_check_at` is due.
+
+**Which assistants run = the tier's roster ∩ the keys MIVAA can resolve, and a dropped one leaves
+no row.** The cheap tier asks Claude Haiku, Gemini Flash and Perplexity Sonar; frontier asks Opus,
+Gemini Pro and Sonar Pro (`TIER_MODELS` in `llm_mention_probe_service.py`). GPT-4o-mini is NOT
+in either: every one of its 212 probes returned HTTP 429 and the `openai` package was removed
+from MIVAA outright (`test_openai_is_gone_entirely` fails the build on any `api.openai.com`
+reference), so bringing GPT back is a policy decision plus a funded OpenAI account, not a flag.
+The probes run in MIVAA (Python → provider HTTP over httpx, per the three-runtimes rule), not
+through the edge AI SDK client; the client is not what decides the roster, the keys are. Gemini
+did not run for materialshub.gr because MIVAA resolved no key under `GEMINI_API_KEY` /
+`GOOGLE_GENAI_API_KEY` — the edge runtime holds the same credential as
+`GOOGLE_GENERATIVE_AI_API_KEY`, so the resolver now accepts that name too, and pasting the key
+into Admin → Platform Secrets under any of the three enables Gemini within 30 s, no deploy.
+Perplexity's key resolves but the account answers 401 (unfunded). `GET
+/api/v1/mention-monitoring/probe-providers` reports the roster with each provider's key source
+(env / db / default / missing, never the value); the panel prints it above "By assistant" with
+"no key configured" on the missing ones, because a two-row table otherwise reads as a
+two-assistant design.
 
 **Keyword Research feeds the tracker and starts from the site's own pages.** A research row, the
 detail header and each cluster carry a Track action (`addTrackedKeywords`, GR/el). "Suggested
