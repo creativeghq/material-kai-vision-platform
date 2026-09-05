@@ -31,7 +31,20 @@ const MAX_SITEMAP_DEPTH = 3;
 // deliberately endless response cannot exhaust the isolate.
 const MAX_SITEMAP_BYTES = 10 * 1024 * 1024;
 const MAX_PAGES_HARD_CAP = 1000;
-const FIRECRAWL_CONCURRENCY = 4;
+const FIRECRAWL_CONCURRENCY = 2;
+/**
+ * Firecrawl rate-limits per plan, and this key is on the tier that allows ten
+ * scrapes a minute: on 2026-09-05 exactly 10 of 82 pages scraped and the other 72
+ * came back 429 inside twenty seconds. A crawl therefore cannot finish a real site
+ * in one request (the edge gateway cuts a request off at 150 s), so a run does what
+ * it can inside this budget — pages with no content first, then the stalest — and
+ * the 6-hourly cron continues from where it stopped.
+ */
+const SCRAPE_BUDGET_MS = 80_000;
+/** A page scraped cleanly this recently is stamped as still in the sitemap, not fetched again. */
+const REFETCH_AFTER_DAYS = 7;
+const RATE_LIMIT_DEFAULT_WAIT_MS = 12_000;
+const RATE_LIMIT_MAX_RETRIES = 3;
 const PREVIEW_SAMPLE_SIZE = 5;
 const USER_AGENT = 'Material-Kai-Vision/1.0 (+sitemap-indexer)';
 
@@ -234,8 +247,25 @@ interface ScrapeResult {
   title: string | null;
   description: string | null;
   content_excerpt: string | null;
+  /** The PAGE's status as Firecrawl saw it — never Firecrawl's own status. */
   http_status: number | null;
   error: string | null;
+  rate_limited?: boolean;
+  retry_after_ms?: number;
+}
+
+/** Retry-After header in seconds, else a reset hint in Firecrawl's message, else the default. */
+function retryAfterMs(res: Response, message: string): number {
+  const header = Number(res.headers.get('retry-after'));
+  if (Number.isFinite(header) && header > 0) return Math.min(header * 1000, 60_000);
+  const inSecs = /reset(?:s)?\s+in:?\s*(\d+)\s*s/i.exec(message)?.[1] ?? /retry (?:after|in)\s*(\d+)\s*s/i.exec(message)?.[1];
+  if (inSecs) return Math.min(Number(inSecs) * 1000 + 500, 60_000);
+  const at = /reset(?:s)?\s+at:?\s*([0-9T:.+-]+Z?)/i.exec(message)?.[1];
+  if (at) {
+    const t = Date.parse(at);
+    if (Number.isFinite(t) && t > Date.now()) return Math.min(t - Date.now() + 500, 60_000);
+  }
+  return RATE_LIMIT_DEFAULT_WAIT_MS;
 }
 
 async function firecrawlScrape(url: string): Promise<ScrapeResult> {
@@ -263,7 +293,16 @@ async function firecrawlScrape(url: string): Promise<ScrapeResult> {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data?.success) {
-      return { url, title: null, description: null, content_excerpt: null, http_status: res.status, error: data?.error || `firecrawl ${res.status}` };
+      const message = String(data?.error || `firecrawl ${res.status}`);
+      // Firecrawl's status is OUR quota or its outage, not the page's: storing it as
+      // http_status filed 72 live pages as "429" on 2026-09-05. Unknown stays null.
+      if (res.status === 429) {
+        return {
+          url, title: null, description: null, content_excerpt: null, http_status: null,
+          error: `rate limited: ${message}`, rate_limited: true, retry_after_ms: retryAfterMs(res, message),
+        };
+      }
+      return { url, title: null, description: null, content_excerpt: null, http_status: null, error: message };
     }
     const md = (data.data?.markdown || '') as string;
     const meta = data.data?.metadata || {};
@@ -281,14 +320,51 @@ async function firecrawlScrape(url: string): Promise<ScrapeResult> {
   }
 }
 
+/**
+ * A worker pool that honours Firecrawl's rate limit and a wall-clock deadline.
+ *
+ * A 429 pauses EVERY worker until the reset — the limit is per key, not per
+ * request, so the other worker hammering on is just a second refusal — then the
+ * same URL is retried. A URL still refused after the retries, or reached after the
+ * deadline, is returned as `skipped`: the caller leaves its stored content alone
+ * and the next run picks it up first.
+ */
+async function pacedScrape(urls: string[], deadline: number): Promise<{ scrapes: ScrapeResult[]; skipped: string[] }> {
+  const queue = [...urls];
+  const scrapes: ScrapeResult[] = [];
+  const skipped: string[] = [];
+  let pausedUntil = 0;
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+  const worker = async () => {
+    for (let url = queue.shift(); url; url = queue.shift()) {
+      let result: ScrapeResult | null = null;
+      for (let attempt = 0; attempt <= RATE_LIMIT_MAX_RETRIES; attempt++) {
+        const wait = pausedUntil - Date.now();
+        if (wait > 0) {
+          if (Date.now() + wait > deadline) break;
+          await sleep(wait);
+        }
+        if (Date.now() > deadline) break;
+        const r = await firecrawlScrape(url);
+        if (!r.rate_limited) { result = r; break; }
+        pausedUntil = Math.max(pausedUntil, Date.now() + (r.retry_after_ms ?? RATE_LIMIT_DEFAULT_WAIT_MS));
+      }
+      if (result) scrapes.push(result); else skipped.push(url);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(FIRECRAWL_CONCURRENCY, queue.length) }, worker));
+  return { scrapes, skipped };
+}
+
+/** Preview-sized scrape: everything, or an explicit failure per URL the budget left out. */
 async function chunkedScrape(urls: string[]): Promise<ScrapeResult[]> {
-  const out: ScrapeResult[] = [];
-  for (let i = 0; i < urls.length; i += FIRECRAWL_CONCURRENCY) {
-    const chunk = urls.slice(i, i + FIRECRAWL_CONCURRENCY);
-    const results = await Promise.all(chunk.map(firecrawlScrape));
-    out.push(...results);
-  }
-  return out;
+  const { scrapes, skipped } = await pacedScrape(urls, Date.now() + SCRAPE_BUDGET_MS);
+  return [
+    ...scrapes,
+    ...skipped.map((url): ScrapeResult => ({
+      url, title: null, description: null, content_excerpt: null, http_status: null, error: 'rate limited', rate_limited: true,
+    })),
+  ];
 }
 
 /** Pick N evenly-spaced items from arr — gives a non-biased sample of the sitemap. */
@@ -357,10 +433,13 @@ async function crawlOneWebsite(
   website: { id: string; user_id: string; workspace_id: string | null; url: string; sitemap_url: string | null; max_pages: number },
 ): Promise<{
   ok: boolean; pages_indexed: number; pages_discovered: number;
-  pages_capped_at: number; capped: boolean; error?: string;
+  pages_capped_at: number; capped: boolean;
+  pages_with_content: number; pages_pending: number; rate_limited: number;
+  error?: string;
 }> {
   const { id: websiteId, user_id: userId, workspace_id: workspaceId, url: siteUrl, max_pages } = website;
   const cap = Math.min(max_pages || 50, MAX_PAGES_HARD_CAP);
+  const nothing = { pages_indexed: 0, pages_discovered: 0, pages_capped_at: cap, capped: false, pages_with_content: 0, pages_pending: 0, rate_limited: 0 };
 
   let sitemapUrl = website.sitemap_url;
   const discovered = !sitemapUrl;
@@ -371,7 +450,7 @@ async function crawlOneWebsite(
         last_crawled_at: new Date().toISOString(),
         last_crawl_error: 'Could not autodetect sitemap. Add sitemap_url manually.',
       }).eq('id', websiteId);
-      return { ok: false, pages_indexed: 0, pages_discovered: 0, pages_capped_at: cap, capped: false, error: 'sitemap not found' };
+      return { ok: false, ...nothing, error: 'sitemap not found' };
     }
   }
 
@@ -385,7 +464,7 @@ async function crawlOneWebsite(
       last_crawled_at: new Date().toISOString(),
       last_crawl_error: 'Sitemap returned no URLs.',
     }).eq('id', websiteId);
-    return { ok: false, pages_indexed: 0, pages_discovered: 0, pages_capped_at: cap, capped: false, error: 'sitemap empty' };
+    return { ok: false, ...nothing, error: 'sitemap empty' };
   }
   const urls = allUrls.slice(0, cap);
   const capped = allUrls.length > cap;
@@ -395,17 +474,43 @@ async function crawlOneWebsite(
   }
 
   const crawlStartedAt = new Date().toISOString();
-  const scrapes = await chunkedScrape(urls);
+
+  // What each URL needs. A page scraped cleanly within REFETCH_AFTER_DAYS is only
+  // stamped as still in the sitemap; the rest are fetched, pages with no content
+  // first and then the stalest. Re-scraping every page four times a day spent the
+  // whole rate-limit allowance on pages that had not changed.
+  const { data: existingRows } = await supabase
+    .from('user_website_pages')
+    .select('url, fetched_at, content_excerpt')
+    .eq('website_id', websiteId);
+  const existing = new Map<string, { fetched_at: number; has_content: boolean }>();
+  for (const r of existingRows || []) {
+    existing.set(r.url, { fetched_at: r.fetched_at ? Date.parse(r.fetched_at) : 0, has_content: !!r.content_excerpt });
+  }
+  const freshCutoff = Date.now() - REFETCH_AFTER_DAYS * 86_400_000;
+  const fresh: string[] = [];
+  const toFetch: { url: string; fetched_at: number; has_content: boolean }[] = [];
+  for (const url of urls) {
+    const row = existing.get(url);
+    if (row?.has_content && row.fetched_at >= freshCutoff) fresh.push(url);
+    else toFetch.push({ url, fetched_at: row?.fetched_at ?? 0, has_content: !!row?.has_content });
+  }
+  toFetch.sort((a, b) => Number(a.has_content) - Number(b.has_content) || a.fetched_at - b.fetched_at);
+
+  const { scrapes, skipped } = await pacedScrape(toFetch.map((t) => t.url), Date.now() + SCRAPE_BUDGET_MS);
 
   let indexed = 0;
+  let rateLimited = 0;
   // Upsert failures were previously discarded — `upsert(...)` was called and its `error` never
   // read, so a crawl in which every single write was rejected still returned ok:true, cleared
   // `last_crawl_error` and stamped `last_crawled_at` (#363 `EE-18`). Zero pages written looks
   // identical to a site with nothing new, which is the silent-zero shape: count the failures and
   // let them decide the verdict.
+  let writes = 0;
   let writeFailures = 0;
   const firstWriteError: string[] = [];
   const recordWrite = (error: { message?: string } | null) => {
+    writes += 1;
     if (!error) return;
     writeFailures += 1;
     if (firstWriteError.length === 0) firstWriteError.push(error.message || 'unknown write error');
@@ -413,13 +518,17 @@ async function crawlOneWebsite(
 
   for (const s of scrapes) {
     if (s.error || !s.content_excerpt) {
+      // Keep whatever an earlier crawl stored: a failed scrape says nothing about the
+      // page, and writing nulls over a good excerpt is how 72 indexed pages became
+      // empty rows in one rate-limited run. Only the sitemap stamp moves, plus the
+      // page's real status when Firecrawl actually reached it.
       const { error: upsertErr } = await supabase.from('user_website_pages').upsert({
         website_id: websiteId, user_id: userId, url: s.url,
-        title: s.title, description: s.description, content_excerpt: s.content_excerpt,
-        keywords: [], embedding: null, http_status: s.http_status,
-        last_seen_in_sitemap: crawlStartedAt, fetched_at: new Date().toISOString(), is_active: true,
+        last_seen_in_sitemap: crawlStartedAt, is_active: true,
+        ...(s.http_status ? { http_status: s.http_status, fetched_at: new Date().toISOString() } : {}),
       }, { onConflict: 'website_id,url' });
       recordWrite(upsertErr);
+      if (s.rate_limited) rateLimited += 1;
       continue;
     }
 
@@ -437,10 +546,23 @@ async function crawlOneWebsite(
     if (embedding && !upsertErr) indexed += 1;
   }
 
+  // Pages not fetched this run — the fresh ones, and those the budget or the rate
+  // limit left over — are still in the sitemap and must not be retired below.
+  const seenOnly = [...fresh, ...skipped];
+  for (let i = 0; i < seenOnly.length; i += 200) {
+    const { error: seenErr } = await supabase.from('user_website_pages').upsert(
+      seenOnly.slice(i, i + 200).map((url) => ({
+        website_id: websiteId, user_id: userId, url, last_seen_in_sitemap: crawlStartedAt, is_active: true,
+      })),
+      { onConflict: 'website_id,url' },
+    );
+    recordWrite(seenErr);
+  }
+
   // Deactivating pages that vanished from the sitemap is only correct if this crawl actually
   // saw the sitemap through. After widespread write failures the `last_seen_in_sitemap` stamps
   // are missing, so this sweep would retire pages that are still live.
-  const allWritesFailed = writeFailures > 0 && writeFailures === scrapes.length;
+  const allWritesFailed = writes > 0 && writeFailures === writes;
   if (!allWritesFailed) {
     await supabase.from('user_website_pages')
       .update({ is_active: false })
@@ -448,23 +570,30 @@ async function crawlOneWebsite(
       .lt('last_seen_in_sitemap', crawlStartedAt);
   }
 
-  const { count } = await supabase
+  // "Indexed" means holding content. An active row with nothing in it is a URL we
+  // know about, not a page anybody can search or interlink.
+  const { count: withContent } = await supabase
     .from('user_website_pages')
     .select('id', { count: 'exact', head: true })
     .eq('website_id', websiteId)
-    .eq('is_active', true);
+    .eq('is_active', true)
+    .not('content_excerpt', 'is', null);
 
   const writeError = writeFailures > 0
-    ? `${writeFailures}/${scrapes.length} pages failed to save: ${firstWriteError[0]}`
+    ? `${writeFailures}/${writes} page writes failed: ${firstWriteError[0]}`
     : null;
 
   await supabase.from('user_websites').update({
     last_crawled_at: new Date().toISOString(),
     last_crawl_error: writeError,
-    page_count: count || indexed,
+    page_count: withContent ?? indexed,
   }).eq('id', websiteId);
 
   if (writeError) console.error(`[crawl-user-website] ${websiteId}: ${writeError}`);
+  const pending = skipped.length + rateLimited;
+  if (pending > 0) {
+    console.warn(`[crawl-user-website] ${websiteId}: ${pending} of ${urls.length} pages left for the next run (${rateLimited} rate-limited, ${skipped.length} past the budget)`);
+  }
 
   // Partial write failure is reported, not hidden; total failure is not a successful crawl.
   return {
@@ -473,6 +602,9 @@ async function crawlOneWebsite(
     pages_discovered: allUrls.length,
     pages_capped_at: cap,
     capped,
+    pages_with_content: withContent ?? 0,
+    pages_pending: pending,
+    rate_limited: rateLimited,
     ...(writeError ? { error: writeError } : {}),
   };
 }

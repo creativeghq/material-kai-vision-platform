@@ -46,18 +46,29 @@ export interface CrawlResult {
   pages_discovered: number;
   pages_capped_at?: number;
   capped?: boolean;
+  /** Active pages holding content after this run — the number the site can search and interlink. */
+  pages_with_content?: number;
+  /** Pages this run could not fetch (crawler rate limit or the run's time budget); the next run takes them first. */
+  pages_pending?: number;
+  rate_limited?: number;
   error?: string;
 }
 
 /**
- * One sentence for the crawl toast that names the cap when the cap is what stopped
- * the crawl. "50 of 50 pages indexed" on a 127-URL sitemap read as a 50-page site.
+ * One sentence for the crawl toast, naming what stopped the crawl when something did.
+ * "50 of 50 pages indexed" on an 82-URL sitemap read as a 50-page site, and "82 pages
+ * indexed" with 72 of them empty read as a finished crawl.
  */
 export function describeCrawlResult(r: CrawlResult): string {
-  const base = `${r.pages_indexed} of ${r.pages_discovered} pages indexed`;
-  return r.capped && r.pages_capped_at
-    ? `${base} — this site's page cap is ${r.pages_capped_at}. Raise it under Websites → Edit to index the rest.`
-    : base;
+  const held = r.pages_with_content ?? r.pages_indexed;
+  let s = `${held} of ${r.pages_discovered} pages indexed`;
+  if (r.pages_pending) {
+    s += ` · ${r.pages_pending} waiting on the crawler's rate limit — the crawl continues automatically every 6 hours`;
+  }
+  if (r.capped && r.pages_capped_at) {
+    s += ` · this site's page cap is ${r.pages_capped_at}; raise it under Websites → Edit to index the rest`;
+  }
+  return s;
 }
 
 export interface PreviewSampleItem {

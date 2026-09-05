@@ -127,6 +127,20 @@ a 50-page site. It now collects up to the hard cap, returns `pages_discovered` (
 site's page cap is 50" so the reader knows where to go. The cap itself is edited under
 Websites → Edit (10–1000).
 
+**The crawl is a rotation, because Firecrawl is rate-limited per plan and a run has 150 s.**
+With the cap raised, the same recrawl scraped exactly 10 of 82 pages and got HTTP 429 on the other
+72 inside twenty seconds (the key is on the ten-scrapes-a-minute tier), stored each refusal as
+an ACTIVE page with `http_status = 429` and no content — overwriting the excerpt an earlier crawl
+had saved — and reported `ok`. `crawl-user-website` now: pauses every worker on a 429 until the
+reset and retries (`pacedScrape`); works inside `SCRAPE_BUDGET_MS`, pages with no content first
+and then the stalest, and leaves the rest for the 6-hourly cron; stamps a page scraped cleanly
+within `REFETCH_AFTER_DAYS` as still-in-sitemap instead of fetching it again; never writes nulls
+over stored content on a failed scrape and never records Firecrawl's own status as the page's;
+counts `page_count` as active pages WITH content; and returns `pages_with_content`,
+`pages_pending` and `rate_limited`, which the toast prints ("10 of 82 pages indexed · 72 waiting
+on the crawler's rate limit — the crawl continues automatically every 6 hours"). At ten a minute
+a fresh 82-page site fills in over about two cron cycles; a bigger Firecrawl plan lifts that.
+
 **Alerts fire on leaving the top 10 only**, through the existing `seo.ranking_movement` flow
 trigger — not a new near-duplicate one. A tracker that alerts on every wobble gets muted, and a
 muted alert cannot warn about anything. (The first cut emitted `seo.rank_drop`, which is in no
