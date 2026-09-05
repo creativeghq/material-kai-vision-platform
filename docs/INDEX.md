@@ -437,6 +437,8 @@ Complete documentation for Material Kai Vision Platform.
 
 **[agent-and-tools-reference.md](agent-and-tools-reference.md)** - Reference for the JARVIS agents and their tool surfaces
 
+**[extraction-evaluation.md](extraction-evaluation.md)** - Is what the pipeline wrote what the page says? Golden cases, agreement without ground truth, the stage-5 page judge, two probes ✨ NEW (2026-09-05)
+
 **[agent-evaluation.md](agent-evaluation.md)** - Does the agent see what the platform knows? ✨ NEW (2026-09-05)
 - Data coverage: every derived SQL read vs the ones an agent tool reads (`agent_data_coverage`, committed baseline with a reason per gap)
 - Retrospective audit of real conversations (`agent_conversation_audit`): no-tool turns, empty calls, hedged replies, cost
