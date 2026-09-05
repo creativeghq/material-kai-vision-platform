@@ -150,6 +150,38 @@ Check the operator wallet before a sweep: the credit floor lets one turn of over
 contain, and mark it `factual` if it is a lookup. A case that fails today is a finding, not a
 mistake — that is what the first 14 were for.
 
+### Reading a batch — repeats, failure classes, and what a zero means
+
+Adopted 2026-09-05 from the GAIK toolkit's extraction-evaluation method, whose authors published
+a wrong finding first: a newer model looked markedly less stable than its predecessor, and the
+whole gap was eight rate-limited documents out of 180. Four rules keep a comparison honest here:
+
+1. **Five repeats minimum.** One run per case has no spread, so a difference between two batches
+   has no noise floor under it and is not a result. `scripts/run-agent-eval-batch.mjs` runs
+   every active case `--repeats` times under one `batch_id` and prints the summary; a case with
+   fewer repeats than `AGENT_EVAL_MIN_REPEATS` is flagged `att!` and must not be compared.
+2. **A failed run says WHICH WAY it failed.** `agent_eval_runs.failure_class` is the first class
+   by precedence and `failure_classes` is every one, from the closed list in
+   [src/config/agentEvalVocabulary.ts](../src/config/agentEvalVocabulary.ts) (mirrored to the
+   edge; the DB CHECK is the enforcer). `transport` — agent-chat unreachable, a non-2xx, a cut
+   stream — is the harness or the network, and the summary reports it BESIDE agent failures,
+   never folded in. Read the failure column before calling anything unstable.
+3. **The denominator does not move.** Every attempt in the batch counts; a case that produced no
+   run is listed with zero attempts (`cases_missing`) rather than dropped. A pipeline must not
+   raise its own average by crashing on the hard cases.
+4. **Stability is measured without ground truth, and never read alone.** `tools_agreement` is
+   the share of a case's repeats that called the modal SET of tools — "did the same thing happen
+   each time", answerable the same day, with no labelling. It rewards silence (an empty reply is
+   perfectly repeatable), so it is printed next to the pass rate and `reply_completeness`.
+
+```sh
+node scripts/run-agent-eval-batch.mjs --user <uuid> --workspace <uuid> --repeats 5 --model claude-sonnet-5
+curl -s -X POST "$SUPABASE_URL/functions/v1/agent-eval" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+  -H 'Content-Type: application/json' -d '{"action":"summary","batch_id":"<uuid>","user_id":"<uuid>","workspace_id":"<uuid>"}'
+```
+
+Guarded by [tests/unit/agentEvalSummary.test.ts](../tests/unit/agentEvalSummary.test.ts).
+
 ## Before a manual test session
 
 1. `npm test` — the coverage baseline is honest.

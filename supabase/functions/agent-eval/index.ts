@@ -29,6 +29,15 @@
  * promotion and next-step chips. An eval question must never become a durable "fact" about the
  * user (#370's poisoned memories), and the chips are spend nobody reads here.
  *
+ * READING A RUN
+ * -------------
+ * A failed run carries WHICH WAY it failed: `failure_class` (the first by precedence) and
+ * `failure_classes` (every one), from the closed list in `agentEvalVocabulary`. A transport
+ * failure and a hedge both score zero and are two different findings; averaged together the
+ * information is gone. `action: 'summary'` reads a whole batch that way — fixed denominator,
+ * harness failures beside agent failures, tool-set agreement across repeats — and
+ * `scripts/run-agent-eval-batch.mjs` runs the repeats that give it a noise floor.
+ *
  * Process doc: docs/agent-evaluation.md.
  */
 import { corsHeaders } from '../_shared/cors.ts';
@@ -36,6 +45,8 @@ import { jsonResponse } from '../_shared/http.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate, isPlatformOperator, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { shapeToolResult } from '../_shared/tool-result-shape.ts';
+import { AGENT_EVAL_FAILURE_CLASSES, type AgentEvalFailureClass } from '../_shared/agentEvalVocabulary.generated.ts';
+import { summarizeBatch } from '../_shared/agent-eval-summary.ts';
 
 interface EvalCase {
   id: string;
@@ -65,8 +76,32 @@ interface TurnOutcome {
   toolsZero: string[];
   toolsFailed: string[];
   error: string | null;
+  /** The error is the harness or the network (unreachable, non-2xx, stream cut), not the agent. */
+  transport: boolean;
   ms: number;
   chunkTypes: Record<string, number>;
+}
+
+/** One thing the run got wrong, with the class the batch summary counts it under. */
+interface Failure {
+  cls: AgentEvalFailureClass;
+  message: string;
+}
+
+/** The first failure by the vocabulary's precedence: what stopped the turn outranks what it got wrong. */
+function primaryFailureClass(failures: Failure[]): AgentEvalFailureClass | null {
+  let best: AgentEvalFailureClass | null = null;
+  let bestRank = Number.POSITIVE_INFINITY;
+  for (const f of failures) {
+    const rank = AGENT_EVAL_FAILURE_CLASSES.indexOf(f.cls);
+    if (rank !== -1 && rank < bestRank) { best = f.cls; bestRank = rank; }
+  }
+  return best;
+}
+
+function failureClassesInOrder(failures: Failure[]): AgentEvalFailureClass[] {
+  const present = new Set(failures.map((f) => f.cls));
+  return AGENT_EVAL_FAILURE_CLASSES.filter((c) => present.has(c));
 }
 
 /** Below the 150 s edge ceiling with room to score and persist. */
@@ -102,7 +137,7 @@ async function runTurn(input: {
   const out: TurnOutcome = {
     text: '', routedAgent: null, model: null,
     toolsCalled: [], toolsZero: [], toolsFailed: [],
-    error: null, ms: 0, chunkTypes: {},
+    error: null, transport: false, ms: 0, chunkTypes: {},
   };
 
   let resp: Response;
@@ -125,11 +160,13 @@ async function runTurn(input: {
     });
   } catch (e) {
     out.error = `agent-chat unreachable: ${e instanceof Error ? e.message : String(e)}`;
+    out.transport = true;
     out.ms = Date.now() - started;
     return out;
   }
   if (!resp.ok || !resp.body) {
     out.error = `agent-chat HTTP ${resp.status}: ${(await resp.text().catch(() => '')).slice(0, 300)}`;
+    out.transport = true;
     out.ms = Date.now() - started;
     return out;
   }
@@ -195,7 +232,10 @@ async function runTurn(input: {
     }
     if (buffer.trim()) handle(buffer.trim());
   } catch (e) {
-    out.error = out.error ?? `stream ended early: ${e instanceof Error ? e.message : String(e)}`;
+    if (!out.error) {
+      out.error = `stream ended early: ${e instanceof Error ? e.message : String(e)}`;
+      out.transport = true;
+    }
   }
   out.ms = Date.now() - started;
   return out;
@@ -210,52 +250,60 @@ function compileRegex(src: string): RegExp | null {
  * the verdicts are "this tool was called", "this text is present", "this text is absent",
  * "this cost". A judge model can be layered on later; it must never replace these.
  */
-function scoreCase(c: EvalCase, turn: TurnOutcome, credits: number | null, hedgePattern: string | null): string[] {
-  const failures: string[] = [];
+function scoreCase(c: EvalCase, turn: TurnOutcome, credits: number | null, hedgePattern: string | null): Failure[] {
+  const failures: Failure[] = [];
+  const fail = (cls: AgentEvalFailureClass, message: string) => failures.push({ cls, message });
   const called = new Set(turn.toolsCalled);
   const reply = turn.text || '';
 
-  if (turn.error) failures.push(`turn error: ${turn.error}`);
-  if (!reply.trim()) failures.push('empty reply');
+  // The harness or the network failing is a finding about the harness, and it is classified as
+  // one — so a quota spike is never read, in aggregate, as an unstable agent.
+  if (turn.error) fail(turn.transport ? 'transport' : 'turn_error', `turn error: ${turn.error}`);
+  if (!reply.trim()) fail('empty_reply', 'empty reply');
 
   if (c.expect_tools_any.length > 0 && !c.expect_tools_any.some((t) => called.has(t))) {
-    failures.push(
+    fail('expected_tool_not_called',
       `none of the expected tools was called [${c.expect_tools_any.join(', ')}]; ` +
-      `called [${turn.toolsCalled.join(', ') || 'nothing'}]`,
-    );
+      `called [${turn.toolsCalled.join(', ') || 'nothing'}]`);
   }
   for (const t of c.expect_tools_any) {
     if (!called.has(t)) continue;
-    if (turn.toolsFailed.includes(t)) failures.push(`expected tool ${t} failed`);
+    if (turn.toolsFailed.includes(t)) fail('expected_tool_failed', `expected tool ${t} failed`);
     // An empty result is a pass unless the case asked for rows: crm.forecast reported an empty
     // pipeline truthfully and the first scorer counted it as a failure. Zero is a valid answer.
-    else if (c.expect_results && turn.toolsZero.includes(t)) failures.push(`expected tool ${t} returned nothing`);
+    else if (c.expect_results && turn.toolsZero.includes(t)) fail('expected_tool_empty', `expected tool ${t} returned nothing`);
   }
   for (const t of c.expect_tools_none) {
-    if (called.has(t)) failures.push(`forbidden tool called: ${t}`);
+    if (called.has(t)) fail('forbidden_tool_called', `forbidden tool called: ${t}`);
   }
   for (const src of c.expect_reply_regex) {
     const re = compileRegex(src);
-    if (!re) failures.push(`case has an invalid regex: ${src}`);
-    else if (!re.test(reply)) failures.push(`reply does not match /${src}/i`);
+    if (!re) fail('invalid_case', `case has an invalid regex: ${src}`);
+    else if (!re.test(reply)) fail('reply_missing_fact', `reply does not match /${src}/i`);
+  }
+  for (const src of c.forbid_reply_regex) {
+    const re = compileRegex(src);
+    if (!re) fail('invalid_case', `case has an invalid regex: ${src}`);
+    else if (re.test(reply)) fail('reply_forbidden_text', `reply matches forbidden /${src}/i`);
   }
   // A factual question gets facts. The framework (MODE / Confidence) is for analysis and
   // decisions — the shared operating doctrine says so, and 9225f61f wore it on a lookup.
-  const forbid = [...c.forbid_reply_regex, ...(c.factual ? ['\\bMODE: ', '\\bConfidence:'] : [])];
-  for (const src of forbid) {
-    const re = compileRegex(src);
-    if (re && re.test(reply)) failures.push(`reply matches forbidden /${src}/i`);
+  if (c.factual) {
+    for (const src of ['\\bMODE: ', '\\bConfidence:']) {
+      const re = compileRegex(src);
+      if (re && re.test(reply)) fail('framework_on_factual', `factual question answered with the framework: /${src}/i`);
+    }
   }
   if (hedgePattern) {
     const re = compileRegex(hedgePattern);
     const m = re?.exec(reply);
-    if (m) failures.push(`reply hedges: "${m[0].trim().slice(0, 160)}"`);
+    if (m) fail('hedged', `reply hedges: "${m[0].trim().slice(0, 160)}"`);
   }
   if (c.max_seconds && turn.ms > c.max_seconds * 1000) {
-    failures.push(`took ${Math.round(turn.ms / 1000)} s, limit ${c.max_seconds} s`);
+    fail('too_slow', `took ${Math.round(turn.ms / 1000)} s, limit ${c.max_seconds} s`);
   }
   if (c.max_credits != null && credits != null && credits > Number(c.max_credits)) {
-    failures.push(`cost ${credits} credits, limit ${c.max_credits}`);
+    fail('over_budget', `cost ${credits} credits, limit ${c.max_credits}`);
   }
   return failures;
 }
@@ -330,7 +378,26 @@ Deno.serve(withApiLogging('agent-eval', async (req: Request): Promise<Response> 
       cases: (cases ?? []).map((c: any) => ({ ...c, last_run: latest[c.key] ?? null })),
     });
   }
-  if (action !== 'run') throw new HttpError(400, `Unknown action "${action}" — use run or list`);
+  /*
+   * summary — one batch, read honestly: every attempt counts, a case that never ran is listed
+   * with zero attempts, harness failures sit beside agent failures, and agreement across repeats
+   * is printed next to the pass rate (stability alone rewards silence).
+   */
+  if (action === 'summary') {
+    const batchId = typeof body.batch_id === 'string' ? body.batch_id : '';
+    if (!batchId) throw new HttpError(400, 'batch_id is required');
+    const [{ data: cases, error: caseErr }, { data: runs, error: runErr }] = await Promise.all([
+      sb.from('agent_eval_cases').select('key, title, agent_id').eq('is_active', true).order('sort_order'),
+      sb.from('agent_eval_runs')
+        .select('case_key, passed, failure_class, failure_classes, tools_called, credits, latency_ms, model, routed_agent, reply')
+        .eq('batch_id', batchId)
+        .order('created_at'),
+    ]);
+    if (caseErr) throw new HttpError(500, caseErr.message, caseErr);
+    if (runErr) throw new HttpError(500, runErr.message, runErr);
+    return jsonResponse(summarizeBatch(batchId, cases ?? [], runs ?? []));
+  }
+  if (action !== 'run') throw new HttpError(400, `Unknown action "${action}" — use run, list or summary`);
 
   let caseRow: any = null;
   if (typeof body.case_key === 'string') {
@@ -352,6 +419,7 @@ Deno.serve(withApiLogging('agent-eval', async (req: Request): Promise<Response> 
 
   const modelOverride = typeof body.model_override === 'string' ? body.model_override : null;
   const batchId = typeof body.batch_id === 'string' ? body.batch_id : null;
+  const repeatIndex = Number.isInteger(body.repeat_index) && body.repeat_index > 0 ? Number(body.repeat_index) : null;
   const conversationId = crypto.randomUUID();
 
   // Persisted as a real conversation, BEFORE the turn, so the transcript the operator opens
@@ -377,8 +445,11 @@ Deno.serve(withApiLogging('agent-eval', async (req: Request): Promise<Response> 
     userId, workspaceId, conversationId, modelOverride,
   });
   const credits = await creditsFor(sb, conversationId);
-  const failures = scoreCase(evalCase, turn, credits, hedgePattern);
-  const passed = failures.length === 0;
+  const scored = scoreCase(evalCase, turn, credits, hedgePattern);
+  const failures = scored.map((f) => f.message);
+  const failureClass = primaryFailureClass(scored);
+  const failureClasses = failureClassesInOrder(scored);
+  const passed = scored.length === 0;
 
   const now = new Date().toISOString();
   await sb.from('agent_chat_messages').insert([
@@ -417,6 +488,9 @@ Deno.serve(withApiLogging('agent-eval', async (req: Request): Promise<Response> 
     reply: turn.text,
     passed,
     failures,
+    failure_class: failureClass,
+    failure_classes: failureClasses,
+    repeat_index: repeatIndex,
     credits,
     latency_ms: turn.ms,
     error: turn.error,
@@ -432,6 +506,9 @@ Deno.serve(withApiLogging('agent-eval', async (req: Request): Promise<Response> 
     session: asUser ? 'user' : 'service_role (smoke only: user-scoped tools have no JWT here)',
     passed,
     failures,
+    failure_class: failureClass,
+    failure_classes: failureClasses,
+    repeat_index: repeatIndex,
     conversation_id: conversationId,
     requested_agent: evalCase.agent_id,
     routed_agent: turn.routedAgent,
