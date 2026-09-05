@@ -74,10 +74,21 @@ function pushUnique(arr: string[], v: string) {
   if (v && !arr.includes(v)) arr.push(v);
 }
 
-/** Drive one agent-chat turn and fold its stream into an outcome. */
+/**
+ * Drive one agent-chat turn and fold its stream into an outcome.
+ *
+ * `authorization` is the caller's OWN bearer when the caller is a signed-in operator, and the
+ * service key only on the service-role path. This matters more than it looks: agent-chat threads
+ * the caller's user JWT into ~30 user-scoped tools (`find_records`, `manage_deal`,
+ * `manage_finance`, `manage_flows`, the mention and job-research tools…), and on the service-role
+ * path that JWT is EMPTY, so every one of them fails with "Empty JWT" / "No active session". The
+ * first sweep (batch 20260905-…0001) scored `records.find` as a PASS on a reply that told the user
+ * to sign in. A faithful run is a real user turn; the service-role path is for smoke only.
+ */
 async function runTurn(input: {
   supabaseUrl: string;
-  serviceKey: string;
+  authorization: string;
+  asUser: boolean;
   question: string;
   agentId: string;
   userId: string;
@@ -96,11 +107,13 @@ async function runTurn(input: {
   try {
     resp = await fetch(`${input.supabaseUrl}/functions/v1/agent-chat`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${input.serviceKey}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: input.authorization, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         messages: [{ role: 'user', content: input.question }],
         agentId: input.agentId,
-        user_id: input.userId,
+        // On a user turn agent-chat derives the user from the JWT; body ids are honoured only at
+        // secret level, so sending them there would be ignored and sending them here is wrong.
+        ...(input.asUser ? {} : { user_id: input.userId }),
         workspace_id: input.workspaceId,
         conversation_id: input.conversationId,
         model_override: input.modelOverride,
@@ -279,6 +292,7 @@ Deno.serve(withApiLogging('agent-eval', async (req: Request): Promise<Response> 
   // and runs as themselves, in a workspace they belong to.
   let userId: string;
   let workspaceId: string;
+  const asUser = auth.level === 'user';
   if (auth.level === 'secret') {
     if (typeof body.user_id !== 'string' || typeof body.workspace_id !== 'string') {
       throw new HttpError(400, 'user_id and workspace_id are required on the service-role path — the eval runs AS that user');
@@ -352,7 +366,9 @@ Deno.serve(withApiLogging('agent-eval', async (req: Request): Promise<Response> 
   const hedgePattern = typeof hedgeRow === 'string' ? hedgeRow : null;
 
   const turn = await runTurn({
-    supabaseUrl, serviceKey,
+    supabaseUrl,
+    authorization: asUser ? (req.headers.get('Authorization') ?? '') : `Bearer ${serviceKey}`,
+    asUser,
     question: evalCase.question, agentId: evalCase.agent_id,
     userId, workspaceId, conversationId, modelOverride,
   });
@@ -373,7 +389,7 @@ Deno.serve(withApiLogging('agent-eval', async (req: Request): Promise<Response> 
         agentId: turn.routedAgent ?? evalCase.agent_id,
         model: turn.model,
         responseTimeMs: turn.ms,
-        eval: { case_key: evalCase.key, passed, failures, tools_called: turn.toolsCalled },
+        eval: { case_key: evalCase.key, passed, failures, tools_called: turn.toolsCalled, session: asUser ? 'user' : 'service_role' },
       },
     },
   ]);
@@ -408,6 +424,8 @@ Deno.serve(withApiLogging('agent-eval', async (req: Request): Promise<Response> 
     run_id: runRow?.id ?? null,
     case_key: evalCase.key,
     title: evalCase.title,
+    // A service-role run cannot exercise the user-scoped tools — say so on every result.
+    session: asUser ? 'user' : 'service_role (smoke only: user-scoped tools have no JWT here)',
     passed,
     failures,
     conversation_id: conversationId,

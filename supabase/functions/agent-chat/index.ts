@@ -63,7 +63,7 @@ let debitAgentChatTurn: any, refundAgentChatTurn: any, getAgentTurnCost: any;
 let isPartnerApiKeyAccess: any, isEndpointAllowed: any;
 let getToolPrompt: any;
 let extractTextContent: any;
-let authenticate: any, isAdminAccess: any;
+let authenticate: any, isAdminAccess: any, isPlatformOperator: any;
 let getSkillsForAgent: any, getSkillContent: any, formatSkillsForSystemPrompt: any;
 let emitFlowEvent: any;
 let aiCallLogger: any;
@@ -116,6 +116,7 @@ async function initRuntime() {
   extractTextContent = lgCoreMod.extractTextContent;
   authenticate = authMod.authenticate;
   isAdminAccess = authMod.isAdminAccess;
+  isPlatformOperator = authMod.isPlatformOperator;
   isPartnerApiKeyAccess = authMod.isPartnerApiKeyAccess;
   isEndpointAllowed = authMod.isEndpointAllowed;
   getSkillsForAgent = skillsMod.getSkillsForAgent;
@@ -4062,6 +4063,19 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
         : null;
     if (modelOverride) console.log(`[agent-chat] model pinned to ${modelOverride} by an internal caller`);
 
+    // A golden-case run from `agent-eval` (docs/agent-evaluation.md): the turn is a real one —
+    // same router, tools and model — but it must not become a durable "fact" about the user
+    // (#370's poisoned memories came from exactly that) and nobody reads next-step chips in a
+    // scored run, so both are switched off below. Honoured for the service-role bearer and for a
+    // signed-in PLATFORM OPERATOR: an eval has to run as a real user session, because ~30 tools
+    // take the caller's JWT and a service-role turn hands them an empty one. A tenant's JWT
+    // cannot set it — the flag is ignored, the turn is ordinary.
+    const isEvalRun = bodyEvalRun === true && (
+      auth.level === 'secret' ||
+      (auth.level === 'user' && await isPlatformOperator(auth.supabase, userId))
+    );
+    if (isEvalRun) console.log('[agent-chat] eval run — memory promotion and next steps are off for this turn');
+
     // ── Audience ──────────────────────────────────────────────────────────
     // `customer` means the other end of this turn is a stranger in an Inbox thread, not the
     // operator in their own app. It costs the turn 163 of its 166 tools, its long-term memory in
@@ -4483,12 +4497,6 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
           // Same fact as `forCustomer` inside executeAgent, named separately because this is the
           // handler scope and the two never see each other's locals.
           const forCustomerTurn = audience === 'customer';
-          // A golden-case run from `agent-eval` (docs/agent-evaluation.md). Honoured ONLY at
-          // secret level, like `audience`: it switches off memory promotion and next-step chips
-          // for this turn. An eval question must never become a durable "fact" about the user
-          // (#370's poisoned memories came from exactly that), and the chips are spend nobody
-          // reads in a scored run. The turn is otherwise identical to a real one — that is the point.
-          const isEvalRun = auth.level === 'secret' && bodyEvalRun === true;
 
           // 🧠 Promotion gate: distil this turn into long-term memory (non-blocking).
           //
