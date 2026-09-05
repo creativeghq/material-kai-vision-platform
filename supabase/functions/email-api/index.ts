@@ -154,10 +154,14 @@ async function sendViaResend(apiKey: string, payload: {
 
   if (!res.ok) {
     console.error('Resend API error response:', JSON.stringify({ status: res.status, data }));
-    // 502: the upstream provider rejected or failed the send. Not a 500 — the fault is
-    // Resend's (or the payload it refused), and a real bug in THIS function should stay
-    // distinguishable from an upstream outage in api_usage_logs.
-    throw new HttpError(502, data.message || data.name || `Resend API error: ${res.status} - ${JSON.stringify(data)}`);
+    const detail = data.message || data.name || `Resend API error: ${res.status} - ${JSON.stringify(data)}`;
+    // Resend's own 400/422 is a verdict on THIS payload — an `example.com` recipient, a sender
+    // domain nobody verified (KAI-R4, KAI-R6). That is the caller's to fix, so it is a 422
+    // here, which api-logger does not page for. Everything else — 401/403 (our key), 429,
+    // 5xx — is the upstream's, and stays a 502 so a real bug in this function remains
+    // distinguishable from an outage in api_usage_logs.
+    const status = res.status === 400 || res.status === 422 ? 422 : 502;
+    throw new HttpError(status, detail);
   }
 
   return data.id as string;

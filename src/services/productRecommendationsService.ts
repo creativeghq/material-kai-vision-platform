@@ -128,6 +128,8 @@ async function hydrate(rows: RelatedEdgeRow[]): Promise<RecommendedProduct[]> {
     });
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export const productRecommendationsService = {
   /**
    * Related products for one product, read from the persisted edge set.
@@ -142,6 +144,11 @@ export const productRecommendationsService = {
     limit = 10,
   ): Promise<RecommendedProduct[]> {
     if (!workspaceId || !productId) return [];
+    // A demo product (`src/data/demo/*.json`, ids like `demo-cement-tile-003`) is not a row in
+    // `products`, so it has no edge set to read. Sent on, the id reached Postgres as
+    // `invalid input syntax for type uuid` and the panel logged a failure (KAI-RN, KAI-RP,
+    // KAI-RQ) for a strip that is legitimately empty.
+    if (!UUID_RE.test(productId)) return [];
 
     const { data, error } = await supabase.rpc('get_related_products', {
       p_workspace_id: workspaceId,
