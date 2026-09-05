@@ -3140,14 +3140,21 @@ async function handleJwtAction(
       const reserve = await reserveCredits(db, userId, workspaceId, SPREADSHEET_CEILING, opType);
       if (!reserve.ok) throw new HttpError(402, reserve.message ?? 'Insufficient credits for a spreadsheet question');
 
-      // Read at handler time, never at module load.
+      // Read at handler time, never at module load. MIVAA's internal routes are gated by
+      // `verify_internal_access`: the shared x-cron-secret (trusted by construction) or the
+      // `mk_` platform key. A Supabase service-role bearer is NOT one of them — its JWT carries
+      // no `sub`, so MIVAA's validator rejects it — which is why every edge caller sends these.
       const mivaaUrl = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
-      const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+      const mivaaHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+      const cronSecret = Deno.env.get('CRON_SECRET') || '';
+      if (cronSecret) mivaaHeaders['x-cron-secret'] = cronSecret;
+      const mivaaKey = Deno.env.get('MIVAA_API_KEY') || Deno.env.get('MATERIAL_KAI_API_KEY') || '';
+      if (mivaaKey) mivaaHeaders['Authorization'] = `Bearer ${mivaaKey}`;
       let result: Record<string, unknown> = {};
       try {
         const resp = await fetch(`${mivaaUrl}/api/internal/tabular/ask`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${serviceKey}` },
+          headers: mivaaHeaders,
           body: JSON.stringify({
             workspace_id: workspaceId,
             user_id: userId,
