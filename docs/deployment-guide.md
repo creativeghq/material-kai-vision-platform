@@ -99,7 +99,7 @@ Set these in **Vercel > Project Settings > Environment Variables**. All `VITE_` 
 
 ### **PDF Pipeline Structural Backbone — PaddleOCR-VL on Modal**
 
-The catalog pipeline's layout + OCR backbone is **PaddleOCR-VL** (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B), a two-stage parser (PP-DocLayoutV2 detector + 0.9B VLM) hosted on **Modal** with scale-to-zero (`$0` idle). It **replaced Surya-2 on 2026-06-13** (which had itself replaced YOLO + Chandra). HuggingFace now hosts nothing; **both** the structural pass (PaddleOCR-VL) and SLIG run on Modal.
+The catalog pipeline's layout + OCR backbone is **PaddleOCR-VL** (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B), a two-stage parser (PP-DocLayoutV3 detector + 0.9B VLM) hosted on **Modal** with scale-to-zero (`$0` idle). It **replaced Surya-2 on 2026-06-13** (which had itself replaced YOLO + Chandra). HuggingFace now hosts nothing; **both** the structural pass (PaddleOCR-VL) and SLIG run on Modal.
 
 | Secret Name | Type | Where Set | Description | Default |
 |------------|------|-----------|-------------|---------|
@@ -166,7 +166,7 @@ MODAL_TOKEN_ID  MODAL_TOKEN_SECRET   ← GitHub Actions only; let the deploy-mod
 
 ### **PDF Structural Pass — PaddleOCR-VL on Modal**
 
-**PaddleOCR-VL** (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B) is the catalog pipeline's layout + OCR backbone, run as a two-stage parser (PP-DocLayoutV2 RT-DETR detector + 0.9B VLM) in one GPU container on **Modal**. It localizes regions, labels them, predicts reading order, and recognizes content (text, tables→markdown, formulas→LaTeX, charts). It **replaced Surya-2 on 2026-06-13** (which replaced YOLO + Chandra).
+**PaddleOCR-VL** (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B) is the catalog pipeline's layout + OCR backbone, run as a two-stage parser (PP-DocLayoutV3 RT-DETR detector + 0.9B VLM) in one GPU container on **Modal**. It localizes regions, labels them, predicts reading order, and recognizes content (text, tables→markdown, formulas→LaTeX, charts). It **replaced Surya-2 on 2026-06-13** (which replaced YOLO + Chandra).
 
 #### **How It Works:**
 1. **Custom contract** (NOT vLLM): `GET /health` (unauth warmup probe) + `POST /parse {image_b64, mode}` → `{regions:[{bbox, label, content, order}], width, height}`. `mode=page` = structural pass, `mode=block` = per-crop OCR.

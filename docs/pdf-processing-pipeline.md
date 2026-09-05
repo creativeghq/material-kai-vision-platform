@@ -2,7 +2,7 @@
 
 > **⚠️ ARCHITECTURE UPDATED 2026-06-13 — PaddleOCR-VL structural backbone (structure-first).**
 > The layout + OCR front-end is now a single **PaddleOCR-VL** two-stage document parser
-> (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B) hosted on **Modal**: **PP-DocLayoutV2** (RT-DETR
+> (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B) hosted on **Modal**: **PP-DocLayoutV3** (RT-DETR
 > detector + pointer network) localizes regions, labels them, and predicts reading order; the
 > **0.9B VLM** recognizes the content inside each region (text, tables→markdown, formulas→LaTeX,
 > charts). It runs as **Stage 1, BEFORE discovery**, persisting `document_layout_analysis` rows
@@ -380,7 +380,7 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 
 **Process**:
 1. **Page Mapping**: Map catalog pages to physical PDF pages
-2. **PaddleOCR-VL structural pass** (`mode=page`): **PP-DocLayoutV2** (RT-DETR detector + pointer network) localizes regions + labels them + predicts reading order; the **0.9B VLM** recognizes content inside each region (text, tables→markdown/HTML, formulas→LaTeX, charts).
+2. **PaddleOCR-VL structural pass** (`mode=page`): **PP-DocLayoutV3** (RT-DETR detector; multi-point boxes + reading order predicted in the decoder) localizes regions + labels them + predicts reading order; the **0.9B VLM** recognizes content inside each region (text, tables→markdown/HTML, formulas→LaTeX, charts).
 3. **Layout cache persistence**: Map the `/parse` JSON onto the unchanged `document_layout_analysis.layout_elements[]` schema and persist with `processing_version='paddleocr-vl'`.
 4. **Table content**: table region `content` (markdown/HTML recognized by the VLM) is preserved in `metadata.html`. It is parsed into `product_tables` by **Stage 2.5**, not here — see below.
 
@@ -1345,7 +1345,7 @@ Keep mathematical formulas intact with `region_type: "FORMULA"` and a `formula_t
 **Major Features**:
 - ✅ **Product-Centric Architecture**: Process each product individually (Stages 1-4)
 - ✅ **PaddleOCR-VL Structure-First Layout + OCR** (Stage 1, BEFORE discovery; replaced Surya-2 → which had replaced YOLO+Chandra+`merge_layout`)
-  - Two-stage parser on Modal: PP-DocLayoutV2 (RT-DETR + pointer network) localizes/labels regions + predicts reading order; 0.9B VLM recognizes content (text, tables→markdown, formulas→LaTeX, charts)
+  - Two-stage parser on Modal: PP-DocLayoutV3 (RT-DETR + pointer network) localizes/labels regions + predicts reading order; 0.9B VLM recognizes content (text, tables→markdown, formulas→LaTeX, charts)
   - Persists `document_layout_analysis` rows with `processing_version='paddleocr-vl'`; discovery/chunking/crops all read the cache
   - Region labels via `PADDLE_LABEL_TO_REGION_TYPE`; `image`/`figure`/`chart` are product-crop sources
   - Modal-hosted (GPU L4, scale-to-zero = $0 idle); only required secret `PADDLEOCR_MODAL_API_KEY`

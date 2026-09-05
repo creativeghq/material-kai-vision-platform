@@ -218,7 +218,7 @@ The per-page timeout is calculated dynamically: `max(300, file_size_mb * 10 + nu
 **Applies to**: PDF, Web Scraping, XML Import
 **Services**: `slig_client`, `paddleocr_endpoint_manager`
 
-> **Note (2026-06-13)**: The layout+OCR backbone is **PaddleOCR-VL** (`PaddlePaddle/PaddleOCR-VL-1.6`, two-stage: PP-DocLayoutV2 RT-DETR detector + 0.9B VLM), hosted on **Modal** (app `paddleocr-vl`, GPU L4, scale-to-zero). It replaced Surya-2 (which had replaced YOLO + Chandra + `merge_layout`). Both SLIG and PaddleOCR-VL run on **Modal**; HuggingFace hosts nothing.
+> **Note (2026-06-13)**: The layout+OCR backbone is **PaddleOCR-VL** (`PaddlePaddle/PaddleOCR-VL-1.6`, two-stage: PP-DocLayoutV3 RT-DETR detector + 0.9B VLM), hosted on **Modal** (app `paddleocr-vl`, GPU L4, scale-to-zero). It replaced Surya-2 (which had replaced YOLO + Chandra + `merge_layout`). Both SLIG and PaddleOCR-VL run on **Modal**; HuggingFace hosts nothing.
 > **Note (2026. Vision moved to Anthropic Claude Opus 5 via tool use.
 
 | Limit | Value | Purpose |

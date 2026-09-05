@@ -92,7 +92,7 @@ The four aspect collections (color/texture/style/material) are Voyage `voyage-4`
 Plus an **Understanding Embedding** (1024D Voyage AI from Claude Opus 5 `vision_analysis` JSON) → `image_understanding_embeddings` for spec-based semantic search.
 
 #### PaddleOCR-VL (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B) — STRUCTURAL-PASS BACKBONE (layout + OCR + figure boxes)
-A **two-stage** document parser run in-process on **Modal**: PP-DocLayoutV2 (RT-DETR detector + pointer network) gives per-region bboxes + labels + reading order; the 0.9B VLM recognizes content (text, tables→markdown, formulas→LaTeX, charts). **Replaced Surya-2 (2026-06-13)** — tighter RT-DETR crop boxes + dedicated reading order; validated ~1-3s/page warm, near-perfect Greek, figure boxes within ~8px. (Surya-2 had earlier replaced YOLO + Chandra + `merge_layout`.)
+A **two-stage** document parser run in-process on **Modal**: PP-DocLayoutV3 (RT-DETR detector; multi-point boxes + reading order predicted in the decoder) gives per-region bboxes + labels + reading order; the 0.9B VLM recognizes content (text, tables→markdown, formulas→LaTeX, charts). **Replaced Surya-2 (2026-06-13)** — tighter RT-DETR crop boxes + dedicated reading order; validated ~1-3s/page warm, near-perfect Greek, figure boxes within ~8px. (Surya-2 had earlier replaced YOLO + Chandra + `merge_layout`.)
 - **Use Cases**:
   - Stage 1 document-level structural pass (runs before discovery — structure-first), persisted to `document_layout_analysis` (`processing_version='paddleocr-vl'`)
   - Phase 3 per-image OCR + icon-metadata + admin re-OCR (via `ocr_service` → `run_structural_pass` on the crop)
@@ -275,7 +275,7 @@ A **two-stage** document parser run in-process on **Modal**: PP-DocLayoutV2 (RT-
 3. Claude Haiku 4.5 (tertiary, lower accuracy)
 
 ### Layout + OCR (structural pass)
-1. **PaddleOCR-VL 1.6 structural pass on Modal** (PRIMARY, sole) — PP-DocLayoutV2 RT-DETR + 0.9B VLM, runs before discovery
+1. **PaddleOCR-VL 1.6 structural pass on Modal** (PRIMARY, sole) — PP-DocLayoutV3 RT-DETR + 0.9B VLM, runs before discovery
 2. No fallback — `OCRResult.method='paddleocr_failed'` set on inference failure
 
 ### Visual Embeddings
@@ -301,7 +301,7 @@ A **two-stage** document parser run in-process on **Modal**: PP-DocLayoutV2 (RT-
 - ✅ `VisionProvider.
 
 **2026-06-13 — PaddleOCR-VL structural backbone** (replaced Surya-2, which had replaced YOLO + Chandra earlier the same day):
-- ✅ **PaddleOCR-VL** (two-stage: PP-DocLayoutV2 RT-DETR + 0.9B VLM) is the sole layout+OCR engine, hosted in-process on Modal; structure-first (runs before discovery)
+- ✅ **PaddleOCR-VL** (two-stage: PP-DocLayoutV3 RT-DETR + 0.9B VLM) is the sole layout+OCR engine, hosted in-process on Modal; structure-first (runs before discovery)
 - ✅ `paddleocr_metrics` table for per-call telemetry; `surya_ocr_metrics` dropped
 - ✅ Phase 3 per-image OCR (icons + text-bearing images) runs on PaddleOCR block OCR
 - ❌ `surya_endpoint_manager.py`, `surya_blocks.py`, `modal_app/surya_vllm.py` + all `surya_*` config deleted

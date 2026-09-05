@@ -218,7 +218,7 @@ All tables use RLS policies that restrict access based on workspace membership. 
 
 10. **Model Endpoint APIs**
     - SLIG (SigLIP2) on Modal — visual embeddings (768D, 5 specialized types)
-    - PaddleOCR-VL on Modal — two-stage structural layout (PP-DocLayoutV2) + OCR backbone
+    - PaddleOCR-VL on Modal — two-stage structural layout (PP-DocLayoutV3) + OCR backbone
 
 11. **Monitoring Routes** (3 endpoints)
     - System health
@@ -254,7 +254,7 @@ All tables use RLS policies that restrict access based on workspace membership. 
 - **SLIG (SigLIP2)** — visual embeddings (768D, 5 specialized types: visual / color / texture / style / material). Model `basiliskan/slig` duplicates `google/siglip2-base-patch16-512` (native 768D, no projection head). Migrated off HuggingFace onto Modal 2026-06-14, so HuggingFace now hosts nothing.
 
 **Modal** (structural layout + OCR backbone):
-- **PaddleOCR-VL** (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B) — two-stage parser: PP-DocLayoutV2 (RT-DETR detector + pointer network) localizes/labels regions and predicts reading order; the 0.9B VLM recognizes content (text, tables→markdown, formulas→LaTeX, charts). Runs structure-first as Stage 1, BEFORE discovery (`processing_version="paddleocr-vl"`); also backs Phase 3 per-image OCR (`OCRResult.method` = `paddleocr`/`paddleocr_failed`, metrics in `paddleocr_metrics`, `ocr_engine`=`paddleocr`)
+- **PaddleOCR-VL** (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B) — two-stage parser: PP-DocLayoutV3 (RT-DETR detector; multi-point boxes + reading order predicted in the decoder) localizes/labels regions and predicts reading order; the 0.9B VLM recognizes content (text, tables→markdown, formulas→LaTeX, charts). Runs structure-first as Stage 1, BEFORE discovery (`processing_version="paddleocr-vl"`); also backs Phase 3 per-image OCR (`OCRResult.method` = `paddleocr`/`paddleocr_failed`, metrics in `paddleocr_metrics`, `ocr_engine`=`paddleocr`)
 - **Hosting**: Modal app `paddleocr-vl` (GPU L4, scale-to-zero → $0 idle). Contract `GET /health` + `POST /parse`. ~1-3s/page warm. Only `PADDLEOCR_MODAL_API_KEY` required (URL baked as config default); CI auto-deploys on `modal_app/**` via the `deploy-modal` job
 - **Replaced**: Surya-2 (2026-06-13); Surya-2 had replaced YOLO + Chandra v2 + `merge_layout` (those, plus pytesseract + EasyOCR, are all removed)
 

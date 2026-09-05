@@ -399,7 +399,7 @@ Complete documentation for Material Kai Vision Platform.
 **[ai-models-guide.md](ai-models-guide.md)** - AI models integration
 - Anthropic: Claude Opus 5 (vision via tool use, agent turns), Sonnet 5 (`Settings.chunking_primary_model`), Haiku 4.5 (classifiers, rerank, semantic chunking)
 - Voyage AI: voyage-4 (sole text + understanding embedder, 1024D)
-- Modal: PaddleOCR-VL 1.6 (0.9B, PP-DocLayoutV2 detector + VLM) — layout + OCR backbone, structure-first
+- Modal: PaddleOCR-VL 1.6 (0.9B, PP-DocLayoutV3 detector + VLM) — layout + OCR backbone, structure-first
 - Modal: SLIG SigLIP2 (5 visual embedding types, 768D each — `siglip2-base-patch16-512`, native 768D; migrated off HuggingFace 2026-06-14, so HuggingFace now hosts nothing)
 - OpenAI: GPT-4o, GPT-5 (optional alternatives — NOT vision)
 - WorldLabs Marble: 3D Gaussian Splat generation
@@ -448,7 +448,7 @@ Complete documentation for Material Kai Vision Platform.
 
 **[pdf-processing-pipeline.md](pdf-processing-pipeline.md)** - 14-stage PDF processing ✨ UPDATED
 - Product-centric architecture (process each product individually)
-- **Stage 1: PaddleOCR-VL layout + OCR pass (structure-first, BEFORE discovery)** — PP-DocLayoutV2 localizes/labels regions + predicts reading order; the 0.9B VLM recognizes content (text, tables→markdown, formulas→LaTeX). Persists `document_layout_analysis` rows (`processing_version="paddleocr-vl"`); tables preserved as markdown/HTML
+- **Stage 1: PaddleOCR-VL layout + OCR pass (structure-first, BEFORE discovery)** — PP-DocLayoutV3 localizes/labels regions + predicts reading order; the 0.9B VLM recognizes content (text, tables→markdown, formulas→LaTeX). Persists `document_layout_analysis` rows (`processing_version="paddleocr-vl"`); tables preserved as markdown/HTML
 - Stage 0A: Product Discovery — reads reading-order text from the PaddleOCR layout cache (not raw `page.get_text()`)
 - Stage 0B: Document Entity Discovery - Certificates, Logos, Specs
 - Stage 2: Text Extraction / Chunking — reads the same PaddleOCR layout cache

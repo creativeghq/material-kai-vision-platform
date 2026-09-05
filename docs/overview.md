@@ -69,7 +69,7 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 - Anthropic (Claude Opus 5 vision-via-tool-use + chunking via Sonnet 5 + Haiku 4.5 classifiers + built-in web_search_20250305)
 - Voyage AI (voyage-4, sole text + understanding embedder, 1024D)
 - SigLIP2 (SLIG) via Modal Endpoint (5 visual embedding types, 768D each)
-- PaddleOCR-VL (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B) on Modal — two-stage structural layout (PP-DocLayoutV2) + OCR backbone (replaced Surya-2 2026-06-13)
+- PaddleOCR-VL (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B) on Modal — two-stage structural layout (PP-DocLayoutV3) + OCR backbone (replaced Surya-2 2026-06-13)
 - OpenAI (GPT-4o, GPT-5 — optional alternative for product discovery / agents; NOT vision)
 - Replicate (virtual staging, Wan video, Runway Gen4, FLUX Dev, SAM 2, AnyDoor)
 - WorldLabs Marble (3D Gaussian Splat VR world generation)
@@ -130,7 +130,7 @@ Real-time updates → Frontend displays results
 
 #### 2. Modal — PaddleOCR-VL (structural layout + OCR backbone)
 
-- **Model**: `PaddlePaddle/PaddleOCR-VL-1.6` (0.9B), a two-stage document parser — PP-DocLayoutV2 (RT-DETR detector + pointer network) localizes/labels regions and predicts reading order; the 0.9B VLM recognizes content (text, tables→markdown, formulas→LaTeX, charts)
+- **Model**: `PaddlePaddle/PaddleOCR-VL-1.6` (0.9B), a two-stage document parser — PP-DocLayoutV3 (RT-DETR detector; multi-point boxes + reading order predicted in the decoder) localizes/labels regions and predicts reading order; the 0.9B VLM recognizes content (text, tables→markdown, formulas→LaTeX, charts)
 - **Hosting**: Modal app `paddleocr-vl` (GPU L4, scale-to-zero → $0 idle). Contract: `GET /health` + `POST /parse`. ~1-3s/page warm, ~90s cold start
 - **Use Cases**: Structure-first Stage 1 layout pass (runs BEFORE discovery, `processing_version="paddleocr-vl"`) + Phase 3 per-image OCR for text-bearing images + admin re-OCR
 - **Failure marker**: `OCRResult.method` = `paddleocr` / `paddleocr_failed` (`ocr_engine` = `paddleocr`)

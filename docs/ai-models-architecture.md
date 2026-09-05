@@ -3,7 +3,7 @@
 **Last Updated**: 2026-06-13
 **Status**: Production
 
-> **⚠️ 2026-06-13:** The PDF layout/OCR engine changed. **Surya-2 was deleted** (and earlier the same day Surya-2 had replaced **YOLO DocParser + Chandra OCR + `merge_layout`**) — the backbone is now a single **PaddleOCR-VL** two-stage parser (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B: PP-DocLayoutV2 RT-DETR + 0.9B VLM) that returns layout regions + OCR text + figure boxes in one pass, run **before discovery** (structure-first). It is hosted on **Modal**, NOT HuggingFace. The active endpoints are now **SLIG on Modal + PaddleOCR-VL on Modal** — HuggingFace hosts nothing in this platform anymore. Anywhere below that names YOLO, Chandra, or Surya, read "PaddleOCR-VL structural pass on Modal". See [ai-models-complete-list.md](./ai-models-complete-list.md) + the PaddleOCR section in `CLAUDE.md`.
+> **⚠️ 2026-06-13:** The PDF layout/OCR engine changed. **Surya-2 was deleted** (and earlier the same day Surya-2 had replaced **YOLO DocParser + Chandra OCR + `merge_layout`**) — the backbone is now a single **PaddleOCR-VL** two-stage parser (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B: PP-DocLayoutV3 RT-DETR + 0.9B VLM) that returns layout regions + OCR text + figure boxes in one pass, run **before discovery** (structure-first). It is hosted on **Modal**, NOT HuggingFace. The active endpoints are now **SLIG on Modal + PaddleOCR-VL on Modal** — HuggingFace hosts nothing in this platform anymore. Anywhere below that names YOLO, Chandra, or Surya, read "PaddleOCR-VL structural pass on Modal". See [ai-models-complete-list.md](./ai-models-complete-list.md) + the PaddleOCR section in `CLAUDE.md`.
 
 ## Executive Summary
 
@@ -14,7 +14,7 @@ MIVAA Platform uses AI models from **5 providers** for distinct purposes. Vision
 | **Anthropic** | Claude Opus 5, Claude Sonnet 5, Claude Haiku 4.5 | Vision analysis (tool-use schema-locked), chunking, agents, validation |
 | **Voyage AI** | voyage-4 | Text embeddings (1024D) + understanding embeddings (1024D) — sole text embedder |
 | **Google (Modal)** | SigLIP2 base (768D) (SLIG) | Visual embeddings (768D) — cloud endpoint, 5 specialized types |
-| **PaddlePaddle (Modal)** | PaddleOCR-VL 1.6 (0.9B: PP-DocLayoutV2 RT-DETR + VLM) | Structural pass — layout + OCR + figure boxes, sole layout/OCR engine (Surya-2/YOLO/Chandra all deleted 2026-06-13) |
+| **PaddlePaddle (Modal)** | PaddleOCR-VL 1.6 (0.9B: PP-DocLayoutV3 RT-DETR + VLM) | Structural pass — layout + OCR + figure boxes, sole layout/OCR engine (Surya-2/YOLO/Chandra all deleted 2026-06-13) |
 | **OpenAI** | GPT-4o, GPT-5 | Optional alternative for product discovery / agents |
 
 ---
@@ -30,7 +30,7 @@ MIVAA Platform uses AI models from **5 providers** for distinct purposes. Vision
 │ STAGE 1 — STRUCTURAL PASS: Layout + Page OCR + figure boxes             │
 │   (structure-first — runs BEFORE discovery)                            │
 │ Model: PaddleOCR-VL 1.6 (PaddlePaddle on Modal)                        │
-│ Two-stage: PP-DocLayoutV2 (RT-DETR + pointer net) → regions/labels/    │
+│ Two-stage: PP-DocLayoutV3 (RT-DETR + multi-point) → regions/labels/    │
 │            reading-order; 0.9B VLM → content (text, tables→md,          │
 │            formulas→LaTeX, charts). One /parse call per page.           │
 │ Persists: document_layout_analysis (processing_version='paddleocr-vl') │
@@ -246,7 +246,7 @@ Modal endpoint (app: slig). Modes: `zero_shot`, `image_embedding`, `text_embeddi
 - `mivaa-pdf-extractor/app/services/pdf/paddleocr_pipeline.py` (maps `/parse` JSON onto the unchanged `document_layout_analysis.layout_elements[]` schema)
 - `mivaa-pdf-extractor/modal_app/paddleocr_vl.py` (the Modal app)
 
-`PaddlePaddle/PaddleOCR-VL-1.6` (0.9B) is a **two-stage** document parser hosted **in-process on Modal** (the full `paddleocr[doc-parser]` `PaddleOCRVL` pipeline on `paddlepaddle-gpu`, **NOT vLLM**): **PP-DocLayoutV2** (RT-DETR detector + pointer network) localizes regions, labels them, and predicts reading order; the **0.9B VLM** recognizes the content inside each region (text, tables→markdown, formulas→LaTeX, charts).
+`PaddlePaddle/PaddleOCR-VL-1.6` (0.9B) is a **two-stage** document parser hosted **in-process on Modal** (the full `paddleocr[doc-parser]` `PaddleOCRVL` pipeline on `paddlepaddle-gpu`, **NOT vLLM**): **PP-DocLayoutV3** (RT-DETR detector; multi-point boxes + reading order predicted in the decoder) localizes regions, labels them, and predicts reading order; the **0.9B VLM** recognizes the content inside each region (text, tables→markdown, formulas→LaTeX, charts).
 
 **Replaced Surya-2 on 2026-06-13** — tighter RT-DETR crop boxes (→ cleaner product crops → better SLIG visual embeddings) and reading order from a dedicated model; validated ~1-3s/page warm, near-perfect Greek OCR, figure boxes within ~8px. (Surya-2 had earlier replaced YOLO + Chandra + `merge_layout`; pytesseract + EasyOCR were removed before that in 2026-05.) `surya_endpoint_manager.py`, `surya_blocks.py`, `modal_app/surya_vllm.py`, and all `surya_*` config are deleted.
 

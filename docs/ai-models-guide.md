@@ -2,7 +2,7 @@
 
 **Last Updated:** 2026-06-13
 
-> **⚠️ 2026-06-13:** PDF layout/OCR is now a single **PaddleOCR-VL** two-stage structural pass (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B: PP-DocLayoutV2 RT-DETR + 0.9B VLM) — **Surya-2 was deleted** (and Surya-2 had earlier replaced **YOLO + Chandra + `merge_layout`**). It runs before discovery (structure-first) and is hosted on **Modal**, not HuggingFace. Active endpoints are **SLIG on Modal + PaddleOCR-VL on Modal** — HuggingFace hosts nothing in this platform anymore. Read "PaddleOCR-VL on Modal" wherever YOLO/Chandra/Surya appear below. See [ai-models-complete-list.md](./ai-models-complete-list.md).
+> **⚠️ 2026-06-13:** PDF layout/OCR is now a single **PaddleOCR-VL** two-stage structural pass (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B: PP-DocLayoutV3 RT-DETR + 0.9B VLM) — **Surya-2 was deleted** (and Surya-2 had earlier replaced **YOLO + Chandra + `merge_layout`**). It runs before discovery (structure-first) and is hosted on **Modal**, not HuggingFace. Active endpoints are **SLIG on Modal + PaddleOCR-VL on Modal** — HuggingFace hosts nothing in this platform anymore. Read "PaddleOCR-VL on Modal" wherever YOLO/Chandra/Surya appear below. See [ai-models-complete-list.md](./ai-models-complete-list.md).
 
 Complete reference of all AI models used across the Material KAI Vision Platform.
 
@@ -30,7 +30,7 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 | SLIG (SigLIP2 base, 768D) Style | Modal Endpoint | Style-guided embeddings | 768D | endpoint |
 | SLIG (SigLIP2 base, 768D) Material | Modal Endpoint | Material-guided embeddings | 768D | endpoint |
 | **Layout + OCR** |
-| PaddleOCR-VL 1.6 (0.9B) | PaddlePaddle (Modal) | **SOLE LAYOUT + OCR ENGINE** — structural pass (PP-DocLayoutV2 RT-DETR + 0.9B VLM), runs before discovery | layout + OCR + figure boxes, ~1-3s/page warm | Modal GPU (scale-to-zero) |
+| PaddleOCR-VL 1.6 (0.9B) | PaddlePaddle (Modal) | **SOLE LAYOUT + OCR ENGINE** — structural pass (PP-DocLayoutV3 RT-DETR + 0.9B VLM), runs before discovery | layout + OCR + figure boxes, ~1-3s/page warm | Modal GPU (scale-to-zero) |
 
 ---
 
@@ -184,7 +184,7 @@ Plus the **Understanding Embedding** (1024D Voyage AI from Claude Opus 5 `vision
 - `mivaa-pdf-extractor/app/services/pdf/paddleocr_pipeline.py` (maps `/parse` JSON onto the unchanged `document_layout_analysis.layout_elements[]` schema)
 - `mivaa-pdf-extractor/modal_app/paddleocr_vl.py` (the Modal app)
 
-**Purpose**: The whole layout+OCR backbone — Stage 1 document-level structural pass (layout + reading order + OCR + figure boxes) AND Phase 3 per-image OCR. `PaddlePaddle/PaddleOCR-VL-1.6` (0.9B) is a **two-stage** parser: PP-DocLayoutV2 (RT-DETR detector + pointer network) gives region bboxes + labels + reading order; the 0.9B VLM recognizes content (text, tables→markdown, formulas→LaTeX, charts). Hosted **in-process on Modal** (`paddleocr[doc-parser]` on `paddlepaddle-gpu`, NOT vLLM).
+**Purpose**: The whole layout+OCR backbone — Stage 1 document-level structural pass (layout + reading order + OCR + figure boxes) AND Phase 3 per-image OCR. `PaddlePaddle/PaddleOCR-VL-1.6` (0.9B) is a **two-stage** parser: PP-DocLayoutV3 (RT-DETR detector; multi-point boxes + reading order predicted in the decoder) gives region bboxes + labels + reading order; the 0.9B VLM recognizes content (text, tables→markdown, formulas→LaTeX, charts). Hosted **in-process on Modal** (`paddleocr[doc-parser]` on `paddlepaddle-gpu`, NOT vLLM).
 
 **Replaced**: Surya-2 (2026-06-13) — tighter RT-DETR crop boxes + dedicated reading order; validated ~1-3s/page warm, near-perfect Greek, figure boxes within ~8px. (Surya-2 had earlier replaced YOLO + Chandra + `merge_layout`; pytesseract + EasyOCR were removed before that in 2026-05.) `surya_endpoint_manager.py`, `surya_blocks.py`, `modal_app/surya_vllm.py` + all `surya_*` config are deleted.
 
@@ -323,7 +323,7 @@ The model configuration maps each task to its designated model:
    - `Settings.chunking_primary_model = 'claude-sonnet-5'`
 
 ### Layout + OCR
-1. **PaddleOCR-VL 1.6 structural pass on Modal** (PRIMARY, sole) — PP-DocLayoutV2 RT-DETR + 0.9B VLM, runs before discovery
+1. **PaddleOCR-VL 1.6 structural pass on Modal** (PRIMARY, sole) — PP-DocLayoutV3 RT-DETR + 0.9B VLM, runs before discovery
    - Failure → `OCRResult.method='paddleocr_failed'`
 
 ### Text Embeddings
