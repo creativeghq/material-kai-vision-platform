@@ -115,6 +115,29 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [website.id]);
 
+  const [trackingDomain, setTrackingDomain] = useState(false);
+  /**
+   * The Domain Audits tab is about THIS website's domain, so the button tracks
+   * exactly that. It used to open the agent's "Snapshot a domain" flow, which asked
+   * the operator to type the domain they were already standing on and left the row
+   * unattached to the website — so this tab stayed empty after they had done it.
+   */
+  const trackOwnDomain = async () => {
+    setTrackingDomain(true);
+    try {
+      const row = await userWebsitesService.trackOwnDomain(website);
+      toast({
+        title: `Tracking ${row.domain}`,
+        description: 'The first rank and backlink audit runs within the hour, then weekly.',
+      });
+      setDomains(await userWebsitesService.trackedDomains(website.id));
+    } catch (e: any) {
+      toast({ title: 'Could not track the domain', description: e.message, variant: 'destructive' });
+    } finally {
+      setTrackingDomain(false);
+    }
+  };
+
   const handleRecrawl = async () => {
     setRecrawling(true);
     try {
@@ -523,10 +546,15 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
               <CardTitle>Domain Audits</CardTitle>
               <CardDescription>Scheduled domain-rank tracking for this website's domain.</CardDescription>
               </div>
-              <Button size="sm" variant="outline" className="shrink-0"
-                onClick={() => launchQuickStart('seo-domain', 'Snapshot a domain')}>
-                <Plus className="w-3.5 h-3.5 mr-1" />Track a domain
-              </Button>
+              {!loading && domains.length === 0 && (
+                <Button size="sm" variant="outline" className="shrink-0"
+                  onClick={trackOwnDomain} disabled={trackingDomain}>
+                  {trackingDomain
+                    ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                    : <Plus className="w-3.5 h-3.5 mr-1" />}
+                  Track this domain
+                </Button>
+              )}
             </CardHeader>
             <CardContent className="p-0">
               {loading ? (
@@ -537,8 +565,11 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
                   title="This domain is not tracked yet"
                   description="Tracking takes a weekly rank and backlink snapshot so movement shows up as a trend rather than a surprise."
                   action={
-                    <Button size="sm" onClick={() => launchQuickStart('seo-domain', 'Snapshot a domain')}>
-                      <Plus className="w-3.5 h-3.5 mr-1" />Track a domain
+                    <Button size="sm" onClick={trackOwnDomain} disabled={trackingDomain}>
+                      {trackingDomain
+                        ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                        : <Plus className="w-3.5 h-3.5 mr-1" />}
+                      Track this domain
                     </Button>
                   }
                 />

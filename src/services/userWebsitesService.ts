@@ -727,6 +727,55 @@ export const userWebsitesService = {
     return (data as SeoTrackedDomainRow[]) || [];
   },
 
+  /**
+   * Track THIS website's own domain in the SEO toolkit (weekly rank + backlink
+   * audit). The domain comes from the website's URL, never from a text box: the tab
+   * that offers this reads "tracking for this website's domain", and a free-text
+   * form is how a competitor ends up filed under the wrong site. Locale matches
+   * the rank tracker's (Greek results). Idempotent — the table is unique on
+   * user + domain + country, so a second click hands back the existing row and,
+   * if that row was created from the admin toolkit without a website, attaches it.
+   */
+  async trackOwnDomain(website: UserWebsite, countryCode = 'GR', languageCode = 'el'): Promise<SeoTrackedDomainRow> {
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) throw new Error('Not authenticated');
+    const domain = website.url
+      .replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/.*$/, '').trim().toLowerCase();
+    if (!domain) throw new Error('This website has no usable domain.');
+    const cols = 'id, domain, display_label, country_code, is_active, current_domain_rank, current_organic_traffic, last_audited_at';
+    const { data, error } = await supabase
+      .from('seo_tracked_domains')
+      .insert({
+        user_id: userData.user.id,
+        workspace_id: website.workspace_id,
+        website_id: website.id,
+        domain,
+        display_label: website.display_name || null,
+        country_code: countryCode,
+        language_code: languageCode,
+        audit_cadence_hours: 168,
+      })
+      .select(cols)
+      .single();
+    if (!error) return data as SeoTrackedDomainRow;
+    if (error.code !== '23505') throw error;
+    const { data: existing, error: selErr } = await supabase
+      .from('seo_tracked_domains')
+      .select(`${cols}, website_id`)
+      .eq('user_id', userData.user.id).eq('domain', domain).eq('country_code', countryCode)
+      .maybeSingle();
+    if (selErr) throw selErr;
+    if (!existing) throw error;
+    if (!existing.website_id) {
+      const { error: upErr } = await supabase
+        .from('seo_tracked_domains')
+        .update({ website_id: website.id, workspace_id: website.workspace_id })
+        .eq('id', existing.id);
+      if (upErr) throw upErr;
+    }
+    return existing as SeoTrackedDomainRow;
+  },
+
   /** Read one website by id (RLS lets any workspace member read it). */
   async get(websiteId: string): Promise<UserWebsite | null> {
     const { data, error } = await supabase.from('user_websites').select('*').eq('id', websiteId).maybeSingle();

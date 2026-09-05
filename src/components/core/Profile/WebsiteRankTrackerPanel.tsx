@@ -6,6 +6,7 @@ import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
+import { TablePagination, clampPage, paginate } from '@/components/core/ui/table-pagination';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { useToast } from '@/hooks/use-toast';
 import { timeAgo } from '@/utils/datetime';
@@ -85,6 +86,7 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
   const [busy, setBusy] = useState<string | null>(null);
   const [adding, setAdding] = useState('');
   const [showAdd, setShowAdd] = useState(false);
+  const [page, setPage] = useState(1);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -155,6 +157,10 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
 
   const s = data?.summary;
   const rows = data?.keywords ?? [];
+  // Clamped on every render so removing the last keyword on the last page does not
+  // leave the reader on an empty page with no way back.
+  const currentPage = clampPage(page, rows.length);
+  const visibleRows = paginate(rows, currentPage);
   const bandTotal = s ? BANDS.reduce((t, b) => t + (s.distribution[b.key] ?? 0), 0) || 1 : 1;
   const addForm = (
     <div className="space-y-2">
@@ -330,7 +336,7 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map((r) => (
+                  {visibleRows.map((r) => (
                     <TableRow key={r.id}>
                       <TableCell className="max-w-[220px]">
                         <div className="truncate font-medium">{r.keyword}</div>
@@ -370,6 +376,7 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
                 </TableBody>
               </Table>
             </div>
+            <TablePagination page={currentPage} total={rows.length} onPageChange={setPage} label="keywords" />
           </CardContent>
         </Card>
       )}

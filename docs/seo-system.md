@@ -19,7 +19,7 @@ Home is **Profile → Websites** (`ConnectedWebsitesTab` → `WebsiteSeoDashboar
 | **Health** | `seo-site-audit` → `website_health_audits` | On-page audit score + issue list; Lighthouse gauges when the async run has returned. |
 | **Rankings** | `seo-domain-tracker` → `seo_domain_snapshots`, `seo_domain_keywords` | Tracked DataForSEO ranked keywords, positions, movement. |
 | **Rank tracking** | `seo-rank-tracker` → `seo_tracked_keywords`, `seo_keyword_positions` | Daily position for the keywords the workspace CHOSE (§4.1). |
-| **Domains** | `seo_tracked_domains`, `seo_domain_audit_history` | Which domains are tracked and their audit history. |
+| **Domains** | `seo_tracked_domains`, `seo_domain_audit_history` | Which domains are tracked and their audit history. Two ways in: the admin toolkit's "Track domain" dialog (any domain, no `website_id`), and Websites → Domain Audits → "Track this domain", which tracks the website's OWN domain from its URL and stamps `website_id` + `workspace_id` so the tab can find it. The latter used to hand off to the agent's "Snapshot a domain" flow, which asked for a domain the operator was already standing on and left the row unattached, so the tab stayed empty. |
 | **Research** | `seo-api` `research` → `seo_keyword_research` | Saved keyword research. |
 | **Articles** | `seo-api` `write` → `seo_articles` | Generated articles + the viewer. |
 | **Runs** | `seo_research_runs` | Pipeline run history. |
