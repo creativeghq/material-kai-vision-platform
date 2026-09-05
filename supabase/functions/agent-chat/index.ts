@@ -69,7 +69,7 @@ let emitFlowEvent: any;
 let aiCallLogger: any;
 let resolveBusinessIdentity: any, formatBusinessIdentityForPrompt: any;
 let clampToolsForCustomer: any, isCustomerAudience: any, fenceCustomerMessage: any,
-  customerAudienceGuardrails: any;
+  customerAudienceGuardrails: any, operatorInstructionBlock: any;
 let inboxAutopilotSettings: any;
 type Audience = 'internal' | 'customer';
 
@@ -129,6 +129,7 @@ async function initRuntime() {
   isCustomerAudience = audienceMod.isCustomerAudience;
   fenceCustomerMessage = audienceMod.fenceCustomerMessage;
   customerAudienceGuardrails = audienceMod.customerAudienceGuardrails;
+  operatorInstructionBlock = audienceMod.operatorInstructionBlock;
   inboxAutopilotSettings = autopilotMod.inboxAutopilotSettings;
   createClient = sbMod.createClient;
   ChatAnthropic = anthropicMod.ChatAnthropic;
@@ -3991,7 +3992,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
     await initRuntime();
 
     // Get request body
-    const { messages = [], agentId = 'kai', images = [], documents = [], conversation_id = null, pinned_material_images = [], generation_mode = null, selected_toolkits = null, user_id: bodyUserId = null, mode = 'chat', direct_tool = null, workspace_id: bodyWorkspaceId = null, model_override: bodyModelOverride = null, audience: bodyAudience = null, thread_id: bodyThreadId = null, eval_run: bodyEvalRun = false } = await req.json();
+    const { messages = [], agentId = 'kai', images = [], documents = [], conversation_id = null, pinned_material_images = [], generation_mode = null, selected_toolkits = null, user_id: bodyUserId = null, mode = 'chat', direct_tool = null, workspace_id: bodyWorkspaceId = null, model_override: bodyModelOverride = null, audience: bodyAudience = null, thread_id: bodyThreadId = null, eval_run: bodyEvalRun = false, operator_instruction: bodyOperatorInstruction = null } = await req.json();
     // mode: 'chat' (default, LLM-driven) | 'direct_tool' (deterministic single-tool run).
     // direct_tool: { name: string, input: object } — required when mode==='direct_tool'.
     //   Fired by toolkit quick-starts that carry a `run` descriptor. The tool is
@@ -4302,6 +4303,12 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
     // tools are not bound at all. A fence that is talked around still reaches nothing.
     if (audience === 'customer' && userInput) {
       userInput = fenceCustomerMessage(String(userInput));
+      // The member's steer for a "Draft with AI" reply rides OUTSIDE the fence, labelled as the
+      // operator's own words. `audience === 'customer'` already implies the service-role caller,
+      // so nothing reachable from outside can attach an instruction to a customer turn.
+      if (typeof bodyOperatorInstruction === 'string' && bodyOperatorInstruction.trim()) {
+        userInput += `\n\n${operatorInstructionBlock(bodyOperatorInstruction)}`;
+      }
       if (anthropicMessages.length) {
         anthropicMessages[anthropicMessages.length - 1] = {
           ...anthropicMessages[anthropicMessages.length - 1],

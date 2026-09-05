@@ -10,8 +10,15 @@ import {
   MoreHorizontal, Forward, Pin, PinOff, Star, StickyNote as StickyNoteIcon,
   BellRing, CalendarClock,
   ShoppingCart, AlertTriangle, ExternalLink, Image as ImageIcon, CookingPot,
-  Smile, Copy, Download,
+  Smile, Copy, Download, Package, Wrench, Slash,
 } from 'lucide-react';
+import {
+  Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem,
+} from '@/components/core/ui/command';
+import { InboxCatalogCards, readInboxCards } from '@/modules/messaging/components/InboxCatalogCards';
+import {
+  INBOX_CARD_SLASH_COMMANDS, INBOX_CARD_MAX, type InboxCardKind,
+} from '@/modules/messaging/inboxCardKinds';
 import { splitMessageLinks, messageUrls, shortenUrlForDisplay } from '@/utils/messageLinks';
 import { projectPlansService } from '@/services/projectPlansService';
 import { supabase } from '@/integrations/supabase/client';
@@ -66,7 +73,7 @@ import {
   type WhatsAppWindow, type InboxThreadContext, type InboxAgentSettings, type InboxLabel,
   type InboxThreadStatus, type OrderIntake, type IntakeItem, type IntakeTotals,
   type IntakeConfirmation, type IntakeMatchMethod, type UserEmailAddress,
-  type ConversationSentiment, type InboxLinkPreview,
+  type ConversationSentiment, type InboxLinkPreview, type InboxCatalogItem,
 } from '@/services/inboxApi';
 
 interface WorkspaceMemberOption { user_id: string; label: string; }
@@ -319,6 +326,18 @@ const InboxPage: React.FC = () => {
   const [replyTo, setReplyTo] = useState<InboxMessage | null>(null);
   const [aiDrafting, setAiDrafting] = useState(false);
   const [aiDraftShown, setAiDraftShown] = useState(false);
+  /** The member's steer for "Draft with AI" — what the reply should offer or say. Optional. */
+  const [draftSteer, setDraftSteer] = useState('');
+  const [draftSteerOpen, setDraftSteerOpen] = useState(false);
+  /** Catalog cards queued for the next send — picked through `/product` or `/service`. */
+  const [pendingCards, setPendingCards] = useState<InboxCatalogItem[]>([]);
+  /**
+   * The composer's slash menu: the command list while `/…` is being typed at the start of a line,
+   * or the catalog picker once a command (or the toolbar button) chose a kind.
+   */
+  const [slashMenu, setSlashMenu] = useState<
+    null | { mode: 'commands'; query: string } | { mode: 'picker'; kind: InboxCardKind }
+  >(null);
 
   const [showNew, setShowNew] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
@@ -658,7 +677,7 @@ const InboxPage: React.FC = () => {
   }, [messages, scrollToBottom]);
 
   const send = useCallback(async () => {
-    if (!activeId || (!draft.trim() && !attachment)) return;
+    if (!activeId || (!draft.trim() && !attachment && pendingCards.length === 0)) return;
     // Re-entrancy guard, on a ref rather than the `sending` state.
     //
     // The send button is disabled while in flight, but the textarea's Enter handler was not — and
@@ -688,9 +707,13 @@ const InboxPage: React.FC = () => {
         message_type: isNote ? 'note' : 'text',
         // A private note quotes nothing on the platform — there is no platform message to quote.
         reply_to_message_id: !isNote && replyTo ? replyTo.id : undefined,
+        // Picks only. The card the customer sees — price included — is resolved by inbox-api.
+        cards: pendingCards.length ? pendingCards.map((c) => ({ kind: c.kind, product_id: c.product_id })) : undefined,
       });
       setDraft('');
       setAttachment(null);
+      setPendingCards([]);
+      setSlashMenu(null);
       setReplyTo(null);
       setAiDraftShown(false);
       // Human takeover: a member's text reply pauses the assistant server-side — reflect it locally.
@@ -703,14 +726,16 @@ const InboxPage: React.FC = () => {
       sendInFlight.current = false;
       setSending(false);
     }
-  }, [activeId, draft, attachment, isNote, isMember, activeThread, replyTo, toast]);
+  }, [activeId, draft, attachment, pendingCards, isNote, isMember, activeThread, replyTo, toast]);
 
   // "Help me write" — the assistant drafts the next reply into the composer for review/edit/send.
+  // The steer, when the member typed one, tells it WHAT the reply should do.
   const aiSuggest = useCallback(async () => {
     if (!activeId) return;
     setAiDrafting(true);
+    setDraftSteerOpen(false);
     try {
-      const { draft: suggestion } = await inboxApi.suggestReply(activeId);
+      const { draft: suggestion } = await inboxApi.suggestReply(activeId, draftSteer);
       setDraft(suggestion);
       setIsNote(false);
       setAiDraftShown(true);
@@ -719,7 +744,21 @@ const InboxPage: React.FC = () => {
     } finally {
       setAiDrafting(false);
     }
-  }, [activeId, toast]);
+  }, [activeId, draftSteer, toast]);
+
+  /** `/product` chosen (by Enter, Tab or click): drop the typed token and open the picker. */
+  const chooseSlashCommand = useCallback((kind: InboxCardKind) => {
+    setDraft((d) => d.replace(/(^|\n)\/[a-z]*$/i, '$1'));
+    setSlashMenu({ mode: 'picker', kind });
+  }, []);
+
+  const togglePendingCard = useCallback((item: InboxCatalogItem) => {
+    setPendingCards((cur) => {
+      if (cur.some((c) => c.product_id === item.product_id)) return cur.filter((c) => c.product_id !== item.product_id);
+      if (cur.length >= INBOX_CARD_MAX) return cur;
+      return [...cur, item];
+    });
+  }, []);
 
   /*
    * The five things you can do TO one message, beyond replying to it.
@@ -963,6 +1002,14 @@ const InboxPage: React.FC = () => {
         <Bot className="w-4 h-4" />
       </Button>
       <InboxAgentSettingsButton workspaceId={activeThread.workspace_id} />
+      {/* JARVIS reads the thread itself (manage_inbox action:"read" — transcript + the customer's
+          orders, quotes and open invoices), so the prompt names the conversation and nothing
+          else. Sent as a real operator turn in the Agent Hub, not as a customer-audience draft. */}
+      <Button variant="outline" size="icon" className="h-9 w-9" title="Ask JARVIS about this conversation" asChild>
+        <a href={`/agent-hub?agent=kai&prompt=${encodeURIComponent(askJarvisAboutThreadPrompt(activeThread))}`}>
+          <Sparkles className="w-4 h-4" />
+        </a>
+      </Button>
       <LabelAssignButton
         workspaceId={activeThread.workspace_id}
         threadId={activeThread.id}
@@ -1648,15 +1695,40 @@ const InboxPage: React.FC = () => {
                       </button>
                     </div>
                     {!isNote && (
-                      <Button
-                        variant="secondary" size="sm"
-                        onClick={aiSuggest}
-                        disabled={aiDrafting || waBlocked}
-                        title="Let the assistant draft a reply you can edit before sending (1 credit)"
-                        className="ml-auto h-8"
-                      >
-                        {aiDrafting ? <Loader2 className="w-3 h-3 mr-1.5 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1.5" />} Draft with AI
-                      </Button>
+                      <Popover open={draftSteerOpen} onOpenChange={setDraftSteerOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="secondary" size="sm"
+                            disabled={aiDrafting || waBlocked}
+                            title="Let the assistant draft a reply you can edit before sending (1 credit)"
+                            className="ml-auto h-8"
+                          >
+                            {aiDrafting ? <Loader2 className="w-3 h-3 mr-1.5 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1.5" />} Draft with AI
+                          </Button>
+                        </PopoverTrigger>
+                        {/* The steer is optional: Draft with nothing typed is the old one-click
+                            behaviour. With one, the assistant is told what the reply should DO —
+                            "offer the oak decking", "say it ships Monday" — which it otherwise
+                            cannot know from the transcript alone. */}
+                        <PopoverContent align="end" className="w-80 p-3 space-y-2">
+                          <Label htmlFor="inbox-draft-steer" className="text-xs">What should the reply do? (optional)</Label>
+                          <Textarea
+                            id="inbox-draft-steer"
+                            value={draftSteer}
+                            onChange={(e) => setDraftSteer(e.target.value.slice(0, 1000))}
+                            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void aiSuggest(); } }}
+                            placeholder="e.g. Offer the oak decking at the price on file and say we can deliver next week."
+                            className="min-h-[72px] text-sm bg-card"
+                            autoFocus
+                          />
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[11px] text-muted-foreground">You review it before it is sent.</span>
+                            <Button size="sm" className="h-8" onClick={() => void aiSuggest()} disabled={aiDrafting}>
+                              <Sparkles className="w-3 h-3 mr-1.5" /> Draft
+                            </Button>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                     )}
                   </div>
                 )}
@@ -1690,35 +1762,103 @@ const InboxPage: React.FC = () => {
                     <button onClick={() => setAttachment(null)} className="hover:text-foreground"><X className="w-3 h-3" /></button>
                   </div>
                 )}
-                <div className="flex items-end gap-2">
-                  <div className="shrink-0">
-                    <EmojiPicker
-                      disabled={waBlocked}
-                      onPick={(e) => setDraft((d) => d + e)}
-                    />
+                {/* The cards queued for this send. What the customer gets is resolved on send —
+                    the chip shows the list price for orientation, the card shows THEIR price. */}
+                {pendingCards.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {pendingCards.map((c) => (
+                      <span key={c.product_id} className="inline-flex items-center gap-1.5 rounded-sm border border-hairline bg-card pl-1 pr-1.5 py-1 text-xs">
+                        {c.image_url
+                          ? <img src={c.image_url} alt="" className="h-5 w-5 rounded-xs object-cover" />
+                          : (c.kind === 'service' ? <Wrench className="h-3.5 w-3.5 text-muted-foreground" /> : <Package className="h-3.5 w-3.5 text-muted-foreground" />)}
+                        <span className="max-w-[14rem] truncate">{c.name}</span>
+                        <button onClick={() => togglePendingCard(c)} className="text-muted-foreground hover:text-foreground" title="Remove">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
                   </div>
-                  <label className="cursor-pointer p-2.5 rounded-sm hover:bg-surface-hover shrink-0">
-                    <Paperclip className="w-4 h-4 text-muted-foreground" />
-                    {/* `accept` names what the channel can actually carry, so the picker does not
-                        offer a file the send will reject. */}
-                    <input
-                      type="file" className="hidden"
-                      accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
-                      onChange={(e) => setAttachment(e.target.files?.[0] ?? null)}
+                )}
+                <div className="relative">
+                  {/* `/product` and `/service`: the command list while the token is typed, the
+                      picker once one is chosen. Anchored above the composer so it never covers
+                      the words being written. */}
+                  {slashMenu && isMember && activeId && (
+                    <div className="absolute bottom-full left-0 mb-2 z-20 w-full max-w-md">
+                      {slashMenu.mode === 'commands' ? (
+                        <SlashCommandMenu query={slashMenu.query} onChoose={chooseSlashCommand} onClose={() => setSlashMenu(null)} />
+                      ) : (
+                        <CatalogPicker
+                          threadId={activeId}
+                          kind={slashMenu.kind}
+                          picked={pendingCards}
+                          onKind={(kind) => setSlashMenu({ mode: 'picker', kind })}
+                          onToggle={togglePendingCard}
+                          onClose={() => { setSlashMenu(null); composerRef.current?.focus(); }}
+                        />
+                      )}
+                    </div>
+                  )}
+                  <div className="flex items-end gap-2">
+                    <div className="shrink-0">
+                      <EmojiPicker
+                        disabled={waBlocked}
+                        onPick={(e) => setDraft((d) => d + e)}
+                      />
+                    </div>
+                    <label className="cursor-pointer p-2.5 rounded-sm hover:bg-surface-hover shrink-0">
+                      <Paperclip className="w-4 h-4 text-muted-foreground" />
+                      {/* `accept` names what the channel can actually carry, so the picker does not
+                          offer a file the send will reject. */}
+                      <input
+                        type="file" className="hidden"
+                        accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
+                        onChange={(e) => setAttachment(e.target.files?.[0] ?? null)}
+                      />
+                    </label>
+                    {isMember && (
+                      <button
+                        type="button"
+                        onClick={() => setSlashMenu((m) => (m?.mode === 'picker' ? null : { mode: 'picker', kind: 'product' }))}
+                        disabled={waBlocked}
+                        className="p-2.5 rounded-sm hover:bg-surface-hover shrink-0 disabled:opacity-50"
+                        title="Suggest a product or service (or type /product, /service)"
+                        aria-pressed={slashMenu?.mode === 'picker'}
+                      >
+                        <ShoppingCart className="w-4 h-4 text-muted-foreground" />
+                      </button>
+                    )}
+                    <Textarea
+                      ref={composerRef}
+                      value={draft}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setDraft(v);
+                        // A slash command is `/`, `/pro`, `/product` at the START of a line. A
+                        // slash anywhere else is a slash (a URL, "and/or").
+                        const caret = e.target.selectionStart ?? v.length;
+                        const m = /(?:^|\n)\/([a-z]*)$/i.exec(v.slice(0, caret));
+                        if (isMember && m) setSlashMenu({ mode: 'commands', query: m[1] });
+                        else if (slashMenu?.mode === 'commands') setSlashMenu(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (slashMenu?.mode === 'commands') {
+                          if (e.key === 'Escape') { e.preventDefault(); setSlashMenu(null); return; }
+                          if (e.key === 'Enter' || e.key === 'Tab') {
+                            const first = slashCommandMatches(slashMenu.query)[0];
+                            if (first) { e.preventDefault(); chooseSlashCommand(first.kind); return; }
+                          }
+                        }
+                        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!waBlocked && !sending) send(); }
+                      }}
+                      placeholder={isNote ? 'Write a private note (only your team sees this)…' : waBlocked ? 'Reply window closed — template required' : isMember ? 'Type a message… (/product, /service to suggest one)' : 'Type a message…'}
+                      className={`flex-1 min-h-[44px] max-h-32 resize-none bg-card ${isNote ? 'border-warning/40 focus-visible:ring-warning/30' : ''}`}
+                      disabled={waBlocked}
                     />
-                  </label>
-                  <Textarea
-                    ref={composerRef}
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!waBlocked && !sending) send(); } }}
-                    placeholder={isNote ? 'Write a private note (only your team sees this)…' : waBlocked ? 'Reply window closed — template required' : 'Type a message…'}
-                    className={`flex-1 min-h-[44px] max-h-32 resize-none bg-card ${isNote ? 'border-warning/40 focus-visible:ring-warning/30' : ''}`}
-                    disabled={waBlocked}
-                  />
-                  <Button className="h-10 w-10 p-0 shrink-0" onClick={send} disabled={sending || waBlocked || (!draft.trim() && !attachment)}>
-                    {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                  </Button>
+                    <Button className="h-10 w-10 p-0 shrink-0" onClick={send} disabled={sending || waBlocked || (!draft.trim() && !attachment && pendingCards.length === 0)}>
+                      {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    </Button>
+                  </div>
                 </div>
               </div>
             </>
@@ -2225,6 +2365,173 @@ const COMPOSER_EMOJI: Array<{ group: string; emoji: string[] }> = [
   { group: 'Work', emoji: ['📦', '📸', '📄', '📐', '🔧', '🚚', '🏗️', '🧱', '🪵', '🪟'] },
   { group: 'Signals', emoji: ['🔥', '⭐', '💡', '⏰', '📌', '💰', '📈', '🎉', '❤️', '👀'] },
 ];
+
+// ──────────────────────────────────────────────────────────────────────────
+// Composer · slash commands and the catalog picker
+// ──────────────────────────────────────────────────────────────────────────
+
+/** `/pro` → the product command; `/services` → the service one; `/` → both. */
+function slashCommandMatches(query: string) {
+  const q = query.toLowerCase().replace(/s$/, '');
+  return INBOX_CARD_SLASH_COMMANDS.filter((c) => c.command.startsWith(q));
+}
+
+/**
+ * What the Ask-JARVIS button sends. JARVIS reads the thread itself through `manage_inbox`
+ * action:"read", so this only has to name the conversation and say what a brief looks like.
+ */
+function askJarvisAboutThreadPrompt(t: InboxThread): string {
+  const who = t.subject ? ` ("${t.subject}")` : '';
+  return `Read Inbox conversation ${t.id}${who} with manage_inbox action:"read" and brief me: what it is about, `
+    + 'who the customer is, the status of their orders, quotes and open invoices, and what you suggest I reply.';
+}
+
+const SlashCommandMenu: React.FC<{
+  query: string;
+  onChoose: (kind: InboxCardKind) => void;
+  onClose: () => void;
+}> = ({ query, onChoose, onClose }) => {
+  const matches = slashCommandMatches(query);
+  if (!matches.length) return null;
+  return (
+    <div className="rounded-sm border border-hairline bg-card shadow-overlay overflow-hidden">
+      <div className="flex items-center gap-1.5 border-b border-hairline bg-surface-sunken px-3 py-1.5 text-[11px] text-muted-foreground">
+        <Slash className="h-3 w-3" /> Commands · Enter picks the first
+        <button type="button" onClick={onClose} className="ml-auto hover:text-foreground" title="Close"><X className="h-3 w-3" /></button>
+      </div>
+      {matches.map((c, i) => (
+        <button
+          key={c.command}
+          type="button"
+          onMouseDown={(e) => { e.preventDefault(); onChoose(c.kind); }}
+          className={`flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-surface-hover ${i === 0 ? 'bg-surface-hover/60' : ''}`}
+        >
+          {c.kind === 'service' ? <Wrench className="h-4 w-4 text-muted-foreground" /> : <Package className="h-4 w-4 text-muted-foreground" />}
+          <span className="font-medium">{c.label}</span>
+          <span className="text-xs text-muted-foreground">{c.hint}</span>
+        </button>
+      ))}
+    </div>
+  );
+};
+
+/**
+ * The `/product` / `/service` picker. Searches the thread's workspace catalog as you type; a
+ * pick toggles the item into the pending cards (several at once, up to the message cap). The
+ * list price shown here is orientation — the customer's price is resolved when the message is
+ * sent, for the customer on the thread.
+ */
+const CatalogPicker: React.FC<{
+  threadId: string;
+  kind: InboxCardKind;
+  picked: InboxCatalogItem[];
+  onKind: (kind: InboxCardKind) => void;
+  onToggle: (item: InboxCatalogItem) => void;
+  onClose: () => void;
+}> = ({ threadId, kind, picked, onKind, onToggle, onClose }) => {
+  const [query, setQuery] = useState('');
+  const [items, setItems] = useState<InboxCatalogItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    const t = setTimeout(async () => {
+      try {
+        const res = await inboxApi.searchCatalog(threadId, query, kind);
+        if (alive) { setItems(res.items); setFailed(null); }
+      } catch (e) {
+        if (alive) { setItems([]); setFailed((e as Error).message); }
+      } finally {
+        if (alive) setLoading(false);
+      }
+    }, 200);
+    return () => { alive = false; clearTimeout(t); };
+  }, [threadId, query, kind]);
+
+  const pickedIds = useMemo(() => new Set(picked.map((p) => p.product_id)), [picked]);
+  const full = picked.length >= INBOX_CARD_MAX;
+
+  return (
+    <div className="rounded-sm border border-hairline bg-card shadow-overlay overflow-hidden">
+      <div className="flex items-center gap-1 border-b border-hairline bg-surface-sunken px-2 py-1.5 text-xs">
+        {INBOX_CARD_SLASH_COMMANDS.map((c) => (
+          <button
+            key={c.command}
+            type="button"
+            aria-pressed={c.kind === kind}
+            onClick={() => onKind(c.kind)}
+            className={`inline-flex items-center gap-1 rounded-sm px-2 py-1 ${c.kind === kind ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-surface-hover'}`}
+          >
+            {c.kind === 'service' ? <Wrench className="h-3 w-3" /> : <Package className="h-3 w-3" />} {c.label}
+          </button>
+        ))}
+        <span className="ml-auto text-muted-foreground tabular-nums">{picked.length}/{INBOX_CARD_MAX}</span>
+        <Button size="sm" variant="ghost" className="h-7 px-2" onClick={onClose}>Done</Button>
+      </div>
+      <Command
+        shouldFilter={false}
+        className="rounded-none"
+        onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } }}
+      >
+        <CommandInput
+          autoFocus
+          value={query}
+          onValueChange={setQuery}
+          placeholder={kind === 'service' ? 'Search your services…' : 'Search products by name or SKU…'}
+        />
+        <CommandList className="max-h-64">
+          {failed ? (
+            <div className="p-3 text-xs text-destructive">Could not search the catalog: {failed}</div>
+          ) : loading && items.length === 0 ? (
+            <div className="p-3 text-xs text-muted-foreground inline-flex items-center gap-1.5"><Loader2 className="h-3 w-3 animate-spin" /> Searching…</div>
+          ) : (
+            <CommandEmpty>
+              {query
+                ? 'Nothing matches that name or SKU.'
+                : kind === 'service'
+                  ? 'You have not listed any services. Add them under Finance → Settings → Services.'
+                  : 'The catalog is empty. Import or add products under Products first.'}
+            </CommandEmpty>
+          )}
+          <CommandGroup>
+            {items.map((it) => {
+              const on = pickedIds.has(it.product_id);
+              return (
+                <CommandItem
+                  key={it.product_id}
+                  value={it.product_id}
+                  disabled={!on && full}
+                  onSelect={() => onToggle(it)}
+                  className="gap-3"
+                >
+                  <div className="h-9 w-9 shrink-0 overflow-hidden rounded-xs border border-hairline bg-surface-sunken">
+                    {it.image_url
+                      ? <img src={it.image_url} alt="" className="h-full w-full object-cover" loading="lazy" />
+                      : <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                        {it.kind === 'service' ? <Wrench className="h-4 w-4" /> : <Package className="h-4 w-4" />}
+                      </div>}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm">{it.name}</div>
+                    <div className="truncate text-[11px] text-muted-foreground">
+                      {[it.sku ? `Ref ${it.sku}` : null, it.description].filter(Boolean).join(' · ')}
+                    </div>
+                  </div>
+                  <div className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                    {it.list_price != null ? `${money(it.list_price, it.currency)}${it.unit ? `/${it.unit}` : ''}` : '—'}
+                  </div>
+                  {on && <Check className="h-4 w-4 shrink-0 text-primary" />}
+                </CommandItem>
+              );
+            })}
+          </CommandGroup>
+        </CommandList>
+      </Command>
+    </div>
+  );
+};
 
 const EmojiPicker: React.FC<{ onPick: (emoji: string) => void; disabled?: boolean }> = ({ onPick, disabled }) => {
   const [open, setOpen] = useState(false);
@@ -3032,6 +3339,8 @@ const MessageBubble: React.FC<{
           ) : (
             <MessageBody body={m.body} threadId={m.thread_id} />
           ))}
+          {/* Catalog cards, as the customer saw them: name, image, THEIR price, the same link. */}
+          <InboxCatalogCards cards={readInboxCards(m.metadata)} />
           {/* A public comment answered in public stays public. These are the two ways out:
               answer the person privately, or take the comment down. Both are one-shot at the
               platform (Meta allows a single private reply per comment, inside a window), so
@@ -4163,6 +4472,7 @@ const DetailsRail: React.FC<{
   const subtitle = [contact?.position, company?.name].filter(Boolean).join(' · ');
   const metrics = context?.metrics ?? null;
   const invoices = context?.invoices ?? [];
+  const orders = context?.orders ?? [];
   const requestedServices = inboxRequestedServices(thread);
   const hireOrder = inboxHireOrder(thread);
 
@@ -4352,6 +4662,33 @@ const DetailsRail: React.FC<{
               {company.vat_number && <Row icon={<Hash className="w-3.5 h-3.5" />}>VAT {company.vat_number}</Row>}
             </div>
           )}
+
+          {/* Orders — the customer's sales orders, newest first. Status is the order's; payment
+              and what is still owed come from the ledger derivation, never a cached column. */}
+          <div className="p-5 border-b border-hairline">
+            <SectionTitle icon={<ShoppingCart className="h-4 w-4" />} count={orders.length}>Orders</SectionTitle>
+            {orders.length === 0 ? (
+              <div className="text-xs text-muted-foreground">Nothing ordered so far. An order approved from this conversation shows here.</div>
+            ) : (
+              <div className="space-y-0.5">
+                {orders.map((o) => (
+                  <a key={o.id} href={`/finance/orders/${o.id}`} className="flex items-center gap-2 text-sm py-1.5 px-2 -mx-2 rounded-sm hover:bg-surface-hover transition-colors">
+                    <ShoppingCart className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                    <span className="flex-1 min-w-0">
+                      <span className="block truncate">{o.order_number || 'Order'}</span>
+                      <span className="block text-[11px] text-muted-foreground truncate">
+                        {formatDate(o.created_at)}
+                        {o.payment_status ? ` · ${o.payment_status.replace(/_/g, ' ')}` : ''}
+                        {o.outstanding != null && o.outstanding > 0 ? ` · owes ${money(o.outstanding, o.currency)}` : ''}
+                      </span>
+                    </span>
+                    <span className="text-xs text-muted-foreground shrink-0">{money(o.total, o.currency)}</span>
+                    {o.status && <span className={`text-[10px] capitalize shrink-0 ${statusTone(o.status)}`}>{o.status.replace(/_/g, ' ')}</span>}
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Quotes */}
           <div className="p-5 border-b border-hairline">

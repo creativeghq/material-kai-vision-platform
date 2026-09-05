@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { parseEdgeError } from '@/utils/edgeError';
 import type { InboxDocumentKind } from '@/modules/messaging/inboxDocumentKinds';
+import type { InboxCardKind } from '@/modules/messaging/inboxCardKinds';
 
 /**
  * Multi-Tenant Inbox client. Thin wrapper over the single `inbox-api` edge function
@@ -260,6 +261,57 @@ export interface InboxInvoiceRef {
   due_at: string | null;
 }
 
+/** A sales order of the customer on the thread. Settlement figures come from `get_order_settlements`. */
+export interface InboxOrderRef {
+  id: string;
+  order_number: string | null;
+  status: string | null;
+  /** The ledger-derived payment status, never the cached column. */
+  payment_status: string | null;
+  total: number;
+  outstanding: number | null;
+  currency: string | null;
+  created_at: string;
+}
+
+/**
+ * A catalog card on a message (`metadata.cards`) — a product or a service suggested to the
+ * customer. Resolved SERVER-side for the customer on the thread: the client only ever sends
+ * `{ kind, product_id }` picks, and the price here is the one the customer was shown.
+ */
+export interface InboxCard {
+  kind: InboxCardKind;
+  product_id: string;
+  name: string;
+  description: string | null;
+  sku: string | null;
+  image_url: string | null;
+  price: number | null;
+  currency: string;
+  unit: string | null;
+  price_basis: 'net' | 'gross' | null;
+  url: string | null;
+}
+
+/** A pick to send: ids only. Everything else on the card is derived by inbox-api. */
+export interface InboxCardPick {
+  kind: InboxCardKind;
+  product_id: string;
+}
+
+/** A row of the `/product` / `/service` picker. The list price is orientation, not the card's price. */
+export interface InboxCatalogItem {
+  kind: InboxCardKind;
+  product_id: string;
+  name: string;
+  sku: string | null;
+  description: string | null;
+  image_url: string | null;
+  list_price: number | null;
+  currency: string | null;
+  unit: string | null;
+}
+
 /** Rolled-up finance figures for the customer on the thread (from `invoices`). */
 export interface InboxCustomerMetrics {
   currency: string;
@@ -276,6 +328,8 @@ export interface InboxThreadContext {
   projects: InboxProjectRef[];
   /** Open invoices for the customer (amount_due > 0). Absent on older API responses. */
   invoices?: InboxInvoiceRef[];
+  /** The customer's recent sales orders, newest first. Absent on older API responses. */
+  orders?: InboxOrderRef[];
   /** Lifetime value + open balance. Absent on older API responses / internal threads. */
   metrics?: InboxCustomerMetrics | null;
 }
@@ -468,8 +522,14 @@ export const inboxApi = {
     thread_id: string; body?: string; attachments?: AttachmentInput[]; message_type?: 'text' | 'note';
     /** Our id for the message being answered — resolved server-side to the platform id. */
     reply_to_message_id?: string;
+    /** Catalog cards to send with the message — picks only; the card itself is resolved server-side. */
+    cards?: InboxCardPick[];
   }) {
     return call<{ message: InboxMessage }>('send_message', input);
+  },
+  /** The `/product` and `/service` pickers: the thread's workspace catalog, filtered by name or SKU. */
+  searchCatalog(thread_id: string, query: string, kind: InboxCardKind) {
+    return call<{ items: InboxCatalogItem[] }>('search_catalog', { thread_id, query, kind });
   },
   /**
    * How the customer feels, and what to say back.
@@ -646,8 +706,13 @@ export const inboxApi = {
   },
 
   // ── AI "help me write" — a draft reply for a member to review/edit/send ──
-  suggestReply(thread_id: string) {
-    return call<{ draft: string }>('suggest_reply', { thread_id });
+  /**
+   * "Draft with AI". `instruction` is the member's optional steer ("offer the oak decking, and say
+   * it ships Monday") — it reaches the assistant outside the customer-data fence, as the
+   * operator's own words, and the member still reviews the draft before sending.
+   */
+  suggestReply(thread_id: string, instruction?: string) {
+    return call<{ draft: string }>('suggest_reply', { thread_id, ...(instruction?.trim() ? { instruction: instruction.trim() } : {}) });
   },
 
   // ── Inbound email address (#342) — one per user, on the shared receiving domain ──

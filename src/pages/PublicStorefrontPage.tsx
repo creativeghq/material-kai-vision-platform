@@ -5,7 +5,7 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { formatMoney } from '@/utils/decimal';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { Loader2, ShoppingCart, Plus, Minus, Trash2, Store, ArrowRight, Package, Wrench } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -18,6 +18,10 @@ const money = (n: number, ccy: string) => formatMoney(n, ccy || 'EUR');
 
 const PublicStorefrontPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
+  // `?product=<id>` is where an Inbox card's "View product" button lands: the store, opened
+  // on that product. It is highlighted and scrolled to once the catalog has loaded.
+  const [searchParams] = useSearchParams();
+  const highlightId = searchParams.get('product');
   const [meta, setMeta] = useState<StorefrontMeta | null>(null);
   const [products, setProducts] = useState<StorefrontProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,6 +54,11 @@ const PublicStorefrontPage: React.FC = () => {
       }
     })();
   }, [slug]);
+
+  useEffect(() => {
+    if (!highlightId || !products.length) return;
+    document.getElementById(`product-${highlightId}`)?.scrollIntoView({ block: 'center' });
+  }, [highlightId, products]);
 
   const byId = useMemo(() => new Map(products.map((p) => [p.product_id, p])), [products]);
   const currency = products[0]?.currency ?? 'EUR';
@@ -119,7 +128,11 @@ const PublicStorefrontPage: React.FC = () => {
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {products.map((p) => (
-                <Card key={p.product_id} className="overflow-hidden">
+                <Card
+                  key={p.product_id}
+                  id={`product-${p.product_id}`}
+                  className={`overflow-hidden ${p.product_id === highlightId ? 'ring-2 ring-primary' : ''}`}
+                >
                   <div className="aspect-square bg-muted/40">
                     {p.image_url
                       ? <img src={p.image_url} alt={p.name} className="h-full w-full object-cover" loading="lazy" />

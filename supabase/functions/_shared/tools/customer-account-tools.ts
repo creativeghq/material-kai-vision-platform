@@ -1,5 +1,5 @@
 /**
- * The three tools a CUSTOMER's own conversation may use to read their OWN account.
+ * The four tools a CUSTOMER's own conversation may use to read their OWN account.
  *
  * ── Why they take no arguments ──────────────────────────────────────────────────────────────
  * This is the single most important property in the file, so it is the first thing said:
@@ -47,6 +47,7 @@ export const CUSTOMER_ACCOUNT_TOOL_NAMES = [
   'get_account_statement',
   'list_open_invoices',
   'list_quotes_and_projects',
+  'list_orders',
 ] as const;
 
 export interface CustomerAccountScope {
@@ -147,8 +148,46 @@ export function createCustomerAccountTools(db: DbClient, scope: CustomerAccountS
         name: 'list_quotes_and_projects',
         description:
           'The recent quotes (with status and total) and projects of the customer you are TALKING '
-          + 'TO. Use for questions about their orders, quotes, proposals, or project status. Takes '
-          + 'no arguments.',
+          + 'TO. Use for questions about their quotes, proposals, or project status. For orders '
+          + 'use list_orders. Takes no arguments.',
+        schema: z.object({}),
+      },
+    ),
+
+    tool(
+      async () => {
+        // Sales orders only: on a purchase order this contact would be the SUPPLIER, and "where
+        // is my order" from a supplier is a different question with a different answer.
+        const { data } = await db.from('orders')
+          .select('id, order_number, status, total, currency, created_at')
+          .eq('workspace_id', scope.workspaceId).eq('customer_contact_id', scope.contactId)
+          .eq('order_type', 'sales')
+          .order('created_at', { ascending: false }).limit(8);
+        const rows = (data || []) as Array<Record<string, unknown>>;
+        if (!rows.length) return JSON.stringify([]);
+        // Settlement from the ONE derivation of "how much is still owed on an order"
+        // (`get_order_settlements`) — never `total − paid` re-done here.
+        const { data: st } = await db.rpc('get_order_settlements', { p_order_ids: rows.map((r) => String(r.id)) });
+        const settled = new Map(
+          ((st || []) as Array<{ order_id: string; outstanding: number; payment_status: string }>)
+            .map((s) => [s.order_id, s]),
+        );
+        return JSON.stringify(rows.map((r) => ({
+          number: r.order_number,
+          status: r.status,
+          payment_status: settled.get(String(r.id))?.payment_status ?? null,
+          outstanding: settled.get(String(r.id))?.outstanding ?? null,
+          total: Number(r.total || 0),
+          currency: r.currency || 'EUR',
+          placed_at: r.created_at,
+        })));
+      },
+      {
+        name: 'list_orders',
+        description:
+          'The recent orders of the customer you are TALKING TO: order number, fulfilment status, '
+          + 'payment status, amount still owed, total and the date it was placed. Use for "where is '
+          + 'my order", "has it shipped", "is it paid". Takes no arguments.',
         schema: z.object({}),
       },
     ),

@@ -14096,6 +14096,10 @@
                       },
                       "attachments": {
                         "type": "array"
+                      },
+                      "cards": {
+                        "type": "array",
+                        "description": "Catalog cards to send: [{kind: product|service, product_id}]. Members only, ids only — name, image, link and the customer's price are resolved server-side and relayed as a WhatsApp interactive card, an email table, or text lines."
                       }
                     },
                     "description": "Returns: {data: message}"
@@ -14466,7 +14470,7 @@
                         "enum": [
                           "get_thread_context"
                         ],
-                        "description": "Fetch grounding context for the agent (thread customer statement/invoices/quotes scoped to the thread)"
+                        "description": "Fetch grounding context for the agent (thread customer statement/invoices/quotes/orders scoped to the thread; order settlement from get_order_settlements)"
                       },
                       "thread_id": {
                         "type": "string",
@@ -14677,6 +14681,10 @@
                       "thread_id": {
                         "type": "string",
                         "description": "Thread the caller can access (string (uuid))"
+                      },
+                      "instruction": {
+                        "type": "string",
+                        "description": "What the reply should do (e.g. offer a product, state a delivery date). Max 1000 chars; passed to the assistant outside the customer-data fence as the operator's words."
                       }
                     },
                     "description": "Returns: {draft:string}"
@@ -14855,6 +14863,35 @@
                       }
                     },
                     "description": "Returns: {candidates:[]}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "thread_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "search_catalog"
+                        ],
+                        "description": "The /product and /service pickers: the thread's workspace catalog by name or SKU, with the list price for orientation. Members only. The card sent on send_message is re-priced for the customer server-side."
+                      },
+                      "thread_id": {
+                        "type": "string",
+                        "description": "Thread the caller is a member of (string (uuid))"
+                      },
+                      "query": {
+                        "type": "string",
+                        "description": "Name or SKU fragment; empty returns the most recently updated items"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "description": "product (default) or service"
+                      }
+                    },
+                    "description": "Returns: {items:[{kind, product_id, name, sku, description, image_url, list_price, currency, unit}]}"
                   },
                   {
                     "type": "object",

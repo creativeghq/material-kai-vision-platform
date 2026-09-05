@@ -72,6 +72,12 @@ export const VOCABULARIES = [
     'supabase/functions/_shared/inboxDocumentKinds.generated.ts',
   ],
   [
+    // A catalog card in an Inbox message: product or service, and how many one message carries.
+    // The composer's slash menu offers these; inbox-api validates the pick against the same list.
+    'src/modules/messaging/inboxCardKinds.ts',
+    'supabase/functions/_shared/inboxCardKinds.generated.ts',
+  ],
+  [
     // How a golden-case run failed. `agent_eval_runs_failure_class_check` is the enforcer; the
     // scorer in agent-eval emits these and a future evals page labels them.
     'src/config/agentEvalVocabulary.ts',

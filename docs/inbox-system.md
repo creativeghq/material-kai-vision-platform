@@ -461,3 +461,54 @@ Two rules the editor obeys, both of which are invisible when broken:
 
 Reachability is guarded: [tests/unit/inboxApiReachability.test.ts](../tests/unit/inboxApiReachability.test.ts)
 fails the build for any `inbox-api` action with no caller in `src/`.
+
+---
+
+## 12. Suggesting a product or a service from a conversation
+
+A member types `/product` or `/service` in the composer (or presses the cart button next to the
+paperclip). A picker searches the thread's workspace catalog by name or SKU — products, or
+`products(item_type='service')` for services — and each pick becomes a **card** on the outgoing
+message. Several cards go in one message, up to `INBOX_CARD_MAX` (10).
+
+### The client sends ids; the card is resolved for the customer
+
+`send_message` accepts `cards: [{ kind, product_id }]` from members only. `resolveInboxCards` in
+`inbox-api` derives everything else for **this thread's customer**:
+
+- the product must belong to the thread's workspace (a foreign id is not a card);
+- the **price** comes from `get_product_price_for_workspace` through `resolveLinePrice` — the same
+  resolver a quote line and an intake line use, for the contact and company on the thread — shown
+  **gross** to a consumer and **net** to a VAT-registered buyer (the `derive_invoice_document_type`
+  split). A member cannot type a price into a card; the list price in the picker is orientation;
+- the **link** is the storefront (`/store/:slug?product=<id>`) when the product is
+  `storefront_published`, the seller's public profile (`/u/:id`) for a listed service, and nothing
+  otherwise — never an app route the customer cannot open.
+
+The resolved cards are stored on the message (`inbox_messages.metadata.cards`) and rendered by
+`InboxCatalogCards` in the member's transcript and on the customer's `/i/:token` page.
+
+### One shape, three renderings (`_shared/inbox-cards.ts`)
+
+| Channel | What goes out |
+|---|---|
+| WhatsApp | Meta's interactive **`cta_url`** message: image header (or a text header when there is no image), body = the member's words + name + price, footer = SKU/unit, one link button. Two to ten cards that all carry an image and a link go as one **media carousel**; a mixed set goes as the text, then one message per card. No public link → image with caption; no image either → plain text. All are session messages, gated by the same 24h-window check as any reply. Relay stops at the first failed card and records every result under `metadata.relay`. |
+| Email | The member's words, then an HTML **table** (thumbnail · name · description · SKU · price · button), every field through the canonical `escapeHtml`, `href`/`src` refused unless http(s), plus a text alternative listing the same cards. |
+| Social DM / comment | The cards as text lines under the message. |
+
+Guarded by [tests/unit/inboxCatalogCards.test.ts](../tests/unit/inboxCatalogCards.test.ts).
+
+### Order status, on the rail and for the assistant
+
+`get_thread_context` returns the customer's recent **sales orders** (number, status, ledger-derived
+payment status and outstanding from `get_order_settlements`), shown as an *Orders* section on the
+Customer profile rail with a link to the order. The customer-audience assistant has a fourth
+account tool, `list_orders`, for "where is my order" — scoped by the thread like the other three.
+
+### Steering "Draft with AI", and asking JARVIS about a conversation
+
+*Draft with AI* opens a small popover: an optional instruction ("offer the oak decking, say it
+ships Monday") goes to agent-chat as `operator_instruction`, appended **after** the customer-data
+fence and labelled as the operator's words. The *Ask JARVIS* button in the thread header opens the
+Agent Hub with a prompt naming the thread; `manage_inbox action:"read"` returns the transcript
+(customer text wrapped as untrusted data) with the same orders/quotes/invoices context the rail shows.

@@ -111,7 +111,9 @@ describe('the account tools cannot be widened by anything the customer says', ()
     // and nothing in the logs to separate it from ordinary use. `z.object({})` makes it
     // unrepresentable instead of merely refused.
     const schemas = [...src.matchAll(/schema:\s*z\.object\((\{[^}]*\})\)/g)].map((m) => m[1].trim());
-    expect(schemas.length, 'expected one schema per account tool').toBe(3);
+    // Four: statement, open invoices, quotes + projects, orders. A fifth is fine — as long as it
+    // also takes nothing.
+    expect(schemas.length, 'expected one schema per account tool').toBe(4);
     for (const schema of schemas) {
       expect(schema, 'an account tool grew an argument').toBe('{}');
     }
@@ -130,7 +132,7 @@ describe('the account tools cannot be widened by anything the customer says', ()
     // thread resolved to a real contact and the workspace allows account answers — putting them in
     // a cluster would expose them to operator chats as a worse copy of the finance tools.
     const clusters = read('supabase/functions/_shared/toolkitClusters.generated.ts');
-    for (const name of ['get_account_statement', 'list_open_invoices', 'list_quotes_and_projects']) {
+    for (const name of ['get_account_statement', 'list_open_invoices', 'list_quotes_and_projects', 'list_orders']) {
       expect(clusters, `${name} must not be in any toolkit cluster`).not.toContain(name);
     }
     const chat = code(AGENT_CHAT);

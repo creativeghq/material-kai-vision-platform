@@ -7085,6 +7085,12 @@
             "name": "attachments",
             "type": "array",
             "required": false
+          },
+          {
+            "name": "cards",
+            "type": "array",
+            "required": false,
+            "desc": "Catalog cards to send: [{kind: product|service, product_id}]. Members only, ids only — name, image, link and the customer's price are resolved server-side and relayed as a WhatsApp interactive card, an email table, or text lines."
           }
         ],
         "response": "{data: message}"
@@ -7371,7 +7377,7 @@
       },
       {
         "name": "get_thread_context",
-        "summary": "Fetch grounding context for the agent (thread customer statement/invoices/quotes scoped to the thread)",
+        "summary": "Fetch grounding context for the agent (thread customer statement/invoices/quotes/orders scoped to the thread; order settlement from get_order_settlements)",
         "params": [
           {
             "name": "thread_id",
@@ -7529,6 +7535,12 @@
             "type": "string (uuid)",
             "required": true,
             "desc": "Thread the caller can access"
+          },
+          {
+            "name": "instruction",
+            "type": "string",
+            "required": false,
+            "desc": "What the reply should do (e.g. offer a product, state a delivery date). Max 1000 chars; passed to the assistant outside the customer-data fence as the operator's words."
           }
         ],
         "response": "{draft:string}"
@@ -7676,6 +7688,31 @@
           }
         ],
         "response": "{candidates:[]}"
+      },
+      {
+        "name": "search_catalog",
+        "summary": "The /product and /service pickers: the thread's workspace catalog by name or SKU, with the list price for orientation. Members only. The card sent on send_message is re-priced for the customer server-side.",
+        "params": [
+          {
+            "name": "thread_id",
+            "type": "string (uuid)",
+            "required": true,
+            "desc": "Thread the caller is a member of"
+          },
+          {
+            "name": "query",
+            "type": "string",
+            "required": false,
+            "desc": "Name or SKU fragment; empty returns the most recently updated items"
+          },
+          {
+            "name": "kind",
+            "type": "string",
+            "required": false,
+            "desc": "product (default) or service"
+          }
+        ],
+        "response": "{items:[{kind, product_id, name, sku, description, image_url, list_price, currency, unit}]}"
       },
       {
         "name": "approve_intake",

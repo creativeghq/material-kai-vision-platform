@@ -41,8 +41,14 @@ import {
   sendWhatsAppReply, sendWhatsAppMessage, setMessageReaction,
   sendSocialCommentReply, sendSocialDirectMessage,
   sendCommentPrivateReply, setCommentHidden, markConversationRead,
-  ensureZernioSecrets, fetchLastInboundAt,
+  ensureZernioSecrets, fetchLastInboundAt, publicAppUrl,
 } from '../_shared/zernio.ts';
+import {
+  buildEmailCardsHtml, buildEmailCardsText, buildWhatsAppCardMessages, cardsPreview, cardsToText,
+  safeCardUrl, INBOX_CARD_MAX, type InboxCard, type InboxCardKind,
+} from '../_shared/inbox-cards.ts';
+import { imageFromMetadata } from '../_shared/product-media.ts';
+import { grossFromNet } from '../_shared/money.ts';
 import {
   allocateUserEmailAddress,
   buildOutboundMessageId,
@@ -684,7 +690,12 @@ async function buildTranscript(
 async function buildAgentDraft(
   db: DbClient,
   thread: Record<string, unknown>,
-  billedTo: { userId?: string; task: 'inbox_agent_reply' | 'inbox_agent_suggest' },
+  billedTo: {
+    userId?: string;
+    task: 'inbox_agent_reply' | 'inbox_agent_suggest';
+    /** A member's steer for the draft. Only the suggest path sets it; the auto-reply has no member. */
+    operatorInstruction?: string;
+  },
 ): Promise<string> {
   const threadId = String(thread.id);
   const workspaceId = String(thread.workspace_id);
@@ -785,6 +796,10 @@ async function buildAgentDraft(
       // chat history has, and flattening it into `user`/`assistant` would tell the model that a
       // colleague's sentence was its own.
       messages: [{ role: 'user', content: agentInput }],
+      // The member's steer, as its own field. agent-chat appends it AFTER the customer-data fence
+      // and labels it as coming from the operator's side — inside the transcript it would be
+      // fenced as customer text and rightly ignored.
+      ...(billedTo.operatorInstruction ? { operator_instruction: billedTo.operatorInstruction } : {}),
       // The reply is a single message, so there is no conversation to continue and nothing should
       // be written to one. A null id also keeps a customer thread out of the operator's Studio.
       conversation_id: null,
@@ -1036,6 +1051,119 @@ async function normalizeAttachments(
   return out;
 }
 
+/**
+ * Who the customer on a thread IS, for pricing and for the account rail: the CRM contact of the
+ * first active customer participant, and the company the platform already links them to — the
+ * most recent quote or project, the same derivation `get_thread_context` uses for the rail. A
+ * VAT number on either makes them a VAT-registered buyer, which decides net vs gross exactly the
+ * way `derive_invoice_document_type` decides 1.1 vs 11.1.
+ */
+async function threadCustomerParty(
+  db: DbClient,
+  thread: Record<string, unknown>,
+): Promise<{ contactId: string | null; companyId: string | null; vatRegistered: boolean }> {
+  const { data: custP } = await db
+    .from('inbox_participants').select('contact_id')
+    .eq('thread_id', String(thread.id)).eq('participant_type', 'customer').eq('status', 'active')
+    .not('contact_id', 'is', null).limit(1).maybeSingle();
+  const contactId = (custP as { contact_id?: string } | null)?.contact_id ?? null;
+  if (!contactId) return { contactId: null, companyId: null, vatRegistered: false };
+
+  const [{ data: contact }, { data: q }, { data: p }] = await Promise.all([
+    db.from('crm_contacts').select('vat_number').eq('id', contactId).maybeSingle(),
+    db.from('quotes').select('customer_company_id').eq('customer_contact_id', contactId)
+      .not('customer_company_id', 'is', null).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+    db.from('projects').select('client_company_id').eq('client_contact_id', contactId)
+      .not('client_company_id', 'is', null).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  const companyId = (q as { customer_company_id?: string } | null)?.customer_company_id
+    ?? (p as { client_company_id?: string } | null)?.client_company_id ?? null;
+  let vatRegistered = !!(contact as { vat_number?: string | null } | null)?.vat_number;
+  if (!vatRegistered && companyId) {
+    const { data: co } = await db.from('crm_companies').select('vat_number').eq('id', companyId).maybeSingle();
+    vatRegistered = !!(co as { vat_number?: string | null } | null)?.vat_number;
+  }
+  return { contactId, companyId, vatRegistered };
+}
+
+/**
+ * The client's picks (a kind and a product id each) → cards the customer can be shown.
+ *
+ * Everything but the id is derived HERE, for THIS thread's customer:
+ *   • the product must belong to the thread's workspace — a foreign id is simply not a card;
+ *   • the PRICE is `get_product_price_for_workspace` for the customer party, through the same
+ *     `resolveLinePrice` an intake line and a quote line use (one derivation per money quantity —
+ *     a member cannot type a price into a card), shown gross to a consumer and net to a
+ *     VAT-registered buyer;
+ *   • the LINK is the workspace storefront when the product is published there, the seller's
+ *     public profile for a listed service, and nothing otherwise — never an app route the
+ *     customer cannot open.
+ */
+async function resolveInboxCards(
+  db: DbClient,
+  thread: Record<string, unknown>,
+  raw: unknown,
+): Promise<InboxCard[]> {
+  if (!Array.isArray(raw) || raw.length === 0) return [];
+  const ids: string[] = [];
+  for (const r of raw) {
+    const id = String((r as { product_id?: unknown })?.product_id ?? '');
+    if (!/^[0-9a-f-]{36}$/i.test(id) || ids.includes(id)) continue;
+    ids.push(id);
+    if (ids.length >= INBOX_CARD_MAX) break;
+  }
+  if (!ids.length) return [];
+
+  const workspaceId = String(thread.workspace_id);
+  const [{ data: rows }, party, { data: ws }, { data: pub }, { data: fs }] = await Promise.all([
+    db.from('products').select('id, name, description, sku, metadata, item_type, profile_user_id')
+      .eq('workspace_id', workspaceId).in('id', ids),
+    threadCustomerParty(db, thread),
+    db.from('workspaces').select('slug').eq('id', workspaceId).maybeSingle(),
+    db.from('product_prices').select('product_id, unit')
+      .eq('workspace_id', workspaceId).eq('storefront_published', true).in('product_id', ids),
+    db.from('finance_settings').select('default_vat_rate').eq('workspace_id', workspaceId).maybeSingle(),
+  ]);
+  type ProductRow = {
+    id: string; name: string | null; description: string | null; sku: string | null;
+    metadata: unknown; item_type: string | null; profile_user_id: string | null;
+  };
+  const byId = new Map(((rows || []) as ProductRow[]).map((r) => [r.id, r]));
+  const published = new Map(((pub || []) as Array<{ product_id: string; unit: string | null }>).map((r) => [r.product_id, r]));
+  const slug = (ws as { slug?: string | null } | null)?.slug || null;
+  // Same default the storefront applies when the workspace has not set a rate.
+  const vatPct = Number((fs as { default_vat_rate?: number | null } | null)?.default_vat_rate ?? 24);
+  const base = publicAppUrl();
+
+  const out: InboxCard[] = [];
+  for (const id of ids) {
+    const p = byId.get(id);
+    if (!p) continue;
+    const kind: InboxCardKind = p.item_type === 'service' ? 'service' : 'product';
+    const price = await resolveLinePrice(db, {
+      workspaceId, productId: p.id, companyId: party.companyId, contactId: party.contactId,
+    });
+    const net = price.unpriced ? null : price.unit_price;
+    const url = published.has(p.id) && slug
+      ? `${base}/store/${encodeURIComponent(slug)}?product=${p.id}`
+      : kind === 'service' && p.profile_user_id ? `${base}/u/${p.profile_user_id}` : null;
+    out.push({
+      kind,
+      product_id: p.id,
+      name: String(p.name || (kind === 'service' ? 'Service' : 'Product')),
+      description: p.description ? String(p.description).slice(0, 400) : null,
+      sku: p.sku ? String(p.sku) : null,
+      image_url: safeCardUrl(imageFromMetadata(p.metadata)),
+      price: net == null ? null : party.vatRegistered ? net : grossFromNet(net, vatPct),
+      currency: price.currency || 'EUR',
+      unit: price.measurement_unit_code || published.get(p.id)?.unit || null,
+      price_basis: net == null ? null : party.vatRegistered ? 'net' : 'gross',
+      url,
+    });
+  }
+  return out;
+}
+
 /** Persist a message, bump the thread, fan out the channel relay + the in-app bell. */
 async function insertMessageAndNotify(
   db: DbClient,
@@ -1051,9 +1179,15 @@ async function insertMessageAndNotify(
     replyToWamid?: string;
     /** Our own id for the same message, so the transcript can render the quote locally too. */
     replyToMessageId?: string;
+    /**
+     * Catalog cards, already RESOLVED for this thread's customer by `resolveInboxCards` — never
+     * the client's picks. Stored on the message and relayed in each channel's own rich shape.
+     */
+    cards?: InboxCard[];
   },
 ): Promise<Record<string, unknown>> {
   const { thread, senderParticipantId, body, attachments, messageType, replyToWamid, replyToMessageId } = opts;
+  const cards = opts.cards ?? [];
   const threadId = String(thread.id);
 
   const { data: msg, error } = await db
@@ -1067,17 +1201,23 @@ async function insertMessageAndNotify(
       // Recorded so the transcript can render the quoted block locally. WhatsApp shows it on the
       // customer's side from `replyTo`; without this OUR side would show a bare reply and the
       // operator could not see what they had answered.
-      ...(replyToMessageId ? { metadata: { reply_to: replyToMessageId } } : {}),
+      ...((replyToMessageId || cards.length) ? {
+        metadata: {
+          ...(replyToMessageId ? { reply_to: replyToMessageId } : {}),
+          ...(cards.length ? { cards } : {}),
+        },
+      } : {}),
     })
     .select('*')
     .single();
   if (error) throw new HttpError(500, `Failed to store message: ${error.message}`);
+  const storedMetadata = ((msg as { metadata?: Record<string, unknown> }).metadata ?? {}) as Record<string, unknown>;
 
   // Denormalized last-message snippet for the mailbox list. Notes are private (never shown to
   // customers) and system events aren't content, so neither updates the preview.
   const preview = (messageType === 'note' || messageType === 'system')
     ? undefined
-    : (body ? body.replace(/\s+/g, ' ').slice(0, 140) : '[attachment]');
+    : (body ? body.replace(/\s+/g, ' ').slice(0, 140) : cards.length ? cardsPreview(cards) : '[attachment]');
   /*
    * The STATUS is not set here any more, and that is the point.
    *
@@ -1106,7 +1246,7 @@ async function insertMessageAndNotify(
   // spec sheet, see it in their own transcript, and the customer would receive the text alone
   // or nothing at all, with no indication either way.
   if (thread.channel === 'whatsapp' && (messageType === 'text' || messageType === 'agent')
-      && (body || attachments.length > 0)) {
+      && (body || attachments.length > 0 || cards.length > 0)) {
     const meta = (thread.metadata as Json) || {};
     const accountId = String(meta.zernio_account_id || '');
     const conversationId = String(meta.zernio_conversation_id || '');
@@ -1131,25 +1271,48 @@ async function insertMessageAndNotify(
           : ct.startsWith('audio/') ? 'audio'
           : 'file';
       }
-      const res = await sendWhatsAppReply({
-        accountId,
-        conversationId,
-        message: body ?? undefined,
-        attachmentUrl,
-        attachmentType,
-        replyTo: replyToWamid,
-      });
+      /*
+       * Catalog cards go out in WhatsApp's OWN shape — an interactive `cta_url` message (image
+       * header, body, link button) or a media carousel — never as a pasted URL. The member's
+       * text rides inside the first card's body, so the customer reads one thing, not a
+       * paragraph followed by a stray box. A file attachment sent alongside cards follows as
+       * its own message, because Zernio carries one attachment per send.
+       *
+       * Several sends for one stored message: the first send's id is the one delivery receipts
+       * match on (`metadata->>wamid`), and every result is kept under `relay` so a failure of
+       * the third card is visible rather than averaged away.
+       */
+      const sends = cards.length
+        ? [
+          ...buildWhatsAppCardMessages(cards, body).map((m) => ({ ...m, replyTo: undefined as string | undefined })),
+          ...(attachmentUrl ? [{ attachmentUrl, attachmentType, replyTo: undefined as string | undefined }] : []),
+        ]
+        : [{ message: body ?? undefined, attachmentUrl, attachmentType, replyTo: replyToWamid }];
+      if (sends.length && replyToWamid) sends[0].replyTo = replyToWamid;
+
+      const results: unknown[] = [];
+      let firstFailure: string | null = null;
+      for (const s of sends) {
+        const res = await sendWhatsAppReply({ accountId, conversationId, ...s });
+        results.push(res);
+        if (!(res as { success?: boolean })?.success) {
+          firstFailure = String((res as { error?: unknown })?.error ?? 'WhatsApp relay failed');
+          break; // a card that could not be sent must not be followed by the rest as if it had
+        }
+      }
+      const res = results[0] ?? { success: false, error: 'nothing to send' };
       // Store the returned message id as `wamid` so the zernio-webhook-handler's
       // message.delivered|read|failed handler (which matches `metadata->>wamid`) can apply
       // delivery/read receipts to THIS outbound message. Keep `relay` for debugging.
-      const relayOk = !!(res as { success?: boolean })?.success;
+      const relayOk = firstFailure === null && !!(res as { success?: boolean })?.success;
       await db
         .from('inbox_messages')
         .update({
           metadata: {
+            ...storedMetadata,
             channel: 'whatsapp',
             wamid: (res as { messageId?: string })?.messageId ?? null,
-            relay: res,
+            relay: results.length === 1 ? res : results,
             // Explicit failure marker (pipeline convention #1) — emptiness alone is ambiguous.
             delivery_status: relayOk ? 'sent' : 'relay_failed',
           },
@@ -1162,7 +1325,7 @@ async function insertMessageAndNotify(
       // message bubble in the operator's thread and a cleared composer, while the customer
       // received nothing. The failure text sat in metadata.relay.error with no reader.
       if (!relayOk) {
-        const detail = String((res as { error?: unknown })?.error ?? 'WhatsApp relay failed');
+        const detail = firstFailure ?? String((res as { error?: unknown })?.error ?? 'WhatsApp relay failed');
         throw new HttpError(502, `Message stored but NOT delivered to WhatsApp: ${detail}`);
       }
     }
@@ -1172,10 +1335,12 @@ async function insertMessageAndNotify(
   // a comment thread (many commenters under one of our posts) or a 1:1 DM. Sending one down the
   // other's path would either post a private answer publicly under a post, or silently drop a
   // public reply into a DM nobody is in — both "succeed" at the API layer.
-  if (thread.channel === 'social' && (messageType === 'text' || messageType === 'agent') && body) {
+  if (thread.channel === 'social' && (messageType === 'text' || messageType === 'agent') && (body || cards.length)) {
     const meta = (thread.metadata as Json) || {};
     const accountId = String(meta.zernio_account_id || '');
     const kind = String(meta.social_kind || '');
+    // A social DM or comment has no card layout of its own: the cards go as lines under the text.
+    const socialText = [body, cards.length ? cardsToText(cards) : ''].filter(Boolean).join('\n\n');
     let res: { success?: boolean; messageId?: string; error?: string } = { success: false, error: 'unrouted' };
 
     if (!accountId) {
@@ -1198,11 +1363,11 @@ async function insertMessageAndNotify(
         .limit(1).maybeSingle();
       const commentId = (lastInbound?.metadata as Json | undefined)?.comment_id as string | undefined;
 
-      res = await sendSocialCommentReply({ accountId, postId, message: body, commentId });
+      res = await sendSocialCommentReply({ accountId, postId, message: socialText, commentId });
     } else {
       const participantId = String(meta.participant_id || '');
       if (!participantId) throw new HttpError(502, 'Message stored but NOT delivered: the thread has no recipient.');
-      res = await sendSocialDirectMessage({ accountId, participantId, message: body });
+      res = await sendSocialDirectMessage({ accountId, participantId, message: socialText });
     }
 
     const relayOk = !!res?.success;
@@ -1232,7 +1397,7 @@ async function insertMessageAndNotify(
   // own bubble, the composer clears — and the customer is never sent anything. Same failure the
   // WhatsApp branch above was fixed for, so it is built the same way: send, CHECK the result, and
   // fail loudly rather than leave a delivered-looking message that never left.
-  if (thread.channel === 'email' && (messageType === 'text' || messageType === 'agent') && body) {
+  if (thread.channel === 'email' && (messageType === 'text' || messageType === 'agent') && (body || cards.length)) {
     const meta = (thread.metadata as Json) || {};
     const toAddress = String(meta.email_from || '');
     const ourMailbox = String(meta.email_to || '');
@@ -1296,9 +1461,13 @@ async function insertMessageAndNotify(
             action: 'send',
             to: toAddress,
             subject,
-            // Plain text only: the body is a member's own words, and building an HTML string
-            // around untrusted content is how invariant 11 gets violated by accident.
-            text: body,
+            // Plain text unless there are cards: the body is a member's own words, and building
+            // an HTML string around untrusted content is how invariant 11 gets violated by
+            // accident. With cards the HTML is built by `buildEmailCardsHtml`, which runs every
+            // field — the member's text included — through the canonical escaper, and the text
+            // part lists the same cards so a text-only client loses nothing.
+            text: cards.length ? buildEmailCardsText(cards, body) : body,
+            ...(cards.length ? { html: buildEmailCardsHtml(cards, body) } : {}),
             replyTo: buildReplyToAddress(ourMailbox, threadId),
             headers,
             emailType: 'agent_reply',
@@ -1872,7 +2041,12 @@ async function handleJwtAction(
       }
       const body = payload.body != null ? String(payload.body) : null;
       const attachments = await normalizeAttachments(db, threadId, payload.attachments);
-      if (!body && attachments.length === 0) throw new HttpError(400, 'message body or attachment required');
+      // Catalog cards (`/product`, `/service` in the composer). Members only — a customer has no
+      // catalog to offer — and ids only: the card the customer sees is resolved server-side.
+      const cards = access.isMember ? await resolveInboxCards(db, thread, payload.cards) : [];
+      if (!body && attachments.length === 0 && cards.length === 0) {
+        throw new HttpError(400, 'message body, attachment or catalog card required');
+      }
       // WhatsApp: freeform replies only inside Meta's 24h service window. Notes (internal) exempt.
       if (thread.channel === 'whatsapp' && messageType !== 'note') {
         const w = await whatsappWindow(db, threadId, thread);
@@ -1919,6 +2093,7 @@ async function handleJwtAction(
         senderLabel: 'New message',
         replyToWamid,
         replyToMessageId: replyToWamid ? replyToId : undefined,
+        cards,
       });
       // Mark the sender as caught up.
       if (senderParticipantId) {
@@ -2935,7 +3110,37 @@ async function handleJwtAction(
           due_at: (i.due_at as string) || null,
         }));
 
-      return json({ contact: contact || null, company, quotes: quotes || [], projects: projects || [], invoices, metrics });
+      // Orders: the customer's SALES orders in this workspace, newest first. Settlement comes from
+      // `get_order_settlements` — the one derivation of "how much is still owed on an order" —
+      // never from `total − paid` re-done here.
+      const { data: ordRows } = await db
+        .from('orders')
+        .select('id, order_number, status, total, currency, created_at')
+        .eq('workspace_id', thread.workspace_id)
+        .eq('order_type', 'sales')
+        .or(invFilter.join(','))
+        .order('created_at', { ascending: false })
+        .limit(8);
+      const orderRows = (ordRows || []) as Array<Record<string, unknown>>;
+      const settlements = new Map<string, { outstanding: number; payment_status: string }>();
+      if (orderRows.length) {
+        const { data: st } = await db.rpc('get_order_settlements', { p_order_ids: orderRows.map((o) => String(o.id)) });
+        for (const s of (st || []) as Array<{ order_id: string; outstanding: number; payment_status: string }>) {
+          settlements.set(s.order_id, { outstanding: num(s.outstanding), payment_status: String(s.payment_status) });
+        }
+      }
+      const orders = orderRows.map((o) => ({
+        id: String(o.id),
+        order_number: (o.order_number as string | null) ?? null,
+        status: (o.status as string | null) ?? null,
+        payment_status: settlements.get(String(o.id))?.payment_status ?? null,
+        total: num(o.total),
+        outstanding: settlements.get(String(o.id))?.outstanding ?? null,
+        currency: (o.currency as string | null) ?? metrics.currency,
+        created_at: String(o.created_at),
+      }));
+
+      return json({ contact: contact || null, company, quotes: quotes || [], projects: projects || [], invoices, orders, metrics });
     }
 
     /*
@@ -3707,7 +3912,13 @@ async function handleJwtAction(
       // now a real JARVIS turn, agent-chat meters it against `userId` in `agent_usage_logs` and
       // refuses up front with a 402 when they cannot pay. Charging a fixed fee on top would bill
       // the same reply into two ledgers that then disagree.
-      const draft = await buildAgentDraft(db, thread, { userId, task: 'inbox_agent_suggest' });
+      // What the MEMBER wants the reply to do ("offer the oak decking", "say the order ships
+      // Monday"). Optional; trusted because it comes from the member's own JWT-authenticated
+      // request, and passed to agent-chat OUTSIDE the customer-data fence for that reason.
+      const instruction = typeof payload.instruction === 'string' ? payload.instruction.trim().slice(0, 1000) : '';
+      const draft = await buildAgentDraft(db, thread, {
+        userId, task: 'inbox_agent_suggest', operatorInstruction: instruction || undefined,
+      });
       if (!draft) {
         // An empty draft is either "the credit gate said no" or "the turn produced nothing". Both
         // leave the member exactly where they were, with nothing charged.
@@ -3937,6 +4148,62 @@ async function handleJwtAction(
       if (query.length < 2) return json({ candidates: [] });
       const match = await matchByText(db, String(thread.workspace_id), query);
       return json({ candidates: match.candidates });
+    }
+
+    /*
+     * search_catalog — the `/product` and `/service` pickers in the composer.
+     *
+     * Workspace-scoped through the THREAD, so the picker offers the catalog of the workspace the
+     * conversation belongs to and nothing else. The list price shown here is orientation for the
+     * member; the card that goes out is re-priced for the customer by `resolveInboxCards`, which
+     * is why nothing from this response is trusted back on `send_message` except the id.
+     */
+    case 'search_catalog': {
+      const threadId = String(payload.thread_id || '');
+      if (!threadId) throw new HttpError(400, 'thread_id is required');
+      const thread = await getThreadOrThrow(db, threadId);
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      assertThreadVisible(access);
+      if (!access.isMember) throw new HttpError(403, 'Only thread members may browse the catalog');
+      const workspaceId = String(thread.workspace_id);
+      const kind: InboxCardKind = payload.kind === 'service' ? 'service' : 'product';
+      // The query reaches a PostgREST filter grammar: strip the operator characters (`,` `.` `(`
+      // `)` `*`), same as the intake matcher — escapeHtml is not a filter sanitizer.
+      const q = String(payload.query || '').replace(/[^\p{L}\p{N}\s\-]/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
+
+      let query = db.from('products')
+        .select('id, name, sku, description, metadata, item_type')
+        .eq('workspace_id', workspaceId);
+      query = kind === 'service' ? query.eq('item_type', 'service') : query.neq('item_type', 'service');
+      if (q) query = query.or(`name.ilike.%${q}%,sku.ilike.%${q}%`);
+      const { data: rows, error: qErr } = await query.order('updated_at', { ascending: false }).limit(12);
+      if (qErr) throw new HttpError(500, `catalog search failed: ${qErr.message}`);
+
+      const ids = ((rows || []) as Array<{ id: string }>).map((r) => r.id);
+      const { data: prices } = ids.length
+        ? await db.from('product_prices').select('product_id, list_price, currency, unit')
+          .eq('workspace_id', workspaceId).in('product_id', ids)
+        : { data: [] as Array<Record<string, unknown>> };
+      const priceById = new Map(
+        ((prices || []) as Array<{ product_id: string; list_price: number | null; currency: string | null; unit: string | null }>)
+          .map((p) => [p.product_id, p]),
+      );
+      const items = ((rows || []) as Array<{ id: string; name: string; sku: string | null; description: string | null; metadata: unknown; item_type: string | null }>)
+        .map((r) => {
+          const pr = priceById.get(r.id);
+          return {
+            kind: r.item_type === 'service' ? 'service' : 'product',
+            product_id: r.id,
+            name: r.name,
+            sku: r.sku,
+            description: r.description ? String(r.description).slice(0, 160) : null,
+            image_url: safeCardUrl(imageFromMetadata(r.metadata)),
+            list_price: pr?.list_price ?? null,
+            currency: pr?.currency ?? null,
+            unit: pr?.unit ?? null,
+          };
+        });
+      return json({ items });
     }
 
     case 'approve_intake': {

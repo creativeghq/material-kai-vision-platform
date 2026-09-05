@@ -937,6 +937,14 @@ export async function sendWhatsAppReply(params: {
    * message and the customer has to guess which one it answers.
    */
   replyTo?: string;
+  /**
+   * Meta's `interactive` object, forwarded as-is (a `cta_url` card, a media carousel, a list).
+   * Built by `_shared/inbox-cards.ts`; a session message, so it is subject to the 24h window
+   * exactly like `message`. Takes priority over `message` at Zernio when both are set.
+   */
+  interactive?: Record<string, unknown>;
+  /** False to suppress the thumbnail WhatsApp renders for the first URL in `message`. */
+  linkPreview?: boolean;
 }): Promise<ZernioSendResult> {
   try {
     const body: Record<string, unknown> = { accountId: params.accountId };
@@ -946,6 +954,8 @@ export async function sendWhatsAppReply(params: {
       body.attachmentUrl = params.attachmentUrl;
       body.attachmentType = params.attachmentType || 'file';
     }
+    if (params.interactive) body.interactive = params.interactive;
+    if (params.linkPreview === false) body.linkPreview = false;
     const res = await zernioApi(
       'POST',
       `/inbox/conversations/${encodeURIComponent(params.conversationId)}/messages`,

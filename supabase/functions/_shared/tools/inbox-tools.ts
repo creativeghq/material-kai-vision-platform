@@ -3,6 +3,8 @@
  *
  * ONE tool, actions:
  *   - list     — recent customer conversations (optionally by status, or by label)
+ *   - read     — one conversation: its recent messages (fenced as customer DATA) plus who the
+ *                customer is and their orders, quotes and open invoices from the context rail
  *   - reply    — send a reply into a conversation (CONFIRM-gated: it's a real customer-facing message)
  *   - status   — set a thread open/snoozed/closed
  *   - handover — hand a thread to the AI assistant (agent_state=active) or take it back (off)
@@ -45,6 +47,7 @@ const MODULE_SLUG = 'inbox';
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
 import { describeUpstreamError } from '../tool-result-shape.ts';
+import { wrapUntrusted } from '../untrusted.ts';
 async function moduleReady(workspaceId: string): Promise<{ ok: boolean; error?: string }> {
   try {
     const sb = svcClient();
@@ -191,6 +194,54 @@ export const createManageInboxTool = (
         return JSON.stringify({ success: true, thread_id, labels: wanted, label_ids: resolved });
       }
 
+      if (action === 'read') {
+        // "What is this conversation about, and what is their order status?" — the transcript
+        // and the same customer context the Inbox rail shows, in one call. The customer's words
+        // are the other party's and go back to the model fenced as DATA (invariant 9); the
+        // context figures are ours and go back plain.
+        if (!thread_id) return JSON.stringify({ success: false, error: 'read needs thread_id.' });
+        const [t, c] = await Promise.all([
+          callInbox('get_thread', { thread_id }, jwt),
+          callInbox('get_thread_context', { thread_id }, jwt),
+        ]);
+        if (!t.ok) return JSON.stringify({ success: false, error: t.error || `inbox-api ${t.status}` });
+        const participants = (t.data?.participants ?? []) as Array<{ id: string; participant_type: string }>;
+        const kindOf = new Map(participants.map((p) => [p.id, p.participant_type]));
+        const messages = ((t.data?.messages ?? []) as Array<Record<string, unknown>>).slice(-30).map((m) => {
+          const from = m.message_type === 'agent' ? 'assistant'
+            : m.message_type === 'system' ? 'system'
+            : m.message_type === 'note' ? 'internal_note'
+            : (kindOf.get(String(m.sender_participant_id)) ?? 'unknown');
+          const cards = (m.metadata as { cards?: Array<{ name?: string }> } | null)?.cards;
+          return {
+            at: m.created_at,
+            from,
+            text: typeof m.body === 'string' && m.body
+              ? (from === 'customer' ? wrapUntrusted('customer message', m.body, 600) : m.body.slice(0, 600))
+              : null,
+            attachments: Array.isArray(m.attachments) ? m.attachments.length : 0,
+            ...(Array.isArray(cards) && cards.length ? { cards: cards.map((x) => x?.name).filter(Boolean) } : {}),
+          };
+        });
+        const th = (t.data?.thread ?? {}) as Record<string, unknown>;
+        return JSON.stringify({
+          success: true,
+          thread: {
+            id: th.id, subject: th.subject, channel: th.channel, status: th.status,
+            agent_state: th.agent_state, last_message_at: th.last_message_at,
+          },
+          customer: c.ok ? {
+            contact: c.data?.contact ?? null,
+            company: c.data?.company ?? null,
+            orders: c.data?.orders ?? [],
+            quotes: c.data?.quotes ?? [],
+            open_invoices: c.data?.invoices ?? [],
+            metrics: c.data?.metrics ?? null,
+          } : null,
+          messages,
+        });
+      }
+
       if (action === 'list') {
         // "Show me the conversations tagged Urgent" — the filter is applied SERVER-side by
         // `list_threads`, so it narrows the query rather than the 200 rows that came back.
@@ -253,7 +304,9 @@ export const createManageInboxTool = (
     {
       name: 'manage_inbox',
       description:
-        'Customer Inbox: list conversations (optionally filtered by label), reply, set status '
+        'Customer Inbox: list conversations (optionally filtered by label), read one (its recent '
+        + 'messages plus the customer\'s orders, quotes and open invoices — use this for "what is '
+        + 'this conversation about" or "what is their order status"), reply, set status '
         + '(close/reopen/snooze), hand a thread to/from the AI assistant, list the workspace labels, or '
         + 'set a thread\'s labels. Labels are referred to BY NAME — call action:"labels" first if you do '
         + 'not know what exists. A customer-facing reply ALWAYS asks the user to Approve/Decline first '
@@ -262,12 +315,12 @@ export const createManageInboxTool = (
         + 'CSV/XLSX attachment on a thread (a price list, an order sheet) with validated read-only SQL — '
         + 'the latest spreadsheet on the thread unless message_id names one.',
       schema: z.object({
-        action: z.enum(['list', 'reply', 'status', 'handover', 'labels', 'label', 'ask_spreadsheet']).default('list'),
+        action: z.enum(['list', 'read', 'reply', 'status', 'handover', 'labels', 'label', 'ask_spreadsheet']).default('list'),
         message_id: z.string().optional().describe('ask_spreadsheet: the message carrying the spreadsheet. Omit for the latest spreadsheet on the thread.'),
         attachment_index: z.number().int().optional().describe('ask_spreadsheet: which attachment on that message, 0-based. Omit for the first spreadsheet.'),
         question: z.string().optional().describe('ask_spreadsheet: the question, in plain language ("total per category", "which items cost over 50").'),
         status: z.string().optional().describe('list: filter by thread status. status action: open|snoozed|closed.'),
-        thread_id: z.string().optional().describe('the conversation id (reply/status/handover/label).'),
+        thread_id: z.string().optional().describe('the conversation id (read/reply/status/handover/label).'),
         body: z.string().optional().describe('reply: the message text.'),
         internal_note: z.boolean().optional().describe('reply: post as a private internal note instead of a customer-facing message (no confirmation).'),
         agent_state: z.enum(['off', 'active']).optional().describe('handover: active = hand the thread to the AI; off = take it back.'),
