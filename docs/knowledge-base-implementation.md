@@ -271,8 +271,11 @@ both together before adding an HNSW index.
 
 `agent_eval_cases` scores a whole agent turn; nothing scored the retriever, so "the retriever
 missed it" and "the model ignored it" were one failure. The golden set maps a question to the
-`kb_docs` that hold its answer (22 cases: real user questions, distinctive-term questions,
-paraphrases that avoid the term, and one Greek question over the English corpus).
+`kb_docs` that hold its answer (27 cases: real user questions, distinctive-term and acronym
+questions, paraphrases that avoid the term, and one Greek question over the English corpus).
+The scorer calls the RPC with its default similarity floor, the same 0.4 the agent path passes:
+at floor 0 the two modes looked identical, while in production two acronym questions returned
+no section at all in vector-only mode and rank 1 through the lexical channel.
 `POST /api/rag/kb-eval/run` (MIVAA; `x-cron-secret` or the service-role bearer) embeds each
 question once through `kb_query_vector` and calls `kb_retrieval_eval_score` for **both** modes,
 `vector` (the wrapper) and `hybrid`, so every batch is an A/B. It records the rank of the first
