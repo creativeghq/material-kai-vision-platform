@@ -4,7 +4,6 @@ import {
   FileText,
   FolderTree,
   Link2,
-  BarChart3,
   Brain,
   ExternalLink,
 } from 'lucide-react';
@@ -32,7 +31,6 @@ export const KnowledgeBaseManagement: React.FC = () => {
     totalDocs: 0,
     totalCategories: 0,
     totalAttachments: 0,
-    totalSearches: null as number | null,
   });
 
   const { toast } = useToast();
@@ -50,25 +48,16 @@ export const KnowledgeBaseManagement: React.FC = () => {
         { count: docsCount },
         { count: categoriesCount },
         { count: attachmentsCount },
-        { count: searchesCount },
       ] = await Promise.all([
         supabase.from('kb_docs').select('*', { count: 'exact', head: true }),
         supabase.from('kb_categories').select('*', { count: 'exact', head: true }),
         supabase.from('kb_doc_attachments').select('*', { count: 'exact', head: true }),
-        // `kb_search_analytics` has NO PRODUCER — nothing in the platform writes a KB search.
-        // The count is therefore 0 forever, which reads as "nobody searches the KB" rather than
-        // "KB search is not instrumented". It is NOT repointed at `search_query_tracking`: that
-        // table records only the material multi_vector path, so borrowing it would report
-        // material searches as KB searches, which is worse than reporting nothing.
-        supabase.from('kb_search_analytics').select('*', { count: 'exact', head: true }),
       ]);
 
       setStats({
         totalDocs: docsCount || 0,
         totalCategories: categoriesCount || 0,
         totalAttachments: attachmentsCount || 0,
-        // null, not 0 — see the query above. Rendered as "not tracked".
-        totalSearches: searchesCount || null,
       });
     } catch (error) {
       console.error('Failed to load stats:', error);
@@ -117,7 +106,7 @@ export const KnowledgeBaseManagement: React.FC = () => {
 
       <div className="p-3 sm:p-6 space-y-6">
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <div className="dashboard-card rounded-2xl border-0 shadow-sm p-4">
             <div className="flex items-center gap-3">
               <div className="flex items-center justify-center flex-shrink-0 w-10 h-10 rounded-xl bg-primary/10">
@@ -150,24 +139,6 @@ export const KnowledgeBaseManagement: React.FC = () => {
               <div>
                 <p className="text-xs text-muted-foreground">Product Links</p>
                 <p className="text-lg font-semibold">{isLoading ? '—' : stats.totalAttachments}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center flex-shrink-0 w-10 h-10 rounded-xl bg-primary/10">
-                <BarChart3 className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Total Searches</p>
-                <p className="text-lg font-semibold">
-                  {isLoading ? '—' : (stats.totalSearches ?? (
-                    <span className="text-sm font-normal text-muted-foreground" title="No producer writes kb_search_analytics">
-                      not tracked
-                    </span>
-                  ))}
-                </p>
               </div>
             </div>
           </div>

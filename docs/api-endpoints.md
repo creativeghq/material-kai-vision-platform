@@ -235,7 +235,8 @@ The response includes `status`, `timestamp`, per-service health details with res
 **Database Operations:**
 - Generate query embedding (1024D, Voyage AI)
 - Vector similarity search using `<=>` operator
-- Track search in `kb_search_analytics`
+- No per-search analytics row is written. `kb_search_analytics` was dropped 2026-09-05: it never had a
+  producer. Agent KB searches are logged in `agent_tool_call_logs`.
 
 ---
 

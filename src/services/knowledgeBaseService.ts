@@ -130,7 +130,8 @@ export interface KBAttachment {
 export interface KBSearchRequest {
   workspace_id: string;
   query: string;
-  search_type?: 'semantic' | 'full_text' | 'hybrid';
+  /** 'hybrid' was removed 2026-09-05: the endpoint never fused the two passes and now refuses it with 400. */
+  search_type?: 'semantic' | 'full_text';
   category_id?: string;
   limit?: number;
   offset?: number;

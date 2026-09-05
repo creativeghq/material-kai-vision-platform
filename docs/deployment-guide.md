@@ -1321,7 +1321,7 @@ Storage buckets cleared: `pdf-extracted-images`, `generated-images`, `vr-worlds`
 - `user_credits`, `credit_transactions`, `credit_packages` — billing
 - `prompts`, `extraction_prompts` — AI configuration
 - `prompt_history` — **trimmed** to the 5 most recent rows per `prompt_id` (audit trail kept, bloat dropped)
-- `kb_docs`, `kb_categories`, `kb_doc_attachments`, `kb_search_analytics` — Knowledge Base
+- `kb_docs`, `kb_categories`, `kb_doc_attachments` — Knowledge Base
 - `crm_companies`, `crm_contacts`, `crm_contact_relationships`, `crm_company_contacts` — CRM
 - `flows`, `background_agents`, `roles`, `role_permissions`, `ai_model_pricing`, `subscription_plans`, `webhook_endpoints` — admin config
 - `system_settings`, `upsells`, `timeline_steps` — global config

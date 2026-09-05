@@ -36,7 +36,7 @@ const RESET_CONFIRM_PHRASE = 'RESET PLATFORM';
 //   - ai_model_pricing         ← pricing reference data
 //   - subscription_plans       ← billing plans
 //   - webhook_endpoints        ← configured webhook URLs
-//   - kb_categories / kb_doc_attachments / kb_search_analytics
+//   - kb_categories / kb_doc_attachments
 //                              ← KB categories preserved in full
 //   - kb_docs                  ← Knowledge Base docs — preserved EXCEPT unprotected
 //                                (public/unlocked/non-auto-synced) docs, which are
@@ -235,12 +235,10 @@ const TABLES_TO_CLEAR = [
 
   // ── Search caches & derived search state (direct hallucination risk)
   'saved_searches',                // User saved searches
-  'search_analytics',              // Search analytics events
   'search_query_corrections',      // Derived query corrections
   'search_query_tracking',         // Per-query tracking
   'search_suggestion_clicks',      // Suggestion click tracking
   'search_suggestions',            // Derived autocomplete suggestions
-  'trending_searches',             // Trending terms
   'unmatched_term_frequency',      // Unknown term frequency
   // query_understanding_cache (no `id` column) is TRUNCATEd via reset_truncate_heavy() — STEP 3.
   'duplicate_detection_cache',     // Cached duplicate detection

@@ -13646,60 +13646,6 @@ export type Database = {
           },
         ]
       }
-      kb_search_analytics: {
-        Row: {
-          click_position: number | null
-          clicked_document_id: string | null
-          created_at: string | null
-          id: string
-          query: string
-          results_count: number | null
-          search_time_ms: number | null
-          search_type: string | null
-          user_id: string | null
-          workspace_id: string
-        }
-        Insert: {
-          click_position?: number | null
-          clicked_document_id?: string | null
-          created_at?: string | null
-          id?: string
-          query: string
-          results_count?: number | null
-          search_time_ms?: number | null
-          search_type?: string | null
-          user_id?: string | null
-          workspace_id: string
-        }
-        Update: {
-          click_position?: number | null
-          clicked_document_id?: string | null
-          created_at?: string | null
-          id?: string
-          query?: string
-          results_count?: number | null
-          search_time_ms?: number | null
-          search_type?: string | null
-          user_id?: string | null
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "kb_search_analytics_clicked_document_id_fkey"
-            columns: ["clicked_document_id"]
-            isOneToOne: false
-            referencedRelation: "kb_docs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "kb_search_analytics_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       llm_mention_probes: {
         Row: {
           competitors_mentioned: string[] | null
@@ -27092,126 +27038,6 @@ export type Database = {
           },
         ]
       }
-      search_analytics: {
-        Row: {
-          added_to_moodboard: boolean | null
-          avg_relevance_score: number | null
-          clicks_count: number | null
-          conversation_id: string | null
-          created_at: string
-          detected_categories: Json | null
-          extracted_entities: Json | null
-          follow_up_queries: string[] | null
-          generation_3d_id: string | null
-          id: string
-          material_filters_applied: Json | null
-          material_mentions: Json | null
-          moodboard_id: string | null
-          personalization_applied: boolean | null
-          query_embedding: unknown
-          query_processing_time_ms: number | null
-          query_text: string
-          refinements_count: number | null
-          response_time_ms: number | null
-          results_shown: number | null
-          satisfaction_rating: number | null
-          saved_search: boolean | null
-          search_intent: string | null
-          search_strategy: string | null
-          session_id: string | null
-          time_on_results: number | null
-          total_results: number | null
-          used_in_3d_generation: boolean | null
-          user_behavior_factors: Json | null
-          user_country: string | null
-          user_id: string | null
-          user_language: string | null
-        }
-        Insert: {
-          added_to_moodboard?: boolean | null
-          avg_relevance_score?: number | null
-          clicks_count?: number | null
-          conversation_id?: string | null
-          created_at?: string
-          detected_categories?: Json | null
-          extracted_entities?: Json | null
-          follow_up_queries?: string[] | null
-          generation_3d_id?: string | null
-          id?: string
-          material_filters_applied?: Json | null
-          material_mentions?: Json | null
-          moodboard_id?: string | null
-          personalization_applied?: boolean | null
-          query_embedding?: unknown
-          query_processing_time_ms?: number | null
-          query_text: string
-          refinements_count?: number | null
-          response_time_ms?: number | null
-          results_shown?: number | null
-          satisfaction_rating?: number | null
-          saved_search?: boolean | null
-          search_intent?: string | null
-          search_strategy?: string | null
-          session_id?: string | null
-          time_on_results?: number | null
-          total_results?: number | null
-          used_in_3d_generation?: boolean | null
-          user_behavior_factors?: Json | null
-          user_country?: string | null
-          user_id?: string | null
-          user_language?: string | null
-        }
-        Update: {
-          added_to_moodboard?: boolean | null
-          avg_relevance_score?: number | null
-          clicks_count?: number | null
-          conversation_id?: string | null
-          created_at?: string
-          detected_categories?: Json | null
-          extracted_entities?: Json | null
-          follow_up_queries?: string[] | null
-          generation_3d_id?: string | null
-          id?: string
-          material_filters_applied?: Json | null
-          material_mentions?: Json | null
-          moodboard_id?: string | null
-          personalization_applied?: boolean | null
-          query_embedding?: unknown
-          query_processing_time_ms?: number | null
-          query_text?: string
-          refinements_count?: number | null
-          response_time_ms?: number | null
-          results_shown?: number | null
-          satisfaction_rating?: number | null
-          saved_search?: boolean | null
-          search_intent?: string | null
-          search_strategy?: string | null
-          session_id?: string | null
-          time_on_results?: number | null
-          total_results?: number | null
-          used_in_3d_generation?: boolean | null
-          user_behavior_factors?: Json | null
-          user_country?: string | null
-          user_id?: string | null
-          user_language?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "search_analytics_conversation_id_fkey"
-            columns: ["conversation_id"]
-            isOneToOne: false
-            referencedRelation: "agent_chat_conversations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "search_analytics_moodboard_id_fkey"
-            columns: ["moodboard_id"]
-            isOneToOne: false
-            referencedRelation: "moodboards"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       search_query_corrections: {
         Row: {
           acceptance_rate: number | null
@@ -30686,54 +30512,6 @@ export type Database = {
           },
         ]
       }
-      trending_searches: {
-        Row: {
-          category: string | null
-          created_at: string | null
-          growth_rate: number | null
-          id: string
-          metadata: Json | null
-          query_text: string
-          search_count: number | null
-          time_window: string
-          trend_score: number | null
-          unique_users_count: number | null
-          updated_at: string | null
-          window_end: string
-          window_start: string
-        }
-        Insert: {
-          category?: string | null
-          created_at?: string | null
-          growth_rate?: number | null
-          id?: string
-          metadata?: Json | null
-          query_text: string
-          search_count?: number | null
-          time_window: string
-          trend_score?: number | null
-          unique_users_count?: number | null
-          updated_at?: string | null
-          window_end: string
-          window_start: string
-        }
-        Update: {
-          category?: string | null
-          created_at?: string | null
-          growth_rate?: number | null
-          id?: string
-          metadata?: Json | null
-          query_text?: string
-          search_count?: number | null
-          time_window?: string
-          trend_score?: number | null
-          unique_users_count?: number | null
-          updated_at?: string | null
-          window_end?: string
-          window_start?: string
-        }
-        Relationships: []
-      }
       trip_expense_items: {
         Row: {
           amount: number
@@ -34064,21 +33842,6 @@ export type Database = {
           },
         ]
       }
-      material_demand_analytics: {
-        Row: {
-          avg_confidence: number | null
-          first_requested: string | null
-          last_requested: string | null
-          material_category: string | null
-          material_name: string | null
-          mention_count: number | null
-          times_added_to_moodboard: number | null
-          times_saved: number | null
-          times_used_in_3d: number | null
-          unique_users_requesting: number | null
-        }
-        Relationships: []
-      }
       pipeline_errors: {
         Row: {
           context: Json | null
@@ -34095,13 +33858,10 @@ export type Database = {
       }
       popular_searches: {
         Row: {
-          all_material_mentions: Json | null
           avg_results: number | null
           last_searched: string | null
           query_text: string | null
           search_count: number | null
-          times_added_to_moodboard: number | null
-          times_saved: number | null
           unique_users: number | null
         }
         Relationships: []
@@ -35011,16 +34771,6 @@ export type Database = {
           last_exec: string
         }
         Returns: number
-      }
-      calculate_trending_searches: {
-        Args: { p_limit?: number; p_time_window?: string }
-        Returns: {
-          growth_rate: number
-          query_text: string
-          search_count: number
-          trend_score: number
-          unique_users: number
-        }[]
       }
       campaign_materialize_recipients: {
         Args: { p_campaign_id: string }
@@ -36901,16 +36651,6 @@ export type Database = {
           workspace_id: string
         }[]
       }
-      get_popular_searches: {
-        Args: { p_days?: number; p_limit?: number; p_query_filter?: string }
-        Returns: {
-          avg_results: number
-          last_searched: string
-          query_text: string
-          search_count: number
-          unique_users: number
-        }[]
-      }
       get_product_categories: {
         Args: { p_workspace_id: string }
         Returns: {
@@ -38725,7 +38465,6 @@ export type Database = {
       recover_stale_jobs: { Args: never; Returns: number }
       redeem_workspace_invite: { Args: { p_code: string }; Returns: Json }
       redeem_workspace_referral: { Args: { p_code: string }; Returns: Json }
-      refresh_search_analytics_views: { Args: never; Returns: undefined }
       refresh_three_way_match: {
         Args: { p_order_id: string }
         Returns: undefined

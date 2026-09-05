@@ -8,7 +8,7 @@ The Knowledge Base & Documentation System provides a comprehensive solution for 
 
 ## Database Schema
 
-### Tables Created (6 total)
+### Tables Created (5 total)
 
 1. **`kb_docs`** - Main documents table
    - Embeddings support (1024D vector with ivfflat index)
@@ -44,13 +44,6 @@ The Knowledge Base & Documentation System provides a comprehensive solution for 
    - @mentions support (mentioned_users array)
    - Status tracking (open, resolved, archived)
    - Workspace isolation
-
-6. **`kb_search_analytics`** - Search tracking
-   - Query tracking with search type
-   - Click tracking (which document was clicked)
-   - Performance metrics (search_time_ms)
-   - Immutable (no updates, only inserts)
-   - User tracking
 
 ### Indexes Created
 
@@ -115,13 +108,15 @@ The Knowledge Base & Documentation System provides a comprehensive solution for 
    - **Full-Text Search:** ILIKE-based keyword matching
      - Searches title and content fields
      - Case-insensitive matching
-   - **Hybrid Search:** Combination of semantic + full-text
-     - Weighted scoring for best results
+   - **Hybrid:** not offered here. `kb_search_docs` never read `search_type`, so "hybrid" was the
+     ILIKE branch under another name; the endpoint refuses it with 400 since 2026-09-05. The admin
+     `SearchInterface` fuses `kb_keyword_search` + semantic client-side; the agent path fuses in SQL
+     (see `kb_hybrid_doc_chunks` below).
    - Category filtering (optional)
    - Pagination support (default: 20 results)
    - Returns: Results with search time metrics (ms)
 
-   The request body takes `workspace_id`, `query`, `search_type` (semantic, full_text, or hybrid), and optional `limit`. Additional filters added 2026-04: `category_id`, `category_slug` (e.g. `"pricing"`), `price_doc_type` (`price_list | discount_rule | contract_terms | promotion`), `allowed_access_levels`, `require_published` (default `false` for admin management). The response includes `results` with `category_slug`, `category_name`, `price_doc_type`, and `similarity`, plus `search_time_ms` and `total_results`.
+   The request body takes `workspace_id`, `query`, `search_type` (semantic or full_text), and optional `limit`. Additional filters added 2026-04: `category_id`, `category_slug` (e.g. `"pricing"`), `price_doc_type` (`price_list | discount_rule | contract_terms | promotion`), `allowed_access_levels`, `require_published` (default `false` for admin management). The response includes `results` with `category_slug`, `category_name`, `price_doc_type`, and `similarity`, plus `search_time_ms` and `total_results`.
 
    **Architecture:**
    - Frontend → MIVAA API `/api/kb/search`
@@ -242,14 +237,59 @@ The chunker is **boundary-aware** (splits on section/heading boundaries) and
 coverage-invariant — the concatenation of chunks reproduces the full document, so no content
 is dropped.
 
-### `kb_match_doc_chunks` RPC
+### `kb_hybrid_doc_chunks` RPC — retrieval for the agent (2026-09)
 
-Retrieval calls the `kb_match_doc_chunks(query_embedding, match_workspace_id, match_threshold,
-match_count, allowed_access_levels, match_category_id, match_category_slug,
-match_price_doc_type, require_published, include_private, match_agent_id)` RPC, which performs
-pgvector cosine similarity over `kb_doc_chunks.text_embedding` and returns the best-matching
-**sections** (with their `kb_doc_id`, heading, and similarity) rather than whole documents.
-This replaces the whole-doc match + truncation path for agent retrieval.
+The agent's `kb_docs` branch of `POST /api/rag/search/knowledge-base` calls
+`kb_hybrid_doc_chunks(query_embedding, query_text, match_workspace_id, …)`. It runs **two
+channels over one gated candidate set** and fuses them by rank position:
+
+- **Vector**: cosine over `kb_doc_chunks.text_embedding`, top-N by distance FIRST, the
+  similarity floor applied AFTER the ordered limit (a floor inside the scan is what defeats
+  an HNSW index and returns fewer than N rows).
+- **Lexical**: `kb_doc_chunks.content_tsv`, a generated tsvector of English stems (heading
+  weighted A, body B) plus Greek stems of the Greek words only (C), GIN-indexed. The query
+  side mirrors it: `websearch_to_tsquery('english', q) || websearch_to_tsquery('greek', greek_only(q))`.
+  Latin text never reaches the Greek configuration: it has no English stop-word list, and
+  "the and of" matched ten sections through it before that rule.
+- **Fusion**: Reciprocal Rank Fusion, `1/(60 + rank)` per channel. Never a cosine added to a
+  `ts_rank`; they are not on one scale. Every row carries `similarity` (exact, for lexical-only
+  hits too), `vector_rank`, `lexical_rank` and `rrf_score`, and the endpoint ships per-channel
+  counts in `search_metadata.kb_channels`, so a dead channel is visible from one call.
+
+**The gate is written once.** Workspace, shared operator workspace, published, private,
+category `access_level` and per-doc `allowed_agents` all live in the `eligible` CTE of this one
+function. `kb_match_doc_chunks(...)` keeps its 13-column signature as a wrapper with
+`query_text = NULL` (lexical channel off), so `kb_read_doc_section` and older callers are
+unchanged and there is no second copy to drift. The Haiku reranker in `_shared/rerank.ts` sits
+downstream in the edge tool and reorders the fused candidates.
+
+`kb_doc_chunks` has **no vector index**: 9.8k sections scan exactly in milliseconds, and the
+materialised `eligible` set is the right shape for a per-workspace corpus of this size. Revisit
+both together before adding an HNSW index.
+
+### Retrieval evaluation — `kb_retrieval_eval_cases`
+
+`agent_eval_cases` scores a whole agent turn; nothing scored the retriever, so "the retriever
+missed it" and "the model ignored it" were one failure. The golden set maps a question to the
+`kb_docs` that hold its answer (22 cases: real user questions, distinctive-term questions,
+paraphrases that avoid the term, and one Greek question over the English corpus).
+`POST /api/rag/kb-eval/run` (MIVAA; `x-cron-secret` or the service-role bearer) embeds each
+question once through `kb_query_vector` and calls `kb_retrieval_eval_score` for **both** modes,
+`vector` (the wrapper) and `hybrid`, so every batch is an A/B. It records the rank of the first
+expected document among distinct documents; `kb_retrieval_eval_summary(batch_id)` derives
+recall@5 and MRR in SQL. The nightly `kb.retrieval_recall` probe fires when the set has not run
+in 14 days, when a question finds its document in no mode, or when hybrid recall@5 falls below
+vector-only.
+
+```sh
+# from the MIVAA host (the only place CRON_SECRET lives)
+curl -s -X POST "$MIVAA_URL/api/rag/kb-eval/run" -H "x-cron-secret: $CRON_SECRET" \
+  -H "Content-Type: application/json" -d "{}"
+```
+
+```sql
+select * from kb_retrieval_eval_summary();   -- latest batch, one row per mode
+```
 
 ### On-write auto-rechunk
 
@@ -303,13 +343,13 @@ Success responses include document fields such as `id`, `workspace_id`, `title`,
 
 ## 📈 Metrics
 
-- **Database Tables:** 6 created
+- **Database Tables:** 5 created
 - **API Endpoints:** 15+ created
 - **Indexes:** 15+ created
 - **RLS Policies:** 24 created
 - **Lines of Code:** 605 (backend API)
 - **Embedding Dimension:** 1024D
-- **Search Types:** 3 (semantic, full-text, hybrid)
+- **Search Types:** 2 (semantic, full-text)
 - **Relationship Types:** 5 (primary, supplementary, related, certification, specification)
 
 ---
@@ -358,7 +398,7 @@ Success responses include document fields such as `id`, `workspace_id`, `title`,
    - Edit and delete actions
 
 5. **`SearchInterface.tsx`** - Semantic search
-   - Search type selector (semantic, full-text, hybrid)
+   - Keyword pass (`kb_keyword_search`) + semantic pass, merged client-side
    - Real-time search with performance metrics
    - Results display with similarity scores
    - AI indexed badge for documents with embeddings
@@ -412,7 +452,7 @@ Success responses include document fields such as `id`, `workspace_id`, `title`,
 
 ## System Metrics
 
-- **Database Tables:** 6 created
+- **Database Tables:** 5 created
 - **API Endpoints:** 15+ created
 - **Frontend Components:** 6 created
 - **Service Layer:** 1 service with 13 methods
@@ -420,5 +460,5 @@ Success responses include document fields such as `id`, `workspace_id`, `title`,
 - **RLS Policies:** 24 created
 - **Lines of Code:** 605 (backend) + 1,200+ (frontend)
 - **Embedding Dimension:** 1024D
-- **Search Types:** 3 (semantic, full-text, hybrid)
+- **Search Types:** 2 (semantic, full-text)
 - **Relationship Types:** 5 (primary, supplementary, related, certification, specification)
