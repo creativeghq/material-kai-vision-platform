@@ -45,7 +45,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { FilterBar, useFilters } from '@/components/core/filters';
 import { buildInboxFilters } from './inboxFilters';
 import {
-  channelForSource, inboxRequestedServices, inboxSourceKey, inboxSourceMeta, inboxThreadSource,
+  channelForSource, inboxHireOrder, inboxRequestedServices, inboxSourceKey, inboxSourceMeta, inboxThreadSource,
   SOURCE_FILTER_ORDER, type InboxSource, type InboxSourceKey,
 } from './inboxSource';
 import { formatDate, formatTime } from '@/utils/datetime';
@@ -3974,6 +3974,7 @@ const DetailsRail: React.FC<{
   const metrics = context?.metrics ?? null;
   const invoices = context?.invoices ?? [];
   const requestedServices = inboxRequestedServices(thread);
+  const hireOrder = inboxHireOrder(thread);
 
   // Information block: who's handling it + status (real data, no fabricated priority/response-rate).
   const agentActive = thread.agent_state === 'active';
@@ -4242,6 +4243,16 @@ const DetailsRail: React.FC<{
           </span>
         </div>
         <Row icon={<Hash className="w-3.5 h-3.5" />}><span className="capitalize">{thread.status}</span></Row>
+        {/* A priced hire opened a sales order with a draft pre-invoice; the same pay link the
+            visitor got, so the member can hand it over again instead of asking Finance. */}
+        {hireOrder && (
+          <Row icon={<FileText className="w-3.5 h-3.5" />}>
+            <span>
+              Order {hireOrder.internal_number} · <span className="tabular-nums">{money(hireOrder.total, hireOrder.currency)}</span> ·{' '}
+              <a href={`/pay/${hireOrder.pay_token}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">pay link</a>
+            </span>
+          </Row>
+        )}
         {/* The one thing a public-profile enquiry carries that no channel does: which services
             the visitor ticked. It used to be the only reason the separate profile inbox existed. */}
         {requestedServices.length > 0 && (

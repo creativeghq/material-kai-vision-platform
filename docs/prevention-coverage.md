@@ -602,6 +602,28 @@ that column is precisely the one that can be missing.
 - **The SQL half is invisible to both.** `pos_issue_receipt`'s token, `issue_credit_note`'s cumulative cap and the `hr_time_punches` sequence trigger live in `pg_proc`, where no repo-file test can see them; they are asserted in [tests/integration/fiscal-derivations.test.ts](../tests/integration/fiscal-derivations.test.ts) and were verified against the live database with rolled-back fixtures.
 - **Blind spot:** both guards are per-file and per-finding. The shape is available to every "create then stamp" pair in the codebase, and neither test would notice a NEW one. The cheap search is a `await` that writes, followed by another `await` that writes, inside one `try` whose `catch` shows a single generic toast.
 
+### 19. Paid but never issued — a status column that a trigger writes for a document nobody numbered
+
+The storefront receipt and the quote pre-invoice are born `status='draft'` with a pay token. When
+the customer paid, `recordInvoicePayment` booked the money and inserted the allocation, and
+`_recompute_invoice_status_after_allocation` moved the row to `paid`. Nothing issued it: no legal
+number, no `issued_at`, no myDATA submission — a `paid` retail receipt that legally did not exist,
+while the customer held a payment confirmation. **Why nothing catches it:** `paid` is a valid
+status and every write in the chain is checked. The trigger does exactly what it says; the defect
+is that "settled" and "issued" are two facts and only one of them had a writer on this path.
+
+The same audit found the services behind those receipts stored TWICE — a jsonb blob on
+`user_profiles` with a free-text price (what the public profile and the Hire form read) and
+`products(item_type='service')` + `product_prices` (what the invoice picker and myDATA read) —
+with no link between them, so a hire could never become a document at all. Both stores were empty
+in production, which is why the split had never been observed.
+
+- **Fix:** `issue_invoice_on_online_payment` runs in `record-payment.ts` BEFORE the allocation, for every provider, only on a draft settled in FULL; it re-derives the document type from buyer + lines (`derive_invoice_document_type`), stamps the payment method by name, numbers through `_mark_invoice_issued_core` (the core `mark_invoice_issued` now wraps) and transmits through `finance-issue-invoice` as the service role, which bills the workspace via `resolveBillingUser` rather than transmitting free. Services: one store, listed on a profile by `products.profile_user_id`; a hire of priced listed services opens an order + pre-invoice through `create_service_order_from_profile` → `_generate_invoice_from_order_core` (the ONE order→invoice writer; `generate_invoice_from_order` is its auth wrapper).
+- **Guarded by:** [tests/unit/profileServicesSingleSource.test.ts](../tests/unit/profileServicesSingleSource.test.ts) — asserts the issue-before-allocate ORDER, the full-settlement condition, the named payment code, that no file reads the dropped `services_detail`, and that a hire resolves ids against `profile_user_id`.
+- **Probe:** `finance.paid_draft_never_issued` (`dic_detect__finance_paid_draft_never_issued`) — a `paid` invoice with `issued_at IS NULL`, registered in `data_integrity_checks` and run nightly. Zero rows today because no storefront sale has ever completed; the probe exists for the first one.
+- **Proven to fire (SQL):** 2026-09-05 — a rolled-back DO-block probe created a listed service, called `create_service_order_from_profile` (2 × €80 → €198.40, type 11.2) and then `issue_invoice_on_online_payment`, which returned `issued: true` with a legal number, and the profile cache trigger had rewritten `user_profiles.services`.
+- **Blind spot:** the SQL half (the RPC bodies, the trigger, the probe) lives in `pg_proc` and no repo-file test can see it; `lint_plpgsql_errors()` and the rolled-back probe are the evidence. A NEW payment path that writes `payment_allocations` without going through `recordInvoicePayment` (a bank-feed match, a manual "record payment" dialog) reintroduces the shape — the probe catches the outcome, nothing catches the code.
+
 ### 19. One rule, two shared helpers, and the wrong one is imported
 
 `_shared/client-ip.ts` says never key a rate limit on the leftmost `x-forwarded-for` hop, because

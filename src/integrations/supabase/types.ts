@@ -20316,6 +20316,7 @@ export type Database = {
           numeric_specs: Json | null
           prices_include_vat: boolean
           product_url: string | null
+          profile_user_id: string | null
           properties: Json | null
           quality_assessment: string | null
           quality_metrics: Json | null
@@ -20400,6 +20401,7 @@ export type Database = {
           numeric_specs?: Json | null
           prices_include_vat?: boolean
           product_url?: string | null
+          profile_user_id?: string | null
           properties?: Json | null
           quality_assessment?: string | null
           quality_metrics?: Json | null
@@ -20484,6 +20486,7 @@ export type Database = {
           numeric_specs?: Json | null
           prices_include_vat?: boolean
           product_url?: string | null
+          profile_user_id?: string | null
           properties?: Json | null
           quality_assessment?: string | null
           quality_metrics?: Json | null
@@ -31349,7 +31352,6 @@ export type Database = {
           profile_views: number | null
           role_id: string
           services: string[] | null
-          services_detail: Json | null
           show_listings: boolean
           skill_tags: string[] | null
           status: string | null
@@ -31396,7 +31398,6 @@ export type Database = {
           profile_views?: number | null
           role_id: string
           services?: string[] | null
-          services_detail?: Json | null
           show_listings?: boolean
           skill_tags?: string[] | null
           status?: string | null
@@ -31443,7 +31444,6 @@ export type Database = {
           profile_views?: number | null
           role_id?: string
           services?: string[] | null
-          services_detail?: Json | null
           show_listings?: boolean
           skill_tags?: string[] | null
           status?: string | null
@@ -35256,6 +35256,18 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_service_order_from_profile: {
+        Args: {
+          p_customer_company_id: string
+          p_customer_contact_id: string
+          p_lines: Json
+          p_notes: string
+          p_profile_user_id: string
+          p_thread_id: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
       create_simple_flow: {
         Args: {
           p_actions?: Json
@@ -36361,6 +36373,7 @@ export type Database = {
           numeric_specs: Json | null
           prices_include_vat: boolean
           product_url: string | null
+          profile_user_id: string | null
           properties: Json | null
           quality_assessment: string | null
           quality_metrics: Json | null
@@ -37032,6 +37045,20 @@ export type Database = {
       }
       get_query_cache_stats: { Args: never; Returns: Json }
       get_quote_expiration_days: { Args: never; Returns: number }
+      get_public_profile_services: {
+        Args: { p_user_id: string }
+        Returns: {
+          currency: string
+          description: string | null
+          id: string
+          list_price: number | null
+          name: string
+          previous_work: Json
+          unit: string | null
+          vat_category: number | null
+          workspace_id: string
+        }[]
+      }
       get_quote_totals: {
         Args: { p_quote_ids: string[] }
         Returns: {
@@ -37597,6 +37624,10 @@ export type Database = {
       issue_invoice_from_quote: {
         Args: { p_quote_id: string }
         Returns: string
+      }
+      issue_invoice_on_online_payment: {
+        Args: { p_invoice_id: string; p_payment_method_code: number }
+        Returns: Json
       }
       issue_supplier_credit_note: {
         Args: {
@@ -39393,6 +39424,10 @@ export type Database = {
         Returns: undefined
       }
       set_project_baseline: { Args: { p_project_id: string; p_note?: string }; Returns: number }
+      set_profile_service_listing: {
+        Args: { p_listed: boolean; p_product_id: string }
+        Returns: undefined
+      }
       set_quote_public_share: {
         Args: { p_enabled: boolean; p_quote_id: string }
         Returns: {
@@ -39830,6 +39865,19 @@ export type Database = {
           p_product_id?: string
           p_sku: string
           p_source_workspace_id?: string
+        }
+        Returns: string
+      }
+      upsert_profile_service: {
+        Args: {
+          p_currency: string
+          p_description: string
+          p_name: string
+          p_previous_work: Json
+          p_price: number
+          p_product_id: string
+          p_unit: string
+          p_workspace_id: string
         }
         Returns: string
       }

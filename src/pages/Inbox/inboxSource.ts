@@ -240,3 +240,32 @@ export function inboxRequestedServices(t: Pick<InboxThread, 'metadata'>): string
   const raw = (t.metadata as Record<string, unknown> | null)?.services_requested;
   return Array.isArray(raw) ? raw.filter((s): s is string => typeof s === 'string' && s.length > 0) : [];
 }
+
+/**
+ * The sales order a PRICED hire opened from the public form (inbox-api `profile_contact`
+ * stamps `metadata.hire_order`). Carries the pay token so the rail can hand the customer the
+ * same link again; the amount is the pre-invoice's total, VAT included.
+ */
+export interface InboxHireOrder {
+  order_id: string;
+  invoice_id: string;
+  internal_number: string;
+  total: number;
+  currency: string;
+  pay_token: string;
+  document_type: string | null;
+}
+
+export function inboxHireOrder(t: Pick<InboxThread, 'metadata'>): InboxHireOrder | null {
+  const raw = (t.metadata as Record<string, unknown> | null)?.hire_order as Record<string, unknown> | undefined;
+  if (!raw || typeof raw.order_id !== 'string' || typeof raw.pay_token !== 'string') return null;
+  return {
+    order_id: raw.order_id,
+    invoice_id: typeof raw.invoice_id === 'string' ? raw.invoice_id : '',
+    internal_number: typeof raw.internal_number === 'string' ? raw.internal_number : '',
+    total: Number(raw.total ?? 0),
+    currency: typeof raw.currency === 'string' && raw.currency ? raw.currency : 'EUR',
+    pay_token: raw.pay_token,
+    document_type: typeof raw.document_type === 'string' ? raw.document_type : null,
+  };
+}

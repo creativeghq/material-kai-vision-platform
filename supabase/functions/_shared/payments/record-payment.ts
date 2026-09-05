@@ -20,6 +20,8 @@
 
 import { emitFlowEvent } from '../flow-events.ts';
 import { runInBackground as sharedRunInBackground } from '../background.ts';
+import { emitDocumentIssued } from '../fiscal/document-issued.ts';
+import { MYDATA_PAYMENT_CODE } from '../paymentVocabulary.generated.ts';
 
 export type PaymentMethod = 'card' | 'bank_transfer' | 'cash' | 'check' | 'other';
 
@@ -58,6 +60,14 @@ export interface RecordResult {
   allocated?: number;
   unallocated?: number;
   error?: string;
+  /**
+   * Set when the invoice was a DRAFT and this payment settled it in full: the document it was
+   * issued as (`issue_invoice_on_online_payment`). Absent for an already-issued invoice or a
+   * part payment, which legitimately leaves a pre-invoice draft.
+   */
+  issued?: { document_type: string | null; legal_number: string | null; internal_number: string | null } | null;
+  /** The issue step failed; the money was still booked. Named so the operator can act. */
+  issue_error?: string;
 }
 
 /** Did this insert fail purely because the provider ref is already recorded? */
@@ -234,6 +244,22 @@ export async function recordInvoicePayment(
   const applied = Math.max(0, Math.min(due, src.amount));
   const unallocated = Number((src.amount - applied).toFixed(2));
 
+  // A DRAFT settled in full becomes the document the buyer is entitled to — BEFORE the
+  // allocation, so issuing and settling are one delivery and the allocation trigger moves an
+  // ISSUED document to `paid`, not a draft. Until this step existed every storefront receipt and
+  // every quote pre-invoice paid by card ended as a draft whose row said `paid`: no legal number,
+  // no issue date, nothing filed with AADE — while the customer had a payment confirmation.
+  // A part payment (a deposit) legitimately leaves the pre-invoice a draft. If the issue fails
+  // the money is still booked (it is real), the failure is NAMED on the result, and the
+  // `finance.paid_draft_never_issued` probe raises it nightly.
+  let issued: RecordResult['issued'] = null;
+  let issueError: string | undefined;
+  if (inv.status === 'draft' && due > 0 && applied >= due - 0.005) {
+    const r = await issueDraftOnFullPayment(supabase, inv.id, src);
+    issued = r.issued;
+    issueError = r.error;
+  }
+
   if (applied > 0) {
     const { error: allocErr } = await supabase
       .from('payment_allocations')
@@ -294,7 +320,11 @@ export async function recordInvoicePayment(
     }).catch(() => {});
   })());
 
-  return { ok: true, paymentId: paymentRow.id, allocated: applied, unallocated };
+  return {
+    ok: true, paymentId: paymentRow.id, allocated: applied, unallocated,
+    ...(issued ? { issued } : {}),
+    ...(issueError ? { issue_error: issueError } : {}),
+  };
 }
 
 /**
@@ -427,6 +457,88 @@ export async function recordStatementPayment(
     allocated: Number((src.amount - remaining).toFixed(2)),
     unallocated: Number(remaining.toFixed(2)),
   };
+}
+
+/**
+ * Issue a draft that an online payment has just settled in full.
+ *
+ * `issue_invoice_on_online_payment` (service-role only) re-derives the document type from the
+ * buyer and the lines — a business buyer gets an invoice (1.1/2.1), a consumer a retail receipt
+ * (11.1/11.2) — stamps the myDATA payment method by NAME, and runs the same numbering core the
+ * manual "Issue" button runs. Then the issued/receipt flow fires and the transmission to myDATA
+ * is attempted in the background through `finance-issue-invoice` (which reserves the workspace's
+ * transmission credits and records the submission); a transmission failure lands on the invoice
+ * as `fiscal_error`, exactly as a manual attempt would, and is retried from the invoice page.
+ */
+async function issueDraftOnFullPayment(
+  supabase: any,
+  invoiceId: string,
+  src: PaymentSource,
+): Promise<{ issued: RecordResult['issued']; error?: string }> {
+  // AADE 8.12 by NAME (CLAUDE.md 1c): a card charge is POS / e-POS, a bank reference settles
+  // into the merchant's domestic account. Never an integer literal here.
+  const methodCode = src.method === 'card'
+    ? MYDATA_PAYMENT_CODE.pos
+    : src.method === 'bank_transfer'
+      ? MYDATA_PAYMENT_CODE.domestic_account
+      : MYDATA_PAYMENT_CODE.web_banking;
+  const { data, error } = await supabase.rpc('issue_invoice_on_online_payment', {
+    p_invoice_id: invoiceId,
+    p_payment_method_code: methodCode,
+  });
+  if (error) {
+    console.error(`[payments] issue on payment FAILED for invoice ${invoiceId}: ${error.message}`);
+    return { issued: null, error: error.message };
+  }
+  const out = (data ?? {}) as { issued?: boolean; reason?: string; document_type?: string; legal_number?: string; internal_number?: string };
+  if (!out.issued) {
+    // Not a failure: a concurrent delivery already issued it, or it was issued by hand meanwhile.
+    console.log(`[payments] invoice ${invoiceId} not issued on payment: ${out.reason ?? 'unknown'}`);
+    return { issued: null };
+  }
+  console.log(`[payments] issued ${out.document_type} ${out.legal_number ?? out.internal_number} for invoice ${invoiceId} on ${src.provider} payment`);
+  runInBackground((async () => {
+    await emitDocumentIssued(supabase, invoiceId);
+    await transmitIssuedInvoice(invoiceId);
+  })());
+  return {
+    issued: {
+      document_type: out.document_type ?? null,
+      legal_number: out.legal_number ?? null,
+      internal_number: out.internal_number ?? null,
+    },
+  };
+}
+
+/**
+ * Hand the freshly issued document to myDATA through the ONE transmission path.
+ *
+ * `finance-issue-invoice` owns the connector resolution, the credit reservation, the duplicate
+ * guard on `fiscal_submissions` and the stamp on the invoice; calling it (as the service role,
+ * which it recognises as a trusted server caller) means this path cannot drift from the manual
+ * one. Best-effort: the provider must never see a 5xx because AADE was slow.
+ */
+async function transmitIssuedInvoice(invoiceId: string): Promise<void> {
+  try {
+    const base = Deno.env.get('SUPABASE_URL');
+    const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!base || !key) return;
+    const res = await fetch(`${base}/functions/v1/finance-issue-invoice`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}`, apikey: key },
+      body: JSON.stringify({ invoice_id: invoiceId, submit_fiscal: true }),
+    });
+    const out = await res.json().catch(() => null) as { fiscal?: { ok?: boolean; code?: string; error?: string } } | null;
+    if (!res.ok) {
+      console.error(`[payments] myDATA transmission request failed (${res.status}) for ${invoiceId}`, out);
+      return;
+    }
+    if (out?.fiscal && out.fiscal.ok === false) {
+      console.error(`[payments] myDATA transmission NOT accepted for ${invoiceId}: ${out.fiscal.code ?? ''} ${out.fiscal.error ?? ''}`);
+    }
+  } catch (err) {
+    console.error('[payments] myDATA transmission threw', invoiceId, err);
+  }
 }
 
 /**

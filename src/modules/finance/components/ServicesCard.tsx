@@ -4,7 +4,7 @@
  * receipt lines and transmit to myDATA with the right classification.
  */
 import React, { useEffect, useState } from 'react';
-import { Loader2, Plus, Pencil, Trash2, Wrench, Save, X } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, Wrench, Save, X, UserRound } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -20,12 +20,15 @@ import { VAT_CATEGORIES } from '@/modules/finance/services/financeService';
 import { formatMoney } from '@/utils/decimal';
 import { HubEmptyState } from '@/components/core/hub';
 import { WorkspaceQuotaBadge } from '@/components/core/WorkspaceQuotaBadge';
+import { Badge } from '@/components/core/ui/badge';
+import { useAuth } from '@/contexts/AuthContext';
 
 const EMPTY: ServiceInput = { name: '', description: '', unit: '', price: null, currency: 'EUR', vatCategory: 1, incType: '', incCat: '' };
 
 export const ServicesCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
   const { toast } = useToast();
   const handleQuota = useQuotaErrorHandler();
+  const { user } = useAuth();
   const [items, setItems] = useState<ServiceItem[]>([]);
   const [incTypes, setIncTypes] = useState<RefRow[]>([]);
   const [incCats, setIncCats] = useState<RefRow[]>([]);
@@ -81,6 +84,17 @@ export const ServicesCard: React.FC<{ workspaceId: string }> = ({ workspaceId })
   const remove = async (id: string) => {
     try { await servicesService.remove(id); await load(); }
     catch (err: any) { toast({ title: 'Delete failed', description: err?.message, variant: 'destructive' }); }
+  };
+
+  // Same rows as Profile → Services: listing here is the same fact as adding it there.
+  const toggleListing = async (s: ServiceItem) => {
+    try {
+      await servicesService.setProfileListing(s.id, !s.profile_user_id);
+      await load();
+      toast({ title: s.profile_user_id ? 'Removed from the profile' : 'Listed on your profile' });
+    } catch (err: any) {
+      toast({ title: 'Could not update the listing', description: err?.message, variant: 'destructive' });
+    }
   };
 
   const money = (v: number | null, c: string) => formatMoney(v, c);
@@ -171,10 +185,22 @@ export const ServicesCard: React.FC<{ workspaceId: string }> = ({ workspaceId })
             {items.map((s) => (
               <div key={s.id} className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2 text-sm">
                 <div className="min-w-0">
-                  <div className="font-medium truncate">{s.name}</div>
+                  <div className="font-medium truncate flex items-center gap-2">
+                    {s.name}
+                    {s.profile_user_id && (
+                      <Badge variant="info" className="text-[10px] gap-1">
+                        <UserRound className="h-2.5 w-2.5" />{s.profile_user_id === user?.id ? 'On your profile' : 'On a profile'}
+                      </Badge>
+                    )}
+                  </div>
                   <div className="text-xs text-muted-foreground">{money(s.list_price, s.currency)}{s.unit ? ` / ${s.unit}` : ''}{s.vat_category ? ` · VAT ${s.vat_category}` : ''}</div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
+                  {(!s.profile_user_id || s.profile_user_id === user?.id) && (
+                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => toggleListing(s)}>
+                      {s.profile_user_id ? 'Remove from profile' : 'List on my profile'}
+                    </Button>
+                  )}
                   <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => startEdit(s)}><Pencil className="h-3.5 w-3.5" /></button>
                   <button type="button" className="text-muted-foreground hover:text-destructive" onClick={() => remove(s.id)}><Trash2 className="h-3.5 w-3.5" /></button>
                 </div>

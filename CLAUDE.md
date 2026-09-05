@@ -130,6 +130,15 @@ failed, and `uncheckedSupabaseWrites` cannot see it because every write in the p
 - **A duplicate guard reads the record written on the SUCCESS path**, never the local status column written after it — that column is exactly the one that can be missing (`hr_ergani_submissions`, not `hr_overtime.status`).
 - Guarded by [tests/unit/financeAtomicity.test.ts](tests/unit/financeAtomicity.test.ts) and [tests/unit/hrFilingIntegrity.test.ts](tests/unit/hrFilingIntegrity.test.ts); both assert ORDER, because a check after the side effect is not a check. Full write-up: [docs/prevention-coverage.md](docs/prevention-coverage.md) shape 18.
 
+### 5. A DRAFT paid in full online is ISSUED, before the money is allocated. And a service exists ONCE.
+The storefront receipt and the quote pre-invoice are born `status='draft'` with a pay token.
+`recordInvoicePayment` allocated the payment and `_recompute_invoice_status_after_allocation`
+set `paid` — on a document with no legal number, no issue date and nothing filed with AADE, while
+the customer held a payment confirmation. Nothing raised: `paid` is a valid status.
+- **`issue_invoice_on_online_payment` runs in `record-payment.ts` BEFORE the allocation insert**, for every provider, only when the draft is settled in FULL (a deposit legitimately leaves a pre-invoice). It re-derives the document type from the buyer and the lines (`derive_invoice_document_type`: a VAT-holder gets 1.1/2.1, a consumer 11.1/11.2 — the storefront hard-codes 11.1 for everyone), stamps the payment method by NAME, and numbers through `_mark_invoice_issued_core` — the same core `mark_invoice_issued` wraps. Transmission goes through `finance-issue-invoice` as the service role, which bills the workspace (`resolveBillingUser`), never "nobody". `finance.paid_draft_never_issued` is the probe.
+- **Profile → Services IS Finance → Settings → Services**: `products(item_type='service')` + `product_prices`, listed on a profile by `products.profile_user_id`. `user_profiles.services_detail` was a second store with a free-text price no invoice could read; it is dropped, and `user_profiles.services` is a trigger-derived cache. A hire of PRICED listed services opens a sales order + draft pre-invoice through `create_service_order_from_profile` → `_generate_invoice_from_order_core` (the ONE order→invoice writer; `generate_invoice_from_order` is now its auth wrapper). Never add a jsonb services column, and never build a second order→invoice path.
+- Guarded by [tests/unit/profileServicesSingleSource.test.ts](tests/unit/profileServicesSingleSource.test.ts), which asserts the issue-before-allocate ORDER.
+
 ## Data layering — the pipeline is Medallion; name the layers
 
 **Every cache/pipeline bug we have hit has been a layer violation.**

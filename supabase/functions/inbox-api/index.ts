@@ -64,6 +64,8 @@ import { resolveLinePrice } from '../_shared/order-intake/price.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
 import { isWorkspaceEntitled } from '../_shared/entitlement.ts';
+import { vatPctForCat } from '../_shared/vatVocabulary.generated.ts';
+import { CRM_VAT_COLUMN, normalizeVat } from '../_shared/crm/vatNormalize.generated.ts';
 import { tool } from 'npm:ai@6';
 import { z } from 'npm:zod@3';
 import { getAgentSystemPrompt, loadPrompt } from '../_shared/prompt-utils.ts';
@@ -4266,15 +4268,199 @@ async function profileHostWorkspace(db: DbClient, userId: string): Promise<strin
   return (owned ?? active[0])?.workspace_id ?? null;
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+interface HireService {
+  id: string;
+  name: string;
+  workspace_id: string;
+  list_price: number | null;
+  currency: string;
+  vat_category: number | null;
+  unit: string | null;
+}
+
+interface HireOrderRecord {
+  order_id: string;
+  invoice_id: string;
+  internal_number: string;
+  total: number;
+  currency: string;
+  document_type: string | null;
+  pay_token: string;
+  pay_url: string;
+  created_at: string;
+}
+
+/**
+ * The services a visitor ticked, resolved against what the PROFILE OWNER lists — the same rows
+ * `get_public_profile_services` shows them. An id the owner does not list is dropped: it is a
+ * mistake or somebody else's product, and neither belongs on this order. A member's listed
+ * services all live in one workspace by construction (a listing is per product, a product per
+ * workspace), so the first one names the workspace the order files into.
+ */
+async function resolveProfileHire(
+  db: DbClient,
+  profileUserId: string,
+  ids: string[],
+): Promise<{ workspaceId: string | null; services: HireService[]; unpriced: string[] }> {
+  if (ids.length === 0) return { workspaceId: null, services: [], unpriced: [] };
+  const { data: rows, error } = await db
+    .from('products')
+    .select('id, name, workspace_id, mydata_vat_category, metadata')
+    .in('id', ids)
+    .eq('item_type', 'service')
+    .eq('profile_user_id', profileUserId);
+  if (error) throw new HttpError(500, 'Could not read the services.');
+  const products = (rows ?? []) as Array<{
+    id: string; name: string; workspace_id: string; mydata_vat_category: number | null; metadata: Record<string, unknown> | null;
+  }>;
+  if (products.length === 0) return { workspaceId: null, services: [], unpriced: [] };
+  const workspaceId = products[0].workspace_id;
+  const inWorkspace = products.filter((p) => p.workspace_id === workspaceId);
+  const { data: prices } = await db
+    .from('product_prices')
+    .select('product_id, list_price, currency, unit')
+    .eq('workspace_id', workspaceId)
+    .in('product_id', inWorkspace.map((p) => p.id))
+    .is('variant_key', null);
+  const priceBy = new Map<string, { list_price: number | null; currency: string | null; unit: string | null }>();
+  for (const p of (prices ?? []) as Array<{ product_id: string; list_price: number | null; currency: string | null; unit: string | null }>) {
+    priceBy.set(p.product_id, p);
+  }
+  const services: HireService[] = inWorkspace.map((p) => {
+    const pr = priceBy.get(p.id);
+    const metaUnit = p.metadata && typeof p.metadata.unit === 'string' ? (p.metadata.unit as string) : null;
+    return {
+      id: p.id,
+      name: p.name,
+      workspace_id: p.workspace_id,
+      list_price: pr?.list_price != null ? Number(pr.list_price) : null,
+      currency: pr?.currency ?? 'EUR',
+      vat_category: p.mydata_vat_category ?? null,
+      unit: pr?.unit ?? metaUnit,
+    };
+  });
+  return { workspaceId, services, unpriced: services.filter((s) => s.list_price == null).map((s) => s.name) };
+}
+
+/**
+ * Who the ORDER is for.
+ *
+ * Retail = the CRM contact the enquiry already created. A visitor who gave a VAT number is buying
+ * as a business: find that company in the workspace by its NORMALISED VAT (`vat_norm`, a generated
+ * column — the same matcher the CRM uses), else create it from an allowlisted set of fields, and
+ * link the contact to it. Both ids travel: the invoice takes at least one, and the document-type
+ * derivation reads the company first, which is what makes the pre-invoice a τιμολόγιο.
+ */
+async function resolveHireParty(
+  db: DbClient,
+  workspaceId: string,
+  customer: { contactId: string | null; companyId: string | null },
+  biz: { companyName: string; vatNumber: string; email: string },
+): Promise<{ contactId: string | null; companyId: string | null }> {
+  const vat = normalizeVat(biz.vatNumber);
+  if (!vat) return { contactId: customer.contactId, companyId: customer.companyId };
+
+  const { data: existing } = await db
+    .from('crm_companies').select('id').eq('workspace_id', workspaceId).eq(CRM_VAT_COLUMN, vat).limit(1).maybeSingle();
+  let companyId = (existing as { id?: string } | null)?.id ?? null;
+  if (!companyId) {
+    const { data: created, error } = await db
+      .from('crm_companies')
+      .insert({
+        workspace_id: workspaceId,
+        name: biz.companyName || `Company ${biz.vatNumber}`,
+        vat_number: biz.vatNumber,
+        email: biz.email,
+      })
+      .select('id')
+      .single();
+    if (error || !created) {
+      console.error('[inbox-api] profile_contact: could not create the buyer company — ordering to the contact instead:', error?.message);
+      return { contactId: customer.contactId, companyId: customer.companyId };
+    }
+    companyId = (created as { id: string }).id;
+  }
+  if (customer.contactId) {
+    const { error: linkErr } = await db
+      .from('crm_company_contacts')
+      .insert({ company_id: companyId, contact_id: customer.contactId });
+    // Already linked is fine; anything else is worth a line but must not lose the order.
+    if (linkErr && linkErr.code !== '23505') console.warn('[inbox-api] profile_contact: contact→company link failed:', linkErr.message);
+  }
+  return { contactId: customer.contactId, companyId };
+}
+
+/**
+ * Open the sales order + draft pre-invoice for a hire. The VAT rate per line comes from the
+ * mirrored vocabulary (`vatPctForCat`): the service's own category when it has one, else the
+ * workspace default — the SQL side owns no copy of that table and takes the rate as an argument.
+ */
+async function createHireOrder(
+  db: DbClient,
+  args: {
+    workspaceId: string;
+    profileUserId: string;
+    party: { contactId: string | null; companyId: string | null };
+    services: HireService[];
+    threadId: string;
+    notes: string;
+  },
+): Promise<HireOrderRecord> {
+  const { data: fs } = await db
+    .from('finance_settings').select('default_vat_rate').eq('workspace_id', args.workspaceId).maybeSingle();
+  const defaultRate = Number((fs as { default_vat_rate?: number | null } | null)?.default_vat_rate ?? 24);
+  const lines = args.services.map((s) => ({
+    product_id: s.id,
+    quantity: 1,
+    vat_percent: vatPctForCat(s.vat_category, defaultRate),
+  }));
+  const { data, error } = await db.rpc('create_service_order_from_profile', {
+    p_workspace_id: args.workspaceId,
+    p_profile_user_id: args.profileUserId,
+    p_customer_contact_id: args.party.contactId,
+    p_customer_company_id: args.party.companyId,
+    p_lines: lines,
+    p_thread_id: args.threadId,
+    p_notes: args.notes,
+  });
+  if (error) throw new Error(error.message);
+  const out = (data ?? {}) as {
+    order_id?: string; invoice_id?: string; internal_number?: string; document_type?: string | null;
+    pay_token?: string; total?: number | string; currency?: string;
+  };
+  if (!out.order_id || !out.invoice_id || !out.pay_token) throw new Error('order RPC returned no document');
+  return {
+    order_id: out.order_id,
+    invoice_id: out.invoice_id,
+    internal_number: out.internal_number ?? '',
+    total: Number(out.total ?? 0),
+    currency: out.currency ?? 'EUR',
+    document_type: out.document_type ?? null,
+    pay_token: out.pay_token,
+    pay_url: `${PUBLIC_APP_URL}/pay/${out.pay_token}`,
+    created_at: new Date().toISOString(),
+  };
+}
+
 async function handleProfileContact(db: DbClient, req: Request, payload: Json): Promise<Response> {
   const toUserId = String((payload as Record<string, unknown>).to_user_id ?? '').trim();
   const name = String((payload as Record<string, unknown>).from_name ?? '').trim().slice(0, 200);
   const email = String((payload as Record<string, unknown>).from_email ?? '').trim().slice(0, 200).toLowerCase();
   const message = String((payload as Record<string, unknown>).message ?? '').trim().slice(0, 5000);
   const servicesRaw = (payload as Record<string, unknown>).services_requested;
-  const services = Array.isArray(servicesRaw)
+  const requestedNames = Array.isArray(servicesRaw)
     ? servicesRaw.map((s) => String(s).slice(0, 120)).slice(0, 20)
     : [];
+  // Service IDS, not just names: a name is an enquiry; the id of a PRICED listed service is an
+  // order. A business buyer states the company + VAT so the pre-invoice is born a τιμολόγιο.
+  const serviceIdsRaw = (payload as Record<string, unknown>).service_ids;
+  const serviceIds = Array.isArray(serviceIdsRaw)
+    ? [...new Set(serviceIdsRaw.map((s) => String(s)).filter((s) => UUID_RE.test(s)))].slice(0, 20)
+    : [];
+  const companyName = String((payload as Record<string, unknown>).company_name ?? '').trim().slice(0, 200);
+  const vatNumber = String((payload as Record<string, unknown>).vat_number ?? '').trim().slice(0, 32);
 
   if (!toUserId || !name || !email || !message) throw new HttpError(400, 'name, email and message are required');
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new HttpError(400, 'Please enter a valid email address.');
@@ -4317,7 +4503,16 @@ async function handleProfileContact(db: DbClient, req: Request, payload: Json): 
     throw new HttpError(400, 'Bot check failed — please retry.');
   }
 
-  const workspaceId = await profileHostWorkspace(db, toUserId);
+  // The services the visitor picked, resolved against the PROFILE OWNER's own listing. An id that
+  // is not one of theirs is dropped here: a visitor names ids, and the order below must only ever
+  // hold what this profile actually offers.
+  const hire = await resolveProfileHire(db, toUserId, serviceIds);
+  const serviceNames = [...new Set([...requestedNames, ...hire.services.map((s) => s.name)])].slice(0, 20);
+
+  // The order lives where the services live, and the conversation with the order — so a hire of
+  // listed services files into the services' workspace. A plain enquiry keeps the inbound-address
+  // / membership derivation.
+  const workspaceId = hire.workspaceId ?? await profileHostWorkspace(db, toUserId);
   // 5xx on purpose: a professional publishing a profile with nowhere to receive is a platform
   // fault, and the api-logger reports 5xx to Sentry while it deliberately never reports a 4xx.
   // Telling the visitor to try another way beats accepting a message into a hole.
@@ -4352,7 +4547,7 @@ async function handleProfileContact(db: DbClient, req: Request, payload: Json): 
     ...(addressId ? { email_address_id: addressId } : {}),
     from_name: name,
     // The only thing this form carries that no channel does — rendered in the thread details.
-    ...(services.length ? { services_requested: services } : {}),
+    ...(serviceNames.length ? { services_requested: serviceNames } : {}),
   };
 
   // Fold a repeat enquiry from the same person into the conversation it continues, rather than
@@ -4379,7 +4574,7 @@ async function handleProfileContact(db: DbClient, req: Request, payload: Json): 
     // that ticked none.
     const prior = ((existingThread as { metadata?: Record<string, unknown> } | null)?.metadata ?? {});
     const priorServices = Array.isArray(prior.services_requested) ? prior.services_requested as string[] : [];
-    const merged = [...new Set([...priorServices, ...services])];
+    const merged = [...new Set([...priorServices, ...serviceNames])];
     await db.from('inbox_threads')
       .update({
         metadata: { ...prior, ...meta, ...(merged.length ? { services_requested: merged } : {}) },
@@ -4432,10 +4627,38 @@ async function handleProfileContact(db: DbClient, req: Request, payload: Json): 
     if (ownerErr) throw new HttpError(500, 'Could not deliver your message.');
   }
 
+  // A hire of PRICED services is a sales ORDER with a draft pre-invoice, born payable — one SQL
+  // transaction (`create_service_order_from_profile`) through the same order→invoice writer the
+  // quote path uses, filed against this conversation. Anything else stays an enquiry: a service
+  // priced "on request", no CRM contact (a colleague writing in), or the writer refusing (an
+  // unjustified 0% line). A refusal is logged and NOT shown — the message still lands and the
+  // professional quotes by hand, which is exactly what the enquiry path exists for.
+  let hireOrder: HireOrderRecord | null = null;
+  let hireSuffix = '';
+  if (hire.services.length > 0 && hire.unpriced.length === 0 && customer.contactId) {
+    try {
+      const party = await resolveHireParty(db, workspaceId, customer, { companyName, vatNumber, email });
+      hireOrder = await createHireOrder(db, {
+        workspaceId, profileUserId: toUserId, party, services: hire.services, threadId,
+        notes: `Hired from public profile by ${name} <${email}>`,
+      });
+      hireSuffix = `\n\n— Order ${hireOrder.internal_number}: ${hireOrder.total.toFixed(2)} ${hireOrder.currency} incl. VAT`
+        + ` (${hire.services.map((s) => s.name).join(', ')}). Pay online: ${hireOrder.pay_url}`;
+      // On the thread, so the rail can show the amount and re-send the pay link.
+      const { data: cur } = await db.from('inbox_threads').select('metadata').eq('id', threadId).maybeSingle();
+      const { error: hoErr } = await db.from('inbox_threads')
+        .update({ metadata: { ...(((cur as { metadata?: Record<string, unknown> } | null)?.metadata) ?? {}), hire_order: hireOrder } })
+        .eq('id', threadId);
+      if (hoErr) console.error('[inbox-api] profile_contact: hire_order not stamped on thread', threadId, hoErr.message);
+    } catch (err) {
+      console.error('[inbox-api] profile_contact: hire order not created — filed as an enquiry:', (err as Error)?.message);
+    }
+  }
+
   const { error: msgErr } = await db.from('inbox_messages').insert({
     thread_id: threadId,
     sender_participant_id: customerParticipantId,
-    body: message,
+    body: message + hireSuffix,
     attachments: [],
     message_type: 'text',
     metadata: {
@@ -4444,7 +4667,8 @@ async function handleProfileContact(db: DbClient, req: Request, payload: Json): 
       source: 'public_profile',
       profile_user_id: toUserId,
       email_from: email,
-      ...(services.length ? { services_requested: services } : {}),
+      ...(serviceNames.length ? { services_requested: serviceNames } : {}),
+      ...(hireOrder ? { order_id: hireOrder.order_id, invoice_id: hireOrder.invoice_id } : {}),
     },
   });
   if (msgErr) throw new HttpError(500, 'Could not deliver your message.');
@@ -4461,15 +4685,32 @@ async function handleProfileContact(db: DbClient, req: Request, payload: Json): 
   await emitFlowEvent('hire_me_received', {
     user_id: toUserId, to_user_id: toUserId, type: 'hire_me',
     workspace_id: workspaceId,
-    title: `New hire request from ${name}`,
-    body: services.length ? `Interested in: ${services.join(', ')}` : message.slice(0, 100),
+    title: hireOrder ? `New order ${hireOrder.internal_number} from ${name}` : `New hire request from ${name}`,
+    body: hireOrder
+      ? `${hireOrder.total.toFixed(2)} ${hireOrder.currency} — ${serviceNames.join(', ')}. Awaiting online payment.`
+      : serviceNames.length ? `Interested in: ${serviceNames.join(', ')}` : message.slice(0, 100),
     action_url: `/inbox?thread=${threadId}`,
     thread_id: threadId,
-    from_name: name, from_email: email, services_requested: services,
+    from_name: name, from_email: email, services_requested: serviceNames,
+    ...(hireOrder
+      ? { order_id: hireOrder.order_id, invoice_id: hireOrder.invoice_id, pay_url: hireOrder.pay_url, order_total: hireOrder.total, currency: hireOrder.currency }
+      : {}),
     sent_at: new Date().toISOString(),
   }).catch(() => {});
 
-  return json({ ok: true });
+  // The visitor gets the pay link back too — `pay_token` is deliberately not the whole story
+  // (the URL is), and nothing internal beyond the numbers they will see on the pay page.
+  return json({
+    ok: true,
+    ...(hireOrder
+      ? {
+        order: {
+          order_id: hireOrder.order_id, invoice_id: hireOrder.invoice_id, internal_number: hireOrder.internal_number,
+          total: hireOrder.total, currency: hireOrder.currency, document_type: hireOrder.document_type, pay_url: hireOrder.pay_url,
+        },
+      }
+      : {}),
+  });
 }
 
 /**

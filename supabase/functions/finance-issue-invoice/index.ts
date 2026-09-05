@@ -6,8 +6,8 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { resolveWorkspaceConnector } from '../_shared/fiscal/registry.ts';
 import { buildInvoiceInputFromDb, buildCreditNoteInputFromDb, buildDeliveryNoteInputFromDb, type FiscalOverrides } from '../_shared/fiscal/invoice-builder.ts';
+import { emitDocumentIssued } from '../_shared/fiscal/document-issued.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
-import { emitFlowEvent } from '../_shared/flow-events.ts';
 
 // Sales/Finance — issue an invoice from an accepted quote.
 // Flow:
@@ -258,43 +258,32 @@ async function autoReceiptForConsumerQuote(supabase: any, invoiceId: string): Pr
   }
 }
 
-/** Emit invoice_issued / receipt_issued so seeded flows notify + email the customer. */
-async function emitDocumentIssued(supabase: any, invoiceId: string): Promise<void> {
-  try {
-    const { data: inv } = await supabase
-      .from('invoices')
-      .select('id, internal_number, legal_number, document_type, total, currency, customer_company_id, customer_contact_id, workspace_id')
-      .eq('id', invoiceId)
-      .maybeSingle();
-    if (!inv) return;
-    const isReceipt = String(inv.document_type ?? '').startsWith('11');
-    let name: string | null = null, email: string | null = null, userId: string | null = null;
-    if (inv.customer_company_id) {
-      const { data: c } = await supabase.from('crm_companies').select('name, email').eq('id', inv.customer_company_id).maybeSingle();
-      name = c?.name ?? null; email = c?.email ?? null;
-    } else if (inv.customer_contact_id) {
-      const { data: c } = await supabase.from('crm_contacts').select('name, first_name, last_name, email, user_id').eq('id', inv.customer_contact_id).maybeSingle();
-      name = c?.name || [c?.first_name, c?.last_name].filter(Boolean).join(' ') || null; email = c?.email ?? null; userId = c?.user_id ?? null;
-    }
-    const num = inv.legal_number ?? inv.internal_number ?? '';
-    const amount = `${Number(inv.total ?? 0).toFixed(2)} ${inv.currency ?? 'EUR'}`;
-    const docWord = isReceipt ? 'Receipt' : 'Invoice';
-    await emitFlowEvent(isReceipt ? 'receipt_issued' : 'invoice_issued', {
-      type: isReceipt ? 'receipt_issued' : 'invoice_issued',
-      user_id: userId ?? undefined,
-      customer_email: email ?? undefined,
-      customer_name: name ?? undefined,
-      invoice_id: inv.id,
-      document_number: num,
-      document_type: inv.document_type ?? undefined,
-      amount,
-      currency: inv.currency ?? 'EUR',
-      workspace_id: inv.workspace_id,
-      title: `${docWord} ${num} issued`,
-      body: `${docWord} ${num} for ${amount}${name ? ` to ${name}` : ''} has been issued.`,
-      action_url: `/finance/invoices/${inv.id}`,
-    }).catch(() => {});
-  } catch { /* best-effort */ }
+// `emitDocumentIssued` moved to `_shared/fiscal/document-issued.ts`: the online-payment path
+// (`record-payment.ts`) issues a paid draft and has to fire the same event.
+
+/**
+ * Whose credits a SERVER-initiated transmission debits.
+ *
+ * A webhook has no user: `reserveTransmission` with a null user id transmits for FREE, which is
+ * the operator-root exemption leaking to every tenant whose draft was paid online. The document
+ * belongs to a workspace, so the workspace pays — through whoever created the invoice, else its
+ * owner. Null only when the workspace has neither, in which case the caller's existing rule
+ * (no user → no debit) applies and is logged as such.
+ */
+async function resolveBillingUser(supabase: any, workspaceId: string, invoiceId: string): Promise<string | null> {
+  const { data: inv } = await supabase.from('invoices').select('created_by').eq('id', invoiceId).maybeSingle();
+  if (inv?.created_by) return inv.created_by as string;
+  const { data: owner } = await supabase
+    .from('workspace_members')
+    .select('user_id')
+    .eq('workspace_id', workspaceId)
+    .eq('status', 'active')
+    .eq('role', 'owner')
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (!owner?.user_id) console.warn('[finance-issue-invoice] no billing user for workspace', workspaceId, '— transmission will not be debited');
+  return (owner?.user_id as string | undefined) ?? null;
 }
 
 /**
@@ -753,7 +742,10 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
       // Without this, any finance user could issue/transmit another tenant's invoice by id.
       const { data: invWs } = await supabase.from('invoices').select('workspace_id').eq('id', invoiceId).maybeSingle();
       if (!invWs) return json({ error: 'invoice not found' }, 404);
-      if (!(await userCanAccessWorkspace(supabase, auth.userId, invWs.workspace_id))) {
+      // A 'secret' caller is another edge function (record-payment transmitting a draft it just
+      // issued on a full online payment); it has no user to bind, and the service key IS the
+      // authorisation. Every other level must be a member of the document's workspace.
+      if (auth.level !== 'secret' && !(await userCanAccessWorkspace(supabase, auth.userId, invWs.workspace_id))) {
         return json({ error: 'Not authorized for this document' }, 403);
       }
     } else {
@@ -862,8 +854,12 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
       } else {
         const resolved: any = await resolveWorkspaceConnector(supabase, invRow!.workspace_id, 'legal_invoice');
         // Reserve transmission credits atomically before the connector handoff (see reserveTransmission).
+        // A server-initiated call has no user of its own; the workspace pays (resolveBillingUser).
+        const billingUserId = auth.level === 'secret'
+          ? await resolveBillingUser(supabase, invRow!.workspace_id, invoiceId)
+          : auth.userId;
         const reserve = resolved.ok
-          ? await reserveTransmission(supabase, invRow!.workspace_id, auth.userId, `myDATA transmission for invoice ${invoiceId}`,
+          ? await reserveTransmission(supabase, invRow!.workspace_id, billingUserId, `myDATA transmission for invoice ${invoiceId}`,
               { table: 'invoices', id: invoiceId })
           : null;
         if (!resolved.ok) {

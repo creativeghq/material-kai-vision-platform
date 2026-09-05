@@ -47,7 +47,7 @@ All live under `supabase/functions/`. Full request/response detail in [finance-s
 | `finance-inbound-sync` | finance JWT (manual, free) or `x-cron-secret` (batch, 2 cr) | Pull `RequestDocs` **and** `RequestTransmittedDocs` from AADE myDATA into `inbound_documents`, every continuation page followed |
 | `finance-fiscal-offline-recovery` | `x-cron-secret` | Backfill MARK on `fiscal_status='offline'` documents via `RequestTransmittedDocs` |
 | `finance-digest-aggregate` | Flows / `x-cron-secret` / admin `mode:'now'` | Email AR/AP + P&L + follow-up digest; dispatch quote follow-up reminders |
-| `finance-storefront` | none (public, slug-keyed) | Anonymous mini-store meta/products/checkout → draft retail receipt + pay link |
+| `finance-storefront` | none (public, slug-keyed) | Anonymous mini-store meta/products/checkout → draft retail receipt + pay link. **A draft paid online in FULL is issued automatically** by the provider-neutral payment path (`_shared/payments/record-payment.ts`, all providers): `issue_invoice_on_online_payment` runs BEFORE the allocation, re-derives the document type from buyer + lines (business → 1.1/2.1, consumer → 11.1/11.2), numbers through `_mark_invoice_issued_core`, then transmits via `finance-issue-invoice`. Same for a quote pre-invoice and a profile hire — see [professional-marketplace.md](professional-marketplace.md) § Hire Me Flow |
 | `finance-customer-documents` | buyer session JWT (not a workspace member) | Customer self-service: list **their own** invoices / retail receipts / payment receipts with fresh signed PDF links |
 | `parse-supplier-cost-list` | `admin/super_admin/owner` JWT | Apply a supplier price list (KB doc) → `products.cost` (procurement cost maintenance) |
 

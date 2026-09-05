@@ -14,6 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { HireMeModal } from '@/components/core/Profile/HireMeModal';
 import type { ServiceItem } from '@/components/core/Profile/ProfileTab';
+import { servicesService } from '@/modules/finance/services/servicesService';
 import { FollowButton } from '@/components/features/social/FollowButton';
 import { RequestFactoryAccessButton } from '@/components/features/discover/RequestFactoryAccessButton';
 import { MoodboardComments } from '@/components/features/social/MoodboardComments';
@@ -23,7 +24,7 @@ import { PROFESSIONAL_TYPE_LABELS } from '@/lib/materialCategories';
 import type { Ambassadorship } from '@/lib/ambassadorships';
 import { listAmbassadorships } from '@/services/ambassadorService';
 import { AmbassadorShowcase } from '@/components/features/profile/AmbassadorShowcase';
-import { formatNumber } from '@/utils/decimal';
+import { formatNumber, formatMoney } from '@/utils/decimal';
 
 const CARD_COLORS = [
   'from-violet-950/60 to-indigo-950/40',
@@ -65,11 +66,12 @@ function ServiceRow({ service, onHire, isLast }: { service: ServiceItem; onHire:
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-medium">{service.name}</span>
-            {service.price && (
-              <Badge variant="secondary" className="text-xs gap-1 px-1.5">
-                <DollarSign className="h-2.5 w-2.5" />{service.price}
-              </Badge>
-            )}
+            <Badge variant="secondary" className="text-xs gap-1 px-1.5 tabular-nums">
+              <DollarSign className="h-2.5 w-2.5" />
+              {service.list_price != null
+                ? `${formatMoney(service.list_price, service.currency)}${service.unit ? ` / ${service.unit}` : ''} + VAT`
+                : 'On request'}
+            </Badge>
           </div>
           {service.description && !expanded && (
             <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{service.description}</p>
@@ -125,7 +127,6 @@ interface PublicProfile {
   location: string;
   website_url: string;
   services: string[];
-  services_detail: ServiceItem[];
   skill_tags: string[];
   profile_views: number;
   professional_type: string | null;
@@ -157,6 +158,8 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
   const { user } = useAuth();
 
   const [profile, setProfile] = useState<PublicProfile | null>(null);
+  // The Finance services this member lists — the same rows the invoice picker reads.
+  const [profileServices, setProfileServices] = useState<ServiceItem[]>([]);
   const [moodboards, setMoodboards] = useState<PublicMoodboard[]>([]);
   const [ambassadorships, setAmbassadorships] = useState<Ambassadorship[]>([]);
   const [followerCount, setFollowerCount] = useState(0);
@@ -183,11 +186,12 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
     setMoodboards([]);
     setReviewStats(null);
     setAmbassadorships([]);
+    setProfileServices([]);
 
     try {
       const { data: profileData } = await supabase
         .from('user_profiles')
-        .select('user_id, full_name, company, bio, avatar_url, location, website_url, services, services_detail, skill_tags, featured_moodboard_id, profile_views, professional_type, is_public')
+        .select('user_id, full_name, company, bio, avatar_url, location, website_url, services, skill_tags, featured_moodboard_id, profile_views, professional_type, is_public')
         .eq('user_id', uid)
         .eq('is_public', true)
         .maybeSingle();
@@ -195,11 +199,11 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
       if (!profileData) { setLoading(false); return; }
 
       listAmbassadorships(uid).then(setAmbassadorships).catch(() => setAmbassadorships([]));
+      servicesService.listForProfile(uid).then(setProfileServices).catch(() => setProfileServices([]));
 
       setProfile({
         ...profileData,
         services: profileData.services ?? [],
-        services_detail: (profileData.services_detail as ServiceItem[]) ?? [],
         skill_tags: profileData.skill_tags ?? [],
         profile_views: profileData.profile_views ?? 0,
         professional_type: profileData.professional_type ?? null,
@@ -272,11 +276,7 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
   const displayName = profile?.full_name || 'Anonymous';
   const initials = displayName.split(' ').filter(Boolean).slice(0, 2).map((s: string) => s[0].toUpperCase()).join('');
   const isOwnProfile = user?.id === profile?.user_id;
-  const richServices: ServiceItem[] = profile
-    ? (profile.services_detail.length > 0
-        ? profile.services_detail
-        : profile.services.map((name, i) => ({ id: String(i), name })))
-    : [];
+  const richServices: ServiceItem[] = profile ? profileServices : [];
 
   return (
     <>

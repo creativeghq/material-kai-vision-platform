@@ -21,8 +21,18 @@ import { flowEventService } from '@/services/flows/flowEventService';
 import { PROFESSIONAL_TYPE_LABELS } from '@/lib/materialCategories';
 import { BusinessSection } from '@/components/core/Profile/BusinessSection';
 import { AppearanceSection } from '@/components/core/Profile/AppearanceSection';
-import { formatNumber } from '@/utils/decimal';
+import { formatNumber, formatMoney } from '@/utils/decimal';
 import { HubEmptyState } from '@/components/core/hub';
+import { MoneyInput } from '@/components/core/ui/money-input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { useQuotaErrorHandler } from '@/hooks/useQuotaErrorHandler';
+import {
+  servicesService,
+  type ProfileService,
+  type ProfileServiceInput,
+  type ServiceItem as WorkspaceService,
+} from '@/modules/finance/services/servicesService';
 
 const MAX_AVATAR_SIZE = 2 * 1024 * 1024;
 
@@ -253,13 +263,16 @@ interface PersonalData {
   professional_type: ProfessionalType;
 }
 
-export interface ServiceItem {
-  id: string;
-  name: string;
-  description?: string;
-  price?: string;
-  previous_work?: { title: string; url?: string }[];
-}
+/**
+ * A service on a profile IS a Finance service (`products`, item_type='service') this member has
+ * listed — the public shape, re-exported under the name the marketplace surfaces already import.
+ * The jsonb blob with a free-text price that used to live on `user_profiles` is gone: nothing
+ * could invoice it, and Finance had a second list nobody on the profile could see.
+ */
+export type ServiceItem = ProfileService;
+
+/** What the profile form edits. Price NULL = "on request": shown, but not orderable. */
+type ServiceFormData = ProfileServiceInput;
 
 interface FactoryOption { name: string; source: string; }
 
@@ -269,8 +282,8 @@ const EMPTY_PERSONAL: PersonalData = {
   professional_type: null,
 };
 
-const EMPTY_SERVICE: Omit<ServiceItem, 'id'> = {
-  name: '', description: '', price: '', previous_work: [],
+const EMPTY_SERVICE: ServiceFormData = {
+  name: '', description: '', unit: '', price: null, currency: 'EUR', previous_work: [],
 };
 
 // ─── Searchable combobox ──────────────────────────────────────────────────────
@@ -326,12 +339,14 @@ function ServiceForm({
   initial,
   onSave,
   onCancel,
+  busy = false,
 }: {
-  initial: Omit<ServiceItem, 'id'>;
-  onSave: (data: Omit<ServiceItem, 'id'>) => void;
+  initial: ServiceFormData;
+  onSave: (data: ServiceFormData) => void;
   onCancel: () => void;
+  busy?: boolean;
 }) {
-  const [form, setForm] = useState(initial);
+  const [form, setForm] = useState<ServiceFormData>(initial);
   const [newWorkTitle, setNewWorkTitle] = useState('');
   const [newWorkUrl, setNewWorkUrl] = useState('');
 
@@ -357,11 +372,24 @@ function ServiceForm({
             placeholder="e.g. Interior Design Consultation" autoFocus />
         </div>
         <div className="space-y-1.5">
+          <label htmlFor="profiletab-unit" className="text-xs text-muted-foreground">Unit</label>
+          <Input id="profiletab-unit" value={form.unit ?? ''} onChange={(e) => setForm({ ...form, unit: e.target.value })}
+            placeholder="hour, job, m²" />
+        </div>
+        <div className="space-y-1.5">
           <label htmlFor="profiletab-price" className="text-xs text-muted-foreground flex items-center gap-1">
-            <DollarSign className="h-3 w-3" /> Price
+            <DollarSign className="h-3 w-3" /> Price (net, before VAT)
           </label>
-          <Input id="profiletab-price" value={form.price ?? ''} onChange={(e) => setForm({ ...form, price: e.target.value })}
-            placeholder="e.g. from €500, €80/hr, on request" />
+          <div className="flex gap-2">
+            <MoneyInput id="profiletab-price" className="flex-1" value={form.price} onValueChange={(v) => setForm({ ...form, price: v })} placeholder="Leave empty for on request" />
+            <Select value={form.currency ?? 'EUR'} onValueChange={(v) => setForm({ ...form, currency: v })}>
+              <SelectTrigger className="w-24" aria-label="Currency"><SelectValue /></SelectTrigger>
+              <SelectContent>{['EUR', 'USD', 'GBP'].map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            A priced service can be hired and paid from your profile. Without a price it is shown as on request and a hire is an enquiry.
+          </p>
         </div>
         <div className="space-y-1.5 md:col-span-2">
           <label htmlFor="profiletab-description" className="text-xs text-muted-foreground">Description</label>
@@ -402,8 +430,8 @@ function ServiceForm({
 
       <div className="flex gap-2 justify-end pt-1">
         <Button size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
-        <Button size="sm" onClick={() => onSave(form)} disabled={!form.name.trim()}>
-          <Save className="h-3.5 w-3.5 mr-1.5" /> Save service
+        <Button size="sm" onClick={() => onSave(form)} disabled={!form.name.trim() || busy}>
+          {busy ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Save className="h-3.5 w-3.5 mr-1.5" />} Save service
         </Button>
       </div>
     </div>
@@ -414,11 +442,11 @@ function ServiceForm({
 function ServiceCard({
   service,
   onEdit,
-  onDelete,
+  onUnlist,
 }: {
   service: ServiceItem;
   onEdit: () => void;
-  onDelete: () => void;
+  onUnlist: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const hasDetails = service.description || (service.previous_work?.length ?? 0) > 0;
@@ -429,17 +457,19 @@ function ServiceCard({
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-sm">{service.name}</p>
-            {service.price && (
-              <Badge variant="secondary" className="mt-1 text-xs gap-1">
-                <DollarSign className="h-2.5 w-2.5" />{service.price}
-              </Badge>
-            )}
+            <Badge variant="secondary" className="mt-1 text-xs gap-1 tabular-nums">
+              <DollarSign className="h-2.5 w-2.5" />
+              {service.list_price != null
+                ? `${formatMoney(service.list_price, service.currency)}${service.unit ? ` / ${service.unit}` : ''} + VAT`
+                : 'On request'}
+            </Badge>
           </div>
           <div className="flex gap-1 shrink-0">
             <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={onEdit}>
               <Pencil className="h-3.5 w-3.5" />
             </Button>
-            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" onClick={onDelete}>
+            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" onClick={onUnlist}
+              aria-label="Remove from profile" title="Remove from your profile (it stays sellable under Finance → Settings → Services)">
               <Trash2 className="h-3.5 w-3.5" />
             </Button>
           </div>
@@ -494,6 +524,10 @@ function ServiceCard({
 export const ProfileTab: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  // A service belongs to the business that invoices it, so the profile lists services of the
+  // ACTIVE workspace; the public page shows every workspace's listings for this member.
+  const { activeWorkspaceId } = useWorkspace();
+  const handleQuota = useQuotaErrorHandler();
 
   const [personal, setPersonal] = useState<PersonalData>(EMPTY_PERSONAL);
   const [personalForm, setPersonalForm] = useState<PersonalData>(EMPTY_PERSONAL);
@@ -504,6 +538,10 @@ export const ProfileTab: React.FC = () => {
   const [showListings, setShowListings] = useState(true); // Show property listings on public profile
   const { enabled: realEstateEnabled } = useModule('real-estate');
   const [services, setServices] = useState<ServiceItem[]>([]);
+  // Every service of the active workspace, so the ones not yet on this profile can be listed
+  // with one click instead of being typed a second time.
+  const [workspaceServices, setWorkspaceServices] = useState<WorkspaceService[]>([]);
+  const [servicesBusy, setServicesBusy] = useState(false);
   const [skillTags, setSkillTags] = useState<string[]>([]);
   const [featuredMoodboardId, setFeaturedMoodboardId] = useState<string | null>(null);
   const [profileViews, setProfileViews] = useState(0);
@@ -556,13 +594,18 @@ export const ProfileTab: React.FC = () => {
     Promise.all([loadProfile(), loadMoodboards(), loadFactoryOptions(), loadRegistrationRequest(), loadAnalytics()]);
   }, [user]);
 
+  useEffect(() => {
+    if (!user) return;
+    void loadServices();
+  }, [user, activeWorkspaceId]);
+
   const loadProfile = async () => {
     if (!user) return;
     const { data } = await supabase
       .from('user_profiles')
       .select(
         'full_name, company, phone, address, bio, avatar_url, location, website_url, professional_type,' +
-        'is_public, services, services_detail, skill_tags, featured_moodboard_id, profile_views,' +
+        'is_public, services, skill_tags, featured_moodboard_id, profile_views,' +
         'factory_verified, factory_claimed_name',
       )
       .eq('user_id', user.id)
@@ -579,7 +622,6 @@ export const ProfileTab: React.FC = () => {
     setPersonal(p); setPersonalForm(p);
     setIsPublic(data.is_public ?? false);
     setShowListings((data as any).show_listings ?? true);
-    setServices((data.services_detail as ServiceItem[]) ?? []);
     setSkillTags(data.skill_tags ?? []);
     setFeaturedMoodboardId(data.featured_moodboard_id ?? null);
     setProfileViews(data.profile_views ?? 0);
@@ -751,26 +793,72 @@ export const ProfileTab: React.FC = () => {
   };
 
   // ── Services ──────────────────────────────────────────────────
-  const saveServicesTo = async (next: ServiceItem[]) => {
-    setServices(next);
-    // Keep text[] in sync for search/discover filtering
-    await patch({ services_detail: next, services: next.map((s) => s.name) });
+  // A profile service IS a Finance service (products, item_type='service') this member lists.
+  // Reads use the same RPC the public page uses; writes go through self-guarding RPCs, because a
+  // profile owner is often a plain member and products UPDATE RLS is admin/owner only.
+  // `user_profiles.services` — what Discover searches — is a trigger-derived cache of these rows,
+  // so nothing here writes it.
+  const loadServices = async () => {
+    if (!user) return;
+    try {
+      const [mine, all] = await Promise.all([
+        servicesService.listForProfile(user.id),
+        activeWorkspaceId ? servicesService.list(activeWorkspaceId) : Promise.resolve([] as WorkspaceService[]),
+      ]);
+      setServices(mine);
+      setWorkspaceServices(all);
+    } catch (err) {
+      toast({ title: 'Could not load services', description: (err as Error)?.message, variant: 'destructive' });
+    }
   };
 
-  const addService = async (data: Omit<ServiceItem, 'id'>) => {
-    const item: ServiceItem = { ...data, id: crypto.randomUUID() };
-    await saveServicesTo([...services, item]);
-    setAddingService(false);
+  const saveService = async (productId: string | null, data: ServiceFormData) => {
+    if (!activeWorkspaceId) {
+      toast({ title: 'No workspace selected', description: 'A service belongs to the business that invoices it — pick a workspace first.', variant: 'destructive' });
+      return;
+    }
+    setServicesBusy(true);
+    try {
+      await servicesService.upsertProfileService(activeWorkspaceId, productId, data);
+      setAddingService(false);
+      setEditingServiceId(null);
+      await loadServices();
+      toast({
+        title: productId ? 'Service updated' : 'Service added',
+        description: 'It is on your public profile and in the invoice and quote pickers.',
+      });
+    } catch (err) {
+      // Services count against the plan's `max_services`; route that to the upsell, not a
+      // generic failure that only says the row did not save.
+      if (!handleQuota(err)) {
+        toast({ title: 'Could not save service', description: (err as Error)?.message, variant: 'destructive' });
+      }
+    } finally {
+      setServicesBusy(false);
+    }
   };
 
-  const updateService = async (id: string, data: Omit<ServiceItem, 'id'>) => {
-    await saveServicesTo(services.map((s) => s.id === id ? { ...data, id } : s));
-    setEditingServiceId(null);
+  const setListing = async (productId: string, listed: boolean) => {
+    setServicesBusy(true);
+    try {
+      await servicesService.setProfileListing(productId, listed);
+      await loadServices();
+      toast({
+        title: listed ? 'Listed on your profile' : 'Removed from your profile',
+        description: listed ? undefined : 'It stays sellable under Finance → Settings → Services.',
+      });
+    } catch (err) {
+      toast({ title: 'Could not update the listing', description: (err as Error)?.message, variant: 'destructive' });
+    } finally {
+      setServicesBusy(false);
+    }
   };
 
-  const deleteService = async (id: string) => {
-    await saveServicesTo(services.filter((s) => s.id !== id));
-  };
+  const unlistedWorkspaceServices = workspaceServices.filter((s) => !s.profile_user_id);
+  const toFormData = (svc: ServiceItem): ServiceFormData => ({
+    name: svc.name, description: svc.description ?? '', unit: svc.unit ?? '',
+    price: svc.list_price, currency: svc.currency, previous_work: svc.previous_work,
+  });
 
   // ── Skill tags ────────────────────────────────────────────────
   const addSkill = async () => {
@@ -1025,41 +1113,68 @@ export const ProfileTab: React.FC = () => {
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            The services on your public profile are the same services Finance invoices — a visitor can hire a priced one and pay online, and every one of them is in the invoice and quote pickers.
+          </p>
           {services.map((svc) =>
             editingServiceId === svc.id ? (
               <ServiceForm
                 key={svc.id}
-                initial={{ name: svc.name, description: svc.description, price: svc.price, previous_work: svc.previous_work }}
-                onSave={(data) => updateService(svc.id, data)}
+                initial={toFormData(svc)}
+                onSave={(data) => saveService(svc.id, data)}
                 onCancel={() => setEditingServiceId(null)}
+                busy={servicesBusy}
               />
             ) : (
               <ServiceCard
                 key={svc.id}
                 service={svc}
                 onEdit={() => { setEditingServiceId(svc.id); setAddingService(false); }}
-                onDelete={() => deleteService(svc.id)}
+                onUnlist={() => setListing(svc.id, false)}
               />
             ),
           )}
           {addingService && (
             <ServiceForm
               initial={EMPTY_SERVICE}
-              onSave={addService}
+              onSave={(data) => saveService(null, data)}
               onCancel={() => setAddingService(false)}
+              busy={servicesBusy}
             />
           )}
           {services.length === 0 && !addingService && (
             <HubEmptyState
               icon={Wrench}
-              title="No services added yet"
-              description="What you offer, in your own words — this is what shows on your public profile and in the marketplace."
+              title="No services on your profile yet"
+              description="Name it, price it, and it shows on your public profile with a Hire button — and lands in the invoice picker at the same time."
               action={
                 <Button size="sm" onClick={() => { setAddingService(true); setEditingServiceId(null); }}>
                   <Plus /> Add a service
                 </Button>
               }
             />
+          )}
+          {unlistedWorkspaceServices.length > 0 && (
+            <div className="rounded-xl border border-dashed p-3 space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Already under Finance → Settings → Services, not on your profile yet:
+              </p>
+              <div className="space-y-1">
+                {unlistedWorkspaceServices.map((s) => (
+                  <div key={s.id} className="flex items-center justify-between gap-3 text-sm">
+                    <div className="min-w-0">
+                      <span className="font-medium truncate">{s.name}</span>
+                      <span className="text-xs text-muted-foreground ml-2 tabular-nums">
+                        {s.list_price != null ? `${formatMoney(s.list_price, s.currency)}${s.unit ? ` / ${s.unit}` : ''}` : 'On request'}
+                      </span>
+                    </div>
+                    <Button size="sm" variant="outline" className="h-7 text-xs shrink-0" disabled={servicesBusy} onClick={() => setListing(s.id, true)}>
+                      <Plus className="h-3 w-3 mr-1" />List on profile
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>

@@ -33,6 +33,13 @@ export const VOCABULARIES = [
     'supabase/functions/_shared/tools/tenantVocabulary.generated.ts',
   ],
   [
+    // AADE VAT category ↔ rate. Lived inside financeService (unmirrorable), so the edge had no
+    // category→rate lookup and every server-built line took the workspace default rate. A hire
+    // from a public profile prices its lines server-side and needs the real one.
+    'src/modules/finance/vatVocabulary.ts',
+    'supabase/functions/_shared/vatVocabulary.generated.ts',
+  ],
+  [
     // #391 — eight HR value-sets that were written across ten files, two to six copies
     // each. The DB CHECK constraints are the enforcer; this source equals them exactly.
     'src/modules/hr/hrVocabulary.ts',

@@ -33,6 +33,7 @@ import { ValuationWidget } from '@/modules/real-estate/components/ValuationWidge
 import { useAuth } from '@/contexts/AuthContext';
 import { HireMeModal } from '@/components/core/Profile/HireMeModal';
 import type { ServiceItem } from '@/components/core/Profile/ProfileTab';
+import { servicesService } from '@/modules/finance/services/servicesService';
 import { FollowButton } from '@/components/features/social/FollowButton';
 import { MoodboardComments } from '@/components/features/social/MoodboardComments';
 import { ReviewsSection } from '@/components/features/profile/ReviewsSection';
@@ -43,7 +44,7 @@ import { listAmbassadorships } from '@/services/ambassadorService';
 import { AmbassadorShowcase } from '@/components/features/profile/AmbassadorShowcase';
 
 import { onEnterOrSpace } from '@/utils/a11y';
-import { formatNumber } from '@/utils/decimal';
+import { formatNumber, formatMoney } from '@/utils/decimal';
 
 interface PublicProfile {
   user_id: string;
@@ -54,7 +55,6 @@ interface PublicProfile {
   location: string;
   website_url: string;
   services: string[];
-  services_detail: ServiceItem[];
   skill_tags: string[];
   featured_moodboard_id: string | null;
   profile_views: number;
@@ -124,11 +124,12 @@ function ServiceRow({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-medium">{service.name}</span>
-            {service.price && (
-              <Badge variant="secondary" className="text-xs gap-1 px-1.5">
-                <DollarSign className="h-2.5 w-2.5" />{service.price}
-              </Badge>
-            )}
+            <Badge variant="secondary" className="text-xs gap-1 px-1.5 tabular-nums">
+              <DollarSign className="h-2.5 w-2.5" />
+              {service.list_price != null
+                ? `${formatMoney(service.list_price, service.currency)}${service.unit ? ` / ${service.unit}` : ''} + VAT`
+                : 'On request'}
+            </Badge>
           </div>
           {service.description && !expanded && (
             <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{service.description}</p>
@@ -201,6 +202,9 @@ export const PublicProfilePage: React.FC = () => {
   const [notFound, setNotFound] = useState(false);
   const [hireMeOpen, setHireMeOpen] = useState(false);
   const [preselectedServiceId, setPreselectedServiceId] = useState<string | undefined>();
+  // The Finance services this member lists — read through the same RPC the owner's profile
+  // form uses, so what a visitor can hire is exactly what the invoice picker offers.
+  const [profileServices, setProfileServices] = useState<ServiceItem[]>([]);
   const [expandedComments, setExpandedComments] = useState<string | null>(null);
   // A showcase link is only rendered when the moodboard behind it is actually public — a link
   // to a private board is a 'this moodboard is private' page with the visitor's name on it.
@@ -226,7 +230,7 @@ export const PublicProfilePage: React.FC = () => {
       const { data: profileData, error: profileError } = await supabase
         .from('user_profiles')
         .select(
-          'user_id, full_name, company, bio, avatar_url, location, website_url, services, services_detail, skill_tags, featured_moodboard_id, profile_views, professional_type, is_public, show_listings',
+          'user_id, full_name, company, bio, avatar_url, location, website_url, services, skill_tags, featured_moodboard_id, profile_views, professional_type, is_public, show_listings',
         )
         .eq('user_id', userId)
         .eq('is_public', true)
@@ -242,12 +246,16 @@ export const PublicProfilePage: React.FC = () => {
       setProfile({
         ...profileData,
         services: profileData.services ?? [],
-        services_detail: (profileData.services_detail as ServiceItem[]) ?? [],
         skill_tags: profileData.skill_tags ?? [],
         featured_moodboard_id: profileData.featured_moodboard_id ?? null,
         profile_views: profileData.profile_views ?? 0,
         professional_type: profileData.professional_type ?? null,
       });
+
+      // Services: the Finance services this member lists — the rows the invoice picker reads.
+      servicesService.listForProfile(userId!)
+        .then((list) => { if (loadId === loadIdRef.current) setProfileServices(list); })
+        .catch(() => setProfileServices([]));
 
       // Ambassadorships: RLS returns the ones this profile shows publicly.
       listAmbassadorships(userId!)
@@ -363,10 +371,7 @@ export const PublicProfilePage: React.FC = () => {
   const displayName = profile.full_name || 'Anonymous';
   const isOwnProfile = user?.id === profile.user_id;
 
-  const richServices: ServiceItem[] =
-    profile.services_detail.length > 0
-      ? profile.services_detail
-      : profile.services.map((name, i) => ({ id: String(i), name }));
+  const richServices: ServiceItem[] = profileServices;
 
   return (
     <div className="min-h-screen bg-background">

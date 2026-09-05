@@ -109,28 +109,38 @@ Guarded by [tests/unit/ambassadorships.test.ts](../tests/unit/ambassadorships.te
 
 ## Services
 
-Services are stored in two columns for backwards compatibility:
+**A profile service IS a Finance service.** There is ONE store: `products` rows with
+`item_type='service'` (priced in `product_prices`, myDATA-classified on the product — the rows the
+invoice and quote pickers read). A member "lists" one on their public profile by pointing at it:
+`products.profile_user_id` (CHECK: only a service may be listed). Until 2026-09-05 there were two
+stores — this one, and a jsonb blob on `user_profiles` (`services_detail`, free-text price) that
+fed the profile and the Hire form and that no invoice could ever read. The blob is dropped.
 
-- `services` (text[]) — legacy, name-only list
-- `services_detail` (jsonb) — rich objects, preferred when available
+| Where | Reads | Writes |
+|---|---|---|
+| Profile → Services (`ProfileTab`) | `get_public_profile_services(user_id)` — own rows, public or not | `upsert_profile_service` (create / edit one I list), `set_profile_service_listing` (list an existing Finance service / take mine off) |
+| Public profile (`PublicProfilePage`, Discover `ProfileModal`) | `get_public_profile_services(user_id)` — only while `is_public` | — |
+| Finance → Settings → Services (`ServicesCard`) | `servicesService.list(workspace)` — every service of the workspace, with an "On your profile" tag | direct RLS writes (admin/owner) + the same listing RPC |
 
-### ServiceItem structure
+- The RPCs are `SECURITY DEFINER` because a profile owner is often a plain member and `products`
+  UPDATE/DELETE RLS is admin/owner only. They bind to the caller: you may edit or unlist only what
+  YOU list (or be a finance manager). "Remove from profile" unlists — it never deletes the
+  product, because "not on my profile" and "not sellable" are different facts.
+- `user_profiles.services` (text[]) — what Discover searches and tags by — is a **trigger-derived
+  cache** (`tg_products_sync_profile_services`). Nothing writes it by hand.
+- **Price is a number, net of VAT, or NULL = "on request".** A priced service can be hired and
+  paid straight from the profile; an unpriced one turns the hire into an enquiry. VAT category
+  and myDATA income classification are set under Finance → Settings → Services; a service created
+  from the profile takes the workspace defaults.
+- `previous_work` (`[{title, url?}]`) lives in `products.metadata` — marketing content beside
+  `unit`. A Finance edit merges metadata rather than replacing it, so it survives.
 
-```typescript
-interface ServiceItem {
-  id: string;
-  name: string;
-  description?: string;
-  price?: string;
-  previous_work?: { title: string; url?: string }[];
-}
-```
+`servicesService.ts` is the one client (`ProfileService` is the public shape; `ServiceItem` in
+`ProfileTab` is a re-export of it for the surfaces that already imported that name). Guarded by
+[tests/unit/profileServicesSingleSource.test.ts](../tests/unit/profileServicesSingleSource.test.ts).
 
-On the public profile, if `services_detail` is populated it takes precedence over `services`. Each service card has:
-- Name + optional price badge
-- Description (collapsible)
-- Previous work links (collapsible)
-- **Hire** button → opens `HireMeModal`
+Each service card on the public profile shows name, the price badge (or "On request"), description
+and previous work (collapsible), and a **Hire** button → `HireMeModal`.
 
 ---
 
@@ -141,13 +151,38 @@ Visitors can contact a professional directly from their public profile.
 ### How it works
 
 1. Visitor clicks **Hire Me** (global) or **Hire** on a specific service card
-2. `HireMeModal` opens with optional service pre-selected
+2. `HireMeModal` opens with optional service pre-selected; each service shows its net price + VAT
+   or "Price on request"; a **buying as a business** switch takes company name + VAT number
 3. Visitor fills in name, email, message, and optionally selects services
 4. On submit: POSTs `action: 'profile_contact'` to the `inbox-api` edge function — never a direct
    client write. The modal renders on a page with no auth gate, so a browser-side insert fails for
    exactly the audience the form exists for. The function is Turnstile-gated and rate-limited
    (3 per sender / 10 min, 20 per recipient / hour), and both guards run BEFORE the bot check so a
    malformed or flooding request never burns a Turnstile verification.
+5. **If every picked service is priced, the hire is an ORDER.** `create_service_order_from_profile`
+   (one SQL transaction, service-role only) opens a `sales` order in `draft` with one line per
+   service (VAT rate from the mirrored `vatVocabulary`, category from the product) and creates the
+   draft **pre-invoice** through `_generate_invoice_from_order_core` — the same order→invoice writer
+   the quote path and the Orders hub use, which derives the document type from the buyer and the
+   lines (`2.1` service invoice to a company / VAT-holder, `11.2` retail services receipt otherwise)
+   and refuses an unjustified 0% line. The pre-invoice is born with a `pay_token`; the visitor gets
+   the `/pay/:token` link back in the response ("Pay now"), the message body carries it, the thread
+   holds it as `metadata.hire_order` (rendered in the Inbox rail), and `hire_me_received` carries
+   `order_id` / `pay_url`. Only services the PROFILE OWNER lists can be ordered — the ids are
+   resolved against `products.profile_user_id`, never trusted.
+   - A business buyer (VAT number given) is matched to a `crm_companies` row by normalised VAT or
+     created, the contact linked to it, and the company is the invoice's counterparty.
+   - Anything else — an "on request" service, no CRM contact, the writer refusing — files as a
+     plain enquiry; the refusal is logged, never shown.
+6. **When the pre-invoice is paid online in full, it is issued automatically.** The provider-neutral
+   payment path (`_shared/payments/record-payment.ts`, all of Stripe / Viva / Revolut) calls
+   `issue_invoice_on_online_payment` BEFORE allocating the payment: it re-derives the document type
+   (a business gets an invoice, a consumer a retail receipt — also correcting the storefront's
+   hard-coded `11.1`), stamps the myDATA payment method by name, numbers the document through
+   `_mark_invoice_issued_core`, fires `invoice_issued`/`receipt_issued`, and transmits to myDATA
+   through `finance-issue-invoice` (which reserves the workspace's transmission credits). A deposit
+   leaves the pre-invoice a draft. `finance.paid_draft_never_issued` (nightly integrity probe) names
+   any draft that reached `paid` without an issue date.
 
 ### Where the enquiry lands: the unified Inbox
 
