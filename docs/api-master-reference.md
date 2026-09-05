@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (138)
+## 1. Supabase Edge Functions (142)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -348,6 +348,10 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | Function | Auth | Summary |
 |---|---|---|
 | `project-assessment` | JWT | Derive a project's health signals, and optionally write the AI assessment of them |
+| `scan-drawing-title-block` | JWT | Read a drawing's title block into project drawing-register fields |
+| `structure-site-note` | JWT | Turn a dictated site walk into a diary entry and the defects it described |
+| `takeoff-from-drawing` | JWT | Transcribe the schedules printed on a drawing into proposed bill-of-quantities lines |
+| `tender-bid-portal` | public / JWT | Issue a trade package to a subcontractor and take their priced return |
 
 **Stock**
 

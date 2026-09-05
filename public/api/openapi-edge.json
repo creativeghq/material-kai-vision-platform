@@ -11552,7 +11552,7 @@
         ],
         "summary": "Unified SEO API — action-discriminated keyword research, planning, writing, analysis, and toolkit.",
         "operationId": "post_seo_api",
-        "description": "Single POST endpoint routing on body.action to one of seven handlers: research, plan, write, analyze, pipeline, toolkit_audit, toolkit_research. All handlers require Supabase JWT auth and debit user credits. toolkit_audit also accepts x-cron-secret for cron-mode batch auditing.\n\n**Response:** `{success: boolean, data: object}`\n\n📖 [docs/seo-system.md](https://github.com/creativeghq/material-kai-vision-platform/blob/main/docs/seo-system.md)",
+        "description": "Single POST endpoint routing on body.action to one of eight handlers: research, plan, write, analyze, pipeline, toolkit_audit, toolkit_research, page_ideas. All handlers require Supabase JWT auth and debit user credits. toolkit_audit also accepts x-cron-secret for cron-mode batch auditing.\n\n**Response:** `{success: boolean, data: object}`\n\n📖 [docs/seo-system.md](https://github.com/creativeghq/material-kai-vision-platform/blob/main/docs/seo-system.md)",
         "security": [
           {
             "supabaseJwt": []
@@ -11847,6 +11847,32 @@
                       }
                     },
                     "description": "Returns: {ok: boolean, run_id: string, opportunities: object}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "website_id",
+                      "page"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "page_ideas"
+                        ],
+                        "description": "Keyword ideas for ONE of the site's own indexed pages, seeded from its stored title (DataForSEO Google Ads expansion + Labs related keywords, GR/el). Membership, seo-toolkit entitlement and a credit reserve precede the call; the reserve settles against the provider's reported cost."
+                      },
+                      "website_id": {
+                        "type": "string",
+                        "description": "user_websites.id; the caller must be a member of its workspace."
+                      },
+                      "page": {
+                        "type": "string",
+                        "description": "URL of a page in the site's index (user_website_pages). The seed is the stored title, never the URL text."
+                      }
+                    },
+                    "description": "Returns: {success: boolean, data: {seed: string, page: string, location_code: number, language_code: string, ideas: [{term, search_volume, cpc, competition}], cost_usd: number|null}}"
                   }
                 ],
                 "discriminator": {
@@ -26392,6 +26418,429 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/scan-drawing-title-block": {
+      "post": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "Read a drawing's title block into project drawing-register fields",
+        "operationId": "post_scan_drawing_title_block",
+        "description": "Turns a PDF or image of a drawing sheet into the fields a register entry needs: drawing number, title, revision, discipline, scale, sheet size, issue date and the purpose it was issued for. The reader is a forced Anthropic tool call over the sheet; credits are debited BEFORE the model runs, and the prompt is loaded from the database with no code fallback. The workspace is derived from the PROJECT row rather than the body, so naming a workspace you belong to does not grant a scan against a project you do not own. It deliberately writes nothing: a scanner that also created register entries would file a whole drawing set off a model's reading, and a wrong drawing number stays invisible until somebody builds from the wrong sheet. discipline and purpose are snapped onto the controlled vocabularies the register offers, and anything that could not be placed is returned under unmapped rather than dropped. An unreadable issue date comes back null, never defaulted to today, because a drawing stamped with today shows as issued on time.\n\n**Response:** `{ success, status: 'read'|'unreadable', fields: { drawing_number, title, revision, discipline, purpose, scale, sheet_size, issued_at, issuer, notes }, unmapped, confidence }`",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "project_id": {
+                    "type": "string",
+                    "description": "The register's project. Its workspace is what the caller is checked against; a project in another workspace reports as not found. (string (uuid))"
+                  },
+                  "content_type": {
+                    "type": "string",
+                    "description": "application/pdf or image/jpeg|png|webp|gif|heic|heif"
+                  },
+                  "data_base64": {
+                    "type": "string",
+                    "description": "The sheet, base64 or a data URL. Capped at about 4 MB so a credit is never spent on a call the provider would reject."
+                  }
+                },
+                "required": [
+                  "project_id",
+                  "content_type",
+                  "data_base64"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/takeoff-from-drawing": {
+      "post": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "Transcribe the schedules printed on a drawing into proposed bill-of-quantities lines",
+        "operationId": "post_takeoff_from_drawing",
+        "description": "Reads the tabular schedules a design team PRINTED on a drawing sheet — door, window, room, finishes — and returns them as proposed schedule-of-works lines. It transcribes; it never measures. A quantity worked out from the geometry of a plan is a guess indistinguishable from a fact, and somebody orders materials against it, so the tool schema offers no area or length field and every returned row must carry the schedule and row it was read from. A row that printed no quantity comes back null, never zero. The reader is a forced Anthropic tool call; credits are debited BEFORE the model runs and the prompt is a database row with no code fallback. Only a revision id is accepted — the file is fetched server-side from that row's own bucket and object path, so no URL in a request body can redirect it. The workspace comes from the project that owns the revision; a drawing in another workspace reports as not found. It writes nothing: the caller confirms the rows and adds them by the normal path.\n\n**Response:** `{ success, status: 'read'|'no_schedules'|'failed', drawing: { revision_id, rev_label, drawing_number, title, project_id }, items: [{ description, item_ref, quantity, unit, schedule, source, notes }], truncated, without_quantity, confidence, notes }`",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "revision_id": {
+                    "type": "string",
+                    "description": "The drawing revision to read. Its file location and its workspace are both taken from this row; nothing about which bytes are read comes from the body. (string (uuid))"
+                  }
+                },
+                "required": [
+                  "revision_id"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/structure-site-note": {
+      "post": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "Turn a dictated site walk into a diary entry and the defects it described",
+        "operationId": "post_structure_site_note",
+        "description": "One site walk normally produces two kinds of record at once — a diary entry about the day and several distinct defects — so this returns both, with each defect as its own record because they get assigned and closed separately. The reader is a forced Anthropic tool call over the transcript; credits are debited BEFORE the model runs and the prompt is loaded from the database with no code fallback. The workspace is derived from the PROJECT row rather than the body. Rooms are read server-side and a returned room_id is validated against them, because a room list supplied by the caller could name another project's rooms and the id is written onto a defect. It writes NOTHING: a transcription mishears, and a defect filed straight off a mishearing is a job somebody gets sent to do, so the caller confirms and siteService does the writes. Everything heard but not placed comes back under `unclear`, `dropped` or `room_unmatched` rather than being discarded.\n\n**Response:** `{ success, status, log: { notes, weather, attendance } | null, snags: [{ title, description, severity, room_id, room_unmatched }], unclear, dropped, severities }`",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "project_id": {
+                    "type": "string",
+                    "description": "The project the records belong to. Its workspace is what the caller is checked against; a project in another workspace reports as not found. (string (uuid))"
+                  },
+                  "transcript": {
+                    "type": "string",
+                    "description": "What was dictated. Capped at 20,000 characters — a long walk is a few hundred words."
+                  }
+                },
+                "required": [
+                  "project_id",
+                  "transcript"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tender-bid-portal": {
+      "post": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "Issue a trade package to a subcontractor and take their priced return",
+        "operationId": "post_tender_bid_portal",
+        "description": "Makes a tender sendable. `send` (authenticated) mints a private link for one bid, emails it to the subcontractor's CRM address and returns the link either way, since a company with no email on file is ordinary. `resolve_token` and `submit` are PUBLIC and token-authenticated: the subcontractor never needs an account. THE TOKEN IS PER BID, which is the security model — it resolves to one subcontractor's own lines, so a forwarded link cannot reveal what a competitor quoted. Re-sending keeps the same token so somebody part-way through pricing does not lose their link. `submit` never spreads the request body into a write: each rate is matched against a line that token owns and anything else is discarded, and a blank rate is stored as NULL rather than 0, because 'not priced' and 'free' are different answers. An expired or withdrawn link is indistinguishable from a wrong one.\n\n**Response:** `{ ok, link, emailed, has_email } for send; { ok, package, items, lines, submitted, notes } for resolve_token; { ok, lines_priced } for submit`",
+        "security": [
+          {
+            "supabaseJwt": []
+          },
+          {}
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "token"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "resolve_token"
+                        ],
+                        "description": "Public: open an enquiry by its token and read this bidder's own lines"
+                      },
+                      "token": {
+                        "type": "string",
+                        "description": "The per-bid access token from the emailed link"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "token"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "submit"
+                        ],
+                        "description": "Public: send the rates back and mark the bid received"
+                      },
+                      "token": {
+                        "type": "string",
+                        "description": "The per-bid access token"
+                      },
+                      "rates": {
+                        "type": "array",
+                        "description": "[{bid_item_id, rate}] — a null or omitted rate means NOT priced, never zero"
+                      },
+                      "notes": {
+                        "type": "string",
+                        "description": "Exclusions and qualifications, read alongside the figures"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "bid_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "send"
+                        ],
+                        "description": "Issue or re-issue the enquiry link for one bid, and email it"
+                      },
+                      "bid_id": {
+                        "type": "string",
+                        "description": "Checked against the caller's workspace membership via the bid's row (string (uuid))"
+                      }
+                    }
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "action"
                 }
               }
             }

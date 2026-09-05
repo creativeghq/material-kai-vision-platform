@@ -118,6 +118,11 @@ panel for days. `serpWithRetry` now makes three attempts with backoff, and `trac
 takes `seo_keywords_to_recheck` (latest capture has an error; service_role only) ahead of the
 oldest-checked fill. The summary carries `last_checked_at` (a timestamp — the capture DATE
 read "checked 10h ago" at ten in the morning) and the note names the source's error text.
+**A partial page set is used when we are IN it.** 40106 returns the result pages DataForSEO did
+fetch; MIVAA's `_call` passes those items through with `ok=False`, and the tracker accepts them
+on its LAST attempt only: a position found in the fetched pages is real, "not found in a partial
+set" stays unknown. Three Greek queries failed 40106 on every one of three attempts on
+2026-09-05, which is what this is for.
 
 **An upstream failure inside a 200 envelope is UNKNOWN, never "not in top 100".** MIVAA's
 dispatcher answers HTTP 200 with `success:false` and `data.error` when DataForSEO itself fails
@@ -218,6 +223,17 @@ detail header and each cluster carry a Track action (`addTrackedKeywords`, GR/el
 from your pages" lists page titles (brand suffix stripped) that are neither tracked nor
 researched, each with Research (opens the agent with the keyword and market in the prompt) and
 Track. The Search Performance breakdown sorts by any column on click.
+
+**Suggestions for ONE page come from two sources, in order of trust.** Pick a page (title or URL
+search over the indexed pages) and the card shows (1) the queries Search Console already shows
+that page for — `get_page_gsc_queries(website, page, days)`: impressions, clicks, CTR and an
+impression-weighted position over the window, from `gsc_performance` rows we hold, free and
+instant; and (2) on request, paid keyword ideas seeded from the page's TITLE — `seo-api`
+`page_ideas` → `DataForSEOClient.keywordIdeas` (Google Ads expansion + Labs related keywords,
+GR/el, merged, by volume). The seed comes from the page row we stored, never from a URL the
+caller typed; the handler checks membership, entitlement and reserves credits before the call
+and settles against the provider's reported cost (`keywordIdeas` returns `costUsd` for that
+reason — the research helpers discard it). Every row has Research and Track.
 
 **Alerts fire on leaving the top 10 only**, through the existing `seo.ranking_movement` flow
 trigger — not a new near-duplicate one. A tracker that alerts on every wobble gets muted, and a

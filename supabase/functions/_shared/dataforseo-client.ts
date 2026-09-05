@@ -215,6 +215,59 @@ export class DataForSEOClient {
     };
   }
 
+  /**
+   * Keyword ideas around ONE seed — expansion + semantically related, merged and
+   * sorted by volume. Two calls, no SERP, no difficulty: the light form of
+   * `researchKeyword` for "what should this page also be about", where the reader
+   * wants a list to pick from, not a report.
+   */
+  async keywordIdeas(
+    seed: string,
+    locationCode: number,
+    languageCode: string,
+    limit = 60,
+  ): Promise<{ items: KeyTerm[]; costUsd: number | null }> {
+    // The provider prices each task in its response (`tasks[].cost`); the spend gate settles
+    // against that figure, so it is read here rather than discarded the way the research
+    // helpers do. A response with no cost settles at the ceiling and is logged as a defect.
+    const taskCost = (data: any): number | null => {
+      const c = Number(data?.tasks?.[0]?.cost);
+      return Number.isFinite(c) ? c : null;
+    };
+    const [expanded, related] = await Promise.allSettled([
+      this.apiCall('/keywords_data/google_ads/keywords_for_keywords/live', [{
+        keywords: [seed], location_code: locationCode, language_code: languageCode,
+        sort_by: 'relevance', include_adult_keywords: false,
+      }]),
+      this.apiCall('/dataforseo_labs/google/related_keywords/live', [{
+        keyword: seed, location_code: locationCode, language_code: languageCode, limit: 100,
+      }]),
+    ]);
+    if (expanded.status === 'rejected' && related.status === 'rejected') {
+      throw expanded.reason instanceof Error ? expanded.reason : new Error(String(expanded.reason));
+    }
+    const expandedItems: KeyTerm[] = expanded.status === 'fulfilled'
+      ? (expanded.value?.tasks?.[0]?.result || []).map((item: any) => this.parseKeyTerm(item))
+      : [];
+    const relatedItems: KeyTerm[] = related.status === 'fulfilled'
+      ? (related.value?.tasks?.[0]?.result?.[0]?.items || []).map((item: any) => ({
+          ...this.parseKeyTerm(item.keyword_data || item),
+          term: item.keyword || item.keyword_data?.keyword || '',
+        }))
+      : [];
+    const costs = [expanded, related]
+      .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
+      .map((r) => taskCost(r.value));
+    const costUsd = costs.some((c) => c == null)
+      ? null
+      : costs.reduce<number>((s, c) => s + (c ?? 0), 0);
+    const items = this.mergeKeywords(expandedItems, relatedItems)
+      .filter((k) => k.term)
+      .sort((a, b) => (b.searchVolume || 0) - (a.searchVolume || 0))
+      .slice(0, limit);
+    return { items, costUsd };
+  }
+
   // ════════════════════════════════════════════════════════════════
   // API CALL METHODS
   // ════════════════════════════════════════════════════════════════

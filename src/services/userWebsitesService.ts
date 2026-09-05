@@ -135,6 +135,32 @@ export interface SeoArticleRow {
   completed_at: string | null;
 }
 
+export interface PageGscQuery {
+  query: string;
+  impressions: number;
+  clicks: number;
+  ctr: number | null;
+  position: number | null;
+  days_seen: number;
+}
+
+export interface PageKeywordIdea {
+  term: string;
+  search_volume: number | null;
+  cpc: number | null;
+  competition: number | null;
+}
+
+export interface PageKeywordIdeas {
+  seed: string;
+  page: string;
+  location_code: number;
+  language_code: string;
+  ideas: PageKeywordIdea[];
+  /** What the provider reported for the two calls; null = it reported nothing (the reserve stands). */
+  cost_usd: number | null;
+}
+
 export interface SeoKeywordResearchRow {
   id: string;
   topic: string;
@@ -803,6 +829,33 @@ export const userWebsitesService = {
     if (error) throw error;
     return ((data as { url: string; title: string | null }[]) || [])
       .filter((r): r is { url: string; title: string } => !!r.title);
+  },
+
+  /**
+   * The queries Google already shows ONE page for — impressions, clicks, CTR and
+   * impression-weighted position over the window. Demand that exists, on a page that
+   * exists, measured by Google: the truest keyword suggestion there is for a page.
+   */
+  async pageGscQueries(websiteId: string, page: string, days = 90): Promise<PageGscQuery[]> {
+    const { data, error } = await supabase.rpc('get_page_gsc_queries' as any, {
+      p_website_id: websiteId, p_page: page, p_days: days,
+    } as any);
+    if (error) throw error;
+    return (data as PageGscQuery[]) || [];
+  },
+
+  /**
+   * Paid keyword ideas seeded from a page's title (DataForSEO, Greek market). One
+   * credit-debited call; the edge function refuses before spending if the workspace
+   * is not entitled or out of credits.
+   */
+  async pageKeywordIdeas(websiteId: string, page: string): Promise<PageKeywordIdeas> {
+    const { data, error } = await supabase.functions.invoke('seo-api', {
+      body: { action: 'page_ideas', website_id: websiteId, page },
+    });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Could not fetch keyword ideas'));
+    if (!data?.success) throw new Error(data?.error || 'Could not fetch keyword ideas');
+    return data.data as PageKeywordIdeas;
   },
 
   /** The keyword strings this site tracks, lower-cased, for de-duplicating suggestions. */

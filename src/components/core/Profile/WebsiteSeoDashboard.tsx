@@ -27,9 +27,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/core/ui/badge';
 import { Dialog, DialogContent, DialogTitle } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { Input } from '@/components/core/ui/input';
 import {
   userWebsitesService,
   describeCrawlResult,
+  type PageGscQuery,
+  type PageKeywordIdeas,
   type UserWebsite,
   type WebsiteSeoOverview,
   type SeoArticleRow,
@@ -178,6 +181,45 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
     const prompt = `Research the keyword "${keyword}" for ${siteHost} in the Greek market (GR, el): search volume, difficulty, what the results page shows, keyword clusters and who ranks now.`;
     navigate(`/agent-hub?agent=kai&prompt=${encodeURIComponent(prompt)}`);
   };
+
+  // ── Suggestions for ONE chosen page ─────────────────────────────────────
+  // Two sources, in order of trust: the queries Google already shows the page for
+  // (free, from Search Console rows we hold), then paid keyword ideas seeded from
+  // the page's title (one DataForSEO call, credit-debited by the edge function).
+  const [pageQuery, setPageQuery] = useState('');
+  const [chosenPage, setChosenPage] = useState<{ url: string; title: string } | null>(null);
+  const [pageQueries, setPageQueries] = useState<PageGscQuery[] | null>(null);
+  const [pageIdeas, setPageIdeas] = useState<PageKeywordIdeas | null>(null);
+  const [ideasBusy, setIdeasBusy] = useState(false);
+  const pageMatches = pageQuery.trim().length < 2
+    ? []
+    : pageTitles
+      .filter((p) => p.title.toLowerCase().includes(pageQuery.toLowerCase()) || p.url.toLowerCase().includes(pageQuery.toLowerCase()))
+      .slice(0, 8);
+  const choosePage = async (p: { url: string; title: string }) => {
+    setChosenPage(p);
+    setPageQuery(p.title);
+    setPageIdeas(null);
+    setPageQueries(null);
+    try {
+      setPageQueries(await userWebsitesService.pageGscQueries(website.id, p.url, 90));
+    } catch (e: any) {
+      toast({ title: 'Could not read Search Console rows for this page', description: e.message, variant: 'destructive' });
+      setPageQueries([]);
+    }
+  };
+  const fetchIdeas = async () => {
+    if (!chosenPage) return;
+    setIdeasBusy(true);
+    try {
+      setPageIdeas(await userWebsitesService.pageKeywordIdeas(website.id, chosenPage.url));
+    } catch (e: any) {
+      toast({ title: 'Could not fetch keyword ideas', description: e.message, variant: 'destructive' });
+    } finally {
+      setIdeasBusy(false);
+    }
+  };
+  const seedOf = (title: string) => title.split(/\s+[|–—-]\s+/)[0].replace(/\s+/g, ' ').trim();
 
   // ── Domain audit history ────────────────────────────────────────────────
   const [openDomain, setOpenDomain] = useState<SeoTrackedDomainRow | null>(null);
@@ -643,16 +685,170 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
             </CardContent>
           </Card>
 
-          {suggestions.length > 0 && (
+          {(suggestions.length > 0 || pageTitles.length > 0) && (
             <Card className="dashboard-card mt-4">
               <CardHeader>
                 <CardTitle className="text-base">Suggested from your pages</CardTitle>
                 <CardDescription>
-                  Titles of pages this site already has, that are neither tracked nor researched yet. Research one
-                  to size it up, or track it straight away to follow its position.
+                  Pick one of your pages to see the queries Google already shows it for and to get keyword ideas
+                  around its title. Below that, page titles that are neither tracked nor researched yet.
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                <div className="relative max-w-xl">
+                  <Input
+                    value={pageQuery}
+                    onChange={(e) => { setPageQuery(e.target.value); if (chosenPage) { setChosenPage(null); setPageQueries(null); setPageIdeas(null); } }}
+                    placeholder="Type part of a page title or URL — e.g. πλακάκια, /thessaloniki/marmaro"
+                    aria-label="Find one of your pages"
+                  />
+                  {!chosenPage && pageMatches.length > 0 && (
+                    <div className="absolute z-10 mt-1 w-full rounded-sm border border-hairline bg-card shadow-overlay">
+                      {pageMatches.map((p) => (
+                        <button
+                          key={p.url}
+                          type="button"
+                          className="block w-full truncate px-3 py-1.5 text-left text-xs hover:bg-surface-sunken"
+                          onClick={() => void choosePage(p)}
+                          title={p.url}
+                        >
+                          <span className="text-foreground">{p.title}</span>
+                          <span className="ml-2 text-muted-foreground">{p.url.replace(/^https?:\/\/[^/]+/, '')}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {chosenPage && (
+                  <div className="space-y-4 rounded-sm border border-hairline p-3">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <a href={chosenPage.url} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate text-sm font-medium text-foreground hover:underline">
+                        {chosenPage.title}
+                      </a>
+                      <span className="text-[11px] text-muted-foreground">seed: “{seedOf(chosenPage.title)}”</span>
+                    </div>
+
+                    <div>
+                      <p className="mb-1 text-xs font-semibold text-muted-foreground">Queries Google already shows this page for (90 days)</p>
+                      {pageQueries == null ? (
+                        <Loading />
+                      ) : pageQueries.length === 0 ? (
+                        <HubEmptyState
+                          variant="empty"
+                          title="Google has not shown this page for any query yet"
+                          description="Either it has no impressions in the window, or Search Console is not connected under Search Performance. Keyword ideas around its title still work."
+                          action={
+                            <Button size="sm" onClick={() => void fetchIdeas()} disabled={ideasBusy || !!pageIdeas}>
+                              {ideasBusy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Search className="mr-1 h-3.5 w-3.5" />}
+                              Get keyword ideas
+                            </Button>
+                          }
+                        />
+                      ) : (
+                        <div className="table-scroll">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Query</TableHead>
+                                <TableHead className="text-right">Impr.</TableHead>
+                                <TableHead className="text-right">Clicks</TableHead>
+                                <TableHead className="text-right">Pos.</TableHead>
+                                <TableHead className="w-36" />
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {pageQueries.slice(0, 30).map((q) => (
+                                <TableRow key={q.query}>
+                                  <TableCell className="max-w-[260px] truncate font-medium">{q.query}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{formatNumber(q.impressions)}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{formatNumber(q.clicks)}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{q.position != null ? q.position : '—'}</TableCell>
+                                  <TableCell>
+                                    <div className="flex justify-end gap-0.5">
+                                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => researchKeyword(q.query)}>Research</Button>
+                                      {tracked.has(q.query.toLowerCase()) ? (
+                                        <span className="self-center text-[11px] text-muted-foreground">tracked</span>
+                                      ) : (
+                                        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" disabled={trackingKeywords === q.query}
+                                          onClick={() => void trackKeywords([q.query], q.query)}>
+                                          {trackingKeywords === q.query ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Track'}
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <div className="mb-1 flex items-baseline justify-between gap-2">
+                        <p className="text-xs font-semibold text-muted-foreground">Keyword ideas around this page's title (Greek market)</p>
+                        {!pageIdeas && (
+                          <Button size="sm" variant="outline" onClick={() => void fetchIdeas()} disabled={ideasBusy}>
+                            {ideasBusy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Search className="mr-1 h-3.5 w-3.5" />}
+                            Get ideas
+                          </Button>
+                        )}
+                      </div>
+                      {pageIdeas && (
+                        pageIdeas.ideas.length === 0 ? (
+                          <HubEmptyState
+                            variant="empty"
+                            title={`The source returned no ideas for “${pageIdeas.seed}”`}
+                            description="Research the seed itself instead — the full run also reads the results page and who ranks."
+                            action={<Button size="sm" onClick={() => researchKeyword(pageIdeas.seed)}>Research “{pageIdeas.seed}”</Button>}
+                          />
+                        ) : (
+                          <div className="table-scroll">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Keyword</TableHead>
+                                  <TableHead className="text-right">Volume</TableHead>
+                                  <TableHead className="text-right">CPC</TableHead>
+                                  <TableHead className="text-right">Competition</TableHead>
+                                  <TableHead className="w-36" />
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {pageIdeas.ideas.map((k) => (
+                                  <TableRow key={k.term}>
+                                    <TableCell className="max-w-[260px] truncate font-medium">{k.term}</TableCell>
+                                    <TableCell className="text-right tabular-nums">{k.search_volume != null ? formatNumber(k.search_volume) : '—'}</TableCell>
+                                    <TableCell className="text-right tabular-nums">{k.cpc != null ? `$${k.cpc.toFixed(2)}` : '—'}</TableCell>
+                                    <TableCell className="text-right tabular-nums">{k.competition != null ? `${Math.round(k.competition * 100)}%` : '—'}</TableCell>
+                                    <TableCell>
+                                      <div className="flex justify-end gap-0.5">
+                                        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => researchKeyword(k.term)}>Research</Button>
+                                        {tracked.has(k.term.toLowerCase()) ? (
+                                          <span className="self-center text-[11px] text-muted-foreground">tracked</span>
+                                        ) : (
+                                          <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" disabled={trackingKeywords === k.term}
+                                            onClick={() => void trackKeywords([k.term], k.term)}>
+                                            {trackingKeywords === k.term ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Track'}
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {suggestions.length > 0 && (
+                  <p className="text-xs font-semibold text-muted-foreground">Page titles not yet tracked or researched</p>
+                )}
                 <div className="grid gap-1.5 sm:grid-cols-2">
                   {suggestions.map((sg) => (
                     <div key={sg.keyword} className="flex items-center gap-2 rounded-sm border border-hairline px-2.5 py-1.5">

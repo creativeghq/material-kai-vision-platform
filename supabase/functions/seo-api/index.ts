@@ -11,6 +11,7 @@ import { handleWrite } from './handlers/write.ts';
 import { handlePipeline } from './handlers/pipeline.ts';
 import { handleToolkitAudit } from './handlers/toolkit-audit.ts';
 import { handleToolkitResearch } from './handlers/toolkit-research.ts';
+import { handlePageIdeas } from './handlers/page-ideas.ts';
 
 const ROUTES: Record<string, (req: Request, body: any) => Promise<Response>> = {
   research: handleResearch,
@@ -20,6 +21,7 @@ const ROUTES: Record<string, (req: Request, body: any) => Promise<Response>> = {
   pipeline: handlePipeline,
   toolkit_audit: handleToolkitAudit,
   toolkit_research: handleToolkitResearch,
+  page_ideas: handlePageIdeas,
 };
 
 Deno.serve(withApiLogging('seo-api', async (req) => {

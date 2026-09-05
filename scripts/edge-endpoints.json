@@ -5543,7 +5543,7 @@
     "name": "seo-api",
     "tag": "SEO",
     "summary": "Unified SEO API — action-discriminated keyword research, planning, writing, analysis, and toolkit.",
-    "description": "Single POST endpoint routing on body.action to one of seven handlers: research, plan, write, analyze, pipeline, toolkit_audit, toolkit_research. All handlers require Supabase JWT auth and debit user credits. toolkit_audit also accepts x-cron-secret for cron-mode batch auditing.",
+    "description": "Single POST endpoint routing on body.action to one of eight handlers: research, plan, write, analyze, pipeline, toolkit_audit, toolkit_research, page_ideas. All handlers require Supabase JWT auth and debit user credits. toolkit_audit also accepts x-cron-secret for cron-mode batch auditing.",
     "security": [
       "supabaseJwt",
       "cronSecret"
@@ -5757,6 +5757,25 @@
           }
         ],
         "response": "{ok: boolean, run_id: string, opportunities: object}"
+      },
+      {
+        "name": "page_ideas",
+        "summary": "Keyword ideas for ONE of the site's own indexed pages, seeded from its stored title (DataForSEO Google Ads expansion + Labs related keywords, GR/el). Membership, seo-toolkit entitlement and a credit reserve precede the call; the reserve settles against the provider's reported cost.",
+        "params": [
+          {
+            "name": "website_id",
+            "type": "string",
+            "required": true,
+            "desc": "user_websites.id; the caller must be a member of its workspace."
+          },
+          {
+            "name": "page",
+            "type": "string",
+            "required": true,
+            "desc": "URL of a page in the site's index (user_website_pages). The seed is the stored title, never the URL text."
+          }
+        ],
+        "response": "{success: boolean, data: {seed: string, page: string, location_code: number, language_code: string, ideas: [{term, search_volume, cpc, competition}], cost_usd: number|null}}"
       }
     ],
     "request": [
@@ -5764,7 +5783,7 @@
         "name": "action",
         "type": "string",
         "required": true,
-        "desc": "One of: research | plan | write | analyze | pipeline | toolkit_audit | toolkit_research"
+        "desc": "One of: research | plan | write | analyze | pipeline | toolkit_audit | toolkit_research | page_ideas"
       }
     ],
     "response": "{success: boolean, data: object}"
