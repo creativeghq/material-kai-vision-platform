@@ -65,6 +65,19 @@ export const VOCABULARIES = [
     'supabase/functions/_shared/contractVocabulary.generated.ts',
   ],
   [
+    // What kind of business document an inbox attachment is. The edge needs it for the
+    // classifier's forced-tool enum; the client needs it for the tag and the "Add as expense"
+    // decision. One list, or the tag offers a kind the classifier cannot return.
+    'src/modules/messaging/inboxDocumentKinds.ts',
+    'supabase/functions/_shared/inboxDocumentKinds.generated.ts',
+  ],
+  [
+    // How a golden-case run failed. `agent_eval_runs_failure_class_check` is the enforcer; the
+    // scorer in agent-eval emits these and a future evals page labels them.
+    'src/config/agentEvalVocabulary.ts',
+    'supabase/functions/_shared/agentEvalVocabulary.generated.ts',
+  ],
+  [
     // The drawing register's value-sets. `scan-drawing-title-block` snaps what it reads off a
     // title block onto the same lists the register's pickers offer — a model answers
     // "FOR CONSTRUCTION" / "Construction Issue" / "Issued for Construction" for one status, and a

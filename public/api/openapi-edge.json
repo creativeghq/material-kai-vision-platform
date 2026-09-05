@@ -15169,6 +15169,69 @@
                       "action": {
                         "type": "string",
                         "enum": [
+                          "enrich_attachments"
+                        ],
+                        "description": "Run the attachment reader on one message: transcribe its voice notes (Gemini) and classify its PDFs and photos (kind, confidence, reason, printed header facts) with a forced Claude tool call. Every attachment ends with a status on the row — ok, failed or skipped, with the reason. Members only; the member who asks pays, credits reserved before the call"
+                      },
+                      "thread_id": {
+                        "type": "string",
+                        "description": "string (uuid)"
+                      },
+                      "message_id": {
+                        "type": "string",
+                        "description": "string (uuid)"
+                      },
+                      "force": {
+                        "type": "boolean",
+                        "description": "Re-read an attachment that already carries an ok verdict (after a prompt correction, or a retry)"
+                      }
+                    },
+                    "description": "Returns: {ok, results: [{index, family, wrote: 'transcript'|'document'|'none', status: 'ok'|'failed'|'skipped'|'already'|'none', transcript?, document?}], attachments}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "thread_id",
+                      "question"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "ask_spreadsheet"
+                        ],
+                        "description": "Ask a question of a CSV/XLSX attachment on a thread. MIVAA loads it into an in-memory DuckDB, a forced Claude tool writes ONE read-only SELECT, the query is parsed and allow-listed (no writes, no file or network functions, only the loaded tables), the engine is locked before it runs, and the answer comes back with the SQL and rows that produced it. Members only; the asker's credits are reserved before a token is spent and settled against MIVAA's reported usage"
+                      },
+                      "thread_id": {
+                        "type": "string",
+                        "description": "string (uuid)"
+                      },
+                      "question": {
+                        "type": "string"
+                      },
+                      "message_id": {
+                        "type": "string",
+                        "description": "The message carrying the spreadsheet. Default: the latest spreadsheet attachment on the thread (string (uuid))"
+                      },
+                      "attachment_index": {
+                        "type": "integer",
+                        "description": "Which attachment on that message (0-based). Default: the first spreadsheet"
+                      }
+                    },
+                    "description": "Returns: {ok, status: 'ok'|'failed', message_id, file_name, answer, caveat, sql, columns, rows (≤100), row_count, attempts: [{attempt, sql, outcome}], tables, error?}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "thread_id",
+                      "message_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
                           "pin_message"
                         ],
                         "description": "Pin a message to the top of the conversation for everyone, or unpin it. Local to this inbox — WhatsApp exposes no way to pin on the customer’s side"

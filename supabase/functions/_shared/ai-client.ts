@@ -383,6 +383,77 @@ export interface AIGenerateResult<T = string> {
   model: string;
 }
 
+// ── Gemini: audio → text ──
+// The recording travels as a FILE PART in the user message; Gemini is the one text model behind
+// this client that accepts audio inline. The transcript is plain text, on purpose: a voice note is
+// the customer's words, and the reader (a person in the inbox, or the assistant) wants them as
+// said, not as a schema. Cost lands in ai_usage_logs like every other call here.
+export async function transcribeAudioWithGemini(
+  audio: Uint8Array,
+  mediaType: string,
+  config: AIGenerateConfig & {
+    systemPrompt: string;
+    /** The user-turn text beside the recording. Default: a bare instruction to transcribe. */
+    instruction?: string;
+    /** Upstream ceiling. A voice note is seconds long; a minute of silence here is a stuck call. */
+    timeoutMs?: number;
+  },
+): Promise<AIGenerateResult<string>> {
+  const modelId = config.model || DEFAULT_GEMINI_MODEL;
+  const _start = Date.now();
+  const task = config.task ?? 'gemini_audio_transcription';
+
+  try {
+    const result = await generateText({
+      model: google(modelId),
+      system: config.systemPrompt,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'file', data: audio, mediaType },
+          { type: 'text', text: config.instruction ?? 'Transcribe this recording.' },
+        ],
+      }],
+      temperature: config.temperature ?? 0,
+      maxOutputTokens: config.maxTokens ?? 2048,
+      abortSignal: AbortSignal.timeout(config.timeoutMs ?? 60_000),
+    });
+
+    const usage = await result.usage;
+    const inputTokens = usage?.inputTokens ?? 0;
+    const outputTokens = usage?.outputTokens ?? 0;
+
+    void _logTrackedCall({
+      task,
+      userId: config.userId,
+      workspaceId: config.workspaceId,
+      model: modelId,
+      inputTokens,
+      outputTokens,
+      latencyMs: Date.now() - _start,
+    });
+
+    return {
+      output: result.text,
+      text: result.text,
+      usage: { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens },
+      model: modelId,
+    };
+  } catch (err) {
+    void _logTrackedCall({
+      task,
+      userId: config.userId,
+      workspaceId: config.workspaceId,
+      model: modelId,
+      inputTokens: 0,
+      outputTokens: 0,
+      latencyMs: Date.now() - _start,
+      errorMessage: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
+}
+
 // ── Gemini: Text generation ──
 export async function generateWithGemini(
   prompt: string,

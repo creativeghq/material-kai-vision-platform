@@ -105,6 +105,8 @@ export const APP_DESTINATIONS: readonly AppDestination[] = [
   // The Orders pane is keyed `doc_orders`, not `orders` — read from the module's own constant so
   // this cannot become the "valid URL, blank pane" link that FINANCE_TAB was written to stop.
   { id: 'finance-orders', breadcrumb: 'Finance → Orders', route: `${FINANCE_BASE}?tab=${FINANCE_TAB.orders}` },
+  // Where a supplier invoice that arrived in the Inbox is booked. The attachment card links here.
+  { id: 'finance-expenses', breadcrumb: 'Finance → Expenses', route: `${FINANCE_BASE}?tab=${FINANCE_TAB.expenses}`, aliases: ['Finance → Bills'] },
   { id: 'marketing-email', breadcrumb: 'Marketing → Email', route: '/marketing/email' },
   { id: 'automations', breadcrumb: 'Marketing → Automations', route: '/automations' },
 

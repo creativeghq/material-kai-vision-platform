@@ -250,10 +250,11 @@ const KAI_TOOLS: AgentToolEntry[] = [
   {
     id: 'manage_inbox', name: 'Inbox', category: 'Inbox',
     moduleSlug: 'inbox',
-    desc: 'List customer conversations and reply to one (a customer-facing reply asks for Approve/Decline first).',
+    desc: 'List customer conversations, reply to one (a customer-facing reply asks for Approve/Decline first), or ask a question of a spreadsheet a customer or supplier sent.',
     examples: [
       'Show my open customer conversations',
       'Reply to that thread …',
+      'What is the total of the price list they sent in that conversation?',
     ],
   },
 
@@ -1739,6 +1740,11 @@ export const TOOLKITS: ToolkitDefinition[] = [
       },
       // Replying needs a thread_id only the list above can supply.
       { label: 'Reply to a thread', description: 'Draft and send a customer reply', prompt: 'Help me reply to a customer conversation.', icon: 'Send' },
+      // A question needs a thread_id too, and the question itself; the model asks for both.
+      {
+        label: 'Ask a spreadsheet they sent', description: 'Question a price list or order sheet from a conversation', icon: 'ListChecks',
+        prompt: 'A customer or supplier sent a spreadsheet in one of my inbox conversations — help me ask it a question (totals, a filter, a ranking).',
+      },
     ],
   },
   {

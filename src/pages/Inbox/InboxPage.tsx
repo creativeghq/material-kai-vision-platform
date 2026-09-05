@@ -18,6 +18,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 import { marketplaceService } from '@/services/marketplaceService';
 import { messagingService } from '@/modules/messaging/services/messagingService';
+import {
+  INBOX_DOCUMENT_KIND_LABELS, INBOX_DOCUMENT_KINDS_BOOKABLE_AS_EXPENSE, INBOX_DOCUMENT_KIND_LOW_CONFIDENCE,
+} from '@/modules/messaging/inboxDocumentKinds';
+import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import {
   castObjectFor, castObjectForSlot, castSlotFor, normalizeCastSlot, nameGender,
@@ -1540,6 +1544,7 @@ const InboxPage: React.FC = () => {
                     // wrong bubble, which looks like a working feature giving a wrong answer.
                     mood={messageMoods[m.id]}
                     isCustomerThread={activeThread.thread_type !== 'internal'}
+                    workspaceId={activeThread.workspace_id}
                     onAttachmentsRepaired={() => { void openThread(activeThread.id); }}
                     onReplyTo={(msg) => setReplyTo(msg)}
                     onReact={async (msg, emoji) => {
@@ -2466,13 +2471,184 @@ const AttachmentLightbox: React.FC<{
   );
 };
 
+/** A reader's machine reason, said the way the operator would say it. */
+function enrichmentReasonText(raw: string | undefined): string {
+  if (!raw) return 'skipped';
+  if (raw.startsWith('too_large')) return 'the file is too large to read';
+  if (raw === 'no_billing_user') return 'no workspace owner to bill';
+  if (raw === 'not_stored') return 'the file was never downloaded';
+  if (raw === 'download_failed') return 'the file could not be fetched from storage';
+  if (raw.startsWith('unsupported_image_type')) return 'this image type cannot be read';
+  return raw.replace(/_/g, ' ');
+}
+
+/**
+ * The words in a voice note, under its player.
+ *
+ * Written by the inbound reader as the note arrives; this renders what the row holds, and offers
+ * the same reader for a note filed before it existed or one that failed. The assistant reads the
+ * identical text (see `describeAttachmentForAssistant`), so what you see here is what it was told.
+ */
+const AttachmentTranscript: React.FC<{
+  att: InboxAttachment;
+  threadId?: string;
+  messageId?: string;
+  onRefreshed?: () => void;
+}> = ({ att, threadId, messageId, onRefreshed }) => {
+  const [running, setRunning] = useState(false);
+  const { toast } = useToast();
+  const t = att.transcript;
+  const canRun = !!threadId && !!messageId;
+
+  const run = async () => {
+    if (!threadId || !messageId) return;
+    setRunning(true);
+    try {
+      const r = await inboxApi.enrichAttachments({ thread_id: threadId, message_id: messageId, force: true });
+      const mine = r.results.find((x) => x.wrote === 'transcript');
+      if (mine?.status === 'ok') onRefreshed?.();
+      else {
+        toast({
+          title: 'Could not transcribe it',
+          description: mine?.transcript?.error ?? enrichmentReasonText(mine?.transcript?.reason),
+          variant: 'destructive',
+        });
+      }
+    } catch (e) {
+      toast({ title: 'Could not transcribe it', description: (e as Error).message, variant: 'destructive' });
+    } finally { setRunning(false); }
+  };
+
+  if (t?.status === 'ok' && t.text) {
+    return (
+      <div className="mt-1.5 max-w-[420px] rounded-sm border border-hairline bg-surface-sunken px-2.5 py-2">
+        <div className="mb-0.5 text-[10px] font-semibold text-muted-foreground">Transcript</div>
+        <p className="whitespace-pre-wrap break-words text-xs">{t.text}</p>
+      </div>
+    );
+  }
+  const why = t?.status === 'failed'
+    ? (t.error ?? 'transcription failed')
+    : t?.status === 'skipped' ? enrichmentReasonText(t.reason) : null;
+  return (
+    <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
+      <span className="truncate">{why ? `Not transcribed: ${why}` : 'Not transcribed yet'}</span>
+      {canRun && (
+        <Button size="sm" variant="outline" className="h-6 shrink-0 px-2 text-[11px]" disabled={running} onClick={run}>
+          {running ? <Loader2 className="h-3 w-3 animate-spin" /> : <><Sparkles className="mr-1 h-3 w-3" />Transcribe</>}
+        </Button>
+      )}
+    </div>
+  );
+};
+
+/**
+ * What a PDF or photo IS, under its card: the kind the reader decided, how sure it was, the facts
+ * printed on it — and, for a supplier invoice or receipt, the one action that follows from it.
+ *
+ * The expense opens with the supplier and a description PREFILLED and the amount EMPTY: the
+ * document's total is gross and the form's amount is net, and guessing the VAT split books a
+ * cost with its tax folded into the net. The total is named in the description instead.
+ */
+const AttachmentDocumentTag: React.FC<{
+  att: InboxAttachment;
+  family: 'pdf' | 'image';
+  threadId?: string;
+  messageId?: string;
+  workspaceId?: string;
+  onRefreshed?: () => void;
+}> = ({ att, family, threadId, messageId, workspaceId, onRefreshed }) => {
+  const [running, setRunning] = useState(false);
+  const [expenseOpen, setExpenseOpen] = useState(false);
+  const { toast } = useToast();
+  const d = att.document;
+  const canRun = !!threadId && !!messageId;
+
+  const run = async () => {
+    if (!threadId || !messageId) return;
+    setRunning(true);
+    try {
+      const r = await inboxApi.enrichAttachments({ thread_id: threadId, message_id: messageId, force: true });
+      const mine = r.results.find((x) => x.wrote === 'document');
+      if (mine?.status === 'ok') onRefreshed?.();
+      else {
+        toast({
+          title: 'Could not read it',
+          description: mine?.document?.error ?? enrichmentReasonText(mine?.document?.skip_reason),
+          variant: 'destructive',
+        });
+      }
+    } catch (e) {
+      toast({ title: 'Could not read it', description: (e as Error).message, variant: 'destructive' });
+    } finally { setRunning(false); }
+  };
+
+  if (d?.status === 'ok' && d.kind) {
+    // A photo tagged "Photo" tells the operator nothing; every other verdict on an image does.
+    if (family === 'image' && d.kind === 'photo') return null;
+    const label = INBOX_DOCUMENT_KIND_LABELS[d.kind] ?? d.kind;
+    const pct = typeof d.confidence === 'number' ? Math.round(d.confidence * 100) : null;
+    const unsure = typeof d.confidence === 'number' && d.confidence < INBOX_DOCUMENT_KIND_LOW_CONFIDENCE;
+    const bookable = INBOX_DOCUMENT_KINDS_BOOKABLE_AS_EXPENSE.includes(d.kind) && !!workspaceId;
+    const money = typeof d.total === 'number' ? formatMoney(d.total, d.currency ?? 'EUR') : null;
+    const facts = [d.issuer, d.document_number ? `no. ${d.document_number}` : null, d.document_date, money]
+      .filter((x): x is string => !!x).join(' · ');
+    const description = `${label}${d.document_number ? ` ${d.document_number}` : ''}`
+      + `${d.issuer ? ` from ${d.issuer}` : ''}${d.document_date ? ` dated ${d.document_date}` : ''}`
+      + `${money ? ` — total on document ${money} (gross, VAT not split)` : ''}`
+      + ` · from Inbox attachment${att.name ? ` ${att.name}` : ''}`;
+    return (
+      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
+        <Badge variant={unsure ? 'warning' : 'info'} title={d.reason}>
+          {label}{pct !== null ? ` · ${pct}%` : ''}{unsure ? ' · unsure' : ''}
+        </Badge>
+        {facts && <span className="max-w-[280px] truncate text-muted-foreground" title={facts}>{facts}</span>}
+        {bookable && workspaceId && (
+          <>
+            <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" onClick={() => setExpenseOpen(true)}>
+              <Wallet className="mr-1 h-3 w-3" />Add as expense
+            </Button>
+            <NewExpenseDialog
+              workspaceId={workspaceId}
+              open={expenseOpen}
+              onOpenChange={setExpenseOpen}
+              onCreated={() => { setExpenseOpen(false); toast({ title: 'Expense recorded' }); }}
+              prefill={{ description, supplier: d.issuer ? { name: d.issuer } : undefined }}
+            />
+          </>
+        )}
+      </div>
+    );
+  }
+
+  const why = d?.status === 'failed'
+    ? (d.error ?? 'reading failed')
+    : d?.status === 'skipped' ? enrichmentReasonText(d.skip_reason) : null;
+  // A PDF that was never read is offered the reader; a photo that was never read is a photo.
+  if (!why && family === 'image') return null;
+  return (
+    <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
+      <span className="truncate">{why ? `Not read: ${why}` : 'Not read yet'}</span>
+      {canRun && (
+        <Button size="sm" variant="outline" className="h-6 shrink-0 px-2 text-[11px]" disabled={running} onClick={run}>
+          {running ? <Loader2 className="h-3 w-3 animate-spin" /> : <><Sparkles className="mr-1 h-3 w-3" />Read it</>}
+        </Button>
+      )}
+    </div>
+  );
+};
+
 const AttachmentView: React.FC<{
   att: InboxAttachment;
   href?: string;
   /** For the retry: repair is scoped to the one message rather than the whole workspace. */
   messageId?: string;
+  /** For the attachment reader (transcribe / classify), which is scoped the same way. */
+  threadId?: string;
+  /** The thread's workspace — the expense a supplier invoice becomes is booked there. */
+  workspaceId?: string;
   onRepaired?: () => void;
-}> = ({ att, href, messageId, onRepaired }) => {
+}> = ({ att, href, messageId, threadId, workspaceId, onRepaired }) => {
   const name = att.name || 'attachment';
   const ct = (att.content_type || '').toLowerCase();
   const ext = name.split('.').pop()?.toLowerCase() ?? '';
@@ -2565,6 +2741,9 @@ const AttachmentView: React.FC<{
                        group-hover:border-primary/40 transition-colors"
           />
         </button>
+        <AttachmentDocumentTag
+          att={att} family="image" threadId={threadId} messageId={messageId} workspaceId={workspaceId} onRefreshed={onRepaired}
+        />
         <AttachmentLightbox open={zoom} onOpenChange={setZoom} href={href} name={name} kind="image" att={att} />
       </>
     );
@@ -2575,7 +2754,12 @@ const AttachmentView: React.FC<{
     return <video src={href} controls preload="metadata" className="mt-1.5 max-h-64 w-full rounded-sm border border-hairline" />;
   }
   if (kind === 'audio') {
-    return <audio src={href} controls preload="metadata" className="mt-1.5 w-full max-w-[260px]" />;
+    return (
+      <>
+        <audio src={href} controls preload="metadata" className="mt-1.5 w-full max-w-[260px]" />
+        <AttachmentTranscript att={att} threadId={threadId} messageId={messageId} onRefreshed={onRepaired} />
+      </>
+    );
   }
   if (kind === 'pdf') {
     // A PDF is unreadable at bubble width, so the bubble gets a card and the READING happens in
@@ -2596,6 +2780,9 @@ const AttachmentView: React.FC<{
             </span>
           </span>
         </button>
+        <AttachmentDocumentTag
+          att={att} family="pdf" threadId={threadId} messageId={messageId} workspaceId={workspaceId} onRefreshed={onRepaired}
+        />
         <AttachmentLightbox open={zoom} onOpenChange={setZoom} href={href} name={name} kind="pdf" att={att} />
       </>
     );
@@ -2633,10 +2820,12 @@ const MessageBubble: React.FC<{
   onDelete?: (m: InboxMessage) => void;
   /** This message's own read mood, from the conversation analysis. Absent = never analysed. */
   mood?: string | null;
+  /** The thread's workspace, for the expense a classified supplier invoice can become. */
+  workspaceId?: string;
 }> = ({
   m, info, myUserId, isCustomerThread, onAttachmentsRepaired, onReplyTo, onReact,
   onPrivateReply, onToggleHidden, mood, onForward, onTogglePin, onToggleStar, starred,
-  onAddToNote, onDelete,
+  onAddToNote, onDelete, workspaceId,
 }) => {
   const { toast } = useToast();
   const [urls, setUrls] = useState<Record<string, string>>({});
@@ -2877,7 +3066,8 @@ const MessageBubble: React.FC<{
             return (
               <AttachmentView
                 key={k || i} att={a} href={urls[k] || a.url}
-                messageId={m.id} onRepaired={onAttachmentsRepaired}
+                messageId={m.id} threadId={m.thread_id} workspaceId={workspaceId}
+                onRepaired={onAttachmentsRepaired}
               />
             );
           })}

@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { parseEdgeError } from '@/utils/edgeError';
+import type { InboxDocumentKind } from '@/modules/messaging/inboxDocumentKinds';
 
 /**
  * Multi-Tenant Inbox client. Thin wrapper over the single `inbox-api` edge function
@@ -121,6 +122,35 @@ export interface InboxLinkPreview {
   error?: string | null;
 }
 
+export type InboxAttachmentEnrichmentStatus = 'ok' | 'failed' | 'skipped';
+
+/** A voice note's words, written on the attachment by the inbound reader (or the retry button). */
+export interface InboxAttachmentTranscript {
+  status: InboxAttachmentEnrichmentStatus;
+  text?: string;
+  model?: string;
+  transcribed_at?: string;
+  error?: string;
+  reason?: string;
+}
+
+/** What kind of business document a PDF or photo is, with the header facts when printed. */
+export interface InboxAttachmentDocument {
+  status: InboxAttachmentEnrichmentStatus;
+  kind?: InboxDocumentKind;
+  confidence?: number;
+  reason?: string;
+  issuer?: string;
+  document_number?: string;
+  document_date?: string;
+  total?: number;
+  currency?: string;
+  model?: string;
+  classified_at?: string;
+  error?: string;
+  skip_reason?: string;
+}
+
 export interface InboxAttachment {
   storage_bucket?: string;
   storage_object_path?: string;
@@ -129,6 +159,19 @@ export interface InboxAttachment {
   name?: string;
   content_type?: string;
   size?: number;
+  /** Present once the reader has run on an audio attachment. Absent = never read. */
+  transcript?: InboxAttachmentTranscript;
+  /** Present once the reader has run on a PDF or image. Absent = never read. */
+  document?: InboxAttachmentDocument;
+}
+
+export interface InboxEnrichmentResult {
+  index: number;
+  family: 'audio' | 'pdf' | 'image' | 'other';
+  wrote: 'transcript' | 'document' | 'none';
+  status: InboxAttachmentEnrichmentStatus | 'already' | 'none';
+  transcript?: InboxAttachmentTranscript;
+  document?: InboxAttachmentDocument;
 }
 
 export interface InboxMessage {
@@ -443,6 +486,14 @@ export const inboxApi = {
   },
   getThreadContext(thread_id: string) {
     return call<InboxThreadContext>('get_thread_context', { thread_id });
+  },
+  /**
+   * Run the attachment reader on one message: transcribe its voice notes, classify its PDFs and
+   * photos. Member-only; the member who asks pays. `force` re-reads an attachment that already
+   * carries a verdict.
+   */
+  enrichAttachments(input: { thread_id: string; message_id: string; force?: boolean }) {
+    return call<{ ok: boolean; results: InboxEnrichmentResult[]; attachments: InboxAttachment[] }>('enrich_attachments', input);
   },
   addParticipant(input: { thread_id: string } & NewParticipantInput) {
     return call<{ participant: InboxParticipant }>('add_participant', input as unknown as Record<string, unknown>);

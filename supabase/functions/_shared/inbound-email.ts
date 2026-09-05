@@ -18,6 +18,7 @@ import PostalMime from 'postal-mime';
 import type { DbClient } from './supabase-client.ts';
 import { emitFlowEvent, emitFlowEventToWorkspaceRoles, emitInboxMessageEvent } from './flow-events.ts';
 import { inboxAutopilotSettings } from './inbox-autopilot.ts';
+import { enrichInboundAttachments } from './inbox-attachment-intelligence.ts';
 
 /** Private bucket for the raw `.eml`. Registered in `build_storage_reference_set()`. */
 export const RAW_EMAIL_BUCKET = 'pdf-documents';
@@ -741,7 +742,7 @@ export async function deliverToInbox(
 
   const attachments = await storeAttachments(db, threadId, parsed.attachments);
 
-  const { error: msgErr } = await db.from('inbox_messages').insert({
+  const { data: insertedMsg, error: msgErr } = await db.from('inbox_messages').insert({
     thread_id: threadId,
     sender_participant_id: customerParticipantId,
     // Store the plain-text body. The HTML is kept in metadata and rendered through
@@ -761,8 +762,22 @@ export async function deliverToInbox(
       email_html: parsed.html,
       thread_matched_by: found.matchedBy,
     },
-  });
+  }).select('id').single();
   if (msgErr) throw new Error(`inbox_messages insert failed: ${msgErr.message}`);
+
+  // READ before anyone is told: an emailed invoice is classified now (kind, confidence, reason,
+  // the printed header facts), so the thread shows what arrived and the assistant is not left
+  // saying it "cannot open" a supplier bill. Each attachment ends with a status on the row; a
+  // failure here never loses the email.
+  if (attachments.length && insertedMsg?.id) {
+    try {
+      await enrichInboundAttachments(db, {
+        messageId: String(insertedMsg.id), threadId, workspaceId, attachments,
+      });
+    } catch (err) {
+      console.warn('[inbound-email] attachment enrichment failed:', err instanceof Error ? err.message : String(err));
+    }
+  }
 
   // Notify every member participant through Flows — never a hardcoded notification insert.
   const { data: members } = await db

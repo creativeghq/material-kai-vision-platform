@@ -112,9 +112,34 @@ export const createManageInboxTool = (
   onChunk?: (chunk: any) => void,
 ) => {
   return tool(
-    async ({ action, status, thread_id, body, internal_note, confirm, agent_state, label_ids, label }) => {
+    async ({ action, status, thread_id, body, internal_note, confirm, agent_state, label_ids, label, message_id, attachment_index, question }) => {
       const gate = await moduleReady(workspaceId);
       if (!gate.ok) return JSON.stringify({ success: false, error: gate.error });
+
+      // Ask a spreadsheet the customer or supplier sent. inbox-api finds the latest CSV/XLSX on the
+      // thread (or the named message), MIVAA answers it with validated read-only SQL over a locked
+      // in-memory DuckDB, and the card shows the SQL and rows beside the answer so the number can
+      // be checked rather than trusted. Member-only; the asker pays.
+      if (action === 'ask_spreadsheet') {
+        if (!thread_id || !question) return JSON.stringify({ success: false, error: 'ask_spreadsheet needs thread_id and question (message_id and attachment_index are optional).' });
+        const r = await callInbox('ask_spreadsheet', { thread_id, message_id, attachment_index, question }, jwt);
+        if (!r.ok) return JSON.stringify({ success: false, error: r.error || `inbox-api ${r.status}` });
+        const d = r.data ?? {};
+        const rows = Array.isArray(d.rows) ? d.rows.slice(0, 25) : [];
+        onChunk?.({
+          type: 'inbox_spreadsheet_answer', thread_id, message_id: d.message_id, question,
+          file_name: d.file_name, answer: d.answer, caveat: d.caveat, sql: d.sql,
+          columns: d.columns, rows, row_count: d.row_count, attempts: Array.isArray(d.attempts) ? d.attempts.length : undefined,
+          timestamp: Date.now(),
+        });
+        if (d.status !== 'ok') {
+          return JSON.stringify({ success: false, error: d.error || 'no valid query after the allowed attempts', attempts: d.attempts, file_name: d.file_name });
+        }
+        return JSON.stringify({
+          success: true, file_name: d.file_name, answer: d.answer, caveat: d.caveat, sql: d.sql,
+          columns: d.columns, rows, row_count: d.row_count,
+        });
+      }
 
       // Set a thread's status (open / snoozed / closed) — e.g. "close this conversation".
       if (action === 'status') {
@@ -233,9 +258,14 @@ export const createManageInboxTool = (
         + 'set a thread\'s labels. Labels are referred to BY NAME — call action:"labels" first if you do '
         + 'not know what exists. A customer-facing reply ALWAYS asks the user to Approve/Decline first '
         + '(never set confirm:true yourself). Use internal_note:true for a private team note (not sent '
-        + 'to the customer, no confirmation).',
+        + 'to the customer, no confirmation). action:"ask_spreadsheet" answers a question about a '
+        + 'CSV/XLSX attachment on a thread (a price list, an order sheet) with validated read-only SQL — '
+        + 'the latest spreadsheet on the thread unless message_id names one.',
       schema: z.object({
-        action: z.enum(['list', 'reply', 'status', 'handover', 'labels', 'label']).default('list'),
+        action: z.enum(['list', 'reply', 'status', 'handover', 'labels', 'label', 'ask_spreadsheet']).default('list'),
+        message_id: z.string().optional().describe('ask_spreadsheet: the message carrying the spreadsheet. Omit for the latest spreadsheet on the thread.'),
+        attachment_index: z.number().int().optional().describe('ask_spreadsheet: which attachment on that message, 0-based. Omit for the first spreadsheet.'),
+        question: z.string().optional().describe('ask_spreadsheet: the question, in plain language ("total per category", "which items cost over 50").'),
         status: z.string().optional().describe('list: filter by thread status. status action: open|snoozed|closed.'),
         thread_id: z.string().optional().describe('the conversation id (reply/status/handover/label).'),
         body: z.string().optional().describe('reply: the message text.'),

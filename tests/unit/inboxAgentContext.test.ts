@@ -198,7 +198,13 @@ describe('the transcript names its speakers and its attachments', () => {
     // notification saying "[attachment]" is fine, a model prompt hiding one is not.
     expect(fn).not.toMatch(/\|\| '\[attachment\]'/);
     expect(fn).toContain('attachments');
-    expect(fn).toMatch(/name \|\| a\.filename/);
+    // The naming moved into the module that WRITES the verdicts on an attachment
+    // (`_shared/inbox-attachment-intelligence.ts`), so a transcribed voice note is quoted and a
+    // classified document is named for what it is — one derivation for the row and the prompt.
+    // The honest wording for an unread file still exists, there.
+    expect(fn).toContain('describeAttachmentForAssistant(');
+    const shared = read('supabase/functions/_shared/inbox-attachment-intelligence.ts');
+    expect(shared).toContain('[attached, and you CANNOT open it:');
   });
 
   it('rewrites a provider placeholder so the model does not quote it as the customer', () => {

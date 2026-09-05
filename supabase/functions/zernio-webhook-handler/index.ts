@@ -40,6 +40,7 @@ import {
 } from '../_shared/inbox-media.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { shouldAutoEngageAgent } from '../_shared/inbox-autopilot.ts';
+import { enrichInboundAttachments } from '../_shared/inbox-attachment-intelligence.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -833,7 +834,7 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
     senderParticipantId = (memberP as { id?: string } | null)?.id ?? null;
   }
 
-  const { error: msgErr } = await supabase.from('inbox_messages').insert({
+  const { data: insertedMsg, error: msgErr } = await supabase.from('inbox_messages').insert({
     thread_id: threadId,
     sender_participant_id: senderParticipantId,
     body: msg.text ?? null,
@@ -853,7 +854,7 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
       // today" is answerable from the row rather than from a guess.
       ...(historical ? { imported: true, sent_at: msg.sentAt ?? null } : {}),
     },
-  });
+  }).select('id').single();
   if (msgErr) {
     // 23505 on inbox_messages_wamid_unique means another delivery of the SAME message won the
     // race between the pre-check above and this insert. That is the index doing its job, not a
@@ -880,6 +881,33 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
     return { outcome: 'filed', reason: 'outgoing echo filed (sent from the device)' };
   }
 
+  // HEARD and READ before anyone is told. A voice note is transcribed and a document is
+  // classified now, so the notification below can carry the words that were spoken and the
+  // assistant's hand-off further down reads a thread that already holds the transcript. Each
+  // attachment ends with a status on the row (ok / failed / skipped, with the reason); a
+  // failure here never stops the message from flowing.
+  let spokenPreview: string | null = null;
+  if (inboundAttachments.length && insertedMsg?.id) {
+    try {
+      const enriched = await enrichInboundAttachments(supabase, {
+        messageId: String(insertedMsg.id), threadId, workspaceId, attachments: inboundAttachments,
+      });
+      const heard = enriched.find((r) => r.transcript?.status === 'ok' && r.transcript.text);
+      if (heard?.transcript?.text && !hasRealText) {
+        spokenPreview = `🎤 ${heard.transcript.text.replace(/\s+/g, ' ').slice(0, 200)}`;
+        // The thread list shows the words, not "[voice message]". The PREVIEW is the caller's
+        // column (inbox-api says so); status and the follow-up state belong to the
+        // `inbox_message_moves_thread_state` trigger and are not touched here.
+        await supabase
+          .from('inbox_threads')
+          .update({ last_message_preview: spokenPreview })
+          .eq('id', threadId);
+      }
+    } catch (err) {
+      console.warn('[zernio-webhook] attachment enrichment failed:', err instanceof Error ? err.message : String(err));
+    }
+  }
+
   // Notify every member participant via the unified inbox event.
   const { data: members } = await supabase
     .from('inbox_participants').select('user_id')
@@ -890,7 +918,8 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
     // Was omitted entirely, so a tenant-scoped flow could not match a WhatsApp message.
     workspaceId,
     title: `WhatsApp · ${contactName || phone}`,
-    body: preview,
+    // The spoken words when there were no typed ones — "[voice message]" tells nobody anything.
+    body: spokenPreview ?? preview,
   });
 
   // Phase-2 agent takeover: if the thread is handed to the AI, let inbox-api generate + relay

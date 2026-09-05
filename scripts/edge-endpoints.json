@@ -7895,6 +7895,58 @@
         "response": "{preview: {url, final_url, cache_status: 'ok'|'no_metadata'|'fetch_failed'|'blocked', title, description, image_url, site_name, error}}"
       },
       {
+        "name": "enrich_attachments",
+        "summary": "Run the attachment reader on one message: transcribe its voice notes (Gemini) and classify its PDFs and photos (kind, confidence, reason, printed header facts) with a forced Claude tool call. Every attachment ends with a status on the row — ok, failed or skipped, with the reason. Members only; the member who asks pays, credits reserved before the call",
+        "params": [
+          {
+            "name": "thread_id",
+            "required": true,
+            "type": "string (uuid)"
+          },
+          {
+            "name": "message_id",
+            "required": true,
+            "type": "string (uuid)"
+          },
+          {
+            "name": "force",
+            "required": false,
+            "type": "boolean",
+            "desc": "Re-read an attachment that already carries an ok verdict (after a prompt correction, or a retry)"
+          }
+        ],
+        "response": "{ok, results: [{index, family, wrote: 'transcript'|'document'|'none', status: 'ok'|'failed'|'skipped'|'already'|'none', transcript?, document?}], attachments}"
+      },
+      {
+        "name": "ask_spreadsheet",
+        "summary": "Ask a question of a CSV/XLSX attachment on a thread. MIVAA loads it into an in-memory DuckDB, a forced Claude tool writes ONE read-only SELECT, the query is parsed and allow-listed (no writes, no file or network functions, only the loaded tables), the engine is locked before it runs, and the answer comes back with the SQL and rows that produced it. Members only; the asker's credits are reserved before a token is spent and settled against MIVAA's reported usage",
+        "params": [
+          {
+            "name": "thread_id",
+            "required": true,
+            "type": "string (uuid)"
+          },
+          {
+            "name": "question",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "message_id",
+            "required": false,
+            "type": "string (uuid)",
+            "desc": "The message carrying the spreadsheet. Default: the latest spreadsheet attachment on the thread"
+          },
+          {
+            "name": "attachment_index",
+            "required": false,
+            "type": "integer",
+            "desc": "Which attachment on that message (0-based). Default: the first spreadsheet"
+          }
+        ],
+        "response": "{ok, status: 'ok'|'failed', message_id, file_name, answer, caveat, sql, columns, rows (≤100), row_count, attempts: [{attempt, sql, outcome}], tables, error?}"
+      },
+      {
         "name": "pin_message",
         "summary": "Pin a message to the top of the conversation for everyone, or unpin it. Local to this inbox — WhatsApp exposes no way to pin on the customer’s side",
         "params": [
@@ -14766,14 +14818,21 @@
     ],
     "actions": [
       "run",
-      "list"
+      "list",
+      "summary"
     ],
     "request": [
       {
         "name": "action",
-        "type": "'run' | 'list'",
+        "type": "'run' | 'list' | 'summary'",
         "required": false,
-        "desc": "Default run. list returns every case with its last run."
+        "desc": "Default run. list returns every case with its last run. summary reads one batch honestly: fixed denominator, harness failures beside agent failures, tool-set agreement across repeats (needs batch_id)."
+      },
+      {
+        "name": "repeat_index",
+        "type": "integer",
+        "required": false,
+        "desc": "run: which repeat of the case within the batch (1-based). Five repeats minimum before comparing two batches."
       },
       {
         "name": "case_key",

@@ -1129,7 +1129,10 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     factory: 'createManageInboxTool',
     description: 'Customer Inbox: list conversations (optionally filtered by label), reply, set status (close/reopen/snooze), hand a thread to/from the AI assistant, list the workspace labels, or set a thread\'s labels. Labels are refer…',
     params: [
-      { name: 'action', type: 'enum', enum: ['list', 'reply', 'status', 'handover', 'labels', 'label'], optional: true },
+      { name: 'action', type: 'enum', enum: ['list', 'reply', 'status', 'handover', 'labels', 'label', 'ask_spreadsheet'], optional: true },
+      { name: 'message_id', type: 'string', optional: true, description: 'ask_spreadsheet: the message carrying the spreadsheet. Omit for the latest spreadsheet on the thread.' },
+      { name: 'attachment_index', type: 'number', optional: true, description: 'ask_spreadsheet: which attachment on that message, 0-based. Omit for the first spreadsheet.' },
+      { name: 'question', type: 'string', optional: true, description: 'ask_spreadsheet: the question, in plain language ("total per category", "which items cost over 50").' },
       { name: 'status', type: 'string', optional: true, description: 'list: filter by thread status. status action: open|snoozed|closed.' },
       { name: 'thread_id', type: 'string', optional: true, description: 'the conversation id (reply/status/handover/label).' },
       { name: 'body', type: 'string', optional: true, description: 'reply: the message text.' },

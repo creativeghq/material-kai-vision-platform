@@ -66,6 +66,9 @@ import { resolveSecret } from '../_shared/secrets.ts';
 import { isWorkspaceEntitled } from '../_shared/entitlement.ts';
 import { vatPctForCat } from '../_shared/vatVocabulary.generated.ts';
 import { CRM_VAT_COLUMN, normalizeVat } from '../_shared/crm/vatNormalize.generated.ts';
+import { describeAttachmentForAssistant, enrichInboundAttachments } from '../_shared/inbox-attachment-intelligence.ts';
+import { reserveCredits, refundCredits, settleCredits } from '../_shared/credit-reserve.ts';
+import { resolveTokenPrice } from '../_shared/ai-logger.ts';
 import { tool } from 'npm:ai@6';
 import { z } from 'npm:zod@3';
 import { getAgentSystemPrompt, loadPrompt } from '../_shared/prompt-utils.ts';
@@ -637,14 +640,17 @@ async function buildTranscript(
     return 'Customer (unidentified sender)';
   };
 
+  // What the row holds is what the model is told. A transcribed voice note is quoted as the
+  // customer's words; a classified document is named for what it is, with the printed facts;
+  // anything unread keeps the honest "you cannot open it". One derivation, in the module that
+  // wrote the verdict, so the transcript cannot describe an attachment differently from the row.
   const files = (raw: Json | null): string => {
     const list = Array.isArray(raw) ? (raw as TranscriptAttachment[]) : [];
-    const names = list
-      .map((a) => (a && typeof a === 'object' ? (a.name || a.filename || a.type || a.mime_type) : null))
-      .filter((n): n is string => typeof n === 'string' && n.trim().length > 0)
-      .slice(0, 5);
-    if (!names.length) return '';
-    return ` [attached, and you CANNOT open it: ${names.join(', ')}]`;
+    const lines = list
+      .slice(0, 5)
+      .map((a) => describeAttachmentForAssistant(a as Record<string, unknown>))
+      .filter((s): s is string => typeof s === 'string' && s.length > 0);
+    return lines.length ? ` ${lines.join(' ')}` : '';
   };
 
   return rows.slice().reverse().map((m) => {
@@ -3037,6 +3043,155 @@ async function handleJwtAction(
      * phone and Zernio exposes no way to set it, so claiming to have pinned it for them would be
      * a lie the operator cannot see through.
      */
+    /*
+     * enrich_attachments — run the attachment reader on one message, on demand.
+     *
+     * The inbound webhooks read every voice note and document as it arrives; this is the same
+     * reader for what was filed before it existed (96 messages on 2026-09-05), for a retry after
+     * a failure, and for `force` after a prompt was corrected. Member-only, and the member who
+     * presses the button pays — the same rule as "help me write".
+     */
+    case 'enrich_attachments': {
+      const threadId = String(payload.thread_id || '');
+      const messageId = String(payload.message_id || '');
+      if (!threadId || !messageId) throw new HttpError(400, 'thread_id and message_id are required');
+
+      const thread = await getThreadOrThrow(db, threadId);
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      assertThreadVisible(access);
+      if (!access.isMember) throw new HttpError(403, 'Only members may run the attachment reader');
+
+      const { data: target } = await db.from('inbox_messages')
+        .select('id, attachments').eq('id', messageId).eq('thread_id', threadId).is('deleted_at', null).maybeSingle();
+      if (!target) throw new HttpError(404, 'Message not found');
+      const list = Array.isArray((target as { attachments?: unknown }).attachments)
+        ? (target as { attachments: Array<Record<string, unknown>> }).attachments
+        : [];
+      if (!list.length) throw new HttpError(400, 'This message has no attachments');
+
+      const results = await enrichInboundAttachments(db, {
+        messageId, threadId, workspaceId: String(thread.workspace_id),
+        attachments: list, force: payload.force === true, billedUserId: userId,
+      });
+      const { data: after } = await db.from('inbox_messages').select('attachments').eq('id', messageId).maybeSingle();
+      return json({
+        ok: true,
+        results,
+        attachments: (after as { attachments?: unknown } | null)?.attachments ?? [],
+      });
+    }
+
+    /*
+     * ask_spreadsheet — a question about a CSV/XLSX a customer or supplier sent.
+     *
+     * MIVAA loads the file into an in-memory DuckDB, a forced tool writes ONE read-only SELECT,
+     * the SQL is parsed and allow-listed, the engine is locked before it runs, and the answer
+     * comes back with the SQL and the rows that produced it (the GAIK TabularAgent security
+     * model, adopted 2026-09-05; no Python execution anywhere). Member-only; the asker pays:
+     * credits are RESERVED here before MIVAA spends a token (invariant 10) and settled against
+     * the usage it reports. MIVAA writes the ai_usage_logs rows; this side writes the credit
+     * ledger — one derivation each, so the two cannot disagree about which feature ran.
+     */
+    case 'ask_spreadsheet': {
+      const threadId = String(payload.thread_id || '');
+      const question = String(payload.question || '').trim().slice(0, 1000);
+      const wantedMessage = typeof payload.message_id === 'string' ? payload.message_id : null;
+      const wantedIndex = Number.isInteger(payload.attachment_index) ? Number(payload.attachment_index) : null;
+      if (!threadId || !question) throw new HttpError(400, 'thread_id and question are required');
+
+      const thread = await getThreadOrThrow(db, threadId);
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      assertThreadVisible(access);
+      if (!access.isMember) throw new HttpError(403, 'Only members may question an attachment');
+      const workspaceId = String(thread.workspace_id);
+
+      const isSheet = (a: Record<string, unknown> | null | undefined) =>
+        /\.(xlsx|xlsm|xls|csv|tsv|txt)$/i.test(String(a?.name ?? a?.storage_object_path ?? ''));
+      type Att = Record<string, unknown> & { storage_bucket?: string; storage_object_path?: string; name?: string };
+      let chosen: { messageId: string; att: Att } | null = null;
+      if (wantedMessage) {
+        const { data: target } = await db.from('inbox_messages')
+          .select('id, attachments').eq('id', wantedMessage).eq('thread_id', threadId).is('deleted_at', null).maybeSingle();
+        if (!target) throw new HttpError(404, 'Message not found');
+        const list = Array.isArray((target as { attachments?: unknown }).attachments)
+          ? (target as { attachments: Att[] }).attachments : [];
+        const att = wantedIndex !== null ? list[wantedIndex] : list.find(isSheet);
+        if (att && isSheet(att)) chosen = { messageId: wantedMessage, att };
+      } else {
+        // The latest spreadsheet on the thread — the one the question is almost always about.
+        const { data: recent } = await db.from('inbox_messages')
+          .select('id, attachments').eq('thread_id', threadId).is('deleted_at', null)
+          .order('created_at', { ascending: false }).limit(50);
+        for (const m of (recent ?? []) as Array<{ id: string; attachments?: unknown }>) {
+          const list = Array.isArray(m.attachments) ? (m.attachments as Att[]) : [];
+          const att = list.find(isSheet);
+          if (att) { chosen = { messageId: m.id, att }; break; }
+        }
+      }
+      if (!chosen) throw new HttpError(404, 'No spreadsheet (xlsx, xls or csv) attachment found on this conversation');
+      const { att } = chosen;
+      if (!att.storage_bucket || !att.storage_object_path) {
+        throw new HttpError(409, 'That attachment was never downloaded into storage — fetch it first');
+      }
+      const fileName = String(att.name || att.storage_object_path.split('/').pop() || 'spreadsheet');
+
+      const SPREADSHEET_CEILING = 8;
+      const opType = 'inbox_spreadsheet_question';
+      const reserve = await reserveCredits(db, userId, workspaceId, SPREADSHEET_CEILING, opType);
+      if (!reserve.ok) throw new HttpError(402, reserve.message ?? 'Insufficient credits for a spreadsheet question');
+
+      // Read at handler time, never at module load.
+      const mivaaUrl = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
+      const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+      let result: Record<string, unknown> = {};
+      try {
+        const resp = await fetch(`${mivaaUrl}/api/internal/tabular/ask`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${serviceKey}` },
+          body: JSON.stringify({
+            workspace_id: workspaceId,
+            user_id: userId,
+            storage_bucket: att.storage_bucket,
+            storage_object_path: att.storage_object_path,
+            file_name: fileName,
+            question,
+          }),
+          signal: AbortSignal.timeout(120_000),
+        });
+        const text = await resp.text();
+        try { result = JSON.parse(text); } catch { result = { raw: text }; }
+        if (!resp.ok) {
+          await refundCredits(db, userId, workspaceId, SPREADSHEET_CEILING, opType, { reason: `mivaa_${resp.status}` });
+          const detail = String((result as { detail?: unknown }).detail ?? text).slice(0, 300);
+          throw new HttpError(resp.status === 415 || resp.status === 413 || resp.status === 422 ? 400 : 502, `Spreadsheet service: ${detail}`);
+        }
+      } catch (err) {
+        if (err instanceof HttpError) throw err;
+        await refundCredits(db, userId, workspaceId, SPREADSHEET_CEILING, opType, { reason: 'mivaa_unreachable' });
+        throw new HttpError(502, `Spreadsheet service unreachable: ${err instanceof Error ? err.message : String(err)}`);
+      }
+
+      // Settle against what MIVAA actually spent. An unpriced model releases the reservation.
+      const usage = (result.usage ?? {}) as { input_tokens?: number; output_tokens?: number };
+      const modelUsed = String(result.model ?? 'claude-haiku-4-5');
+      const inTok = Number(usage.input_tokens ?? 0);
+      const outTok = Number(usage.output_tokens ?? 0);
+      if (inTok + outTok === 0) {
+        await refundCredits(db, userId, workspaceId, SPREADSHEET_CEILING, opType, { reason: 'no_usage' });
+      } else {
+        const price = await resolveTokenPrice(db, modelUsed);
+        if (!price) {
+          await refundCredits(db, userId, workspaceId, SPREADSHEET_CEILING, opType, { reason: 'unpriced_model' });
+        } else {
+          const raw = (inTok / 1_000_000) * price.input + (outTok / 1_000_000) * price.output;
+          const credits = Math.round(raw * price.markup * 100 * 100) / 100;
+          await settleCredits(db, userId, workspaceId, SPREADSHEET_CEILING, credits, opType, { thread_id: threadId, message_id: chosen.messageId });
+        }
+      }
+
+      return json({ ok: result.status === 'ok', message_id: chosen.messageId, file_name: fileName, ...result });
+    }
+
     case 'pin_message': {
       const threadId = String(payload.thread_id || '');
       const messageId = String(payload.message_id || '');
