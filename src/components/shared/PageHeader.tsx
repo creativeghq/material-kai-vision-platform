@@ -18,6 +18,12 @@ export interface PageHeaderCrumb {
 
 interface PageHeaderProps {
   icon: React.ComponentType<{ className?: string }>;
+  /**
+   * A picture standing in for the icon — a project's cover, a product's photo. Rendered in the
+   * same 32px square so the band keeps its height; the icon stays the fallback while it loads
+   * or when there is none. Identity, not decoration: the same picture the list card carried.
+   */
+  thumbnailUrl?: string | null;
   title: string;
   subtitle?: string;
   /**
@@ -48,6 +54,7 @@ interface PageHeaderProps {
  */
 export function PageHeader({
   icon: Icon,
+  thumbnailUrl,
   title,
   subtitle,
   breadcrumbs,
@@ -87,9 +94,17 @@ export function PageHeader({
       <div className="flex flex-col gap-2 pb-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         {/* Left: page icon + title */}
         <div className="flex min-w-0 items-center gap-2.5">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-primary/10">
-            <Icon className="h-4 w-4 text-primary" />
-          </div>
+          {thumbnailUrl ? (
+            <img
+              src={thumbnailUrl}
+              alt=""
+              className="h-8 w-8 shrink-0 rounded-sm border border-hairline bg-surface-sunken object-cover"
+            />
+          ) : (
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-primary/10">
+              <Icon className="h-4 w-4 text-primary" />
+            </div>
+          )}
           <div className="min-w-0">
             <h1 className="truncate font-display text-xl font-semibold leading-tight tracking-tight text-foreground">
               {title}

@@ -280,7 +280,10 @@ A JARVIS prompt addendum (idempotent block `--BEGIN_PROJECT_WORKSPACE_ADDENDUM--
 
 | File | Purpose |
 |---|---|
-| [pages/ProjectsListPage.tsx](../src/modules/projects/pages/ProjectsListPage.tsx) | Card grid with budget bar + deadline countdown. |
+| [pages/ProjectsListPage.tsx](../src/modules/projects/pages/ProjectsListPage.tsx) | One panel: toolbar (search, filters, sort, grid/list toggle) → cover-card grid or `HubDataTable` → count footer. Moodboard covers come from ONE `project_cover_candidates` RPC for the page. |
+| [components/ProjectCard.tsx](../src/modules/projects/components/ProjectCard.tsx) | The grid card: cover → category/name/client → budget → sunken footer (boards, quotes, deadline verdict). A real `<Link>`. |
+| [components/ProjectCoverPanel.tsx](../src/modules/projects/components/ProjectCoverPanel.tsx) + [ProjectCoverDialog.tsx](../src/modules/projects/components/ProjectCoverDialog.tsx) | Top of Overview: the cover at full width, where it came from, and (owner) *Change cover* — from a moodboard, the library, an upload, or an AI render. See "Cover image" below. |
+| [utils/projectCover.ts](../src/modules/projects/utils/projectCover.ts) + [utils/projectPresentation.ts](../src/modules/projects/utils/projectPresentation.ts) | The cover ladder and the library (import-free); the client/deadline/budget read-outs the card and the table share. `projectStatus.ts` is the one copy of the status vocabulary. |
 | [pages/ProjectDetailPage.tsx](../src/modules/projects/pages/ProjectDetailPage.tsx) | 19 sections grouped into 7 stages (`TAB_GROUPS`). `isOwner` check switches between owner UX and collaborator UX. |
 | [pages/InviteLandingPage.tsx](../src/modules/projects/pages/InviteLandingPage.tsx) | Public, no auth. Pre-auth invitation preview + email entry. |
 | [pages/AcceptInvitePage.tsx](../src/modules/projects/pages/AcceptInvitePage.tsx) | Magic-link redirect target. Calls `accept_project_invitation`. |
@@ -289,6 +292,34 @@ A JARVIS prompt addendum (idempotent block `--BEGIN_PROJECT_WORKSPACE_ADDENDUM--
 | [components/ProjectPickerInline.tsx](../src/modules/projects/components/ProjectPickerInline.tsx) | Reusable picker embedded in `CreateQuoteModal` + `AddToMoodboardModal` so existing flows can attach to a project. |
 | [components/InviteCollaboratorsModal.tsx](../src/modules/projects/components/InviteCollaboratorsModal.tsx) | Owner-only invite/list/revoke/resend/copy-link. |
 | [components/tabs/](../src/modules/projects/components/tabs/) | One component per section. Each accepts `isOwner` for collaborator-aware rendering. |
+
+---
+
+## Cover image
+
+Every project wears a picture — on its grid card and at the top of its Overview — and it is
+resolved by ONE ladder in [utils/projectCover.ts](../src/modules/projects/utils/projectCover.ts),
+guarded by [tests/unit/projectCover.test.ts](../tests/unit/projectCover.test.ts):
+
+1. **`projects.cover_image_url`** — set by the owner in *Change cover*: an image from one of the
+   project's moodboards, a library scene, an upload (`generation-images/u/{uid}/project-covers/…`,
+   10 MB cap), or a render from a prompt through `generate-interior-gemini` (text-to-image, 16:9,
+   fast tier — credits debited in the function, before the model runs). Persisted only on
+   confirm; *Use automatic* clears it.
+2. **A moodboard image** — `project_cover_candidates(p_project_ids, p_limit)`, SECURITY INVOKER
+   so it is RLS-bound: newest board first (direct `project_id` or via a room), then item position;
+   `media_url` images and catalogue products' primary photos alike. The list page calls it once
+   for every project on the page; the detail page once per project, and passes the result down so
+   the header thumbnail and the Overview panel cannot disagree.
+3. **A library scene** — 17 static 16:9 WebPs under `public/covers/projects/`, picked from what
+   the project is ABOUT: the name first (EN + Greek stems, accents folded), then the description,
+   the category (`renovation`, `trip`, `warehouse`, `real_estate`), the most common room type,
+   else the materials flat-lay. A room word beats a venue beats a dwelling beats the kind of work,
+   so "Villa Kavouri — kitchen" is a kitchen. `/covers` is excluded from the SPA catch-all in
+   `vercel.json`; without that every asset would 200 as `index.html`.
+
+The storage half is registered in `build_storage_reference_set()` (absolute URLs only — a library
+path is not a storage claim), see [storage-buckets.md](storage-buckets.md).
 
 ---
 

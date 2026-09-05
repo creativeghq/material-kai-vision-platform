@@ -51,6 +51,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import {
   projectsService,
+  type ProjectCoverCandidate,
   type ProjectWithClient,
   type ProjectStatus,
 } from '../services/projectsService';
@@ -77,25 +78,10 @@ import { PlanTab } from '../components/tabs/PlanTab';
 import { PurchaseItemsTab } from '../components/tabs/PurchaseItemsTab';
 import { InviteCollaboratorsModal } from '../components/InviteCollaboratorsModal';
 import { SaveAsTemplateDialog } from '@/components/features/templates/SaveAsTemplateDialog';
-
-const STATUS_LABELS: Record<ProjectStatus, string> = {
-  planning: 'Planning',
-  in_progress: 'In Progress',
-  on_hold: 'On Hold',
-  completed: 'Completed',
-  archived: 'Archived',
-};
-
-// A raw palette shade is a light/dark PAIR. The bare `-300` these carried is chosen for the
-// plum-black dark theme and measures ~1.2:1 on the light themes' cream — the same defect the Inbox
-// source chip had. Both halves are measured by tests/unit/inboxChipContrast.test.ts.
-const STATUS_TONES: Record<ProjectStatus, string> = {
-  planning: 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30',
-  in_progress: 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border-emerald-500/30',
-  on_hold: 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30',
-  completed: 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30',
-  archived: 'bg-muted text-muted-foreground border-border',
-};
+import { PROJECT_STATUS_BADGE, PROJECT_STATUS_LABELS } from '../projectStatus';
+import { projectCoverSrc } from '../components/ProjectCard';
+import { resolveProjectCover } from '../utils/projectCover';
+import { projectCoverInput } from '../utils/projectPresentation';
 
 /**
  * `PROJECT_TABS` (../projectSections) is every section this page can render, and the same file
@@ -188,6 +174,9 @@ export const ProjectDetailPage: React.FC = () => {
   const [sp, setSp] = useSearchParams();
   const [showInvite, setShowInvite] = useState(false);
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+  // The newest moodboard image, fetched ONCE here so the header thumbnail and the Overview's
+  // cover panel resolve the same picture. Re-read when a board is added or removed.
+  const [coverCandidate, setCoverCandidate] = useState<ProjectCoverCandidate | null>(null);
 
   // Ownership: project.user_id is the creator. Anyone else who can read the project
   // got here via a project_collaborators row (RLS guarantees this). Owner gets the
@@ -258,12 +247,23 @@ export const ProjectDetailPage: React.FC = () => {
 
   useEffect(() => { load(); }, [load]);
 
+  const projectId = project?.id;
+  const moodboardCount = project?.moodboard_count;
+  useEffect(() => {
+    if (!projectId) return;
+    let cancelled = false;
+    projectsService.coverCandidates([projectId], 1)
+      .then((m) => { if (!cancelled) setCoverCandidate(m.get(projectId)?.[0] ?? null); })
+      .catch(() => { if (!cancelled) setCoverCandidate(null); });
+    return () => { cancelled = true; };
+  }, [projectId, moodboardCount]);
+
   const handleStatusChange = async (status: ProjectStatus) => {
     if (!project) return;
     try {
       const updated = await projectsService.updateProject(project.id, { status });
       setProject(prev => prev ? { ...prev, status: updated.status } : null);
-      toast({ title: `Status set to ${STATUS_LABELS[status]}` });
+      toast({ title: `Status set to ${PROJECT_STATUS_LABELS[status]}` });
     } catch (_err) {
       toast({ title: 'Failed to update status', variant: 'destructive' });
     }
@@ -311,10 +311,13 @@ export const ProjectDetailPage: React.FC = () => {
     return n > 0 ? <Badge variant="outline" className="ml-1 text-xs h-5">{n}</Badge> : null;
   };
 
+  const cover = resolveProjectCover(projectCoverInput(project), coverCandidate);
+
   return (
     <div className="min-h-screen bg-background">
       <PageHeader
         icon={FolderKanban}
+        thumbnailUrl={projectCoverSrc(cover, 200)}
         title={project.name}
         subtitle={project.description || undefined}
         actions={
@@ -330,8 +333,8 @@ export const ProjectDetailPage: React.FC = () => {
                 {project.category.label}
               </Badge>
             )}
-            <Badge variant="outline" className={`hidden sm:inline-flex ${STATUS_TONES[project.status]}`}>
-              {STATUS_LABELS[project.status]}
+            <Badge variant={PROJECT_STATUS_BADGE[project.status]} className="hidden sm:inline-flex">
+              {PROJECT_STATUS_LABELS[project.status]}
             </Badge>
             {isOwner && (
               <Button variant="outline" size="sm" onClick={() => navigate('/projects')}>
@@ -412,7 +415,7 @@ export const ProjectDetailPage: React.FC = () => {
                 </TabsList>
               )}
 
-          <TabsContent value="overview"><OverviewTab project={project} isOwner={isOwner} onProjectPatched={(patch) => setProject(prev => prev ? { ...prev, ...patch } : null)} /></TabsContent>
+          <TabsContent value="overview"><OverviewTab project={project} isOwner={isOwner} coverCandidate={coverCandidate} onProjectPatched={(patch) => setProject(prev => prev ? { ...prev, ...patch } : null)} /></TabsContent>
           <TabsContent value="rooms"><RoomsTab projectId={project.id} budgetCurrency={project.budget_currency} isOwner={isOwner} /></TabsContent>
           {isOwner && <TabsContent value="products"><ProductsTab projectId={project.id} workspaceId={project.workspace_id} /></TabsContent>}
           {isOwner && <TabsContent value="plan"><PlanTab projectId={project.id} workspaceId={project.workspace_id} currency={project.budget_currency} isOwner={isOwner} /></TabsContent>}

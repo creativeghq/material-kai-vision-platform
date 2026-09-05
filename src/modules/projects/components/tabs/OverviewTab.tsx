@@ -20,15 +20,19 @@ import { Badge } from '@/components/core/ui/badge';
 import { Progress } from '@/components/core/ui/progress';
 import {
   projectsService,
+  type ProjectCoverCandidate,
   type ProjectWithClient,
   type ProjectRoom,
   type ProjectTaskWithSubtasks,
 } from '../../services/projectsService';
+import { ProjectCoverPanel } from '../ProjectCoverPanel';
 
 interface OverviewTabProps {
   project: ProjectWithClient;
   /** When false (collaborator viewing a shared project), hide budget + task internals. */
   isOwner?: boolean;
+  /** Newest moodboard image, resolved by the page so the header and the cover panel agree. */
+  coverCandidate?: ProjectCoverCandidate | null;
   /**
    * Patch the parent's copy of the project after an edit here. Without it the page header keeps
    * rendering the value this tab just changed until a reload — the kind of disagreement between
@@ -55,7 +59,7 @@ const daysUntil = (date: string | null) => {
   return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 };
 
-export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = true, onProjectPatched }) => {
+export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = true, coverCandidate = null, onProjectPatched }) => {
   const { toast } = useToast();
   // Buildings are only a sensible answer where the workspace actually has them. A permanently
   // empty picker reads as a broken control rather than a neutral one.
@@ -120,6 +124,15 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      {/* The picture the project wears — the same one its card carries on /projects. */}
+      <ProjectCoverPanel
+        project={project}
+        isOwner={isOwner}
+        candidate={coverCandidate}
+        onProjectPatched={onProjectPatched}
+        className="lg:col-span-3"
+      />
+
       {/* What kind of job this is. Owner-only: a collaborator on a shared project sees the
           delivery, not how the business files it. */}
       {isOwner && (

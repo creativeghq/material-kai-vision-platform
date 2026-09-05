@@ -222,6 +222,10 @@ const PALETTES: Array<{ what: string; strings: string[] }> = [
     what: 'the Projects module (src/modules/projects)',
     strings: fileClassStrings(
       'src/modules/projects/pages/ProjectsListPage.tsx',
+      'src/modules/projects/components/ProjectCard.tsx',
+      'src/modules/projects/components/ProjectCoverDialog.tsx',
+      'src/modules/projects/components/ProjectCoverPanel.tsx',
+      'src/modules/projects/utils/projectPresentation.ts',
       'src/modules/projects/pages/ProjectDetailPage.tsx',
       'src/modules/projects/pages/InviteLandingPage.tsx',
       'src/modules/projects/components/JobCostCard.tsx',

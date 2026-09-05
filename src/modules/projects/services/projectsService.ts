@@ -73,6 +73,20 @@ export interface ProjectWithClient extends Project {
   is_mine?: boolean;
   /** Owner display name — 'You' for your own, else the owner's name. */
   owner_name?: string | null;
+  /**
+   * Room kinds only — what the cover ladder needs to say "this is a bedroom job" when nothing
+   * else does. Embedded by listProjects/getProject as `rooms:project_rooms(room_type)`.
+   */
+  rooms?: Array<{ room_type: RoomType | null }> | null;
+}
+
+/** One row of `project_cover_candidates()` — an image a project could wear as its cover. */
+export interface ProjectCoverCandidate {
+  project_id: string;
+  image_url: string;
+  moodboard_id: string | null;
+  moodboard_title: string | null;
+  rank: number;
 }
 
 export interface ProjectRoom {
@@ -552,7 +566,8 @@ class ProjectsService {
         *,
         category:project_categories(id, key, label),
         client_company:crm_companies(id, name),
-        client_contact:crm_contacts(id, name, first_name, last_name, email)
+        client_contact:crm_contacts(id, name, first_name, last_name, email),
+        rooms:project_rooms(room_type)
       `)
       .order('last_activity_at', { ascending: false });
 
@@ -643,7 +658,8 @@ class ProjectsService {
         *,
         category:project_categories(id, key, label),
         client_company:crm_companies(id, name, email, phone, website),
-        client_contact:crm_contacts(id, name, first_name, last_name, email, phone)
+        client_contact:crm_contacts(id, name, first_name, last_name, email, phone),
+        rooms:project_rooms(room_type)
       `)
       .eq('id', id)
       .maybeSingle();
@@ -2133,6 +2149,89 @@ class ProjectsService {
     if (error) throw error;
     return (data || []) as Array<{ id: string; name: string | null; first_name: string | null; last_name: string | null; email: string | null }>;
   }
+
+  // ---------- COVER IMAGE ----------
+  // The ladder (own cover → moodboard image → library scene) is walked by
+  // utils/projectCover.ts; this is the data behind its first two rungs.
+
+  /**
+   * Moodboard images a project could wear as its cover — `project_cover_candidates()`, ONE
+   * round trip for the whole grid. Keyed by project id; a project with no board image is
+   * simply absent. RLS-bound (SECURITY INVOKER), so a collaborator sees the boards they can
+   * open and nothing else.
+   */
+  async coverCandidates(projectIds: string[], limit = 1): Promise<Map<string, ProjectCoverCandidate[]>> {
+    const map = new Map<string, ProjectCoverCandidate[]>();
+    const ids = [...new Set(projectIds.filter(Boolean))];
+    if (ids.length === 0) return map;
+    const { data, error } = await (supabase as any)
+      .rpc('project_cover_candidates', { p_project_ids: ids, p_limit: limit });
+    if (error) throw error;
+    for (const row of (data ?? []) as ProjectCoverCandidate[]) {
+      const list = map.get(row.project_id) ?? [];
+      list.push(row);
+      map.set(row.project_id, list);
+    }
+    return map;
+  }
+
+  /** Set the project's own cover, or clear it (null) to go back to the automatic ladder. */
+  async setCoverImage(projectId: string, url: string | null): Promise<void> {
+    await this.updateProject(projectId, { cover_image_url: url });
+  }
+
+  /**
+   * Upload a cover picture. Lands in the public generation-images bucket under the uploader's
+   * own prefix; `projects.cover_image_url` is registered in build_storage_reference_set(), so
+   * the orphan reaper leaves the file alone for as long as a project points at it. Returns the
+   * URL and persists nothing — the picker saves on confirm, not on choose.
+   */
+  async uploadCoverImage(projectId: string, file: File): Promise<string> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+    if (!file.type.startsWith('image/')) throw new Error('Choose an image file (PNG, JPG or WebP).');
+    if (file.size > COVER_MAX_BYTES) throw new Error('That image is over 10 MB — pick a smaller one.');
+
+    const ext = ((file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '')) || 'jpg';
+    const path = `u/${user.id}/project-covers/${projectId}/${Date.now()}.${ext}`;
+    const { data, error } = await supabase.storage
+      .from(COVER_BUCKET)
+      .upload(path, file, { upsert: false, contentType: file.type });
+    if (error || !data) throw error ?? new Error('Upload failed');
+    return supabase.storage.from(COVER_BUCKET).getPublicUrl(data.path).data.publicUrl;
+  }
+
+  /**
+   * Render a cover from a prompt through generate-interior-gemini (text-to-image, 16:9, the
+   * fast tier). Credits are debited inside the function BEFORE the model runs (invariant 10),
+   * and the render is recorded in the caller's generation history like any other. Persists
+   * nothing — the picker shows the result and saves on confirm.
+   */
+  async generateCoverImage(projectId: string, prompt: string): Promise<{ url: string; creditsUsed: number | null }> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+    const text = prompt.trim();
+    if (!text) throw new Error('Describe the cover you want first.');
+
+    const { data, error } = await supabase.functions.invoke('generate-interior-gemini', {
+      body: {
+        mode: 'text-to-image',
+        prompt: text,
+        aspect_ratio: '16:9',
+        model_tier: 'fast',
+        workspace_id: getActiveWorkspaceId(user.id),
+      },
+    });
+    if (error) throw await edgeError(error, 'Cover generation failed');
+    const url: string | undefined = (data as any)?.image_url;
+    if (!url) throw new Error((data as any)?.error || 'Cover generation returned no image');
+    const credits = Number((data as any)?.credits_used);
+    return { url, creditsUsed: Number.isFinite(credits) ? credits : null };
+  }
 }
+
+/** Covers share the room-plan bucket: public-read, RLS-gated writes, GC-registered. */
+const COVER_BUCKET = 'generation-images';
+const COVER_MAX_BYTES = 10 * 1024 * 1024;
 
 export const projectsService = new ProjectsService();
