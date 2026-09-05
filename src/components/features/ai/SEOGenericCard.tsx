@@ -44,6 +44,7 @@
 
 import type { ReactNode } from 'react';
 import { safeHref } from '@/utils/safeUrl';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 
 export interface SEOGenericCardData {
   type: string;
@@ -55,7 +56,17 @@ const fmtNum = (n: any): string => {
   if (!Number.isFinite(v)) return '—';
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
   if (v >= 1_000) return `${(v / 1_000).toFixed(1)}k`;
-  return String(v);
+  if (Number.isInteger(v)) return String(v);
+  // An estimate like 0.2939999997615814 visits/month is a float straight off the wire; it
+  // was printed verbatim on the ranked-keywords card (2026-09-05). One decimal below ten,
+  // whole numbers above — the precision the figure actually carries.
+  return v < 10 ? v.toFixed(1).replace(/\.0$/, '') : String(Math.round(v));
+};
+
+/** Fixed decimals, or the dash — for money and per-keyword estimates. */
+const fmtDec = (n: any, digits = 1): string => {
+  const v = Number(n);
+  return Number.isFinite(v) ? v.toFixed(digits) : '—';
 };
 
 const fmtPct = (n: any): string => {
@@ -64,6 +75,43 @@ const fmtPct = (n: any): string => {
   if (v <= 1 && v >= 0) return `${Math.round(v * 100)}%`;
   return `${Math.round(v)}%`;
 };
+
+/** Signed percentage for a volume trend (DataForSEO gives whole percents: 56 means +56%). */
+const fmtSignedPct = (n: any): string => {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return '—';
+  return `${v > 0 ? '+' : ''}${Math.round(v)}%`;
+};
+
+/** `/el/ylika/monotika` for a full URL — the host is already in the card title. */
+const pathOf = (url: any): string => {
+  const s = String(url || '');
+  try {
+    const u = new URL(s);
+    return `${u.pathname}${u.search}` || '/';
+  } catch {
+    return s;
+  }
+};
+
+/** Short labels for the SERP blocks DataForSEO reports on a keyword's results page. */
+const SERP_BLOCK_LABELS: Record<string, string> = {
+  featured_snippet: 'Snippet',
+  ai_overview: 'AI Overview',
+  people_also_ask: 'PAA',
+  local_pack: 'Local pack',
+  images: 'Images',
+  video: 'Video',
+  knowledge_graph: 'Knowledge',
+  shopping: 'Shopping',
+  top_stories: 'News',
+  related_searches: 'Related',
+  compare_sites: 'Compare',
+};
+const serpBlocks = (types: any): string[] =>
+  (Array.isArray(types) ? types : [])
+    .filter((x) => x !== 'organic' && x !== 'paid')
+    .map((x) => SERP_BLOCK_LABELS[String(x)] ?? String(x).replace(/_/g, ' '));
 
 const GOOD = 'text-emerald-600 dark:text-emerald-400';
 const WARN = 'text-amber-600 dark:text-amber-400';
@@ -139,6 +187,162 @@ function ItemList({ rows, max = 8 }: { rows: Array<{ left: string; right?: strin
         <li className="text-[10px] text-muted-foreground px-2">+ {rows.length - max} more</li>
       )}
     </ul>
+  );
+}
+
+/** Up is good: a smaller position number is the improvement. */
+function RankChange({ current, previous, isNew }: { current?: number | null; previous?: number | null; isNew?: boolean }) {
+  if (isNew) return <Pill tone="blue">new</Pill>;
+  if (current == null || previous == null || previous === current) return <span className="text-muted-foreground">—</span>;
+  const d = previous - current;
+  return <span className={d > 0 ? GOOD : BAD}>{d > 0 ? `▲ ${d}` : `▼ ${Math.abs(d)}`}</span>;
+}
+
+const kdTone = (kd: number): string => (kd <= 30 ? GOOD : kd <= 60 ? WARN : BAD);
+
+function SerpBlockTags({ blocks }: { blocks: string[] }) {
+  if (blocks.length === 0) return <span className="text-muted-foreground">—</span>;
+  return (
+    <div className="flex flex-wrap gap-1">
+      {blocks.map((b) => (
+        <span key={b} className="text-[10px] px-1 rounded-sm bg-muted text-muted-foreground whitespace-nowrap">{b}</span>
+      ))}
+    </div>
+  );
+}
+
+function PageLink({ url }: { url?: string | null }) {
+  if (!url) return <span className="text-muted-foreground">—</span>;
+  return (
+    <a href={safeHref(url)} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline truncate block" title={url}>
+      {pathOf(url)}
+    </a>
+  );
+}
+
+/**
+ * The DataForSEO Labs `ranked_keywords` items as the table the Profile → Websites tabs
+ * show, not a two-line list. Every figure the index carries is a column: position and its
+ * change since the previous crawl, volume and its yearly trend, CPC, competition,
+ * difficulty, estimated traffic, the SERP blocks on that results page, the ranking page,
+ * and the date the SERP was crawled — the fact that separates an index from a live check.
+ * Sorted by position, because "which of these is closest to page 1" is the question.
+ */
+function RankedKeywordsTable({ items, crawlDate, max = 100 }: { items: any[]; crawlDate: (it: any) => string; max?: number }) {
+  const rankOf = (it: any): number => Number(it.ranked_serp_element?.serp_item?.rank_absolute) || 9999;
+  const rows = [...items].sort((a, b) => rankOf(a) - rankOf(b)).slice(0, max);
+  return (
+    <>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Keyword</TableHead>
+            <TableHead className="text-right">Pos.</TableHead>
+            <TableHead className="text-right">Change</TableHead>
+            <TableHead className="text-right">Volume</TableHead>
+            <TableHead className="text-right">Trend (yr)</TableHead>
+            <TableHead className="text-right">CPC</TableHead>
+            <TableHead className="text-right">Comp.</TableHead>
+            <TableHead className="text-right">KD</TableHead>
+            <TableHead className="text-right">Est. traffic</TableHead>
+            <TableHead>SERP blocks</TableHead>
+            <TableHead>Ranking page</TableHead>
+            <TableHead>SERP crawled</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((it, i) => {
+            const kd = it.keyword_data || {};
+            const info = kd.keyword_info || {};
+            const serp = it.ranked_serp_element?.serp_item || {};
+            const changes = serp.rank_changes || {};
+            const difficulty = kd.keyword_properties?.keyword_difficulty;
+            const intent = kd.search_intent_info?.main_intent;
+            const trend = info.search_volume_trend || {};
+            const trendTitle = [
+              trend.monthly != null ? `month ${fmtSignedPct(trend.monthly)}` : null,
+              trend.quarterly != null ? `quarter ${fmtSignedPct(trend.quarterly)}` : null,
+              trend.yearly != null ? `year ${fmtSignedPct(trend.yearly)}` : null,
+            ].filter(Boolean).join(' · ');
+            const compTitle = info.competition_level ? `${String(info.competition_level).toLowerCase()} competition` : undefined;
+            return (
+              <TableRow key={i}>
+                <TableCell className="font-medium max-w-[240px]">
+                  <div className="truncate" title={kd.keyword}>{kd.keyword}</div>
+                  {intent && <div className="text-[10px] text-muted-foreground">{String(intent)}</div>}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">{serp.rank_absolute ?? '—'}</TableCell>
+                <TableCell className="text-right tabular-nums">
+                  <RankChange current={serp.rank_absolute} previous={changes.previous_rank_absolute} isNew={changes.is_new} />
+                </TableCell>
+                <TableCell className="text-right tabular-nums">{info.search_volume != null ? fmtNum(info.search_volume) : '—'}</TableCell>
+                <TableCell className="text-right tabular-nums" title={trendTitle || undefined}>
+                  {trend.yearly == null ? '—' : <span className={Number(trend.yearly) > 0 ? GOOD : Number(trend.yearly) < 0 ? WARN : ''}>{fmtSignedPct(trend.yearly)}</span>}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">{info.cpc != null ? `$${fmtDec(info.cpc, 2)}` : '—'}</TableCell>
+                <TableCell className="text-right tabular-nums" title={compTitle}>{info.competition != null ? fmtPct(info.competition) : '—'}</TableCell>
+                <TableCell className={`text-right tabular-nums ${difficulty != null ? kdTone(Number(difficulty)) : ''}`}>{difficulty ?? '—'}</TableCell>
+                <TableCell className="text-right tabular-nums">{serp.etv != null ? fmtDec(serp.etv, 1) : '—'}</TableCell>
+                <TableCell className="max-w-[220px]"><SerpBlockTags blocks={serpBlocks(kd.serp_info?.serp_item_types)} /></TableCell>
+                <TableCell className="max-w-[220px]"><PageLink url={serp.url} /></TableCell>
+                <TableCell className="tabular-nums text-muted-foreground whitespace-nowrap">{crawlDate(it) || '—'}</TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+      {items.length > max && (
+        <p className="text-[10px] text-muted-foreground">+ {items.length - max} more keywords — ask for a narrower set or the next page.</p>
+      )}
+    </>
+  );
+}
+
+/**
+ * The workspace's own rank-tracker rows (`get_website_rank_summary` via seo_my_rankings) as
+ * the table the Rank tracking tab shows: position, the change the RPC already inverted (up
+ * is good), volume, the ranking page and the day it was checked.
+ */
+function TrackedKeywordsTable({ rows, max = 30 }: { rows: any[]; max?: number }) {
+  const sorted = [...rows].sort((a, b) => (Number(a.position) || 9999) - (Number(b.position) || 9999)).slice(0, max);
+  const dayOf = (d: any): string => (d ? String(d).slice(0, 10) : '—');
+  return (
+    <>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Keyword</TableHead>
+            <TableHead className="text-right">Position</TableHead>
+            <TableHead className="text-right">Change</TableHead>
+            <TableHead className="text-right">Volume</TableHead>
+            <TableHead>Ranking page</TableHead>
+            <TableHead>Checked</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {sorted.map((k, i) => (
+            <TableRow key={i}>
+              <TableCell className="font-medium max-w-[240px]">
+                <div className="truncate" title={k.keyword}>{k.keyword}</div>
+                {Array.isArray(k.tags) && k.tags.length > 0 && (
+                  <div className="text-[10px] text-muted-foreground truncate">{k.tags.join(' · ')}</div>
+                )}
+              </TableCell>
+              <TableCell className="text-right tabular-nums">{k.position ?? '—'}</TableCell>
+              <TableCell className="text-right tabular-nums">
+                {k.entered ? <Pill tone="blue">new</Pill>
+                  : typeof k.change !== 'number' || k.change === 0 ? <span className="text-muted-foreground">—</span>
+                  : <span className={k.change > 0 ? GOOD : BAD}>{k.change > 0 ? `▲ ${k.change}` : `▼ ${Math.abs(k.change)}`}</span>}
+              </TableCell>
+              <TableCell className="text-right tabular-nums">{k.search_volume != null ? fmtNum(k.search_volume) : '—'}</TableCell>
+              <TableCell className="max-w-[220px]"><PageLink url={k.url} /></TableCell>
+              <TableCell className="tabular-nums text-muted-foreground whitespace-nowrap">{dayOf(k.captured_at)}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      {rows.length > max && <p className="text-[10px] text-muted-foreground">+ {rows.length - max} more — the full set is under Profile → Websites → Rank tracking.</p>}
+    </>
   );
 }
 
@@ -438,26 +642,9 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
     return (
       <Card>
         <Header icon="📈" title={`Top Ranking Keywords — ${data.domain}`} subtitle={`${items.length} keywords · DataForSEO index${crawlSpan}`} />
-        <Primer>The terms this domain ranks for in DataForSEO's index, with the Google position (#) and each term's monthly volume. Each row shows when its SERP was last crawled — this is an index, not a live check, so it lags recent movement and can miss a site's own brand terms. Positions 4–15 are the quickest to push onto page 1.</Primer>
+        <Primer>The terms this domain ranks for in DataForSEO's index: Google position and its change since the previous crawl, monthly volume and its yearly trend, CPC, competition, keyword difficulty (KD), estimated monthly visits, the blocks on that results page, and the page that ranks. "SERP crawled" is when the index last looked — this is not a live check, so it lags recent movement and can miss a site's own brand terms. Positions 4–15 are the quickest to push onto page 1.</Primer>
         {items.length === 0 ? <Empty>The index has no ranking keywords for this domain — not the same as ranking for none.</Empty> : (
-          <ItemList rows={items.map((it: any) => {
-            const serp = it.ranked_serp_element?.serp_item || {};
-            const rank = serp.rank_absolute;
-            const vol = it.keyword_data?.keyword_info?.search_volume;
-            const etv = serp.etv;
-            const when = crawlDate(it);
-            const parts = [
-              etv != null ? `~${fmtNum(etv)} est. visits/mo` : null,
-              serp.url || null,
-              when ? `crawled ${when}` : null,
-            ].filter(Boolean);
-            return {
-              left: `#${rank ?? '?'} · ${it.keyword_data?.keyword}`,
-              right: vol ? `${fmtNum(vol)} /mo` : 'no volume data',
-              sub: parts.length ? parts.join(' · ') : undefined,
-              href: serp.url || undefined,
-            };
-          })} max={12} />
+          <RankedKeywordsTable items={items} crawlDate={crawlDate} />
         )}
       </Card>
     );
@@ -1129,11 +1316,6 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
     const queries: any[] = gsc.top_queries || [];
     // The RPC hands back a calendar day already; this only trims a timestamp to it.
     const dayOf = (d: any): string => (d ? String(d).slice(0, 10) : '—');
-    const changeOf = (k: any): string | undefined => {
-      if (k.entered) return 'new';
-      if (typeof k.change !== 'number' || k.change === 0) return undefined;
-      return k.change > 0 ? `▲ ${k.change}` : `▼ ${Math.abs(k.change)}`;
-    };
     const trackerHasData = tr.status === 'ok' || tr.status === 'collector_failed';
     return (
       <Card>
@@ -1160,15 +1342,7 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
             {ranking.length === 0 ? (
               <Empty>None of the tracked keywords is in Google's top 100 right now.</Empty>
             ) : (
-              <ItemList
-                max={15}
-                rows={ranking.map((k: any) => ({
-                  left: `#${k.position} · ${k.keyword}`,
-                  right: changeOf(k),
-                  sub: [k.url, k.search_volume ? `${fmtNum(k.search_volume)} /mo` : null].filter(Boolean).join(' · ') || undefined,
-                  href: k.url || undefined,
-                }))}
-              />
+              <TrackedKeywordsTable rows={ranking} />
             )}
           </>
         )}
