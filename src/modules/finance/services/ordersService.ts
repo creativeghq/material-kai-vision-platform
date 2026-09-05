@@ -897,10 +897,14 @@ export const ordersService = {
   async get(id: string): Promise<{ order: Order; items: OrderItem[] }> {
     const { data: order, error } = await supabase.from('orders').select('*').eq('id', id).single();
     if (error) throw error;
-    const [{ data: items }, costs] = await Promise.all([
+    const [{ data: items, error: itemsError }, costs] = await Promise.all([
       supabase.from('order_items').select(ORDER_ITEM_SELECT).eq('order_id', id).order('sort_order', { ascending: true }),
       this.orderItemCosts([id]),
     ]);
+    // A refused line read is an ERROR, not an order with no lines. This swallowed a 42501 for a
+    // week (2026-08-29 → 09-05): `configured_options` joined ORDER_ITEM_SELECT without a column
+    // grant, PostgREST refused every order's lines, and the detail page rendered each order empty.
+    if (itemsError) throw itemsError;
     // A line the caller may not see the cost of comes back with `unit_cost: null` — cost unknown,
     // which the panel renders as a dash. It is never folded to 0, which would read as free.
     return {

@@ -241,6 +241,28 @@ await check('db.plpgsql-lint', ['DB_KEY'], async () => {
   return `${json.length} known-broken (no new regressions)`;
 });
 
+// 4b'. Column grants — `products`, `order_items` and `invoice_items` have NO table-level SELECT
+//   for `authenticated` since #358, only a column list, so a column ADDED later is readable by
+//   nobody until someone grants it. PostgREST then refuses the WHOLE request naming it (42501),
+//   which is loud in a toast and silent in a `{ data }` destructure: `products.profile_user_id`
+//   broke Profile → Services, and `order_items.configured_options` made every order detail
+//   render with no lines for a week. `lint_column_grants()` lists such columns unless their
+//   COMMENT says "NOT selectable" (the declared-withheld cost columns). Strict zero.
+await check('db.column-grants', ['DB_KEY'], async () => {
+  const { res, json } = await http(`${SUPABASE_URL}/rest/v1/rpc/lint_column_grants`, {
+    method: 'POST',
+    headers: { apikey: DB_KEY, Authorization: `Bearer ${DB_KEY}`, 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  assert(res.ok, `rpc lint_column_grants → ${res.status} ${(JSON.stringify(json) || '').slice(0, 140)}`);
+  assert(Array.isArray(json), 'lint did not return an array');
+  assert(json.length === 0,
+    `${json.length} column(s) nobody can read and nobody declared withheld: `
+    + json.slice(0, 6).map((r) => `${r.table_name}.${r.column_name}`).join(', ')
+    + (json.length > 6 ? ` (+${json.length - 6} more)` : ''));
+  return 'every ungranted column is declared';
+});
+
 // 4b. Does this checkout still agree with the live schema?
 //
 //   `db.plpgsql-lint` above asks the same question of SQL functions and answers it well — it is
