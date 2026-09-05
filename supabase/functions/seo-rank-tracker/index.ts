@@ -58,8 +58,15 @@ function hostOf(url: string): string {
   catch { return String(url || '').replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].toLowerCase(); }
 }
 
-/** DataForSEO via MIVAA's dispatcher. Only params the endpoint declares. */
-async function serp(keyword: string, country: string, language: string, userId: string | null): Promise<any> {
+/**
+ * DataForSEO via MIVAA's dispatcher. Only params the endpoint declares.
+ *
+ * `acceptPartial`: DataForSEO's 40106 "partial results" returns the result pages it
+ * DID fetch. A position found in those pages is real; "not found in a partial set" is
+ * unknown. The caller accepts a partial set only on its last attempt, so a full page
+ * set is still preferred when a retry can get one.
+ */
+async function serp(keyword: string, country: string, language: string, userId: string | null, acceptPartial = false): Promise<any> {
   const resp = await fetch(`${MIVAA_GATEWAY_URL()}/api/v1/seo-agent/dataforseo/serp_google_organic`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET() },
@@ -81,7 +88,12 @@ async function serp(keyword: string, country: string, language: string, userId: 
   // Google results page with no blocks of any kind does not exist either, so an
   // empty item list is the same fact wearing a different envelope.
   if (parsed?.success === false || parsed?.data?.error) {
-    throw new Error(String(parsed?.data?.error || 'upstream returned no result'));
+    const err = String(parsed?.data?.error || 'upstream returned no result');
+    const partialItems = Array.isArray(parsed?.data?.items) ? parsed.data.items : [];
+    if (acceptPartial && /40106/.test(err) && partialItems.length > 0) {
+      return { ...parsed.data, partial: true, partial_error: err };
+    }
+    throw new Error(err);
   }
   const data = parsed?.data ?? {};
   if (!Array.isArray(data.items) || data.items.length === 0) {
@@ -105,7 +117,7 @@ async function serpWithRetry(keyword: string, country: string, language: string,
   let last: unknown;
   for (let attempt = 0; attempt < SERP_ATTEMPTS; attempt++) {
     try {
-      return await serp(keyword, country, language, userId);
+      return await serp(keyword, country, language, userId, attempt === SERP_ATTEMPTS - 1);
     } catch (e) {
       last = e;
       console.warn(`[seo-rank-tracker] attempt ${attempt + 1} failed for "${keyword}":`, e instanceof Error ? e.message : e);
@@ -225,6 +237,9 @@ async function trackWebsite(
       const r = await serpWithRetry(kw.keyword, kw.country_code, kw.language_code, userId);
       const items: any[] = r.items || [];
       const { position, url } = findPosition(items, host);
+      // A partial page set that does not contain us says nothing about the pages that
+      // did not load — unknown, never "not in top 100".
+      if (r.partial && position == null) throw new Error(String(r.partial_error || 'partial results'));
       // Every distinct block type on the page, so "we lost the featured snippet"
       // is answerable later without re-fetching.
       const features = [...new Set(items.map((i: any) => i?.type).filter(Boolean))] as string[];
