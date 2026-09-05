@@ -42,8 +42,22 @@ export interface UserWebsitePage {
 export interface CrawlResult {
   ok: boolean;
   pages_indexed: number;
+  /** Every URL the sitemap holds, NOT the number crawled — the cap below decides that. */
   pages_discovered: number;
+  pages_capped_at?: number;
+  capped?: boolean;
   error?: string;
+}
+
+/**
+ * One sentence for the crawl toast that names the cap when the cap is what stopped
+ * the crawl. "50 of 50 pages indexed" on a 127-URL sitemap read as a 50-page site.
+ */
+export function describeCrawlResult(r: CrawlResult): string {
+  const base = `${r.pages_indexed} of ${r.pages_discovered} pages indexed`;
+  return r.capped && r.pages_capped_at
+    ? `${base} — this site's page cap is ${r.pages_capped_at}. Raise it under Websites → Edit to index the rest.`
+    : base;
 }
 
 export interface PreviewSampleItem {
@@ -337,6 +351,8 @@ export interface TrackedKeywordRow {
   country_code: string;
   device: string;
   tags: string[];
+  /** Date of THIS keyword's most recent check — a capped run leaves part of the set on an older day. */
+  captured_at: string | null;
   /** NULL = not in the top 100. Never a sentinel rank. */
   position: number | null;
   found: boolean;

@@ -126,9 +126,16 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
     setBusy('check');
     try {
       const r = await userWebsitesService.runRankCheck(website.id);
+      // A run is capped (oldest-checked first), so with a large set it covers part of
+      // it. Say which part, or "0 of 60 ranking" over a set of 129 reads as the site
+      // having lost every position it held yesterday.
+      const tracked = data?.tracked ?? r.checked;
+      const scope = tracked > r.checked
+        ? `Checked ${r.checked} of ${tracked} (oldest first — run again for the rest)`
+        : `Checked ${r.checked}`;
       toast({
         title: 'Rank check finished',
-        description: `${r.ranking} of ${r.checked} ranking${r.failed ? ` · ${r.failed} could not be checked` : ''}.`,
+        description: `${scope} · ${r.ranking} ranking${r.failed ? ` · ${r.failed} could not be checked` : ''}.`,
       });
       await load();
     } catch (e: any) {
@@ -343,6 +350,11 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
                         <div className="text-[11px] text-muted-foreground">
                           {r.country_code} · {r.device}
                           {r.search_volume != null ? ` · ${compact(r.search_volume)}/mo` : ''}
+                          {/* A capped run leaves part of the set on an older day; say so per
+                              row rather than let yesterday's position pass as today's. */}
+                          {r.captured_at && s?.captured_at && r.captured_at !== s.captured_at
+                            ? ` · checked ${timeAgo(r.captured_at)}`
+                            : ''}
                         </div>
                       </TableCell>
                       <TableCell className="text-right tabular-nums">

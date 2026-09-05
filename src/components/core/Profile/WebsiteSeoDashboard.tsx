@@ -29,6 +29,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/core/ui/dialog'
 import { useToast } from '@/hooks/use-toast';
 import {
   userWebsitesService,
+  describeCrawlResult,
   type UserWebsite,
   type WebsiteSeoOverview,
   type SeoArticleRow,
@@ -142,7 +143,7 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
     setRecrawling(true);
     try {
       const result = await userWebsitesService.crawl(website.id);
-      toast({ title: 'Crawl complete', description: `${result.pages_indexed} of ${result.pages_discovered} pages indexed` });
+      toast({ title: 'Crawl complete', description: describeCrawlResult(result) });
       loadAll();
     } catch (e: any) {
       toast({ title: 'Crawl failed', description: e.message, variant: 'destructive' });

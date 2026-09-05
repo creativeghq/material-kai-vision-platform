@@ -74,7 +74,35 @@ async function serp(keyword: string, country: string, language: string, userId: 
   let parsed: any = null;
   try { parsed = JSON.parse(text); } catch { parsed = text; }
   if (!resp.ok) throw new Error(describeUpstreamError(resp.status, parsed, 200));
-  return parsed?.data ?? {};
+  // MIVAA answers HTTP 200 with `success:false` when DataForSEO itself failed —
+  // task 40106 "partial results", zero items. That is UNKNOWN, not "not in the top
+  // 100": on 2026-09-05 three such calls were stored as unranked with no error and
+  // an empty feature list, indistinguishable in the panel from a real miss. A
+  // Google results page with no blocks of any kind does not exist either, so an
+  // empty item list is the same fact wearing a different envelope.
+  if (parsed?.success === false || parsed?.data?.error) {
+    throw new Error(String(parsed?.data?.error || 'upstream returned no result'));
+  }
+  const data = parsed?.data ?? {};
+  if (!Array.isArray(data.items) || data.items.length === 0) {
+    throw new Error('upstream returned an empty SERP');
+  }
+  return data;
+}
+
+/**
+ * One retry. DataForSEO's 40106 is transient by its own description ("some pages
+ * could not be retrieved after several retry attempts") and a second task a few
+ * seconds later normally completes; a keyword that still fails is recorded as
+ * unknown with the message, never as unranked.
+ */
+async function serpWithRetry(keyword: string, country: string, language: string, userId: string | null): Promise<any> {
+  try {
+    return await serp(keyword, country, language, userId);
+  } catch (first) {
+    console.warn(`[seo-rank-tracker] retrying "${keyword}":`, first instanceof Error ? first.message : first);
+    return await serp(keyword, country, language, userId);
+  }
 }
 
 /**
@@ -124,7 +152,7 @@ async function trackWebsite(
   const checkOne = async (kw: any): Promise<void> => {
     let row: Record<string, unknown>;
     try {
-      const r = await serp(kw.keyword, kw.country_code, kw.language_code, userId);
+      const r = await serpWithRetry(kw.keyword, kw.country_code, kw.language_code, userId);
       const items: any[] = r.items || [];
       const { position, url } = findPosition(items, host);
       // Every distinct block type on the page, so "we lost the featured snippet"

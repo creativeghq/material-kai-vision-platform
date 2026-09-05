@@ -98,6 +98,35 @@ checked was checked correctly, so nothing raised. The loop is now a pool of **12
 (`CONCURRENCY`), which puts the 60-cap at ~5 rounds, ~100 s. With 129 keywords the set still
 rotates over ~2 days; that is the cap doing its job, not a defect.
 
+**A capped run means the newest capture DATE covers part of the set, so every reader uses each
+keyword's OWN latest capture.** `get_website_rank_summary` joined every keyword to the site's
+newest date; the morning after a 60-of-129 run that rendered "materialshub", #1 for a week, as
+"not in top 100", and the visibility line dropped to 0% on a day nothing moved. The summary,
+the per-keyword row (which now carries its own `captured_at`, and the panel prints "checked 2
+days ago" when it differs), the `change` column (against the last ANSWERED check, so a failed
+day in between does not blank it), the visibility trend (the state of the whole set as of each
+day) and `seo_keywords_dropped_out_of_top10` all derive from the per-keyword latest capture.
+`summary.as_of_latest` says how much of the set the newest run reached and the note says the
+rest.
+
+**An upstream failure inside a 200 envelope is UNKNOWN, never "not in top 100".** MIVAA's
+dispatcher answers HTTP 200 with `success:false` and `data.error` when DataForSEO itself fails
+(task 40106 "partial results", 40101 "internal SE error"), with an empty item list. The tracker
+read `data.items ?? []`, found nothing, and stored `found=false, error=null` — 12 rows over two
+days, pixel-identical in the panel to a real miss and counted in the visibility denominator.
+`serp()` now throws on `success:false`, on `data.error`, and on an EMPTY item list (a Google
+results page with no blocks of any kind does not exist), and `serpWithRetry` tries once more
+before recording the error. The 12 rows were stamped with an error retroactively; an empty
+`serp_features` on a `found=false` row is the tell for any older data.
+
+**The crawl reports the sitemap's real size, and the toast names the cap when it bit.**
+`crawl-user-website` collected `max_pages` URLs and returned that count as `pages_discovered`,
+so a 127-URL sitemap under the default cap of 50 reported "50 of 50 pages indexed" and read as
+a 50-page site. It now collects up to the hard cap, returns `pages_discovered` (all of them),
+`pages_capped_at` and `capped`, and `describeCrawlResult` prints "50 of 127 pages indexed — this
+site's page cap is 50" so the reader knows where to go. The cap itself is edited under
+Websites → Edit (10–1000).
+
 **Alerts fire on leaving the top 10 only**, through the existing `seo.ranking_movement` flow
 trigger — not a new near-duplicate one. A tracker that alerts on every wobble gets muted, and a
 muted alert cannot warn about anything. (The first cut emitted `seo.rank_drop`, which is in no

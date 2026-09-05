@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import {
   userWebsitesService,
+  describeCrawlResult,
   type UserWebsite,
   type PreviewResult,
 } from '@/services/userWebsitesService';
@@ -168,7 +169,7 @@ export const ConnectedWebsitesTab: React.FC<{ onOpen?: (w: UserWebsite) => void 
       const result = await userWebsitesService.crawl(w.id);
       toast({
         title: 'Crawl complete',
-        description: `${result.pages_indexed} of ${result.pages_discovered} pages indexed`,
+        description: describeCrawlResult(result),
       });
       reload();
     } catch (e: any) {
@@ -200,7 +201,7 @@ export const ConnectedWebsitesTab: React.FC<{ onOpen?: (w: UserWebsite) => void 
       const result = await userWebsitesService.crawl(w.id);
       toast({
         title: 'Crawl complete',
-        description: `${result.pages_indexed} of ${result.pages_discovered} pages indexed`,
+        description: describeCrawlResult(result),
       });
     } catch (e: any) {
       toast({ title: 'Crawl failed', description: e.message, variant: 'destructive' });

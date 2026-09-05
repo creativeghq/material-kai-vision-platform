@@ -355,7 +355,10 @@ async function previewWebsite(
 async function crawlOneWebsite(
   supabase: DbClient,
   website: { id: string; user_id: string; workspace_id: string | null; url: string; sitemap_url: string | null; max_pages: number },
-): Promise<{ ok: boolean; pages_indexed: number; pages_discovered: number; error?: string }> {
+): Promise<{
+  ok: boolean; pages_indexed: number; pages_discovered: number;
+  pages_capped_at: number; capped: boolean; error?: string;
+}> {
   const { id: websiteId, user_id: userId, workspace_id: workspaceId, url: siteUrl, max_pages } = website;
   const cap = Math.min(max_pages || 50, MAX_PAGES_HARD_CAP);
 
@@ -368,18 +371,24 @@ async function crawlOneWebsite(
         last_crawled_at: new Date().toISOString(),
         last_crawl_error: 'Could not autodetect sitemap. Add sitemap_url manually.',
       }).eq('id', websiteId);
-      return { ok: false, pages_indexed: 0, pages_discovered: 0, error: 'sitemap not found' };
+      return { ok: false, pages_indexed: 0, pages_discovered: 0, pages_capped_at: cap, capped: false, error: 'sitemap not found' };
     }
   }
 
-  const urls = await collectSitemapUrls(sitemapUrl, cap);
-  if (urls.length === 0) {
+  // Collect the WHOLE sitemap (bounded by the hard cap) and cut to this site's cap
+  // afterwards, so the caller learns the real size. Collecting only `cap` entries
+  // reported "50 of 50 pages indexed" for a 127-URL sitemap: the cap was invisible
+  // and read as the site having 50 pages.
+  const allUrls = await collectSitemapUrls(sitemapUrl, MAX_PAGES_HARD_CAP);
+  if (allUrls.length === 0) {
     await supabase.from('user_websites').update({
       last_crawled_at: new Date().toISOString(),
       last_crawl_error: 'Sitemap returned no URLs.',
     }).eq('id', websiteId);
-    return { ok: false, pages_indexed: 0, pages_discovered: 0, error: 'sitemap empty' };
+    return { ok: false, pages_indexed: 0, pages_discovered: 0, pages_capped_at: cap, capped: false, error: 'sitemap empty' };
   }
+  const urls = allUrls.slice(0, cap);
+  const capped = allUrls.length > cap;
   // Store only once the sitemap has actually yielded URLs (#363 `EE-19`).
   if (discovered) {
     await supabase.from('user_websites').update({ sitemap_url: sitemapUrl }).eq('id', websiteId);
@@ -461,7 +470,9 @@ async function crawlOneWebsite(
   return {
     ok: !allWritesFailed,
     pages_indexed: indexed,
-    pages_discovered: urls.length,
+    pages_discovered: allUrls.length,
+    pages_capped_at: cap,
+    capped,
     ...(writeError ? { error: writeError } : {}),
   };
 }
