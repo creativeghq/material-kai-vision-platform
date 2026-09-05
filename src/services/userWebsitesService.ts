@@ -404,6 +404,8 @@ export interface RankSummary {
   summary?: {
     captured_at: string;
     previous_at: string | null;
+    /** When the most recently checked keyword was checked — a timestamp, unlike `captured_at`. */
+    last_checked_at?: string | null;
     checked: number;
     answered: number;
     failed: number;

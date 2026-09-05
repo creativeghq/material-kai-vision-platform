@@ -237,7 +237,8 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
             <CardDescription>
               The keywords you chose, followed daily.
               {data?.tracked ? <> · {data.tracked} tracked</> : null}
-              {s?.captured_at ? <> · checked {timeAgo(s.captured_at)}</> : null}
+              {/* The timestamp, not the capture DATE: the date read "checked 10h ago" at ten in the morning. */}
+              {s?.last_checked_at || s?.captured_at ? <> · checked {timeAgo(s.last_checked_at ?? s.captured_at)}</> : null}
             </CardDescription>
           </div>
           <div className="flex gap-2">

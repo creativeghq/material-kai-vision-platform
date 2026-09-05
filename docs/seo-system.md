@@ -109,6 +109,16 @@ day) and `seo_keywords_dropped_out_of_top10` all derive from the per-keyword lat
 `summary.as_of_latest` says how much of the set the newest run reached and the note says the
 rest.
 
+**A failed check is retried three times and re-checked FIRST next run.** DataForSEO fails
+8–12% of Greek depth-100 SERP tasks on the first try (40101 "internal SE server error", 40106
+"partial results"); one retry left 5–8% of a sweep as unknown, and because `last_checked_at`
+is stamped on failure too (correctly — a broken keyword must not starve the rest) those
+keywords went to the BACK of a two-day rotation, so "8 of 129 latest checks failed" sat on the
+panel for days. `serpWithRetry` now makes three attempts with backoff, and `trackWebsite`
+takes `seo_keywords_to_recheck` (latest capture has an error; service_role only) ahead of the
+oldest-checked fill. The summary carries `last_checked_at` (a timestamp — the capture DATE
+read "checked 10h ago" at ten in the morning) and the note names the source's error text.
+
 **An upstream failure inside a 200 envelope is UNKNOWN, never "not in top 100".** MIVAA's
 dispatcher answers HTTP 200 with `success:false` and `data.error` when DataForSEO itself fails
 (task 40106 "partial results", 40101 "internal SE error"), with an empty item list. The tracker

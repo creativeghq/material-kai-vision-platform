@@ -91,18 +91,28 @@ async function serp(keyword: string, country: string, language: string, userId: 
 }
 
 /**
- * One retry. DataForSEO's 40106 is transient by its own description ("some pages
- * could not be retrieved after several retry attempts") and a second task a few
- * seconds later normally completes; a keyword that still fails is recorded as
- * unknown with the message, never as unranked.
+ * Three attempts with a short backoff. DataForSEO fails 8–12% of Greek depth-100
+ * SERP tasks on the first try — 40106 "partial results, some pages could not be
+ * retrieved after several retry attempts" and 40101 "internal SE server error",
+ * both transient by their own description. One retry still left 5–8% of a sweep as
+ * unknown (measured 2026-09-05: 15 failures in 128 calls, 8 keywords left failed).
+ * A keyword that fails all three is recorded as unknown with the message, never as
+ * unranked, and the next run takes it first (`seo_keywords_to_recheck`).
  */
+const SERP_ATTEMPTS = 3;
+const SERP_BACKOFF_MS = [1500, 4000];
 async function serpWithRetry(keyword: string, country: string, language: string, userId: string | null): Promise<any> {
-  try {
-    return await serp(keyword, country, language, userId);
-  } catch (first) {
-    console.warn(`[seo-rank-tracker] retrying "${keyword}":`, first instanceof Error ? first.message : first);
-    return await serp(keyword, country, language, userId);
+  let last: unknown;
+  for (let attempt = 0; attempt < SERP_ATTEMPTS; attempt++) {
+    try {
+      return await serp(keyword, country, language, userId);
+    } catch (e) {
+      last = e;
+      console.warn(`[seo-rank-tracker] attempt ${attempt + 1} failed for "${keyword}":`, e instanceof Error ? e.message : e);
+      if (attempt < SERP_ATTEMPTS - 1) await new Promise((r) => setTimeout(r, SERP_BACKOFF_MS[attempt] ?? 4000));
+    }
   }
+  throw last;
 }
 
 /**
@@ -181,14 +191,32 @@ async function trackWebsite(
   const host = hostOf(website.url);
   const today = new Date().toISOString().slice(0, 10);
 
-  // Oldest-checked first, so a set larger than the cap rotates through rather than
+  // Keywords whose LATEST check failed go first: `last_checked_at` is stamped on
+  // failure too (or a broken keyword starves the rest), which put them at the back
+  // of a two-day rotation, so "8 of 129 failed" sat on the panel for days. Then
+  // oldest-checked first, so a set larger than the cap rotates through rather than
   // always re-checking the same head of the list.
-  const { data: keywords } = await supabase
+  const { data: recheckIds, error: recheckErr } = await supabase.rpc('seo_keywords_to_recheck', { p_website_id: website.id });
+  if (recheckErr) console.warn('[seo-rank-tracker] recheck read failed:', recheckErr.message);
+  const first = new Set<string>(((recheckIds as string[] | null) || []).slice(0, limit));
+  const { data: oldest } = await supabase
     .from('seo_tracked_keywords')
     .select('id, keyword, country_code, language_code, device, last_checked_at')
     .eq('website_id', website.id).eq('is_active', true)
     .order('last_checked_at', { ascending: true, nullsFirst: true })
-    .limit(limit);
+    .limit(limit + first.size);
+  let failedFirst: any[] = [];
+  if (first.size > 0) {
+    const { data } = await supabase
+      .from('seo_tracked_keywords')
+      .select('id, keyword, country_code, language_code, device, last_checked_at')
+      .in('id', [...first]);
+    failedFirst = data || [];
+  }
+  const keywords = [
+    ...failedFirst,
+    ...(oldest || []).filter((k: any) => !first.has(k.id)),
+  ].slice(0, limit);
 
   let checked = 0, ranking = 0, failed = 0;
   const checkOne = async (kw: any): Promise<void> => {
