@@ -19,6 +19,7 @@ import type { DbClient } from './supabase-client.ts';
 import { emitFlowEvent, emitFlowEventToWorkspaceRoles, emitInboxMessageEvent } from './flow-events.ts';
 import { inboxAutopilotSettings } from './inbox-autopilot.ts';
 import { enrichInboundAttachments } from './inbox-attachment-intelligence.ts';
+import { runInBackground } from './background.ts';
 
 /** Private bucket for the raw `.eml`. Registered in `build_storage_reference_set()`. */
 export const RAW_EMAIL_BUCKET = 'pdf-documents';
@@ -765,18 +766,20 @@ export async function deliverToInbox(
   }).select('id').single();
   if (msgErr) throw new Error(`inbox_messages insert failed: ${msgErr.message}`);
 
-  // READ before anyone is told: an emailed invoice is classified now (kind, confidence, reason,
+  // READ once the email is filed: an emailed invoice is classified (kind, confidence, reason,
   // the printed header facts), so the thread shows what arrived and the assistant is not left
   // saying it "cannot open" a supplier bill. Each attachment ends with a status on the row; a
-  // failure here never loses the email.
+  // failure here never loses the email. Off the response path: the mail worker is waiting on
+  // this call, and a classification is a model round-trip, not a database write.
   if (attachments.length && insertedMsg?.id) {
-    try {
-      await enrichInboundAttachments(db, {
-        messageId: String(insertedMsg.id), threadId, workspaceId, attachments,
-      });
-    } catch (err) {
-      console.warn('[inbound-email] attachment enrichment failed:', err instanceof Error ? err.message : String(err));
-    }
+    const messageId = String(insertedMsg.id);
+    runInBackground((async () => {
+      try {
+        await enrichInboundAttachments(db, { messageId, threadId, workspaceId, attachments });
+      } catch (err) {
+        console.warn('[inbound-email] attachment enrichment failed:', err instanceof Error ? err.message : String(err));
+      }
+    })(), `inbound-email-reader:${messageId}`);
   }
 
   // Notify every member participant through Flows — never a hardcoded notification insert.

@@ -36,11 +36,12 @@ import {
 import { emitFlowEvent, emitFlowEventToWorkspaceRoles, emitInboxMessageEvent } from '../_shared/flow-events.ts';
 import { fetchImageGuardedOrNull } from '../_shared/fetch-image.ts';
 import {
-  INBOX_ATTACHMENT_BUCKET, materialiseInlineAttachments, extensionFor, storeParticipantPicture,
+  INBOX_ATTACHMENT_BUCKET, bucketForAttachment, materialiseInlineAttachments, extensionFor, storeParticipantPicture,
 } from '../_shared/inbox-media.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { shouldAutoEngageAgent } from '../_shared/inbox-autopilot.ts';
 import { enrichInboundAttachments } from '../_shared/inbox-attachment-intelligence.ts';
+import { runInBackground } from '../_shared/background.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -414,9 +415,12 @@ async function fetchAndStoreInboundAttachments(
     const ext = extensionFor(got.contentType, got.fileName);
     const safeName = (got.fileName || `attachment-${i + 1}${ext}`).replace(/[^a-zA-Z0-9._-]/g, '_');
     const path = `inbox/${params.threadId}/${crypto.randomUUID()}-${safeName}`;
+    // A photo goes to the public image bucket; a PDF or a spreadsheet to the private document
+    // bucket, whose MIME allowlist does not refuse it (see INBOX_DOCUMENT_BUCKET).
+    const bucket = bucketForAttachment(got.contentType);
 
     const { error } = await supabase.storage
-      .from(INBOX_ATTACHMENT_BUCKET)
+      .from(bucket)
       .upload(path, got.bytes, { contentType: got.contentType, upsert: false });
     if (error) {
       // Loud, and not fatal: the message body must still be filed. A dropped file the operator
@@ -426,7 +430,7 @@ async function fetchAndStoreInboundAttachments(
     }
 
     out.push({
-      storage_bucket: INBOX_ATTACHMENT_BUCKET,
+      storage_bucket: bucket,
       storage_object_path: path,
       name: got.fileName || safeName,
       content_type: got.contentType,
@@ -881,54 +885,62 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
     return { outcome: 'filed', reason: 'outgoing echo filed (sent from the device)' };
   }
 
-  // HEARD and READ before anyone is told. A voice note is transcribed and a document is
-  // classified now, so the notification below can carry the words that were spoken and the
-  // assistant's hand-off further down reads a thread that already holds the transcript. Each
-  // attachment ends with a status on the row (ok / failed / skipped, with the reason); a
-  // failure here never stops the message from flowing.
-  let spokenPreview: string | null = null;
-  if (inboundAttachments.length && insertedMsg?.id) {
-    try {
-      const enriched = await enrichInboundAttachments(supabase, {
-        messageId: String(insertedMsg.id), threadId, workspaceId, attachments: inboundAttachments,
-      });
-      const heard = enriched.find((r) => r.transcript?.status === 'ok' && r.transcript.text);
-      if (heard?.transcript?.text && !hasRealText) {
-        spokenPreview = `🎤 ${heard.transcript.text.replace(/\s+/g, ' ').slice(0, 200)}`;
-        // The thread list shows the words, not "[voice message]". The PREVIEW is the caller's
-        // column (inbox-api says so); status and the follow-up state belong to the
-        // `inbox_message_moves_thread_state` trigger and are not touched here.
-        await supabase
-          .from('inbox_threads')
-          .update({ last_message_preview: spokenPreview })
-          .eq('id', threadId);
+  // Everything below REACTS to the filed message, and it runs AFTER the 200 goes back to Zernio:
+  // the reader below makes model calls that take seconds, and a webhook that answers slowly is
+  // a webhook that gets retried (the wamid index makes a retry harmless, but a delivery marked
+  // failed on their side is not). `runInBackground` keeps the isolate alive until this settles.
+  // The ORDER inside is the point and is unchanged: read → notify → hand-off.
+  const messageId = insertedMsg?.id ? String(insertedMsg.id) : null;
+  runInBackground((async () => {
+    // HEARD and READ before anyone is told. A voice note is transcribed and a document is
+    // classified now, so the notification below can carry the words that were spoken and the
+    // assistant's hand-off further down reads a thread that already holds the transcript. Each
+    // attachment ends with a status on the row (ok / failed / skipped, with the reason); a
+    // failure here never stops the message from flowing.
+    let spokenPreview: string | null = null;
+    if (inboundAttachments.length && messageId) {
+      try {
+        const enriched = await enrichInboundAttachments(supabase, {
+          messageId, threadId, workspaceId, attachments: inboundAttachments,
+        });
+        const heard = enriched.find((r) => r.transcript?.status === 'ok' && r.transcript.text);
+        if (heard?.transcript?.text && !hasRealText) {
+          spokenPreview = `🎤 ${heard.transcript.text.replace(/\s+/g, ' ').slice(0, 200)}`;
+          // The thread list shows the words, not "[voice message]". The PREVIEW is the caller's
+          // column (inbox-api says so); status and the follow-up state belong to the
+          // `inbox_message_moves_thread_state` trigger and are not touched here.
+          await supabase
+            .from('inbox_threads')
+            .update({ last_message_preview: spokenPreview })
+            .eq('id', threadId);
+        }
+      } catch (err) {
+        console.warn('[zernio-webhook] attachment enrichment failed:', err instanceof Error ? err.message : String(err));
       }
-    } catch (err) {
-      console.warn('[zernio-webhook] attachment enrichment failed:', err instanceof Error ? err.message : String(err));
     }
-  }
 
-  // Notify every member participant via the unified inbox event.
-  const { data: members } = await supabase
-    .from('inbox_participants').select('user_id')
-    .eq('thread_id', threadId).eq('participant_type', 'member').eq('status', 'active').not('user_id', 'is', null);
-  await emitInboxMessageEvent({
-    userIds: ((members || []) as Array<{ user_id: string }>).map((m) => m.user_id),
-    threadId,
-    // Was omitted entirely, so a tenant-scoped flow could not match a WhatsApp message.
-    workspaceId,
-    title: `WhatsApp · ${contactName || phone}`,
-    // The spoken words when there were no typed ones — "[voice message]" tells nobody anything.
-    body: spokenPreview ?? preview,
-  });
+    // Notify every member participant via the unified inbox event.
+    const { data: members } = await supabase
+      .from('inbox_participants').select('user_id')
+      .eq('thread_id', threadId).eq('participant_type', 'member').eq('status', 'active').not('user_id', 'is', null);
+    await emitInboxMessageEvent({
+      userIds: ((members || []) as Array<{ user_id: string }>).map((m) => m.user_id),
+      threadId,
+      // Was omitted entirely, so a tenant-scoped flow could not match a WhatsApp message.
+      workspaceId,
+      title: `WhatsApp · ${contactName || phone}`,
+      // The spoken words when there were no typed ones — "[voice message]" tells nobody anything.
+      body: spokenPreview ?? preview,
+    });
 
-  // Phase-2 agent takeover: if the thread is handed to the AI, let inbox-api generate + relay
-  // the reply (it owns the Claude call + credit metering). Service-role, best-effort.
-  await fetch(`${supabaseUrl}/functions/v1/inbox-api`, {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${supabaseServiceKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'internal_agent_reply', thread_id: threadId }),
-  }).catch(() => {});
+    // Phase-2 agent takeover: if the thread is handed to the AI, let inbox-api generate + relay
+    // the reply (it owns the Claude call + credit metering). Service-role, best-effort.
+    await fetch(`${supabaseUrl}/functions/v1/inbox-api`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${supabaseServiceKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'internal_agent_reply', thread_id: threadId }),
+    }).catch(() => {});
+  })(), `zernio-inbound-reactions:${threadId}`);
 
   // Reached only after the message is in a thread. Everything above returns 'dropped' with the
   // reason, so 'filed' means filed.

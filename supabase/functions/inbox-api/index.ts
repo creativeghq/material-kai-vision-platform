@@ -3311,7 +3311,9 @@ async function handleJwtAction(
       const workspaceId = String(thread.workspace_id);
 
       const isSheet = (a: Record<string, unknown> | null | undefined) =>
-        /\.(xlsx|xlsm|xls|csv|tsv|txt)$/i.test(String(a?.name ?? a?.storage_object_path ?? ''));
+        // No `.txt`: a notes file is not a spreadsheet, and "the latest spreadsheet on the thread"
+        // must not pick one up ahead of the price list that sits next to it.
+        /\.(xlsx|xlsm|xls|csv|tsv)$/i.test(String(a?.name ?? a?.storage_object_path ?? ''));
       type Att = Record<string, unknown> & { storage_bucket?: string; storage_object_path?: string; name?: string };
       let chosen: { messageId: string; att: Att } | null = null;
       if (wantedMessage) {

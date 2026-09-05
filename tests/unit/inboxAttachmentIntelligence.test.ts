@@ -69,6 +69,36 @@ describe('inbox attachment intelligence — both inbound paths read what arrived
     const around = EMAIL.slice(enrich - 120, enrich);
     expect(around).toContain('try {');
   });
+
+  it('the reader runs OFF the webhook response path, with the isolate kept alive', () => {
+    // A model round-trip on the response path is a webhook that gets retried. Both inbound
+    // writers hand the reader to runInBackground (EdgeRuntime.waitUntil), never a bare promise.
+    for (const [src, name] of [[ZERNIO, 'zernio'], [EMAIL, 'email']] as const) {
+      const bg = src.indexOf('runInBackground(');
+      const enrich = src.indexOf('enrichInboundAttachments(');
+      expect(bg, `${name}: runInBackground must wrap the reader`).toBeGreaterThan(-1);
+      expect(enrich).toBeGreaterThan(bg);
+    }
+    // And the WhatsApp reply to the provider comes AFTER the background block is started, not
+    // after the reader has finished.
+    expect(ZERNIO.indexOf("return { outcome: 'filed' };")).toBeGreaterThan(ZERNIO.indexOf("action: 'internal_agent_reply'"));
+  });
+
+  it('a WhatsApp PDF or spreadsheet is stored in the private document bucket, not refused by the image bucket', () => {
+    // generation-images carries a MIME allowlist (image/video/3D); every WhatsApp file on record
+    // was fetch_failed because of it. Both upload sites now pick the bucket by content type.
+    const media = read('supabase/functions/_shared/inbox-media.ts');
+    expect(media).toContain("export const INBOX_DOCUMENT_BUCKET = 'pdf-documents'");
+    expect(media).toMatch(/startsWith\('image\/'\) \|\| ct\.startsWith\('video\/'\) \? INBOX_ATTACHMENT_BUCKET : INBOX_DOCUMENT_BUCKET/);
+    expect(media).toContain('const bucket = bucketForAttachment(contentType)');
+    expect(ZERNIO).toContain('const bucket = bucketForAttachment(got.contentType)');
+    // Neither ATTACHMENT upload site writes the image bucket by name any more. (Profile pictures
+    // further down the module are images by construction and stay where they were.)
+    const inline = media.slice(media.indexOf('export async function materialiseInlineAttachments('), media.indexOf('export function normalizeMediaType('));
+    expect(inline).not.toMatch(/\.from\(INBOX_ATTACHMENT_BUCKET\)\s*\.upload\(/);
+    const fetchStore = ZERNIO.slice(ZERNIO.indexOf('async function fetchAndStoreInboundAttachments('), ZERNIO.indexOf('const bucket = bucketForAttachment(got.contentType)') + 400);
+    expect(fetchStore).not.toMatch(/\.from\(INBOX_ATTACHMENT_BUCKET\)\s*\.upload\(/);
+  });
 });
 
 describe('inbox attachment intelligence — the verdict is forced, sourced and paid for', () => {

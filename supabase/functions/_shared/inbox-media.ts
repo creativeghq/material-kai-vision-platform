@@ -9,8 +9,26 @@
 import { fetchZernioMediaUrl } from './zernio.ts';
 import { fetchImageGuardedOrNull } from './fetch-image.ts';
 
-/** Where inbound files land — the same bucket and prefix inbox-api writes outbound ones to. */
+/** Where inbound MEDIA lands — the same bucket and prefix inbox-api writes outbound ones to. */
 export const INBOX_ATTACHMENT_BUCKET = 'generation-images';
+/**
+ * Where inbound DOCUMENTS land — the private bucket the email path already uses.
+ *
+ * `generation-images` carries a MIME allowlist of image, video and 3D types, so Storage refused
+ * every `application/pdf` and every spreadsheet a customer sent over WhatsApp: measured
+ * 2026-09-05, all 15 WhatsApp file attachments on record were `fetch_failed` with no path,
+ * while all 77 photos were stored. The failure was reported as "not downloaded yet", which
+ * reads as the vendor's fault; it was ours. The orphan cron protects any bucket recorded on a
+ * message, and the inbox signs URLs per bucket, so a document can live here without a second
+ * reader of anything.
+ */
+export const INBOX_DOCUMENT_BUCKET = 'pdf-documents';
+
+/** Media goes to the public image bucket; anything else to the private document bucket. */
+export function bucketForAttachment(contentType: string): string {
+  const ct = String(contentType || '').toLowerCase();
+  return ct.startsWith('image/') || ct.startsWith('video/') ? INBOX_ATTACHMENT_BUCKET : INBOX_DOCUMENT_BUCKET;
+}
 
 /**
  * Pull inline media URLs into our own storage.
@@ -47,9 +65,10 @@ export async function materialiseInlineAttachments(
     const base = got.fileName || (typeof a.name === 'string' && a.name ? a.name : `attachment-${i + 1}${ext}`);
     const safeName = base.replace(/[^a-zA-Z0-9._-]/g, '_');
     const path = `inbox/${threadId}/${crypto.randomUUID()}-${safeName}`;
+    const bucket = bucketForAttachment(contentType);
 
     const { error } = await supabase.storage
-      .from(INBOX_ATTACHMENT_BUCKET)
+      .from(bucket)
       .upload(path, got.bytes, { contentType, upsert: false });
     if (error) {
       console.error('[zernio-webhook] inline attachment upload failed:', error.message);
@@ -58,7 +77,7 @@ export async function materialiseInlineAttachments(
     }
 
     out.push({
-      storage_bucket: INBOX_ATTACHMENT_BUCKET,
+      storage_bucket: bucket,
       storage_object_path: path,
       name: base,
       content_type: contentType,
