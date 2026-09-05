@@ -33,6 +33,7 @@ import {
   Zap,
   Crown,
   Wand2,
+  Bot,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -238,9 +239,20 @@ const MODEL_OPTIONS = [
     bg: 'bg-amber-50 border-amber-200',
     active: 'bg-amber-500 border-amber-500 text-white',
   },
+  {
+    // Restored 2026-09-05. Credits mirror GENERATION_CREDIT_COSTS['gpt-image-1'].
+    id: 'chatgpt' as const,
+    label: 'ChatGPT',
+    description: 'GPT Image — strong prompt adherence',
+    credits: 10,
+    icon: Bot,
+    color: 'text-emerald-500',
+    bg: 'bg-emerald-50 border-emerald-200',
+    active: 'bg-emerald-600 border-emerald-600 text-white',
+  },
 ] as const;
 
-export type EditModelTier = 'fast' | 'pro' | 'grok';
+export type EditModelTier = 'fast' | 'pro' | 'grok' | 'chatgpt';
 
 // ── Exported types ───────────────────────────────────────────────────────────
 

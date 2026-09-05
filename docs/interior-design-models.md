@@ -73,6 +73,7 @@ Used when the variations grid is **not** appropriate — chip modes, iterative e
 | `gemini-3-pro-image-preview` | `pro` | 15 cr | Same modes at 4K quality. **Forced for `materials-selection-board`.** |
 | `black-forest-labs/flux-depth-pro` (called inside the edge fn) | implied by mode | 15 cr | `redesign` (1 image, locks room geometry), `copy-style` (2 images: inspiration + your room — copy aesthetic via depth/ControlNet) |
 | `aurora` (Grok image model, called inside edge fn when `model_tier=grok`) | `grok` | 15 cr | Best spatial accuracy alternative to Flux Depth Pro for `redesign` / `copy-style` |
+| `gpt-image-1` (OpenAI, called inside edge fn when `model_tier=chatgpt`; restored 2026-09-05) | `chatgpt` | 10 cr | `text-to-image` (no image) and `image-edit` (with an image) plus the product modes — strong prompt adherence. Same single-image shape as Grok: multi-reference briefs, `copy-style`, the diagram/board modes and `unstage` collapse to Gemini/Flux in `generation-routing.ts` and are billed as what runs. Needs `OPENAI_API_KEY` (Admin → Platform Secrets). |
 
 ### Modes (auto-detected by `generate_gemini` if not forced by chip)
 
@@ -129,7 +130,7 @@ A typical text-to-image variations request runs 4 tiles in parallel:
 A typical image-to-image variations request runs up to 12 tiles in parallel:
 - 1× Gemini (6 cr) + 11× Replicate ($0.014–$0.14 each, ~$0.30 total raw)
 
-Single inline (`generate_gemini`) is always cheapest: 6 cr (fast) or 15 cr (pro/grok).
+Single inline (`generate_gemini`) is always cheapest: 6 cr (fast), 10 cr (chatgpt) or 15 cr (pro/grok).
 
 ---
 

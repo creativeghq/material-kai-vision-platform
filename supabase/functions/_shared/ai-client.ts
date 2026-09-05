@@ -98,6 +98,10 @@ const GOOGLE_API_KEY = () => Deno.env.get('GOOGLE_GENERATIVE_AI_API_KEY') || '';
 // Lazy getter (same rationale as GOOGLE_API_KEY) for the xAI Grok/Aurora image
 // + edit + masked-inpaint paths (generateImageWithGrok / editImageWithGrok).
 const XAI_API_KEY = () => Deno.env.get('XAI_API_KEY') || '';
+// Images ONLY. OpenAI was removed from the platform on 2026-08-23; gpt-image-1 came back on
+// 2026-09-05 for the interior grid (text-to-image and image edit) through this chokepoint,
+// the same way Grok's OpenAI-compatible endpoint did. No SDK, no text models here.
+const OPENAI_API_KEY = () => Deno.env.get('OPENAI_API_KEY') || '';
 const _logSupabase = (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY)
   ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
   : null;
@@ -2353,6 +2357,138 @@ export async function editImageWithGrok(
   }
 
   void logGrok(1);
+  return { base64: b64, mimeType: 'image/png', model: modelId };
+}
+
+// ── OpenAI gpt-image-1 (interior grid: text-to-image + image edit) ──────────────
+
+export const OPENAI_IMAGE_MODEL = 'gpt-image-1';
+/** `ai_model_pricing.model_key` — priced per image at the medium 1024px tier. */
+const OPENAI_IMAGE_PRICING_MODEL_ID = 'gpt-image-1';
+
+export interface OpenAIImageResult {
+  base64: string;
+  mimeType: string;
+  model: string;
+}
+
+/**
+ * Generate an image from a text prompt with gpt-image-1 (/v1/images/generations).
+ * The model returns base64 by default and has no `response_format` parameter.
+ */
+export async function generateImageWithOpenAI(
+  prompt: string,
+  config?: UnitBillingConfig & { model?: string; size?: '1024x1024' | '1536x1024' | '1024x1536' | 'auto'; quality?: 'low' | 'medium' | 'high' },
+): Promise<OpenAIImageResult> {
+  if (!OPENAI_API_KEY()) throw new Error('OPENAI_API_KEY not set');
+
+  const modelId = config?.model ?? OPENAI_IMAGE_MODEL;
+  const _start = Date.now();
+  const logOpenAI = (units: number, errorMessage?: string) => _logUnitCall({
+    task: config?.task ?? 'openai_image_generation',
+    modelKey: OPENAI_IMAGE_PRICING_MODEL_ID,
+    units,
+    latencyMs: Date.now() - _start,
+    ...(errorMessage ? { errorMessage } : {}),
+    userId: config?.userId,
+    workspaceId: config?.workspaceId,
+  });
+
+  const response = await fetch('https://api.openai.com/v1/images/generations', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${OPENAI_API_KEY()}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: modelId,
+      prompt,
+      n: 1,
+      size: config?.size ?? '1536x1024',
+      // The pricing row is the medium tier; a different quality here is a different price.
+      quality: config?.quality ?? 'medium',
+    }),
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    void logOpenAI(0, `HTTP ${response.status}`);
+    throw new Error(`OpenAI image generation failed (${response.status}): ${err}`);
+  }
+
+  const data = await response.json();
+  const b64 = data.data?.[0]?.b64_json;
+  if (!b64) {
+    void logOpenAI(0, 'no image in generation response');
+    throw new Error('OpenAI: no image in generation response');
+  }
+
+  void logOpenAI(1);
+  return { base64: b64, mimeType: 'image/png', model: modelId };
+}
+
+/**
+ * Edit an existing image with gpt-image-1 (/v1/images/edits, multipart). Without a mask
+ * the whole image is re-rendered under the prompt; with a mask, transparent pixels are
+ * the region to change (OpenAI's convention — the inverse of Grok's white=change).
+ */
+export async function editImageWithOpenAI(
+  prompt: string,
+  imageBytes: Uint8Array,
+  config?: UnitBillingConfig & {
+    model?: string;
+    maskBytes?: Uint8Array;
+    imageMimeType?: string;
+    size?: '1024x1024' | '1536x1024' | '1024x1536' | 'auto';
+    quality?: 'low' | 'medium' | 'high';
+  },
+): Promise<OpenAIImageResult> {
+  if (!OPENAI_API_KEY()) throw new Error('OPENAI_API_KEY not set');
+
+  const modelId = config?.model ?? OPENAI_IMAGE_MODEL;
+  const mimeType = config?.imageMimeType ?? 'image/jpeg';
+  const _start = Date.now();
+  const logOpenAI = (units: number, errorMessage?: string) => _logUnitCall({
+    task: config?.task ?? 'openai_image_edit',
+    modelKey: OPENAI_IMAGE_PRICING_MODEL_ID,
+    units,
+    latencyMs: Date.now() - _start,
+    ...(errorMessage ? { errorMessage } : {}),
+    userId: config?.userId,
+    workspaceId: config?.workspaceId,
+  });
+
+  const form = new FormData();
+  form.append('model', modelId);
+  form.append('prompt', prompt);
+  form.append('n', '1');
+  form.append('size', config?.size ?? 'auto');
+  form.append('quality', config?.quality ?? 'medium');
+  form.append('image', new Blob([imageBytes as unknown as BlobPart], { type: mimeType }), mimeType === 'image/png' ? 'image.png' : 'image.jpg');
+  if (config?.maskBytes) {
+    form.append('mask', new Blob([config.maskBytes as unknown as BlobPart], { type: 'image/png' }), 'mask.png');
+  }
+
+  const response = await fetch('https://api.openai.com/v1/images/edits', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${OPENAI_API_KEY()}` },
+    body: form,
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    void logOpenAI(0, `HTTP ${response.status}`);
+    throw new Error(`OpenAI image edit failed (${response.status}): ${err}`);
+  }
+
+  const data = await response.json();
+  const b64 = data.data?.[0]?.b64_json;
+  if (!b64) {
+    void logOpenAI(0, 'no image in edit response');
+    throw new Error('OpenAI: no image in edit response');
+  }
+
+  void logOpenAI(1);
   return { base64: b64, mimeType: 'image/png', model: modelId };
 }
 

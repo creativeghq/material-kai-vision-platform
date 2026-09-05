@@ -260,9 +260,9 @@ export const createGeminiGenerationTool = (
         // The prefix encodes the model tier chosen by the user without going through the agent.
         let prompt = rawPrompt;
         let modelTier = agentModelTier;
-        const modelPrefixMatch = rawPrompt?.match(/^\[model:(fast|pro|grok)\]\s*/);
+        const modelPrefixMatch = rawPrompt?.match(/^\[model:(fast|pro|grok|chatgpt)\]\s*/);
         if (modelPrefixMatch) {
-          modelTier = modelPrefixMatch[1] as 'fast' | 'pro' | 'grok';
+          modelTier = modelPrefixMatch[1] as 'fast' | 'pro' | 'grok' | 'chatgpt';
           prompt = rawPrompt.slice(modelPrefixMatch[0].length);
         }
 
@@ -436,7 +436,7 @@ export const createGeminiGenerationTool = (
           // unusable — so the mode is not offered at a tier that cannot do it.
           model_tier: (resolvedMode === 'materials-selection-board' || resolvedMode === 'unstage')
             ? 'pro'
-            : (modelTier ?? 'fast') as 'fast' | 'pro' | 'grok',
+            : (modelTier ?? 'fast') as 'fast' | 'pro' | 'grok' | 'chatgpt',
           user_id: userId,
           workspace_id: workspaceId,
           conversation_id: conversationId,
@@ -616,7 +616,7 @@ a call that will be refused.`,
         mode: z.enum(['text-to-image', 'image-edit', 'redesign', 'copy-style', 'floor-plan-render', 'floor-plan-text', 'materials-selection-board', 'product-shot', 'product-lifestyle', 'material-texture', 'unstage']).optional().describe('Generation mode. redesign=Flux Depth Pro full redesign (1 image). copy-style=Flux Depth Pro copy aesthetic from inspiration (2 images). image-edit=Gemini targeted change. unstage=REMOVE all furniture and decor, returning the same room empty (use before staging or redesigning a furnished photo). product-shot=one product on seamless white. product-lifestyle=product staged in a room. material-texture=seamless tileable swatch. Omit to auto-detect.'),
         referenceImageUrl: z.string().optional().describe('URL of image to edit, floor plan to render, or the product/swatch photo for the product modes. Leave empty when user has uploaded an image — it is used automatically.'),
         productName: z.string().optional().describe('Name of the single item being rendered, for product-shot / product-lifestyle / material-texture (e.g. "Fenwick lounge chair", "olive green boucle").'),
-        modelTier: z.enum(['fast', 'pro', 'grok']).optional().describe('fast=Gemini Flash (6 credits), pro=Gemini Pro (15 credits), grok=Aurora best spatial accuracy (15 credits). Use pro or grok when user requests maximum quality. materials-selection-board always uses pro. If the user names a model ("use Grok", "try Gemini Pro"), honour it; if they ask to compare, call once per tier so they can pick.'),
+        modelTier: z.enum(['fast', 'pro', 'grok', 'chatgpt']).optional().describe('fast=Gemini Flash (6 credits), pro=Gemini Pro (15 credits), grok=Aurora best spatial accuracy (15 credits), chatgpt=OpenAI gpt-image-1 strong prompt adherence (10 credits). Use pro or grok when user requests maximum quality. materials-selection-board always uses pro. If the user names a model ("use Grok", "try Gemini Pro", "use ChatGPT"), honour it; if they ask to compare, call once per tier so they can pick.'),
         materialImages: z.array(z.string()).optional().describe('URLs of catalog material images to incorporate into the design (up to 14)'),
         sqm: z.number().optional().describe('Floor area in sqm for floor-plan-text generation'),
         boardMode: z.enum(['presentation-board', 'selection-board', 'photorealistic-render']).optional().describe('Board layout when mode=materials-selection-board. presentation-board=fitment + isometric + material column; selection-board=cutaway view with swatches; photorealistic-render=magazine-quality 16:9 render. Defaults to selection-board.'),

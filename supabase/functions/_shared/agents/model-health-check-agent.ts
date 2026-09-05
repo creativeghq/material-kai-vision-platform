@@ -69,6 +69,7 @@ const PROVIDER_KEYS: Record<string, string[]> = {
   worldlabs: ['WORLDLABS_API_KEY'],
   proplabs:  ['PROPLABS_API_KEY'],
   xai:       ['XAI_API_KEY'],
+  openai:    ['OPENAI_API_KEY'],
 };
 
 /**

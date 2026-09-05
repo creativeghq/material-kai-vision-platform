@@ -72,7 +72,7 @@ describe('unstage — the Replicate grid must not run alongside it', () => {
 
 describe('unstage — billing and the model that runs cannot disagree', () => {
   it('routes to Gemini on every tier, including an explicit grok request', () => {
-    for (const tier of ['fast', 'pro', 'grok'] as const) {
+    for (const tier of ['fast', 'pro', 'grok', 'chatgpt'] as const) {
       const r = resolveGenerationRouting('unstage', tier);
       expect(r.provider, `tier=${tier}`).toBe('gemini');
       // The label is what both the credit lookup and the ai_usage_logs row are keyed on.

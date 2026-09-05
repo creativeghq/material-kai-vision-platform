@@ -32,6 +32,8 @@ import {
   generateImageWithGemini,
   generateImageWithGrok,
   editImageWithGrok,
+  generateImageWithOpenAI,
+  editImageWithOpenAI,
   type GeminiImageModel,
   type ImageAspectRatio,
 } from '../_shared/ai-client.ts';
@@ -279,7 +281,7 @@ interface GenerateInteriorRequest {
   style?: string;
   sqm?: number;
   aspect_ratio?: ImageAspectRatio;
-  model_tier?: 'fast' | 'pro' | 'grok';
+  model_tier?: 'fast' | 'pro' | 'grok' | 'chatgpt';
   // Material references (multi-reference generation)
   material_images?: string[]; // up to 14 catalog product image URLs
   // Image edit / floor plan render
@@ -580,6 +582,9 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
     multiReference: (body.material_images?.length ?? 0) > 0,
   });
   const useGrok = routing.provider === 'grok';
+  // ChatGPT (gpt-image-1): the same single-image generate-or-edit shape as Grok, so it
+  // sits beside `useGrok` in every branch below and is never derived from the tier here.
+  const useOpenAI = routing.provider === 'openai';
   const isFluxMode = routing.provider === 'flux';
   const model: GeminiImageModel = routing.geminiModel;
   const credits = routing.credits;
@@ -644,10 +649,12 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
       // it, so `model_tier: 'grok'` billed grok-aurora and ran Gemini Flash. It is also
       // now the hot path: the interior grid renders one tile per tier, so a silently
       // Gemini-serving Grok tile would be a duplicate image at the Grok price.
-      // `useGrok` is already false when material_images made this multi-reference.
+      // `useGrok`/`useOpenAI` are already false when material_images made this multi-reference.
       const result = useGrok
         ? await generateImageWithGrok(narrative)
-        : await generateImageWithGemini(prompt, { model, aspectRatio });
+        : useOpenAI
+          ? await generateImageWithOpenAI(narrative, { userId: resolvedUserId, workspaceId: body.workspace_id })
+          : await generateImageWithGemini(prompt, { model, aspectRatio });
       imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
     }
 
@@ -670,7 +677,9 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
       // silently billed the Grok rate and ran Gemini anyway.
       const result = useGrok
         ? await generateImageWithGrok(shotPrompt)
-        : await generateImageWithGemini(shotPrompt, { model, aspectRatio: shotRatio });
+        : useOpenAI
+          ? await generateImageWithOpenAI(shotPrompt, { userId: resolvedUserId, workspaceId: body.workspace_id })
+          : await generateImageWithGemini(shotPrompt, { model, aspectRatio: shotRatio });
       imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
     }
 
@@ -691,15 +700,19 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
         const productBuffer = await fetchImageBuffer(body.reference_image_url);
         const result = useGrok
           ? await editImageWithGrok(lifePrompt, productBuffer)
-          : await generateImageWithGemini(
-              { text: lifePrompt, images: [productBuffer] },
-              { model, aspectRatio: lifeRatio },
-            );
+          : useOpenAI
+            ? await editImageWithOpenAI(lifePrompt, productBuffer, { userId: resolvedUserId, workspaceId: body.workspace_id })
+            : await generateImageWithGemini(
+                { text: lifePrompt, images: [productBuffer] },
+                { model, aspectRatio: lifeRatio },
+              );
         imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
       } else {
         const result = useGrok
           ? await generateImageWithGrok(lifePrompt)
-          : await generateImageWithGemini(lifePrompt, { model, aspectRatio: lifeRatio });
+          : useOpenAI
+            ? await generateImageWithOpenAI(lifePrompt, { userId: resolvedUserId, workspaceId: body.workspace_id })
+            : await generateImageWithGemini(lifePrompt, { model, aspectRatio: lifeRatio });
         imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
       }
     }
@@ -717,15 +730,19 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
         const swatchBuffer = await fetchImageBuffer(body.reference_image_url);
         const result = useGrok
           ? await editImageWithGrok(texPrompt, swatchBuffer)
-          : await generateImageWithGemini(
-              { text: texPrompt, images: [swatchBuffer] },
-              { model, aspectRatio: texRatio },
-            );
+          : useOpenAI
+            ? await editImageWithOpenAI(texPrompt, swatchBuffer, { userId: resolvedUserId, workspaceId: body.workspace_id, size: '1024x1024' })
+            : await generateImageWithGemini(
+                { text: texPrompt, images: [swatchBuffer] },
+                { model, aspectRatio: texRatio },
+              );
         imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
       } else {
         const result = useGrok
           ? await generateImageWithGrok(texPrompt)
-          : await generateImageWithGemini(texPrompt, { model, aspectRatio: texRatio });
+          : useOpenAI
+            ? await generateImageWithOpenAI(texPrompt, { userId: resolvedUserId, workspaceId: body.workspace_id, size: '1024x1024' })
+            : await generateImageWithGemini(texPrompt, { model, aspectRatio: texRatio });
         imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
       }
     }
@@ -744,6 +761,14 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
         const grokPrompt = renderPromptTemplate(await getGenerationPrompt(supabase, 'interior_targeted_edit'), { instruction: instruction });
 
         const result = await editImageWithGrok(grokPrompt, sourceBuffer);
+        imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
+      } else if (useOpenAI) {
+        // ChatGPT (gpt-image-1) edit — the source photo goes to /v1/images/edits with the
+        // same targeted-edit template Grok uses; no mask, so the whole frame is re-rendered
+        // under the instruction while the template pins the architecture.
+        const openAiPrompt = renderPromptTemplate(await getGenerationPrompt(supabase, 'interior_targeted_edit'), { instruction: instruction });
+
+        const result = await editImageWithOpenAI(openAiPrompt, sourceBuffer, { userId: resolvedUserId, workspaceId: body.workspace_id });
         imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
       } else if (body.style_reference_url) {
         // Two-step style-transfer (Gemini):

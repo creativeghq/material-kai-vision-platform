@@ -18,7 +18,7 @@ import {
   type GenerationTier,
 } from '../../supabase/functions/_shared/generation-routing.ts';
 
-const TIERS: GenerationTier[] = ['fast', 'pro', 'grok'];
+const TIERS: GenerationTier[] = ['fast', 'pro', 'grok', 'chatgpt'];
 const ALL_MODES = [
   'text-to-image', 'image-edit', 'redesign', 'copy-style',
   'floor-plan-render', 'floor-plan-text', 'materials-selection-board',
@@ -33,7 +33,7 @@ describe('generation routing', () => {
         const r = resolveGenerationRouting(mode, tier);
         expect(r.credits, `${mode}/${tier} credits`).toBe(GENERATION_CREDIT_COSTS[r.modelLabel]);
         // The label must name the provider that actually runs.
-        const expectedPrefix = { gemini: 'gemini-', grok: 'grok-', flux: 'flux-' }[r.provider];
+        const expectedPrefix = { gemini: 'gemini-', grok: 'grok-', flux: 'flux-', openai: 'gpt-' }[r.provider];
         expect(r.modelLabel.startsWith(expectedPrefix), `${mode}/${tier} label ${r.modelLabel} vs provider ${r.provider}`).toBe(true);
       }
     }
@@ -69,6 +69,32 @@ describe('generation routing', () => {
     expect(resolveGenerationRouting('copy-style', 'fast').provider).toBe('flux');
     expect(resolveGenerationRouting('copy-style', 'pro').provider).toBe('flux');
     expect(resolveGenerationRouting('copy-style', 'grok').provider).toBe('grok');
+    // No gpt-image-1 style-transfer template exists, so ChatGPT takes the Flux pipeline
+    // and is billed as Flux — the model that actually runs.
+    expect(resolveGenerationRouting('copy-style', 'chatgpt').provider).toBe('flux');
+  });
+
+  it('routes the single-image modes to ChatGPT when ChatGPT is asked for, and prices it as gpt-image-1', () => {
+    // Restored 2026-09-05. The interior grid renders one tile per tier, so a tile that
+    // silently ran Gemini would be a duplicate image at the ChatGPT price.
+    for (const mode of ['text-to-image', 'image-edit', ...PRODUCT_MODES]) {
+      const r = resolveGenerationRouting(mode, 'chatgpt');
+      expect(r.provider, mode).toBe('openai');
+      expect(r.modelLabel, mode).toBe('gpt-image-1');
+      expect(r.pricingKey, mode).toBe('gpt-image-1');
+      expect(r.credits, mode).toBe(GENERATION_CREDIT_COSTS['gpt-image-1']);
+    }
+  });
+
+  it('collapses ChatGPT to Gemini exactly where Grok collapses — diagram modes and multi-reference', () => {
+    for (const mode of ['floor-plan-render', 'floor-plan-text', 'materials-selection-board', 'unstage']) {
+      const r = resolveGenerationRouting(mode, 'chatgpt');
+      expect(r.provider, mode).toBe('gemini');
+      expect(r.credits, mode).toBe(GENERATION_CREDIT_COSTS[r.modelLabel]);
+    }
+    const multi = resolveGenerationRouting('text-to-image', 'chatgpt', { multiReference: true });
+    expect(multi.provider).toBe('gemini');
+    expect(multi.credits).toBe(GENERATION_CREDIT_COSTS[multi.modelLabel]);
   });
 
   it('defaults to the cheap Gemini tier when no tier is given', () => {

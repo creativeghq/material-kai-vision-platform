@@ -230,11 +230,15 @@ diagnosis banner, which does not show on a healthy subject). The nightly run is 
 `cron-probe-llm` (x-cron-secret) takes subjects whose `next_check_at` is due.
 
 **Which assistants run = the tier's roster ∩ the keys MIVAA can resolve, and a dropped one leaves
-no row.** The cheap tier asks Claude Haiku, Gemini Flash and Perplexity Sonar; frontier asks Opus,
-Gemini Pro and Sonar Pro (`TIER_MODELS` in `llm_mention_probe_service.py`). GPT-4o-mini is NOT
-in either: every one of its 212 probes returned HTTP 429 and the `openai` package was removed
-from MIVAA outright (`test_openai_is_gone_entirely` fails the build on any `api.openai.com`
-reference), so bringing GPT back is a policy decision plus a funded OpenAI account, not a flag.
+no row.** The cheap tier asks Claude Haiku, ChatGPT (gpt-5-mini), Gemini Flash and Perplexity
+Sonar; frontier asks Opus, GPT-5, Gemini Pro and Sonar Pro (`TIER_MODELS` in
+`llm_mention_probe_service.py`). ChatGPT was removed on 2026-08-23 after every one of its 212
+gpt-4o-mini probes returned HTTP 429, and restored on 2026-09-05 as a deliberate provider
+decision — in the one shape that cannot regrow the fallback embedder: httpx (no `openai`
+package), chat completions only, in that one file. `test_openai_is_chat_only_and_lives_in_one_file`
+fails the build on the package, on any embeddings endpoint, and on `api.openai.com` /
+`OPENAI_API_KEY` anywhere else in MIVAA. It runs only once `OPENAI_API_KEY` is set in Admin →
+Platform Secrets on a FUNDED account; until then the roster shows it as "no key configured".
 The probes run in MIVAA (Python → provider HTTP over httpx, per the three-runtimes rule), not
 through the edge AI SDK client; the client is not what decides the roster, the keys are. Gemini
 did not run for materialshub.gr because MIVAA resolved no key under `GEMINI_API_KEY` /
