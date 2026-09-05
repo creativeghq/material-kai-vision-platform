@@ -295,3 +295,7 @@ verify_jwt = false
 # LOCAL DEV ONLY — production uses Supabase-hosted secret (never committed)
 jwt_secret = "super-secret-jwt-token-with-at-least-32-characters-long-for-local-dev-only"
 jwt_expiry = 2592000  # 30 days in seconds
+# Operator-only golden-question runner for the agent (docs/agent-evaluation.md). Does its own auth:
+# service-role bearer with body user_id/workspace_id, or a platform-admin JWT.
+[functions.agent-eval]
+verify_jwt = false

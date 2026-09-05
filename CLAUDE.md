@@ -537,6 +537,7 @@ whose job is showing tables of money.
 |---|---|
 | PDF pipeline (PaddleOCR-VL, stages, OCR) | [docs/pdf-processing-pipeline.md](docs/pdf-processing-pipeline.md) |
 | Agents, tools, JARVIS roster | [docs/agent-system.md](docs/agent-system.md), [docs/agent-and-tools-reference.md](docs/agent-and-tools-reference.md) |
+| Does the agent see what the platform knows — coverage baseline, conversation audit, hedge probe, golden cases | [docs/agent-evaluation.md](docs/agent-evaluation.md) — a derived read with no tool is data the agent cannot use; `.github/agent-data-coverage-baseline.json` records every gap WITH a reason (guarded by [tests/unit/agentDataCoverage.test.ts](tests/unit/agentDataCoverage.test.ts)); `agent_conversation_audit(p_days)` and `agent_eval_cases` are the operator's pre-test-session checks |
 | Background agents framework | [docs/background-agents.md](docs/background-agents.md) |
 | Job tracking / `background_jobs` | [docs/unified-job-tracking.md](docs/unified-job-tracking.md), [docs/job-queue-system.md](docs/job-queue-system.md) |
 | Price monitoring (+ version history) | [docs/price-monitoring-system.md](docs/price-monitoring-system.md) |

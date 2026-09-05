@@ -3143,8 +3143,9 @@ export const TOOLKITS: ToolkitDefinition[] = [
     description: 'Your own rankings (rank tracker + Search Console), keyword research, SERP audit, URL audit, intent classification — read-only.',
     icon: 'Search',
     tool_ids: [
-      // First-party first: the workspace's own rank tracker + Search Console.
-      'seo_my_rankings',
+      // First-party first: the workspace's own rank tracker + Search Console, and every
+      // derived report the Websites dashboard already holds (health, crawl, AI visibility…).
+      'seo_my_rankings', 'seo_site_report',
       'seo_research_keyword', 'seo_keyword_difficulty', 'seo_keyword_suggestions',
       'seo_search_intent', 'seo_keyword_overview', 'seo_ai_keyword_volume',
       'seo_serp_audit', 'seo_audit_url', 'seo_historical_serps',
@@ -3161,6 +3162,16 @@ export const TOOLKITS: ToolkitDefinition[] = [
         form: [
           { key: 'days', label: 'Look-back window (days)', kind: 'number', default: '28' },
         ],
+      },
+      {
+        // autoFields: the `kind` enum (eleven reports) becomes the select, so the picker offers
+        // exactly what the tool accepts and nothing hand-mirrored can drift.
+        label: 'Site report', description: 'Health, crawl, Search Console, AI visibility — your own site, first-party', icon: 'BadgeCheck',
+        prompt: 'Give me the health report for our own website.',
+        done: 'Here is that report on your own site.',
+        promptTemplate: 'Give me the {{kind}} report for our own website.',
+        run: { tool: 'seo_site_report' },
+        autoFields: true,
       },
       {
         label: 'Research a keyword', description: 'Full SERP + AI Overview snapshot', icon: 'Search',

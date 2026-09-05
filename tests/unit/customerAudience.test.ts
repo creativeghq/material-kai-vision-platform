@@ -201,7 +201,9 @@ describe('agent-chat applies the audience clamp', () => {
     expect(src).toMatch(/forCustomer \? \[\] : await longTermMemory\.recall/);
     // promotion — a memory distilled from a CUSTOMER's message is attacker-controlled text written
     // into a store later recalled into the OPERATOR's turns. A persistent injection on a fuse.
-    expect(src).toMatch(/if \(!forCustomerTurn\) \{\s*void runInBackground\(/);
+    // `!isEvalRun` may sit beside it (a golden-case run must not become a memory either — see
+    // docs/agent-evaluation.md); what this pins is that the CUSTOMER condition stays on the gate.
+    expect(src).toMatch(/if \(!forCustomerTurn(?: && !isEvalRun)?\) \{\s*void runInBackground\(/);
   });
 
   it('withholds account data on a PUBLIC comment thread', () => {

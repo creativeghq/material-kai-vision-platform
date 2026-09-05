@@ -437,6 +437,12 @@ Complete documentation for Material Kai Vision Platform.
 
 **[agent-and-tools-reference.md](agent-and-tools-reference.md)** - Reference for the JARVIS agents and their tool surfaces
 
+**[agent-evaluation.md](agent-evaluation.md)** - Does the agent see what the platform knows? ✨ NEW (2026-09-05)
+- Data coverage: every derived SQL read vs the ones an agent tool reads (`agent_data_coverage`, committed baseline with a reason per gap)
+- Retrospective audit of real conversations (`agent_conversation_audit`): no-tool turns, empty calls, hedged replies, cost
+- Nightly probe `agent.reply_quality` on hedged / empty replies
+- Golden cases (`agent_eval_cases`) scored by the `agent-eval` edge function, one `agent_eval_runs` row per run
+
 **[prompt-enhancement-system.md](prompt-enhancement-system.md)** - Dynamic prompt system ✨ NEW
 - Database-driven extraction prompts (extraction_prompts table)
 - Custom vs default prompt priority (is_custom flag)

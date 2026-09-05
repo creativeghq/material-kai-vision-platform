@@ -351,6 +351,7 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   seo_gsc_striking_distance_card: 'Striking-distance keywords',
   seo_gsc_movers_card: 'Search Console movers',
   seo_my_rankings_card: 'Your rankings',
+  seo_site_report_card: 'Site report',
   // SEO — DataForSEO gap-fillers
   seo_onpage_issues_card: 'Site-audit issues',
   seo_backlinks_timeseries_card: 'Backlink history',

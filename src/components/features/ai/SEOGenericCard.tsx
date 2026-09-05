@@ -26,7 +26,7 @@
  *   - seo_llm_mentions_card
  *   - seo_youtube_card / seo_local_pack_card / seo_trends_card
  *   - seo_site_review_card / seo_brand_audit_card
- *   - seo_gsc_striking_distance_card / seo_gsc_movers_card / seo_my_rankings_card
+ *   - seo_gsc_striking_distance_card / seo_gsc_movers_card / seo_my_rankings_card / seo_site_report_card
  *   - seo_onpage_issues_card
  *   - seo_backlinks_timeseries_card / seo_backlinks_competitors_card
  *   - seo_historical_rank_card / seo_keywords_for_site_card
@@ -1377,6 +1377,38 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
             </>
           )}
         </div>
+      </Card>
+    );
+  }
+
+  // ── Own-site report: health, crawl, AI visibility, … (one renderer, eleven kinds) ─
+  if (t === 'seo_site_report_card') {
+    const stats: Array<{ label: string; value: string }> = data.stats || [];
+    const items: Array<{ left: string; right?: string; sub?: string; href?: string }> = data.items || [];
+    const kind = String(data.kind || '').replace(/_/g, ' ');
+    const status: string | null = typeof data.status === 'string' ? data.status : null;
+    const off = !!status && status !== 'ok';
+    return (
+      <Card>
+        <Header
+          icon="🗂️"
+          title={`Site report · ${kind} — ${data.website}`}
+          subtitle={`first-party · last ${data.days ?? 90} days${status ? ` · ${status.replace(/_/g, ' ')}` : ''}`}
+        />
+        <Primer>
+          Read from what the platform already measures about your own site — audits, crawls, Search Console,
+          AI-assistant probes. A status other than ok is a fact about the collector, not a zero.
+        </Primer>
+        {off && <p className={`text-[11px] ${WARN}`}>{data.note || `The source reports ${String(status).replace(/_/g, ' ')}.`}</p>}
+        {stats.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {stats.slice(0, 8).map((s, i) => <Stat key={i} label={s.label} value={s.value} />)}
+          </div>
+        )}
+        {items.length > 0 ? (
+          <ItemList rows={items} max={12} />
+        ) : (!off && stats.length === 0 ? <Empty>Nothing to show for this report yet.</Empty> : null)}
+        {!off && data.note && <p className="text-[11px] text-muted-foreground">{data.note}</p>}
       </Card>
     );
   }

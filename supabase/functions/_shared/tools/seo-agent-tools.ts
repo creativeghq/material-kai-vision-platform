@@ -668,6 +668,212 @@ export const createSEOMyRankingsTool = (
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Own-site report — every derived website read the platform holds, behind ONE tool
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The Websites dashboard derives a dozen verdicts about the connected site in SQL — health
+ * audit, crawl, Search Console metrics, weekly domain snapshot, AI-assistant probes,
+ * cannibalisation, competitor series, Analytics. Until 2026-09-05 NONE of them had an agent
+ * tool: `agent_data_coverage()` listed 16 website RPCs with 4 exposed. So "is our site healthy"
+ * got a paid third-party crawl instead of the audit that ran last night.
+ *
+ * One tool with a `kind` enum rather than eleven tools: the model picks a report the way the
+ * dashboard's tabs do, every kind resolves the site the same way, and the card is one renderer.
+ * The RPCs already derive the verdict (`status`, `note`), and this relays it: a source that is
+ * missing is STATED, never rendered as zero.
+ */
+const SITE_REPORT_DEFAULT_DAYS: Record<string, number> = {
+  search_metrics: 180, domain_intel: 180, ai_visibility: 90, ai_answers: 90,
+  cannibalisation: 90, competitors: 365, analytics: 28, page_queries: 90,
+};
+
+/** Trim a jsonb payload so a 129-row series does not become the whole context window. */
+function compactJson(value: any, depth = 0): any {
+  if (depth > 5) return '[…]';
+  if (Array.isArray(value)) {
+    const out = value.slice(0, 20).map((v) => compactJson(v, depth + 1));
+    if (value.length > 20) out.push({ _truncated: `${value.length - 20} more rows` });
+    return out;
+  }
+  if (value && typeof value === 'object') {
+    const out: Record<string, any> = {};
+    for (const [k, v] of Object.entries(value)) out[k] = compactJson(v, depth + 1);
+    return out;
+  }
+  if (typeof value === 'string' && value.length > 300) return value.slice(0, 300) + '…';
+  return value;
+}
+
+const SITE_REPORT_LIST_KEYS = ['items', 'issue_groups', 'issues', 'top_keywords', 'questions', 'competitors', 'channels', 'prompts', 'models', 'queries', 'subjects', 'trend', 'toolkit_runs', 'articles'];
+const SITE_REPORT_LABEL_KEYS = ['query', 'keyword', 'title', 'name', 'label', 'question', 'competitor', 'domain', 'issue', 'issue_type', 'type', 'channel', 'model', 'page', 'url', 'date', 'kind', 'prompt'];
+const SITE_REPORT_VALUE_KEYS = ['position', 'count', 'impressions', 'clicks', 'score', 'share', 'mentions', 'pages', 'total', 'delta', 'value', 'v', 'organic_traffic', 'severity', 'rank'];
+
+/**
+ * Card projection: top-level scalars (one level of nesting flattened) as stats, the first list of
+ * objects as rows. Generic on purpose — eleven reports, one renderer — and honest: it shows what
+ * the RPC returned, it never computes a number of its own.
+ */
+function siteReportCardProjection(data: any): {
+  stats: Array<{ label: string; value: string }>;
+  items: Array<{ left: string; right?: string; sub?: string; href?: string }>;
+} {
+  const stats: Array<{ label: string; value: string }> = [];
+  const items: Array<{ left: string; right?: string; sub?: string; href?: string }> = [];
+  const skip = /(^id$|_id$|url|^task|^error$|^note$|^status$|_at$)/;
+  const scalar = (v: any) => typeof v === 'number' || typeof v === 'boolean' || (typeof v === 'string' && v.length <= 40);
+  const fmt = (v: any) => typeof v === 'number' ? (Number.isInteger(v) ? String(v) : v.toFixed(1)) : String(v);
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return { stats, items };
+
+  for (const [k, v] of Object.entries(data)) {
+    if (stats.length >= 10) break;
+    if (skip.test(k)) continue;
+    if (scalar(v)) stats.push({ label: k.replace(/_/g, ' '), value: fmt(v) });
+    else if (v && typeof v === 'object' && !Array.isArray(v)) {
+      for (const [k2, v2] of Object.entries(v as Record<string, unknown>)) {
+        if (stats.length >= 10) break;
+        if (scalar(v2) && !skip.test(k2)) stats.push({ label: `${k} ${k2}`.replace(/_/g, ' '), value: fmt(v2) });
+      }
+    }
+  }
+
+  const listKey = SITE_REPORT_LIST_KEYS.find((k) => Array.isArray(data[k]) && data[k].length > 0)
+    ?? Object.keys(data).find((k) => Array.isArray(data[k]) && data[k].length > 0);
+  const list: any[] = listKey ? data[listKey] : [];
+  for (const row of list.slice(0, 12)) {
+    if (!row || typeof row !== 'object') { items.push({ left: String(row) }); continue; }
+    const labelKey = SITE_REPORT_LABEL_KEYS.find((k) => typeof row[k] === 'string' && row[k]);
+    const valueKey = SITE_REPORT_VALUE_KEYS.find((k) => typeof row[k] === 'number');
+    const rest = Object.entries(row)
+      .filter(([k, v]) => k !== labelKey && k !== valueKey && scalar(v) && !skip.test(k))
+      .slice(0, 3)
+      .map(([k, v]) => `${k.replace(/_/g, ' ')} ${fmt(v)}`);
+    items.push({
+      left: labelKey ? String(row[labelKey]) : JSON.stringify(row).slice(0, 80),
+      right: valueKey ? `${valueKey.replace(/_/g, ' ')} ${fmt(row[valueKey])}` : undefined,
+      sub: rest.length ? rest.join(' · ') : undefined,
+      href: typeof row.url === 'string' && /^https?:/.test(row.url) ? row.url : undefined,
+    });
+  }
+  return { stats, items };
+}
+
+async function readSiteReport(
+  supabase: any, siteId: string, kind: string, days: number, page?: string, metric?: string,
+): Promise<{ data: any; error?: string }> {
+  // Named `rpc` so `scripts/audit-agent-data-coverage.mjs` sees these reads the same way it sees
+  // a direct `.rpc('…')` — the coverage baseline is scanned from source.
+  const rpc = async (fn: string, args: Record<string, unknown>) => {
+    const { data, error } = await supabase.rpc(fn, args);
+    if (error) throw new Error(`${fn}: ${error.message}`);
+    return data;
+  };
+  try {
+    switch (kind) {
+      case 'overview':
+        return { data: await rpc('get_website_seo_overview', { p_website_id: siteId }) };
+      case 'health': {
+        const [summary, latest] = await Promise.all([
+          rpc('seo_website_health_summary', { p_website_id: siteId }),
+          rpc('get_website_health', { p_website_id: siteId }),
+        ]);
+        return {
+          data: {
+            ...(summary || {}),
+            latest_audit: latest ? {
+              url: latest.url, audited_at: latest.created_at,
+              scores: { performance: latest.perf_score, seo: latest.seo_score, accessibility: latest.a11y_score, best_practices: latest.bp_score },
+              issues: latest.issues ?? [],
+            } : null,
+          },
+        };
+      }
+      case 'crawl':
+        return { data: await rpc('get_website_crawl_report', { p_website_id: siteId }) };
+      case 'search_metrics':
+        return { data: await rpc('get_website_search_metrics', { p_website_id: siteId, p_days: days }) };
+      case 'domain_intel':
+        return { data: await rpc('get_website_domain_intel', { p_website_id: siteId, p_days: days }) };
+      case 'ai_visibility':
+        return { data: await rpc('get_website_ai_visibility', { p_website_id: siteId, p_days: days }) };
+      case 'ai_answers':
+        return { data: await rpc('get_website_ai_answers', { p_website_id: siteId, p_days: days }) };
+      case 'cannibalisation':
+        return { data: await rpc('get_website_cannibalisation', { p_website_id: siteId, p_days: days, p_min_impressions: 10 }) };
+      case 'competitors':
+        return { data: await rpc('get_website_competitor_series', { p_website_id: siteId, p_days: days, p_metric: metric || 'organic_traffic' }) };
+      case 'analytics':
+        return { data: await rpc('seo_website_ga_summary', { p_website_id: siteId, p_days: days }) };
+      case 'page_queries': {
+        if (!page) return { data: null, error: 'page_queries needs the page URL (page).' };
+        const rows = await rpc('get_page_gsc_queries', { p_website_id: siteId, p_page: page, p_days: days });
+        const list = Array.isArray(rows) ? rows : [];
+        return { data: { page, window_days: days, status: list.length ? 'ok' : 'no_data', queries: list } };
+      }
+      default:
+        return { data: null, error: `unknown report kind "${kind}"` };
+    }
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+export const createSEOSiteReportTool = (
+  _userId: string, onChunk?: (chunk: any) => void, ctx?: SeoWebsiteCtx,
+) => {
+  return tool(
+    async ({ kind, website_id, days, page, metric }) => {
+      if (!ctx?.supabase || !ctx?.workspaceId) {
+        return JSON.stringify({ success: false, error: 'No workspace context — a site report needs a signed-in workspace.' });
+      }
+      let site: ResolvedWebsite | null = ctx.defaultWebsite ?? null;
+      if (website_id) site = await resolveWebsite(ctx.supabase, { workspaceId: ctx.workspaceId, explicitWebsiteId: website_id });
+      if (!site) {
+        return JSON.stringify({ success: false, error: 'No connected website. Ask the user to connect one under Profile → Websites — every site report hangs off it.' });
+      }
+      const windowDays = Math.min(Math.max(Math.trunc(days ?? SITE_REPORT_DEFAULT_DAYS[kind] ?? 90), 7), 365);
+      onChunk?.({ type: 'tool_progress', status: `Reading the ${kind.replace(/_/g, ' ')} report for ${site.domain}…`, timestamp: Date.now() });
+
+      const r = await readSiteReport(ctx.supabase, site.id, kind, windowDays, page, metric);
+      if (r.error) return JSON.stringify({ success: false, error: r.error });
+      const data = r.data;
+      const status = typeof data?.status === 'string' ? data.status : null;
+      const note = typeof data?.note === 'string' ? data.note : null;
+      const { stats, items } = siteReportCardProjection(data);
+
+      onChunk?.({
+        type: 'seo_site_report_card',
+        kind, website: site.domain, days: windowDays, status, note, stats, items, timestamp: Date.now(),
+      });
+      return JSON.stringify({
+        success: true,
+        website: site.domain,
+        kind,
+        window_days: windowDays,
+        status,
+        note,
+        data: compactJson(data),
+        guidance: status && status !== 'ok'
+          ? `The source reports status "${status}": say that in those words — it is a fact about the collector, not a zero.`
+          : 'First-party measurement of the workspace\'s own site. Quote the figures with the dates they carry; nothing here is an estimate.',
+      });
+    },
+    {
+      name: 'seo_site_report',
+      description: 'A report on the workspace\'s OWN connected website from what the platform already measures — free, first-party, no upstream call. kind: overview (site, tracked domains, research, articles at a glance) · health (latest Lighthouse/on-page audit: scores + issues) · crawl (last site crawl: pages, issues by severity, issue groups) · search_metrics (Search Console + tracked-domain metrics with verdicts) · domain_intel (the weekly DataForSEO snapshot of the site itself: rank, keywords, backlinks, trend) · ai_visibility (how often ChatGPT/Gemini/Claude probes mention the site, by model and prompt, with competitors) · ai_answers (what each assistant answered each question) · cannibalisation (queries where two of our pages compete) · competitors (tracked competitors\' series for a metric) · analytics (Google Analytics summary) · page_queries (Search Console queries for ONE page — needs page). Use this before any paid crawl or third-party lookup when the question is about our own site. Defaults to the connected website.',
+      schema: z.object({
+        kind: z.enum(['overview', 'health', 'crawl', 'search_metrics', 'domain_intel', 'ai_visibility', 'ai_answers', 'cannibalisation', 'competitors', 'analytics', 'page_queries'])
+          .describe('Which report to read.'),
+        website_id: z.string().optional().describe('Connected website id. Omit to use the workspace default.'),
+        days: z.number().int().min(7).max(365).optional().describe('Look-back window in days. Defaults per report (28 analytics, 90 AI/cannibalisation, 180 search/domain, 365 competitors).'),
+        page: z.string().optional().describe('page_queries only: the page URL whose Search Console queries to list.'),
+        metric: z.string().optional().describe('competitors only: which metric series to read, default organic_traffic.'),
+      }),
+    },
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Wave 1B — Standalone Labs utilities (difficulty / suggestions / intent)
 // ─────────────────────────────────────────────────────────────────────────────
 

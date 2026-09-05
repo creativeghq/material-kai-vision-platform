@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (142)
+## 1. Supabase Edge Functions (143)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -50,6 +50,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | Function | Auth | Summary |
 |---|---|---|
 | `agent-chat` | JWT / kai_* | Multi-agent LangGraph chat with tool execution and SSE streaming |
+| `agent-eval` | service_role / JWT | Run ONE golden question through agent-chat and score the reply (operator-only) |
 
 **AI Generation**
 

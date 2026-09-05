@@ -26847,6 +26847,86 @@
           }
         }
       }
+    },
+    "/agent-eval": {
+      "post": {
+        "tags": [
+          "AI Agents"
+        ],
+        "summary": "Run ONE golden question through agent-chat and score the reply (operator-only)",
+        "operationId": "post_agent_eval",
+        "description": "The agent evaluation harness (docs/agent-evaluation.md). Loads a case from `agent_eval_cases`, runs it as a normal agent-chat turn — same router, tools and model — with `eval_run: true` (no memory promotion, no next-step chips), then scores deterministically: the expected tools were called and returned something, the reply matches / does not match the case regexes, a factual question carries no MODE/Confidence framework, the reply does not hedge (`agent_reply_hedge_pattern()`), and cost/latency stay under the ceilings. One `agent_eval_runs` row per run; the turn is persisted as a real conversation (`/agent-hub?conversation=<id>`) for review.\n\nOne case per call — a turn is 20–60 s against the 150 s edge ceiling; a batch is the caller looping with one `batch_id`. Operator-only: the service-role bearer names the user/workspace the eval runs AS; a platform-admin JWT runs as the admin.\n\n**Response:** `{ ok, run_id, case_key, passed, failures[], conversation_id, routed_agent, model, tools_called[], tools_zero[], tools_failed[], credits, latency_ms, reply }`\n\n📖 [docs/agent-evaluation.md](https://github.com/creativeghq/material-kai-vision-platform/blob/main/docs/agent-evaluation.md)",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [],
+                "discriminator": {
+                  "propertyName": "action"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {

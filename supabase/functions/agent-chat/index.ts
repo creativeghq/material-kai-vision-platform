@@ -1139,8 +1139,9 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'seo_trustpilot_search', 'seo_pinterest_search', 'seo_reddit_search',
       // Composite audits
       'seo_site_review', 'seo_brand_search_audit',
-      // First-party: the workspace's own rank tracker + Google Search Console
-      'seo_my_rankings', 'seo_gsc_striking_distance', 'seo_gsc_top_movers',
+      // First-party: the workspace's own rank tracker + Google Search Console + every report
+      // the Websites dashboard derives (health, crawl, AI visibility, …)
+      'seo_my_rankings', 'seo_site_report', 'seo_gsc_striking_distance', 'seo_gsc_top_movers',
       // Gap-fillers (DataForSEO data GSC can't provide)
       'seo_onpage_issues', 'seo_backlinks_timeseries', 'seo_backlinks_competitors',
       'seo_historical_rank_overview', 'seo_keywords_for_site', 'seo_keyword_ideas',
@@ -1381,7 +1382,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'seo_domain_whois', 'seo_llm_mentions_search', 'seo_youtube_search', 'seo_local_pack', 'seo_google_trends',
       'seo_amazon_asin', 'seo_app_keywords', 'seo_trustpilot_search', 'seo_pinterest_search', 'seo_reddit_search',
       'seo_site_review', 'seo_brand_search_audit', 'seo_dataforseo_call',
-      'seo_my_rankings', 'seo_gsc_striking_distance', 'seo_gsc_top_movers',
+      'seo_my_rankings', 'seo_site_report', 'seo_gsc_striking_distance', 'seo_gsc_top_movers',
       'seo_onpage_issues', 'seo_backlinks_timeseries', 'seo_backlinks_competitors',
       'seo_historical_rank_overview', 'seo_keywords_for_site', 'seo_keyword_ideas',
       'seo_related_keywords', 'seo_search_volume', 'seo_domain_intersection',
@@ -2129,7 +2130,7 @@ async function executeAgent(
     'seo_trustpilot_search', 'seo_pinterest_search', 'seo_reddit_search',
     'seo_site_review', 'seo_brand_search_audit',
     'seo_dataforseo_call',
-    'seo_my_rankings', 'seo_gsc_striking_distance', 'seo_gsc_top_movers',
+    'seo_my_rankings', 'seo_site_report', 'seo_gsc_striking_distance', 'seo_gsc_top_movers',
     'seo_onpage_issues', 'seo_backlinks_timeseries', 'seo_backlinks_competitors',
     'seo_historical_rank_overview', 'seo_keywords_for_site', 'seo_keyword_ideas',
     'seo_related_keywords', 'seo_search_volume', 'seo_domain_intersection',
@@ -2281,6 +2282,7 @@ async function executeAgent(
   const createSEOGscStrikingDistanceTool = seoAgentMod?.createSEOGscStrikingDistanceTool;
   const createSEOGscTopMoversTool = seoAgentMod?.createSEOGscTopMoversTool;
   const createSEOMyRankingsTool = seoAgentMod?.createSEOMyRankingsTool;
+  const createSEOSiteReportTool = seoAgentMod?.createSEOSiteReportTool;
   // Phase 12+ niche tools
   const createSEOAmazonAsinTool = seoAgentMod?.createSEOAmazonAsinTool;
   const createSEOAppKeywordsTool = seoAgentMod?.createSEOAppKeywordsTool;
@@ -2595,6 +2597,11 @@ async function executeAgent(
   // rank for", which until 2026-09-05 no tool could give (conversation 9225f61f).
   if (config.tools.includes('seo_my_rankings') && createSEOMyRankingsTool) {
     tools.push(createSEOMyRankingsTool(userId, onChunk, { supabase, workspaceId, defaultWebsite: seoDefaultWebsite }));
+  }
+  // Every other derived report about the connected site (health, crawl, AI visibility, …).
+  // `agent_data_coverage()` listed 16 website RPCs with 4 exposed before this existed.
+  if (config.tools.includes('seo_site_report') && createSEOSiteReportTool) {
+    tools.push(createSEOSiteReportTool(userId, onChunk, { supabase, workspaceId, defaultWebsite: seoDefaultWebsite }));
   }
   // Phase 12+ niche tools
   if (config.tools.includes('seo_amazon_asin') && createSEOAmazonAsinTool) {
@@ -3345,16 +3352,51 @@ async function executeAgent(
       onChunk?.({ type: 'tool_call', tool: directTool.name, args: directTool.input, message: `Running ${directTool.name}...` });
     } catch { /* stream may be closed */ }
 
+    // Logged like a tools-node call, or the audit cannot see it. Direct runs never wrote to
+    // `agent_tool_call_logs`: 8 of the 23 conversations in the 30 days to 2026-09-05 were
+    // quick-start runs and every one read as "0 tool calls" — including the ones that ended in
+    // "No response from agent". Same row shape, same `shapeToolResult` derivation, `_via`
+    // stamped the way the grounding call stamps its own.
+    const directStart = Date.now();
+    const logDirectRun = (result: unknown, threw: string | null) => {
+      try {
+        const shape = threw ? null : shapeToolResult(result);
+        supabase
+          .from('agent_tool_call_logs')
+          .insert({
+            conversation_id: conversation_id ?? null,
+            user_id: userId ?? null,
+            workspace_id: workspaceId ?? null,
+            agent_id: agentId ?? null,
+            tool_name: directTool.name,
+            tool_args: { ...(directTool.input || {}), _via: 'direct_tool' },
+            result_summary: shape?.summary ?? null,
+            result_count: shape?.resultCount ?? null,
+            zero_result: shape?.zeroResult ?? false,
+            duration_ms: Date.now() - directStart,
+            success: threw ? false : (shape?.ok ?? true),
+            error_message: threw ?? shape?.errorMessage ?? null,
+          })
+          .then((res: any) => {
+            if (res?.error) console.warn('[agent-chat] direct-run tool log insert error:', res.error.message);
+          });
+      } catch (e) {
+        console.warn('[agent-chat] direct-run tool log failed:', e);
+      }
+    };
+
     let toolResult: string;
     try {
       toolResult = await matched.invoke(directTool.input);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Tool execution failed';
+      logDirectRun(null, msg);
       try {
         onChunk?.({ type: 'error', error: 'tool_execution_failed', tool: directTool.name, message: msg });
       } catch { /* stream may be closed */ }
       return { text: `The "${directTool.name}" run failed: ${msg}`, toolResults: [] };
     }
+    logDirectRun(toolResult, null);
 
     let parsed: any = null;
     try { parsed = JSON.parse(toolResult); } catch { /* non-JSON tool result */ }
@@ -3935,7 +3977,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
     await initRuntime();
 
     // Get request body
-    const { messages = [], agentId = 'kai', images = [], documents = [], conversation_id = null, pinned_material_images = [], generation_mode = null, selected_toolkits = null, user_id: bodyUserId = null, mode = 'chat', direct_tool = null, workspace_id: bodyWorkspaceId = null, model_override: bodyModelOverride = null, audience: bodyAudience = null, thread_id: bodyThreadId = null } = await req.json();
+    const { messages = [], agentId = 'kai', images = [], documents = [], conversation_id = null, pinned_material_images = [], generation_mode = null, selected_toolkits = null, user_id: bodyUserId = null, mode = 'chat', direct_tool = null, workspace_id: bodyWorkspaceId = null, model_override: bodyModelOverride = null, audience: bodyAudience = null, thread_id: bodyThreadId = null, eval_run: bodyEvalRun = false } = await req.json();
     // mode: 'chat' (default, LLM-driven) | 'direct_tool' (deterministic single-tool run).
     // direct_tool: { name: string, input: object } — required when mode==='direct_tool'.
     //   Fired by toolkit quick-starts that carry a `run` descriptor. The tool is
@@ -4441,6 +4483,12 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
           // Same fact as `forCustomer` inside executeAgent, named separately because this is the
           // handler scope and the two never see each other's locals.
           const forCustomerTurn = audience === 'customer';
+          // A golden-case run from `agent-eval` (docs/agent-evaluation.md). Honoured ONLY at
+          // secret level, like `audience`: it switches off memory promotion and next-step chips
+          // for this turn. An eval question must never become a durable "fact" about the user
+          // (#370's poisoned memories came from exactly that), and the chips are spend nobody
+          // reads in a scored run. The turn is otherwise identical to a real one — that is the point.
+          const isEvalRun = auth.level === 'secret' && bodyEvalRun === true;
 
           // 🧠 Promotion gate: distil this turn into long-term memory (non-blocking).
           //
@@ -4458,7 +4506,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
           // writes a distillation of it into the store that is recalled into the OPERATOR's own
           // turns — a persistent cross-audience injection with a delay fuse. The recall half is
           // skipped for the mirror-image reason; see the gate above it.
-          if (!forCustomerTurn) {
+          if (!forCustomerTurn && !isEvalRun) {
             void runInBackground(
               promoteTurnToMemory(
                 userId, workspaceId, ranAsAgentId, userInput, finalResult.text, conversation_id,
@@ -4558,7 +4606,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
           // Nobody sees them in a WhatsApp thread, and generating them is a second model call
           // whose only effect there would be latency and spend.
           let nextSteps: Array<{ label: string; prompt: string }> = [];
-          if (finalResult.text && !forCustomerTurn) {
+          if (finalResult.text && !forCustomerTurn && !isEvalRun) {
             try {
               const { proposeNextSteps } = await import('../_shared/next-steps.ts');
               const firstTool = finalResult.toolResults?.[0];

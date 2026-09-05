@@ -14750,5 +14750,68 @@
     ],
     "request": [],
     "response": "{ ok, link, emailed, has_email } for send; { ok, package, items, lines, submitted, notes } for resolve_token; { ok, lines_priced } for submit"
+  },
+  {
+    "name": "agent-eval",
+    "tag": "AI Agents",
+    "summary": "Run ONE golden question through agent-chat and score the reply (operator-only)",
+    "description": "The agent evaluation harness (docs/agent-evaluation.md). Loads a case from `agent_eval_cases`, runs it as a normal agent-chat turn — same router, tools and model — with `eval_run: true` (no memory promotion, no next-step chips), then scores deterministically: the expected tools were called and returned something, the reply matches / does not match the case regexes, a factual question carries no MODE/Confidence framework, the reply does not hedge (`agent_reply_hedge_pattern()`), and cost/latency stay under the ceilings. One `agent_eval_runs` row per run; the turn is persisted as a real conversation (`/agent-hub?conversation=<id>`) for review.\n\nOne case per call — a turn is 20–60 s against the 150 s edge ceiling; a batch is the caller looping with one `batch_id`. Operator-only: the service-role bearer names the user/workspace the eval runs AS; a platform-admin JWT runs as the admin.",
+    "security": [
+      "service_role",
+      "supabaseJwt"
+    ],
+    "docs": "docs/agent-evaluation.md",
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      "run",
+      "list"
+    ],
+    "request": [
+      {
+        "name": "action",
+        "type": "'run' | 'list'",
+        "required": false,
+        "desc": "Default run. list returns every case with its last run."
+      },
+      {
+        "name": "case_key",
+        "type": "string",
+        "required": false,
+        "desc": "run: the case to execute (or case_id)."
+      },
+      {
+        "name": "case_id",
+        "type": "string (uuid)",
+        "required": false,
+        "desc": "run: alternative to case_key."
+      },
+      {
+        "name": "user_id",
+        "type": "string (uuid)",
+        "required": false,
+        "desc": "Service-role path only: the user the eval runs AS. Required there; ignored for a JWT caller."
+      },
+      {
+        "name": "workspace_id",
+        "type": "string (uuid)",
+        "required": true,
+        "desc": "Workspace whose data the turn reads. A JWT caller must be an active member (404 otherwise)."
+      },
+      {
+        "name": "batch_id",
+        "type": "string (uuid)",
+        "required": false,
+        "desc": "Groups runs of one sweep."
+      },
+      {
+        "name": "model_override",
+        "type": "'claude-opus-5' | 'claude-sonnet-5' | 'claude-haiku-4-5'",
+        "required": false,
+        "desc": "Pin the model for a cheaper sweep. Default: the production router."
+      }
+    ],
+    "response": "{ ok, run_id, case_key, passed, failures[], conversation_id, routed_agent, model, tools_called[], tools_zero[], tools_failed[], credits, latency_ms, reply }"
   }
 ]
