@@ -89,7 +89,8 @@ Each finding is a case where the platform held the answer or the tool and the ag
 
 | Column | Meaning |
 |---|---|
-| `expect_tools_any` | at least one of these tools must be called — and must not return nothing |
+| `expect_tools_any` | at least one of these tools must be called, and must not fail |
+| `expect_results` | when true, an expected tool that returns an empty result fails the case; default false, because an honestly reported empty pipeline is a correct answer |
 | `expect_tools_none` | none of these may be called |
 | `expect_reply_regex` / `forbid_reply_regex` | the reply must / must not match |
 | `factual` | a factual question: the reply must not carry `MODE:` or `Confidence:` |
@@ -104,24 +105,46 @@ tools and model — persisted as a real conversation you can open at
 `/agent-hub?conversation=<conversation_id>`, with one difference: `eval_run: true` switches off
 memory promotion and next-step chips, so an eval question never becomes a "fact" about the user.
 
-Run one from the MIVAA host (the only place the service key lives):
+**Run it as a real user session.** agent-chat threads the caller's JWT into about thirty
+user-scoped tools (`find_records`, `manage_deal`, `manage_finance`, `manage_flows`, the mention
+and job-research tools). On the service-role path that JWT is empty and every one of them fails
+with "Empty JWT" or "No active session" — the first sweep scored `records.find` as a pass on a
+reply that told the user to sign in. So call `agent-eval` with a **platform operator's own
+bearer**; it forwards that bearer to agent-chat and the turn is the one a user would get. The
+service-role path (body `user_id`) still works for a smoke run and says `session: service_role`
+on every result.
+
+From the MIVAA host (the only place the service key lives), mint an operator session with the
+magic-link flow, then run cases with it. Each turn is 20–60 s and the ssh tool's own limit is
+30 s, so background the call and read the result from `agent_eval_runs`:
 
 ```sh
 eval "$(systemctl show mivaa-pdf-extractor -p Environment --value | tr ' ' '\n' \
   | grep -E '^(SUPABASE_URL|SUPABASE_SERVICE_ROLE_KEY)=' | sed 's/^/export /')"
-curl -s -X POST "$SUPABASE_URL/functions/v1/agent-eval" \
+# 1. operator session (1 h): hashed magic-link token → verify → access_token in the redirect fragment
+H=$(curl -s -X POST "$SUPABASE_URL/auth/v1/admin/generate_link" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
   -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H 'Content-Type: application/json' \
-  --max-time 150 -d '{"case_key":"seo.own_rankings","user_id":"<uuid>","workspace_id":"<uuid>","batch_id":"<uuid>"}'
+  -d '{"type":"magiclink","email":"<operator email>"}' | jq -r .hashed_token)
+L=$(curl -s -o /dev/null -w '%{redirect_url}' "$SUPABASE_URL/auth/v1/verify?type=magiclink&token=$H&redirect_to=https://materialshub.gr/")
+umask 077; printf '%s' "$L" | sed -n 's/.*[#&]access_token=\([^&]*\).*/\1/p' > /tmp/eval-jwt
+# 2. one case, in the background
+nohup curl -s -X POST "$SUPABASE_URL/functions/v1/agent-eval" \
+  -H "Authorization: Bearer $(cat /tmp/eval-jwt)" -H 'Content-Type: application/json' --max-time 150 \
+  -d '{"case_key":"seo.own_rankings","workspace_id":"<uuid>","batch_id":"<uuid>"}' > /tmp/eval-own_rankings.json 2>&1 &
+# 3. read: select case_key, passed, failures, tools_called, credits from agent_eval_runs where batch_id = '<uuid>';
+rm -f /tmp/eval-jwt   # when the sweep is done
 ```
 
-`action: "list"` returns every case with its last run. A platform-admin JWT may call it too
-(`workspace_id` in the body, runs as the admin). `model_override` (`claude-sonnet-5`,
-`claude-haiku-4-5`, `claude-opus-5`) pins the model for a cheaper sweep; the default is the
+`action: "list"` returns every case with its last run. `model_override` (`claude-sonnet-5`,
+`claude-haiku-4-5`, `claude-opus-5`) pins the model for a cheaper sweep — honoured for the service
+role and for a platform operator's session, silently ignored for anyone else; the default is the
 production router, which is what you actually want to measure.
 
-Cost: an Opus turn is 30–60 credits. Fourteen cases on the default router is roughly 500 credits;
-the same sweep on Sonnet is roughly a fifth of that and still finds every *structural* gap (a
-missing tool is missing on every model).
+Cost, measured 2026-09-05: an Opus turn is 29–38 credits, a Sonnet turn 14–27 (the KAI prompt is
+36 KB, so a "cheap" model is not that cheap). Fourteen cases on the default router is roughly
+500 credits; on Sonnet roughly half. A Sonnet sweep still finds every *structural* gap — a missing
+tool is missing on every model — and `agent_eval_runs.credits` is the per-case bill either way.
+Check the operator wallet before a sweep: the credit floor lets one turn of overage through.
 
 **Adding a case:** insert a row. Name the tools that MUST be the source, the facts the reply must
 contain, and mark it `factual` if it is a lookup. A case that fails today is a finding, not a

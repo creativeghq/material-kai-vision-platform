@@ -4055,8 +4055,18 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
     // everyone else, including partner keys — which model a turn runs on is a cost decision
     // the operator owns. An unrecognised value falls back to the router rather than erroring,
     // so a stale eval script degrades to normal behaviour instead of failing the turn.
+    // A signed-in PLATFORM OPERATOR gets the two measurement-only knobs below (model pin, eval
+    // run) that were secret-level only. An eval has to run as a real user session — ~30 tools take
+    // the caller's JWT and a service-role turn hands them an empty one — and the first user-session
+    // sweep (2026-09-05) then ran every "cheap" Sonnet case on Opus because the pin was silently
+    // dropped on this path. Looked up once, and only when a knob is actually asked for, so an
+    // ordinary turn pays no extra query. A tenant's JWT never matches: both knobs stay ignored.
+    const callerIsOperator = auth.level === 'user'
+      && (bodyEvalRun === true || typeof bodyModelOverride === 'string')
+      && await isPlatformOperator(auth.supabase, userId);
+
     const modelOverride =
-      (auth.level === 'secret' || isAdminAccess(auth)) &&
+      (auth.level === 'secret' || isAdminAccess(auth) || callerIsOperator) &&
       typeof bodyModelOverride === 'string' &&
       MODEL_OVERRIDE_ALLOWED.has(bodyModelOverride)
         ? bodyModelOverride
@@ -4066,14 +4076,8 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
     // A golden-case run from `agent-eval` (docs/agent-evaluation.md): the turn is a real one —
     // same router, tools and model — but it must not become a durable "fact" about the user
     // (#370's poisoned memories came from exactly that) and nobody reads next-step chips in a
-    // scored run, so both are switched off below. Honoured for the service-role bearer and for a
-    // signed-in PLATFORM OPERATOR: an eval has to run as a real user session, because ~30 tools
-    // take the caller's JWT and a service-role turn hands them an empty one. A tenant's JWT
-    // cannot set it — the flag is ignored, the turn is ordinary.
-    const isEvalRun = bodyEvalRun === true && (
-      auth.level === 'secret' ||
-      (auth.level === 'user' && await isPlatformOperator(auth.supabase, userId))
-    );
+    // scored run, so both are switched off below.
+    const isEvalRun = bodyEvalRun === true && (auth.level === 'secret' || callerIsOperator);
     if (isEvalRun) console.log('[agent-chat] eval run — memory promotion and next steps are off for this turn');
 
     // ── Audience ──────────────────────────────────────────────────────────

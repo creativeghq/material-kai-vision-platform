@@ -48,6 +48,8 @@ interface EvalCase {
   expect_tools_none: string[];
   expect_reply_regex: string[];
   forbid_reply_regex: string[];
+  /** An expected tool that returns nothing fails the case only when this is set. */
+  expect_results: boolean;
   max_credits: number | null;
   max_seconds: number | null;
   is_active: boolean;
@@ -225,7 +227,9 @@ function scoreCase(c: EvalCase, turn: TurnOutcome, credits: number | null, hedge
   for (const t of c.expect_tools_any) {
     if (!called.has(t)) continue;
     if (turn.toolsFailed.includes(t)) failures.push(`expected tool ${t} failed`);
-    else if (turn.toolsZero.includes(t)) failures.push(`expected tool ${t} returned nothing`);
+    // An empty result is a pass unless the case asked for rows: crm.forecast reported an empty
+    // pipeline truthfully and the first scorer counted it as a failure. Zero is a valid answer.
+    else if (c.expect_results && turn.toolsZero.includes(t)) failures.push(`expected tool ${t} returned nothing`);
   }
   for (const t of c.expect_tools_none) {
     if (called.has(t)) failures.push(`forbidden tool called: ${t}`);
