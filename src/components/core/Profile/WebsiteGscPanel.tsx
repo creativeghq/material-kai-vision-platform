@@ -61,6 +61,16 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
   const [syncing, setSyncing] = useState(false);
   const [props, setProps] = useState<{ property: string; permission?: string }[] | null>(null);
   const [view, setView] = useState<'queries' | 'pages' | 'countries' | 'appearance'>('queries');
+  // Click a header to sort by it; click again to flip. Search Console's own order
+  // (by clicks) is the default, but the question is usually "where do I have
+  // impressions and no clicks" — which is a sort by impressions or by position.
+  type SortKey = 'label' | 'clicks' | 'impressions' | 'ctr' | 'position';
+  const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'clicks', dir: 'desc' });
+  const toggleSort = (key: SortKey) =>
+    setSort((s) => (s.key === key
+      ? { key, dir: s.dir === 'desc' ? 'asc' : 'desc' }
+      // A numeric column starts high-to-low; the label column starts A→Z.
+      : { key, dir: key === 'label' ? 'asc' : 'desc' }));
 
   const load = async () => {
     setLoading(true);
@@ -209,8 +219,26 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
     countries: () => summary?.countries || [],
     appearance: () => summary?.appearances || [],
   };
-  const rows = VIEW_ROWS[view]();
+  const labelOf = (r: any): string => String(view === 'queries' ? r.query : view === 'pages' ? r.page : r.value) ?? '';
+  const rows = [...VIEW_ROWS[view]()].sort((a, b) => {
+    const dir = sort.dir === 'asc' ? 1 : -1;
+    if (sort.key === 'label') return labelOf(a).localeCompare(labelOf(b), 'el') * dir;
+    return ((Number(a[sort.key]) || 0) - (Number(b[sort.key]) || 0)) * dir;
+  });
   const firstColLabel = view === 'queries' ? 'Query' : view === 'pages' ? 'Page' : view === 'countries' ? 'Country' : 'Appearance';
+  const SortHead = ({ k, children, className }: { k: SortKey; children: React.ReactNode; className?: string }) => (
+    <TableHead className={className}>
+      <button
+        type="button"
+        onClick={() => toggleSort(k)}
+        aria-sort={sort.key === k ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+        className={`inline-flex items-center gap-1 hover:text-foreground ${sort.key === k ? 'text-foreground' : ''}`}
+      >
+        {children}
+        <span aria-hidden="true" className="text-[10px]">{sort.key === k ? (sort.dir === 'asc' ? '▲' : '▼') : ''}</span>
+      </button>
+    </TableHead>
+  );
   const devices = summary?.devices || [];
   const trend = summary?.trend || [];
   return (
@@ -300,11 +328,11 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>{firstColLabel}</TableHead>
-                    <TableHead className="text-right">Clicks</TableHead>
-                    <TableHead className="text-right">Impr.</TableHead>
-                    <TableHead className="text-right">CTR</TableHead>
-                    <TableHead className="text-right">Pos.</TableHead>
+                    <SortHead k="label">{firstColLabel}</SortHead>
+                    <SortHead k="clicks" className="text-right">Clicks</SortHead>
+                    <SortHead k="impressions" className="text-right">Impr.</SortHead>
+                    <SortHead k="ctr" className="text-right">CTR</SortHead>
+                    <SortHead k="position" className="text-right">Pos.</SortHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

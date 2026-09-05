@@ -432,7 +432,7 @@ export const ConnectedWebsitesTab: React.FC<{ onOpen?: (w: UserWebsite) => void 
                 min={10}
                 max={1000}
                 value={form.max_pages}
-                onChange={(e) => setForm((f) => ({ ...f, max_pages: Math.max(10, Math.min(1000, parseInt(e.target.value, 10) || 50)) }))}
+                onChange={(e) => setForm((f) => ({ ...f, max_pages: Math.max(10, Math.min(6000, parseInt(e.target.value, 10) || 50)) }))}
               />
               <p className="text-xs text-muted-foreground mt-1">Default 50 — enough for most blogs. Hard cap is 1000. Larger sites should use a topic-scoped sitemap URL.</p>
             </div>
@@ -505,7 +505,7 @@ export const ConnectedWebsitesTab: React.FC<{ onOpen?: (w: UserWebsite) => void 
                   <AlertTriangle className="w-3.5 h-3.5 text-[hsl(var(--warning))] mt-0.5 flex-shrink-0" />
                   <p>
                     Your sitemap has {formatNumber(previewResult.result.pages_discovered)} URLs but the cap for this site is {previewResult.website.max_pages}.
-                    The crawler picks the first {previewResult.website.max_pages} sitemap entries. Raise the cap (max 1000) or use a topic-scoped sitemap URL if needed.
+                    The crawler picks the first {previewResult.website.max_pages} sitemap entries. Raise the cap (max 6000) or use a topic-scoped sitemap URL if needed.
                   </p>
                 </div>
               )}

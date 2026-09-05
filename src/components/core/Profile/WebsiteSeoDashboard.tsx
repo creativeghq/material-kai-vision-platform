@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { timeAgo } from '@/utils/datetime';
+import { formatDate, timeAgo } from '@/utils/datetime';
 import {
   ArrowLeft, Globe, ExternalLink, RefreshCw, Loader2, FileText, Search,
   FlaskConical, Radar, AlertTriangle, LineChart, Gauge, TrendingUp, CalendarClock, Check, Bot,
@@ -40,6 +40,7 @@ import {
 } from '@/services/userWebsitesService';
 import SEOArticleViewer from '@/components/features/ai/SEOArticleViewer';
 import { formatNumber } from '@/utils/decimal';
+import { listAuditHistory, triggerAuditNow, type SeoDomainAuditSnapshot } from '@/services/seoToolkitApi';
 
 
 const STATUS_COLOR: Record<string, string> = {
@@ -115,6 +116,98 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [website.id]);
+
+  const navigate = useNavigate();
+  const siteHost = website.url.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '');
+
+  // ── Research → rank tracker ─────────────────────────────────────────────
+  // Research answers "is this keyword worth it"; the tracker answers "are we
+  // winning it". The two were separate boxes with retyping in between.
+  const [trackingKeywords, setTrackingKeywords] = useState<string | null>(null);
+  const trackKeywords = async (keywords: string[], origin: string) => {
+    if (!website.workspace_id) return;
+    setTrackingKeywords(origin);
+    try {
+      const n = await userWebsitesService.addTrackedKeywords(website.id, website.workspace_id, keywords, 'GR', 'el');
+      toast({ title: `Tracking ${n} keyword${n === 1 ? '' : 's'}`, description: 'Positions arrive on the next check, under Rankings.' });
+      setTracked((prev) => { const next = new Set(prev); keywords.forEach((k) => next.add(k.trim().toLowerCase())); return next; });
+    } catch (e: any) {
+      toast({ title: 'Could not track them', description: e.message, variant: 'destructive' });
+    } finally {
+      setTrackingKeywords(null);
+    }
+  };
+
+  // ── Research suggestions from the site's own pages ─────────────────────
+  // A page's title is the keyword its author chose for it. Suggest those the
+  // site neither tracks nor has researched, so "what should I look at next"
+  // starts from what the site says it is about rather than a blank box.
+  const [pageTitles, setPageTitles] = useState<{ url: string; title: string }[]>([]);
+  const [tracked, setTracked] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [titles, trackedSet] = await Promise.allSettled([
+        userWebsitesService.pageTitles(website.id),
+        userWebsitesService.trackedKeywordStrings(website.id),
+      ]);
+      if (cancelled) return;
+      setPageTitles(titles.status === 'fulfilled' ? titles.value : []);
+      setTracked(trackedSet.status === 'fulfilled' ? trackedSet.value : new Set());
+    })();
+    return () => { cancelled = true; };
+  }, [website.id]);
+  const researched = new Set(research.map((r) => r.target_keyword.trim().toLowerCase()));
+  const suggestions = (() => {
+    const seen = new Set<string>();
+    const out: { keyword: string; url: string }[] = [];
+    for (const p of pageTitles) {
+      // "Πλακάκια Θεσσαλονίκη | MaterialsHub" → "Πλακάκια Θεσσαλονίκη"
+      const keyword = p.title.split(/\s+[|–—-]\s+/)[0].replace(/\s+/g, ' ').trim();
+      const key = keyword.toLowerCase();
+      if (keyword.length < 4 || keyword.length > 80 || seen.has(key)) continue;
+      if (tracked.has(key) || researched.has(key)) continue;
+      if (/materialshub|materials hub/i.test(keyword)) continue;
+      seen.add(key);
+      out.push({ keyword, url: p.url });
+      if (out.length >= 24) break;
+    }
+    return out;
+  })();
+  const researchKeyword = (keyword: string) => {
+    const prompt = `Research the keyword "${keyword}" for ${siteHost} in the Greek market (GR, el): search volume, difficulty, what the results page shows, keyword clusters and who ranks now.`;
+    navigate(`/agent-hub?agent=kai&prompt=${encodeURIComponent(prompt)}`);
+  };
+
+  // ── Domain audit history ────────────────────────────────────────────────
+  const [openDomain, setOpenDomain] = useState<SeoTrackedDomainRow | null>(null);
+  const [domainHistory, setDomainHistory] = useState<SeoDomainAuditSnapshot[] | null>(null);
+  const openDomainHistory = async (d: SeoTrackedDomainRow) => {
+    setOpenDomain(d);
+    setDomainHistory(null);
+    try {
+      setDomainHistory(await listAuditHistory(d.id, 30));
+    } catch (e: any) {
+      toast({ title: 'Could not load the audit history', description: e.message, variant: 'destructive' });
+      setDomainHistory([]);
+    }
+  };
+  const [auditingDomain, setAuditingDomain] = useState(false);
+  const auditDomainNow = async () => {
+    if (!openDomain) return;
+    setAuditingDomain(true);
+    try {
+      const r = await triggerAuditNow(openDomain.id);
+      if (!r.ok) throw new Error(r.error || 'Audit failed');
+      toast({ title: 'Audit complete', description: `${openDomain.domain} audited.` });
+      setDomainHistory(await listAuditHistory(openDomain.id, 30));
+      setDomains(await userWebsitesService.trackedDomains(website.id));
+    } catch (e: any) {
+      toast({ title: 'Audit failed', description: e.message, variant: 'destructive' });
+    } finally {
+      setAuditingDomain(false);
+    }
+  };
 
   const [deletingResearchId, setDeletingResearchId] = useState<string | null>(null);
   const deleteResearch = async (r: SeoKeywordResearchRow) => {
@@ -517,14 +610,29 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
                         <TableCell className="text-right tabular-nums">{formatNumber(r.total_addressable_volume)}</TableCell>
                         <TableCell className="text-muted-foreground">{timeAgo(r.created_at)}</TableCell>
                         <TableCell>
-                          <Button size="icon" variant="ghost" className="h-7 w-7"
-                            aria-label={`Delete research for ${r.target_keyword}`}
-                            onClick={(e) => { e.stopPropagation(); void deleteResearch(r); }}
-                            disabled={deletingResearchId === r.id}>
-                            {deletingResearchId === r.id
-                              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              : <Trash2 className="h-3.5 w-3.5 text-destructive" />}
-                          </Button>
+                          <div className="flex items-center gap-0.5">
+                            {tracked.has(r.target_keyword.trim().toLowerCase()) ? (
+                              <span className="text-[11px] text-muted-foreground" title="Already in the rank tracker">tracked</span>
+                            ) : (
+                              <Button size="icon" variant="ghost" className="h-7 w-7"
+                                aria-label={`Track ${r.target_keyword} in the rank tracker`}
+                                title="Track in the rank tracker"
+                                onClick={(e) => { e.stopPropagation(); void trackKeywords([r.target_keyword], r.id); }}
+                                disabled={trackingKeywords === r.id}>
+                                {trackingKeywords === r.id
+                                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  : <Target className="h-3.5 w-3.5 text-primary" />}
+                              </Button>
+                            )}
+                            <Button size="icon" variant="ghost" className="h-7 w-7"
+                              aria-label={`Delete research for ${r.target_keyword}`}
+                              onClick={(e) => { e.stopPropagation(); void deleteResearch(r); }}
+                              disabled={deletingResearchId === r.id}>
+                              {deletingResearchId === r.id
+                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                : <Trash2 className="h-3.5 w-3.5 text-destructive" />}
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -534,6 +642,37 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
               )}
             </CardContent>
           </Card>
+
+          {suggestions.length > 0 && (
+            <Card className="dashboard-card mt-4">
+              <CardHeader>
+                <CardTitle className="text-base">Suggested from your pages</CardTitle>
+                <CardDescription>
+                  Titles of pages this site already has, that are neither tracked nor researched yet. Research one
+                  to size it up, or track it straight away to follow its position.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-1.5 sm:grid-cols-2">
+                  {suggestions.map((sg) => (
+                    <div key={sg.keyword} className="flex items-center gap-2 rounded-sm border border-hairline px-2.5 py-1.5">
+                      <a href={sg.url} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 truncate text-xs text-foreground hover:underline" title={sg.url}>
+                        {sg.keyword}
+                      </a>
+                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => researchKeyword(sg.keyword)}>
+                        Research
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs"
+                        onClick={() => void trackKeywords([sg.keyword], sg.keyword)}
+                        disabled={trackingKeywords === sg.keyword}>
+                        {trackingKeywords === sg.keyword ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Track'}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* Toolkit Runs */}
@@ -644,7 +783,7 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
                   </TableHeader>
                   <TableBody>
                     {domains.map((d) => (
-                      <TableRow key={d.id}>
+                      <TableRow key={d.id} className="cursor-pointer" onClick={() => void openDomainHistory(d)}>
                         <TableCell className="font-medium">{d.display_label || d.domain}</TableCell>
                         <TableCell className="text-right">{d.current_domain_rank ?? '—'}</TableCell>
                         <TableCell className="text-right">{formatNumber(d.current_organic_traffic)}</TableCell>
@@ -694,6 +833,59 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
         </div>
       </Tabs>
 
+      {/* Domain audit history — every weekly audit for one tracked domain. */}
+      <Dialog open={!!openDomain} onOpenChange={(o) => { if (!o) setOpenDomain(null); }}>
+        <DialogContent className="max-w-3xl">
+          <DialogTitle>{openDomain?.display_label || openDomain?.domain} · audit history</DialogTitle>
+          {domainHistory == null ? (
+            <Loading />
+          ) : domainHistory.length === 0 ? (
+            <HubEmptyState
+              variant="empty"
+              title="No audits recorded yet"
+              description="The first runs within the hour of tracking, then weekly. History is visible to the person who added the domain."
+              action={
+                <Button size="sm" disabled={auditingDomain} onClick={() => void auditDomainNow()}>
+                  {auditingDomain ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1 h-3.5 w-3.5" />}
+                  Audit now
+                </Button>
+              }
+            />
+          ) : (
+            <div className="table-scroll">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Audited</TableHead>
+                    <TableHead className="text-right">Rank</TableHead>
+                    <TableHead className="text-right">Keywords</TableHead>
+                    <TableHead className="text-right">Traffic</TableHead>
+                    <TableHead className="text-right">Ref. domains</TableHead>
+                    <TableHead className="text-right">Backlinks</TableHead>
+                    <TableHead className="text-right">Spam</TableHead>
+                    <TableHead className="text-right">Cost</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {domainHistory.map((h) => (
+                    <TableRow key={h.id}>
+                      <TableCell className="text-muted-foreground">{formatDate(h.audited_at, { withTime: true })}</TableCell>
+                      <TableCell className="text-right tabular-nums">{h.domain_rank ?? '—'}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatNumber(h.ranking_keywords)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatNumber(h.organic_traffic)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatNumber(h.referring_domains)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatNumber(h.backlinks)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{h.spam_score ?? '—'}</TableCell>
+                      <TableCell className="text-right tabular-nums text-muted-foreground">${Number(h.cost_usd ?? 0).toFixed(4)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Keyword-research reader — the full captured SERP, not the 5-column summary. */}
       <Dialog open={!!openResearchId} onOpenChange={(o) => { if (!o) setOpenResearchId(null); }}>
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
@@ -702,6 +894,8 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
             <KeywordResearchDetail
               researchId={openResearchId}
               siteDomain={website.url.replace(/^https?:\/\//, '').replace(/\/.*$/, '')}
+              tracked={tracked}
+              onTrack={(keywords) => trackKeywords(keywords, 'detail')}
             />
           )}
         </DialogContent>

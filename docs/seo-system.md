@@ -169,7 +169,45 @@ owner-only by RLS (`seo_keyword_research_owner`); a member who did not run it ge
 **Rival domains live under Competitors, not Domain Audits.** Domain Audits is the site's own
 domain (weekly rank + backlink audit). Competitors takes any domain, measures it on the same
 weekly `seo-domain-tracker` run in the same market (`seo_competitor_snapshots`), and plots it
-beside the site. The admin toolkit at /admin/seo tracks arbitrary domains for the operator.
+beside the site. The admin toolkit at /admin/seo tracks arbitrary domains for the operator. A
+Domain Audits row opens its audit history (`seo_domain_audit_history`, owner-visible by RLS).
+
+**The crawl reads the sitemap the site ADVERTISES, and the site is bigger than its first sitemap.**
+materialshub.gr's robots.txt names `/sitemap-index.xml`, which holds three children: 82 + 83 +
+5,082 URLs (the city × category tree). `user_websites.sitemap_url` had been auto-discovered as
+`/sitemap.xml` — the 82-URL child — and the hard cap was 1,000, so "we have 1,700 pages and it
+finds 50" was two ceilings stacked. The row now points at the index, the hard cap and the form
+cap are 6,000, the Site Health crawl requests the site's own `max_pages` instead of a flat 100,
+and the recrawl cron runs hourly (`15 * * * *`, 55-minute staleness) so the rotation moves at
+the rate Firecrawl allows. At ten scrapes a minute a 5,000-page site still takes weeks; that is
+the Firecrawl tier, not the crawler.
+
+**The rank tracker records which SERP blocks WE hold.** `seo_keyword_positions.owned_features`
+(featured_snippet, ai_overview, people_also_ask, local_pack, knowledge_graph, images, video…) is
+computed by a bounded walk over every non-organic block for any `domain`/`url` that is ours — a
+featured snippet carries `domain` at the top, an AI Overview buries it in `references`, People
+Also Ask in `expanded_element`, and a per-type map goes stale the next time the provider adds a
+field. `get_website_rank_summary` returns `summary.features.{block}.{present,owned}` and the
+per-keyword `owned_features`; the Rankings panel prints owned/present tiles and per-row badges
+(✓ = cites us). A block on the page that names a rival is a target, not a win.
+
+**AI Visibility asks what the subject's facets say, and a subject with no product type asks
+nothing useful.** MIVAA's `llm_probe_templates.build_probes` renders the four stock questions
+from `tracked_mentions.subject_facets` (`product_type` defaults to the literal "products") plus
+`source_config.custom_probes`. materialshub.gr's brand subject had no product type, `language_codes
+['en']` and no country, so the assistants were asked "What are the best products brands?" and
+named Apple, Toyota and Sony — which the panel then reported as "who they name instead". The
+questions are the measurement: the panel now has **Edit questions** (custom prompts, aliases,
+languages, countries → `updateTrackedMention`), and this subject was given a product type,
+`el`+`en`, `GR` and five Greek/English questions about sourcing tiles, sanitary ware and marble
+in Thessaloniki and for hotel projects. Perplexity (`sonar`) probes return HTTP 401 because that
+account is unfunded; the panel reports it as No verdict, not 0%.
+
+**Keyword Research feeds the tracker and starts from the site's own pages.** A research row, the
+detail header and each cluster carry a Track action (`addTrackedKeywords`, GR/el). "Suggested
+from your pages" lists page titles (brand suffix stripped) that are neither tracked nor
+researched, each with Research (opens the agent with the keyword and market in the prompt) and
+Track. The Search Performance breakdown sorts by any column on click.
 
 **Alerts fire on leaving the top 10 only**, through the existing `seo.ranking_movement` flow
 trigger — not a new near-duplicate one. A tracker that alerts on every wobble gets muted, and a

@@ -41,6 +41,42 @@ import { compact } from './seo/seoMetrics';
  *    from the raw delta and coloured by meaning rather than by sign.
  */
 
+/**
+ * SERP blocks worth reporting on. `present` is whether the block is on the page at
+ * all; `owned` is whether it cites or shows us. A featured snippet on the page that
+ * belongs to a rival is a target, not a win, and the two must not look alike.
+ */
+const FEATURE_LABELS: { key: string; label: string; short: string }[] = [
+  { key: 'featured_snippet', label: 'Featured snippet', short: 'Snippet' },
+  { key: 'ai_overview', label: 'AI Overview', short: 'AI' },
+  { key: 'people_also_ask', label: 'People also ask', short: 'PAA' },
+  { key: 'local_pack', label: 'Local pack', short: 'Local' },
+  { key: 'images', label: 'Image pack', short: 'Images' },
+  { key: 'video', label: 'Video', short: 'Video' },
+  { key: 'knowledge_graph', label: 'Knowledge panel', short: 'Knowledge' },
+];
+
+function FeatureBadges({ present, owned }: { present: string[]; owned: string[] }) {
+  const shown = FEATURE_LABELS.filter((f) => present.includes(f.key) || owned.includes(f.key));
+  if (shown.length === 0) return <span className="text-[11px] text-muted-foreground">—</span>;
+  return (
+    <div className="flex flex-wrap gap-1">
+      {shown.map((f) => {
+        const ours = owned.includes(f.key);
+        return (
+          <Badge
+            key={f.key}
+            variant={ours ? 'success' : 'neutral'}
+            title={ours ? `${f.label}: cites or shows this site` : `${f.label} is on the page but does not name this site`}
+          >
+            {f.short}{ours ? ' ✓' : ''}
+          </Badge>
+        );
+      })}
+    </div>
+  );
+}
+
 /** Ordered worst-last so the bar reads left-to-right as "best first". */
 const BANDS: { key: string; label: string; tone: string }[] = [
   { key: 'top_3', label: 'Top 3', tone: 'bg-[hsl(var(--success))]' },
@@ -285,6 +321,31 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
                 </div>
               </div>
 
+              {s.features && (
+                <div className="border-t border-hairline pt-3">
+                  <p className="mb-2 text-xs text-muted-foreground">
+                    Featured snippets and AI Overviews on your keywords' results pages — and how many of them name you
+                  </p>
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                    {FEATURE_LABELS.slice(0, 4).map((f) => {
+                      const v = s.features?.[f.key];
+                      if (!v) return null;
+                      return (
+                        <div key={f.key}>
+                          <p className="text-xs font-semibold text-muted-foreground">{f.label}</p>
+                          <p className="mt-0.5 text-xl font-semibold tabular-nums text-foreground">
+                            {v.owned}<span className="text-sm text-muted-foreground">/{v.present}</span>
+                          </p>
+                          <p className="text-[11px] text-muted-foreground">
+                            {v.present === 0 ? 'on none of your pages' : v.owned === 0 ? `on ${v.present}, none cite you` : 'cite you / on the page'}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {(data.visibility_trend?.length ?? 0) >= 2 && (
                 <div className="border-t border-hairline pt-3">
                   <p className="mb-1 text-xs text-muted-foreground">Visibility over time</p>
@@ -338,6 +399,7 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
                     <TableHead className="text-right">Position</TableHead>
                     <TableHead className="text-right">Change</TableHead>
                     <TableHead className="w-28">Trend</TableHead>
+                    <TableHead>SERP blocks</TableHead>
                     <TableHead>Ranking page</TableHead>
                     <TableHead className="w-10" />
                   </TableRow>
@@ -371,6 +433,9 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
                           // good/bad colouring has to be told which way round it is.
                           ? <Sparkline points={r.series.map((p) => p.v)} upIsGood={false} className="h-6 w-24" />
                           : <span className="text-[11px] text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell className="min-w-[140px]">
+                        <FeatureBadges present={r.serp_features ?? []} owned={r.owned_features ?? []} />
                       </TableCell>
                       <TableCell className="max-w-[240px]">
                         {r.url

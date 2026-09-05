@@ -129,6 +129,48 @@ function findPosition(items: any[], host: string): { position: number | null; ur
   return best ?? { position: null, url: null };
 }
 
+function isOurHost(value: unknown, host: string): boolean {
+  if (typeof value !== 'string' || !value) return false;
+  let d = value;
+  if (/^https?:\/\//i.test(d)) { try { d = new URL(d).hostname; } catch { return false; } }
+  d = d.replace(/^www\./i, '').toLowerCase();
+  return d === host || d.endsWith(`.${host}`);
+}
+
+/** Does any `domain`/`url` anywhere inside this SERP block name us? Bounded walk. */
+function blockNamesUs(node: unknown, host: string, depth = 0): boolean {
+  if (!node || typeof node !== 'object' || depth > 5) return false;
+  if (Array.isArray(node)) return node.some((n) => blockNamesUs(n, host, depth + 1));
+  const o = node as Record<string, unknown>;
+  if (isOurHost(o.domain, host) || isOurHost(o.url, host) || isOurHost(o.source_url, host)) return true;
+  return Object.values(o).some((v) => v && typeof v === 'object' && blockNamesUs(v, host, depth + 1));
+}
+
+/** The SERP blocks worth knowing we hold, in the order they matter. */
+const OWNABLE_FEATURES = [
+  'featured_snippet', 'ai_overview', 'people_also_ask', 'local_pack', 'knowledge_graph',
+  'images', 'video', 'top_stories', 'shopping', 'popular_products',
+];
+
+/**
+ * Which non-organic blocks on the page cite or show us. A position of 4 under an AI
+ * Overview that cites us is a different day from a position of 4 under one that cites
+ * three rivals, and `serp_features` alone (which blocks EXIST) cannot tell them apart.
+ * Each block type's item shape differs (a featured snippet carries `domain` at the top,
+ * an AI Overview buries it in `references`, People Also Ask in `expanded_element`), so
+ * the test is a bounded walk for any domain/url that is ours rather than a per-type map
+ * that goes stale the next time the provider adds a field.
+ */
+function ownedFeatures(items: any[], host: string): string[] {
+  const owned = new Set<string>();
+  for (const it of items) {
+    const type = String(it?.type || '');
+    if (!OWNABLE_FEATURES.includes(type)) continue;
+    if (blockNamesUs(it, host)) owned.add(type);
+  }
+  return OWNABLE_FEATURES.filter((f) => owned.has(f));
+}
+
 /** Check one website's tracked keywords and store today's positions. */
 async function trackWebsite(
   supabase: any,
@@ -162,7 +204,7 @@ async function trackWebsite(
         tracked_keyword_id: kw.id, website_id: website.id, workspace_id: website.workspace_id,
         captured_at: today,
         position, found: position != null, url,
-        serp_features: features, error: null,
+        serp_features: features, owned_features: ownedFeatures(items, host), error: null,
       };
       if (position != null) ranking++;
     } catch (e) {

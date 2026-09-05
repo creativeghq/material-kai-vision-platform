@@ -30,7 +30,9 @@ const MAX_SITEMAP_DEPTH = 3;
 // spec caps them at 50 MB / 50k URLs, and index files are tiny) and small enough that a
 // deliberately endless response cannot exhaust the isolate.
 const MAX_SITEMAP_BYTES = 10 * 1024 * 1024;
-const MAX_PAGES_HARD_CAP = 1000;
+// materialshub.gr alone lists 5,247 URLs across its sitemap index (7 cities × the
+// category tree), so a 1,000 ceiling silently dropped four fifths of a real site.
+const MAX_PAGES_HARD_CAP = 6000;
 const FIRECRAWL_CONCURRENCY = 2;
 /**
  * Firecrawl rate-limits per plan, and this key is on the tier that allows ten

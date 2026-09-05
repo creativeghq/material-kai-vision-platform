@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Check, ExternalLink, HelpCircle, Loader2, Minus, Sparkles } from 'lucide-react';
+import { Check, ExternalLink, HelpCircle, Loader2, Minus, Sparkles, Target } from 'lucide-react';
 
 import { supabase } from '@/integrations/supabase/client';
 import { formatDate } from '@/utils/datetime';
 import { Badge } from '@/components/core/ui/badge';
+import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/core/ui/tooltip';
@@ -84,13 +85,29 @@ function Figure({ label, value, sub }: { label: string; value: React.ReactNode; 
   );
 }
 
-export const KeywordResearchDetail: React.FC<{ researchId: string; siteDomain?: string }> = ({
+export const KeywordResearchDetail: React.FC<{
+  researchId: string;
+  siteDomain?: string;
+  /** Lower-cased keywords already in the rank tracker, so a button is not offered twice. */
+  tracked?: Set<string>;
+  /** Hand keywords to the rank tracker. Absent = no tracker on this surface. */
+  onTrack?: (keywords: string[]) => Promise<void>;
+}> = ({
   researchId,
   siteDomain,
+  tracked,
+  onTrack,
 }) => {
   const [row, setRow] = useState<ResearchRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [tracking, setTracking] = useState<string | null>(null);
+  const track = async (keywords: string[], origin: string) => {
+    if (!onTrack) return;
+    setTracking(origin);
+    try { await onTrack(keywords); } finally { setTracking(null); }
+  };
+  const isTracked = (k: string) => !!tracked?.has(k.trim().toLowerCase());
 
   useEffect(() => {
     let cancelled = false;
@@ -152,13 +169,26 @@ export const KeywordResearchDetail: React.FC<{ researchId: string; siteDomain?: 
     <div className="space-y-4">
       {/* ── Header figures ─────────────────────────────────────────────── */}
       <Card className="dashboard-card">
-        <CardHeader>
-          <CardTitle className="text-base">{row.target_keyword}</CardTitle>
-          <CardDescription>
-            {row.topic}
-            {row.language_code ? <> · {row.language_code}</> : null}
-            {blob?.researchedAt ? <> · researched {formatDate(blob.researchedAt)}</> : null}
-          </CardDescription>
+        <CardHeader className="flex flex-row items-start justify-between gap-3">
+          <div>
+            <CardTitle className="text-base">{row.target_keyword}</CardTitle>
+            <CardDescription>
+              {row.topic}
+              {row.language_code ? <> · {row.language_code}</> : null}
+              {blob?.researchedAt ? <> · researched {formatDate(blob.researchedAt)}</> : null}
+            </CardDescription>
+          </div>
+          {onTrack && (
+            isTracked(row.target_keyword) ? (
+              <Badge variant="success">in the rank tracker</Badge>
+            ) : (
+              <Button size="sm" variant="outline" className="shrink-0" disabled={tracking === 'primary'}
+                onClick={() => void track([row.target_keyword], 'primary')}>
+                {tracking === 'primary' ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Target className="mr-1 h-3.5 w-3.5" />}
+                Track this keyword
+              </Button>
+            )
+          )}
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
@@ -411,6 +441,7 @@ export const KeywordResearchDetail: React.FC<{ researchId: string; siteDomain?: 
                     <TableHead className="text-right">Keywords</TableHead>
                     <TableHead className="text-right">Volume</TableHead>
                     <TableHead>Top terms</TableHead>
+                    {onTrack && <TableHead className="w-28" />}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -418,18 +449,30 @@ export const KeywordResearchDetail: React.FC<{ researchId: string; siteDomain?: 
                     const kws: any[] = Array.isArray(c.keywords) ? c.keywords : [];
                     const vol =
                       c.totalVolume ?? kws.reduce((s, k) => s + (Number(k?.searchVolume) || 0), 0);
+                    const terms: string[] = kws.map((k: any) => k?.term ?? k?.keyword).filter(Boolean);
+                    const untracked = terms.slice(0, 5).filter((t) => !isTracked(t));
+                    const origin = `cluster-${i}`;
                     return (
                       <TableRow key={i}>
                         <TableCell className="font-medium">{c.name || c.theme || `Cluster ${i + 1}`}</TableCell>
                         <TableCell className="text-right tabular-nums">{kws.length || '—'}</TableCell>
                         <TableCell className="text-right tabular-nums">{vol ? compact(vol) : '—'}</TableCell>
                         <TableCell className="max-w-[320px] truncate text-xs text-muted-foreground">
-                          {kws
-                            .slice(0, 4)
-                            .map((k: any) => k?.term ?? k?.keyword)
-                            .filter(Boolean)
-                            .join(', ') || '—'}
+                          {terms.slice(0, 4).join(', ') || '—'}
                         </TableCell>
+                        {onTrack && (
+                          <TableCell>
+                            {untracked.length === 0 ? (
+                              <span className="text-[11px] text-muted-foreground">tracked</span>
+                            ) : (
+                              <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" disabled={tracking === origin}
+                                title={untracked.join(', ')}
+                                onClick={() => void track(untracked, origin)}>
+                                {tracking === origin ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : `Track top ${untracked.length}`}
+                              </Button>
+                            )}
+                          </TableCell>
+                        )}
                       </TableRow>
                     );
                   })}

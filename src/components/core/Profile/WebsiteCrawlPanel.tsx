@@ -153,11 +153,14 @@ export const WebsiteCrawlPanel: React.FC<{ website: UserWebsite }> = ({ website 
 
   useEffect(() => { void load(); }, [load]);
 
+  // The site's own page cap, not a flat 100: a 100-page read of a 5,000-page site
+  // reports on the homepage's neighbourhood and calls it the site.
+  const crawlPages = Math.max(100, Math.min(website.max_pages || 100, 6000));
   const start = async () => {
     setBusy('start');
     try {
-      await userWebsitesService.startCrawl(website.id, 100);
-      toast({ title: 'Crawl started', description: 'It reads up to 100 pages. Refresh to follow progress.' });
+      await userWebsitesService.startCrawl(website.id, crawlPages);
+      toast({ title: 'Crawl started', description: `It reads up to ${crawlPages.toLocaleString()} pages. Refresh to follow progress.` });
       await load();
     } catch (e: any) {
       toast({ title: 'Could not start the crawl', description: e?.message, variant: 'destructive' });

@@ -379,6 +379,8 @@ export interface TrackedKeywordRow {
   tags: string[];
   /** Date of THIS keyword's most recent check — a capped run leaves part of the set on an older day. */
   captured_at: string | null;
+  /** Non-organic blocks on the page that cite or show us (featured_snippet, ai_overview, people_also_ask, local_pack…). */
+  owned_features: string[];
   /** NULL = not in the top 100. Never a sentinel rank. */
   position: number | null;
   found: boolean;
@@ -411,6 +413,8 @@ export interface RankSummary {
     /** Share of tracked keywords in the top 10, over probes that answered. */
     visibility: number | null;
     distribution: Record<string, number>;
+    /** Per SERP block: how many tracked pages HAVE it, and how many of those cite us. */
+    features?: Record<string, { present: number; owned: number }>;
   };
   keywords?: TrackedKeywordRow[];
   visibility_trend?: { date: string; v: number }[];
@@ -779,6 +783,34 @@ export const userWebsitesService = {
         } : null,
       } as SeoKeywordResearchRow;
     });
+  },
+
+  /**
+   * Titles of the site's indexed pages — the raw material for research suggestions.
+   * A page's title is the keyword its author already chose for it, so "what should
+   * I research" starts from what the site says it is about, not from a blank box.
+   */
+  async pageTitles(websiteId: string, limit = 400): Promise<{ url: string; title: string }[]> {
+    const { data, error } = await supabase
+      .from('user_website_pages')
+      .select('url, title')
+      .eq('website_id', websiteId).eq('is_active', true)
+      .not('title', 'is', null).not('content_excerpt', 'is', null)
+      .order('fetched_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return ((data as { url: string; title: string | null }[]) || [])
+      .filter((r): r is { url: string; title: string } => !!r.title);
+  },
+
+  /** The keyword strings this site tracks, lower-cased, for de-duplicating suggestions. */
+  async trackedKeywordStrings(websiteId: string): Promise<Set<string>> {
+    const { data, error } = await supabase
+      .from('seo_tracked_keywords')
+      .select('keyword')
+      .eq('website_id', websiteId).eq('is_active', true);
+    if (error) throw error;
+    return new Set(((data as { keyword: string }[]) || []).map((r) => r.keyword.toLowerCase()));
   },
 
   /** Owner-only by RLS (`seo_keyword_research_owner`); a member who did not run it gets a refusal, not a silent no-op. */

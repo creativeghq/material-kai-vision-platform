@@ -3,6 +3,9 @@ import { AlertTriangle, Bot, Loader2, MessageSquareQuote, Play, Power, Plus, Use
 
 import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
+import { Input } from '@/components/core/ui/input';
+import { Textarea } from '@/components/core/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import {
@@ -231,6 +234,101 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
     void load();
   }, [load]);
 
+  // ── What we ask ───────────────────────────────────────────────────────────
+  // The stock questions are rendered from the subject's facets, and a subject
+  // with no product type asks "What are the best products brands?" — which is
+  // how Apple and Toyota became this site's "competitors". The questions are
+  // the measurement; they have to be editable where the answers are read.
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState<{ prompts: string; aliases: string; languages: string; countries: string }>({
+    prompts: '', aliases: '', languages: '', countries: '',
+  });
+  const openEditor = async () => {
+    const id = state?.own_brand_subject_id;
+    if (!id) return;
+    const { data } = await supabase
+      .from('tracked_mentions')
+      .select('aliases, language_codes, country_codes, source_config')
+      .eq('id', id)
+      .maybeSingle();
+    const cfg = (data as any)?.source_config ?? {};
+    const probes: { key?: string; prompt?: string }[] = Array.isArray(cfg.custom_probes) ? cfg.custom_probes : [];
+    setForm({
+      prompts: probes.map((p) => p.prompt ?? '').filter(Boolean).join('\n'),
+      aliases: ((data as any)?.aliases ?? []).join(', '),
+      languages: ((data as any)?.language_codes ?? []).join(', '),
+      countries: ((data as any)?.country_codes ?? []).join(', '),
+    });
+    setEditing(true);
+  };
+  const saveEditor = async () => {
+    const id = state?.own_brand_subject_id;
+    if (!id) return;
+    setSaving(true);
+    try {
+      const list = (s: string) => s.split(/[,\n]/).map((x) => x.trim()).filter(Boolean);
+      const prompts = form.prompts.split('\n').map((p) => p.trim()).filter((p) => p.length >= 8).slice(0, 12);
+      await updateTrackedMention(id, {
+        aliases: list(form.aliases),
+        language_codes: list(form.languages).map((l) => l.toLowerCase()),
+        country_codes: list(form.countries).map((c) => c.toUpperCase()),
+        source_config: { custom_probes: prompts.map((prompt, i) => ({ key: `custom_${i + 1}`, prompt })) },
+      });
+      toast({ title: 'Questions saved', description: 'The next probe run asks these. Run probes now to see the change today.' });
+      setEditing(false);
+    } catch (e: any) {
+      toast({ title: 'Could not save', description: e?.message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  };
+  const editorDialog = (
+    <Dialog open={editing} onOpenChange={(o) => { if (!o) setEditing(false); }}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>What we ask the assistants</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <label htmlFor="ai-vis-prompts" className="text-xs text-muted-foreground">
+              Questions, one per line. Ask what a real customer would ask, in the language they would use.
+              Placeholders: {'{label}'} {'{brand}'} {'{product_type}'} {'{competitors}'} {'{site}'}.
+            </label>
+            <Textarea id="ai-vis-prompts" rows={8} value={form.prompts} className="mt-1 text-sm"
+              onChange={(e) => setForm((f) => ({ ...f, prompts: e.target.value }))}
+              placeholder={'Ποιοι είναι οι καλύτεροι προμηθευτές πλακακιών στη Θεσσαλονίκη;\nI am renovating a hotel in Greece — which suppliers should I look at for tiles and lighting?'} />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div>
+              <label htmlFor="ai-vis-aliases" className="text-xs text-muted-foreground">Also known as</label>
+              <Input id="ai-vis-aliases" value={form.aliases} className="mt-1" placeholder="MaterialsHub, materialshub.gr"
+                onChange={(e) => setForm((f) => ({ ...f, aliases: e.target.value }))} />
+            </div>
+            <div>
+              <label htmlFor="ai-vis-languages" className="text-xs text-muted-foreground">Languages</label>
+              <Input id="ai-vis-languages" value={form.languages} className="mt-1" placeholder="el, en"
+                onChange={(e) => setForm((f) => ({ ...f, languages: e.target.value }))} />
+            </div>
+            <div>
+              <label htmlFor="ai-vis-countries" className="text-xs text-muted-foreground">Countries</label>
+              <Input id="ai-vis-countries" value={form.countries} className="mt-1" placeholder="GR"
+                onChange={(e) => setForm((f) => ({ ...f, countries: e.target.value }))} />
+            </div>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            The four stock questions stay alongside yours. Brands named in the answers become "who they name instead",
+            so a generic question produces a generic competitive set.
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
+          <Button onClick={saveEditor} disabled={saving}>{saving ? 'Saving…' : 'Save questions'}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
   if (loading) {
     return (
       <Card className="dashboard-card">
@@ -279,6 +377,7 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
 
   return (
     <div className="space-y-4">
+      {editorDialog}
       {/* ── Headline ───────────────────────────────────────────────────── */}
       <Card className="dashboard-card">
         <CardHeader>
@@ -496,14 +595,22 @@ export const WebsiteAiVisibilityPanel: React.FC<{ website: UserWebsite }> = ({ w
 
         {/* ── Prompts ─────────────────────────────────────────────────── */}
         <Card className="dashboard-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <MessageSquareQuote className="h-4 w-4 text-primary" />
-              Questions we asked
-            </CardTitle>
-            <CardDescription>
-              The prompts behind these numbers, and how often each one produced a mention.
-            </CardDescription>
+          <CardHeader className="flex flex-row items-start justify-between gap-3">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <MessageSquareQuote className="h-4 w-4 text-primary" />
+                Questions we asked
+              </CardTitle>
+              <CardDescription>
+                The prompts behind these numbers, and how often each one produced a mention. They are the
+                measurement — if they are not what your customers ask, nothing below means anything.
+              </CardDescription>
+            </div>
+            {state?.own_brand_subject_id && (
+              <Button size="sm" variant="outline" className="shrink-0" onClick={() => void openEditor()}>
+                Edit questions
+              </Button>
+            )}
           </CardHeader>
           <CardContent>
             {data.prompts.length === 0 ? (
