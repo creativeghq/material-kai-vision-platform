@@ -1283,6 +1283,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // slipped past the toolkit filter and the audience clamp, both of which read this list.
       // Declared here and gated there: the list is the boundary, and now it says what is true.
       'check_generation_status',
+      // Core record search (see Pepper's note): every specialist the router can pick gets it.
+      'find_records',
       // Calculators (all users; deterministic, free, no upstream API)
       'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost',
       // Image-driven post-processing tools (require an existing room image in the conversation)
@@ -1320,6 +1322,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
     tools: [
       'manage_real_estate',
+      // Core record search (see Pepper's note): every specialist the router can pick gets it.
+      'find_records',
       // CRM + appointments help work leads and book viewings
       'search_crm_by_kad', 'manage_appointments',
       // core search + calculators (all users)
@@ -1358,6 +1362,11 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // so "Search by ΚΑΔ" — a question about companies, which is Pepper's whole subject — was
       // offered and refused. `supplier_overview` stays admin-gated at its push site.
       'customer_overview', 'supplier_overview', 'price_my_spec', 'search_crm_by_kad',
+      // Record search is in the always-on core cluster, and only KAI and Trinity bound it. The
+      // router sends "find the record called X" here too — and Pepper, with four lookups that
+      // each need an id, answered "no record named Tsatsos exists" for a person KAI finds in three
+      // places (golden case records.find, 2026-09-05). A confident wrong answer from a missing binding.
+      'find_records',
       // sub-agents is four analysis agents and Pepper held two. An owner binds the cluster.
       'research_analysis', 'analytics_analysis',
       'review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding',
@@ -1384,6 +1393,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'seo_amazon_asin', 'seo_app_keywords', 'seo_trustpilot_search', 'seo_pinterest_search', 'seo_reddit_search',
       'seo_site_review', 'seo_brand_search_audit', 'seo_dataforseo_call',
       'seo_my_rankings', 'seo_site_report', 'seo_gsc_striking_distance', 'seo_gsc_top_movers',
+      // Core record search (see Pepper's note): every specialist the router can pick gets it.
+      'find_records',
       'seo_onpage_issues', 'seo_backlinks_timeseries', 'seo_backlinks_competitors',
       'seo_historical_rank_overview', 'seo_keywords_for_site', 'seo_keyword_ideas',
       'seo_related_keywords', 'seo_search_volume', 'seo_domain_intersection',
@@ -1452,6 +1463,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
     tools: [
       'knowledge_base_search', 'read_document_section',
+      // Core record search (see Pepper's note): every specialist the router can pick gets it.
+      'find_records',
       'manage_social',
       // Hermes is the comms agent — also handles WhatsApp messaging (send is confirm-gated)
       'manage_messaging',
