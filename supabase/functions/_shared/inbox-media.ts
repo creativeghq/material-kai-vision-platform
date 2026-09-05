@@ -21,6 +21,13 @@ export const INBOX_ATTACHMENT_BUCKET = 'generation-images';
  * reads as the vendor's fault; it was ours. The orphan cron protects any bucket recorded on a
  * message, and the inbox signs URLs per bucket, so a document can live here without a second
  * reader of anything.
+ *
+ * The bucket is PRIVATE and the browser signs with the member's own JWT, so a storage policy has
+ * to let the member see the object: `pdf_docs_inbox_thread_read` (storage.objects) admits
+ * `inbox/<thread_id>/...` to whoever can read that thread — it is an EXISTS over inbox_threads
+ * under the caller's role, so thread visibility stays the one rule. The email path had written
+ * this prefix since it shipped with no such policy; no email attachment had ever been stored, so
+ * nothing had hit it. Keep the path shape `inbox/<thread_id>/<file>` or the policy stops matching.
  */
 export const INBOX_DOCUMENT_BUCKET = 'pdf-documents';
 
