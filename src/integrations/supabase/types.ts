@@ -37525,6 +37525,7 @@ export type Database = {
           visibility: string
         }[]
       }
+      kb_search_analytics: { Args: { p_days?: number }; Returns: Json }
       kb_search_docs:
         | {
             Args: {

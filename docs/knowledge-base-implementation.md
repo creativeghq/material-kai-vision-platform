@@ -294,6 +294,19 @@ curl -s -X POST "$MIVAA_URL/api/rag/kb-eval/run" -H "x-cron-secret: $CRON_SECRET
 select * from kb_retrieval_eval_summary();   -- latest batch, one row per mode
 ```
 
+### KB search analytics — `kb_search_analytics(p_days)`
+
+There is no KB analytics table (the one that existed never had a producer and was dropped
+2026-09-05). What the platform records about knowledge-base use is `agent_tool_call_logs`, one
+row per `knowledge_base_search` / `read_document_section` call with the question, workspace,
+user, result count, zero-result flag, success and duration, plus the per-document counters
+`kb_docs.agent_mention_count` (incremented per surfaced document) and `view_count`. The
+operator-only RPC derives the view from those and nothing is written twice: user-driven searches
+separately from the automatic per-turn grounding search, the zero-result rate against ANSWERED
+calls (NULL when nothing was answered, never 0), per workspace, top and zero-result questions,
+per day, and the most surfaced documents (lifetime, because the counter has no timestamp). Shown
+on the Search Analytics "Knowledge Base" tab and the KB admin "Agent Searches (30d)" card.
+
 ### On-write auto-rechunk
 
 Chunks are kept in sync automatically. After `kb-generate-embedding`

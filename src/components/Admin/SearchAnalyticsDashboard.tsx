@@ -12,6 +12,7 @@ import {
   Database,
   Clock,
   AlertCircle,
+  BookOpen,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -28,7 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/core/ui/select';
-import { todayLocalISO } from '@/utils/datetime';
+import { formatDate, todayLocalISO } from '@/utils/datetime';
 
 interface PerformanceStats {
   total_searches: number;
@@ -113,6 +114,42 @@ interface AnalyticsStats {
   moodboardConversionRate: number | null;
 }
 
+/**
+ * Shape of the `kb_search_analytics` RPC (jsonb), derived from agent_tool_call_logs and the
+ * per-document counters on kb_docs. Rates are NULL when nothing was answered in the window.
+ * `top_docs_lifetime` is lifetime, not windowed: agent_mention_count has no timestamp.
+ */
+interface KbSearchAnalytics {
+  window_days: number;
+  totals: {
+    searches: number;
+    answered: number;
+    failed: number;
+    zero_result: number;
+    zero_result_rate: number | null;
+    avg_duration_ms: number | null;
+    workspaces: number;
+    users: number;
+    section_reads: number;
+    grounding_searches: number;
+    grounding_zero_result: number;
+  };
+  by_workspace: {
+    workspace_id: string | null;
+    workspace_name: string | null;
+    searches: number;
+    zero_result: number;
+    users: number;
+    last_at: string;
+  }[];
+  top_queries: { query: string; searches: number; zero_result: number; answered: number; workspaces: number; last_at: string }[];
+  zero_result_queries: { query: string; searches: number; workspaces: number; last_at: string }[];
+  by_day: { day: string; searches: number; zero_result: number }[];
+  top_docs_lifetime: { id: string; title: string; agent_mentions: number; views: number; status: string }[];
+  docs_published: number;
+  docs_never_surfaced: number;
+}
+
 /** Renders a percentage, or an explicit "not tracked" dash when the metric has no producer. */
 const Rate = ({ value }: { value: number | null }) =>
   value == null
@@ -127,6 +164,8 @@ export const SearchAnalyticsDashboard = () => {
   const [zeroResults, setZeroResults] = useState<ZeroResultQuery[]>([]);
   const [cacheStats, setCacheStats] = useState<CacheStats | null>(null);
   const [topCached, setTopCached] = useState<CachedQuery[]>([]);
+  const [kbStats, setKbStats] = useState<KbSearchAnalytics | null>(null);
+  const [kbError, setKbError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('30d');
   const [activeTab, setActiveTab] = useState('overview');
@@ -180,6 +219,18 @@ export const SearchAnalyticsDashboard = () => {
       });
       if (!zeroError && zeroData) {
         setZeroResults(zeroData);
+      }
+
+      // Knowledge-base usage, derived from agent_tool_call_logs by an operator-only RPC.
+      // A refused or failed read is shown as the reason on the tab, never as an empty panel.
+      const kbDays = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
+      const { data: kbData, error: kbErr } = await supabase.rpc('kb_search_analytics', { p_days: kbDays });
+      if (kbErr) {
+        setKbError(kbErr.message);
+        setKbStats(null);
+      } else {
+        setKbError(null);
+        setKbStats((kbData as unknown as KbSearchAnalytics | null) ?? null);
       }
 
       // Load cache stats
@@ -269,6 +320,10 @@ export const SearchAnalyticsDashboard = () => {
           <TabsTrigger value="cache" className="flex items-center gap-2">
             <Database className="h-4 w-4" />
             Cache Effectiveness
+          </TabsTrigger>
+          <TabsTrigger value="kb" className="flex items-center gap-2">
+            <BookOpen className="h-4 w-4" />
+            Knowledge Base
           </TabsTrigger>
         </TabsList>
 
@@ -663,6 +718,225 @@ export const SearchAnalyticsDashboard = () => {
             </div>
           </CardContent>
         </Card>
+      </TabsContent>
+
+      {/* ─────────────────── KNOWLEDGE BASE TAB ─────────────────── */}
+      <TabsContent value="kb" className="space-y-6">
+        {kbError && (
+          <div className="dashboard-card">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-destructive" />
+              <p className="text-sm">Knowledge-base usage could not be read: {kbError}</p>
+            </div>
+          </div>
+        )}
+        {kbStats && (
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="dashboard-card">
+                <div className="flex items-center gap-2 mb-2">
+                  <Search className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+                  <p className="text-xs text-muted-foreground">Agent KB Searches</p>
+                </div>
+                <div className="text-2xl font-bold tabular-nums">{formatNumber(kbStats.totals.searches)}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {kbStats.totals.section_reads} section reads · {kbStats.totals.failed} failed calls
+                </p>
+              </div>
+              <div className="dashboard-card">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertCircle className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+                  <p className="text-xs text-muted-foreground">Zero-Result Rate</p>
+                </div>
+                <div className="text-2xl font-bold tabular-nums">
+                  {kbStats.totals.zero_result_rate == null ? (
+                    <span className="text-muted-foreground" title="Nothing was answered in this window">—</span>
+                  ) : (
+                    `${(kbStats.totals.zero_result_rate * 100).toFixed(1)}%`
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {kbStats.totals.zero_result} of {kbStats.totals.answered} answered searches found nothing
+                </p>
+              </div>
+              <div className="dashboard-card">
+                <div className="flex items-center gap-2 mb-2">
+                  <Clock className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+                  <p className="text-xs text-muted-foreground">Avg Search Time</p>
+                </div>
+                <div className="text-2xl font-bold tabular-nums">
+                  {kbStats.totals.avg_duration_ms == null ? (
+                    <span className="text-muted-foreground" title="Nothing was answered in this window">—</span>
+                  ) : (
+                    `${(kbStats.totals.avg_duration_ms / 1000).toFixed(1)}s`
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">retrieval plus rerank, per call</p>
+              </div>
+              <div className="dashboard-card">
+                <div className="flex items-center gap-2 mb-2">
+                  <Users className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+                  <p className="text-xs text-muted-foreground">Workspaces / Users</p>
+                </div>
+                <div className="text-2xl font-bold tabular-nums">
+                  {kbStats.totals.workspaces} / {kbStats.totals.users}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {kbStats.totals.grounding_searches} automatic grounding searches, {kbStats.totals.grounding_zero_result} empty
+                </p>
+              </div>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4" />
+                      Top Knowledge-Base Questions
+                    </CardTitle>
+                    <CardDescription>
+                      What people asked the agent that reached the knowledge base, across every workspace
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={kbStats.top_queries.length === 0}
+                    onClick={() => exportToCSV(kbStats.top_queries, 'kb-top-questions')}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Export
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {kbStats.top_queries.length === 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      The agent has not searched the knowledge base in this window.
+                    </p>
+                  )}
+                  {kbStats.top_queries.map((q, i) => (
+                    <div key={i} className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/30">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <Badge variant="outline" className="font-mono shrink-0">#{i + 1}</Badge>
+                        <span className="font-medium truncate">{q.query}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-sm shrink-0">
+                        <span className="text-muted-foreground tabular-nums">{q.searches} searches</span>
+                        {q.zero_result > 0 && (
+                          <Badge variant="warning">{q.zero_result} empty</Badge>
+                        )}
+                        <span className="text-xs text-muted-foreground tabular-nums">{q.workspaces} ws</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  Questions the Knowledge Base Answered With Nothing
+                </CardTitle>
+                <CardDescription>
+                  Every attempt returned zero sections: either the content is missing or retrieval cannot reach it. Both are findings.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {kbStats.zero_result_queries.length === 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      Every answered question in this window found at least one section.
+                    </p>
+                  )}
+                  {kbStats.zero_result_queries.map((q, i) => (
+                    <div key={i} className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/30">
+                      <span className="font-medium truncate min-w-0 flex-1">{q.query}</span>
+                      <div className="flex items-center gap-3 text-sm shrink-0">
+                        <span className="text-muted-foreground tabular-nums">{q.searches}x</span>
+                        <span className="text-xs text-muted-foreground">{formatDate(q.last_at)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BookOpen className="h-4 w-4" />
+                  Most Surfaced Documents
+                </CardTitle>
+                <CardDescription>
+                  Lifetime counts: agent_mention_count has no timestamp, so this does not follow the time range.
+                  {' '}{kbStats.docs_never_surfaced} of {kbStats.docs_published} published documents have never been surfaced by the agent.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {kbStats.top_docs_lifetime.length === 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      The agent has not surfaced a knowledge-base document so far.
+                    </p>
+                  )}
+                  {kbStats.top_docs_lifetime.map((d, i) => (
+                    <div key={d.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/30">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <Badge variant="outline" className="font-mono shrink-0">#{i + 1}</Badge>
+                        <span className="font-medium truncate">{d.title}</span>
+                        {d.status !== 'published' && (
+                          <Badge variant="neutral" className="shrink-0">{d.status}</Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 text-sm shrink-0 tabular-nums">
+                        <span className="text-muted-foreground">{d.agent_mentions} agent mentions</span>
+                        <span className="text-xs text-muted-foreground">{d.views} views</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  By Workspace
+                </CardTitle>
+                <CardDescription>Which workspaces reach the knowledge base through the agent</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {kbStats.by_workspace.length === 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      The agent has not searched the knowledge base in this window.
+                    </p>
+                  )}
+                  {kbStats.by_workspace.map((w) => (
+                    <div key={w.workspace_id ?? 'none'} className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/30">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium truncate">{w.workspace_name ?? w.workspace_id ?? 'unattributed'}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {w.users} {w.users === 1 ? 'user' : 'users'} · last {formatDate(w.last_at)}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 text-sm shrink-0 tabular-nums">
+                        <span>{w.searches} searches</span>
+                        {w.zero_result > 0 && <Badge variant="warning">{w.zero_result} empty</Badge>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </TabsContent>
       </Tabs>
     </div>

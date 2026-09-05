@@ -4,6 +4,7 @@ import {
   FileText,
   FolderTree,
   Link2,
+  BarChart3,
   Brain,
   ExternalLink,
 } from 'lucide-react';
@@ -31,6 +32,9 @@ export const KnowledgeBaseManagement: React.FC = () => {
     totalDocs: 0,
     totalCategories: 0,
     totalAttachments: 0,
+    // Agent searches over the last 30 days, from the operator-only kb_search_analytics RPC.
+    // null = the RPC could not be read (not an operator), rendered as "not available".
+    kbSearches: null as { searches: number; zero_result: number } | null,
   });
 
   const { toast } = useToast();
@@ -54,10 +58,20 @@ export const KnowledgeBaseManagement: React.FC = () => {
         supabase.from('kb_doc_attachments').select('*', { count: 'exact', head: true }),
       ]);
 
+      // Derived from agent_tool_call_logs (every knowledge_base_search call) — the record the
+      // platform actually writes. kb_search_analytics, the table, never had a producer.
+      const { data: kbUsage, error: kbUsageError } = await supabase.rpc('kb_search_analytics', { p_days: 30 });
+      const kbTotals = !kbUsageError && kbUsage && typeof kbUsage === 'object'
+        ? (kbUsage as { totals?: { searches?: number; zero_result?: number } }).totals
+        : undefined;
+
       setStats({
         totalDocs: docsCount || 0,
         totalCategories: categoriesCount || 0,
         totalAttachments: attachmentsCount || 0,
+        kbSearches: kbTotals
+          ? { searches: kbTotals.searches ?? 0, zero_result: kbTotals.zero_result ?? 0 }
+          : null,
       });
     } catch (error) {
       console.error('Failed to load stats:', error);
@@ -106,7 +120,7 @@ export const KnowledgeBaseManagement: React.FC = () => {
 
       <div className="p-3 sm:p-6 space-y-6">
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="dashboard-card rounded-2xl border-0 shadow-sm p-4">
             <div className="flex items-center gap-3">
               <div className="flex items-center justify-center flex-shrink-0 w-10 h-10 rounded-xl bg-primary/10">
@@ -139,6 +153,27 @@ export const KnowledgeBaseManagement: React.FC = () => {
               <div>
                 <p className="text-xs text-muted-foreground">Product Links</p>
                 <p className="text-lg font-semibold">{isLoading ? '—' : stats.totalAttachments}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center flex-shrink-0 w-10 h-10 rounded-xl bg-primary/10">
+                <BarChart3 className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Agent Searches (30d)</p>
+                <p className="text-lg font-semibold">
+                  {isLoading ? '—' : (stats.kbSearches ? stats.kbSearches.searches : (
+                    <span className="text-sm font-normal text-muted-foreground" title="kb_search_analytics is operator-only">
+                      not available
+                    </span>
+                  ))}
+                </p>
+                {!isLoading && stats.kbSearches && (
+                  <p className="text-xs text-muted-foreground">{stats.kbSearches.zero_result} found nothing</p>
+                )}
               </div>
             </div>
           </div>
