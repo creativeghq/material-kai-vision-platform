@@ -97,6 +97,16 @@ export function shapeToolResult(raw: unknown): ToolResultShape {
     const arr = (parsed as Record<string, unknown> | null | undefined)?.[key];
     if (Array.isArray(arr)) total = (total ?? 0) + arr.length;
   }
+  // A tool that answers `{count: N, top: [...]}` has said exactly how many rows it found — every
+  // SEO tool does, 18 of them — and was logged "not countable" regardless. In conversation
+  // 9225f61f (2026-09-05) `seo_ranked_keywords` returned two rows and `agent_tool_call_logs`
+  // stored `has_results:false, result_count:null`, so the zero-result probes and the memory gate
+  // could not tell an empty index from a full one. Arrays still win when present; a declared
+  // count fills in only where nothing else was countable.
+  if (total === null) {
+    const declared = (parsed as Record<string, unknown> | null | undefined)?.count;
+    if (typeof declared === 'number' && Number.isFinite(declared) && declared >= 0) total = declared;
+  }
   shape.resultCount = total;
 
   shape.zeroResult = shape.resultCount === 0;

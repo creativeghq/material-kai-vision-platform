@@ -3140,9 +3140,11 @@ export const TOOLKITS: ToolkitDefinition[] = [
     id: 'seo-research',
     name: 'SEO Research',
     adminOnly: true,
-    description: 'Keyword research, SERP audit, URL audit, intent classification — read-only.',
+    description: 'Your own rankings (rank tracker + Search Console), keyword research, SERP audit, URL audit, intent classification — read-only.',
     icon: 'Search',
     tool_ids: [
+      // First-party first: the workspace's own rank tracker + Search Console.
+      'seo_my_rankings',
       'seo_research_keyword', 'seo_keyword_difficulty', 'seo_keyword_suggestions',
       'seo_search_intent', 'seo_keyword_overview', 'seo_ai_keyword_volume',
       'seo_serp_audit', 'seo_audit_url', 'seo_historical_serps',
@@ -3150,6 +3152,16 @@ export const TOOLKITS: ToolkitDefinition[] = [
       'seo_keyword_ideas', 'seo_related_keywords', 'seo_search_volume', 'seo_ai_overview',
     ],
     quick_starts: [
+      {
+        label: 'My rankings', description: 'What your own site ranks for — rank tracker + Search Console', icon: 'Globe',
+        prompt: 'Which keywords does my website rank for right now? Use our own rank tracker and Search Console data.',
+        done: 'Here is what your site ranks for, from your own tracker and Search Console.',
+        promptTemplate: 'Which keywords does my website rank for right now, over the last {{days}} days? Use our own rank tracker and Search Console data.',
+        run: { tool: 'seo_my_rankings', coerce: { days: 'number' } },
+        form: [
+          { key: 'days', label: 'Look-back window (days)', kind: 'number', default: '28' },
+        ],
+      },
       {
         label: 'Research a keyword', description: 'Full SERP + AI Overview snapshot', icon: 'Search',
         prompt: 'Research the keyword "porcelain tile installation" in the UK. Walk me through the SERP findings.',

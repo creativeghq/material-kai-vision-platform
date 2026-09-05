@@ -26,7 +26,7 @@
  */
 
 import { resolveWebsite, type ResolvedWebsite } from '../seo-website.ts';
-import { openSpendGate, dataForSeoTaskError } from './dataforseo-spend-gate.ts';
+import { openSpendGate, dataForSeoTaskError, type SpendGate } from './dataforseo-spend-gate.ts';
 import { describeUpstreamError } from '../tool-result-shape.ts';
 // Invariant 7 — a model-supplied URL that OUR infrastructure will fetch (#352 A19).
 import { assertSafeUrl } from '../ssrf-guard.ts';
@@ -68,6 +68,24 @@ export interface SeoWebsiteCtx {
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
+type SeoAttribution = { user_id?: string; workspace_id?: string };
+
+/**
+ * Tell MIVAA this call's credits are already reserved here.
+ *
+ * MIVAA's DataForSEO client charges a flat unit per call for callers that do not reserve (the
+ * rank tracker, seo-api, crons with a payer). When the gate above HAS reserved — and settles
+ * against the cost MIVAA reports back — that flat unit was a second charge for the same call:
+ * 134 of them in the 30 days to 2026-09-05, one duplicate credit each. The flag rides on the
+ * attribution because that is what the route turns into MIVAA's `CostAttribution`, and it is
+ * set only when the gate actually metered, so a pass-through (no payer, no pricing row) still
+ * pays MIVAA's unit rather than nothing.
+ */
+function meteredAttribution(gate: SpendGate, attribution?: SeoAttribution): Record<string, unknown> | undefined {
+  if (!gate.metered || !attribution) return attribution;
+  return { ...attribution, metered_upstream: true };
+}
+
 /**
  * Generic dispatcher to MIVAA's `/api/v1/seo-agent/dataforseo/{kind}` endpoint.
  * Every Wave 1B+ tool routes through this. `kind` is the unified-client method
@@ -77,7 +95,7 @@ export interface SeoWebsiteCtx {
 async function callDataForSEO(
   kind: string,
   params: Record<string, any>,
-  attribution?: { user_id?: string; workspace_id?: string },
+  attribution?: SeoAttribution,
 ): Promise<{ ok: boolean; data?: any; error?: string }> {
   if (!CRON_SECRET) {
     return { ok: false, error: 'CRON_SECRET not configured' };
@@ -91,7 +109,7 @@ async function callDataForSEO(
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET },
-        body: JSON.stringify({ params, attribution }),
+        body: JSON.stringify({ params, attribution: meteredAttribution(gate, attribution) }),
       },
     );
     const text = await resp.text();
@@ -119,7 +137,7 @@ async function callSEOAgentRoute(
   body: Record<string, any>,
 ): Promise<{ ok: boolean; data?: any; error?: string }> {
   if (!CRON_SECRET) return { ok: false, error: 'CRON_SECRET not configured' };
-  const attribution = body?.attribution as { user_id?: string; workspace_id?: string } | undefined;
+  const attribution = body?.attribution as SeoAttribution | undefined;
   const gate = await openSpendGate(`composite_${path}`, attribution?.user_id, body, attribution?.workspace_id);
   if (!gate.ok) return { ok: false, error: gate.message };
   try {
@@ -128,7 +146,9 @@ async function callSEOAgentRoute(
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET },
-        body: JSON.stringify(body),
+        // A composite fans out to several DataForSEO calls under ONE reservation, so the flag
+        // has to reach every one of them — MIVAA charged its unit on each leg.
+        body: JSON.stringify(attribution ? { ...body, attribution: meteredAttribution(gate, attribution) } : body),
       },
     );
     const text = await resp.text();
@@ -525,6 +545,129 @@ export const createSEOGscTopMoversTool = (
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Own rankings — the workspace's rank tracker + Search Console, FIRST-PARTY
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * "Which keywords do we rank for?" answered from what the platform already MEASURES for the
+ * connected website, rather than from a third-party index.
+ *
+ * Why this exists: on 2026-09-05 (conversation 9225f61f) that exact question was answered from
+ * DataForSEO Labs — two keywords at positions 75 and 82, SERPs crawled seven weeks earlier —
+ * while the workspace's own tracker had checked 129 keywords 35 minutes before (brand at #1, a
+ * category page at #24) and Search Console was connected and synced that morning. No tool
+ * exposed the tracker at all, and the two Search Console tools were named for niches
+ * ("striking distance", "movers"), so the model reached for the index and then wrote that
+ * first-party data "would confirm" — one call away.
+ *
+ * Reads `get_website_rank_summary` (a live Google check of the keywords this workspace CHOSE to
+ * follow, run daily) and `get_gsc_summary` (Google's own report of what it showed). Both derive
+ * the verdict in SQL — `status` is `ok` / `no_data` / `not_collected` / `collector_failed` —
+ * and this tool relays it: a source that is missing is STATED, never rendered as zero.
+ */
+export const createSEOMyRankingsTool = (
+  _userId: string, onChunk?: (chunk: any) => void, ctx?: SeoWebsiteCtx,
+) => {
+  return tool(
+    async ({ website_id, days }) => {
+      if (!ctx?.supabase || !ctx?.workspaceId) {
+        return JSON.stringify({ success: false, error: 'No workspace context — reading your own rankings needs a signed-in workspace.' });
+      }
+      let site: ResolvedWebsite | null = ctx.defaultWebsite ?? null;
+      // Scoped to the caller's workspace inside resolveWebsite: another tenant's id resolves to null.
+      if (website_id) site = await resolveWebsite(ctx.supabase, { workspaceId: ctx.workspaceId, explicitWebsiteId: website_id });
+      if (!site) {
+        return JSON.stringify({ success: false, error: 'No connected website. Ask the user to connect one under Profile → Websites — the rank tracker and Search Console both hang off it.' });
+      }
+      const windowDays = Math.min(Math.max(Math.trunc(days ?? 28), 7), 180);
+      onChunk?.({ type: 'tool_progress', status: `Reading the rank tracker and Search Console for ${site.domain}…`, timestamp: Date.now() });
+
+      const [rankRes, gscRes, connRes] = await Promise.all([
+        ctx.supabase.rpc('get_website_rank_summary', { p_website_id: site.id, p_days: windowDays }),
+        ctx.supabase.rpc('get_gsc_summary', { p_website_id: site.id, p_days: windowDays }),
+        ctx.supabase.from('website_gsc_connections').select('is_active, last_sync_at, last_sync_error').eq('website_id', site.id).maybeSingle(),
+      ]);
+      if (rankRes.error) return JSON.stringify({ success: false, error: `rank tracker: ${rankRes.error.message}` });
+      if (gscRes.error) return JSON.stringify({ success: false, error: `search console: ${gscRes.error.message}` });
+
+      const rank = rankRes.data || { status: 'not_collected', tracked: 0 };
+      const gsc = gscRes.data || { status: 'not_collected', totals: null, top_queries: [] };
+      const conn = connRes?.data || null;
+      const connected = !!conn?.is_active;
+      const summary = rank.summary || {};
+      const rows: any[] = Array.isArray(rank.keywords) ? rank.keywords : [];
+      const ranking = rows.filter((k: any) => k.found && !k.error && k.position != null);
+      const queries: any[] = Array.isArray(gsc.top_queries) ? gsc.top_queries : [];
+      const trackedSet = new Set(rows.map((k: any) => String(k.keyword || '').trim().toLowerCase()));
+      const untracked = queries.filter((q: any) => Number(q.impressions) >= 5 && !trackedSet.has(String(q.query || '').trim().toLowerCase()));
+      const gscStatus = connected ? gsc.status : 'not_connected';
+
+      onChunk?.({
+        type: 'seo_my_rankings_card',
+        website: site.domain, days: windowDays,
+        tracker: {
+          status: rank.status, note: rank.note ?? null, tracked: rank.tracked ?? 0, summary,
+          // Series and SERP-feature arrays stay out of the card: 129 keywords × 28 points is
+          // weight the chat message store carries forever and the card never reads.
+          keywords: rows.map((k: any) => ({
+            keyword: k.keyword, position: k.position, previous: k.previous, change: k.change,
+            found: k.found, entered: k.entered, lost: k.lost, url: k.url, error: k.error,
+            search_volume: k.search_volume, captured_at: k.captured_at, tags: k.tags,
+          })),
+        },
+        gsc: {
+          connected, status: gscStatus,
+          last_sync_at: conn?.last_sync_at ?? null, sync_error: conn?.last_sync_error ?? null,
+          totals: gsc.totals ?? null, top_queries: queries.slice(0, 25),
+        },
+        timestamp: Date.now(),
+      });
+
+      return JSON.stringify({
+        success: true,
+        website: site.domain,
+        window_days: windowDays,
+        rank_tracker: {
+          status: rank.status,
+          note: rank.note ?? null,
+          tracked: rank.tracked ?? 0,
+          checked_at: summary.captured_at ?? null,
+          ranking: summary.ranking ?? 0,
+          not_ranking: summary.not_ranking ?? 0,
+          failed: summary.failed ?? 0,
+          top_10: (summary.distribution?.top_3 ?? 0) + (summary.distribution?.top_10 ?? 0),
+          avg_position: summary.avg_position ?? null,
+          ranking_keywords: ranking.slice(0, 30).map((k: any) => ({
+            keyword: k.keyword, position: k.position, previous: k.previous ?? null, change: k.change ?? null,
+            url: k.url, volume: k.search_volume ?? null, tags: k.tags ?? [],
+          })),
+          entered: rows.filter((k: any) => k.entered).map((k: any) => k.keyword).slice(0, 15),
+          lost: rows.filter((k: any) => k.lost).map((k: any) => k.keyword).slice(0, 15),
+        },
+        search_console: {
+          connected,
+          status: gscStatus,
+          last_sync_at: conn?.last_sync_at ?? null,
+          sync_error: conn?.last_sync_error ?? null,
+          totals: gsc.totals ?? null,
+          top_queries: queries.slice(0, 25).map((q: any) => ({ query: q.query, position: q.position, impressions: q.impressions, clicks: q.clicks })),
+          queries_with_demand_not_tracked: untracked.slice(0, 10).map((q: any) => ({ query: q.query, position: q.position, impressions: q.impressions })),
+        },
+        guidance: 'These are measurements, not estimates: the rank tracker is a live Google check of the keywords this workspace chose to track, and Search Console is what Google reports having shown. Answer from them. A third-party index (seo_ranked_keywords, seo_domain_snapshot) is refreshed weeks apart and routinely misses a site\'s own brand rank — never let it override these, and if you cite it, give its SERP date. A status of not_connected / not_collected is a fact to report, not a zero.',
+      });
+    },
+    {
+      name: 'seo_my_rankings',
+      description: 'The workspace\'s OWN website: which keywords it ranks for and where, from FIRST-PARTY data — the platform\'s rank tracker (a live Google check of the keywords this workspace chose to follow, run daily) and Google Search Console (what Google reports having shown, with impressions and clicks). Use this FIRST for any question about our own site — "what do we rank for", "are we on page one", "how is the site doing" — before any third-party index. Free. Defaults to the connected website when website_id is omitted.',
+      schema: z.object({
+        website_id: z.string().optional().describe('Connected website id. Omit to use the workspace default.'),
+        days: z.number().int().min(7).max(180).optional().describe('Search Console look-back and rank-history window in days, default 28.'),
+      }),
+    },
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Wave 1B — Standalone Labs utilities (difficulty / suggestions / intent)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -791,19 +934,29 @@ export const createSEORankedKeywordsTool = (
         type: 'seo_ranked_keywords_card',
         domain, country: country_code, items, timestamp: Date.now(),
       });
+      // A Labs row is a crawl of that keyword's SERP on a DATE, not a live check. With the date
+      // absent from this summary the model called a seven-week-old SERP "right now"
+      // (conversation 9225f61f, 2026-09-05). The card shows the same date per row.
+      const crawled = items
+        .map((it: any) => String(it.ranked_serp_element?.last_updated_time || it.keyword_data?.serp_info?.last_updated_time || '').slice(0, 10))
+        .filter(Boolean)
+        .sort();
       return JSON.stringify({
         success: true, domain, count: items.length,
+        serp_crawled_between: crawled.length ? [crawled[0], crawled[crawled.length - 1]] : null,
+        note: 'DataForSEO Labs INDEX: each row is the date its SERP was last crawled, not a live check, and the index can miss recent movement and a site\'s own brand terms. Say the date when you cite a position. For the workspace\'s own connected website, seo_my_rankings reads the rank tracker and Search Console instead.',
         top: items.slice(0, 10).map((it: any) => ({
           keyword: it.keyword_data?.keyword,
           rank: it.ranked_serp_element?.serp_item?.rank_absolute,
           volume: it.keyword_data?.keyword_info?.search_volume,
           traffic: it.ranked_serp_element?.serp_item?.etv,
+          serp_crawled: String(it.ranked_serp_element?.last_updated_time || '').slice(0, 10) || null,
         })),
       });
     },
     {
       name: 'seo_ranked_keywords',
-      description: 'Every keyword the domain currently ranks for — with rank position, volume, and estimated traffic share. Use to understand what the domain captures organically.',
+      description: 'Keywords a domain ranks for in the DataForSEO Labs INDEX — rank position, volume, estimated traffic share, and the date each SERP was crawled (weeks apart; not a live check). Use for competitors and market sizing. For the workspace\'s OWN connected website use seo_my_rankings first: the index misses recent movement and often a site\'s own brand rank.',
       schema: z.object({
         domain: z.string().min(3),
         country_code: z.string().length(2).optional(),

@@ -105,6 +105,34 @@ describe('shapeToolResult: the other tool shapes are unchanged', () => {
   });
 });
 
+describe('shapeToolResult: a declared count is honoured when nothing else is countable', () => {
+  // The SEO tool shape — `{count, top}` — was "not countable", so a tool that returned two rows
+  // logged `has_results:false, result_count:null` (conversation 9225f61f, 2026-09-05).
+  it('reads count off the {count, top} shape every SEO tool returns', () => {
+    const shape = shapeToolResult(JSON.stringify({ success: true, domain: 'x.gr', count: 2, top: [{}, {}] }));
+    expect(shape.resultCount).toBe(2);
+    expect(shape.zeroResult).toBe(false);
+    expect(shape.summary.has_results).toBe(true);
+  });
+
+  it('treats a declared zero as a real empty, not as unknown', () => {
+    const shape = shapeToolResult(JSON.stringify({ success: true, domain: 'x.gr', count: 0, top: [] }));
+    expect(shape.resultCount).toBe(0);
+    expect(shape.zeroResult).toBe(true);
+    expect(turnProducedWork([{ tool: 'seo_ranked_keywords', result: JSON.stringify({ success: true, count: 0 }) }])).toBe(false);
+  });
+
+  it('lets a result array win over a declared count', () => {
+    expect(shapeToolResult(JSON.stringify({ results: [1, 2, 3], count: 99 })).resultCount).toBe(3);
+  });
+
+  it('ignores a count that is not a non-negative number', () => {
+    expect(shapeToolResult(JSON.stringify({ count: 'many' })).resultCount).toBeNull();
+    expect(shapeToolResult(JSON.stringify({ count: -1 })).resultCount).toBeNull();
+    expect(shapeToolResult(JSON.stringify({ count: Number.NaN })).resultCount).toBeNull();
+  });
+});
+
 describe('shapeToolResult: the ladder cannot come back', () => {
   it('no key shadows another — a later key still contributes when an earlier one is empty', () => {
     // This is the exact defect, stated as an invariant: an empty array earlier in the key

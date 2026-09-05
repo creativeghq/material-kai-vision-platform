@@ -26,7 +26,7 @@
  *   - seo_llm_mentions_card
  *   - seo_youtube_card / seo_local_pack_card / seo_trends_card
  *   - seo_site_review_card / seo_brand_audit_card
- *   - seo_gsc_striking_distance_card / seo_gsc_movers_card
+ *   - seo_gsc_striking_distance_card / seo_gsc_movers_card / seo_my_rankings_card
  *   - seo_onpage_issues_card
  *   - seo_backlinks_timeseries_card / seo_backlinks_competitors_card
  *   - seo_historical_rank_card / seo_keywords_for_site_card
@@ -430,20 +430,31 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
 
   if (t === 'seo_ranked_keywords_card') {
     const items: any[] = data.items || [];
+    // The date each SERP was crawled is the one fact that separates an index from a live check.
+    // The card hid it, so a seven-week-old position read as today's (2026-09-05).
+    const crawlDate = (it: any): string => String(it.ranked_serp_element?.last_updated_time || it.keyword_data?.serp_info?.last_updated_time || '').slice(0, 10);
+    const crawled = items.map(crawlDate).filter(Boolean).sort();
+    const crawlSpan = crawled.length === 0 ? '' : crawled[0] === crawled[crawled.length - 1] ? ` · SERPs crawled ${crawled[0]}` : ` · SERPs crawled ${crawled[0]} – ${crawled[crawled.length - 1]}`;
     return (
       <Card>
-        <Header icon="📈" title={`Top Ranking Keywords — ${data.domain}`} subtitle={`${items.length} keywords`} />
-        <Primer>The terms this domain already ranks for, with its Google position (#) and each term's monthly volume. Positions 4–15 are the quickest to push onto page 1.</Primer>
-        {items.length === 0 ? <Empty>This domain isn't ranking for any tracked keywords yet.</Empty> : (
+        <Header icon="📈" title={`Top Ranking Keywords — ${data.domain}`} subtitle={`${items.length} keywords · DataForSEO index${crawlSpan}`} />
+        <Primer>The terms this domain ranks for in DataForSEO's index, with the Google position (#) and each term's monthly volume. Each row shows when its SERP was last crawled — this is an index, not a live check, so it lags recent movement and can miss a site's own brand terms. Positions 4–15 are the quickest to push onto page 1.</Primer>
+        {items.length === 0 ? <Empty>The index has no ranking keywords for this domain — not the same as ranking for none.</Empty> : (
           <ItemList rows={items.map((it: any) => {
             const serp = it.ranked_serp_element?.serp_item || {};
             const rank = serp.rank_absolute;
             const vol = it.keyword_data?.keyword_info?.search_volume;
             const etv = serp.etv;
+            const when = crawlDate(it);
+            const parts = [
+              etv != null ? `~${fmtNum(etv)} est. visits/mo` : null,
+              serp.url || null,
+              when ? `crawled ${when}` : null,
+            ].filter(Boolean);
             return {
               left: `#${rank ?? '?'} · ${it.keyword_data?.keyword}`,
               right: vol ? `${fmtNum(vol)} /mo` : 'no volume data',
-              sub: etv != null ? `~${fmtNum(etv)} est. visits/mo${serp.url ? ' · ' + serp.url : ''}` : (serp.url || undefined),
+              sub: parts.length ? parts.join(' · ') : undefined,
               href: serp.url || undefined,
             };
           })} max={12} />
@@ -1104,6 +1115,94 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
             </div>
           </div>
         )}
+      </Card>
+    );
+  }
+
+  // ── Own rankings: rank tracker + Search Console ───────
+  if (t === 'seo_my_rankings_card') {
+    const tr = data.tracker || {};
+    const gsc = data.gsc || {};
+    const s = tr.summary || {};
+    const kws: any[] = tr.keywords || [];
+    const ranking = kws.filter((k: any) => k.found && !k.error && k.position != null);
+    const queries: any[] = gsc.top_queries || [];
+    // The RPC hands back a calendar day already; this only trims a timestamp to it.
+    const dayOf = (d: any): string => (d ? String(d).slice(0, 10) : '—');
+    const changeOf = (k: any): string | undefined => {
+      if (k.entered) return 'new';
+      if (typeof k.change !== 'number' || k.change === 0) return undefined;
+      return k.change > 0 ? `▲ ${k.change}` : `▼ ${Math.abs(k.change)}`;
+    };
+    const trackerHasData = tr.status === 'ok' || tr.status === 'collector_failed';
+    return (
+      <Card>
+        <Header
+          icon="📍"
+          title={`Your rankings — ${data.website}`}
+          subtitle={trackerHasData ? `${fmtNum(tr.tracked)} tracked · ${fmtNum(s.ranking)} ranking · checked ${dayOf(s.captured_at)}` : 'rank tracker'}
+        />
+        <Primer>
+          First-party data: the rank tracker is a live Google check of the keywords this workspace chose to follow,
+          and Search Console is what Google itself reports showing. Neither is an estimate.
+        </Primer>
+        {!trackerHasData ? (
+          <Empty>{tr.note || 'No keywords are tracked for this site yet.'}</Empty>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <Stat label="Ranking" value={`${fmtNum(s.ranking)} / ${fmtNum(s.answered)}`} />
+              <Stat label="Top 10" value={fmtNum((s.distribution?.top_3 ?? 0) + (s.distribution?.top_10 ?? 0))} />
+              <Stat label="Not ranking" value={fmtNum(s.not_ranking)} />
+              <Stat label="Avg position" value={s.avg_position != null ? `#${s.avg_position}` : '—'} />
+            </div>
+            {tr.note && <p className={`text-[11px] ${WARN}`}>{tr.note}</p>}
+            {ranking.length === 0 ? (
+              <Empty>None of the tracked keywords is in Google's top 100 right now.</Empty>
+            ) : (
+              <ItemList
+                max={15}
+                rows={ranking.map((k: any) => ({
+                  left: `#${k.position} · ${k.keyword}`,
+                  right: changeOf(k),
+                  sub: [k.url, k.search_volume ? `${fmtNum(k.search_volume)} /mo` : null].filter(Boolean).join(' · ') || undefined,
+                  href: k.url || undefined,
+                }))}
+              />
+            )}
+          </>
+        )}
+        <div className="pt-2 border-t border-border space-y-2">
+          <div className="text-xs font-medium text-foreground">Search Console · last {data.days ?? 28} days</div>
+          {!gsc.connected ? (
+            <Empty>Search Console is not connected for this site — connect it under Profile → Websites.</Empty>
+          ) : gsc.status !== 'ok' ? (
+            <Empty>
+              {gsc.status === 'not_collected' ? 'Connected, but nothing has been synced yet.' : 'Google reported no impressions in this window.'}
+              {gsc.sync_error ? ` Last sync error: ${gsc.sync_error}` : ''}
+            </Empty>
+          ) : (
+            <>
+              <div className="grid grid-cols-3 gap-2">
+                <Stat label="Clicks" value={fmtNum(gsc.totals?.clicks)} />
+                <Stat label="Impressions" value={fmtNum(gsc.totals?.impressions)} />
+                <Stat label="Avg position" value={gsc.totals?.position ? `#${gsc.totals.position}` : '—'} />
+              </div>
+              {queries.length === 0 ? (
+                <Empty>No queries with impressions in this window.</Empty>
+              ) : (
+                <ItemList
+                  max={12}
+                  rows={queries.map((q: any) => ({
+                    left: q.query,
+                    right: q.position != null ? `#${Math.round(q.position)}` : undefined,
+                    sub: `${fmtNum(q.impressions)} impressions · ${fmtNum(q.clicks)} clicks`,
+                  }))}
+                />
+              )}
+            </>
+          )}
+        </div>
       </Card>
     );
   }

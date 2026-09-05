@@ -74,6 +74,7 @@ question: a fixed, user-picked set followed as a **time series**.
 | `seo_keyword_positions` | One row per keyword per day. Retained ~760 days (the summary RPC's own ceiling is 730). |
 | `get_website_rank_summary(p_website_id, p_days)` | **SQL derives the number AND the verdict.** Returns the series, the averages and the movement already inverted. |
 | `WebsiteRankTrackerPanel` | The Rank tracking tab — formats what the RPC returns, derives nothing. |
+| `seo_my_rankings` (agent tool, 2026-09-05) | Edith's **first-party** read of the connected website: this RPC plus `get_gsc_summary`, relayed with their `status` intact. It exists because "which keywords does materialshub.gr rank for right now" was answered from the DataForSEO Labs index — two keywords, SERPs crawled seven weeks earlier — while this tracker had checked 129 keywords 35 minutes before (brand at #1) and Search Console was connected. The Labs tools (`seo_ranked_keywords`, `seo_domain_snapshot`) are for competitors and market sizing; they now return and render the SERP crawl date, and Edith's prompt says to read this tool first for the workspace's own site. |
 
 **Three arithmetic rules, which are one rule in three costumes** — all of them the "a metric is a
 value or a stated reason there is no value" rule from CLAUDE.md:

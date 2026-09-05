@@ -1991,6 +1991,16 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'seo_my_rankings',
+    file: 'supabase/functions/_shared/tools/seo-agent-tools.ts',
+    factory: 'createSEOMyRankingsTool',
+    description: 'The workspace\'s OWN website: which keywords it ranks for and where, from FIRST-PARTY data — the platform\'s rank tracker (a live Google check of the keywords this workspace chose to follow, run daily) and Google Search…',
+    params: [
+      { name: 'website_id', type: 'string', optional: true, description: 'Connected website id. Omit to use the workspace default.' },
+      { name: 'days', type: 'number', optional: true, description: 'Search Console look-back and rank-history window in days, default 28.' },
+    ],
+  },
+  {
     name: 'seo_onpage_issues',
     file: 'supabase/functions/_shared/tools/seo-agent-tools.ts',
     factory: 'createSEOOnpageIssuesTool',
@@ -2015,7 +2025,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     name: 'seo_ranked_keywords',
     file: 'supabase/functions/_shared/tools/seo-agent-tools.ts',
     factory: 'createSEORankedKeywordsTool',
-    description: 'Every keyword the domain currently ranks for — with rank position, volume, and estimated traffic share.',
+    description: 'Keywords a domain ranks for in the DataForSEO Labs INDEX — rank position, volume, estimated traffic share, and the date each SERP was crawled (weeks apart; not a live check).',
     params: [
       { name: 'domain', type: 'string', optional: false },
       { name: 'country_code', type: 'string', optional: true },

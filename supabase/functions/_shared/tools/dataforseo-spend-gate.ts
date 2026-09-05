@@ -133,6 +133,15 @@ export function ceilingUnitsFor(kind: string, params?: Record<string, unknown>):
 export interface SpendGate {
   /** Caller may proceed. When false, `refusal` is a ready tool-result string. */
   ok: boolean;
+  /**
+   * True when THIS gate reserved the caller's credits. The dispatcher forwards it to MIVAA as
+   * `attribution.metered_upstream`, and MIVAA's DataForSEO client — which charges a flat unit
+   * per call for callers that do not reserve — stands down for the call. Without the flag every
+   * SEO-agent call was billed twice (edge reserve settled at real cost + MIVAA's flat unit): 134
+   * calls in the 30 days to 2026-09-05. False on a pass-through so an unmetered call still pays
+   * MIVAA's unit rather than nothing.
+   */
+  metered: boolean;
   refusal?: string;
   /** Human-readable reason, safe to hand back to the agent as the tool's error. */
   message?: string;
@@ -144,7 +153,7 @@ export interface SpendGate {
 }
 
 /** A gate that charges nothing and settles to nothing — used when metering is unavailable. */
-const PASS_THROUGH: SpendGate = { ok: true, settle: async () => {} };
+const PASS_THROUGH: SpendGate = { ok: true, metered: false, settle: async () => {} };
 
 /**
  * Reserve DataForSEO spend for one upstream call.
@@ -194,11 +203,12 @@ export async function openSpendGate(
   if (refusal) {
     let message = 'Not enough credits to run this SEO lookup. Please top up.';
     try { message = JSON.parse(refusal)?.error || message; } catch { /* keep the default */ }
-    return { ok: false, refusal, message, settle: async () => {} };
+    return { ok: false, metered: false, refusal, message, settle: async () => {} };
   }
 
   return {
     ok: true,
+    metered: true,
     settle: async (costUsd) => {
       const known = typeof costUsd === 'number' && Number.isFinite(costUsd) && costUsd >= 0;
       // Settling is the moment the outcome becomes knowable, so it is where the usage row learns

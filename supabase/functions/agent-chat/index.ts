@@ -544,6 +544,10 @@ function createAgentGraph(
             tool: toolCall.name,
             result: parsedResult,
             args: toolCall.args,
+            // Measured above, around the tool's own promise. `agent_usage_logs.tools_called`
+            // carried a hardcoded 0 here while `agent_tool_call_logs` held the real figure —
+            // two ledgers, one of them fake.
+            durationMs: toolTimings[toolCall.id || toolCall.name] ?? null,
           });
 
           // Collect products from search.
@@ -1135,8 +1139,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'seo_trustpilot_search', 'seo_pinterest_search', 'seo_reddit_search',
       // Composite audits
       'seo_site_review', 'seo_brand_search_audit',
-      // Google Search Console (first-party performance)
-      'seo_gsc_striking_distance', 'seo_gsc_top_movers',
+      // First-party: the workspace's own rank tracker + Google Search Console
+      'seo_my_rankings', 'seo_gsc_striking_distance', 'seo_gsc_top_movers',
       // Gap-fillers (DataForSEO data GSC can't provide)
       'seo_onpage_issues', 'seo_backlinks_timeseries', 'seo_backlinks_competitors',
       'seo_historical_rank_overview', 'seo_keywords_for_site', 'seo_keyword_ideas',
@@ -1377,7 +1381,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'seo_domain_whois', 'seo_llm_mentions_search', 'seo_youtube_search', 'seo_local_pack', 'seo_google_trends',
       'seo_amazon_asin', 'seo_app_keywords', 'seo_trustpilot_search', 'seo_pinterest_search', 'seo_reddit_search',
       'seo_site_review', 'seo_brand_search_audit', 'seo_dataforseo_call',
-      'seo_gsc_striking_distance', 'seo_gsc_top_movers',
+      'seo_my_rankings', 'seo_gsc_striking_distance', 'seo_gsc_top_movers',
       'seo_onpage_issues', 'seo_backlinks_timeseries', 'seo_backlinks_competitors',
       'seo_historical_rank_overview', 'seo_keywords_for_site', 'seo_keyword_ideas',
       'seo_related_keywords', 'seo_search_volume', 'seo_domain_intersection',
@@ -2125,7 +2129,7 @@ async function executeAgent(
     'seo_trustpilot_search', 'seo_pinterest_search', 'seo_reddit_search',
     'seo_site_review', 'seo_brand_search_audit',
     'seo_dataforseo_call',
-    'seo_gsc_striking_distance', 'seo_gsc_top_movers',
+    'seo_my_rankings', 'seo_gsc_striking_distance', 'seo_gsc_top_movers',
     'seo_onpage_issues', 'seo_backlinks_timeseries', 'seo_backlinks_competitors',
     'seo_historical_rank_overview', 'seo_keywords_for_site', 'seo_keyword_ideas',
     'seo_related_keywords', 'seo_search_volume', 'seo_domain_intersection',
@@ -2276,6 +2280,7 @@ async function executeAgent(
   const createSEOBrandSearchAuditTool = seoAgentMod?.createSEOBrandSearchAuditTool;
   const createSEOGscStrikingDistanceTool = seoAgentMod?.createSEOGscStrikingDistanceTool;
   const createSEOGscTopMoversTool = seoAgentMod?.createSEOGscTopMoversTool;
+  const createSEOMyRankingsTool = seoAgentMod?.createSEOMyRankingsTool;
   // Phase 12+ niche tools
   const createSEOAmazonAsinTool = seoAgentMod?.createSEOAmazonAsinTool;
   const createSEOAppKeywordsTool = seoAgentMod?.createSEOAppKeywordsTool;
@@ -2585,6 +2590,11 @@ async function executeAgent(
   }
   if (config.tools.includes('seo_gsc_top_movers') && createSEOGscTopMoversTool) {
     tools.push(createSEOGscTopMoversTool(userId, onChunk, { supabase, workspaceId, defaultWebsite: seoDefaultWebsite }));
+  }
+  // The workspace's own rank tracker + Search Console — the first-party answer to "what do we
+  // rank for", which until 2026-09-05 no tool could give (conversation 9225f61f).
+  if (config.tools.includes('seo_my_rankings') && createSEOMyRankingsTool) {
+    tools.push(createSEOMyRankingsTool(userId, onChunk, { supabase, workspaceId, defaultWebsite: seoDefaultWebsite }));
   }
   // Phase 12+ niche tools
   if (config.tools.includes('seo_amazon_asin') && createSEOAmazonAsinTool) {
@@ -3855,7 +3865,7 @@ async function logAgentUsage(
     modelName: string;
     turnCount: number;
   },
-  toolsCalled: Array<{ name: string; duration_ms?: number }> = [],
+  toolsCalled: Array<{ name: string; duration_ms?: number | null }> = [],
   // `log_agent_usage` has taken both of these since it was written and this caller passed
   // neither, so every row landed with conversation_id NULL and latency_ms NULL — 100% of
   // them. The cost of a conversation could not be asked of the table that records it, and the
@@ -4495,7 +4505,9 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
           if (finalResult.usage && finalResult.usage.totalTokens > 0) {
             const toolsCalled = finalResult.toolResults?.map((tr: any) => ({
               name: tr.tool,
-              duration_ms: 0 // Could track tool execution time if needed
+              // The tools node measures each call; null (not 0) when it could not, so a missing
+              // timing reads as unknown rather than as instant.
+              duration_ms: typeof tr.durationMs === 'number' ? tr.durationMs : null,
             })) || [];
 
             logAgentUsage(
