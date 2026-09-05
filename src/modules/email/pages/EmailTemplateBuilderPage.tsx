@@ -8,6 +8,10 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import grapesjs, { Editor as GrapesEditor } from 'grapesjs';
 // @ts-ignore — no official TS types for this plugin
 import newsletterPlugin from 'grapesjs-preset-newsletter';
+// The preset's text toolbar is Font Awesome 4.7 (`fa fa-italic` …). GrapesJS would fetch
+// that stylesheet from cdnjs at runtime — a CDN the CSP does not allow (KAI-RH, KAI-RK) —
+// so it is bundled from the npm package instead, and `cssIcons` below is emptied.
+import 'font-awesome/css/font-awesome.min.css';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Save, Monitor, Tablet, Smartphone, Send, Info } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
@@ -697,6 +701,11 @@ export const EmailTemplateBuilder: React.FC<EmailTemplateBuilderProps> = ({ back
       width: 'auto',
       fromElement: false,
       storageManager: false, // we handle persistence ourselves
+      // No phone-home: GrapesJS posts editor telemetry to app.grapesjs.com by default, which
+      // nobody here asked for and which the CSP reports on every open (KAI-RJ).
+      telemetry: false,
+      // Font Awesome is imported above; an empty value stops the default cdnjs <link>.
+      cssIcons: '',
       plugins: [newsletterPlugin],
       pluginsOpts: {
         'grapesjs-preset-newsletter': { inlineCss: true },

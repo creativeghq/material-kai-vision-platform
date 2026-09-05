@@ -495,6 +495,13 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
 
     case 'sync-now': {
       const cfg = await requireConfig(service, workspaceId);
+      // Setup begun, OAuth never finished. That is a precondition the caller can fix, not an
+      // upstream failure: as a 502 it paged Sentry for a workspace that had simply not
+      // connected yet (KAI-SX), and it stamped `last_sync_error` on a config that had never
+      // tried to sync. 4xx is what api-logger does not report.
+      if (!cfg.refresh_token) {
+        throw new HttpError(409, 'Revolut is not connected yet — finish connecting the account first');
+      }
       const result = await syncWorkspaceRevolut(service, cfg);
       if (!result.ok) throw new HttpError(502, result.error ?? 'sync failed');
       return jsonResponse({ ok: true, fetched: result.fetched, upserted: result.upserted });

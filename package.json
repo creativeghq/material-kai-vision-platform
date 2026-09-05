@@ -81,6 +81,7 @@
     "date-fns": "^4.1.0",
     "dompurify": "^3.3.3",
     "embla-carousel-react": "^8.6.0",
+    "font-awesome": "^4.7.0",
     "github-slugger": "^2.0.0",
     "grapesjs": "^0.22.14",
     "grapesjs-preset-newsletter": "^1.0.2",
