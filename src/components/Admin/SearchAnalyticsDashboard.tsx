@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   TrendingUp,
   Search,
+  Package,
   Users,
   BarChart3,
   RefreshCw,
