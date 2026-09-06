@@ -38,6 +38,25 @@ export interface CanvasArtifact {
   title: string;
 }
 
+/**
+ * One TURN of the conversation, not one message.
+ *
+ * The tab strip used to be one tab per artifact-bearing message, so a single request that
+ * produced several artifacts opened several canvas pages: "generate an SEO article" ran
+ * research, a keyword card and a volume card and put three pages on the strip, none of which
+ * was the article. A turn is one piece of work and reads as one page — the members are its
+ * sub-tabs.
+ *
+ * The group is titled by, and opens on, its LAST member: the final artifact of a turn is its
+ * outcome, and the steps that produced it belong behind it rather than in front of it.
+ */
+export interface CanvasArtifactGroup {
+  id: string;
+  kind: CanvasArtifactKind;
+  title: string;
+  members: CanvasArtifact[];
+}
+
 const KIND_ICON: Record<CanvasArtifactKind, React.ComponentType<{ className?: string }>> = {
   sheet: FileText,
   staging: Camera,
@@ -96,7 +115,9 @@ const KIND_LABEL: Record<CanvasArtifactKind, string> = {
 };
 
 interface CanvasPanelProps {
-  artifacts: CanvasArtifact[];
+  /** One entry per TURN. A turn with several artifacts renders as one tab with sub-tabs. */
+  groups: CanvasArtifactGroup[];
+  /** The active MEMBER id — a message id, the same value `onSelect` emits. */
   activeId: string | null;
   onSelect: (id: string) => void;
   onClose: () => void;
@@ -120,8 +141,11 @@ interface CanvasPanelProps {
   singlePane?: boolean;
 }
 
-export const CanvasPanel: React.FC<CanvasPanelProps> = ({ artifacts, activeId, onSelect, onClose, onCloseArtifact, onDeleteArtifact, children, inspector, singlePane }) => {
-  const hasTabMenu = Boolean(onCloseArtifact || onDeleteArtifact);
+export const CanvasPanel: React.FC<CanvasPanelProps> = ({ groups, activeId, onSelect, onClose, onCloseArtifact, onDeleteArtifact, children, inspector, singlePane }) => {
+  const activeGroup = groups.find((g) => g.members.some((m) => m.id === activeId)) ?? null;
+  // Sub-tabs only when there is genuinely more than one thing behind the tab. A single-artifact
+  // turn must look exactly as it did before, or every ordinary result grows a redundant strip.
+  const subTabs = activeGroup && activeGroup.members.length > 1 ? activeGroup.members : [];
   return (
     <div className={cn(
       'flex min-w-0 flex-1 flex-col bg-background',
@@ -142,12 +166,16 @@ export const CanvasPanel: React.FC<CanvasPanelProps> = ({ artifacts, activeId, o
           <LayoutPanelLeft className="mx-1.5 h-4 w-4 shrink-0 text-muted-foreground" />
         )}
         <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto custom-scrollbar">
-          {artifacts.length === 0 && (
+          {groups.length === 0 && (
             <span className="px-1.5 text-sm font-medium text-muted-foreground">Canvas</span>
           )}
-          {artifacts.map((a) => {
-            const Icon = KIND_ICON[a.kind];
-            const active = a.id === activeId;
+          {groups.map((g) => {
+            const a = g;
+            const Icon = KIND_ICON[g.kind];
+            const active = g === activeGroup;
+            // The kebab addresses ONE artifact. On a grouped tab the sub-strip carries it
+            // instead, so a "Delete entry" can never silently mean "delete four of them".
+            const hasTabMenu = Boolean((onCloseArtifact || onDeleteArtifact) && g.members.length === 1);
             return (
               // The tab is a container, not a button: the kebab is a second control
               // and a button inside a button is invalid markup (and unclickable).
@@ -168,6 +196,13 @@ export const CanvasPanel: React.FC<CanvasPanelProps> = ({ artifacts, activeId, o
                 >
                   <Icon className="h-3.5 w-3.5 shrink-0 text-primary" />
                   <span className="max-w-[140px] truncate sm:max-w-[180px]">{a.title}</span>
+                  {g.members.length > 1 && (
+                    // Says there is more behind this tab. Without it a grouped turn looks
+                    // like a single result and the sub-strip appears from nowhere on click.
+                    <span className="shrink-0 rounded-full bg-muted px-1.5 text-[10px] font-medium tabular-nums text-muted-foreground">
+                      {g.members.length}
+                    </span>
+                  )}
                 </button>
                 {hasTabMenu && (
                   <DropdownMenu>
@@ -225,6 +260,81 @@ export const CanvasPanel: React.FC<CanvasPanelProps> = ({ artifacts, activeId, o
           </button>
         )}
       </div>
+
+      {/* Sub-tabs: everything else this turn produced. Underline treatment, because the
+          platform's tab language is underline everywhere and a filled pill here would read
+          as a button sitting inside the page. */}
+      {subTabs.length > 0 && (
+        <div
+          role="tablist"
+          aria-label="Steps in this result"
+          className="flex h-10 shrink-0 items-center gap-1 overflow-x-auto border-b border-border bg-surface-sunken px-2 custom-scrollbar"
+        >
+          {subTabs.map((m) => {
+            const MemberIcon = KIND_ICON[m.kind];
+            const active = m.id === activeId;
+            return (
+              <div key={m.id} className="group flex shrink-0 items-center">
+                <button
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => onSelect(m.id)}
+                  title={m.title}
+                  className={cn(
+                    'flex h-9 min-w-0 items-center gap-1.5 border-b-2 px-2.5 text-xs transition-colors',
+                    active
+                      ? 'border-primary font-medium text-foreground'
+                      : 'border-transparent text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  <MemberIcon className="h-3 w-3 shrink-0" />
+                  <span className="max-w-[130px] truncate">{m.title}</span>
+                </button>
+                {(onCloseArtifact || onDeleteArtifact) && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        title="Step options"
+                        aria-label={`Options for ${m.title}`}
+                        className={cn(
+                          'flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground',
+                          active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+                        )}
+                      >
+                        <MoreHorizontal className="h-3 w-3" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-60">
+                      {onCloseArtifact && (
+                        <DropdownMenuItem onClick={() => onCloseArtifact(m.id)}>
+                          <X className="mr-2 mt-0.5 h-4 w-4 shrink-0 self-start" />
+                          <span className="flex flex-col">
+                            <span>Close in chat</span>
+                            <span className="text-xs text-muted-foreground">Hides it here. Stays saved.</span>
+                          </span>
+                        </DropdownMenuItem>
+                      )}
+                      {onCloseArtifact && onDeleteArtifact && <DropdownMenuSeparator />}
+                      {onDeleteArtifact && (
+                        <DropdownMenuItem
+                          onClick={() => onDeleteArtifact(m.id)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="mr-2 mt-0.5 h-4 w-4 shrink-0 self-start" />
+                          <span className="flex flex-col">
+                            <span>Delete entry</span>
+                            <span className="text-xs text-muted-foreground">Removes it from this chat for good.</span>
+                          </span>
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Active artifact + contextual inspector.
           Below `lg` the inspector stacks UNDER the artifact instead of being

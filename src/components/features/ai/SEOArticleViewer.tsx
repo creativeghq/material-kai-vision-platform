@@ -277,6 +277,35 @@ const GEO_SIGNAL_NAMES: Record<string, string> = {
   freshness: 'Freshness',
 };
 
+/**
+ * Fold `stages_data.extra` back up to the top level.
+ *
+ * Most of what this viewer renders is NOT a column on `seo_articles`. The pipeline computes
+ * `optimize_data`, `brief_data`, `gaps_gains_data`, `research_tab_data`, `html_content`,
+ * `meta_title`, `secondary_keywords`, `schema_markup`, `faq_schema`, `content_analysis` and
+ * `overall_score`, and `updateArticle` deliberately diverts every one of them into the
+ * `stages_data.extra` jsonb — because naming a non-existent column makes PostgREST reject the
+ * WHOLE update, which is how finished articles used to end up with a NULL title and no markdown.
+ *
+ * So the data is written and this viewer was reading the one place it is not. Every tab
+ * rendered its empty state on a completed article. Merging here rather than adding twelve
+ * columns keeps the writer's allowlist as the single source of what is a column; a field the
+ * pipeline adds later lands in `extra` and shows up without a second list to update.
+ *
+ * A real column WINS whenever it holds a value — `extra` is the fallback, never an override,
+ * or a stale stage copy would mask the finished one.
+ */
+function hydrateArticle<T extends Record<string, any>>(row: T): T {
+  const extra = (row?.stages_data as any)?.extra;
+  if (!extra || typeof extra !== 'object') return row;
+  const merged: Record<string, any> = { ...row };
+  for (const [key, value] of Object.entries(extra)) {
+    if (value === null || value === undefined) continue;
+    if (merged[key] === null || merged[key] === undefined) merged[key] = value;
+  }
+  return merged as T;
+}
+
 // ─── Adaptive Polling Hook ──────────────────────────────────────
 
 function useAdaptivePolling(
@@ -317,7 +346,7 @@ function useAdaptivePolling(
       }
 
       if (data) {
-        onData(data as SEOArticle);
+        onData(hydrateArticle(data) as SEOArticle);
 
         if (data.status === 'completed' || data.status === 'failed') {
           return; // Stop polling
@@ -680,7 +709,42 @@ function GapsGainsTab({ data }: { data: GapsGainsData }) {
 
 // ─── Research Tab ───────────────────────────────────────────────
 
-function ResearchTab({ data }: { data: ResearchTabData }) {
+/**
+ * "Add to content" for one research row. Reports what happened on the button itself — an
+ * insertion that silently does nothing is the reason people stop trusting the control.
+ */
+function AddToContentButton({ snippet, onAdd, label = 'Add' }: {
+  snippet: string;
+  onAdd?: (snippet: string) => Promise<'inserted' | 'exists' | 'notfound'>;
+  label?: string;
+}) {
+  const [state, setState] = useState<'idle' | 'busy' | 'inserted' | 'exists' | 'notfound'>('idle');
+  if (!onAdd) return null;
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      className="h-6 shrink-0 px-2 text-[11px]"
+      disabled={state === 'busy' || state === 'inserted'}
+      onClick={async () => {
+        setState('busy');
+        setState(await onAdd(snippet));
+      }}
+    >
+      {state === 'busy' && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+      {state === 'inserted' && <Check className="mr-1 h-3 w-3" />}
+      {state === 'inserted' ? 'Added'
+        : state === 'exists' ? 'Already in'
+          : state === 'notfound' ? 'Could not add'
+            : label}
+    </Button>
+  );
+}
+
+function ResearchTab({ data, onAddToContent }: {
+  data: ResearchTabData;
+  onAddToContent?: (snippet: string) => Promise<'inserted' | 'exists' | 'notfound'>;
+}) {
   const [subTab, setSubTab] = useState<'terms' | 'competition' | 'questions' | 'stats'>('terms');
 
   const TrendIcon = ({ trend }: { trend: string }) => {
@@ -792,16 +856,17 @@ function ResearchTab({ data }: { data: ResearchTabData }) {
       {/* Key Terms — uses KeyTerm from seo-types */}
       {subTab === 'terms' && (
         <div className="space-y-1">
-          <div className="grid grid-cols-[1fr_80px_80px_40px] gap-2 text-xs font-medium text-muted-foreground px-3 py-2">
+          <div className="grid grid-cols-[1fr_70px_80px_40px_70px] gap-2 text-xs font-medium text-muted-foreground px-3 py-2">
             <span>Term</span>
             <span className="text-center">Usage</span>
             <span className="text-center">Importance</span>
             <span className="text-center">Trend</span>
+            <span />
           </div>
           {(data.keyTerms || []).map((term, i) => {
             const imp = importanceLabel(term.importance);
             return (
-              <div key={i} className="grid grid-cols-[1fr_80px_80px_40px] gap-2 items-center px-3 py-2 rounded hover:bg-muted/50">
+              <div key={i} className="grid grid-cols-[1fr_70px_80px_40px_70px] gap-2 items-center px-3 py-2 rounded hover:bg-muted/50">
                 <span className="text-sm">{term.term}</span>
                 <span className="text-xs text-center">{term.usage}x</span>
                 <span className="text-center">
@@ -815,6 +880,16 @@ function ResearchTab({ data }: { data: ResearchTabData }) {
                 </span>
                 <span className="flex justify-center">
                   <TrendIcon trend={term.trend} />
+                </span>
+                <span className="flex justify-end">
+                  {/* Only for a term the draft does not use yet — offering "Add" next to one
+                      already written 18 times is the control contradicting the count beside it. */}
+                  {term.usage === 0 && (
+                    <AddToContentButton
+                      snippet={`${term.term}: `}
+                      onAdd={onAddToContent}
+                    />
+                  )}
                 </span>
               </div>
             );
@@ -860,12 +935,21 @@ function ResearchTab({ data }: { data: ResearchTabData }) {
               <div className={`mt-0.5 ${q.answered ? 'text-green-500' : 'text-muted-foreground/30'}`}>
                 {q.answered ? <CheckCircle2 className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
               </div>
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="text-sm">{q.question}</p>
                 <Badge variant="outline" className="text-xs mt-1">
                   {q.source === 'paa' ? 'People Also Ask' : q.source}
                 </Badge>
               </div>
+              {/* An UNANSWERED question is the actionable one: it goes in as a real H2 with a
+                  to-write marker, so the draft carries the gap rather than the panel remembering it. */}
+              {!q.answered && (
+                <AddToContentButton
+                  snippet={`## ${q.question}\n\n_TODO: answer this — it is a People Also Ask question this article does not cover._`}
+                  onAdd={onAddToContent}
+                  label="Add section"
+                />
+              )}
             </div>
           ))}
         </div>
@@ -1841,7 +1925,7 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
         .single();
 
       if (!error && data) {
-        setArticle(data as SEOArticle);
+        setArticle(hydrateArticle(data) as SEOArticle);
       }
       setLoading(false);
     };
@@ -1869,6 +1953,27 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
     try { re = new RegExp(`(?<!\\[)\\b${escapedAnchor}\\b(?!\\]|\\()`); } catch { re = new RegExp(escapedAnchor); }
     if (!re.test(md)) return 'notfound';
     const next = md.replace(re, `[${anchor}](${url})`);
+    const { error } = await supabase.from('seo_articles').update({ markdown_content: next }).eq('id', article.id);
+    if (error) return 'notfound';
+    setArticle({ ...article, markdown_content: next });
+    return 'inserted';
+  }, [article]);
+
+  /**
+   * Take something the Research tab found and put it IN the draft.
+   *
+   * The research tabs were read-only: they told you a term was under-used or that a PAA question
+   * went unanswered and then left you to retype it into the body yourself, which is the point at
+   * which people stop using the panel. A question becomes an H2 with a to-write marker (an empty
+   * heading would score as thin content and read as finished); a key term becomes a line you edit
+   * in place. Appended at the end so nothing already written is disturbed — moving it is one drag
+   * in the editor, whereas a bad insertion in the middle costs a paragraph.
+   */
+  const addToContent = useCallback(async (snippet: string): Promise<'inserted' | 'exists' | 'notfound'> => {
+    if (!article?.id) return 'notfound';
+    const md = article.markdown_content ?? '';
+    if (md.includes(snippet.trim())) return 'exists';
+    const next = `${md.replace(/\s+$/, '')}\n\n${snippet.trim()}\n`;
     const { error } = await supabase.from('seo_articles').update({ markdown_content: next }).eq('id', article.id);
     if (error) return 'notfound';
     setArticle({ ...article, markdown_content: next });
@@ -2102,7 +2207,7 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
 
                 {article.research_tab_data && (
                   <TabsContent value="research" className="mt-4">
-                    <ResearchTab data={article.research_tab_data} />
+                    <ResearchTab data={article.research_tab_data} onAddToContent={addToContent} />
                   </TabsContent>
                 )}
 

@@ -20,6 +20,10 @@ import { assertEntitled } from '../../_shared/entitlement.ts';
 import { SEO_MODULE } from './entitlement.ts';
 import { generateStandardEmbedding } from '../../_shared/embedding-utils.ts';
 import { resolveWebsite } from '../../_shared/seo-website.ts';
+import { handleResearch } from './research.ts';
+import { handlePlan } from './plan.ts';
+import { handleWrite } from './write.ts';
+import { handleAnalyze } from './analyze.ts';
 import type {
   SEOPipelineRequest,
   SEOPipelineResponse,
@@ -37,38 +41,61 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 
-/** Call another edge function internally */
-async function callEdgeFunction(
-  functionName: string,
+/**
+ * The four stages, called IN-PROCESS.
+ *
+ * They used to be `fetch`ed as standalone edge functions — `seo-research`, `seo-plan`,
+ * `seo-write`, `seo-analyze`. Those functions do not exist and never did after the SEO
+ * surface was consolidated into this one (`seo-api`, action-routed); only the call sites
+ * inside this file were left pointing at the old names. So every run POSTed to a 404,
+ * `result.success` came back undefined, and stage 1 threw the generic
+ * `seo-research returned failure` — which is exactly what every `seo_articles` row records.
+ * The pipeline has therefore never produced an article since the consolidation, while
+ * still creating the row, charging the module and reporting a plausible error.
+ *
+ * They are handlers of the shape `(req, body) => Response` and read `req` only for the
+ * method check and `authenticate(req)`, so handing them THIS request re-authenticates the
+ * same caller at the same level and needs no service-key round trip. In-process also drops
+ * four self-invocations of `seo-api` (four cold starts, four nested calls against the same
+ * Supabase trace budget) off a path that is already one long request.
+ */
+const STAGE_HANDLERS: Record<string, (req: Request, body: any) => Promise<Response>> = {
+  research: handleResearch,
+  plan: handlePlan,
+  write: handleWrite,
+  analyze: handleAnalyze,
+};
+
+async function callStage(
+  stage: 'research' | 'plan' | 'write' | 'analyze',
+  req: Request,
   body: any,
   timeoutMs: number = 120_000,
 ): Promise<any> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  // A stage that hangs would otherwise hang the whole isolate until the platform kills it,
+  // and the catch below — the only thing that marks the row `failed` — would never run. The
+  // race does not cancel the work, it just guarantees we get to write down what happened.
+  let timer: number | undefined;
+  const guard = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`The ${stage} stage did not finish within ${Math.round(timeoutMs / 1000)}s.`)),
+      timeoutMs,
+    ) as unknown as number;
+  });
 
   try {
-    const response = await fetch(`${supabaseUrl}/functions/v1/${functionName}`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${supabaseServiceKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-
-    const result = await response.json();
-    if (!result.success) {
-      throw new Error(result.error || `${functionName} returned failure`);
+    const response = await Promise.race([STAGE_HANDLERS[stage](req, body), guard]);
+    const result = await response.json().catch(() => null);
+    if (!result?.success) {
+      // Name the stage, the status AND whatever the stage itself said. The old message was a
+      // bare `<fn> returned failure` with the real reason dropped, which is why a dead URL
+      // and a genuine research error were indistinguishable in `error_message`.
+      const detail = result?.error || `HTTP ${response.status}`;
+      throw new Error(`The ${stage} stage failed: ${detail}`);
     }
     return result;
-  } catch (error: any) {
-    clearTimeout(timeoutId);
-    if (error.name === 'AbortError') {
-      throw new Error(`${functionName} timed out after ${timeoutMs}ms`);
-    }
-    throw error;
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
   }
 }
 
@@ -279,7 +306,7 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
         stages_data: { research: { skipped: true, data: research } },
       }, 'Using existing research data');
     } else {
-      const researchResult = await callEdgeFunction('seo-research', {
+      const researchResult = await callStage('research', req, {
         topic: body.topic,
         target_keyword: body.target_keyword,
         language_code: body.language_code || 'en',
@@ -307,7 +334,7 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
       current_stage: 'plan',
     }, 'Planning article structure...');
 
-    const planResult = await callEdgeFunction('seo-plan', {
+    const planResult = await callStage('plan', req, {
       topic: body.topic,
       target_keyword: body.target_keyword,
       keyword_research: research,
@@ -339,7 +366,7 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
       current_stage: 'write',
     }, 'Writing article with Claude Opus...');
 
-    const writeResult = await callEdgeFunction('seo-write', {
+    const writeResult = await callStage('write', req, {
       article_plan: plan,
       content_brief: body.content_brief,
       keyword_research_summary: {
@@ -374,7 +401,7 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
       current_stage: 'analyze',
     }, 'Analyzing content quality and SEO...');
 
-    const analyzeResult = await callEdgeFunction('seo-analyze', {
+    const analyzeResult = await callStage('analyze', req, {
       content_markdown: contentMarkdown,
       article_plan: plan,
       content_brief: body.content_brief,

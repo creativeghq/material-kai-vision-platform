@@ -12,7 +12,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { loadVocabulary, type VocabularyTerm } from '@/services/vocabularies';
-import { ImagePlus, X } from 'lucide-react';
+import { Check, ChevronsUpDown, ImagePlus, X } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/core/ui/dialog';
@@ -23,6 +23,11 @@ import { Textarea } from '@/components/core/ui/textarea';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/core/ui/select';
+import {
+  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
+} from '@/components/core/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/core/ui/popover';
+import { cn } from '@/lib/utils';
 import {
   renderPromptTemplate, buildToolInput,
   type ToolkitQuickStart, type ToolkitDefinition, type ToolkitFormField,
@@ -239,21 +244,56 @@ const VocabularySelect: React.FC<{
   onChange: (v: string) => void;
 }> = ({ vocabularyKey, field, value, onChange }) => {
   const { terms, loading, failed } = useVocabulary(vocabularyKey);
+  const [open, setOpen] = useState(false);
   const placeholder = failed
     ? 'Markets unavailable — try again'
     : loading
       ? 'Loading markets…'
       : (field.placeholder || 'Select a market…');
+  const selected = terms.find((t) => t.value === value);
 
+  // A searchable combobox, not a plain Select: `sourcing_markets` is 30 entries and
+  // `seo_markets` is longer still, so picking "Greece" meant scrolling a list with no way
+  // to type. The search matches the LABEL and the stored VALUE both — the SEO markets emit
+  // ISO codes, so someone who knows "GR" should not have to hunt for "Greece".
   return (
-    <Select value={value} onValueChange={onChange} disabled={loading || failed}>
-      <SelectTrigger><SelectValue placeholder={placeholder} /></SelectTrigger>
-      <SelectContent>
-        {terms.map((t) => (
-          <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          disabled={loading || failed}
+          className="w-full justify-between font-normal"
+        >
+          {selected
+            ? <span className="truncate">{selected.label}</span>
+            : <span className="truncate text-muted-foreground">{placeholder}</span>}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Search markets…" />
+          <CommandList>
+            <CommandEmpty>No market found.</CommandEmpty>
+            <CommandGroup>
+              {terms.map((t) => (
+                <CommandItem
+                  key={t.value}
+                  value={`${t.label} ${t.value}`}
+                  onSelect={() => { onChange(t.value); setOpen(false); }}
+                >
+                  <Check className={cn('mr-2 h-4 w-4 shrink-0', value === t.value ? 'opacity-100' : 'opacity-0')} />
+                  <span className="flex-1 truncate">{t.label}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 };
 

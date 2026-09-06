@@ -62,7 +62,7 @@ import { DemoAgentResults } from './DemoAgentResults';
 import { AgentResultCard } from './AgentResultCard';
 import { useRecordLinkAccess } from '@/hooks/useRecordLinkAccess';
 import { ConversationManagerModal } from './ConversationManagerModal';
-import { CanvasPanel, ArtifactChip, type CanvasArtifact } from './CanvasPanel';
+import { CanvasPanel, ArtifactChip, type CanvasArtifact, type CanvasArtifactGroup } from './CanvasPanel';
 import {
   SheetInspector, StagingInspector, ProductsInspector, WorldInspector, BoardInspector, RenderInspector,
   JobFindingsInspector, SourcingInspector, OrderInspector, MentionSummaryInspector, MentionFeedInspector,
@@ -297,6 +297,16 @@ const REASONING_STEP_TONE: Record<'thinking' | 'tool_call' | 'tool_result' | 'it
   tool_call: 'text-blue-700 dark:text-blue-400',
   tool_result: 'text-green-800 dark:text-green-400',
   iteration: 'text-muted-foreground',
+};
+
+/**
+ * Jarvis-voice copy for the backend's own `status` messages. Anything not listed is shown
+ * verbatim — a new emitter reads plainly the day it ships rather than being flattened into
+ * whatever line happened to be hardcoded here.
+ */
+const STATUS_STEP_COPY: Record<string, string> = {
+  'Initializing agent...': 'Systems online. Beginning analysis.',
+  'Consulting the knowledge base…': 'Consulting the knowledge base.',
 };
 
 // Chunk types that were emitted but rendered as plain text. Routed
@@ -2600,14 +2610,20 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   },
                 ]);
               } else if (chunk.type === 'status') {
-                setReasoningSteps((prev) => [
-                  ...prev,
-                  {
-                    type: 'iteration',
-                    message: 'Systems online. Beginning analysis.',
-                    timestamp: Date.now(),
-                  },
-                ]);
+                // A status chunk carries its OWN message and there is more than one emitter:
+                // agent-chat opens the turn with "Initializing agent...", knowledge-grounding
+                // sends "Consulting the knowledge base…" partway through. This branch used to
+                // throw `chunk.message` away and push one hardcoded line for all of them, so two
+                // different things happening rendered as the same sentence twice in a row and
+                // read as a duplicate. Say what actually happened, and never repeat the line
+                // already at the bottom of the list.
+                const raw = typeof chunk.message === 'string' ? chunk.message.trim() : '';
+                const message = STATUS_STEP_COPY[raw] ?? (raw || 'Systems online. Beginning analysis.');
+                setReasoningSteps((prev) => (
+                  prev[prev.length - 1]?.message === message
+                    ? prev
+                    : [...prev, { type: 'iteration', message, timestamp: Date.now() }]
+                ));
               } else if (chunk.type === 'iteration') {
                 setReasoningSteps((prev) => [
                   ...prev,
@@ -4407,6 +4423,37 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     [visibleMessages, getCanvasArtifact],
   );
 
+  /**
+   * The canvas tab strip, one entry per TURN rather than per message.
+   *
+   * A user message opens a new turn; every artifact-bearing assistant message after it belongs
+   * to that turn. One request that produces several artifacts is one piece of work and gets one
+   * page with sub-tabs — "generate an SEO article" ran research, a keyword card and a volume
+   * card and opened three separate canvas pages, so the strip described the steps and never the
+   * result.
+   *
+   * The turn is titled by, and opens on, its LAST artifact: that is its outcome, and the steps
+   * that produced it sit behind it.
+   */
+  const canvasGroups = useMemo(() => {
+    const groups: CanvasArtifactGroup[] = [];
+    let members: CanvasArtifact[] | null = null;
+    for (const m of visibleMessages) {
+      if (m.role === 'user') { members = null; continue; }
+      const artifact = getCanvasArtifact(m);
+      if (!artifact) continue;
+      if (!members) {
+        members = [];
+        groups.push({ id: artifact.id, kind: artifact.kind, title: artifact.title, members });
+      }
+      members.push(artifact);
+    }
+    return groups.map((g) => {
+      const lead = g.members[g.members.length - 1];
+      return { ...g, id: lead.id, kind: lead.kind, title: lead.title };
+    });
+  }, [visibleMessages, getCanvasArtifact]);
+
   // Close an artifact from this conversation's view. The saved entry is untouched.
   const handleCloseArtifact = useCallback((id: string) => {
     setHiddenArtifactIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
@@ -5489,7 +5536,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       {/* Studio canvas — full-width artifact workspace, docked left of the chat */}
       {canvasPaneVisible && (
         <CanvasPanel
-          artifacts={canvasArtifacts}
+          groups={canvasGroups}
           activeId={activeCanvasId}
           onSelect={setActiveCanvasId}
           onCloseArtifact={handleCloseArtifact}
