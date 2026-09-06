@@ -16,6 +16,7 @@ import remarkGfm from 'remark-gfm';
 import { supabase } from '@/integrations/supabase/client';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/core/ui/accordion';
 import { Badge } from '@/components/core/ui/badge';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Dialog, DialogContent, DialogTitle } from '@/components/core/ui/dialog';
@@ -419,6 +420,88 @@ function ScoreGauge({ score, label, size = 'lg' }: { score: number; label: strin
         <span className={`${textSize} font-bold tabular-nums ${tone.text}`}>{score}</span>
       </div>
       <span className="text-xs text-muted-foreground">{label}</span>
+    </div>
+  );
+}
+
+// ─── Search Appearance ──────────────────────────────────────────
+
+/**
+ * The meta title and description, ABOVE the article.
+ *
+ * They were under it, and only rendered `{article.meta_description && …}` — so a missing
+ * description was an ABSENT BLOCK, not a stated gap. That is the hidden-row shape this
+ * codebase keeps fighting (anti-regression rule 3: a value or a stated reason there is
+ * none, never a quietly shorter surface): the one case you need to see is the one that
+ * silently disappeared, and the meta title was never shown here at all.
+ *
+ * Position matters too. These two strings are what a searcher reads before deciding whether
+ * to open the page, so they are the first thing to review — putting them below 2,000 words
+ * of body copy is putting the headline after the article.
+ *
+ * Lengths are Google's practical truncation points, and they are stated as guidance rather
+ * than enforced: a slightly long description is trimmed in the SERP, not rejected, so this
+ * warns and never blocks.
+ */
+const META_TITLE_MAX = 60;
+const META_DESCRIPTION_MAX = 155;
+
+function MetaField({ label, value, max, hint }: {
+  label: string;
+  value: string | null;
+  max: number;
+  hint: string;
+}) {
+  const len = value?.length ?? 0;
+  const over = len > max;
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="text-xs font-medium text-muted-foreground">{label}</p>
+        {value
+          ? (
+            <span className={cn(
+              'text-[11px] tabular-nums',
+              over ? 'text-amber-800 dark:text-amber-400' : 'text-muted-foreground',
+            )}>
+              {len}/{max}{over ? ' — will be truncated' : ''}
+            </span>
+          )
+          : <Badge variant="warning" className="text-[10px]">Missing</Badge>}
+      </div>
+      {value
+        ? <p className="text-sm mt-0.5">{value}</p>
+        : <p className="text-sm mt-0.5 text-muted-foreground italic">{hint}</p>}
+    </div>
+  );
+}
+
+function SearchAppearance({ metaTitle, metaDescription, slug }: {
+  metaTitle: string | null;
+  metaDescription: string | null;
+  slug: string | null;
+}) {
+  return (
+    <div className="mb-4 rounded-lg border border-hairline bg-surface-sunken p-3 space-y-2.5">
+      <p className="text-xs font-semibold">Search appearance</p>
+      <MetaField
+        label="Meta title"
+        value={metaTitle}
+        max={META_TITLE_MAX}
+        hint="No meta title — search engines will invent one from the page."
+      />
+      <MetaField
+        label="Meta description"
+        value={metaDescription}
+        max={META_DESCRIPTION_MAX}
+        hint="No meta description — search engines will pull an arbitrary sentence from the body instead."
+      />
+      {slug && (
+        <div>
+          <p className="text-xs font-medium text-muted-foreground">URL</p>
+          <p className="text-sm mt-0.5 font-mono text-[12px] break-all">/{slug.replace(/^\/+/, '')}</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -2203,6 +2286,11 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
                 </TabsList>
 
                 <TabsContent value="content" className="mt-4">
+                  <SearchAppearance
+                    metaTitle={article.meta_title}
+                    metaDescription={article.meta_description}
+                    slug={article.slug}
+                  />
                   <ArticleContent
                     markdown={article.markdown_content}
                     html={article.html_content}
@@ -2211,14 +2299,6 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
                     wordCount={article.word_count}
                     readingTimeMinutes={article.reading_time_minutes}
                   />
-                  {/* SEO meta description (separate from the post dek for SEO inspection) */}
-                  {article.meta_description && (
-                    <div className="mt-4 p-3 bg-muted/30 rounded-lg">
-                      <p className="text-xs font-medium text-muted-foreground mb-1">Meta Description (SEO)</p>
-                      <p className="text-sm">{article.meta_description}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{article.meta_description.length}/155 characters</p>
-                    </div>
-                  )}
                 </TabsContent>
 
                 {article.optimize_data && (
