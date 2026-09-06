@@ -26,7 +26,9 @@ import { generateWithClaude } from '../../_shared/ai-client.ts';
 import { getGenerationPrompt, renderPromptTemplate } from '../../_shared/prompt-utils.ts';
 import { normalizeContentBrief, briefList } from './content-brief.ts';
 import { analyzeContent } from './analyze.ts';
-import { loadOwnedArticle, storedArticlePlan, persistAnalysis } from './article-access.ts';
+import {
+  loadOwnedArticle, storedArticlePlan, persistAnalysis, reconciledFaqSchema,
+} from './article-access.ts';
 import type { ArticlePlan, ContentAnalysisResult } from '../../_shared/seo-types.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -189,8 +191,9 @@ export async function handleApplyFix(req: Request, body: any): Promise<Response>
       previous_markdown_label: instruction.slice(0, 200),
       updated_at: capturedAt,
     };
+    const faqFix = reconciledFaqSchema(article, next);
     const writeErr = reanalysed
-      ? (await persistAnalysis(supabase, article, reanalysed, snapshot)).error
+      ? (await persistAnalysis(supabase, article, reanalysed, snapshot, faqFix)).error
       : (await supabase.from('seo_articles').update(snapshot).eq('id', articleId)).error?.message ?? null;
     if (writeErr) throw new Error(`Could not save the revised article: ${writeErr}`);
 
@@ -291,8 +294,12 @@ export async function handleRevertFix(req: Request, body: any): Promise<Response
       previous_markdown_label: `Undo of: ${prev.previous_markdown_label ?? 'an applied fix'}`.slice(0, 200),
       updated_at: now,
     };
+    // The FAQ schema follows the body back. Adding a question wrote both; without this,
+    // reverting restored only the markdown and left the schema claiming an entry the article no
+    // longer shows — measured immediately after add_faq shipped: 6 headings, 8 schema entries.
+    const faqFix = reconciledFaqSchema(article, restored);
     const writeErr = reanalysed
-      ? (await persistAnalysis(supabase, article, reanalysed, snapshot)).error
+      ? (await persistAnalysis(supabase, article, reanalysed, snapshot, faqFix)).error
       : (await supabase.from('seo_articles').update(snapshot).eq('id', articleId)).error?.message ?? null;
     if (writeErr) return jsonResponse({ success: false, error: writeErr }, 500);
 

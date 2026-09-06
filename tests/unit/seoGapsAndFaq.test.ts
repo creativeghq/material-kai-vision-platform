@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { buildGapsGains, coversTerm, normalizeText, stemOf } from '../../supabase/functions/seo-api/handlers/gaps.ts';
-import { insertFaqEntry, isFaqHeading } from '../../supabase/functions/seo-api/handlers/faq-insert.ts';
+import { insertFaqEntry, isFaqHeading, faqPairsPresentIn } from '../../supabase/functions/seo-api/handlers/faq-insert.ts';
 
 /**
  * Two panels that looked finished and told the reader nothing true.
@@ -313,5 +313,52 @@ describe('what the first live run got wrong', () => {
     // Never shorter than four characters, or a short word matches half the dictionary.
     expect(stemOf('τιμες')).toBe('τιμε');
     expect(stemOf('ειδη')).toBe('ειδη');
+  });
+});
+
+/**
+ * The FAQ schema is a PROJECTION of the body, and a projection that outlives what it projects is
+ * a page claiming an FAQ it does not display.
+ *
+ * Found by reverting the very first FAQ this feature added: `add_faq` wrote the markdown and the
+ * schema together, `revert_fix` restored only the markdown, and the article came back with six
+ * FAQ headings and eight schema entries. Nothing raised — both halves are well-formed jsonb, and
+ * the tab renders whichever one you happen to be looking at.
+ */
+describe('the FAQ schema follows the body', () => {
+  const pairs = [
+    { question: 'Πρώτη ερώτηση;', answer: 'Α.' },
+    { question: 'Δεύτερη ερώτηση;', answer: 'Β.' },
+  ];
+
+  it('drops an entry the article no longer shows', () => {
+    const body = '## FAQ\n\n### Πρώτη ερώτηση;\n\nΑ.\n';
+    expect(faqPairsPresentIn(body, pairs).map((p) => p.question)).toEqual(['Πρώτη ερώτηση;']);
+  });
+
+  it('keeps every entry that is still there, accents and all', () => {
+    const body = '## FAQ\n\n### Πρώτη ερώτηση;\n\nΑ.\n\n### Δεύτερη ερώτηση;\n\nΒ.\n';
+    expect(faqPairsPresentIn(body, pairs)).toHaveLength(2);
+  });
+
+  it('matches the heading regardless of level', () => {
+    expect(faqPairsPresentIn('#### Πρώτη ερώτηση;\n', pairs)).toHaveLength(1);
+  });
+
+  it('every path that rewrites the body reconciles the schema', () => {
+    // Three call sites, one function. A fourth write path that forgets this puts the two back out
+    // of step, and only a reader comparing the rendered FAQ with the rich result would ever see it.
+    for (const file of ['reanalyze.ts', 'apply-fix.ts']) {
+      const src = readFileSync(join(HANDLERS, file), 'utf-8');
+      expect(src, `${file} must reconcile the FAQ schema`).toContain('reconciledFaqSchema');
+    }
+    // apply AND revert, in the same file.
+    const applySrc = readFileSync(join(HANDLERS, 'apply-fix.ts'), 'utf-8');
+    expect((applySrc.match(/reconciledFaqSchema\(/g) ?? []).length).toBe(2);
+  });
+
+  it('leaves an untouched article alone rather than rewriting it on every save', () => {
+    const access = readFileSync(join(HANDLERS, 'article-access.ts'), 'utf-8');
+    expect(access).toContain('present.length === pairs.length ? {} : { faq_schema: present }');
   });
 });

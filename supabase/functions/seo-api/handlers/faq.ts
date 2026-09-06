@@ -21,7 +21,9 @@ import { generateWithClaude } from '../../_shared/ai-client.ts';
 import { getGenerationPrompt, renderPromptTemplate } from '../../_shared/prompt-utils.ts';
 import { normalizeContentBrief, briefList } from './content-brief.ts';
 import { analyzeContent } from './analyze.ts';
-import { loadOwnedArticle, storedArticlePlan, persistAnalysis } from './article-access.ts';
+import {
+  loadOwnedArticle, storedArticlePlan, persistAnalysis, storedFaqPairs,
+} from './article-access.ts';
 import { buildGapsGains, type GapSources } from './gaps.ts';
 import { insertFaqEntry, STRIP_ACCENTS as stripAccents } from './faq-insert.ts';
 import type { ArticlePlan, ContentAnalysisResult } from '../../_shared/seo-types.ts';
@@ -32,15 +34,6 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 /** One short answer, one model turn. */
 const FAQ_CREDIT_COST = 2;
 const FAQ_MAX_TOKENS = 1200;
-
-/** The stored FAQ pairs. Written as a bare array of {question, answer} by the pipeline. */
-function existingFaqPairs(stagesData: unknown): { question: string; answer: string }[] {
-  const raw = (stagesData as { extra?: { faq_schema?: unknown } } | null)?.extra?.faq_schema;
-  if (!Array.isArray(raw)) return [];
-  return raw.filter((e): e is { question: string; answer: string } =>
-    !!e && typeof (e as { question?: unknown }).question === 'string'
-    && typeof (e as { answer?: unknown }).answer === 'string');
-}
 
 export async function handleAddFaq(req: Request, body: any): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -74,7 +67,7 @@ export async function handleAddFaq(req: Request, body: any): Promise<Response> {
       return jsonResponse({ success: false, error: 'This article has no content yet.' }, 409);
     }
 
-    const pairs = existingFaqPairs(article.stages_data);
+    const pairs = storedFaqPairs(article);
     const already = pairs.some((p) => stripAccents(p.question) === stripAccents(question))
       || new RegExp(`^#{2,4}\\s+${question.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'im').test(markdown);
     if (already) {

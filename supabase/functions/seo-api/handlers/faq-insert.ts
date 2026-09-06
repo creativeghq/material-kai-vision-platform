@@ -103,3 +103,24 @@ export function insertFaqEntry(
   return { markdown: next.join('\n'), createdSection: false, heading };
 }
 
+
+/** A stored FAQ pair. The pipeline writes `faq_schema` as a bare array of these. */
+export interface FaqPair { question: string; answer: string }
+
+/**
+ * The stored FAQ schema, reduced to the entries the article actually shows.
+ *
+ * The BODY is the source of truth: `faq_schema` is a projection of it for the FAQPage rich
+ * result, and a projection that outlives what it projects is a page claiming an FAQ it does not
+ * display. That is exactly what a Revert produced — adding a question wrote both, reverting
+ * restored only the markdown, and the article came back with six FAQ headings and eight schema
+ * entries. Measured on the real article, immediately after the feature that caused it.
+ *
+ * Cheap enough to run on every write that touches the body, which is where it is called from.
+ */
+export function faqPairsPresentIn(markdown: string, pairs: FaqPair[]): FaqPair[] {
+  const headings = new Set(
+    [...markdown.matchAll(/^#{2,4}\s+(.+?)\s*$/gm)].map((m) => STRIP_ACCENTS(m[1])),
+  );
+  return pairs.filter((p) => headings.has(STRIP_ACCENTS(p.question)));
+}

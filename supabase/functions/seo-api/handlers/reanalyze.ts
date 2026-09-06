@@ -27,7 +27,9 @@ import { authenticate } from '../../_shared/auth.ts';
 import { resolveAndAssertSeoEntitled } from './entitlement.ts';
 import { normalizeContentBrief } from './content-brief.ts';
 import { analyzeContent } from './analyze.ts';
-import { loadOwnedArticle, storedArticlePlan, persistAnalysis } from './article-access.ts';
+import {
+  loadOwnedArticle, storedArticlePlan, persistAnalysis, reconciledFaqSchema,
+} from './article-access.ts';
 import { buildGapsGains, type GapSources } from './gaps.ts';
 import type { ArticlePlan } from '../../_shared/seo-types.ts';
 
@@ -97,7 +99,12 @@ export async function handleReanalyze(req: Request, body: any): Promise<Response
       article,
       analysis,
       {},
-      gapsGains ? { gaps_gains_data: gapsGains } : {},
+      {
+        ...(gapsGains ? { gaps_gains_data: gapsGains } : {}),
+        // Drops FAQ schema entries the body no longer shows. Free, and it repairs a row that
+        // drifted before this existed.
+        ...reconciledFaqSchema(article, markdown),
+      },
     );
     if (writeErr) throw new Error(`Could not save the analysis: ${writeErr}`);
 

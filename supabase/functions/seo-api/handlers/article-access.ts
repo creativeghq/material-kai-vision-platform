@@ -16,6 +16,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../../_shared/http.ts';
 import { userCanAccessWorkspace } from '../../_shared/auth.ts';
 import type { ContentAnalysisResult } from '../../_shared/seo-types.ts';
+import { faqPairsPresentIn, type FaqPair } from './faq-insert.ts';
 
 export interface OwnedArticle {
   id: string;
@@ -100,4 +101,31 @@ export async function persistAnalysis(
     .eq('id', article.id);
 
   return { error: error?.message ?? null };
+}
+
+/** The stored FAQ pairs. `faq_schema` is a bare array of {question, answer} in `stages_data.extra`. */
+export function storedFaqPairs(article: Pick<OwnedArticle, 'stages_data'>): FaqPair[] {
+  const raw = (article.stages_data as { extra?: { faq_schema?: unknown } } | null)?.extra?.faq_schema;
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((e): e is FaqPair =>
+    !!e && typeof (e as { question?: unknown }).question === 'string'
+    && typeof (e as { answer?: unknown }).answer === 'string');
+}
+
+/**
+ * `{ faq_schema }` to merge, when the body no longer matches what the schema claims — and `{}`
+ * when it does, so an untouched article is not rewritten on every save.
+ *
+ * Called from every path that changes `markdown_content`. The body is the source of truth and the
+ * schema is its projection; letting the projection outlive it is how a page ends up claiming an
+ * FAQ it does not show.
+ */
+export function reconciledFaqSchema(
+  article: Pick<OwnedArticle, 'stages_data'>,
+  markdown: string,
+): Record<string, unknown> {
+  const pairs = storedFaqPairs(article);
+  if (pairs.length === 0) return {};
+  const present = faqPairsPresentIn(markdown, pairs);
+  return present.length === pairs.length ? {} : { faq_schema: present };
 }
