@@ -28,7 +28,9 @@ interface PlanFieldSpec {
 
 /** What `analyzeContent` dereferences without a guard. */
 export const ANALYZE_PLAN_FIELDS: PlanFieldSpec = {
-  strings: ['title', 'primaryKeyword', 'slug', 'metaTitle', 'metaDescription'],
+  // `searchIntent` too: analyzeContent does `plan.searchIntent.toLowerCase()`. Inside the
+  // pipeline the zod schema guarantees it, but seo_content_analyzer takes a hand-passed plan.
+  strings: ['title', 'primaryKeyword', 'slug', 'metaTitle', 'metaDescription', 'searchIntent'],
   arrays: ['secondaryKeywords', 'faqQuestions', 'entityMentions'],
   numbers: ['targetWordCount'],
 };

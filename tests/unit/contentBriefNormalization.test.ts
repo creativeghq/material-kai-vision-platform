@@ -243,6 +243,19 @@ describe('the handlers normalize instead of dereferencing the raw body', () => {
     expect(src).toContain('maxTokens: PLAN_MAX_OUTPUT_TOKENS');
   });
 
+  it('write.ts budgets for a language that is not English, and says so when it overruns', () => {
+    // Prose truncation is silent in a way the plan stage's was not: a cut-off article is a
+    // valid string, so `analyze` scores it, auto-fixes it and the pipeline publishes it with
+    // a byline. 8192 was a fine ceiling for a 2,000-word English article and not for the
+    // Greek one this pipeline was first asked for (~2.5–3.5 tokens/word).
+    const src = readFileSync(join(process.cwd(), HANDLER_DIR, 'write.ts'), 'utf-8');
+    const budget = src.match(/const WRITE_MAX_OUTPUT_TOKENS = (\d+)/);
+    expect(budget, 'write.ts no longer declares WRITE_MAX_OUTPUT_TOKENS').not.toBeNull();
+    expect(Number(budget![1])).toBeGreaterThanOrEqual(16000);
+    expect(src).toContain('maxTokens: WRITE_MAX_OUTPUT_TOKENS');
+    expect(src, 'a truncated article is accepted silently').toContain("finishReason === 'length'");
+  });
+
   it('plan.ts expresses the outline without a recursive schema', () => {
     // `z.lazy` self-reference cannot be sent to Google: the provider logged "Recursive
     // reference detected ... Defaulting to any" on every call, so `subsections` reached the

@@ -381,6 +381,13 @@ export interface AIGenerateResult<T = string> {
   };
   /** Model used */
   model: string;
+  /**
+   * Why the model stopped. `'length'` means the output hit `maxTokens` and the text is
+   * TRUNCATED — usually mid-sentence, and a truncated string is still a valid string, so a
+   * caller that ignores this ships half an answer with nothing raised. Callers producing a
+   * document (rather than a sentence) must check it.
+   */
+  finishReason?: string;
 }
 
 // ── Gemini: audio → text ──
@@ -673,6 +680,7 @@ export async function generateWithClaude(
         totalTokens: inputTokens + outputTokens,
       },
       model: modelId,
+      finishReason: await result.finishReason,
     };
   } catch (err) {
     void _logTrackedCall({

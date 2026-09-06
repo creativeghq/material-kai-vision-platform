@@ -39,6 +39,24 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 const CREDIT_COST = 20;
 
+const WRITE_TEMPERATURE = 0.7;
+
+/**
+ * Article output budget.
+ *
+ * This was 8192, which is a comfortable ceiling for a 2,000-word ENGLISH article (~1.3
+ * tokens/word) and not one for anything else. Greek, the first language this pipeline was
+ * actually asked for, runs closer to 2.5–3.5 tokens per word on a BPE tokenizer, so the
+ * same 2,000-word target needs 5,000–7,000 tokens and a 2,500-word one exceeds the cap
+ * outright. The failure mode is silent: unlike the structured plan call, which at least
+ * threw a parse error when it was truncated, prose comes back as a perfectly valid string
+ * that simply stops mid-sentence, gets scored by `analyze`, auto-fixed, and published.
+ *
+ * Set well clear of the worst case rather than tuned to a language, and paired with the
+ * `finishReason === 'length'` check below so that if it is ever hit it is LOUD.
+ */
+const WRITE_MAX_OUTPUT_TOKENS = 32000;
+
 
 export async function handleWrite(req: Request, body: any): Promise<Response> {
   if (req.method === 'OPTIONS') {
@@ -129,9 +147,20 @@ export async function handleWrite(req: Request, body: any): Promise<Response> {
     const result = await generateWithClaude(userPrompt, {
       task: 'seo_write',
       systemPrompt,
-      temperature: 0.7,
-      maxTokens: 8192,
+      temperature: WRITE_TEMPERATURE,
+      maxTokens: WRITE_MAX_OUTPUT_TOKENS,
     });
+
+    // A truncated article is a valid string, so nothing downstream can tell one from a
+    // finished one: `analyze` would score it, auto-fix it and the pipeline would publish
+    // it with a byline. Fail instead — the pipeline catch marks the row and refunds.
+    if (result.finishReason === 'length') {
+      throw new Error(
+        `The article was cut off at the ${WRITE_MAX_OUTPUT_TOKENS}-token ceiling `
+        + `(${result.usage.outputTokens} output tokens for a ${plan.targetWordCount}-word target). `
+        + 'Lower targetWordCount or raise WRITE_MAX_OUTPUT_TOKENS.',
+      );
+    }
 
     // Clean response — strip markdown fences if present
     let markdown = result.text;
