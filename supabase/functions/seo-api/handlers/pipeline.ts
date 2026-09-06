@@ -22,6 +22,7 @@ import { generateStandardEmbedding } from '../../_shared/embedding-utils.ts';
 import { resolveWebsite } from '../../_shared/seo-website.ts';
 import { handleResearch } from './research.ts';
 import { handlePlan } from './plan.ts';
+import { normalizeContentBrief, type NormalizedBrief } from './content-brief.ts';
 import { handleWrite } from './write.ts';
 import { handleAnalyze } from './analyze.ts';
 import type {
@@ -252,6 +253,12 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
       });
     }
 
+    // One normalization for the whole run - see content-brief.ts. Every stage normalizes
+    // defensively too, but doing it here means the shape STORED on the article row is the
+    // canonical one, so a re-run, the viewer and the provenance byline all read the same
+    // brief rather than whatever the caller happened to send.
+    const brief = normalizeContentBrief(body.content_brief);
+
     // Resolve the connected website this article belongs to — explicit body.website_id
     // when the agent picked one, else the workspace's default site. Also feeds the
     // interlink page-matcher below so suggestions come from the same site.
@@ -267,8 +274,8 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
         website_id: websiteId,
         target_keyword: body.target_keyword,
         idempotency_key: idempotencyKey,
-        content_type: body.content_brief?.contentType || 'guide',
-        content_brief: body.content_brief || null,
+        content_type: brief?.contentType || 'guide',
+        content_brief: brief,
         status: 'researching',
         progress_percentage: 0,
         current_stage: 'research',
@@ -338,7 +345,7 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
       topic: body.topic,
       target_keyword: body.target_keyword,
       keyword_research: research,
-      content_brief: body.content_brief,
+      content_brief: brief,
       additional_instructions: body.additional_instructions,
       user_id: userId,
     }, 60_000);
@@ -368,7 +375,7 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
 
     const writeResult = await callStage('write', req, {
       article_plan: plan,
-      content_brief: body.content_brief,
+      content_brief: brief,
       keyword_research_summary: {
         targetKeyword: research.targetKeyword,
         recommendedPrimary: research.recommendedPrimary,
@@ -404,7 +411,7 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
     const analyzeResult = await callStage('analyze', req, {
       content_markdown: contentMarkdown,
       article_plan: plan,
-      content_brief: body.content_brief,
+      content_brief: brief,
       auto_fix: autoFix,
       max_iterations: maxFixIterations,
       user_id: userId,
@@ -436,14 +443,14 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
     // `provenance` block — an invented byline is worse than none, and the analyzer
     // already reports the gap.
     const publishedAt = new Date().toISOString();
-    const publishedMarkdown = appendProvenanceBlock(finalMarkdown, body.content_brief, website);
+    const publishedMarkdown = appendProvenanceBlock(finalMarkdown, brief, website);
 
     // Generate HTML from markdown (basic conversion)
     const htmlContent = markdownToHtml(publishedMarkdown);
 
     // Build schema markup
     const schemaMarkup = buildSchemaMarkup(plan, publishedMarkdown, {
-      brief: body.content_brief,
+      brief: brief,
       website,
       publishedAt,
     });
@@ -473,7 +480,7 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
       generalInstructions: {
         targetImages: '5-7',
         targetWordCount: `${plan.targetWordCount}+`,
-        targetHeadings: `${plan.sections.length + plan.sections.reduce((s, sec) => s + sec.subsections.length, 0)}`,
+        targetHeadings: `${plan.sections.length + plan.sections.reduce((s, sec) => s + (sec.subsections?.length ?? 0), 0)}`,
       },
       outline: plan.sections,
       faqQuestions: plan.faqQuestions.map((q, i) => ({ id: `q${i + 1}`, question: q })),
@@ -942,7 +949,7 @@ function buildSchemaMarkup(
   plan: ArticlePlan,
   markdown: string,
   ctx: {
-    brief?: ContentBrief | null;
+    brief?: NormalizedBrief | null;
     website?: { url: string; domain: string; display_name: string | null } | null;
     publishedAt: string;
   },
@@ -1017,7 +1024,7 @@ function buildSchemaMarkup(
  */
 function appendProvenanceBlock(
   markdown: string,
-  brief: ContentBrief | null | undefined,
+  brief: NormalizedBrief | null,
   website: { display_name: string | null; domain: string } | null,
 ): string {
   const prov = brief?.provenance;

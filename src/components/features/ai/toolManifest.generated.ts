@@ -464,6 +464,8 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'max_fix_iterations', type: 'number', optional: true, description: 'Max auto-fix iterations (default: 2)' },
       { name: 'content_type', type: 'string', optional: true, description: 'Article type: guide, listicle, comparison, how-to, case-study (default: guide)' },
       { name: 'website_id', type: 'string', optional: true, description: 'Connected website id to file this article under (drives inter-linking from that site). Omit to use the workspace default connected website.' },
+      { name: 'language_code', type: 'string', optional: true, description: 'Language the article is researched and written in, e.g. "el" for Greek. Defaults to "en" — SET IT whenever the keyword or the requested market is not English, or the whole article is planned against the wrong SERP.' },
+      { name: 'location_code', type: 'number', optional: true, description: 'DataForSEO location code for the market being targeted, e.g. 2300 (Greece), 2826 (UK), 2276 (Germany). Defaults to 2840 (US). Set it together with language_code.' },
     ],
   },
   {

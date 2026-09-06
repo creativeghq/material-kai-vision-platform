@@ -20,11 +20,17 @@ import {
   z,
 } from '../../_shared/ai-client.ts';
 import type {
-  SEOPlanRequest,
   SEOPlanResponse,
   ArticlePlan,
   KeywordResearchResult,
 } from '../../_shared/seo-types.ts';
+import {
+  normalizeContentBrief,
+  briefValue,
+  briefList,
+  briefExtraContextBlock,
+  type NormalizedBrief,
+} from './content-brief.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -32,20 +38,42 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const CREDIT_COST = 2;
 
 
-// Zod schema for structured Gemini output
-const ArticleSectionSchema: z.ZodType<any> = z.lazy(() =>
-  z.object({
-    heading: z.string(),
-    headingLevel: z.enum(['h1', 'h2', 'h3', 'h4']),
-    targetKeywords: z.array(z.string()),
-    description: z.string(),
-    estimatedWordCount: z.number(),
-    includeFaq: z.boolean(),
-    includeTable: z.boolean(),
-    includeList: z.boolean(),
-    subsections: z.array(ArticleSectionSchema).default([]),
-  }),
-);
+/**
+ * Article plan structure budget.
+ *
+ * Gemini counts THINKING tokens against `maxOutputTokens`, and this call runs at
+ * `thinkingLevel: 'high'`. At the old 4096 the split was 3,929 reasoning + 151 text: the
+ * model wrote a good title, metaTitle, metaDescription and slug in Greek and was cut off
+ * mid-key at `"primaryKeyword":`, `finishReason: MAX_TOKENS`. The AI SDK reports that as
+ * `No object generated: could not parse the response.` — which reads like a model that
+ * answered badly rather than a budget that was never large enough, and is why this sat
+ * broken. A full plan is ~1.5–2.5k tokens of JSON, so the cap has to clear reasoning
+ * plus that, not just that.
+ */
+const PLAN_MAX_OUTPUT_TOKENS = 16384;
+
+// Zod schema for structured Gemini output.
+//
+// Two levels, not `z.lazy` recursion. The AI SDK cannot express a self-referencing schema
+// to Google — it logged `Recursive reference detected at
+// #/properties/sections/items/properties/subsections/items! Defaulting to any` on every
+// call, so `subsections` reached the model with NO schema at all and its contents were
+// whatever the model felt like. Two levels is also what an article outline actually is,
+// and what `plan.sections.reduce((s, sec) => s + sec.subsections.length, 0)` counts.
+const ArticleSubsectionSchema = z.object({
+  heading: z.string(),
+  headingLevel: z.enum(['h1', 'h2', 'h3', 'h4']),
+  targetKeywords: z.array(z.string()),
+  description: z.string(),
+  estimatedWordCount: z.number(),
+  includeFaq: z.boolean(),
+  includeTable: z.boolean(),
+  includeList: z.boolean(),
+});
+
+const ArticleSectionSchema = ArticleSubsectionSchema.extend({
+  subsections: z.array(ArticleSubsectionSchema).default([]),
+});
 
 const ArticlePlanSchema = z.object({
   title: z.string(),
@@ -156,7 +184,10 @@ export async function handlePlan(req: Request, body: any): Promise<Response> {
 
     console.log(`[seo-plan] Planning article for "${body.target_keyword}" (user: ${userId})`);
 
-    const brief = body.content_brief;
+    // Normalized at the boundary, never dereferenced raw — `content_brief` arrives through a
+    // `z.any()` tool schema, so `brief.audience.painPoints.join()` was a TypeError waiting for
+    // the first caller that shaped a brief its own way. See content-brief.ts.
+    const brief = normalizeContentBrief(body.content_brief);
 
     // Load base system prompt from DB, then append dynamic context
     const baseSystemPrompt = await getToolPrompt(supabase, 'seo_planner');
@@ -168,7 +199,7 @@ export async function handlePlan(req: Request, body: any): Promise<Response> {
       task: 'seo_plan',
       systemPrompt,
       temperature: 0.4,
-      maxTokens: 4096,
+      maxTokens: PLAN_MAX_OUTPUT_TOKENS,
       thinkingLevel: 'high',
     });
 
@@ -221,7 +252,7 @@ export async function handlePlan(req: Request, body: any): Promise<Response> {
 
 function buildPlanningSystemPrompt(
   basePrompt: string,
-  brief?: SEOPlanRequest['content_brief'],
+  brief: NormalizedBrief | null,
   research?: KeywordResearchResult,
 ): string {
   let prompt = basePrompt;
@@ -248,12 +279,12 @@ Google shows an AI Overview for this keyword. Optimize for AI citation:
     prompt += `
 
 === BUSINESS CONTEXT ===
-Objective: ${brief.businessObjective}
-Target audience: ${brief.audience.primaryPersona}
-Knowledge level: ${brief.audience.knowledgeLevel}
-Decision stage: ${brief.audience.decisionStage}
-Pain points: ${brief.audience.painPoints.join(', ')}
-Content type: ${brief.contentType}`;
+Objective: ${briefValue(brief.businessObjective)}
+Target audience: ${briefValue(brief.audience.primaryPersona)}
+Knowledge level: ${briefValue(brief.audience.knowledgeLevel)}
+Decision stage: ${briefValue(brief.audience.decisionStage)}
+Pain points: ${briefList(brief.audience.painPoints)}
+Content type: ${briefValue(brief.contentType)}`;
 
     if (brief.clusterContext) {
       prompt += `
@@ -265,7 +296,7 @@ Unique angle: ${brief.clusterContext.differentiationNote || 'N/A'}
 Do NOT repeat topics already covered in related articles.`;
     }
 
-    if (brief.requiredPoints?.length) {
+    if (brief.requiredPoints.length > 0) {
       prompt += `
 
 === REQUIRED COVERAGE ===
@@ -276,9 +307,13 @@ ${brief.requiredPoints.map((p) => `- MUST include: ${p}`).join('\n')}`;
       prompt += `
 
 === PERFORMANCE INSIGHTS ===
-Previous issues: ${brief.performanceFeedback.previousArticleScores.map((a) => a.topIssue).join(', ')}
+Previous issues: ${briefList(brief.performanceFeedback.previousArticleScores.map((a) => a.topIssue))}
 Audience feedback: ${brief.performanceFeedback.audienceFeedbackNotes || 'N/A'}`;
     }
+
+    // Keys the caller invented. Usually the only workspace-specific information in the whole
+    // request — dropping it silently is how a brief can be filled in and change nothing.
+    prompt += briefExtraContextBlock(brief);
   }
 
   return prompt;
@@ -288,7 +323,7 @@ function buildPlanningUserPrompt(
   topic: string,
   targetKeyword: string,
   research: KeywordResearchResult,
-  brief?: SEOPlanRequest['content_brief'],
+  brief: NormalizedBrief | null,
 ): string {
   const secondaries = research.recommendedSecondaries
     .slice(0, 10)

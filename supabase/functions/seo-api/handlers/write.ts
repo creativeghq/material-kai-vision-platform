@@ -16,13 +16,19 @@ import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
 import { resolveAndAssertSeoEntitled } from './entitlement.ts';
 import { missingArticlePlanFields, WRITE_PLAN_FIELDS } from './article-plan-guard.ts';
+import {
+  normalizeContentBrief,
+  briefValue,
+  briefList,
+  briefExtraContextBlock,
+  type NormalizedBrief,
+} from './content-brief.ts';
 import { getToolPrompt, getGenerationPrompt, renderPromptTemplate } from '../../_shared/prompt-utils.ts';
 import { generateWithClaude } from '../../_shared/ai-client.ts';
 import type {
   SEOWriteRequest,
   SEOWriteResponse,
   ArticlePlan,
-  ContentBrief,
   KeywordResearchResult,
   SerpSignalBlob,
 } from '../../_shared/seo-types.ts';
@@ -107,7 +113,9 @@ export async function handleWrite(req: Request, body: any): Promise<Response> {
     console.log(`[seo-write] Writing article: "${body.article_plan.title}" (user: ${userId})`);
 
     const plan = body.article_plan;
-    const brief = body.content_brief;
+    // Normalized at the boundary — see content-brief.ts. `content_brief` arrives through a
+    // `z.any()` tool schema, so the prompt builders below cannot assume any of its shape.
+    const brief = normalizeContentBrief(body.content_brief);
     const research = body.keyword_research_summary;
 
     // Load base system prompt from DB, then append dynamic context
@@ -185,7 +193,7 @@ async function buildWritingSystemPrompt(
   supabase: DbClient,
   basePrompt: string,
   plan: ArticlePlan,
-  brief?: ContentBrief,
+  brief: NormalizedBrief | null,
   research?: Partial<KeywordResearchResult>,
 ): Promise<string> {
   let prompt = basePrompt;
@@ -199,23 +207,26 @@ async function buildWritingSystemPrompt(
     prompt += `
 
 === BRAND VOICE ===
-Tone: ${brief.brandVoice.toneAttributes.join(', ')}
-Personality: ${brief.brandVoice.personalityTraits.join('. ')}
+Tone: ${briefList(brief.brandVoice.toneAttributes)}
+Personality: ${briefList(brief.brandVoice.personalityTraits, '. ')}
 Writing style: ${brief.brandVoice.writingStyle || 'Clear, concise, actionable'}
 NEVER use: ${brief.brandVoice.avoidList.join(', ') || 'N/A'}
 Preferred terminology: ${brief.brandVoice.terminologyPreferences.join(', ') || 'N/A'}
 
 === AUDIENCE ===
-Writing for: ${brief.audience.primaryPersona}
-Knowledge level: ${brief.audience.knowledgeLevel}
-Pain points: ${brief.audience.painPoints.join(', ')}
-Decision stage: ${brief.audience.decisionStage}
+Writing for: ${briefValue(brief.audience.primaryPersona)}
+Knowledge level: ${briefValue(brief.audience.knowledgeLevel)}
+Pain points: ${briefList(brief.audience.painPoints)}
+Decision stage: ${briefValue(brief.audience.decisionStage)}
 ${brief.audience.knowledgeLevel === 'beginner' ? 'Explain industry terms when first used. Use analogies.' : ''}
 ${brief.audience.knowledgeLevel === 'expert' ? 'Skip basic explanations. Use industry jargon freely. Go deep on nuance.' : ''}
 
 === CONTENT OBJECTIVE ===
-Business goal: ${brief.businessObjective}
+Business goal: ${briefValue(brief.businessObjective)}
 Call to action: ${brief.callToAction || 'No hard CTA — focus on value'}`;
+
+    // Keys the caller invented — the only workspace-specific information in most briefs.
+    prompt += briefExtraContextBlock(brief);
   }
 
   // E-E-A-T: the only input carrying information the SERP does not already have.
@@ -257,7 +268,7 @@ Call to action: ${brief.callToAction || 'No hard CTA — focus on value'}`;
  * Returns '' when the brief carries none — the analyzer raises a `firsthand_experience`
  * fix in that case rather than the writer inventing experience it does not have.
  */
-async function buildFirsthandExperienceBlock(supabase: DbClient, brief?: ContentBrief): Promise<string> {
+async function buildFirsthandExperienceBlock(supabase: DbClient, brief: NormalizedBrief | null): Promise<string> {
   const fx = brief?.firsthandExperience;
   if (!fx) return '';
 
@@ -346,7 +357,7 @@ async function buildSerpSignalsWriterBlock(supabase: DbClient, signals?: SerpSig
 async function buildWritingUserPrompt(
   supabase: DbClient,
   plan: ArticlePlan,
-  brief?: ContentBrief,
+  brief: NormalizedBrief | null,
   research?: Partial<KeywordResearchResult>,
 ): Promise<string> {
   const outline = buildOutlineText(plan.sections, 0);
@@ -376,7 +387,9 @@ function buildOutlineText(sections: ArticlePlan['sections'], depth: number): str
       if (s.includeFaq) line += `\n${indent}  → Include FAQ`;
       if (s.includeTable) line += `\n${indent}  → Include comparison table`;
       if (s.includeList) line += `\n${indent}  → Include bullet list`;
-      if (s.subsections.length > 0) {
+      // Optional: the plan schema nests two levels, so a subsection carries no
+      // `subsections` key of its own. `plan` is `any` at this boundary anyway.
+      if (s.subsections?.length) {
         line += '\n' + buildOutlineText(s.subsections, depth + 1);
       }
       return line;

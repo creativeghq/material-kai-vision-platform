@@ -573,18 +573,64 @@ export async function generateStructuredWithGemini<T>(
       model: modelId,
     };
   } catch (err) {
+    const failure = _describeStructuredFailure(err);
     void _logTrackedCall({
       task: config?.task ?? 'gemini_structured_generation',
       userId: config?.userId,
       workspaceId: config?.workspaceId,
       model: modelId,
-      inputTokens: 0,
-      outputTokens: 0,
+      // A truncated call still burned every token it was allowed. Reporting 0/0 hid the
+      // whole reason it failed — see _describeStructuredFailure.
+      inputTokens: failure.inputTokens,
+      outputTokens: failure.outputTokens,
       latencyMs: Date.now() - _start,
-      errorMessage: err instanceof Error ? err.message : String(err),
+      errorMessage: failure.message,
     });
-    throw err;
+    throw failure.error;
   }
+}
+
+/**
+ * Name a structured-output failure for what it is.
+ *
+ * Gemini counts THINKING tokens against `maxOutputTokens`. When a reasoning model runs out
+ * of budget mid-JSON the API returns `finishReason: MAX_TOKENS` with a partial body, and
+ * the AI SDK surfaces that as `AI_NoObjectGeneratedError: No object generated: could not
+ * parse the response.` — indistinguishable, to anyone reading a log or an `error_message`
+ * column, from a model that answered badly. `seo_plan` sat broken behind exactly that
+ * sentence: 3,929 reasoning tokens and 151 of JSON against a 4,096 cap, reported as an
+ * unparseable answer for as long as the stage existed.
+ *
+ * So: when the cause is the budget, SAY it is the budget, and carry the token split into
+ * `ai_usage_logs` rather than the 0/0 the old catch wrote.
+ */
+function _describeStructuredFailure(err: unknown): {
+  error: unknown;
+  message: string;
+  inputTokens: number;
+  outputTokens: number;
+} {
+  const e = err as {
+    name?: string;
+    message?: string;
+    finishReason?: string;
+    usage?: { inputTokens?: number; outputTokens?: number; reasoningTokens?: number };
+  };
+
+  const inputTokens = e?.usage?.inputTokens ?? 0;
+  const outputTokens = e?.usage?.outputTokens ?? 0;
+  const message = err instanceof Error ? err.message : String(err);
+
+  if (e?.name === 'AI_NoObjectGeneratedError' && e?.finishReason === 'length') {
+    const reasoning = e.usage?.reasoningTokens ?? 0;
+    const detail =
+      `Structured output hit the token cap before the object closed — raise maxTokens or lower ` +
+      `thinkingLevel (reasoning ${reasoning} + text ${Math.max(outputTokens - reasoning, 0)} ` +
+      `= ${outputTokens} output tokens).`;
+    return { error: new Error(detail), message: detail, inputTokens, outputTokens };
+  }
+
+  return { error: err, message, inputTokens, outputTokens };
 }
 
 // ── Claude: Text generation ──

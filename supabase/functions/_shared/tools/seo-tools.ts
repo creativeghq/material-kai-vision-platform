@@ -356,7 +356,7 @@ export const createSEOContentAnalyzerTool = (userId: string, onProgress?: (statu
  */
 export const createSEOPipelineTool = (userId: string, onChunk?: (chunk: any) => void) => {
   return tool(
-    async ({ topic, target_keyword, content_brief, auto_fix, max_fix_iterations, content_type, website_id }) => {
+    async ({ topic, target_keyword, content_brief, auto_fix, max_fix_iterations, content_type, website_id, language_code, location_code }) => {
       try {
 
         const result = await callSEOFunction('seo-pipeline', {
@@ -368,6 +368,12 @@ export const createSEOPipelineTool = (userId: string, onChunk?: (chunk: any) => 
           content_type: content_type || 'guide',
           user_id: userId,
           website_id: website_id || undefined,
+          // The pipeline defaults these to 2840/'en' — the US in English. `seo_keyword_research`
+          // has always accepted them and this tool never did, so a run asked for "for Greece"
+          // researched American SERPs and planned the article against them. Nothing failed:
+          // US competitor headings for a Greek keyword are a plausible research result.
+          language_code: language_code || undefined,
+          location_code: location_code || undefined,
         }, 300_000); // 5 min timeout for full pipeline
 
         if (!result.success) {
@@ -416,6 +422,8 @@ export const createSEOPipelineTool = (userId: string, onChunk?: (chunk: any) => 
         max_fix_iterations: z.number().optional().describe('Max auto-fix iterations (default: 2)'),
         content_type: z.string().optional().describe('Article type: guide, listicle, comparison, how-to, case-study (default: guide)'),
         website_id: z.string().optional().describe('Connected website id to file this article under (drives inter-linking from that site). Omit to use the workspace default connected website.'),
+        language_code: z.string().optional().describe('Language the article is researched and written in, e.g. "el" for Greek. Defaults to "en" — SET IT whenever the keyword or the requested market is not English, or the whole article is planned against the wrong SERP.'),
+        location_code: z.number().optional().describe('DataForSEO location code for the market being targeted, e.g. 2300 (Greece), 2826 (UK), 2276 (Germany). Defaults to 2840 (US). Set it together with language_code.'),
       }),
     }
   );

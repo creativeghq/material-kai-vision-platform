@@ -14,6 +14,7 @@ import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace } from '../../_shared/auth.ts';
 import { resolveAndAssertSeoEntitled } from './entitlement.ts';
 import { missingArticlePlanFields, ANALYZE_PLAN_FIELDS } from './article-plan-guard.ts';
+import { normalizeContentBrief, briefList, type NormalizedBrief } from './content-brief.ts';
 import { getToolPrompt, getGenerationPrompt, renderPromptTemplate } from '../../_shared/prompt-utils.ts';
 import { generateWithGemini } from '../../_shared/ai-client.ts';
 import type {
@@ -23,7 +24,6 @@ import type {
   ContentAnalysisResult,
   ContentFix,
   SectionScore,
-  ContentBrief,
   GEOScore,
   SerpSignalBlob,
 } from '../../_shared/seo-types.ts';
@@ -124,12 +124,15 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
     const maxIterations = body.max_iterations || DEFAULT_MAX_ITERATIONS;
     let content = body.content_markdown;
     let fixIterations = 0;
+    // Normalized at the boundary - see content-brief.ts. Reaches analyzeContent (which
+    // reports provenance / firsthand-experience gaps off it) and applyFixes (voice).
+    const brief = normalizeContentBrief(body.content_brief);
 
     console.log(`[seo-analyze] Analyzing "${body.article_plan.title}" (auto_fix: ${autoFix}, max: ${maxIterations})`);
 
     // Run analysis
     let analysis = analyzeContent(
-      content, body.article_plan, body.serp_signals, body.content_brief, contentDatedAt,
+      content, body.article_plan, body.serp_signals, brief, contentDatedAt,
     );
 
     console.log(`[seo-analyze] Initial score: ${analysis.overallScore}/100, ${analysis.fixes.length} issues`);
@@ -173,12 +176,12 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
         console.log(`[seo-analyze] Fix iteration ${i + 1}: applying ${autoFixableFixes.length} fixes...`);
 
         // Apply fixes via Gemini
-        content = await applyFixes(supabase, content, autoFixableFixes, body.article_plan, body.content_brief);
+        content = await applyFixes(supabase, content, autoFixableFixes, body.article_plan, brief);
         fixIterations++;
 
         // Re-analyze
         analysis = analyzeContent(
-          content, body.article_plan, body.serp_signals, body.content_brief, contentDatedAt,
+          content, body.article_plan, body.serp_signals, brief, contentDatedAt,
         );
         console.log(`[seo-analyze] Post-fix score: ${analysis.overallScore}/100 (reachable: ${reachableScore(analysis)})`);
 
@@ -286,7 +289,7 @@ function analyzeContent(
   markdown: string,
   plan: ArticlePlan,
   serpSignals?: SerpSignalBlob,
-  brief?: ContentBrief,
+  brief?: NormalizedBrief | null,
   contentDatedAt?: string,
 ): ContentAnalysisResult {
   const fixes: ContentFix[] = [];
@@ -1030,7 +1033,7 @@ async function applyFixes(
   content: string,
   fixes: ContentFix[],
   plan: ArticlePlan,
-  brief?: ContentBrief,
+  brief: NormalizedBrief | null,
 ): Promise<string> {
   const fixList = fixes
     .map(
@@ -1040,7 +1043,7 @@ async function applyFixes(
     .join('\n\n');
 
   const voiceInstructions = brief
-    ? `\n=== VOICE TO PRESERVE ===\nTone: ${brief.brandVoice.toneAttributes.join(', ')}\nStyle: ${brief.brandVoice.writingStyle || 'Clear and professional'}\nNEVER introduce: ${brief.brandVoice.avoidList.join(', ') || 'N/A'}`
+    ? `\n=== VOICE TO PRESERVE ===\nTone: ${briefList(brief.brandVoice.toneAttributes)}\nStyle: ${brief.brandVoice.writingStyle || 'Clear and professional'}\nNEVER introduce: ${brief.brandVoice.avoidList.join(', ') || 'N/A'}`
     : '';
 
   // No fallback. Swallowing this and substituting a one-line stand-in would apply auto-fixes

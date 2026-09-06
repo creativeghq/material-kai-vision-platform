@@ -370,16 +370,53 @@ function useAdaptivePolling(
 
 // ─── Score Gauge Component ──────────────────────────────────────
 
+/**
+ * Score tones, written as light/dark PAIRS and measured, not chosen.
+ *
+ * These were the bare 500-weights (green / yellow / red), one set of classes for
+ * all four themes. Those shades are picked for the plum-black dark ground, so on the light
+ * themes' cream card the headline number of this whole panel rendered at roughly 2:1. The
+ * light shades below are the ones `src/utils/statusTone.ts` already holds at 4.5:1 against
+ * the real `--card` of all four themes (tests/unit/inboxChipContrast.test.ts) — take a shade
+ * from there rather than eyeballing a new one.
+ *
+ * Written out in full because Tailwind's scanner reads source text: a class assembled from a
+ * template literal lands in no stylesheet. That is also why the ring is its own class here
+ * and not `color.replace('text-', 'border-')` — `String.replace` with a string pattern swaps
+ * only the FIRST match, so that produced `border-emerald-700 dark:text-emerald-400` and the
+ * ring silently kept whatever colour it inherited in dark mode.
+ */
+const SCORE_TONES = {
+  good: {
+    text: 'text-emerald-700 dark:text-emerald-400',
+    ring: 'border-emerald-700 dark:border-emerald-400',
+    tint: 'bg-emerald-500/10',
+  },
+  fair: {
+    text: 'text-amber-800 dark:text-amber-400',
+    ring: 'border-amber-800 dark:border-amber-400',
+    tint: 'bg-amber-500/10',
+  },
+  poor: {
+    text: 'text-red-700 dark:text-red-400',
+    ring: 'border-red-700 dark:border-red-400',
+    tint: 'bg-red-500/10',
+  },
+} as const;
+
+function scoreTone(score: number) {
+  return score >= 80 ? SCORE_TONES.good : score >= 60 ? SCORE_TONES.fair : SCORE_TONES.poor;
+}
+
 function ScoreGauge({ score, label, size = 'lg' }: { score: number; label: string; size?: 'sm' | 'lg' }) {
-  const color = score >= 80 ? 'text-green-500' : score >= 60 ? 'text-yellow-500' : 'text-red-500';
-  const bgColor = score >= 80 ? 'bg-green-500/10' : score >= 60 ? 'bg-yellow-500/10' : 'bg-red-500/10';
+  const tone = scoreTone(score);
   const dims = size === 'lg' ? 'w-24 h-24' : 'w-16 h-16';
   const textSize = size === 'lg' ? 'text-3xl' : 'text-xl';
 
   return (
     <div className="flex flex-col items-center gap-1">
-      <div className={`${dims} ${bgColor} rounded-full flex items-center justify-center border-2 ${color.replace('text-', 'border-')}`}>
-        <span className={`${textSize} font-bold ${color}`}>{score}</span>
+      <div className={`${dims} ${tone.tint} rounded-full flex items-center justify-center border-2 ${tone.ring}`}>
+        <span className={`${textSize} font-bold tabular-nums ${tone.text}`}>{score}</span>
       </div>
       <span className="text-xs text-muted-foreground">{label}</span>
     </div>
@@ -403,13 +440,13 @@ function PipelineProgress({ currentStage, progress, status }: { currentStage: st
             <React.Fragment key={stage.key}>
               <div className="flex flex-col items-center gap-1">
                 {isCompleted ? (
-                  <CheckCircle2 className="w-6 h-6 text-green-500" />
+                  <CheckCircle2 className="w-6 h-6 text-emerald-700 dark:text-emerald-400" />
                 ) : isCurrent ? (
-                  <Loader2 className="w-6 h-6 text-blue-500 animate-spin" />
+                  <Loader2 className="w-6 h-6 text-blue-700 dark:text-blue-400 animate-spin" />
                 ) : (
                   <Circle className="w-6 h-6 text-muted-foreground/30" />
                 )}
-                <span className={`text-xs ${isCurrent ? 'text-blue-500 font-medium' : isCompleted ? 'text-green-500' : 'text-muted-foreground/50'}`}>
+                <span className={`text-xs ${isCurrent ? 'text-blue-700 dark:text-blue-400 font-medium' : isCompleted ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground/50'}`}>
                   {stage.label}
                 </span>
               </div>
@@ -481,7 +518,7 @@ function OptimizeTab({ data, overallScore }: { data: OptimizeData; overallScore:
             {Object.entries(data.geoScore.signals).map(([key, value]) => (
               <div key={key} className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">{GEO_SIGNAL_NAMES[key] || key}</span>
-                <span className={value > 0 ? 'text-green-500 font-medium' : 'text-muted-foreground'}>{value}pts</span>
+                <span className={value > 0 ? 'text-emerald-700 dark:text-emerald-400 font-medium' : 'text-muted-foreground'}>{value}pts</span>
               </div>
             ))}
           </div>
@@ -506,9 +543,9 @@ function OptimizeTab({ data, overallScore }: { data: OptimizeData; overallScore:
             >
               <div className="flex items-center gap-2">
                 {section.status === 'all_good' ? (
-                  <CheckCircle2 className="w-4 h-4 text-green-500" />
+                  <CheckCircle2 className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
                 ) : (
-                  <AlertTriangle className="w-4 h-4 text-yellow-500" />
+                  <AlertTriangle className="w-4 h-4 text-amber-800 dark:text-amber-400" />
                 )}
                 <span className="text-sm font-medium">{section.name}</span>
               </div>
@@ -518,7 +555,7 @@ function OptimizeTab({ data, overallScore }: { data: OptimizeData; overallScore:
                     {section.issueCount} issue{section.issueCount > 1 ? 's' : ''}
                   </Badge>
                 ) : (
-                  <span className="text-xs text-green-500">All good</span>
+                  <span className="text-xs text-emerald-700 dark:text-emerald-400">All good</span>
                 )}
                 {expanded[section.key] ? (
                   <ChevronDown className="w-4 h-4 text-muted-foreground" />
@@ -612,7 +649,7 @@ function BriefTab({ data }: { data: BriefData }) {
           <ul className="space-y-1">
             {data.faqQuestions.map((q, i) => (
               <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
-                <span className="text-blue-500 mt-0.5">Q:</span>
+                <span className="text-blue-700 dark:text-blue-400 mt-0.5">Q:</span>
                 <span>{typeof q === 'string' ? q : q.question}</span>
               </li>
             ))}
@@ -687,7 +724,7 @@ function GapsGainsTab({ data }: { data: GapsGainsData }) {
           <div key={i} className="flex items-center justify-between p-3 border rounded-lg">
             <div className="flex items-center gap-3">
               <span
-                className={`text-sm capitalize ${topic.type === 'gap' ? 'text-red-500 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}
+                className={`text-sm capitalize ${topic.type === 'gap' ? 'text-red-700 dark:text-red-400' : 'text-emerald-700 dark:text-emerald-400'}`}
               >
                 {topic.type}
               </span>
@@ -748,8 +785,8 @@ function ResearchTab({ data, onAddToContent }: {
   const [subTab, setSubTab] = useState<'terms' | 'competition' | 'questions' | 'stats'>('terms');
 
   const TrendIcon = ({ trend }: { trend: string }) => {
-    if (trend === 'up') return <TrendingUp className="w-3 h-3 text-green-500" />;
-    if (trend === 'down') return <TrendingDown className="w-3 h-3 text-red-500" />;
+    if (trend === 'up') return <TrendingUp className="w-3 h-3 text-emerald-700 dark:text-emerald-400" />;
+    if (trend === 'down') return <TrendingDown className="w-3 h-3 text-red-700 dark:text-red-400" />;
     return <Minus className="w-3 h-3 text-muted-foreground" />;
   };
 
@@ -816,7 +853,7 @@ function ResearchTab({ data, onAddToContent }: {
       {data.serpFeatures?.hasAiOverview && data.serpFeatures.aiOverviewSources.length > 0 && (
         <details className="border rounded-lg">
           <summary className="px-3 py-2 text-xs font-medium cursor-pointer hover:bg-muted/50 flex items-center gap-2">
-            <Sparkles className="w-3 h-3 text-blue-500" />
+            <Sparkles className="w-3 h-3 text-blue-700 dark:text-blue-400" />
             AI Overview Sources ({data.serpFeatures.aiOverviewSources.length})
           </summary>
           <div className="px-3 pb-3 space-y-1">
@@ -932,7 +969,7 @@ function ResearchTab({ data, onAddToContent }: {
         <div className="space-y-2">
           {(data.questions || []).map((q, i) => (
             <div key={i} className="flex items-start gap-3 p-3 border rounded-lg">
-              <div className={`mt-0.5 ${q.answered ? 'text-green-500' : 'text-muted-foreground/30'}`}>
+              <div className={`mt-0.5 ${q.answered ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground/30'}`}>
                 {q.answered ? <CheckCircle2 className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
               </div>
               <div className="min-w-0 flex-1">
@@ -1045,7 +1082,7 @@ function InterlinkingTab({ data, markdown, onApplyLink }: { data: InterlinkingDa
             {siteMatches.map((m, i) => (
               <div key={i} className="p-3 border rounded-lg space-y-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Link2 className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                  <Link2 className="w-3.5 h-3.5 text-blue-700 dark:text-blue-400 flex-shrink-0" />
                   <span className="text-sm font-medium">{m.anchorSuggestion}</span>
                   <Badge variant="outline" className="text-[10px]">
                     {Math.round(m.relevance * 100)}% match
@@ -1100,7 +1137,7 @@ function InterlinkingTab({ data, markdown, onApplyLink }: { data: InterlinkingDa
       ) : (
         // No connected site — show the CTA disclaimer
         <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-500/5 border border-blue-500/20 text-xs text-muted-foreground">
-          <AlertTriangle className="w-3.5 h-3.5 text-blue-500 mt-0.5 flex-shrink-0" />
+          <AlertTriangle className="w-3.5 h-3.5 text-blue-700 dark:text-blue-400 mt-0.5 flex-shrink-0" />
           <div className="space-y-2 flex-1">
             <p>
               No connected website found. The suggestions below come from links written in your draft and
@@ -1124,7 +1161,7 @@ function InterlinkingTab({ data, markdown, onApplyLink }: { data: InterlinkingDa
             {data.suggestedLinks.map((link, i) => (
               <div key={i} className="p-3 border rounded-lg space-y-1">
                 <div className="flex items-center gap-2">
-                  <Link2 className="w-4 h-4 text-blue-500" />
+                  <Link2 className="w-4 h-4 text-blue-700 dark:text-blue-400" />
                   <span className="text-sm font-medium">{link.anchor}</span>
                 </div>
                 <div className="pl-6 space-y-0.5">
@@ -1149,7 +1186,7 @@ function InterlinkingTab({ data, markdown, onApplyLink }: { data: InterlinkingDa
             {internalWritten.map((link, i) => (
               <div key={i} className="flex items-center justify-between gap-3 p-2 border rounded">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <Link2 className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                  <Link2 className="w-3.5 h-3.5 text-blue-700 dark:text-blue-400 flex-shrink-0" />
                   <span className="text-sm truncate">{link.anchor}</span>
                 </div>
                 <code className="text-xs text-muted-foreground truncate max-w-[40%]">{link.href}</code>
@@ -1307,10 +1344,10 @@ const CALLOUT_META: Record<CalloutKind, {
 }> = {
   tldr:       { label: 'TL;DR',         Icon: Zap,         borderClass: 'border-primary/40',     bgClass: 'bg-primary/5',         iconClass: 'text-primary' },
   key:        { label: 'Key Takeaways', Icon: ListChecks,  borderClass: 'border-emerald-500/30', bgClass: 'bg-emerald-500/5',     iconClass: 'text-emerald-500' },
-  definition: { label: 'Definition',    Icon: BookOpen,    borderClass: 'border-blue-500/30',    bgClass: 'bg-blue-500/5',        iconClass: 'text-blue-500' },
-  example:    { label: 'Example',       Icon: Lightbulb,   borderClass: 'border-amber-500/30',   bgClass: 'bg-amber-500/5',       iconClass: 'text-amber-500' },
+  definition: { label: 'Definition',    Icon: BookOpen,    borderClass: 'border-blue-500/30',    bgClass: 'bg-blue-500/5',        iconClass: 'text-blue-700 dark:text-blue-400' },
+  example:    { label: 'Example',       Icon: Lightbulb,   borderClass: 'border-amber-500/30',   bgClass: 'bg-amber-500/5',       iconClass: 'text-amber-800 dark:text-amber-400' },
   info:       { label: 'Note',          Icon: Info,        borderClass: 'border-sky-500/30',     bgClass: 'bg-sky-500/5',         iconClass: 'text-sky-500' },
-  warning:    { label: 'Heads up',      Icon: AlertOctagon, borderClass: 'border-red-500/30',     bgClass: 'bg-red-500/5',         iconClass: 'text-red-500' },
+  warning:    { label: 'Heads up',      Icon: AlertOctagon, borderClass: 'border-red-500/30',     bgClass: 'bg-red-500/5',         iconClass: 'text-red-700 dark:text-red-400' },
   quote:      { label: 'Quote',         Icon: Quote,       borderClass: 'border-muted-foreground/30', bgClass: 'bg-muted/40',     iconClass: 'text-muted-foreground' },
 };
 
@@ -2007,10 +2044,7 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
     'secondary';
 
   const scoreColor =
-    article.overall_score == null ? '' :
-    article.overall_score >= 80 ? 'text-green-500' :
-    article.overall_score >= 60 ? 'text-yellow-500' :
-    'text-red-500';
+    article.overall_score == null ? '' : scoreTone(article.overall_score).text;
 
   return (
     <>
@@ -2051,7 +2085,7 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
                   </>
                 )}
                 {article.status === 'failed' && (
-                  <span className="text-red-500 truncate">{article.error_message || 'Generation failed'}</span>
+                  <span className="text-red-700 dark:text-red-400 truncate">{article.error_message || 'Generation failed'}</span>
                 )}
               </div>
             </div>
@@ -2106,7 +2140,7 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
             {article.status === 'failed' && article.error_message && (
               <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
                 <div className="flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5" />
+                  <AlertTriangle className="w-4 h-4 text-red-700 dark:text-red-400 mt-0.5" />
                   <p className="text-sm text-red-600 dark:text-red-400">{article.error_message}</p>
                 </div>
               </div>
