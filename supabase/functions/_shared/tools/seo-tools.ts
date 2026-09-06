@@ -374,7 +374,13 @@ export const createSEOPipelineTool = (userId: string, onChunk?: (chunk: any) => 
           // US competitor headings for a Greek keyword are a plausible research result.
           language_code: language_code || undefined,
           location_code: location_code || undefined,
-        }, 300_000); // 5 min timeout for full pipeline
+          // 30s, not 300s. `seo-pipeline` now creates the row and hands the stages to
+          // `EdgeRuntime.waitUntil`, so this call returns as soon as the article id exists —
+          // a second or two. The old 5-minute budget was for a handler that ran all five
+          // stages inline, and it could never be honoured anyway: agent-chat kills any tool
+          // at 90s (`Tool 'create_seo_article' timed out after 90s`, Sentry KAI-T5), so the
+          // number here only ever described an intention.
+        }, 30_000);
 
         if (!result.success) {
           return JSON.stringify({ success: false, error: result.error || 'Pipeline failed' });

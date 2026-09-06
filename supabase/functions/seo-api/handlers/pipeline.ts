@@ -20,6 +20,8 @@ import { assertEntitled } from '../../_shared/entitlement.ts';
 import { SEO_MODULE } from './entitlement.ts';
 import { generateStandardEmbedding } from '../../_shared/embedding-utils.ts';
 import { resolveWebsite } from '../../_shared/seo-website.ts';
+import { runInBackground } from '../../_shared/background.ts';
+import type { DbClient } from '../../_shared/supabase-client.ts';
 import { handleResearch } from './research.ts';
 import { handlePlan } from './plan.ts';
 import { normalizeContentBrief, type NormalizedBrief } from './content-brief.ts';
@@ -292,8 +294,118 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
     articleId = articleRow.id;
     console.log(`[seo-pipeline] Article ${articleId} created. Starting pipeline for "${body.target_keyword}"`);
 
-    // Return the article ID immediately — the pipeline continues running
-    // The frontend polls seo_articles for progress updates
+    // ── Return the article id NOW; the stages run past the response ──────────────────────
+    //
+    // The comment here used to say "Return the article ID immediately" directly above code
+    // that ran all five stages inline and returned only once they finished. Everything
+    // downstream was built for the version in the comment: `create_seo_article` describes
+    // itself as async, emits `article_generation_started` so the frontend can start polling,
+    // and `SEOArticleViewer` polls `seo_articles` until it reads `completed` or `failed`.
+    //
+    // Awaiting the stages cannot work, and not by a small margin. agent-chat caps a tool at
+    // `DEFAULT_TOOL_TIMEOUT_MS = 90s`, while a real run is research ~4s + plan ~25s + write
+    // 60-120s + analyze with up to two fix passes. Article d8037c81 reached "Writing article
+    // with Claude Opus..." at 12:25:58 and the turn died on
+    // `Tool 'create_seo_article' timed out after 90s` (Sentry KAI-T5) while the isolate was
+    // still writing. Raising that cap is not the fix either: the agent-chat invocation has a
+    // ~150s wall of its own, so the tool would still lose the race, just later.
+    //
+    // `runInBackground` is `EdgeRuntime.waitUntil`, so the isolate stays alive for the stages
+    // after this response is sent. If the platform tears it down anyway, the row is left
+    // mid-stage — which is exactly what d8037c81 did, sitting at `writing` / 45% forever —
+    // so `seo.article_stuck_in_stage` sweeps those and records a real reason.
+    // `articleId` stays `string | null` for the catch below; this is the narrowed copy the
+    // background work closes over, so it cannot go null underneath it.
+    const backgroundArticleId: string = articleRow.id;
+    runInBackground(
+      runPipelineStages({
+        supabase, req, body, brief, userId, workspaceId, websiteId, website,
+        articleId: backgroundArticleId, autoFix, maxFixIterations, startTime,
+      }).catch(async (stageError: unknown) => {
+        const message = stageError instanceof Error ? stageError.message : String(stageError);
+        console.error('[seo-pipeline] stage failure:', stageError);
+        // Written directly, not through updateArticle: this is the error path, so it must not
+        // throw and must not depend on the read-modify-write updateArticle performs.
+        // `processing_time_ms` is NOT a column — naming it here once got the FAILURE write
+        // rejected too, which is how a failed article became indistinguishable from a running
+        // one and spun at its last stage forever.
+        const { error: failErr } = await supabase
+          .from('seo_articles')
+          .update({
+            status: 'failed',
+            error_message: message.slice(0, 2000),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', backgroundArticleId);
+        if (failErr) {
+          console.error(`[seo-pipeline] could not mark article ${backgroundArticleId} failed:`, failErr.message);
+        }
+      }),
+      'seo-pipeline',
+    );
+
+    return jsonResponse({
+      success: true,
+      data: {
+        article_id: articleId,
+        status: 'researching' as ArticleStatus,
+        progress_percentage: 0,
+        current_stage: 'research' as PipelineStage,
+      },
+    });
+  } catch (error: any) {
+    // Only reached for a failure BEFORE the stages were handed off — auth, validation,
+    // entitlement, the insert itself. Once `runInBackground` has the work, failures are
+    // recorded on the row by the catch above, because there is no response left to fail.
+    console.error('[seo-pipeline] Error before hand-off:', error);
+    if (articleId) {
+      const { error: failErr } = await supabase
+        .from('seo_articles')
+        .update({
+          status: 'failed',
+          error_message: String(error?.message ?? error).slice(0, 2000),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', articleId);
+      if (failErr) {
+        console.error(`[seo-pipeline] could not mark article ${articleId} failed:`, failErr.message);
+      }
+    }
+    return jsonResponse({
+      success: false,
+      error: error.message || 'Pipeline failed',
+      data: articleId ? { article_id: articleId } : undefined,
+    }, 500);
+  }
+}
+
+/**
+ * Stages 1-5, run AFTER the response has been sent.
+ *
+ * Nothing in here may return a Response — there is no longer a request to answer. The
+ * `seo_articles` row IS the result: every stage updates `status` / `progress_percentage` /
+ * `current_stage`, and the viewer polls until one of them is terminal.
+ */
+async function runPipelineStages(ctx: {
+  supabase: DbClient;
+  req: Request;
+  // deno-lint-ignore no-explicit-any
+  body: any;
+  brief: NormalizedBrief | null;
+  userId: string;
+  workspaceId: string | null;
+  websiteId: string | null;
+  website: Awaited<ReturnType<typeof resolveWebsite>>;
+  articleId: string;
+  autoFix: boolean;
+  maxFixIterations: number;
+  startTime: number;
+}): Promise<void> {
+  const {
+    supabase, req, body, brief, userId, workspaceId, websiteId, website,
+    articleId, autoFix, maxFixIterations, startTime,
+  } = ctx;
+  let totalCredits = 0;
 
     // ────────────────────────────────────────────────────────────
     // STAGE 1: RESEARCH
@@ -667,69 +779,8 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
 
     console.log(`[seo-pipeline] Complete! Article ${articleId}: score ${analysis.overallScore}/100, ${finalWordCount} words, ${processingTimeMs}ms`);
 
-    // Build full ArticleOutput
-    const articleOutput: ArticleOutput = {
-      // `articleRow` is narrowed non-null by the `if (insertError || !articleRow) throw`
-      // guard above, so this needs no assertion — unlike `articleId`, which stays
-      // `string | null` for the catch block.
-      id: articleRow.id,
-      topic: body.topic,
-      targetKeyword: body.target_keyword,
-      title: plan.title,
-      contentMarkdown: publishedMarkdown,
-      contentHtml: htmlContent,
-      wordCount: finalWordCount,
-      metaTitle: plan.metaTitle,
-      metaDescription: plan.metaDescription,
-      slug: plan.slug,
-      primaryKeyword: plan.primaryKeyword,
-      secondaryKeywords: plan.secondaryKeywords,
-      schemaMarkup,
-      faqSchema,
-      optimize: optimizeData,
-      brief: briefData,
-      gapsGains,
-      research: researchTabData,
-      interlinking: interlinkingData,
-      pipelineLog: [],
-      fixIterations,
-      status: 'completed',
-      createdAt: new Date().toISOString(),
-    };
-
-    return jsonResponse({
-      success: true,
-      data: { article_id: articleId, article: articleOutput },
-    });
-  } catch (error: any) {
-    console.error(`[seo-pipeline] Error:`, error);
-
-    // Update article with failure status
-    if (articleId) {
-      // `processing_time_ms` is NOT a column — including it here got the FAILURE write
-      // rejected too, so a failed article was indistinguishable from a running one and
-      // spun at its last current_stage forever. Written directly (not via updateArticle)
-      // because this is the error path: it must not throw, and it must not depend on the
-      // read-modify-write that updateArticle performs.
-      const { error: failErr } = await supabase
-        .from('seo_articles')
-        .update({
-          status: 'failed',
-          error_message: String(error?.message ?? error).slice(0, 2000),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', articleId);
-      if (failErr) {
-        console.error(`[seo-pipeline] could not mark article ${articleId} failed:`, failErr.message);
-      }
-    }
-
-    return jsonResponse({
-      success: false,
-      error: error.message || 'Pipeline failed',
-      data: articleId ? { article_id: articleId } : undefined,
-    }, 500);
-  }
+    // Nothing is returned. The response went out before this function started, so the row is
+    // the only result there is — the viewer polls it and stops on `completed` or `failed`.
 }
 
 // ════════════════════════════════════════════════════════════════

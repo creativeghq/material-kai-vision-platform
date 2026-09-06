@@ -3098,6 +3098,17 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
                 setMessages((prev) => [...prev, articleMessage]);
 
+                // Open it on the canvas straight away.
+                //
+                // The article was already ELIGIBLE for the canvas (`canvasArtifactFor` returns
+                // kind 'seo', `renderCanvasArtifact` mounts the viewer) — it was just never
+                // SELECTED, so the run appeared only as a chip in the chat and the operator had
+                // to find it and click it to watch their own article being written. Every other
+                // long-running result on this screen opens where the work is shown; this one
+                // is the only thing on the canvas worth looking at while it runs, and the
+                // pipeline now takes minutes with a live progress bar.
+                focusCanvas(articleMessage.id);
+
                 if (conversationId) {
                   await saveAndLinkMessage(articleMessage.id, {
                     conversationId,
