@@ -314,6 +314,26 @@ describe('the run is wired to the stream and to the canvas', () => {
     expect(hub).toMatch(/setActiveCanvasId\(`run:\$\{boundWorkflowRunId \?\? runId\}`\)/);
   });
 
+  it('REVEALS the canvas when a turn produces something, for every toolkit', () => {
+    // Selecting a tab in a canvas the user has closed changes nothing they can see:
+    // `canvasHidden` unmounts the pane. Without this, any toolkit that finished while the
+    // canvas was collapsed wrote its result into a surface that was not on screen, and the
+    // only clue was a chip in the chat — which is exactly the complaint the SEO article got
+    // its own `focusCanvas` line for. The yield is the general fix; keep them consistent.
+    const yieldEffect = hub.slice(hub.indexOf('yieldedRunsRef.current.add(runId);'));
+    const body = yieldEffect.slice(0, yieldEffect.indexOf('}, [canvasGroups'));
+    expect(body, 'the yield selects a tab without revealing the pane').toContain('setCanvasHidden(false)');
+  });
+
+  it('does NOT reveal the canvas on run START — that would fight a deliberate close', () => {
+    // Re-opening the pane on every turn takes away the escape hatch: someone who collapsed
+    // the canvas to read the chat full-width would have it reopened under them each time
+    // they typed. Producing a result is the event worth interrupting for; starting is not.
+    const send = hub.slice(hub.indexOf('const handleSendMessage = useCallback'));
+    const upToFocus = send.slice(0, send.indexOf('setActiveCanvasId(`run:'));
+    expect(upToFocus).not.toContain('setCanvasHidden(false)');
+  });
+
   it('consumes the workflow binding above the early returns', () => {
     // Cleared after them, a send that returns early (empty composer) left the binding set and
     // folded the NEXT unrelated turn into that workflow's card.

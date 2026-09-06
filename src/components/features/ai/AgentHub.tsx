@@ -4754,6 +4754,14 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     if (produced.length === 0) return;
     yieldedRunsRef.current.add(runId);
     setActiveCanvasId(produced[produced.length - 1].id);
+    // ...and SHOW it. Selecting a tab in a canvas the user has closed changes nothing they
+    // can see: `canvasHidden` unmounts the whole pane, so every toolkit that finished while
+    // the canvas was collapsed produced a result into a surface that was not on screen, and
+    // the only clue was a chip in the chat. This is the one place it is right to re-open —
+    // the turn has PRODUCED something, which is what they asked for. Run START deliberately
+    // does not (see the `setActiveCanvasId` at the send site): re-opening a pane on every
+    // turn would fight a user who just closed it to read the chat full-width.
+    setCanvasHidden(false);
   }, [canvasGroups, activeCanvasId]);
 
   // Keep the active tab valid; default to the newest artifact.

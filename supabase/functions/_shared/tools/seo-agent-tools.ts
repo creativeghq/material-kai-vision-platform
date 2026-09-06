@@ -721,19 +721,53 @@ function siteReportCardProjection(data: any): {
   const stats: Array<{ label: string; value: string }> = [];
   const items: Array<{ left: string; right?: string; sub?: string; href?: string }> = [];
   const skip = /(^id$|_id$|url|^task|^error$|^note$|^status$|_at$)/;
+  /**
+   * How the subject is SET UP, which is never a finding.
+   *
+   * `overview` returns the `user_websites` row under `website`, so the card led with
+   * "website is active true", "website is default true", "website max pages 6000",
+   * "website display name Materials Hub" — four of its ten slots spent restating
+   * configuration for a site the card already names in its own footer. Scoped to the
+   * subject record on purpose: `is_active` under `tracked_domains` ("1 of 1 active") is a
+   * real figure and must survive.
+   */
+  const SUBJECT_KEYS = new Set(['website', 'site', 'domain_record']);
+  const CONFIG_KEYS = new Set(['is_default', 'is_active', 'max_pages', 'display_name', 'name', 'slug']);
   const scalar = (v: any) => typeof v === 'number' || typeof v === 'boolean' || (typeof v === 'string' && v.length <= 40);
   const fmt = (v: any) => typeof v === 'number' ? (Number.isInteger(v) ? String(v) : v.toFixed(1)) : String(v);
   if (!data || typeof data !== 'object' || Array.isArray(data)) return { stats, items };
 
-  for (const [k, v] of Object.entries(data)) {
-    if (stats.length >= 10) break;
-    if (skip.test(k)) continue;
-    if (scalar(v)) stats.push({ label: k.replace(/_/g, ' '), value: fmt(v) });
-    else if (v && typeof v === 'object' && !Array.isArray(v)) {
-      for (const [k2, v2] of Object.entries(v as Record<string, unknown>)) {
-        if (stats.length >= 10) break;
-        if (scalar(v2) && !skip.test(k2)) stats.push({ label: `${k} ${k2}`.replace(/_/g, ' '), value: fmt(v2) });
+  /**
+   * Flatten to TWO levels, not one.
+   *
+   * At one level a count map is invisible: `articles: { total, by_status: {...} }` rendered
+   * "articles total 2" and dropped `by_status` on the floor, because it is an object and the
+   * walk only tested for scalars. `by_status` is the breakdown — how many drafts, how many
+   * completed, how many failed — i.e. the single most useful thing in the payload and the
+   * one a person actually asks for. It was being discarded to make room for "is default".
+   */
+  const push = (label: string, v: unknown) => {
+    if (stats.length >= 12) return;
+    stats.push({ label: label.replace(/_/g, ' '), value: fmt(v) });
+  };
+  const walk = (obj: Record<string, unknown>, prefix: string, depth: number, drop?: Set<string>) => {
+    for (const [k, v] of Object.entries(obj)) {
+      if (stats.length >= 12) return;
+      if (skip.test(k) || drop?.has(k)) continue;
+      const label = prefix ? `${prefix} ${k}` : k;
+      if (scalar(v)) push(label, v);
+      else if (v && typeof v === 'object' && !Array.isArray(v) && depth < 2) {
+        walk(v as Record<string, unknown>, label, depth + 1, drop);
       }
+    }
+  };
+
+  for (const [k, v] of Object.entries(data)) {
+    if (stats.length >= 12) break;
+    if (skip.test(k)) continue;
+    if (scalar(v)) push(k, v);
+    else if (v && typeof v === 'object' && !Array.isArray(v)) {
+      walk(v as Record<string, unknown>, k, 1, SUBJECT_KEYS.has(k) ? CONFIG_KEYS : undefined);
     }
   }
 
