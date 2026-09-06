@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { SEO_ARTICLE_DEMO_DATA } from '../../src/data/demo/seo-article';
+import { fixListState } from '../../src/components/features/ai/seoFixState';
 
 /**
  * The demo article is the EXECUTABLE CONTRACT between the pipeline and the viewer.
@@ -145,5 +146,136 @@ describe('what the pipeline writes actually survives the write', () => {
     // finished one and the article renders as it looked halfway through.
     const fn = viewerSrc.slice(viewerSrc.indexOf('function hydrateArticle'));
     expect(fn.slice(0, fn.indexOf('\n}'))).toContain('=== null || merged[key] === undefined');
+  });
+});
+
+/**
+ * The Apply card must say why it is empty.
+ *
+ * The card rendered `null` whenever no fix was applicable, and every fix in the database was
+ * inapplicable — analyses produced before the analyzer learned to anchor carry no `scope` and no
+ * `anchor`, so the filter matched nothing. The result: an Apply/Revert feature that was built,
+ * tested against the handler, deployed, and did not exist on screen. Nothing could see it. The
+ * handler tests passed (they call the edge function directly), the types were satisfied (a fix
+ * with no `scope` is a valid fix), and the UI has no assertion that says "be visible".
+ *
+ * `fixListState` is the whole verdict, exported so it can be tested as a value rather than
+ * inferred from a render.
+ */
+describe('the Apply card explains itself rather than disappearing', () => {
+  const fix = (over: Record<string, unknown> = {}) => ({
+    category: 'readability',
+    severity: 'medium',
+    description: 'A long paragraph.',
+    suggestion: 'Break this paragraph into two or three shorter ones.',
+    affectedSection: null,
+    ...over,
+  });
+
+  it('an analysis older than anchoring reads as STALE, not as "nothing to do"', () => {
+    // The exact shape found in every stored article: fixes present, not one carrying a scope.
+    const state = fixListState({ fixes: [fix(), fix({ category: 'links' })] });
+    expect(state.kind).toBe('stale');
+  });
+
+  it('a fix anchored to a paragraph is applicable', () => {
+    const state = fixListState({ fixes: [fix({ scope: 'section', anchor: 'A long paragraph of prose.' })] });
+    expect(state.kind).toBe('applicable');
+    expect(state.kind === 'applicable' && state.fixes).toHaveLength(1);
+  });
+
+  it('a scoped analysis with nothing anchored is document-only, which is a different sentence', () => {
+    // "We looked and none of these can be fixed by rewriting one paragraph" is a real answer.
+    // "Your analysis is too old to say" is a different one, and it has a button that fixes it.
+    const state = fixListState({
+      fixes: [fix({ scope: 'config', category: 'provenance' }), fix({ scope: 'document', category: 'links' })],
+    });
+    expect(state.kind).toBe('document-only');
+  });
+
+  it('separates a clean article from one that was never analysed', () => {
+    expect(fixListState({ fixes: [] }).kind).toBe('clean');
+    expect(fixListState(null).kind).toBe('unanalysed');
+    expect(fixListState({}).kind).toBe('unanalysed');
+    expect(fixListState({ fixes: 'not an array' }).kind).toBe('unanalysed');
+  });
+
+  it('an anchor that is present but empty does not count as applicable', () => {
+    // `anchor: ''` would splice against every position in the document.
+    expect(fixListState({ fixes: [fix({ scope: 'section', anchor: '' })] }).kind).toBe('document-only');
+  });
+
+  it('the card has no early return — every state renders something', () => {
+    const card = viewerSrc.slice(viewerSrc.indexOf('function ApplicableFixes('));
+    const body = card.slice(0, card.indexOf('\n}\n'));
+    expect(
+      body,
+      'ApplicableFixes must not return null. It did, for every article that existed, which is '
+      + 'how a shipped feature stayed invisible.',
+    ).not.toMatch(/return null/);
+  });
+
+  it('every empty state has copy, so a new one cannot render a blank card', () => {
+    // The map is keyed by the union minus `applicable`, so TypeScript already refuses a missing
+    // entry — but only while the map stays exhaustive by TYPE. Assert the four exist by name.
+    const copy = readFileSync(join(ROOT, 'src/components/features/ai/seoFixState.ts'), 'utf-8');
+    const block = copy.slice(copy.indexOf('FIX_STATE_COPY'));
+    for (const kind of ['stale', "'document-only'", 'clean', 'unanalysed']) {
+      expect(block, `no copy for the ${kind} state`).toContain(kind);
+    }
+  });
+
+  it('offers the way out of the stale state', () => {
+    // An empty state that names a problem and offers no action is the empty-state rule broken.
+    expect(viewerSrc).toContain("action: 'reanalyze'");
+    expect(viewerSrc).toMatch(/onReanalyze/);
+  });
+});
+
+/**
+ * A write that changes the article body must also refresh the fix list, or the list describes
+ * text that is no longer there — and the anchor of the fix just applied is precisely the text
+ * that is gone. Pressing it again could only ever return "that paragraph is no longer in the
+ * article", which is true, correct, and a dead end.
+ */
+describe('applying or reverting a fix refreshes the analysis it invalidated', () => {
+  const applySrc = readFileSync(join(HANDLERS, 'apply-fix.ts'), 'utf-8');
+
+  it('both handlers persist the re-derived analysis, not just the score', () => {
+    expect((applySrc.match(/persistAnalysis\(/g) ?? []).length, 'apply and revert must both persist').toBe(2);
+  });
+
+  it('and hand it back, so the screen does not need a reload to agree with the database', () => {
+    expect((applySrc.match(/analysis: reanalysed/g) ?? []).length).toBe(2);
+    expect(viewerSrc).toContain('content_analysis: data.data.analysis ?? prev.content_analysis');
+  });
+
+  it('the re-analysis reads the brief on both paths', () => {
+    // Revert passed `null` where apply passed the real brief, so the same text scored differently
+    // depending on which direction you arrived from — the provenance and firsthand-experience
+    // checks read the brief.
+    const revert = applySrc.slice(applySrc.indexOf('export async function handleRevertFix'));
+    expect(revert).toContain('normalizeContentBrief(article.content_brief)');
+    expect(revert, 'a brief-less re-score gives a different answer for identical text').not.toContain('undefined, null, undefined');
+  });
+
+  it('re-analysis never rewrites the article body', () => {
+    // What makes it safe to offer unconditionally. A "refresh" that silently edited the article
+    // would make the honest answer too expensive to act on.
+    const reanalyze = readFileSync(join(HANDLERS, 'reanalyze.ts'), 'utf-8');
+    expect(reanalyze).not.toMatch(/markdown_content:/);
+    expect(reanalyze, 'the analyzer is pure TypeScript; charging for it would be charging for nothing')
+      .not.toMatch(/debit_credits/);
+  });
+
+  it('and it checks ownership the way every other article route does', () => {
+    const reanalyze = readFileSync(join(HANDLERS, 'reanalyze.ts'), 'utf-8');
+    expect(reanalyze).toContain('loadOwnedArticle');
+    const access = readFileSync(join(HANDLERS, 'article-access.ts'), 'utf-8');
+    // 404 on a foreign article, never 403 — invariant 1.
+    expect(access).toContain('userCanAccessWorkspace');
+    expect((access.match(/'Not found'/g) ?? []).length).toBeGreaterThanOrEqual(3);
+    // The status literal, not the word: the file explains WHY it never returns 403.
+    expect(access, 'a foreign article must 404, never 403 — 403 confirms the id exists').not.toMatch(/,\s*403\)/);
   });
 });

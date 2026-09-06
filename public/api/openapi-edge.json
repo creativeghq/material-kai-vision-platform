@@ -11923,6 +11923,27 @@
                         "description": "The seo_articles row to revert. 409 when there is no previous draft."
                       }
                     }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "article_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "reanalyze"
+                        ],
+                        "description": "Re-score a stored article and replace its saved analysis. Free and not a model call — the analyzer is pure TypeScript. Never touches the article body. Use it when the saved fix list predates per-paragraph anchoring (its fixes carry no scope, so none can be applied) or after the body changed. 409 when the article has no content or no stored plan."
+                      },
+                      "article_id": {
+                        "type": "string",
+                        "description": "The seo_articles row to re-analyse. 404 for an article outside the caller's workspace."
+                      }
+                    },
+                    "description": "Returns: {success: boolean, data: {article_id: string, analysis: ContentAnalysisResult, seo_score: number, readability_score: number|null, applicable_fixes: number, credits_used: 0}}"
                   }
                 ],
                 "discriminator": {

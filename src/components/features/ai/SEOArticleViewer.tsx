@@ -14,6 +14,9 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { supabase } from '@/integrations/supabase/client';
+// Import-free so it can be unit-tested as a value — importing this file boots the Supabase
+// client, which is why the verdict was never covered while it lived here.
+import { fixListState, FIX_STATE_COPY, type FixListState } from './seoFixState';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/core/ui/accordion';
 import { Badge } from '@/components/core/ui/badge';
 import { cn } from '@/lib/utils';
@@ -52,7 +55,7 @@ import {
   AlertOctagon,
   Quote,
   BookOpen,
-  Undo2, Wand2,
+  Undo2, Wand2, RefreshCw,
 } from 'lucide-react';
 
 // ─── Types (matching seo-pipeline output / ArticleOutput) ───────
@@ -113,17 +116,6 @@ interface SerpFeatures {
   hasKnowledgeGraph: boolean;
   hasPeopleAlsoAsk: boolean;
   serpFeatureTypes: string[];
-}
-
-/** A fix the analyzer located in ONE paragraph — the only kind that can be applied surgically. */
-interface ApplicableFix {
-  category: string;
-  severity: 'critical' | 'high' | 'medium' | 'low';
-  description: string;
-  suggestion: string;
-  affectedSection: string | null;
-  scope?: 'section' | 'document' | 'config';
-  anchor?: string | null;
 }
 
 // Matches ArticleOutput.optimize from seo-pipeline
@@ -443,75 +435,92 @@ function ScoreGauge({ score, label, size = 'lg' }: { score: number; label: strin
 /**
  * The fixes that can be applied to one paragraph, each with its own button.
  *
- * Only `scope: 'section'` fixes get here. That is the point: the analyzer's document-wide
- * and config findings still appear in the section breakdown below, but without a button,
- * because there is nothing a button could edit — meta tags come from the plan and
- * provenance from the brief, so an Apply on those would promise what it cannot do.
+ * Only `scope: 'section'` fixes get a button. That is the point: the analyzer’s document-wide
+ * and config findings still appear in the section breakdown below, but without one, because
+ * there is nothing a button could edit — meta tags come from the plan and provenance from the
+ * brief, so an Apply on those would promise what it cannot do.
  *
- * Each row shows the paragraph it will touch. Applying a model rewrite to a customer's
+ * What this card must NEVER do is render nothing. It did, and the result was a feature that
+ * existed in the database, in the edge function and on the deploy, and nowhere on the screen.
+ * A card that states its own emptiness costs one paragraph; one that hides costs the feature.
+ *
+ * Each row shows the paragraph it will touch. Applying a model rewrite to a customer’s
  * finished article without showing them which words are at stake is asking for a signature
  * on a blank page.
  */
-function ApplicableFixes({ fixes, applyingAnchor, onApply, canRevert, onRevert }: {
-  fixes: ApplicableFix[];
+function ApplicableFixes({ state, applyingAnchor, onApply, canRevert, onRevert, onReanalyze, reanalyzing }: {
+  state: FixListState;
   applyingAnchor: string | null;
   onApply: (fix: { anchor: string; suggestion: string }) => void;
   canRevert: boolean;
   onRevert: () => void;
+  onReanalyze: () => void;
+  reanalyzing: boolean;
 }) {
-  if (fixes.length === 0 && !canRevert) return null;
+  const fixes = state.kind === 'applicable' ? state.fixes : [];
+  const empty = state.kind === 'applicable' ? null : FIX_STATE_COPY[state.kind];
 
   return (
     <div className="rounded-lg border border-hairline bg-card">
-      <div className="flex items-center justify-between gap-2 border-b border-hairline px-3 py-2">
+      <div className="flex items-start justify-between gap-2 border-b border-hairline px-3 py-2">
         <div className="min-w-0">
           <p className="text-xs font-semibold">
-            {fixes.length > 0 ? 'Fixes you can apply here' : 'Applied fixes'}
+            {empty ? empty.title : 'Fixes you can apply here'}
           </p>
           <p className="text-[11px] text-muted-foreground">
-            {fixes.length > 0
-              ? 'Each rewrites only the paragraph shown — the rest of the article is untouched.'
-              : 'Nothing further can be applied automatically.'}
+            {empty
+              ? empty.body
+              : 'Each rewrites only the paragraph shown — the rest of the article is untouched.'}
           </p>
         </div>
-        {canRevert && (
-          <Button size="sm" variant="outline" onClick={onRevert} className="shrink-0 gap-1.5">
-            <Undo2 className="h-3.5 w-3.5" />
-            Revert last
+        <div className="flex shrink-0 items-center gap-1.5">
+          {/* Free, and it never touches the article body — so it is safe to press at any time,
+              which is what makes "your analysis is stale" an answer rather than a dead end. */}
+          <Button size="sm" variant="outline" onClick={onReanalyze} disabled={reanalyzing} className="gap-1.5">
+            {reanalyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+            {reanalyzing ? 'Analysing' : 'Re-analyse'}
           </Button>
-        )}
+          {canRevert && (
+            <Button size="sm" variant="outline" onClick={onRevert} className="gap-1.5">
+              <Undo2 className="h-3.5 w-3.5" />
+              Revert last
+            </Button>
+          )}
+        </div>
       </div>
 
-      <div className="divide-y divide-hairline">
-        {fixes.map((fix) => {
-          const busy = applyingAnchor === fix.anchor;
-          return (
-            <div key={fix.anchor} className="flex items-start gap-3 p-3">
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium">{fix.suggestion}</p>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  {fix.description}
-                  {fix.affectedSection ? ` · under “${fix.affectedSection}”` : ''}
-                </p>
-                {/* The words at stake. */}
-                <p className="mt-1.5 line-clamp-2 rounded-sm bg-surface-sunken px-2 py-1 text-[11px] text-muted-foreground">
-                  {fix.anchor}
-                </p>
+      {fixes.length > 0 && (
+        <div className="divide-y divide-hairline">
+          {fixes.map((fix) => {
+            const busy = applyingAnchor === fix.anchor;
+            return (
+              <div key={fix.anchor} className="flex items-start gap-3 p-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium">{fix.suggestion}</p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    {fix.description}
+                    {fix.affectedSection ? ` · under “${fix.affectedSection}”` : ''}
+                  </p>
+                  {/* The words at stake. */}
+                  <p className="mt-1.5 line-clamp-2 rounded-sm bg-surface-sunken px-2 py-1 text-[11px] text-muted-foreground">
+                    {fix.anchor}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={!!applyingAnchor}
+                  onClick={() => onApply({ anchor: fix.anchor as string, suggestion: fix.suggestion })}
+                  className="shrink-0 gap-1.5"
+                >
+                  {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
+                  {busy ? 'Applying' : 'Apply'}
+                </Button>
               </div>
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={!!applyingAnchor}
-                onClick={() => onApply({ anchor: fix.anchor as string, suggestion: fix.suggestion })}
-                className="shrink-0 gap-1.5"
-              >
-                {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
-                {busy ? 'Applying' : 'Apply'}
-              </Button>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -2233,6 +2242,7 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
    */
   const { toast } = useToast();
   const [applyingAnchor, setApplyingAnchor] = useState<string | null>(null);
+  const [reanalyzing, setReanalyzing] = useState(false);
   const applyFix = useCallback(async (fix: { anchor: string; suggestion: string }) => {
     if (!article?.id || applyingAnchor) return;
     setApplyingAnchor(fix.anchor);
@@ -2261,6 +2271,10 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
         seo_score: data.data.seo_score ?? prev.seo_score,
         overall_score: data.data.seo_score ?? prev.overall_score,
         readability_score: data.data.readability_score ?? prev.readability_score,
+        // The fix we just applied rewrote the paragraph its anchor pointed at, so that anchor is
+        // gone from the article. Keeping the old list would leave the applied fix on screen with
+        // a button that can only answer "that paragraph is no longer in the article".
+        content_analysis: data.data.analysis ?? prev.content_analysis,
         previous_markdown_at: data.data.reverts_to,
       } : prev));
       toast({
@@ -2289,25 +2303,61 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
       seo_score: data.data.seo_score ?? prev.seo_score,
       overall_score: data.data.seo_score ?? prev.overall_score,
       readability_score: data.data.readability_score ?? prev.readability_score,
+      content_analysis: data.data.analysis ?? prev.content_analysis,
     } : prev));
     toast({ title: 'Reverted', description: 'The previous draft is back.' });
   }, [article, toast]);
 
   /**
-   * The fixes that can actually be applied to a paragraph.
+   * Re-derive the analysis from the article as it stands.
    *
-   * `scope === 'section'` is the analyzer's own verdict and `anchor` is that paragraph
-   * verbatim. Document-wide and config fixes deliberately get NO button: meta tags come
-   * from the plan and provenance from the brief, so an Apply there would promise something
-   * it cannot do.
+   * Free and non-destructive: `analyzeContent` is pure TypeScript on the edge side, and the
+   * handler is forbidden from touching `markdown_content`. That is what lets this be offered
+   * unconditionally — the honest answer to "this analysis is stale" has to be cheap enough to
+   * act on, or it is not an answer.
    */
-  const applicableFixes = useMemo(() => {
-    const fixes = (article?.content_analysis as { fixes?: unknown })?.fixes;
-    if (!Array.isArray(fixes)) return [] as ApplicableFix[];
-    return (fixes as ApplicableFix[]).filter(
-      (f) => f?.scope === 'section' && typeof f.anchor === 'string' && !!f.anchor,
-    );
-  }, [article?.content_analysis]);
+  const reanalyze = useCallback(async () => {
+    if (!article?.id || reanalyzing) return;
+    setReanalyzing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('seo-api', {
+        body: { action: 'reanalyze', article_id: article.id },
+      });
+      if (error || !data?.success) {
+        toast({
+          title: 'Could not re-analyse',
+          description: data?.error || error?.message || 'Nothing was changed.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      setArticle((prev) => (prev ? {
+        ...prev,
+        content_analysis: data.data.analysis,
+        seo_score: data.data.seo_score ?? prev.seo_score,
+        overall_score: data.data.seo_score ?? prev.overall_score,
+        readability_score: data.data.readability_score ?? prev.readability_score,
+      } : prev));
+      const n = data.data.applicable_fixes ?? 0;
+      toast({
+        title: `Score ${data.data.seo_score}/100`,
+        // Say how many can be ACTED on, not just how many were found: "9 issues" next to zero
+        // buttons is the confusion this whole card exists to remove.
+        description: n > 0
+          ? `${n} ${n === 1 ? 'fix can' : 'fixes can'} be applied to a single paragraph.`
+          : 'No issue here can be fixed by rewriting one paragraph.',
+      });
+    } finally {
+      setReanalyzing(false);
+    }
+  }, [article, reanalyzing, toast]);
+
+  /**
+   * What the Apply card should say. `fixListState` is exported and unit-tested: the branch that
+   * matters (an analysis older than anchoring) is invisible from the types, since a fix with no
+   * `scope` is a perfectly valid fix.
+   */
+  const fixState = useMemo(() => fixListState(article?.content_analysis), [article?.content_analysis]);
 
   if (loading) {
     return (
@@ -2513,11 +2563,13 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
                 {article.optimize_data && (
                   <TabsContent value="optimize" className="mt-4 space-y-4">
                     <ApplicableFixes
-                      fixes={applicableFixes}
+                      state={fixState}
                       applyingAnchor={applyingAnchor}
                       onApply={applyFix}
                       canRevert={!!article.previous_markdown_at}
                       onRevert={revertFix}
+                      onReanalyze={reanalyze}
+                      reanalyzing={reanalyzing}
                     />
                     <OptimizeTab data={article.optimize_data} overallScore={article.overall_score || 0} />
                   </TabsContent>

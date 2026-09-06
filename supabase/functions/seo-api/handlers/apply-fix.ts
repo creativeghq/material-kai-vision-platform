@@ -20,12 +20,14 @@
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../../_shared/http.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
-import { authenticate, userCanAccessWorkspace } from '../../_shared/auth.ts';
+import { authenticate } from '../../_shared/auth.ts';
 import { resolveAndAssertSeoEntitled } from './entitlement.ts';
 import { generateWithClaude } from '../../_shared/ai-client.ts';
 import { getGenerationPrompt, renderPromptTemplate } from '../../_shared/prompt-utils.ts';
 import { normalizeContentBrief, briefList } from './content-brief.ts';
 import { analyzeContent } from './analyze.ts';
+import { loadOwnedArticle, storedArticlePlan, persistAnalysis } from './article-access.ts';
+import type { ArticlePlan, ContentAnalysisResult } from '../../_shared/seo-types.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -74,21 +76,11 @@ export async function handleApplyFix(req: Request, body: any): Promise<Response>
       );
     }
 
-    const { data: article, error: readErr } = await supabase
-      .from('seo_articles')
-      .select('id, workspace_id, user_id, markdown_content, content_brief, stages_data')
-      .eq('id', articleId)
-      .maybeSingle();
-    if (readErr) return jsonResponse({ success: false, error: readErr.message }, 500);
     // 404 on a miss AND on a foreign article — never 403, which confirms the id exists
-    // (invariant 1).
-    if (!article) return jsonResponse({ success: false, error: 'Not found' }, 404);
-    if (article.workspace_id) {
-      const ok = await userCanAccessWorkspace(supabase, userId, article.workspace_id);
-      if (!ok) return jsonResponse({ success: false, error: 'Not found' }, 404);
-    } else if (article.user_id !== userId) {
-      return jsonResponse({ success: false, error: 'Not found' }, 404);
-    }
+    // (invariant 1). One implementation, shared with reanalyze.
+    const loaded = await loadOwnedArticle(supabase, userId, articleId);
+    if ('response' in loaded) return loaded.response;
+    const article = loaded.article;
 
     const markdown: string = article.markdown_content || '';
     const occurrences = markdown.split(anchor).length - 1;
@@ -163,14 +155,21 @@ export async function handleApplyFix(req: Request, body: any): Promise<Response>
       throw new Error('The rewrite came back identical — nothing was changed.');
     }
 
-    // Re-score. `analyzeContent` is pure TypeScript with no model call, so the new score is
-    // free and immediate — there is no reason to hand back a stale one.
-    const plan = (article.stages_data as any)?.extra?.article_plan ?? null;
+    // Re-analyse. `analyzeContent` is pure TypeScript with no model call, so this is free and
+    // immediate — there is no reason to hand back a stale answer.
+    //
+    // The whole ANALYSIS is re-derived, not just the score. The fix we just applied rewrote the
+    // paragraph its anchor pointed at, so that anchor no longer occurs in the article: leaving
+    // the stored analysis alone left the applied fix on the list, and pressing it again returned
+    // "that paragraph is no longer in the article". The list has to describe the article as it
+    // is now, and after this edit only this function knows what that is.
+    const plan = storedArticlePlan(article) as ArticlePlan | null;
     let score: number | null = null;
     let readability: number | null = null;
+    let reanalysed: ContentAnalysisResult | null = null;
     if (plan) {
       try {
-        const reanalysed = analyzeContent(next, plan, undefined, brief, undefined);
+        reanalysed = analyzeContent(next, plan, undefined, brief, undefined);
         score = reanalysed.overallScore;
         readability = reanalysed.readabilityScore;
       } catch (scoreErr) {
@@ -180,21 +179,20 @@ export async function handleApplyFix(req: Request, body: any): Promise<Response>
     }
 
     const capturedAt = new Date().toISOString();
-    const { error: writeErr } = await supabase
-      .from('seo_articles')
-      .update({
-        markdown_content: next,
-        // Snapshot BEFORE-state, written in the same statement as the new body so the two
-        // can never disagree about which text the snapshot precedes.
-        previous_markdown: markdown,
-        previous_markdown_at: capturedAt,
-        previous_markdown_label: instruction.slice(0, 200),
-        ...(score !== null ? { seo_score: score } : {}),
-        ...(readability !== null ? { readability_score: readability } : {}),
-        updated_at: capturedAt,
-      })
-      .eq('id', articleId);
-    if (writeErr) throw new Error(`Could not save the revised article: ${writeErr.message}`);
+    // Snapshot BEFORE-state, written in the SAME statement as the new body so the two can never
+    // disagree about which text the snapshot precedes — and, when the re-analysis succeeded, the
+    // refreshed fix list goes with them for the same reason.
+    const snapshot = {
+      markdown_content: next,
+      previous_markdown: markdown,
+      previous_markdown_at: capturedAt,
+      previous_markdown_label: instruction.slice(0, 200),
+      updated_at: capturedAt,
+    };
+    const writeErr = reanalysed
+      ? (await persistAnalysis(supabase, article, reanalysed, snapshot)).error
+      : (await supabase.from('seo_articles').update(snapshot).eq('id', articleId)).error?.message ?? null;
+    if (writeErr) throw new Error(`Could not save the revised article: ${writeErr}`);
 
     return jsonResponse({
       success: true,
@@ -204,6 +202,7 @@ export async function handleApplyFix(req: Request, body: any): Promise<Response>
         revised_block: revised,
         seo_score: score,
         readability_score: readability,
+        analysis: reanalysed,
         can_revert: true,
         reverts_to: capturedAt,
         credits_used: APPLY_CREDIT_COST,
@@ -250,54 +249,63 @@ export async function handleRevertFix(req: Request, body: any): Promise<Response
     const articleId = typeof body.article_id === 'string' ? body.article_id : null;
     if (!articleId) return jsonResponse({ success: false, error: 'article_id is required' }, 400);
 
-    const { data: article, error: readErr } = await supabase
+    const loaded = await loadOwnedArticle(supabase, userId, articleId);
+    if ('response' in loaded) return loaded.response;
+    const article = loaded.article;
+
+    // `previous_markdown` is not in the shared column list — it is this handler's alone.
+    const { data: prev, error: prevErr } = await supabase
       .from('seo_articles')
-      .select('id, workspace_id, user_id, markdown_content, previous_markdown, previous_markdown_label, stages_data')
+      .select('previous_markdown, previous_markdown_label')
       .eq('id', articleId)
       .maybeSingle();
-    if (readErr) return jsonResponse({ success: false, error: readErr.message }, 500);
-    if (!article) return jsonResponse({ success: false, error: 'Not found' }, 404);
-    if (article.workspace_id) {
-      const ok = await userCanAccessWorkspace(supabase, userId, article.workspace_id);
-      if (!ok) return jsonResponse({ success: false, error: 'Not found' }, 404);
-    } else if (article.user_id !== userId) {
-      return jsonResponse({ success: false, error: 'Not found' }, 404);
-    }
-
-    if (!article.previous_markdown) {
+    if (prevErr) return jsonResponse({ success: false, error: prevErr.message }, 500);
+    if (!prev?.previous_markdown) {
       return jsonResponse({ success: false, error: 'There is no previous draft to revert to.' }, 409);
     }
 
-    const restored: string = article.previous_markdown;
-    const plan = (article.stages_data as any)?.extra?.article_plan ?? null;
+    const restored: string = prev.previous_markdown;
+    // The brief was passed as `null` here and as the real brief on the way in, so a revert used
+    // to hand back a score the apply path would never have produced for the same text — the
+    // provenance and firsthand-experience checks read the brief.
+    const brief = normalizeContentBrief(article.content_brief);
+    const plan = storedArticlePlan(article) as ArticlePlan | null;
     let score: number | null = null;
     let readability: number | null = null;
+    let reanalysed: ContentAnalysisResult | null = null;
     if (plan) {
       try {
-        const reanalysed = analyzeContent(restored, plan, undefined, null, undefined);
+        reanalysed = analyzeContent(restored, plan, undefined, brief, undefined);
         score = reanalysed.overallScore;
         readability = reanalysed.readabilityScore;
       } catch { /* the restore matters more than the score */ }
     }
 
     const now = new Date().toISOString();
-    const { error: writeErr } = await supabase
-      .from('seo_articles')
-      .update({
-        markdown_content: restored,
-        previous_markdown: article.markdown_content,
-        previous_markdown_at: now,
-        previous_markdown_label: `Undo of: ${article.previous_markdown_label ?? 'an applied fix'}`.slice(0, 200),
-        ...(score !== null ? { seo_score: score } : {}),
-        ...(readability !== null ? { readability_score: readability } : {}),
-        updated_at: now,
-      })
-      .eq('id', articleId);
-    if (writeErr) return jsonResponse({ success: false, error: writeErr.message }, 500);
+    // Swap, so the revert is itself undoable — and re-analyse, because the fix list describes
+    // the text that is in the article, which as of this statement is the restored one.
+    const snapshot = {
+      markdown_content: restored,
+      previous_markdown: article.markdown_content,
+      previous_markdown_at: now,
+      previous_markdown_label: `Undo of: ${prev.previous_markdown_label ?? 'an applied fix'}`.slice(0, 200),
+      updated_at: now,
+    };
+    const writeErr = reanalysed
+      ? (await persistAnalysis(supabase, article, reanalysed, snapshot)).error
+      : (await supabase.from('seo_articles').update(snapshot).eq('id', articleId)).error?.message ?? null;
+    if (writeErr) return jsonResponse({ success: false, error: writeErr }, 500);
 
     return jsonResponse({
       success: true,
-      data: { article_id: articleId, markdown_content: restored, seo_score: score, readability_score: readability, can_revert: true },
+      data: {
+        article_id: articleId,
+        markdown_content: restored,
+        seo_score: score,
+        readability_score: readability,
+        analysis: reanalysed,
+        can_revert: true,
+      },
     });
   } catch (error: any) {
     console.error('[seo-revert-fix] Error:', error);
