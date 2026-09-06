@@ -75,7 +75,10 @@ export async function persistAnalysis(
   supabase: SupabaseClient,
   article: Pick<OwnedArticle, 'id' | 'stages_data'>,
   analysis: ContentAnalysisResult,
-  extraFields: Record<string, unknown> = {},
+  /** Real columns to set in the same statement (the revert snapshot, say). */
+  columns: Record<string, unknown> = {},
+  /** Further `stages_data.extra` keys to merge — gaps/gains, when they were re-derived. */
+  extraKeys: Record<string, unknown> = {},
 ): Promise<{ error: string | null }> {
   const stages = (article.stages_data ?? {}) as Record<string, unknown>;
   const extra = (stages.extra ?? {}) as Record<string, unknown>;
@@ -85,12 +88,14 @@ export async function persistAnalysis(
     .update({
       stages_data: {
         ...stages,
-        extra: { ...extra, content_analysis: analysis, overall_score: analysis.overallScore },
+        extra: {
+          ...extra, ...extraKeys, content_analysis: analysis, overall_score: analysis.overallScore,
+        },
       },
       seo_score: analysis.overallScore,
       ...(analysis.readabilityScore !== null ? { readability_score: analysis.readabilityScore } : {}),
       updated_at: new Date().toISOString(),
-      ...extraFields,
+      ...columns,
     })
     .eq('id', article.id);
 

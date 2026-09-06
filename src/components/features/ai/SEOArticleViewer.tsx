@@ -17,6 +17,9 @@ import { supabase } from '@/integrations/supabase/client';
 // Import-free so it can be unit-tested as a value — importing this file boots the Supabase
 // client, which is why the verdict was never covered while it lived here.
 import { fixListState, FIX_STATE_COPY, type FixListState } from './seoFixState';
+import { Link } from 'react-router-dom';
+import { Input } from '@/components/core/ui/input';
+import { Textarea } from '@/components/core/ui/textarea';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/core/ui/accordion';
 import { Badge } from '@/components/core/ui/badge';
 import { cn } from '@/lib/utils';
@@ -55,7 +58,7 @@ import {
   AlertOctagon,
   Quote,
   BookOpen,
-  Undo2, Wand2, RefreshCw,
+  Undo2, Wand2, RefreshCw, Plus,
 } from 'lucide-react';
 
 // ─── Types (matching seo-pipeline output / ArticleOutput) ───────
@@ -172,6 +175,10 @@ interface MissingTopic {
   type: 'gap' | 'gain';
   competitorCount: number;
   relevanceScore: number;
+  /** Absent on rows written before gaps became topics rather than competitor page titles. */
+  source?: 'keyword' | 'question' | 'competitor_heading';
+  searchVolume?: number | null;
+  competitorBrand?: boolean;
 }
 
 // Matches ArticleOutput.research from seo-pipeline
@@ -797,7 +804,84 @@ function OptimizeTab({ data, overallScore }: { data: OptimizeData; overallScore:
 
 // ─── Brief Tab ──────────────────────────────────────────────────
 
-function BriefTab({ data }: { data: BriefData }) {
+/**
+ * Put a new question into the article's FAQ section.
+ *
+ * The only route in before this was Research → Questions, which appends `## <question>` and a TODO
+ * marker to the BOTTOM of the document — below the conclusion, outside the FAQ, and with no answer.
+ * For a question that is the wrong place twice over: the viewer renders the FAQ block as an
+ * accordion and `faq_schema` is what a FAQPage rich result is built from, and appending broke both.
+ *
+ * The answer is optional. Typed by hand it is free; left blank it costs 2 credits and Claude writes
+ * one in the article's language, matching the length and register of the entries already there.
+ */
+function AddFaqControl({ onAdd }: {
+  onAdd: (question: string, answer: string) => Promise<boolean>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [question, setQuestion] = useState('');
+  const [answer, setAnswer] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    if (!question.trim() || busy) return;
+    setBusy(true);
+    try {
+      if (await onAdd(question.trim(), answer.trim())) {
+        setQuestion('');
+        setAnswer('');
+        setOpen(false);
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!open) {
+    return (
+      <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setOpen(true)}>
+        <Plus className="h-3.5 w-3.5" />
+        Add a question
+      </Button>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-hairline bg-surface-sunken p-3 space-y-2">
+      <Input
+        autoFocus
+        value={question}
+        onChange={(e) => setQuestion(e.target.value)}
+        placeholder="The question, as someone would search it"
+        className="h-9"
+      />
+      <Textarea
+        value={answer}
+        onChange={(e) => setAnswer(e.target.value)}
+        placeholder="Answer (optional) — leave blank and it is written for you, 40-60 words, 2 credits"
+        rows={3}
+        className="text-sm"
+      />
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] text-muted-foreground">
+          Goes into the article's FAQ section and its FAQ schema. Revertible.
+        </p>
+        <div className="flex shrink-0 gap-1.5">
+          <Button size="sm" variant="ghost" onClick={() => setOpen(false)} disabled={busy}>Cancel</Button>
+          <Button size="sm" onClick={submit} disabled={busy || !question.trim()} className="gap-1.5">
+            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+            {busy ? 'Adding' : answer.trim() ? 'Add' : 'Write & add'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BriefTab({ data, onAddFaq }: {
+  data: BriefData;
+  onAddFaq?: (question: string, answer: string) => Promise<boolean>;
+}) {
   // Flatten sections into outline items for rendering
   const outlineItems = useMemo(() => {
     const items: { level: number; text: string }[] = [];
@@ -857,10 +941,11 @@ function BriefTab({ data }: { data: BriefData }) {
         </div>
       )}
 
-      {/* FAQ Questions */}
-      {data.faqQuestions?.length > 0 && (
-        <div>
-          <h3 className="text-sm font-semibold mb-3">FAQ Questions</h3>
+      {/* FAQ Questions. Rendered even when there are none: "no FAQ yet" plus the way to add
+          one beats an absent section, which reads as a surface that does not exist. */}
+      <div>
+        <h3 className="text-sm font-semibold mb-3">FAQ Questions</h3>
+        {data.faqQuestions?.length > 0 ? (
           <ul className="space-y-1">
             {data.faqQuestions.map((q, i) => (
               <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
@@ -869,8 +954,16 @@ function BriefTab({ data }: { data: BriefData }) {
               </li>
             ))}
           </ul>
-        </div>
-      )}
+        ) : (
+          // Deliberately not "no FAQ entries yet": a sentence about absence with the control
+          // beneath it is a dead end followed by a way out. Say what the section is for, once.
+          <p className="text-sm text-muted-foreground">
+            Add the questions buyers actually ask — each one goes into the article's FAQ section
+            and its FAQ schema, which is what a rich result is built from.
+          </p>
+        )}
+        {onAddFaq && <div className="mt-3"><AddFaqControl onAdd={onAddFaq} /></div>}
+      </div>
 
       {/* Key Terms */}
       {data.keyTerms?.length > 0 && (
@@ -891,10 +984,31 @@ function BriefTab({ data }: { data: BriefData }) {
 
 // ─── Gaps/Gains Tab ─────────────────────────────────────────────
 
-function GapsGainsTab({ data }: { data: GapsGainsData }) {
+const GAP_SOURCE_LABEL: Record<NonNullable<MissingTopic['source']>, string> = {
+  keyword: 'Searched keyword',
+  question: 'People Also Ask',
+  competitor_heading: 'Competitor section',
+};
+
+/**
+ * What the article does not cover that people search for — and what it already does.
+ *
+ * This panel used to list competitor PAGE TITLES: `Gap: ΨΑΡΑΔΕΛΛΗΣ | ΠΛΑΚΑΚΙΑ` meant "a rival
+ * brand name does not appear in your text", and every row carried the same two hardcoded numbers
+ * (3 competitors, 60%). Rows are topics now, each with the real volume behind it — see
+ * supabase/functions/seo-api/handlers/gaps.ts.
+ *
+ * A row written before that change has no `source`, so it is shown for what it is rather than
+ * dressed up with numbers that were never measured. Re-analyse rebuilds it.
+ */
+function GapsGainsTab({ data, onAddToContent, onReanalyze }: {
+  data: GapsGainsData;
+  onAddToContent?: (snippet: string) => Promise<'inserted' | 'exists' | 'notfound'>;
+  onReanalyze?: () => void;
+}) {
   const [filter, setFilter] = useState<'all' | 'gap' | 'gain'>('all');
 
-  const allTopics = data.all || [];
+  const allTopics = useMemo(() => data.all || [], [data.all]);
   const filtered = useMemo(() => {
     if (filter === 'all') return allTopics;
     if (filter === 'gap') return data.gaps || [];
@@ -903,56 +1017,108 @@ function GapsGainsTab({ data }: { data: GapsGainsData }) {
 
   const gapCount = data.gapCount ?? (data.gaps?.length || 0);
   const gainCount = data.gainCount ?? (data.gains?.length || 0);
+  const legacy = allTopics.length > 0 && allTopics.every((t) => !t.source);
 
   return (
     <div className="space-y-4">
-      {/* Filter buttons */}
+      <p className="text-xs text-muted-foreground">
+        Topics people search for around this keyword. A <span className="text-foreground">gap</span> is
+        one the article does not cover; a <span className="text-foreground">gain</span> is one it already
+        does. Volume is monthly searches.
+      </p>
+
+      {legacy && (
+        <div className="rounded-lg border border-hairline bg-surface-sunken p-3">
+          <p className="text-xs font-semibold">These rows are competitor page titles, not topics</p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            They were produced before this panel measured anything: the two figures on each row were
+            the same constants for every article. Press <span className="text-foreground">Re-analyse</span> on
+            the Optimize tab to rebuild them from the keyword research — it is free.
+          </p>
+        </div>
+      )}
+
       <div className="flex gap-2">
-        <Button
-          variant={filter === 'all' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setFilter('all')}
-        >
+        <Button variant={filter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('all')}>
           All ({allTopics.length})
         </Button>
-        <Button
-          variant={filter === 'gap' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setFilter('gap')}
-          className={filter === 'gap' ? 'bg-red-500 hover:bg-red-600' : ''}
-        >
+        <Button variant={filter === 'gap' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('gap')}>
           Gaps ({gapCount})
         </Button>
-        <Button
-          variant={filter === 'gain' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setFilter('gain')}
-          className={filter === 'gain' ? 'bg-green-500 hover:bg-green-600' : ''}
-        >
+        <Button variant={filter === 'gain' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('gain')}>
           Gains ({gainCount})
         </Button>
       </div>
 
-      {/* Topic list */}
       <div className="space-y-2">
         {filtered.map((topic, i) => (
-          <div key={i} className="flex items-center justify-between p-3 border rounded-lg">
-            <div className="flex items-center gap-3">
-              <span
-                className={`text-sm capitalize ${topic.type === 'gap' ? 'text-red-700 dark:text-red-400' : 'text-emerald-700 dark:text-emerald-400'}`}
-              >
-                {topic.type}
-              </span>
-              <span className="text-sm">{topic.topic}</span>
+          <div key={`${topic.topic}-${i}`} className="flex items-start justify-between gap-3 rounded-lg border p-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant={topic.type === 'gap' ? 'warning' : 'success'} className="capitalize">
+                  {topic.type}
+                </Badge>
+                <span className="text-sm">{topic.topic}</span>
+                {/* Naming it beats hiding it: this is where the demand is, and it is also the one
+                    row you should probably not write about. */}
+                {topic.competitorBrand && (
+                  <Badge variant="neutral" title="This query names a competitor's brand">
+                    Competitor brand
+                  </Badge>
+                )}
+              </div>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                {topic.source ? GAP_SOURCE_LABEL[topic.source] : 'Competitor page title (unmeasured)'}
+                {topic.source && ` · ${topic.competitorCount} of the ranked pages mention it`}
+              </p>
             </div>
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              <span>{topic.competitorCount} competitors</span>
-              <span>Relevance: {Math.round(topic.relevanceScore * 100)}%</span>
+
+            <div className="flex shrink-0 items-center gap-3">
+              <div className="text-right">
+                <p className="text-sm tabular-nums">
+                  {/* Upstream writes 0 when the API returns nothing, so 0 and "unknown" are the
+                      same value. Neither is a number to rank decisions by — say so. */}
+                  {topic.searchVolume != null ? topic.searchVolume.toLocaleString() : '—'}
+                </p>
+                <p className="text-[10px] text-muted-foreground">
+                  {topic.searchVolume != null ? 'searches/mo' : 'no volume data'}
+                </p>
+              </div>
+              {topic.type === 'gap' && topic.source && onAddToContent && (
+                <AddToContentButton
+                  snippet={topic.source === 'question'
+                    ? `## ${topic.topic}\n\n_TODO: answer this — searchers ask it and this article does not._`
+                    : `## ${topic.topic}\n\n_TODO: cover this — it is searched for and this article does not mention it._`}
+                  onAdd={onAddToContent}
+                  label="Add section"
+                />
+              )}
             </div>
           </div>
         ))}
         {filtered.length === 0 && (
-          <p className="text-sm text-muted-foreground text-center py-4">No topics found</p>
+          <div className="flex flex-col items-center gap-2 py-6 text-center">
+            <p className="text-sm text-muted-foreground">
+              {allTopics.length === 0
+                ? 'The research behind this article listed no topics to compare it against.'
+                : filter === 'gap'
+                  ? 'Every researched topic is covered by the article.'
+                  : 'None of the researched topics appear in the article yet.'}
+            </p>
+            {/* An empty surface offers the way out of being empty. Filtered → drop the filter;
+                genuinely empty → the free re-analysis, which is what rebuilds this list. */}
+            {allTopics.length === 0 ? (
+              onReanalyze && (
+                <Button size="sm" variant="outline" className="gap-1.5" onClick={onReanalyze}>
+                  <RefreshCw className="h-3.5 w-3.5" /> Re-analyse
+                </Button>
+              )
+            ) : (
+              <Button size="sm" variant="outline" onClick={() => setFilter('all')}>
+                Show all {allTopics.length}
+              </Button>
+            )}
+          </div>
         )}
       </div>
     </div>
@@ -1027,8 +1193,12 @@ function ResearchTab({ data, onAddToContent }: {
     if (Object.keys(s.contentTypeDistribution || {}).length > 0) {
       entries.push({ label: 'Content Types', value: Object.entries(s.contentTypeDistribution).map(([k, v]) => `${k}: ${v}`).join(', ') });
     }
-    // If no stats available, show a message
-    if (entries.length === 0) entries.push({ label: 'Data', value: 'No statistics available yet' });
+    // A stated reason, not a shrug. Every figure above is a real measurement of the ranked pages,
+    // so an empty set means the research stage recorded none for this keyword — which is a fact
+    // about the SERP, not a placeholder waiting to fill itself in.
+    if (entries.length === 0) {
+      entries.push({ label: 'Content landscape', value: 'The research stage measured none of the ranked pages for this keyword.' });
+    }
     return entries;
   }, [data.statistics]);
 
@@ -1182,6 +1352,34 @@ function ResearchTab({ data, onAddToContent }: {
       {/* Questions — uses QuestionData from seo-types */}
       {subTab === 'questions' && (
         <div className="space-y-2">
+          {/*
+            * An empty list here is a FINDING, not a blank panel.
+            *
+            * "πλακάκια μπάνιου θεσσαλονίκη" returns no People Also Ask box at all — a local-intent
+            * query, so Google shows a local pack instead. The SERP call succeeded and reported
+            * exactly that (`hasPeopleAlsoAsk: false`, features: local_pack, organic, images,
+            * related_searches). The panel rendered nothing, which reads as "this is broken" and is
+            * indistinguishable from a collector that failed. Say which it is.
+            */}
+          {(data.questions || []).length === 0 && (
+            <div className="rounded-lg border border-hairline bg-surface-sunken p-3">
+              <p className="text-xs font-semibold">
+                {data.serpFeatures
+                  ? (data.serpFeatures.hasPeopleAlsoAsk
+                    ? 'The People Also Ask box was there, but no questions came back'
+                    : 'Google shows no People Also Ask box for this keyword')
+                  : 'No questions were collected for this article'}
+              </p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                {data.serpFeatures && !data.serpFeatures.hasPeopleAlsoAsk
+                  ? `The search results carry ${data.serpFeatures.serpFeatureTypes?.join(', ') || 'no listed features'} `
+                    + 'instead — so there is nothing to answer here, rather than something missing. '
+                    + 'The FAQ section in the article was written from the brief.'
+                  : 'The research ran before this panel recorded which SERP features were present, so '
+                    + 'whether the box was absent or the collector failed cannot be told apart from here.'}
+              </p>
+            </div>
+          )}
           {(data.questions || []).map((q, i) => (
             <div key={i} className="flex items-start gap-3 p-3 border rounded-lg">
               <div className={`mt-0.5 ${q.answered ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground/30'}`}>
@@ -1359,9 +1557,12 @@ function InterlinkingTab({ data, markdown, onApplyLink }: { data: InterlinkingDa
               articles previously generated through this tool.
             </p>
             <p>
-              <a href="/profile" className="text-primary font-medium hover:underline">
+              {/* `<Link>`, not `<a href>`: this is an in-app route, and an anchor tears the SPA
+                  down and reloads it. Naming the tab matters too — /profile lands on the default
+                  pane, not the websites list this sentence is sending you to. */}
+              <Link to="/profile?tab=websites" className="text-primary font-medium hover:underline">
                 Connect your website's sitemap →
-              </a>{' '}
+              </Link>{' '}
               to enable site-aware inter-linking suggestions.
             </p>
           </div>
@@ -2309,6 +2510,47 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
   }, [article, toast]);
 
   /**
+   * Add a question (and an answer) to the article's FAQ section.
+   *
+   * Returns whether it landed, so the form can stay open with the text still in it when it did
+   * not — retyping a question you just wrote because a request failed is its own small insult.
+   */
+  const addFaq = useCallback(async (question: string, answer: string): Promise<boolean> => {
+    if (!article?.id) return false;
+    const { data, error } = await supabase.functions.invoke('seo-api', {
+      body: { action: 'add_faq', article_id: article.id, question, ...(answer ? { answer } : {}) },
+    });
+    if (error || !data?.success) {
+      toast({
+        title: 'Could not add that question',
+        description: data?.error || error?.message || 'Nothing was changed.',
+        variant: 'destructive',
+      });
+      return false;
+    }
+    setArticle((prev) => (prev ? {
+      ...prev,
+      markdown_content: data.data.markdown_content,
+      content_analysis: data.data.analysis ?? prev.content_analysis,
+      gaps_gains_data: data.data.gaps_gains ?? prev.gaps_gains_data,
+      brief_data: prev.brief_data
+        ? {
+          ...prev.brief_data,
+          faqQuestions: [...(prev.brief_data.faqQuestions ?? []), { id: data.data.question, question: data.data.question }],
+        }
+        : prev.brief_data,
+      previous_markdown_at: data.data.reverts_to,
+    } : prev));
+    toast({
+      title: 'Added to the FAQ',
+      description: data.data.created_section
+        ? 'The article had no FAQ section, so one was created before the conclusion.'
+        : `Added under “${data.data.heading}”. You can revert this.`,
+    });
+    return true;
+  }, [article, toast]);
+
+  /**
    * Re-derive the analysis from the article as it stands.
    *
    * Free and non-destructive: `analyzeContent` is pure TypeScript on the edge side, and the
@@ -2577,13 +2819,13 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
 
                 {article.brief_data && (
                   <TabsContent value="brief" className="mt-4">
-                    <BriefTab data={article.brief_data} />
+                    <BriefTab data={article.brief_data} onAddFaq={addFaq} />
                   </TabsContent>
                 )}
 
                 {article.gaps_gains_data && (
                   <TabsContent value="gaps" className="mt-4">
-                    <GapsGainsTab data={article.gaps_gains_data} />
+                    <GapsGainsTab data={article.gaps_gains_data} onAddToContent={addToContent} onReanalyze={reanalyze} />
                   </TabsContent>
                 )}
 

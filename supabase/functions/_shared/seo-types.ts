@@ -394,10 +394,23 @@ export interface ContentAnalysisResult {
 // ════════════════════════════════════════════════════════════════
 
 export interface MissingTopic {
+  /** The keyword, question or section heading — never a competitor's page title. */
   topic: string;
   type: 'gap' | 'gain';
-  competitorCount: number; // How many competitors cover it
+  /** Where the topic came from, so a reader knows what they are being shown. */
+  source: 'keyword' | 'question' | 'competitor_heading';
+  /**
+   * Monthly searches, from DataForSEO. NULL when there is no usable figure — which includes the
+   * 0 the client writes when the API returns nothing, since the two are indistinguishable by the
+   * time they get here and neither is a number to rank decisions by.
+   */
+  searchVolume: number | null;
+  /** How many ranked competitors mention it, counted — not the flat `3` this used to carry. */
+  competitorCount: number;
+  /** 0-1, from the keyword's opportunity score where research computed one. */
   relevanceScore: number;
+  /** The query names a competitor's brand: worth seeing, rarely worth writing. */
+  competitorBrand?: boolean;
 }
 
 // ════════════════════════════════════════════════════════════════

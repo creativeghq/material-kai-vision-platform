@@ -28,6 +28,7 @@ import { resolveAndAssertSeoEntitled } from './entitlement.ts';
 import { normalizeContentBrief } from './content-brief.ts';
 import { analyzeContent } from './analyze.ts';
 import { loadOwnedArticle, storedArticlePlan, persistAnalysis } from './article-access.ts';
+import { buildGapsGains, type GapSources } from './gaps.ts';
 import type { ArticlePlan } from '../../_shared/seo-types.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -83,7 +84,21 @@ export async function handleReanalyze(req: Request, body: any): Promise<Response
       undefined,
     );
 
-    const { error: writeErr } = await persistAnalysis(supabase, article, analysis);
+    // Gaps/Gains are re-derived here too. They were built from competitor PAGE TITLES with two
+    // hardcoded numbers beside them, so every article ever produced carries a broken set; without
+    // this, the fix would only ever reach articles written after today. `research_tab_data` is
+    // stored on the row, which is what makes the repair possible at all.
+    const research = (article.stages_data as { extra?: { research_tab_data?: GapSources } } | null)
+      ?.extra?.research_tab_data;
+    const gapsGains = research ? buildGapsGains(markdown, research) : null;
+
+    const { error: writeErr } = await persistAnalysis(
+      supabase,
+      article,
+      analysis,
+      {},
+      gapsGains ? { gaps_gains_data: gapsGains } : {},
+    );
     if (writeErr) throw new Error(`Could not save the analysis: ${writeErr}`);
 
     const applicable = analysis.fixes.filter((f) => f.scope === 'section' && f.anchor).length;
@@ -98,6 +113,7 @@ export async function handleReanalyze(req: Request, body: any): Promise<Response
         seo_score: analysis.overallScore,
         readability_score: analysis.readabilityScore,
         applicable_fixes: applicable,
+        gaps_gains: gapsGains,
         credits_used: 0,
       },
     });

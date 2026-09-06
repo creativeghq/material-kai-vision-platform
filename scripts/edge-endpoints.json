@@ -5824,7 +5824,32 @@
             "desc": "The seo_articles row to re-analyse. 404 for an article outside the caller's workspace."
           }
         ],
-        "response": "{success: boolean, data: {article_id: string, analysis: ContentAnalysisResult, seo_score: number, readability_score: number|null, applicable_fixes: number, credits_used: 0}}"
+        "response": "{success: boolean, data: {article_id: string, analysis: ContentAnalysisResult, seo_score: number, readability_score: number|null, applicable_fixes: number, gaps_gains: object|null, credits_used: 0}}"
+      },
+      {
+        "name": "add_faq",
+        "summary": "Add one question and answer to the article's FAQ section — inside the existing FAQ block, before the conclusion, and mirrored into faq_schema so the page and its FAQPage rich result agree. Supply `answer` and it is free; omit it and Claude writes one (40-60 words) in the article's own language and voice for 2 credits, refunded on failure. Snapshots the previous body for a single Revert. 409 when the question is already there.",
+        "params": [
+          {
+            "name": "article_id",
+            "type": "string",
+            "required": true,
+            "desc": "The seo_articles row to add to. 404 for an article outside the caller's workspace."
+          },
+          {
+            "name": "question",
+            "type": "string",
+            "required": true,
+            "desc": "The question, phrased the way a searcher would ask it."
+          },
+          {
+            "name": "answer",
+            "type": "string",
+            "required": false,
+            "desc": "Your own answer. When omitted, one is generated and 2 credits are debited."
+          }
+        ],
+        "response": "{success: boolean, data: {article_id: string, markdown_content: string, question: string, answer: string, created_section: boolean, heading: string, analysis: ContentAnalysisResult|null, can_revert: true, credits_used: number}}"
       }
     ],
     "request": [
@@ -5832,7 +5857,7 @@
         "name": "action",
         "type": "string",
         "required": true,
-        "desc": "One of: research | plan | write | analyze | pipeline | toolkit_audit | toolkit_research | page_ideas | apply_fix | revert_fix | reanalyze"
+        "desc": "One of: research | plan | write | analyze | pipeline | toolkit_audit | toolkit_research | page_ideas | apply_fix | revert_fix | reanalyze | add_faq"
       }
     ],
     "response": "{success: boolean, data: object}"

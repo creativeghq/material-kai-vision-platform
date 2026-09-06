@@ -27,6 +27,7 @@ import { handlePlan } from './plan.ts';
 import { normalizeContentBrief, type NormalizedBrief } from './content-brief.ts';
 import { handleWrite } from './write.ts';
 import { handleAnalyze } from './analyze.ts';
+import { buildGapsGains } from './gaps.ts';
 import type {
   SEOPipelineRequest,
   SEOPipelineResponse,
@@ -585,7 +586,13 @@ async function runPipelineStages(ctx: {
     const faqSchema = buildFaqSchema(plan, publishedMarkdown);
 
     // Build gaps/gains
-    const gapsGains = buildGapsGains(finalMarkdown, research);
+    // From the RESEARCH TAB shape, not the raw research result, so `reanalyze` can rebuild the
+    // same answer for an article written before this existed — see handlers/gaps.ts.
+    const gapsGains = buildGapsGains(finalMarkdown, {
+      keyTerms: research.recommendedSecondaries,
+      competitors: research.serpInsights,
+      questions: research.paaQuestions.map((q) => ({ question: q, answered: false })),
+    });
 
     // Build tab data — use real data from DataForSEO Content Analysis
     const competitorScores = research.serpInsights
@@ -1158,46 +1165,6 @@ function extractFaqAnswer(markdown: string, question: string): string {
   );
 
   return afterQ.substring(0, endIndex).trim().slice(0, 500);
-}
-
-/** Build gaps/gains analysis */
-function buildGapsGains(
-  markdown: string,
-  research: KeywordResearchResult,
-): ArticleOutput['gapsGains'] {
-  const content = markdown.toLowerCase();
-  const gaps: MissingTopic[] = [];
-  const gains: MissingTopic[] = [];
-
-  // Check competitor topics against our content
-  for (const gap of research.contentGapOpportunities) {
-    const gapLower = gap.toLowerCase();
-    const isPresent = content.includes(gapLower.slice(0, 20));
-
-    if (isPresent) {
-      gains.push({
-        topic: gap,
-        type: 'gain',
-        competitorCount: 0,
-        relevanceScore: 0.7,
-      });
-    } else {
-      gaps.push({
-        topic: gap,
-        type: 'gap',
-        competitorCount: 3, // Approximate
-        relevanceScore: 0.6,
-      });
-    }
-  }
-
-  return {
-    all: [...gaps, ...gains],
-    gaps,
-    gains,
-    gapCount: gaps.length,
-    gainCount: gains.length,
-  };
 }
 
 /** Extract [INTERNAL: anchor](topic) links from markdown */

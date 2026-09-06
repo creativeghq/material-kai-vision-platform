@@ -13,6 +13,7 @@ import { handleToolkitAudit } from './handlers/toolkit-audit.ts';
 import { handleToolkitResearch } from './handlers/toolkit-research.ts';
 import { handleApplyFix, handleRevertFix } from './handlers/apply-fix.ts';
 import { handleReanalyze } from './handlers/reanalyze.ts';
+import { handleAddFaq } from './handlers/faq.ts';
 import { handlePageIdeas } from './handlers/page-ideas.ts';
 
 const ROUTES: Record<string, (req: Request, body: any) => Promise<Response>> = {
@@ -27,6 +28,7 @@ const ROUTES: Record<string, (req: Request, body: any) => Promise<Response>> = {
   apply_fix: handleApplyFix,
   revert_fix: handleRevertFix,
   reanalyze: handleReanalyze,
+  add_faq: handleAddFaq,
 };
 
 Deno.serve(withApiLogging('seo-api', async (req) => {
