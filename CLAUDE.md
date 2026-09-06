@@ -345,6 +345,22 @@ UX; the tool reaches the same tables without passing it. 10 of 19 files did not 
 including the operator, permanently. Guarded by [tests/unit/adminOnlyParity.test.ts](tests/unit/adminOnlyParity.test.ts)
 and [tests/unit/toolModuleGates.test.ts](tests/unit/toolModuleGates.test.ts).
 
+**A run is DERIVED from the stream — never a hand-written pipeline per toolkit.** The canvas shows the
+work while it happens (`runs/RunCanvas.tsx`), and it does that for all 48 toolkits because
+`runs/runDerivation.ts` folds the `tool_call` / `tool_progress` / `tool_result` / `tool_error` chunks
+agent-chat already emits into one `AgentRunState`. Eight toolkits had a hand-written `WorkflowDefinition`
+and the other forty had nothing: for the whole length of a turn the biggest surface on screen held its
+welcome copy, and for the 21 direct-run quick-starts that emit no artifact it held it forever, under a
+chat that said "done". Writing forty more definitions would be a second description of what the tools do,
+and it would drift the first day a tool changed. So: a PLANNED run (steps known ahead) still comes from
+`WORKFLOWS`, `runFromWorkflow` adapts it into the same model, and **there is one renderer** — two cards
+saying the same thing about one turn is how the two step-icon maps drifted. Verdicts are the point and
+they are the silent-zero shape in disguise: a failed call reads "Failed", NEVER "0 results"; a step the
+turn never reported on is **`unreported`**, never `done`. The wizard's "where am I / is there an ask"
+lives in `workflows/wizardState.ts` (import-free) so the card and its host read ONE answer. Guarded by
+[tests/unit/agentRunProgress.test.ts](tests/unit/agentRunProgress.test.ts), which also fails if the run
+module ever names a toolkit — coverage is structural, not a list somebody has to remember to extend.
+
 **Naming a place is LINKING to it, and a button must not ask the model for something no tool can do.**
 `src/config/appDestinations.ts` is the one registry of in-app destinations; `linkifyDestinations` turns
 `Profile → Social Accounts` (or the paraphrase, "the Social Accounts tab") into a real link inside every agent
