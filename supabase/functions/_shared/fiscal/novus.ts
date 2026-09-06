@@ -12,7 +12,8 @@ import type {
   FiscalInvoiceInput,
   FiscalSubmissionResult,
 } from './types.ts';
-import { isUncodedMydataUnit, isUnnamedLineName } from './types.ts';
+import { isUncodedMydataUnit, isUnnamedLineName, mydataUnitCode } from './types.ts';
+import { mydataPaymentLabel } from '../paymentVocabulary.generated.ts';
 
 export const NOVUS_SANDBOX_BASE = 'https://provider-dev.timologisi.online';
 export const NOVUS_PRODUCTION_BASE = 'https://provider.timologisi.online';
@@ -77,8 +78,53 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
     }
   }
 
+  // A MOVEMENT DOCUMENT (9.3) IS A DIFFERENT ENVELOPE, NOT AN INVOICE WITH ZERO TOTALS.
+  // AADE refuses it outright unless four things differ from every value-bearing type — verified
+  // against the sandbox 2026-09-06 (#319), where our 9.3 came back with all of these at once:
+  //   205 "Payment Methods is forbidden for this invoice type"
+  //   205 "Currency is forbidden for this invoice type"
+  //   230 "itemDescr / measurementUnit … is mandatory for invoice detail 1"
+  //   204 "issuer Name / issuer address / Counterpart Name is mandatory for this invoice type"
+  // and its classification is `category3` (Transport) with NO classificationType, not the income
+  // pair a sale carries. So no delivery note has ever been accepted — which is also why the
+  // offline sweep had nothing to find for one.
+  const isMovement = header.movePurpose != null;
+
+  // AN INTERNAL TRANSFER MOVES YOUR OWN GOODS BETWEEN YOUR OWN PREMISES, so AADE requires the
+  // counterpart to BE the issuer — "Issuer must be same with counterpart", error 286. The
+  // platform lets an operator pick Ενδοδιακίνηση (8) on a delivery note addressed to a customer,
+  // and the counterpart is resolved from that customer, so the combination is reachable from the
+  // UI and comes back as a bare 286 nobody can act on. Name it instead: either the purpose is
+  // wrong or the recipient is.
+  if (isMovement && header.movePurpose === 8 && counterpart.vatNumber && counterpart.vatNumber !== issuer.vatNumber) {
+    throw new Error(
+      `Refusing to transmit a movement document: purpose 8 (Ενδοδιακίνηση / internal transfer) ` +
+        `moves goods between the issuer's own establishments, so myDATA requires the recipient to ` +
+        `be the issuer — this note is addressed to ${counterpart.vatNumber}. Either pick the ` +
+        `purpose that describes the movement (1 Sale, 5 Return, 14 Storage by third parties …) ` +
+        `or address the note to your own VAT number and set the delivery branch.`,
+    );
+  }
+
+  // The numeric unit code is mandatory on a movement line and we must not guess it.
+  const unresolvedUnits = isMovement
+    ? lines.filter((l) => mydataUnitCode(l.measurementUnitLabel) == null)
+        .map((l) => `${l.lineNumber} (${l.measurementUnitLabel ?? 'no unit'})`)
+    : [];
+  if (unresolvedUnits.length) {
+    throw new Error(
+      `Refusing to transmit a movement document: line(s) ${unresolvedUnits.join(', ')} have no ` +
+        `AADE measurement_unit code. myDATA requires the numeric unit on every movement line — ` +
+        `restate the quantity in pieces, kg, litres, metres, m² or m³ before transmitting.`,
+    );
+  }
+
   const invoiceDetails = lines.map((l) => ({
     lineNumber: l.lineNumber,
+    // Movement-only, both mandatory there and absent from every other type's template.
+    ...(isMovement
+      ? { itemDescr: l.description, measurementUnit: mydataUnitCode(l.measurementUnitLabel) }
+      : {}),
     lineCode: l.code ?? undefined,
     quantity: l.quantity,
     measurementUnitLabel: l.measurementUnitLabel ?? 'ΤΜΧ',
@@ -103,15 +149,19 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
     ...(l.deductionsAmount ? { deductionsAmount: l.deductionsAmount } : {}),
     ...(l.lineComments ? { lineComments: l.lineComments } : {}),
     lineDescription: l.description,
-    incomeClassification: l.incomeClassificationType
-      ? [
-          {
-            classificationType: l.incomeClassificationType,
-            classificationCategory: l.incomeClassificationCategory ?? 'category1_1',
-            amount: l.netValue,
-          },
-        ]
-      : undefined,
+    // A movement classifies as Transport (`category3`) and carries NO classificationType —
+    // an income type on a zero-valued transport line is error 331.
+    incomeClassification: isMovement
+      ? [{ classificationCategory: 'category3', amount: 0 }]
+      : l.incomeClassificationType
+        ? [
+            {
+              classificationType: l.incomeClassificationType,
+              classificationCategory: l.incomeClassificationCategory ?? 'category1_1',
+              amount: l.netValue,
+            },
+          ]
+        : undefined,
   }));
 
   const addr = (p: typeof issuer) => ({
@@ -122,15 +172,79 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
     addressCountry: p.address?.country ?? p.country ?? '',
   });
 
+  // The payment methods actually transmitted — resolved ONCE, because the printed label below
+  // has to name the method that is really on the envelope. The fallback is 5 (on credit), so a
+  // document with no recorded payment says "On credit" rather than naming a method nobody chose.
+  const paymentMethods = input.paymentMethods?.length
+    ? input.paymentMethods
+    : [{ type: 5, amount: summary.totalGrossValue }];
+  const docLang = input.documentLanguageCode ?? 'EN';
+  const paymentLabel =
+    input.paymentMethodLabel ??
+    mydataPaymentLabel(paymentMethods[0].type, docLang.toUpperCase() === 'EL' ? 'el' : 'en');
+
+  // THE SUMMARY CLASSIFICATION IS DERIVED FROM THE LINES, NEVER RESTATED.
+  // AADE cross-checks the two: the summary must carry one entry per distinct
+  // (classificationType, classificationCategory) present on the lines, each holding the SUM of
+  // those lines' net values. Emitting a single entry for the whole net value — which is what
+  // this did — is accepted only while every line happens to share one classification, and is
+  // rejected outright the moment two differ:
+  //   311 Classification with type … not found in invoice summary
+  //   312 Sum of classifications … not matching with related total in invoice summary
+  //   321 Classifications included in the invoice rows and in the invoice summary do not match
+  // That is exactly the case the builder's own per-product classification feature produces
+  // (`mydata_income_classification_type` on a product), so the feature could never transmit.
+  // Verified against the sandbox 2026-09-06 (issue #319).
+  const byClassification = new Map<string, { classificationType: string; classificationCategory: string; amount: number }>();
+  for (const l of lines) {
+    if (!l.incomeClassificationType) continue;
+    const category = l.incomeClassificationCategory ?? 'category1_1';
+    const key = `${l.incomeClassificationType}|${category}`;
+    const acc = byClassification.get(key);
+    if (acc) acc.amount += l.netValue;
+    else byClassification.set(key, { classificationType: l.incomeClassificationType, classificationCategory: category, amount: l.netValue });
+  }
+  const summaryClassification = isMovement
+    ? [{ classificationCategory: 'category3', amount: 0 }]
+    : byClassification.size
+    ? [...byClassification.values()].map((c) => ({ ...c, amount: Math.round(c.amount * 100) / 100 }))
+    : summary.incomeClassificationType
+      // No line said anything — fall back to the document-level pair. Never both: a summary
+      // that repeats a total the lines already account for is the 312 rejection.
+      ? [{
+          classificationType: summary.incomeClassificationType,
+          classificationCategory: summary.incomeClassificationCategory ?? 'category1_1',
+          amount: summary.totalNetValue,
+        }]
+      : undefined;
+
   return {
     invoice: [
       {
-        issuer: { vatNumber: issuer.vatNumber, country: issuer.country, branch: issuer.branch ?? 0 },
+        issuer: {
+          vatNumber: issuer.vatNumber,
+          country: issuer.country,
+          branch: issuer.branch ?? 0,
+          // Mandatory on a movement document (204), absent from every other type's template.
+          ...(isMovement
+            ? {
+                name: issuer.name ?? '',
+                address: {
+                  street: issuer.address?.street ?? '',
+                  number: issuer.address?.number ?? '',
+                  postalCode: issuer.address?.postalCode ?? '',
+                  city: issuer.address?.city ?? '',
+                },
+              }
+            : {}),
+        },
         counterpart: counterpart.vatNumber
           ? {
               vatNumber: counterpart.vatNumber,
               country: counterpart.country,
               branch: counterpart.branch ?? 0,
+              // Mandatory on a movement document (204).
+              ...(isMovement ? { name: counterpart.name ?? '' } : {}),
               address: {
                 street: counterpart.address?.street ?? '',
                 number: counterpart.address?.number ?? '',
@@ -144,7 +258,9 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
           aa: header.aa,
           issueDate: header.issueDate,
           invoiceType: header.invoiceType,
-          currency: header.currency,
+          // 205 "Currency is forbidden for this invoice type" — a movement carries no value,
+          // so it carries no currency either.
+          ...(isMovement ? {} : { currency: header.currency }),
           ...(header.vatPaymentSuspension != null ? { vatPaymentSuspension: header.vatPaymentSuspension } : {}),
           ...(header.selfPricing ? { selfPricing: true } : {}),
           ...(header.exchangeRate ? { exchangeRate: header.exchangeRate } : {}),
@@ -182,15 +298,15 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
               }
             : {}),
         },
-        paymentMethods: input.paymentMethods?.length
-          ? input.paymentMethods.map((pm: any) => ({
-              type: pm.type, amount: pm.amount,
-              ...(pm.info ? { paymentMethodInfo: pm.info } : {}),
-              // Law 5155 — card(7)/IRIS(8) carry the EFT-POS terminal + NSP for the signature.
-              ...(pm.terminalId ? { terminalId: pm.terminalId } : {}),
-              ...(pm.posNspId != null ? { posNspId: pm.posNspId } : {}),
-            }))
-          : [{ type: 5, amount: summary.totalGrossValue }],
+        // 205 "Payment Methods is forbidden for this invoice type" — nothing is paid on a
+        // movement, and the `[{type:5}]` fallback below was inventing one for every 9.3.
+        ...(isMovement ? {} : { paymentMethods: paymentMethods.map((pm: any) => ({
+          type: pm.type, amount: pm.amount,
+          ...(pm.info ? { paymentMethodInfo: pm.info } : {}),
+          // Law 5155 — card(7)/IRIS(8) carry the EFT-POS terminal + NSP for the signature.
+          ...(pm.terminalId ? { terminalId: pm.terminalId } : {}),
+          ...(pm.posNspId != null ? { posNspId: pm.posNspId } : {}),
+        })) }),
         invoiceDetails,
         // ── Novus's PDF-RENDERING block — NOT tax data ────────────────────────────────
         // Everything above (issuer/counterpart VAT, header, details, summary) is what AADE
@@ -231,9 +347,16 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
             // language pin is exactly the thing that gets copied into somewhere that DOES
             // render — so it is explicit now, and defaults to English per the platform rule
             // that no language field defaults to 'el'.
-            documentLanguageCode: input.documentLanguageCode ?? 'EN',
+            documentLanguageCode: docLang,
             documentSizeCode: 0,
             documentComments: input.documentComments ?? '',
+            // MANDATORY. Novus rejects the whole request with HTTP 400 + a problem+json
+            // `errors` map when this is absent — "The PaymentMethodInvoiceLabel field is
+            // required." It is the PRINTED name of the payment method, so it is derived from
+            // the transmitted code through `MYDATA_PAYMENT_CODE`'s own label table rather than
+            // being written out here: a second hand-kept map of those eight names is exactly
+            // the drift that filed "On credit" as Cash (see `paymentVocabulary.ts`).
+            paymentMethodInvoiceLabel: paymentLabel,
           },
         },
         // B2G (public sector) — same envelope, extra block. Omitted entirely for
@@ -265,15 +388,7 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
           totalOtherTaxesAmount: summary.totalOtherTaxesAmount ?? 0,
           totalDeductionsAmount: summary.totalDeductionsAmount ?? 0,
           totalGrossValue: summary.totalGrossValue,
-          incomeClassification: summary.incomeClassificationType
-            ? [
-                {
-                  classificationType: summary.incomeClassificationType,
-                  classificationCategory: summary.incomeClassificationCategory ?? 'category1_1',
-                  amount: summary.totalNetValue,
-                },
-              ]
-            : undefined,
+          incomeClassification: summaryClassification,
         },
       },
     ],
@@ -283,6 +398,31 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
 function firstError(entry: any): { code?: string; message?: string } {
   const err = entry?.errors?.[0]?.error?.[0];
   return { code: err?.code, message: err?.message };
+}
+
+/**
+ * A 4xx from Novus is NOT the `{ errors: [{ error: [...] }] }` shape a processed request uses —
+ * it is ASP.NET's RFC-9110 problem+json, `{ title, status, errors: { "<field>": ["<why>"] } }`.
+ * `firstError` cannot read that, so every rejected-at-the-door request reported itself as the
+ * uselessly opaque `HttpError / HttpError`. That is what a missing mandatory field looked like
+ * to an operator: no field name, no reason, nothing to act on.
+ */
+function problemDetail(body: any): string | undefined {
+  const errs = body?.errors;
+  // A third shape, and the one that matters most for multi-tenancy: an authorization refusal
+  // answers `{ "errors": [ "You don't have the authority to send for this vat numbers …" ] }` —
+  // a bare array of STRINGS, neither the per-document list nor problem+json. That is what a
+  // tenant transmitting under an unauthorized issuer VAT gets, and it reported as 'HttpError'.
+  if (Array.isArray(errs) && errs.length && typeof errs[0] === 'string') {
+    return errs.join('; ');
+  }
+  if (errs && !Array.isArray(errs) && typeof errs === 'object') {
+    const parts = Object.entries(errs).map(([field, msgs]) =>
+      `${field}: ${Array.isArray(msgs) ? msgs.join(' ') : String(msgs)}`,
+    );
+    if (parts.length) return `${body?.title ?? 'Request rejected'} — ${parts.join('; ')}`;
+  }
+  return typeof body?.title === 'string' ? body.title : undefined;
 }
 
 /** Normalize a Novus `response[0]` entry into our FiscalSubmissionResult. */
@@ -320,9 +460,43 @@ function interpret(entry: any, httpStatus: number): FiscalSubmissionResult {
         raw: entry,
       };
     default: {
-      // XMLSyntaxError | ValidationError | TechnicalError | HttpError
+      // ERROR 228 IS NOT A REFUSAL — IT IS THE PROVIDER TELLING US THE DOCUMENT IS ALREADY FILED,
+      // AND NAMING ITS MARK.
+      //
+      // The provider dedupes on a UID derived from issuer + series + AA (verified 2026-09-06,
+      // #319: resending with a DIFFERENT total produced the same UID and the same 228). So the
+      // dangerous case is not the double-send — it is the send whose RESPONSE WAS LOST. The first
+      // call reached AADE, no `fiscal_submissions` row was written because the response never
+      // came back, the operator retries, and 228 came back as a plain rejection: credits
+      // refunded, `fiscal_status='rejected'`, while the document sits registered at AADE with a
+      // MARK nobody recorded. That is the "create-then-stamp pair" failure in CLAUDE.md wearing
+      // the provider's clothes.
+      //
+      // The MARK is surfaced separately rather than returned as `accepted`, because the same 228
+      // is ALSO what a numbering collision looks like — two different documents sharing a
+      // series+AA. Adopting the MARK blindly would stamp one invoice with another's. The caller
+      // must confirm the filed document is really this one (fetchTransmitted → compare totals)
+      // before adopting it; see the invoice path in `finance-issue-invoice`.
+      const dup = /MARK:\s*(\d+)\s*,\s*AUTHENTICATION_CODE:\s*([0-9A-F]+)/i.exec(
+        String(firstError(entry).message ?? ''),
+      );
+      if (firstError(entry).code === '228' && dup) {
+        return {
+          status: 'rejected',
+          isOffline: false,
+          errorCode: '228',
+          errorMessage: firstError(entry).message,
+          duplicateOf: { mark: dup[1], authenticationCode: dup[2] },
+          raw: entry,
+        };
+      }
+      // XMLSyntaxError | ValidationError | TechnicalError | HttpError.
+      // A processed request carries the per-document error list; a request refused at the door
+      // (4xx) carries problem+json instead, and reporting that as bare 'HttpError' told the
+      // operator nothing about which field the provider actually objected to.
       const { code: ec, message } = firstError(entry);
-      return { status: 'rejected', isOffline: false, errorCode: ec ?? code, errorMessage: message ?? code, raw: entry };
+      const detail = message ?? problemDetail(entry);
+      return { status: 'rejected', isOffline: false, errorCode: ec ?? code, errorMessage: detail ?? code, raw: entry };
     }
   }
 }
@@ -377,19 +551,101 @@ export const novusConnector: FiscalConnector = {
     return interpret(entry, res.status);
   },
 
+  // RequestTransmittedDocs — the ONLY way an offline-queued document ever gets its final MARK.
+  //
+  // Two things about this endpoint are not like SendInvoices, and getting either wrong makes the
+  // whole offline-recovery path silently dead (verified against the sandbox 2026-09-06, #319):
+  //
+  //  1. `issuedFrom` + `issuedTo` are MANDATORY. Without them the provider answers HTTP 400
+  //     problem+json, never a document — so every poll failed, for every document, always.
+  //  2. It answers `{ providerTransmittedDocs: [ … ] }` — NOT the `{ response: [ … ] }` envelope
+  //     SendInvoices uses, and each entry is `{ uid, mark, authenticationCode, … }` with NO
+  //     `statusCode`. Feeding that to `interpret()` fell through to the default branch and
+  //     reported `rejected`, so a perfectly healthy queued document read as refused by AADE.
+  //
+  // Both failures produce a *plausible* verdict, which is why nothing raised: the cron ran, the
+  // call "succeeded", and `finance.paid_draft_never_issued`-style probes saw a rejection rather
+  // than a stall. Since #193 that verdict also flips `fiscal_status` to 'rejected' after the 6h
+  // grace — i.e. it would have condemned documents AADE had accepted.
+  //
+  // NOT FINDING THE DOCUMENT IS NOT A REJECTION. An empty list means "not transmitted yet",
+  // which is `offline`, so the caller keeps waiting instead of burning a live document.
   async fetchTransmitted(query, ctx) {
     const qs = new URLSearchParams();
     if (query.invoiceMark) qs.set('invoiceMark', query.invoiceMark);
     if (query.aa) qs.set('aa', query.aa);
+    if (query.uid) qs.set('uid', query.uid);
     if (query.issuerVatNumber) qs.set('issuerVatNumber', query.issuerVatNumber);
+    // Required by the provider. Default to a window wide enough to cover any document still in
+    // the offline queue (the provider must transmit within 1 day of issue; 30 days is the
+    // sandbox retention) rather than leaving them unset, which is a hard 400.
+    const today = new Date();
+    const from = query.issuedFrom ?? new Date(today.getTime() - 60 * 86_400_000).toISOString().slice(0, 10);
+    qs.set('issuedFrom', from);
+    qs.set('issuedTo', query.issuedTo ?? today.toISOString().slice(0, 10));
     const url = `${ctx.baseUrl}/api/v1/Provider/RequestTransmittedDocs?${qs.toString()}`;
     try {
       const res = await fetch(url, { method: 'GET', headers: { 'API-KEY': ctx.apiKey, 'content-type': 'application/json' } });
-      const body = await res.json();
-      const entry = Array.isArray(body?.response) ? body.response[0] : body;
-      return interpret(entry, res.status);
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        // A malformed query is OUR bug, not a verdict on the document — report it as an error
+        // so the caller retries rather than as a rejection it would act on.
+        return { status: 'error', isOffline: false, transmissionFailure: res.status >= 500, errorMessage: problemDetail(body) ?? `Novus ${res.status}`, raw: body };
+      }
+      const docs = Array.isArray(body?.providerTransmittedDocs) ? body.providerTransmittedDocs : [];
+      const doc = docs.find((d: any) => d?.mark && String(d.mark) !== '0') ?? docs[0];
+      const mark = doc?.mark && String(doc.mark) !== '0' ? String(doc.mark) : undefined;
+      if (!mark) {
+        return { status: 'offline', isOffline: true, uid: doc?.uid ?? query.uid, raw: body };
+      }
+      return {
+        status: 'accepted',
+        isOffline: false,
+        mark,
+        uid: doc?.uid ?? undefined,
+        authenticationCode: doc?.authenticationCode ?? undefined,
+        invoiceUrl: doc?.pdfUrl ?? undefined,
+        providerCredits: typeof doc?.cost === 'number' ? doc.cost : parseCredits(doc?.cost),
+        raw: body,
+      };
     } catch (e) {
       return { status: 'error', isOffline: false, transmissionFailure: true, errorMessage: String(e) };
+    }
+  },
+
+  // POST /CancelDeliveryNote — REST v2.3. Verified against the sandbox 2026-09-06 (#319):
+  // returns `statusCode:"Success"` with a `cancellationMark` and costs 0.25 credits.
+  //
+  // THIS CALL IS NOT IDEMPOTENT AND THE PROVIDER WILL NOT STOP YOU. Sending the same MARK twice
+  // answers Success BOTH times, mints a SECOND cancellationMark, and bills 0.25 credits again —
+  // measured, not assumed. So the "one thing, and a retry must not do it twice" rule applies at
+  // the caller: claim the note locally (`where fiscal_cancellation_mark is null`) before calling,
+  // and never re-send on a retry that finds a mark already stored. See `finance-issue-invoice`.
+  async cancelDeliveryNote(input, ctx) {
+    try {
+      const res = await fetch(`${ctx.baseUrl}/api/v1/Provider/CancelDeliveryNote`, {
+        method: 'POST',
+        headers: { 'API-KEY': ctx.apiKey, 'content-type': 'application/json' },
+        body: JSON.stringify({ mark: String(input.invoiceMark), entityVatNumber: input.issuerVatNumber }),
+      });
+      const body = await res.json().catch(() => null);
+      const entry = body?.response?.[0] ?? body;
+      const cancellationMark = entry?.cancellationMark && entry.cancellationMark !== 0
+        ? String(entry.cancellationMark)
+        : undefined;
+      const ok = res.ok && entry?.statusCode === 'Success' && !!cancellationMark;
+      if (ok) {
+        return { ok, cancellationMark, providerCredits: parseCredits(entry?.credits), raw: body };
+      }
+      const { code, message } = firstError(entry);
+      return {
+        ok: false,
+        errorCode: code ?? entry?.statusCode ?? String(res.status),
+        errorMessage: message ?? problemDetail(body) ?? entry?.statusCode ?? `HTTP ${res.status}`,
+        raw: body,
+      };
+    } catch (e) {
+      return { ok: false, errorMessage: String(e) };
     }
   },
 

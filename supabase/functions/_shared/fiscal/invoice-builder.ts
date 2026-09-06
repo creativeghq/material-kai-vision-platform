@@ -7,8 +7,14 @@
 
 import type { FiscalInvoiceInput, FiscalLine, FiscalParty } from './types.ts';
 import { isUnnamedLineName } from './types.ts';
-import { movePurposeLabel, isMydataMovePurpose } from './fiscalVocabulary.generated.ts';
+import {
+  movePurposeLabel,
+  isMydataMovePurpose,
+  mydataIncomeClassificationType,
+  mydataIncomeClassificationCategory,
+} from './fiscalVocabulary.generated.ts';
 import { resolveContactBillingSource } from '../crm/party-inheritance.ts';
+import { normalizeVat } from '../crm/vatNormalize.generated.ts';
 
 /**
  * Fail loudly before a fiscal document is built from an unconfirmed line-item read.
@@ -172,7 +178,7 @@ function partyFromCrm(c: any): FiscalParty {
     || `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim();
   const country = (hasBilling && c.billing_country_code) || c.country_code || 'GR';
   return {
-    vatNumber: (hasBilling && c.billing_vat) || c.vat_number || '',
+    vatNumber: fiscalVatNumber((hasBilling && c.billing_vat) || c.vat_number, country),
     country,
     branch: 0,
     name,
@@ -260,6 +266,33 @@ async function applyCounterpartAddressUnit(
   };
 }
 
+/**
+ * The VAT number as myDATA wants it: the national number ALONE, because the envelope states the
+ * country separately (`issuer.country` / `counterpart.country`).
+ *
+ * `finance_settings.business_vat` and `crm_companies.vat_number` are free text and Greek
+ * businesses write the same number three ways — `802349569`, `EL802349569`, `GR 800 370 260`.
+ * The operator workspace stores the EL form, and it was passed to the provider VERBATIM, which
+ * answers **HTTP 401** "You don't have the authority to transmit for this vat numbers": the
+ * authorization list holds the bare AFM, so the prefixed spelling matches nothing. Every
+ * transmission from that workspace failed at the door, and it read as a permissions problem with
+ * the account rather than as a stray two letters. Verified against the sandbox 2026-09-06 (#319):
+ * `EL802349569` → 401, `802349569` → the document.
+ *
+ * `normalizeVat` is the platform-wide rule for this and already handles the Greek pair while
+ * KEEPING a real foreign prefix (`DE…` and `FR…` are different taxpayers). A foreign prefix that
+ * merely repeats the party's own declared country is dropped here too, for the same reason the
+ * Greek one is: it is the country field said twice.
+ */
+function fiscalVatNumber(vat: string | null | undefined, country?: string | null): string {
+  const normalized = normalizeVat(vat) ?? '';
+  const cc = String(country ?? '').trim().toUpperCase();
+  if (cc.length === 2 && normalized.toUpperCase().startsWith(cc) && /[0-9]/.test(normalized.charAt(2))) {
+    return normalized.slice(2);
+  }
+  return normalized;
+}
+
 export async function buildInvoiceInputFromDb(
   supabase: any,
   invoiceId: string,
@@ -280,7 +313,7 @@ export async function buildInvoiceInputFromDb(
   assertFiscalLines(items, itemsErr, `invoice ${invoiceId}`);
 
   const issuer: FiscalParty = {
-    vatNumber: fs?.business_vat ?? '',
+    vatNumber: fiscalVatNumber(fs?.business_vat, fs?.business_country_code ?? 'GR'),
     country: fs?.business_country_code ?? 'GR',
     branch: Number(inv.branch_code ?? 0), // myDATA establishment number this invoice was issued under
     name: fs?.business_name ?? '',
@@ -302,8 +335,6 @@ export async function buildInvoiceInputFromDb(
 
   const rate = Number(inv.vat_rate ?? fs?.default_vat_rate ?? 24);
   const cat = vatCategory(rate);
-  const incType = overrides.incomeClassificationType ?? fs?.default_income_classification_type ?? 'E3_561_001';
-  const incCat = overrides.incomeClassificationCategory ?? fs?.default_income_classification_category ?? 'category1_1';
 
   // Pull per-product myDATA defaults for income classification + vat category.
   const productIds = [...new Set((items ?? []).map((it: any) => it.product_id).filter(Boolean))];
@@ -323,6 +354,24 @@ export async function buildInvoiceInputFromDb(
     overrides.invoiceType ?? inv.document_type ?? (counterpart.vatNumber ? '1.1' : '11.1'),
   );
   const isRetailDoc = docTypeForClassification.startsWith('11.');
+
+  // The document-level fallback for a line that carries no classification of its own — DERIVED
+  // from the document type, because AADE validates the pair against it. It was a flat
+  // ('E3_561_001','category1_1'), which is the wholesale-goods pair and is REFUSED off 11.x
+  // (error 313) and off 2.x (error 331) — so every retail receipt and every service invoice was
+  // rejected at the provider while the wholesale invoice beside it succeeded. See
+  // `mydataIncomeClassificationType` for the codes and the sandbox evidence (#319).
+  //
+  // The workspace default still applies where it can be right: it is the operator's choice of
+  // WHICH wholesale-goods classification to use (E3_561_005 for an intra-community seller, say),
+  // so it is honoured only on the families whose derived answer is that baseline pair. It cannot
+  // override the derivation for retail or services, because AADE would refuse the result.
+  const derivedIncType = mydataIncomeClassificationType(docTypeForClassification);
+  const derivedIncCat = mydataIncomeClassificationCategory(docTypeForClassification);
+  const incType = overrides.incomeClassificationType
+    ?? (derivedIncType === 'E3_561_001' ? (fs?.default_income_classification_type ?? derivedIncType) : derivedIncType);
+  const incCat = overrides.incomeClassificationCategory
+    ?? (derivedIncCat === 'category1_1' ? (fs?.default_income_classification_category ?? derivedIncCat) : derivedIncCat);
   const productIncomeType = (p: any) => (isRetailDoc
     ? (p?.mydata_income_classification_type_retail ?? p?.mydata_income_classification_type)
     : p?.mydata_income_classification_type);
@@ -532,7 +581,7 @@ export async function buildCreditNoteInputFromDb(
   assertFiscalLines(items, itemsErr, `credit note ${creditNoteId}`);
 
   const issuer: FiscalParty = {
-    vatNumber: fs?.business_vat ?? '',
+    vatNumber: fiscalVatNumber(fs?.business_vat, fs?.business_country_code ?? 'GR'),
     country: fs?.business_country_code ?? 'GR',
     branch: Number(inv.branch_code ?? 0), // same establishment as the corrected invoice
     name: fs?.business_name ?? '',
@@ -563,8 +612,17 @@ export async function buildCreditNoteInputFromDb(
   // (`issue_credit_note` copies it), so the retail/wholesale split the invoice made — product
   // retail codes included — carries over without being re-derived here. These are only the
   // fallback for a whole-amount credit that has no source line.
-  const defaultIncType = fs?.default_income_classification_type ?? 'E3_561_001';
-  const defaultIncCat = fs?.default_income_classification_category ?? 'category1_1';
+  // Same derivation as the invoice path, keyed on the CREDIT note's own type: an 11.4 reverses
+  // a retail receipt and must classify as retail, and the flat wholesale pair was refused there
+  // for exactly the reason it was refused on 11.1.
+  const derivedCnType = mydataIncomeClassificationType(creditDocType);
+  const derivedCnCat = mydataIncomeClassificationCategory(creditDocType);
+  const defaultIncType = derivedCnType === 'E3_561_001'
+    ? (fs?.default_income_classification_type ?? derivedCnType)
+    : derivedCnType;
+  const defaultIncCat = derivedCnCat === 'category1_1'
+    ? (fs?.default_income_classification_category ?? derivedCnCat)
+    : derivedCnCat;
 
   const lines: FiscalLine[] = (items ?? []).map((it: any, i: number) => {
     const net = round2(Number(it.net_value ?? 0));
@@ -693,7 +751,7 @@ export async function buildDeliveryNoteInputFromDb(
   assertFiscalLines(items, itemsErr, `delivery note ${deliveryNoteId}`);
 
   const issuer: FiscalParty = {
-    vatNumber: fs?.business_vat ?? '',
+    vatNumber: fiscalVatNumber(fs?.business_vat, fs?.business_country_code ?? 'GR'),
     country: fs?.business_country_code ?? 'GR',
     branch: Number(dn.branch_code ?? 0),
     name: fs?.business_name ?? '',

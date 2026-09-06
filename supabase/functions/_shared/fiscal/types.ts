@@ -94,6 +94,34 @@ export const MYDATA_UNIT_BY_CODE: Record<number, string> = {
   1: 'pcs', 2: 'kg', 3: 'lt', 4: 'm', 5: 'm2', 6: 'm3',
 };
 
+/**
+ * The OTHER direction: a unit label or canonical key → the AADE `measurementUnit` CODE.
+ *
+ * A movement document (9.3) is the one family where the numeric code is MANDATORY per line —
+ * "measurementUnit for this invoice type is mandatory for invoice detail N", error 230 — while
+ * every value-bearing type is happy with the label alone. So this is not a nicety: without it a
+ * delivery note cannot be transmitted at all.
+ *
+ * Deliberately NOT a guess. An unrecognised unit returns null and the caller refuses the
+ * transmission, the same stance `UNCODED_MYDATA_UNITS` takes going out: a wrong unit on a
+ * document AADE has registered is not recoverable, and a refusal is.
+ */
+const MYDATA_UNIT_CODE_BY_LABEL: Record<string, number> = {
+  pcs: 1, pc: 1, piece: 1, pieces: 1, item: 1, items: 1, unit: 1, 'τεμ': 1, 'τεμ.': 1, 'τμχ': 1,
+  kg: 2, kgs: 2, kilo: 2, kilos: 2, kilogram: 2, kilograms: 2, 'κγ': 2, 'κιλ': 2, 'κιλά': 2,
+  lt: 3, l: 3, lit: 3, liter: 3, liters: 3, litre: 3, litres: 3, 'λτ': 3, 'λίτρα': 3,
+  m: 4, mtr: 4, meter: 4, meters: 4, metre: 4, metres: 4, 'μ': 4, 'μέτρα': 4,
+  m2: 5, sqm: 5, sqmt: 5, 'm²': 5, 'τμ': 5, 'τ.μ.': 5, 'τετραγωνικά': 5,
+  m3: 6, cbm: 6, 'm³': 6, 'κμ': 6, 'κ.μ.': 6, 'κυβικά': 6,
+};
+
+/** AADE `measurementUnit` code for a unit label / canonical key, or null when unrecognised. */
+export function mydataUnitCode(unit: string | null | undefined): number | null {
+  const key = String(unit ?? '').trim().toLowerCase();
+  if (!key) return null;
+  return MYDATA_UNIT_CODE_BY_LABEL[key] ?? null;
+}
+
 /** The unit AADE stated on a line, or null when the document omitted it. */
 // `code` is typed to include `string` because that is what AADE actually sends: the myDATA
 // payload carries it as XML/JSON text, so an empty element arrives as '' rather than null.
@@ -241,6 +269,12 @@ export interface FiscalInvoiceInput {
   /** Presentation language of the PROVIDER's rendered PDF. Inert while we serve our own
    *  document; defaults to English (never 'el') rather than being pinned in the connector. */
   documentLanguageCode?: string;
+  /** The PRINTED name of the payment method. Novus requires it (`paymentMethodInvoiceLabel`)
+   *  and rejects the whole request with HTTP 400 when it is absent. Leave it unset: the
+   *  connector derives it from the transmitted `paymentMethods[0].type` through
+   *  `MYDATA_PAYMENT_CODE`'s own label table, so the printed name and the transmitted code
+   *  cannot disagree. Set it only to say something that table cannot. */
+  paymentMethodLabel?: string;
 }
 
 export type FiscalSubmissionStatus = 'accepted' | 'offline' | 'rejected' | 'error' | 'awaiting_payment';
@@ -276,6 +310,20 @@ export interface FiscalSubmissionResult {
   /** Present when status='awaiting_payment' (skipSignature=false + card/IRIS): the Law-5155
    *  signature(s) to hand to the POS terminal; complete via completePosInvoice afterwards. */
   providerSignature?: ProviderSignature[];
+  /**
+   * The provider refused this transmission because a document with the same identity
+   * (issuer + series + AA) is ALREADY FILED — and told us which one.
+   *
+   * This is the recovery handle for the one genuinely dangerous case: the first send reached
+   * AADE but its response never came back, so nothing was recorded locally and the retry looks
+   * like a refusal. The document exists; only our copy of the MARK is missing.
+   *
+   * DO NOT ADOPT THIS MARK WITHOUT CHECKING. The identical error is what a numbering collision
+   * produces — two different documents issued under one series+AA — and adopting it there would
+   * stamp one document with another's legal number. Confirm the filed document is this one
+   * (`fetchTransmitted` and compare the totals) before writing it down.
+   */
+  duplicateOf?: { mark: string; authenticationCode?: string };
 }
 
 /** Result of completing a POS/IRIS card payment (CompletionPosInvoices). */
@@ -303,8 +351,20 @@ export interface FiscalConnector {
     opts?: { skipSignature?: boolean; transmissionFailure?: boolean },
   ): Promise<FiscalSubmissionResult>;
   /** Resolve the final MARK for an invoice that came back Offline (AADE was down). */
+  /** Look a transmitted document up at the provider — the offline-recovery path's only way to
+   *  learn the final MARK. `uid` is what the Novus docs name for fetching the SECOND (MARKed)
+   *  copy of a document that came back Offline, and `issuedFrom`/`issuedTo` are mandatory at
+   *  the provider (omitting them is a hard 400), so both are part of the contract rather than
+   *  something each connector invents. */
   fetchTransmitted?(
-    query: { invoiceMark?: string; aa?: string; issuerVatNumber?: string },
+    query: {
+      invoiceMark?: string;
+      aa?: string;
+      uid?: string;
+      issuerVatNumber?: string;
+      issuedFrom?: string; // YYYY-MM-DD
+      issuedTo?: string;   // YYYY-MM-DD
+    },
     ctx: FiscalConnectorContext,
   ): Promise<FiscalSubmissionResult>;
   /** Law 5155 — after the POS terminal charge succeeds, finalize the held card/IRIS invoice
@@ -313,6 +373,19 @@ export interface FiscalConnector {
     input: { signatureToken: string; transactionId: string; paymentAmount: number; paymentType?: number; tipAmount?: number },
     ctx: FiscalConnectorContext,
   ): Promise<PosCompletionResult>;
+  /**
+   * Cancel a transmitted MOVEMENT document (9.3) at the provider.
+   *
+   * This is the ONLY cancellation myDATA offers through the provider REST API, and that is the
+   * immutability rule rather than a gap: a transmitted INVOICE is never withdrawn, it is
+   * corrected by a credit note (5.1 against a wholesale invoice, 11.4 against a retail receipt)
+   * — see the credit-note rule in CLAUDE.md. A delivery note carries no value, so AADE lets it
+   * be cancelled outright and answers with a `cancellationMark` of its own.
+   */
+  cancelDeliveryNote?(
+    input: { invoiceMark: string; issuerVatNumber: string },
+    ctx: FiscalConnectorContext,
+  ): Promise<{ ok: boolean; cancellationMark?: string; providerCredits?: number; errorCode?: string; errorMessage?: string; raw?: unknown }>;
   /** Law 5155 deferred flow — request a signature for an already-issued (on-credit) invoice. */
   askSignatureForOldInvoice?(
     input: { invoiceMark?: string; invoiceUid?: string },

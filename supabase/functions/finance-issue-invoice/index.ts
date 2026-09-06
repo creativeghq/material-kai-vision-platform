@@ -28,6 +28,10 @@ interface RequestBody {
   credit_note_id?: string;
   /** Submit a delivery note (myDATA 9.3 movement document) to the legal_invoice connector. */
   delivery_note_id?: string;
+  /** Cancel an already-transmitted delivery note (myDATA 9.3) at the provider. This is the ONLY
+   *  document myDATA lets us withdraw — a transmitted INVOICE is immutable and is corrected by a
+   *  credit note instead (the provider has no CancelInvoice route: probed 2026-09-06, HTTP 404). */
+  cancel_delivery_note?: { delivery_note_id: string };
   issue_now?: boolean;
   /** Transmit the invoice to the workspace's `legal_invoice` connector (e.g. Novus → myDATA). */
   submit_fiscal?: boolean;
@@ -386,8 +390,8 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
     if (!auth.success) return json({ error: auth.error ?? 'Unauthorized' }, 401);
 
     const body = (await req.json()) as RequestBody;
-    if (!body.quote_id && !body.invoice_id && !body.credit_note_id && !body.delivery_note_id && !body.pos_complete && !body.fiscal_status && !body.emit_issued) {
-      return json({ error: 'quote_id, invoice_id, credit_note_id, delivery_note_id, pos_complete, fiscal_status or emit_issued is required' }, 400);
+    if (!body.quote_id && !body.invoice_id && !body.credit_note_id && !body.delivery_note_id && !body.cancel_delivery_note && !body.pos_complete && !body.fiscal_status && !body.emit_issued) {
+      return json({ error: 'quote_id, invoice_id, credit_note_id, delivery_note_id, cancel_delivery_note, pos_complete, fiscal_status or emit_issued is required' }, 400);
     }
 
     const supabase = createClient(
@@ -631,6 +635,130 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
       } catch (err: any) {
         await cnReserve.refund();
         return json({ ok: false, error: err?.message ?? 'credit note submission failed' }, 500);
+      }
+    }
+
+    // ── Delivery-note CANCELLATION path (myDATA 9.3) ──────────────────────────
+    // The only cancellation myDATA offers. An invoice is never withdrawn — it is corrected by a
+    // credit note (5.1 wholesale / 11.4 retail), which is the immutability rule, not a gap.
+    //
+    // THE PROVIDER WILL CANCEL THE SAME NOTE TWICE AND BILL TWICE. Sending one MARK to
+    // CancelDeliveryNote a second time answers Success again with a *new* cancellation MARK
+    // (measured against the sandbox, #319). So the stored mark is the CLAIM: we take it with a
+    // conditional update BEFORE calling out, and a caller that lost the race — or is retrying a
+    // request whose response never arrived — is told the note is already cancelled instead of
+    // cancelling it again.
+    if (body.cancel_delivery_note) {
+      const dnId = body.cancel_delivery_note.delivery_note_id;
+      if (!dnId) return json({ error: 'cancel_delivery_note.delivery_note_id is required' }, 400);
+
+      const { data: note } = await supabase
+        .from('delivery_notes')
+        .select('id, workspace_id, fiscal_status, fiscal_mark, fiscal_cancellation_mark')
+        .eq('id', dnId).maybeSingle();
+      if (!note) return json({ error: 'delivery note not found' }, 404);
+      if (!(await userCanAccessWorkspace(supabase, auth.userId, (note as any).workspace_id))) {
+        return json({ error: 'Not authorized for this document' }, 404); // 404, not 403 — no id enumeration
+      }
+      // Everything below writes the id from the LOADED, AUTHORIZED row rather than the one the
+      // caller sent. Same value, different provenance — and provenance is the whole point: a
+      // workspace-scoped foreign key must be one we proved belongs to this caller, not one they
+      // named. (Pinned by tests/unit/sameWorkspaceFkSweep.test.ts.)
+      const noteId = String((note as any).id);
+      if ((note as any).fiscal_cancellation_mark) {
+        return json({ ok: true, delivery_note_id: noteId, skipped: true, reason: 'already_cancelled',
+          cancellation_mark: (note as any).fiscal_cancellation_mark });
+      }
+      if (!(note as any).fiscal_mark) {
+        return json({ ok: false, code: 'not_transmitted',
+          error: 'This delivery note has no myDATA MARK, so there is nothing to cancel at AADE.' }, 400);
+      }
+
+      const resolvedCancel: any = await resolveWorkspaceConnector(supabase, (note as any).workspace_id, 'legal_invoice');
+      if (!resolvedCancel.ok) return json({ ok: false, code: resolvedCancel.code, error: resolvedCancel.error }, 400);
+      if (!resolvedCancel.resolved.connector.cancelDeliveryNote) {
+        return json({ ok: false, error: 'Connector does not support delivery-note cancellation' }, 400);
+      }
+
+      const { data: fsRow } = await supabase
+        .from('finance_settings').select('business_vat').eq('workspace_id', (note as any).workspace_id).maybeSingle();
+      const issuerVat = String((fsRow as any)?.business_vat ?? '').replace(/^EL/i, '').trim();
+      if (!issuerVat) {
+        return json({ ok: false, code: 'issuer_vat_missing',
+          error: 'This workspace has no business VAT number in Finance → Settings, so AADE cannot be told who is cancelling.' }, 400);
+      }
+
+      // A cancellation costs provider credits too (0.25), so reserve before the callout.
+      const cancelReserve = await reserveTransmission(
+        supabase, (note as any).workspace_id, auth.userId, `myDATA cancel delivery note ${noteId}`,
+        { table: 'delivery_notes', id: noteId });
+      if (!cancelReserve.ok) {
+        return json({ ok: false, code: cancelReserve.code, balance: cancelReserve.balance, error: cancelReserve.error }, 402);
+      }
+
+      // CLAIM. A concurrent caller that gets 0 rows here must not call the provider.
+      const claimedAt = new Date().toISOString();
+      const { data: claimed, error: claimErr } = await supabase
+        .from('delivery_notes')
+        .update({ fiscal_cancelled_at: claimedAt, updated_at: claimedAt })
+        .eq('id', noteId)
+        .is('fiscal_cancellation_mark', null)
+        .is('fiscal_cancelled_at', null)
+        .select('id');
+      if (claimErr || !claimed?.length) {
+        await cancelReserve.refund();
+        return json({ ok: true, delivery_note_id: noteId, skipped: true, reason: 'cancellation_already_in_progress' });
+      }
+
+      try {
+        const cancelRes = await resolvedCancel.resolved.connector.cancelDeliveryNote(
+          { invoiceMark: String((note as any).fiscal_mark), issuerVatNumber: issuerVat },
+          resolvedCancel.resolved.ctx,
+        );
+
+        await supabase.from('fiscal_submissions').insert({
+          workspace_id: (note as any).workspace_id,
+          document_table: 'delivery_notes',
+          document_id: noteId,
+          connector_slug: resolvedCancel.resolved.slug,
+          capability: 'legal_invoice',
+          status: cancelRes.ok ? 'accepted' : 'rejected',
+          mark: cancelRes.cancellationMark ?? null,
+          fiscal_invoice_type: 'cancel_9.3',
+          is_offline: false,
+          provider_credits: cancelRes.providerCredits ?? null,
+          request_payload: { mark: (note as any).fiscal_mark, entityVatNumber: issuerVat },
+          response_payload: cancelRes.raw ?? null,
+          error_code: cancelRes.errorCode ?? null,
+          error_message: cancelRes.errorMessage ?? null,
+        });
+
+        if (!cancelRes.ok) {
+          // Release the claim so a corrected retry is possible, and hand the credits back.
+          await supabase.from('delivery_notes')
+            .update({ fiscal_cancelled_at: null, fiscal_error: cancelRes.errorMessage ?? null, updated_at: new Date().toISOString() })
+            .eq('id', noteId);
+          await cancelReserve.refund();
+          return json({ ok: false, code: cancelRes.errorCode ?? 'cancel_failed',
+            error: cancelRes.errorMessage ?? 'Cancellation was refused by the provider.' }, 400);
+        }
+
+        await supabase.from('delivery_notes').update({
+          fiscal_cancellation_mark: cancelRes.cancellationMark ?? null,
+          fiscal_status: 'cancelled',
+          fiscal_error: null,
+          updated_at: new Date().toISOString(),
+        }).eq('id', noteId);
+
+        return json({ ok: true, delivery_note_id: noteId, cancellation_mark: cancelRes.cancellationMark });
+      } catch (err: any) {
+        // The callout may well have reached AADE, so the claim STAYS: re-sending is the one
+        // outcome we must not risk. The note is reported as needing a look rather than retried.
+        await supabase.from('delivery_notes')
+          .update({ fiscal_error: `Cancellation failed mid-flight: ${err?.message ?? err}`, updated_at: new Date().toISOString() })
+          .eq('id', noteId);
+        return json({ ok: false, code: 'cancel_indeterminate',
+          error: 'The cancellation was sent but the provider did not answer. It may have gone through - check the note at AADE before retrying.' }, 502);
       }
     }
 

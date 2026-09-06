@@ -29,6 +29,7 @@ import { resolveSecret } from '../_shared/secrets.ts';
 import { resolveWorkspaceConnector } from '../_shared/fiscal/registry.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
+import { normalizeVat } from '../_shared/crm/vatNormalize.generated.ts';
 
 /** Don't call a document dead until it has been offline this long — a provider that simply
  *  hasn't transmitted yet must not be mistaken for AADE refusing the document. */
@@ -212,8 +213,22 @@ Deno.serve(withApiLogging('finance-fiscal-offline-recovery', async (req) => {
       const docLabel = labelOf(r) || r.id;
       const offlineHours = hoursSince(r.fiscal_submitted_at ?? r.updated_at);
       try {
+        // `uid` is what the Novus docs name for picking up the SECOND (MARKed) copy of a
+        // document that came back Offline, and it is the only key an offline document reliably
+        // has: it has no MARK yet, by definition. It was never sent.
+        //
+        // The issuer VAT is NORMALIZED. `finance_settings.business_vat` is free text and the
+        // operator workspace stores it as `EL802349569`; the provider answers HTTP 401 for the
+        // prefixed spelling, so the poll failed for every document of every workspace that
+        // writes the number that way — silently, since a failed poll just leaves the document
+        // queued for the next tick.
         const res = await conn.connector.fetchTransmitted(
-          { invoiceMark: r.fiscal_mark ?? undefined, aa: aaOf(r), issuerVatNumber: fs?.business_vat ?? undefined },
+          {
+            invoiceMark: r.fiscal_mark ?? undefined,
+            uid: r.fiscal_uid ?? undefined,
+            aa: aaOf(r),
+            issuerVatNumber: normalizeVat(fs?.business_vat) ?? undefined,
+          },
           conn.ctx,
         );
         if (res?.status === 'accepted' && res.mark) {
@@ -312,7 +327,7 @@ Deno.serve(withApiLogging('finance-fiscal-offline-recovery', async (req) => {
   };
 
   const { data: invs } = await supabase.from('invoices')
-    .select('id, workspace_id, fiscal_mark, legal_number, internal_number, fiscal_submitted_at, fiscal_alerted_at, fiscal_credits_refunded_at, updated_at')
+    .select('id, workspace_id, fiscal_mark, fiscal_uid, legal_number, internal_number, fiscal_submitted_at, fiscal_alerted_at, fiscal_credits_refunded_at, updated_at')
     .eq('fiscal_status', 'offline').limit(50);
   results.invoices_checked = (invs ?? []).length;
   await recover('invoices', invs ?? [],
@@ -320,7 +335,7 @@ Deno.serve(withApiLogging('finance-fiscal-offline-recovery', async (req) => {
     (r) => `Invoice ${r.legal_number ?? r.internal_number ?? ''}`.trim());
 
   const { data: cns } = await supabase.from('credit_notes')
-    .select('id, workspace_id, fiscal_mark, credit_note_number, fiscal_submitted_at, fiscal_alerted_at, fiscal_credits_refunded_at, updated_at')
+    .select('id, workspace_id, fiscal_mark, fiscal_uid, credit_note_number, fiscal_submitted_at, fiscal_alerted_at, fiscal_credits_refunded_at, updated_at')
     .eq('fiscal_status', 'offline').limit(50);
   results.credit_notes_checked = (cns ?? []).length;
   await recover('credit_notes', cns ?? [],
@@ -330,7 +345,7 @@ Deno.serve(withApiLogging('finance-fiscal-offline-recovery', async (req) => {
   // Delivery notes (myDATA 9.3) go offline exactly like invoices and were never swept here at
   // all — an offline movement document simply never got its MARK. Same treatment.
   const { data: dns } = await supabase.from('delivery_notes')
-    .select('id, workspace_id, fiscal_mark, delivery_note_number, fiscal_submitted_at, fiscal_alerted_at, fiscal_credits_refunded_at, updated_at')
+    .select('id, workspace_id, fiscal_mark, fiscal_uid, delivery_note_number, fiscal_submitted_at, fiscal_alerted_at, fiscal_credits_refunded_at, updated_at')
     .eq('fiscal_status', 'offline').limit(50);
   results.delivery_notes_checked = (dns ?? []).length;
   await recover('delivery_notes', dns ?? [],

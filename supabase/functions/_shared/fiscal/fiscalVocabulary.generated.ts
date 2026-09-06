@@ -129,3 +129,42 @@ export function isMydataMovePurpose(code: unknown): boolean {
   const n = Number(code);
   return Number.isInteger(n) && MYDATA_MOVE_PURPOSES.some((p) => p.code === n);
 }
+
+/**
+ * AADE income classification, DERIVED FROM THE DOCUMENT TYPE.
+ *
+ * Two independent axes, and the tax authority validates the pair against the document type:
+ *
+ *  - the TYPE says which market — `E3_561_001` wholesale (Appendix 19: "Wholesale Sales of
+ *    Goods and Services – for Traders") vs `E3_561_003` retail ("Retail Sales … – Private
+ *    Clientele"). Document family `11.x` is retail; everything else is wholesale.
+ *  - the CATEGORY says what was sold — `category1_1` "Commodity Sale Income" vs `category1_3`
+ *    "Provision of Services Income". Families `2.x` (service invoice) and `11.2` (retail
+ *    service receipt) are services; the rest are goods.
+ *
+ * WHY THIS IS DERIVED AND NOT A DEFAULT. Both halves used to fall back to a flat
+ * `('E3_561_001','category1_1')` — the wholesale-goods pair — for every line whose product
+ * carried no per-product override, which is the ordinary case. AADE does not accept that pair
+ * off `1.x`, so the fallback made two whole document families untransmittable:
+ *
+ *    11.1 → 313 "Classification type E3_561_001 is forbidden for Classification category
+ *               category1_1 combined with invoice type Item11_1"
+ *    2.1  → 331 "Could not load/found valid validation doc for classification with category
+ *               category1_1 and type E3_561_001"
+ *
+ * i.e. every POS retail receipt and every service invoice was rejected at the provider, while
+ * the wholesale invoice next to it went through — so the settings page looked configured and
+ * the connector looked healthy. Confirmed against the Novus sandbox 2026-09-06 (issue #319):
+ * with the pair derived, 1.1 / 2.1 / 11.1 / 11.2 are all accepted.
+ *
+ * An explicit per-product or per-line classification still wins — this is only what to use when
+ * nothing more specific was recorded.
+ */
+export function mydataIncomeClassificationType(documentType: string | null | undefined): string {
+  return String(documentType ?? '').startsWith('11.') ? 'E3_561_003' : 'E3_561_001';
+}
+
+export function mydataIncomeClassificationCategory(documentType: string | null | undefined): string {
+  const t = String(documentType ?? '');
+  return t.startsWith('2.') || t === '11.2' ? 'category1_3' : 'category1_1';
+}
