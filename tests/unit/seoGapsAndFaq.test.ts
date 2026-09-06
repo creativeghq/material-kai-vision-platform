@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { buildGapsGains, coversTerm, normalizeText } from '../../supabase/functions/seo-api/handlers/gaps.ts';
+import { buildGapsGains, coversTerm, normalizeText, stemOf } from '../../supabase/functions/seo-api/handlers/gaps.ts';
 import { insertFaqEntry, isFaqHeading } from '../../supabase/functions/seo-api/handlers/faq-insert.ts';
 
 /**
@@ -252,5 +252,50 @@ describe('an FAQ entry goes into the FAQ section', () => {
   it('and the prompt comes from the database', () => {
     const faq = readFileSync(join(HANDLERS, 'faq.ts'), 'utf-8');
     expect(faq).toContain("getGenerationPrompt(supabase, 'seo_faq_answer_user')");
+  });
+});
+
+/**
+ * Both of these were found by running the derivation against the real article, not by reading it.
+ * Neither is a type error, neither throws, and both produce a full panel of plausible rows.
+ */
+describe('what the first live run got wrong', () => {
+  it('reads the competitor list under the name the article row uses', () => {
+    // `research_tab_data.competition` on the row; `research.serpInsights` in the pipeline. Reading
+    // only `competitors` gave a count of 0 on every row and switched brand detection off — the
+    // exact "every number is the same constant" shape this rewrite existed to remove.
+    const stored = buildGapsGains('# Άρθρο', {
+      keyTerms: [{ term: 'πλακακια μπανιου', searchVolume: 100 }],
+      competition: [{ title: 'Πλακάκια μπάνιου Θεσσαλονίκη', domain: 'www.ravenna.gr' }],
+    });
+    expect(stored.all[0].competitorCount).toBe(1);
+  });
+
+  it('sees through a www. prefix to the brand', () => {
+    const branded = buildGapsGains('# Άρθρο', {
+      keyTerms: [{ term: 'ραβεννα πλακακια', searchVolume: 90 }],
+      competition: [{ title: 'RAVENNA', domain: 'www.ravenna.gr' }],
+    });
+    expect(branded.all[0].competitorBrand).toBe(true);
+  });
+
+  it('does not confuse the Greek word «πρακτική» with the brand Praktiker', () => {
+    // Measured on the real article: the body says «Πρακτικά, τα γρανιτοπλακάκια…», and a
+    // minus-two stem reduced both that and "πρακτικερ" to `πρακτικ`, so the highest-volume gap on
+    // the board was reported as already covered. A wrong verdict, in a valid shape, on the one row
+    // a reader would have acted on first.
+    const body = normalizeText('Πρακτική συμβουλή: τα πλακάκια μπάνιου θέλουν R10.');
+    expect(coversTerm(body, 'πρακτικερ')).toBe(false);
+    // …while the declension it exists for still matches.
+    expect(coversTerm(normalizeText('Τα πλακάκια είναι κεραμικά.'), 'πλακακια')).toBe(true);
+    expect(coversTerm(normalizeText('Η τιμή των πλακακιών.'), 'πλακακιων')).toBe(true);
+  });
+
+  it('keeps the stem long enough to be a measurement', () => {
+    expect(stemOf('πρακτικερ')).toBe('πρακτικε');
+    expect(stemOf('πλακακια')).toBe('πλακακι');
+    // Never shorter than four characters, or a short word matches half the dictionary.
+    expect(stemOf('τιμες')).toBe('τιμε');
+    expect(stemOf('ειδη')).toBe('ειδη');
   });
 });

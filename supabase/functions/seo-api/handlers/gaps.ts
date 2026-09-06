@@ -29,12 +29,27 @@
 
 import type { MissingTopic } from '../../_shared/seo-types.ts';
 
-/** The stored research this derivation needs. Every field optional — old rows are missing some. */
+/** One ranked page. */
+export interface GapCompetitor { title?: string; headings?: string[]; domain?: string }
+
+/**
+ * The stored research this derivation needs. Every field optional — old rows are missing some.
+ *
+ * `competition` and `competitors` are BOTH accepted because the same list is called two different
+ * things: `research_tab_data.competition` on the article row, `research.serpInsights` in the
+ * pipeline. Reading only one of them is not a type error and not a crash — it silently produces a
+ * competitor count of 0 on every row and switches brand detection off, which is what the first
+ * live run of this did.
+ */
 export interface GapSources {
   keyTerms?: { term?: string; searchVolume?: number; opportunityScore?: number }[];
-  competitors?: { title?: string; headings?: string[]; domain?: string }[];
+  competitors?: GapCompetitor[];
+  /** What `research_tab_data` calls the same list. */
+  competition?: GapCompetitor[];
   questions?: { question?: string; answered?: boolean }[];
 }
+
+const competitorsOf = (s: GapSources): GapCompetitor[] => s.competitors ?? s.competition ?? [];
 
 /**
  * Lowercase, strip Greek/Latin diacritics, collapse whitespace.
@@ -57,15 +72,26 @@ export function normalizeText(s: string): string {
  * Does the body cover this term?
  *
  * Every significant token has to appear, stem-matched. Greek inflects the ending of almost every
- * word (πλακάκια / πλακακιών / πλακάκι), so an exact phrase test under-reports badly; trimming two
- * characters off each token catches the declension without matching unrelated words. Tokens
- * shorter than four characters are skipped — they are articles and prepositions, and requiring
- * them would fail on word order rather than on meaning.
+ * word (πλακάκια / πλακακιών / πλακάκι), so an exact phrase test under-reports badly.
+ *
+ * The stem is 80% of the token, not "the token minus two characters". Minus-two was the first
+ * version and it reported this article as covering "πρακτικερ πλακακια μπανιου" — Praktiker's
+ * brand — because the body contains the ordinary Greek adverb «πρακτική»: both reduce to
+ * `πρακτικ` at seven characters. 80% keeps `πρακτικε` distinct from `πρακτικη` while still
+ * catching the declensions it exists for, which for a nine-letter word is the difference between
+ * a measurement and a coincidence.
+ *
+ * Tokens shorter than four characters are skipped — they are articles and prepositions, and
+ * requiring them would fail on word order rather than on meaning.
  */
+export function stemOf(token: string): string {
+  return token.slice(0, Math.max(4, Math.ceil(token.length * 0.8)));
+}
+
 export function coversTerm(normalizedBody: string, term: string): boolean {
   const tokens = normalizeText(term).split(' ').filter((t) => t.length >= 4);
   if (tokens.length === 0) return normalizedBody.includes(normalizeText(term));
-  return tokens.every((t) => normalizedBody.includes(t.slice(0, Math.max(4, t.length - 2))));
+  return tokens.every((t) => normalizedBody.includes(stemOf(t)));
 }
 
 /**
@@ -76,9 +102,9 @@ export function coversTerm(normalizedBody: string, term: string): boolean {
  * customer to write about a competitor. It is still worth SEEING (it says who owns the demand),
  * so it is labelled rather than dropped.
  */
-function brandTokens(competitors: GapSources['competitors']): string[] {
+function brandTokens(competitors: GapCompetitor[]): string[] {
   const tokens = new Set<string>();
-  for (const c of competitors ?? []) {
+  for (const c of competitors) {
     const host = (c.domain ?? '').replace(/^www\./, '').split('.')[0];
     if (host.length >= 5) tokens.add(normalizeText(host));
   }
@@ -109,9 +135,9 @@ function namesACompetitor(term: string, brands: string[]): boolean {
 }
 
 /** How many of the ranked pages mention this term, in their title or their headings. Measured. */
-function competitorsMentioning(term: string, competitors: GapSources['competitors']): number {
+function competitorsMentioning(term: string, competitors: GapCompetitor[]): number {
   let n = 0;
-  for (const c of competitors ?? []) {
+  for (const c of competitors) {
     const haystack = normalizeText([c.title ?? '', ...(c.headings ?? [])].join(' '));
     if (haystack && coversTerm(haystack, term)) n += 1;
   }
@@ -128,7 +154,8 @@ export interface GapsGainsResult {
 
 export function buildGapsGains(markdown: string, sources: GapSources): GapsGainsResult {
   const body = normalizeText(markdown);
-  const brands = brandTokens(sources.competitors);
+  const competitors = competitorsOf(sources);
+  const brands = brandTokens(competitors);
   const seen = new Set<string>();
   const all: MissingTopic[] = [];
 
@@ -149,7 +176,7 @@ export function buildGapsGains(markdown: string, sources: GapSources): GapsGains
       // "DataForSEO said nothing" are the same value by the time it reaches here. Either way it
       // is not a number to rank decisions by, so it travels as null and the UI says so.
       searchVolume: searchVolume && searchVolume > 0 ? searchVolume : null,
-      competitorCount: competitorsMentioning(topic, sources.competitors),
+      competitorCount: competitorsMentioning(topic, competitors),
       relevanceScore: Math.max(0, Math.min(1, relevance)),
       competitorBrand: namesACompetitor(topic, brands) || undefined,
     });
@@ -171,7 +198,7 @@ export function buildGapsGains(markdown: string, sources: GapSources): GapsGains
   // never populated by the SERP client — so this contributes nothing yet and will start working
   // the moment it does, rather than needing to be remembered.
   const headingCounts = new Map<string, { text: string; n: number }>();
-  for (const c of sources.competitors ?? []) {
+  for (const c of competitors) {
     for (const h of new Set((c.headings ?? []).map((x) => x.trim()).filter(Boolean))) {
       const key = normalizeText(h);
       const entry = headingCounts.get(key) ?? { text: h, n: 0 };
