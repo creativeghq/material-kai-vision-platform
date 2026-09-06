@@ -405,12 +405,27 @@ export interface FiscalConnector {
     ctx: FiscalConnectorContext,
   ): Promise<{ ok: boolean; cancellationMark?: string; providerCredits?: number; errorCode?: string; errorMessage?: string; raw?: unknown }>;
   /** Law 5155 deferred flow — request a signature for an already-issued (on-credit) invoice. */
+  /** The MARK identifies the invoice; the TERMINAL has to be named too, because the signature is
+   *  issued for a specific EFT-POS. Both halves are required by the provider — the terminal is
+   *  not an optional refinement. */
   askSignatureForOldInvoice?(
-    input: { invoiceMark?: string; invoiceUid?: string },
+    input: { invoiceMark: string; invoiceUid?: string; terminalId?: string; posNspId?: number },
     ctx: FiscalConnectorContext,
   ): Promise<ProviderSignature>;
+  /** Completing a deferred payment needs the MARK as well as the signature: the provider
+   *  addresses the completion to the document, not to the token alone. */
   completeOldInvoicePosPayment?(
-    input: { signatureToken: string; transactionId: string; paymentAmount: number; paymentType?: number; tipAmount?: number },
+    input: { invoiceMark: string; signatureToken: string; transactionId: string; paymentAmount: number; paymentType?: number; tipAmount?: number },
     ctx: FiscalConnectorContext,
   ): Promise<PosCompletionResult>;
+  /**
+   * The provider credit pool this key draws on.
+   *
+   * Without it the only reading of the balance is the per-document cost returned by a
+   * transmission — so the tier monitor could only learn how much was left by spending some,
+   * which is not a monitor. Optional: a connector that has no notion of a prepaid pool omits it.
+   */
+  getCreditsBalance?(
+    ctx: FiscalConnectorContext,
+  ): Promise<{ ok: boolean; balance?: number; errorMessage?: string; raw?: unknown }>;
 }

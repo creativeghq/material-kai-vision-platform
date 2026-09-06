@@ -24,6 +24,8 @@
  * no integrity probe could see it. Only the provider could, which is why these are pinned here.
  */
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { buildNovusPayload } from '../../supabase/functions/_shared/fiscal/novus.ts';
 import type { FiscalInvoiceInput } from '../../supabase/functions/_shared/fiscal/types.ts';
@@ -231,6 +233,41 @@ describe('the unit code resolves the way units are actually written', () => {
     expect(movementWith('κιλά').invoiceDetails[0].measurementUnit).toBe(2);
     expect(movementWith('ΛΙΤΡΑ').invoiceDetails[0].measurementUnit).toBe(3);
     expect(movementWith('Τ.Μ.').invoiceDetails[0].measurementUnit).toBe(5);
+  });
+});
+
+describe('the provider routes and body shapes, as the swagger declares them', () => {
+  const src = readFileSync(
+    join(__dirname, '..', '..', 'supabase', 'functions', '_shared', 'fiscal', 'novus.ts'),
+    'utf8',
+  );
+
+  it('POSTs an ARRAY to CompletionPosInvoices — a bare object is a 400', () => {
+    // `List<SendInvoicesAfterPosPaymentRequest>`. Sending the object meant the POS completion had
+    // never once succeeded: card charged, receipt held, no legal document filed.
+    const body = src.slice(src.indexOf('CompletionPosInvoices'), src.indexOf('CompletionPosInvoices') + 1400);
+    expect(body).toMatch(/body:\s*JSON\.stringify\(\[\{/);
+  });
+
+  it('sends a B2G invoice to SendInvoicesB2G, not to SendInvoices', () => {
+    // `ProviderInvoice` has no `providerB2gAdditionalInvoiceDetails` property, and the JSON
+    // binder drops unknown members — so the plain route silently discarded every B2G field.
+    expect(src).toMatch(/input\.b2g\s*\?\s*'SendInvoicesB2G'\s*:\s*'SendInvoices'/);
+  });
+
+  it('passes the MARK as the body and the terminal/payment as QUERY on the deferred-signature pair', () => {
+    for (const route of ['AskSignatureForOldInvoice', 'CompletionAskSignatureForOldInvoice']) {
+      const at = src.indexOf(`Provider/${route}`);
+      expect(at, `${route} not called`).toBeGreaterThan(-1);
+      const block = src.slice(at, at + 700);
+      expect(block, `${route} must send the MARK as a bare number body`)
+        .toMatch(/body:\s*JSON\.stringify\(Number\(input\.invoiceMark\)\)/);
+      expect(block, `${route} must carry its parameters in the query string`).toContain('qs.toString()');
+    }
+  });
+
+  it('reads the provider credit pool directly instead of inferring it from a spend', () => {
+    expect(src).toContain('GetCreditsBalance');
   });
 });
 

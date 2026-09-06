@@ -6185,6 +6185,8 @@ export type Database = {
           customer_contact_id: string | null
           delivery_note_number: string | null
           fiscal_alerted_at: string | null
+          fiscal_cancellation_mark: string | null
+          fiscal_cancelled_at: string | null
           fiscal_credits_refunded_at: string | null
           fiscal_error: string | null
           fiscal_mark: string | null
@@ -6234,6 +6236,8 @@ export type Database = {
           customer_contact_id?: string | null
           delivery_note_number?: string | null
           fiscal_alerted_at?: string | null
+          fiscal_cancellation_mark?: string | null
+          fiscal_cancelled_at?: string | null
           fiscal_credits_refunded_at?: string | null
           fiscal_error?: string | null
           fiscal_mark?: string | null
@@ -6283,6 +6287,8 @@ export type Database = {
           customer_contact_id?: string | null
           delivery_note_number?: string | null
           fiscal_alerted_at?: string | null
+          fiscal_cancellation_mark?: string | null
+          fiscal_cancelled_at?: string | null
           fiscal_credits_refunded_at?: string | null
           fiscal_error?: string | null
           fiscal_mark?: string | null

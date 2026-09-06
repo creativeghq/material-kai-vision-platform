@@ -13,6 +13,10 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/core/ui/dropdown-menu';
 import { Button } from '@/components/core/ui/button';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/core/ui/alert-dialog';
 import { HubEmptyState, HubSegmented } from '@/components/core/hub';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -851,6 +855,7 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
   const { toast } = useToast();
   const navigate = useNavigate();
   const [busy, setBusy] = React.useState<string | null>(null);
+  const [cancelling, setCancelling] = React.useState<DeliveryNote | null>(null);
   const financeBase = FINANCE_BASE;
   const issue = async (id: string) => {
     setBusy(id);
@@ -875,6 +880,24 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
     try { const url = await deliveryNotesService.generatePdf(id, true); if (url) window.open(url, '_blank'); }
     catch (err: any) { toast({ title: 'PDF failed', description: err?.message, variant: 'destructive' }); }
     finally { setBusy(null); }
+  };
+  // Withdrawing a movement at myDATA files a cancellation document with AADE and spends provider
+  // credits, so it is confirmed rather than done on a click. There is no undo — the cancellation
+  // is itself a registered document.
+  const cancelFiscal = async () => {
+    if (!cancelling) return;
+    setBusy(cancelling.id);
+    try {
+      const r = await deliveryNotesService.cancelFiscal(cancelling.id);
+      toast({
+        title: r?.skipped ? 'Already cancelled at myDATA' : 'Cancelled at myDATA',
+        description: r?.cancellation_mark ? `Cancellation MARK ${r.cancellation_mark}` : undefined,
+      });
+      setCancelling(null);
+      onChanged();
+    } catch (err: any) {
+      toast({ title: 'myDATA cancellation failed', description: err?.message, variant: 'destructive' });
+    } finally { setBusy(null); }
   };
   return (
     <div className="table-scroll">
@@ -908,7 +931,17 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
             <td className="px-4 py-2 text-center">
               <div className="flex items-center justify-center gap-2">
                 <span className={`text-[10px] ${statusTone(d.status)}`}>{humanizeLabel(d.status)}</span>
-                {d.fiscal_mark && <span className="text-[10px] text-emerald-500" title={`MARK ${d.fiscal_mark}`}>myDATA ✓</span>}
+                {d.fiscal_mark && !d.fiscal_cancellation_mark && (
+                  <span className="text-[10px] text-emerald-700 dark:text-emerald-400" title={`MARK ${d.fiscal_mark}`}>myDATA ✓</span>
+                )}
+                {d.fiscal_cancellation_mark && (
+                  <span
+                    className="text-[10px] text-amber-800 dark:text-amber-300"
+                    title={`MARK ${d.fiscal_mark} · cancellation MARK ${d.fiscal_cancellation_mark}`}
+                  >
+                    myDATA cancelled
+                  </span>
+                )}
               </div>
             </td>
             <td className="px-4 py-2 text-right">
@@ -933,12 +966,46 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
                     {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Create invoice'}
                   </Button>
                 )}
+                {/* A movement document is the ONE thing myDATA lets us withdraw. An invoice or a
+                    receipt is immutable once transmitted and is corrected by a credit note, so
+                    there is deliberately no equivalent button on those tables. */}
+                {!readOnly && d.fiscal_mark && !d.fiscal_cancellation_mark && (
+                  <Button size="sm" variant="ghost" disabled={busy === d.id} onClick={() => setCancelling(d)}>
+                    {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Cancel at myDATA'}
+                  </Button>
+                )}
               </div>
             </td>
           </tr>
         ))}
       </tbody>
     </table>
+    <AlertDialog open={!!cancelling} onOpenChange={(v) => { if (!v) setCancelling(null); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Cancel this delivery note at myDATA?</AlertDialogTitle>
+          <AlertDialogDescription asChild>
+            <div className="space-y-2">
+              <p>
+                Delivery note {cancelling?.delivery_note_number ?? ''} was transmitted with MARK{' '}
+                <span className="font-mono">{cancelling?.fiscal_mark}</span>. Cancelling files a
+                withdrawal with AADE and spends provider credits.
+              </p>
+              <p>
+                There is no undo. The cancellation is its own registered document — the note keeps
+                its original MARK and gains a cancellation MARK beside it.
+              </p>
+            </div>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={!!busy}>Keep it</AlertDialogCancel>
+          <AlertDialogAction onClick={(e) => { e.preventDefault(); void cancelFiscal(); }} disabled={!!busy}>
+            {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Cancel at myDATA
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     </div>
   );
 };

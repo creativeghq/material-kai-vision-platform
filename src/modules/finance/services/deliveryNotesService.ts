@@ -19,6 +19,11 @@ export interface DeliveryNote {
   notes: string | null;
   fiscal_mark: string | null;
   fiscal_status: string | null;
+  /** AADE cancellation MARK. Non-null means the movement has been WITHDRAWN at myDATA — the note
+   *  still exists and still shows its original MARK, which is the point: the cancellation is its
+   *  own registered document, not an erasure of the first one. */
+  fiscal_cancellation_mark: string | null;
+  fiscal_cancelled_at: string | null;
   created_at: string;
   /** Embedded order — read-only, for `deliveryNoteJob`. Never written. */
   orders?: { project_id: string | null; projects?: { name: string | null } | { name: string | null }[] | null } | null;
@@ -231,6 +236,26 @@ export const deliveryNotesService = {
     });
     if (error) throw await edgeError(error);
     if (data && data.ok === false) throw new Error(data.error || 'myDATA transmission failed');
+    return data;
+  },
+
+  /**
+   * Withdraw a transmitted movement document at myDATA (9.3 → CancelDeliveryNote).
+   *
+   * This is the ONLY document myDATA lets us cancel. An invoice or a retail receipt is immutable
+   * once transmitted and is corrected by a CREDIT NOTE instead — the provider has no route for
+   * cancelling one at all.
+   *
+   * Irreversible and billable: it files a cancellation document with AADE and spends provider
+   * credits, so the caller must confirm first. It is idempotent at our end — a note that already
+   * carries a cancellation mark answers `skipped` rather than filing a second one.
+   */
+  async cancelFiscal(id: string): Promise<any> {
+    const { data, error } = await supabase.functions.invoke('finance-issue-invoice', {
+      body: { cancel_delivery_note: { delivery_note_id: id } },
+    });
+    if (error) throw await edgeError(error);
+    if (data && data.ok === false) throw new Error(data.error || 'myDATA cancellation failed');
     return data;
   },
 

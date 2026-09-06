@@ -519,7 +519,15 @@ export const novusConnector: FiscalConnector = {
     // for a card/IRIS payment on a connected POS, the caller must explicitly request signing
     // (opts.skipSignature === false). Send the value explicitly either way.
     const skip = opts?.skipSignature === false ? 'false' : 'true';
-    const url = `${ctx.baseUrl}/api/v1/Provider/SendInvoices?skipSignature=${skip}`;
+    // A B2G (public-sector) invoice has ITS OWN ROUTE. The plain `/SendInvoices` envelope
+    // (`ProviderInvoice`) has no `providerB2gAdditionalInvoiceDetails` property at all, and
+    // ASP.NET's JSON binder DROPS members it does not know — so posting the B2G block there
+    // transmitted a perfectly ordinary invoice with the contract reference, buyer reference,
+    // budget and due date silently removed. No error, no warning, a valid MARK on a document
+    // missing everything that made it B2G. Route list read from the provider's own swagger
+    // 2026-09-06 (#319).
+    const route = input.b2g ? 'SendInvoicesB2G' : 'SendInvoices';
+    const url = `${ctx.baseUrl}/api/v1/Provider/${route}?skipSignature=${skip}`;
     const payload = buildNovusPayload(input) as any;
     if (opts?.transmissionFailure) {
       // resend marker for the 5XX recovery path
@@ -649,6 +657,32 @@ export const novusConnector: FiscalConnector = {
     }
   },
 
+  // GET /GetCreditsBalance — what the workspace's provider pool actually holds.
+  //
+  // `FISCAL_PROVIDER_CREDIT_TIERS` alerts on crossing a tier, and until now the only reading
+  // available was the per-document `credits` cost on a transmission response — i.e. the monitor
+  // could only ever learn the balance by spending some. This is the direct read.
+  async getCreditsBalance(ctx) {
+    try {
+      const res = await fetch(`${ctx.baseUrl}/api/v1/Provider/GetCreditsBalance`, {
+        method: 'GET',
+        headers: { 'API-KEY': ctx.apiKey, 'content-type': 'application/json' },
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        return { ok: false, errorMessage: problemDetail(body) ?? `HTTP ${res.status}`, raw: body };
+      }
+      // The provider reports credits with a comma decimal separator, as it does on a submission.
+      const raw = typeof body === 'object' && body !== null
+        ? (body.credits ?? body.balance ?? body.creditsBalance ?? body.availableCredits)
+        : body;
+      const balance = typeof raw === 'number' ? raw : parseCredits(raw);
+      return { ok: balance != null, balance, raw: body };
+    } catch (e) {
+      return { ok: false, errorMessage: String(e) };
+    }
+  },
+
   // POST /CancelDeliveryNote — REST v2.3. Verified against the sandbox 2026-09-06 (#319):
   // returns `statusCode:"Success"` with a `cancellationMark` and costs 0.25 credits.
   //
@@ -694,13 +728,19 @@ export const novusConnector: FiscalConnector = {
       const res = await fetch(`${ctx.baseUrl}/api/v1/Provider/CompletionPosInvoices`, {
         method: 'POST',
         headers: { 'API-KEY': ctx.apiKey, 'content-type': 'application/json' },
-        body: JSON.stringify({
+        // AN ARRAY, NOT AN OBJECT. The endpoint binds `List<SendInvoicesAfterPosPaymentRequest>`
+        // and answers HTTP 400 for a bare object — "The JSON value could not be converted to
+        // System.Collections.Generic.List`1[…]". This was sending the object, so the POS
+        // completion had NEVER succeeded: the customer's card is charged, the held receipt stays
+        // at `awaiting_payment`, and no legal document is ever filed for money that was taken.
+        // Verified against the sandbox 2026-09-06 (#319) — object → 400, array → MARK.
+        body: JSON.stringify([{
           signatureToken: input.signatureToken,
           transactionId: input.transactionId,
           paymentAmount: input.paymentAmount,
           ...(input.paymentType != null ? { paymentType: input.paymentType } : {}),
           tipAmount: input.tipAmount ?? 0,
-        }),
+        }]),
       });
       const body = await res.json().catch(() => null);
       const entry = body?.response?.[0] ?? body;
@@ -708,18 +748,30 @@ export const novusConnector: FiscalConnector = {
       const ok = res.ok && (entry?.statusCode === 'Success' || !!mark);
       // If the bank returned a final paymentType use it, else default 7 (card) per the spec.
       const finalPaymentType = entry?.paymentType ?? input.paymentType ?? 7;
-      return { ok, mark, finalPaymentType, errorMessage: ok ? undefined : (firstError(entry).message ?? `HTTP ${res.status}`), raw: body };
+      return {
+        ok, mark, finalPaymentType,
+        errorMessage: ok ? undefined : (firstError(entry).message ?? problemDetail(body) ?? `HTTP ${res.status}`),
+        raw: body,
+      };
     } catch (e) {
       return { ok: false, errorMessage: String(e) };
     }
   },
 
   // Deferred flow — request a signature for an already-issued (on-credit) invoice.
+  //
+  // THE BODY IS A BARE int64 — the MARK — and the terminal is passed as QUERY parameters. This
+  // used to POST `{ invoiceMark, invoiceUid }` as JSON with no query at all, which the endpoint
+  // cannot bind. Same family of mistake as CompletionPosInvoices below it, and the same
+  // consequence: the deferred card payment on an on-credit invoice could never be started.
   async askSignatureForOldInvoice(input, ctx) {
-    const res = await fetch(`${ctx.baseUrl}/api/v1/Provider/AskSignatureForOldInvoice`, {
+    const qs = new URLSearchParams();
+    if (input.terminalId) qs.set('terminalId', input.terminalId);
+    if (input.posNspId != null) qs.set('posNspId', String(input.posNspId));
+    const res = await fetch(`${ctx.baseUrl}/api/v1/Provider/AskSignatureForOldInvoice?${qs.toString()}`, {
       method: 'POST',
       headers: { 'API-KEY': ctx.apiKey, 'content-type': 'application/json' },
-      body: JSON.stringify({ invoiceMark: input.invoiceMark, invoiceUid: input.invoiceUid }),
+      body: JSON.stringify(Number(input.invoiceMark)),
     });
     const body = await res.json().catch(() => ({}));
     const s = body?.providerSignature?.[0]?.signatures?.[0] ?? body;
@@ -730,18 +782,20 @@ export const novusConnector: FiscalConnector = {
     };
   },
 
+  // Same shape as its sibling: the MARK is the BODY, everything about the payment is QUERY.
   async completeOldInvoicePosPayment(input, ctx) {
     try {
-      const res = await fetch(`${ctx.baseUrl}/api/v1/Provider/CompletionAskSignatureForOldInvoice`, {
+      const qs = new URLSearchParams({
+        signatureToken: input.signatureToken,
+        transactionId: input.transactionId,
+        paymentAmount: String(input.paymentAmount),
+        tipAmount: String(input.tipAmount ?? 0),
+      });
+      if (input.paymentType != null) qs.set('paymentType', String(input.paymentType));
+      const res = await fetch(`${ctx.baseUrl}/api/v1/Provider/CompletionAskSignatureForOldInvoice?${qs.toString()}`, {
         method: 'POST',
         headers: { 'API-KEY': ctx.apiKey, 'content-type': 'application/json' },
-        body: JSON.stringify({
-          signatureToken: input.signatureToken,
-          transactionId: input.transactionId,
-          paymentAmount: input.paymentAmount,
-          ...(input.paymentType != null ? { paymentType: input.paymentType } : {}),
-          tipAmount: input.tipAmount ?? 0,
-        }),
+        body: JSON.stringify(Number(input.invoiceMark)),
       });
       const body = await res.json().catch(() => null);
       const entry = body?.response?.[0] ?? body;
