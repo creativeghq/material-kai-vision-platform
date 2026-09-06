@@ -74,7 +74,13 @@ export const CAPABILITIES: readonly CapabilityDef[] = [
   { id: 'image-studio', label: 'Image Studio', hub: 'studio', agentId: 'interior-designer', toolkitId: 'generation', canvasKind: 'image' },
 
   // ── Marketing ──
-  { id: 'social-post', label: 'Social Post', hub: 'marketing', agentId: 'social-media', agentTool: 'manage_social', toolkitId: 'social', recordTable: 'social_posts', moduleSlug: 'social-media' },
+  // `pageRoute` was undefined, and that was not a fabric gap — the page exists. Every social post
+  // this platform makes is written by the agent into `social_posts`, and the only surface that
+  // reads that table is the posts list on the social hub's Analytics section. With no route here
+  // the caption card had nowhere to hand off to, so a drafted post was written, charged for, and
+  // then unreachable from the thing that made it. `openInLabel` because the landing is the
+  // profile's channels rail, not the Marketing Hub — same reason contract/warehouse carry one.
+  { id: 'social-post', label: 'Social Post', hub: 'marketing', openInLabel: 'Social Posts', pageRoute: '/profile?tab=social-accounts&section=analytics', agentId: 'social-media', agentTool: 'manage_social', toolkitId: 'social', recordTable: 'social_posts', moduleSlug: 'social-media' },
   { id: 'email-campaign', label: 'Email Campaign', hub: 'marketing', pageRoute: '/marketing/email', agentId: 'kai', agentTool: 'manage_email_campaign', toolkitId: 'email-marketing', recordTable: 'campaigns', moduleSlug: 'email-marketing' },
   // openInLabel, like contract/warehouse: /automations is its own page, not the Marketing Hub
   // landing, so the hub-label fallback would put "Open in Marketing Hub" on a button that lands
@@ -161,6 +167,17 @@ export const RESULT_TYPE_CAPABILITY: Record<string, string> = {
   // machinery was already built; `flows_list` simply was not registered to use it.
   flows_list: 'flow',
   reviews_list: 'reviews',
+  // The whole `manage_social` result family, which had NOT ONE entry here — the same dead end
+  // `flows_list` describes above, seven times over. A drafted caption, a published post, an
+  // engagement report: each rendered its numbers and offered no way to reach the post list they
+  // are about. `social_accounts` is deliberately absent: it is in RESULT_SETUP_DESTINATION, and
+  // "connect an account" is the action there, not "open the posts page".
+  social_content_generated: 'social-post',
+  social_image_generated: 'social-post',
+  social_post: 'social-post',
+  social_insights: 'social-post',
+  social_post_analytics: 'social-post',
+  social_best_time: 'social-post',
   // The AI Assessment cards. Without these the report is a dead end in exactly the way `flows_list`
   // was: it names findings, ranks actions, and offers no way to reach the project any of it is
   // about. `project` is a DETAIL_ROUTE capability, so the handoff deep-links to /projects/:id

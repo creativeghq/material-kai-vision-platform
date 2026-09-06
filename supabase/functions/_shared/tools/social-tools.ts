@@ -117,7 +117,7 @@ export const createManageSocialTool = (
   }
 
   return tool(
-    async ({ action, account_id, platform, caption, hashtags, image_urls, scheduled_at, topic, tone, prompt, confirm }: any) => {
+    async ({ action, account_id, platform, caption, hashtags, image_urls, scheduled_at, topic, tone, prompt, post_id, confirm }: any) => {
       const gate = await moduleReady();
       if (!gate.ok) return JSON.stringify({ success: false, error: gate.error });
       const ws = workspaceId!;
@@ -254,19 +254,41 @@ export const createManageSocialTool = (
 
       if (action === 'generate_content') {
         if (!topic || !platform) return JSON.stringify({ success: false, error: 'generate_content needs a topic and a platform.' });
-        const res = await callEdge(jwt!, 'generate-social-content', { topic, platform, tone, workspace_id: ws });
+        const res = await callEdge(jwt!, 'generate-social-content', { topic, platform, tone, workspace_id: ws, post_id });
         if (!res.ok || res.data?.success === false) return JSON.stringify({ success: false, error: res.data?.error || res.error });
-        onChunk?.({ type: 'social_content_generated', platform, data: res.data, timestamp: Date.now() });
-        return JSON.stringify({ success: true, ...res.data, message: 'Draft caption + hashtags generated. Review, then use publish/schedule.' });
+        // `post_id` is on the chunk so the card can hand off to the draft it just wrote, and it is
+        // named in the message so the NEXT call in the flow attaches to that draft instead of
+        // starting a new one.
+        onChunk?.({ type: 'social_content_generated', platform, post_id: res.data?.post_id ?? null, data: res.data, timestamp: Date.now() });
+        return JSON.stringify({
+          success: true,
+          ...res.data,
+          message: res.data?.post_id
+            ? `Draft caption + hashtags saved to post ${res.data.post_id}. Pass that post_id to generate_image so the picture lands on THIS draft, then publish/schedule.`
+            : 'Draft caption + hashtags generated. Review, then use publish/schedule.',
+        });
       }
 
       if (action === 'generate_image') {
         if (!prompt) return JSON.stringify({ success: false, error: 'generate_image needs a prompt.' });
-        const res = await callEdge(jwt!, 'generate-social-image', { prompt, platform, workspace_id: ws });
+        // `post_id` and `platform` both forwarded. Without post_id the image function has no draft
+        // to attach to and files a SECOND draft of its own, so "write me an Instagram post with a
+        // picture" produced two half-posts — one caption with no image, one image with no caption
+        // — and the planner showed both. Without platform that orphan draft was hardcoded
+        // `instagram`, so a LinkedIn image was filed under the wrong channel.
+        const res = await callEdge(jwt!, 'generate-social-image', { prompt, platform, workspace_id: ws, post_id });
         if (!res.ok || res.data?.success === false) return JSON.stringify({ success: false, error: res.data?.error || res.error });
         const url = res.data?.image_url ?? res.data?.url ?? null;
-        onChunk?.({ type: 'social_image_generated', platform: platform ?? null, image_url: url, timestamp: Date.now() });
-        return JSON.stringify({ success: true, image_url: url, message: 'Image generated. Pass it in image_urls[] on publish/schedule.' });
+        const attachedTo = res.data?.post_id ?? post_id ?? null;
+        onChunk?.({ type: 'social_image_generated', platform: platform ?? null, post_id: attachedTo, image_url: url, timestamp: Date.now() });
+        return JSON.stringify({
+          success: true,
+          image_url: url,
+          post_id: attachedTo,
+          message: attachedTo
+            ? `Image generated and attached to post ${attachedTo}. Publish/schedule that post — you do not need to pass image_urls again.`
+            : 'Image generated. Pass it in image_urls[] on publish/schedule.',
+        });
       }
 
       return JSON.stringify({ success: false, error: `unknown action: ${action}` });
@@ -286,9 +308,13 @@ export const createManageSocialTool = (
         '  account_insights → follower/engagement insights for an account (or the whole workspace if none given).',
         '  post_analytics   → sync + return analytics for the workspace\'s published posts.',
         '  generate_content → AI-draft a caption + hashtags for a topic on a platform (topic + platform).',
-        '  generate_image   → AI-generate an image from a prompt; returns an image_url to attach on publish.',
+        '                     Saves a DRAFT post and returns its post_id.',
+        '  generate_image   → AI-generate an image from a prompt. Pass the post_id from generate_content',
+        '                     and the image is attached to that draft; omit it and you get a second,',
+        '                     separate draft holding only the picture.',
         '',
-        'Typical flow: generate_content (+ generate_image) → review with the user → publish/schedule.',
+        'Typical flow: generate_content → generate_image WITH the returned post_id → review with the',
+        'user → publish/schedule. One post is one draft: carry the post_id through the whole flow.',
         'publish/schedule ALWAYS show the user an Approve/Decline card first — never set confirm:true',
         'yourself; the UI sets it on approval.',
       ].join('\n'),
@@ -304,6 +330,11 @@ export const createManageSocialTool = (
         topic: z.string().optional().describe('generate_content: what the post is about.'),
         tone: z.string().optional().describe('generate_content: optional tone (e.g. playful, professional).'),
         prompt: z.string().optional().describe('generate_image: the image description.'),
+        post_id: z.string().uuid().optional().describe(
+          'The draft post to write into. generate_content returns one; pass it straight back to generate_image '
+          + 'so the caption and the picture land on the SAME draft. Omit it and each call files a separate '
+          + 'half-finished draft.',
+        ),
       }),
     },
   );

@@ -213,6 +213,10 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
     model = 'auto' as ImageModel,
     aspect_ratio = '1:1' as AspectRatio,
     post_id,
+    // The caller's target channel. It was accepted by the tool, sent on the wire and never read
+    // here, so the fallback draft below was hardcoded `instagram` — a LinkedIn image filed under
+    // the wrong platform, in a table whose analytics group BY platform.
+    platform,
   } = body;
   // Reassigned below when a post_id pins the workspace — the post's workspace is authoritative,
   // so the debit and the write cannot land in different tenants. (#365 AD-30)
@@ -315,6 +319,10 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
     const storedUrl = await storeImage(supabase, imageUrl!, filename);
 
     // ⑥ Update social_posts if post_id provided
+    // `attachedPostId` is what the response reports: the caller needs to know WHICH draft now
+    // holds this image, whether it was theirs or the one created below. Without it the tool
+    // could only say "here is a URL", so the next step had to re-attach it by hand.
+    let attachedPostId: string | null = post_id ?? null;
     if (post_id) {
       const { data: existingPost } = await supabase
         .from('social_posts')
@@ -340,10 +348,10 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
       // response below hands the caller `image_url` either way — so failing here would take
       // away something they have. But a discarded result meant the draft never appeared in the
       // workspace's planner and nothing said why (#347 audit).
-      const { error: postErr } = await supabase.from('social_posts').insert({
+      const { data: newPost, error: postErr } = await supabase.from('social_posts').insert({
         workspace_id,
         user_id: userId,
-        platform: 'instagram',
+        platform: typeof platform === 'string' && platform ? platform : 'instagram',
         post_type: 'image',
         image_urls: [storedUrl],
         status: 'draft',
@@ -351,15 +359,17 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
         credits_breakdown: { image: debitResult.credits_debited },
         generation_model: resolvedModel,
         metadata: { prompt, image_type, aspect_ratio },
-      });
+      }).select('id').single();
       if (postErr) {
         console.error('[generate-social-image] image stored but the draft post row FAILED', postErr);
       }
+      attachedPostId = newPost?.id ?? null;
     }
 
     return jsonResponse({
       success: true,
       image_url: storedUrl,
+      post_id: attachedPostId,
       model_used: resolvedModel,
       credits_used: debitResult.credits_debited,
       credits_remaining: debitResult.new_balance,

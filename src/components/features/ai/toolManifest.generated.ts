@@ -1246,6 +1246,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'topic', type: 'string', optional: true, description: 'generate_content: what the post is about.' },
       { name: 'tone', type: 'string', optional: true, description: 'generate_content: optional tone (e.g. playful, professional).' },
       { name: 'prompt', type: 'string', optional: true, description: 'generate_image: the image description.' },
+      { name: 'post_id', type: 'string', optional: true, description: 'The draft post to write into. generate_content returns one; pass it straight back to generate_image so the caption and the picture land on the SAME draft. Omit it and each call files a separate half-finished draft.' },
     ],
   },
   {
