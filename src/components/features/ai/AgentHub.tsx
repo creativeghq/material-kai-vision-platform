@@ -5649,7 +5649,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const starterToolkits = useMemo(() => {
     const active = activeToolkits
       .map((id) => TOOLKITS.find((t) => t.id === id))
-      .filter((tk): tk is ToolkitDefinition => !!tk);
+      .filter((tk): tk is ToolkitDefinition => !!tk)
+      // An always-on toolkit is BOUND on every agent; that does not make its starters
+      // relevant on every agent. `starterAgents` narrows the offer where the maths is
+      // domain-specific — see the field's comment on `calculators`, which is why Edith
+      // opened with "Size a heat pump". Omitted = universal, so `core` and `web-research`
+      // are untouched, and nothing here changes what any agent can DO.
+      .filter((tk) => !tk.starterAgents || tk.starterAgents.includes(selectedAgent));
     const signature = getAgentSignatureToolkits(selectedAgent, userRole, enabledModulesArray)
       .filter((tk) => !activeToolkits.includes(tk.id));
     return [...signature, ...active].filter((tk) => (tk.quick_starts?.length || 0) > 0);

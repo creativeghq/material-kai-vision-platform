@@ -1388,6 +1388,20 @@ export interface ToolkitDefinition {
   /** When true, this toolkit is always loaded (cannot be disabled by the user). */
   alwaysOn?: boolean;
   /**
+   * Which agents' launchers OFFER this toolkit's quick-starts. `alwaysOn` only.
+   *
+   * Binding and offering are not the same question, and conflating them put "Size a heat
+   * pump" and "Price a kitchen" on Edith's opening screen. `alwaysOn` exists so the TOOLS
+   * stay bound on every agent — `calculators` was made a cluster precisely to express the
+   * hardcoded always-bound list it replaced — but it also put every one of its quick-starts
+   * on every agent's first screen, which is not the same claim. Ask Edith to size a heat
+   * pump and she still can; she just no longer opens by suggesting it.
+   *
+   * Omit for a genuinely universal always-on toolkit (`core`, `web-research`) — those stay
+   * everywhere. This narrows the OFFER only; it never removes a tool.
+   */
+  starterAgents?: string[];
+  /**
    * 1–4 starter actions surfaced in the ToolkitOnboardingCard the moment the
    * toolkit is enabled (or in the empty state when the chat has no messages
    * yet). Each click pre-fills the chat with `prompt` so the agent has a
@@ -1517,6 +1531,11 @@ export const TOOLKITS: ToolkitDefinition[] = [
     description: 'Deterministic HVAC/energy maths — heat-pump sizing and an annual running-cost comparison across six heating methods. Free, instant, no upstream API.',
     icon: 'Calculator',
     alwaysOn: true,
+    // Bound everywhere, OFFERED only where the maths belongs. Heat-pump sizing, annual
+    // running cost and a fitted-kitchen price are dwelling questions: Trinity quotes them,
+    // Vision designs the room, Estate advises on the property. On Edith's opening screen
+    // — an SEO agent — they read as the app having no idea what it is for.
+    starterAgents: ['erp', 'interior-designer', 'property-advisor'],
     tool_ids: ['calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost'],
     quick_starts: [
       {

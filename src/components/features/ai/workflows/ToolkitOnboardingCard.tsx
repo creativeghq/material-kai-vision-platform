@@ -98,11 +98,80 @@ export const ToolkitOnboardingCard: React.FC<Props> = ({ toolkits, mode, agentNa
         )}
       </div>
 
-      <div className="p-3 space-y-3">
-        {filtered.map((tk) => (
-          <ToolkitGroup key={tk.id} toolkit={tk} onLaunch={onLaunch} />
-        ))}
+      {/*
+        One toolkit → just show it. Several → TABS, not a stack.
+        Stacking every active toolkit made the first screen of an agent a scroll: eleven
+        clusters of up to four starters each, so the thing you wanted was usually below the
+        fold and the answer to "what does this agent do" was "keep scrolling". Tabs make
+        the same set browsable in one screen — you read the toolkit names first and open
+        the one you want, which is also the order the question is actually asked in.
+      */}
+      {filtered.length === 1 ? (
+        <div className="p-3">
+          <ToolkitGroup toolkit={filtered[0]} onLaunch={onLaunch} showHeading={false} />
+        </div>
+      ) : (
+        <ToolkitTabs toolkits={filtered} onLaunch={onLaunch} />
+      )}
+    </div>
+  );
+};
+
+/**
+ * The toolkit strip.
+ *
+ * Underline tabs come from `[role="tab"]` in index.css, platform-wide — Radix `TabsList`
+ * inherits the house treatment, so this must NOT restyle them into pills (a filled pill is
+ * the silhouette of a primary button, so "where I am" and "what to press" stop being
+ * distinguishable). The strip scrolls horizontally on its own: with eleven toolkits it is
+ * wider than the canvas rail, and `<main>` is `overflow-x-hidden`, so without this the last
+ * tabs are clipped with no scrollbar and no swipe.
+ */
+const ToolkitTabs: React.FC<{
+  toolkits: ToolkitDefinition[];
+  onLaunch: (prompt: string, qs: ToolkitQuickStart, tk: ToolkitDefinition) => void;
+}> = ({ toolkits, onLaunch }) => {
+  // Keyed on the toolkit set: when the agent changes, the tabs change, and holding the old
+  // id would leave the card blank until the user clicked something.
+  const [active, setActive] = React.useState(toolkits[0]?.id);
+  const activeId = toolkits.some((t) => t.id === active) ? active : toolkits[0]?.id;
+  const current = toolkits.find((t) => t.id === activeId);
+
+  return (
+    <div className="p-3">
+      <div className="-mx-1 mb-3 overflow-x-auto">
+        <div role="tablist" className="flex items-center gap-1 px-1 min-w-max">
+          {toolkits.map((tk) => {
+            const Icon = ICON_MAP[tk.icon] || Wrench;
+            const isActive = tk.id === activeId;
+            return (
+              <button
+                key={tk.id}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setActive(tk.id)}
+                title={tk.description}
+                className={cn(
+                  'flex items-center gap-1.5 whitespace-nowrap px-2.5 py-1.5 text-xs transition-colors',
+                  isActive ? 'font-medium text-foreground' : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <Icon className={cn('h-3 w-3', isActive ? 'text-primary' : 'text-muted-foreground')} />
+                {tk.name}
+                <Badge variant="outline" className="text-[9px] py-0">{tk.quick_starts?.length}</Badge>
+              </button>
+            );
+          })}
+        </div>
       </div>
+
+      {current && (
+        <>
+          <p className="mb-2 text-[11px] text-muted-foreground">{current.description}</p>
+          <ToolkitGroup toolkit={current} onLaunch={onLaunch} showHeading={false} />
+        </>
+      )}
     </div>
   );
 };
@@ -110,15 +179,19 @@ export const ToolkitOnboardingCard: React.FC<Props> = ({ toolkits, mode, agentNa
 const ToolkitGroup: React.FC<{
   toolkit: ToolkitDefinition;
   onLaunch: (prompt: string, qs: ToolkitQuickStart, tk: ToolkitDefinition) => void;
-}> = ({ toolkit, onLaunch }) => {
+  /** The tab strip already names the toolkit; repeating it under the tab is noise. */
+  showHeading?: boolean;
+}> = ({ toolkit, onLaunch, showHeading = true }) => {
   const ToolkitIcon = ICON_MAP[toolkit.icon] || Wrench;
   return (
     <div>
-      <div className="flex items-center gap-1.5 mb-1.5">
-        <ToolkitIcon className="h-3 w-3 text-primary" />
-        <span className="text-xs font-medium">{toolkit.name}</span>
-        <Badge variant="outline" className="text-[9px] py-0">{toolkit.quick_starts?.length}</Badge>
-      </div>
+      {showHeading && (
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <ToolkitIcon className="h-3 w-3 text-primary" />
+          <span className="text-xs font-medium">{toolkit.name}</span>
+          <Badge variant="outline" className="text-[9px] py-0">{toolkit.quick_starts?.length}</Badge>
+        </div>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
         {(toolkit.quick_starts || []).map((qs, idx) => (
           <QuickStartButton
