@@ -11,6 +11,7 @@ import { handleWrite } from './handlers/write.ts';
 import { handlePipeline } from './handlers/pipeline.ts';
 import { handleToolkitAudit } from './handlers/toolkit-audit.ts';
 import { handleToolkitResearch } from './handlers/toolkit-research.ts';
+import { handleApplyFix, handleRevertFix } from './handlers/apply-fix.ts';
 import { handlePageIdeas } from './handlers/page-ideas.ts';
 
 const ROUTES: Record<string, (req: Request, body: any) => Promise<Response>> = {
@@ -22,6 +23,8 @@ const ROUTES: Record<string, (req: Request, body: any) => Promise<Response>> = {
   toolkit_audit: handleToolkitAudit,
   toolkit_research: handleToolkitResearch,
   page_ideas: handlePageIdeas,
+  apply_fix: handleApplyFix,
+  revert_fix: handleRevertFix,
 };
 
 Deno.serve(withApiLogging('seo-api', async (req) => {

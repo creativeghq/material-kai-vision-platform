@@ -11873,6 +11873,56 @@
                       }
                     },
                     "description": "Returns: {success: boolean, data: {seed: string, page: string, location_code: number, language_code: string, ideas: [{term, search_volume, cpc, competition}], cost_usd: number|null}}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "article_id",
+                      "anchor",
+                      "instruction"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "apply_fix"
+                        ],
+                        "description": "Apply ONE analyzer recommendation to ONE paragraph of a stored article. The anchored block is sent to the model alone and spliced back by exact string replacement, so everything outside it is byte-identical afterwards. The previous body is snapshotted for a single Revert. Refuses when the anchor is absent (the article moved on) or appears more than once (ambiguous). 2 credits, refunded on failure."
+                      },
+                      "article_id": {
+                        "type": "string",
+                        "description": "The seo_articles row to edit. 404 for an article outside the caller's workspace."
+                      },
+                      "anchor": {
+                        "type": "string",
+                        "description": "The paragraph to rewrite, VERBATIM, as carried on the fix's `anchor` field. Must occur exactly once in the article body."
+                      },
+                      "instruction": {
+                        "type": "string",
+                        "description": "The single improvement to apply, as carried on the fix's `suggestion` field."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "article_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "revert_fix"
+                        ],
+                        "description": "Restore the article body captured before the last applied fix. Free — a column swap, no model call. Swaps rather than discards, so a revert can itself be undone."
+                      },
+                      "article_id": {
+                        "type": "string",
+                        "description": "The seo_articles row to revert. 409 when there is no previous draft."
+                      }
+                    }
                   }
                 ],
                 "discriminator": {

@@ -5776,6 +5776,42 @@
           }
         ],
         "response": "{success: boolean, data: {seed: string, page: string, location_code: number, language_code: string, ideas: [{term, search_volume, cpc, competition}], cost_usd: number|null}}"
+      },
+      {
+        "name": "apply_fix",
+        "summary": "Apply ONE analyzer recommendation to ONE paragraph of a stored article. The anchored block is sent to the model alone and spliced back by exact string replacement, so everything outside it is byte-identical afterwards. The previous body is snapshotted for a single Revert. Refuses when the anchor is absent (the article moved on) or appears more than once (ambiguous). 2 credits, refunded on failure.",
+        "params": [
+          {
+            "name": "article_id",
+            "type": "string",
+            "required": true,
+            "desc": "The seo_articles row to edit. 404 for an article outside the caller's workspace."
+          },
+          {
+            "name": "anchor",
+            "type": "string",
+            "required": true,
+            "desc": "The paragraph to rewrite, VERBATIM, as carried on the fix's `anchor` field. Must occur exactly once in the article body."
+          },
+          {
+            "name": "instruction",
+            "type": "string",
+            "required": true,
+            "desc": "The single improvement to apply, as carried on the fix's `suggestion` field."
+          }
+        ]
+      },
+      {
+        "name": "revert_fix",
+        "summary": "Restore the article body captured before the last applied fix. Free — a column swap, no model call. Swaps rather than discards, so a revert can itself be undone.",
+        "params": [
+          {
+            "name": "article_id",
+            "type": "string",
+            "required": true,
+            "desc": "The seo_articles row to revert. 409 when there is no previous draft."
+          }
+        ]
       }
     ],
     "request": [

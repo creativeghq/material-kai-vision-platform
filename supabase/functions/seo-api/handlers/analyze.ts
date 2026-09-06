@@ -357,7 +357,7 @@ async function resolveContentDate(
   }
 }
 
-function analyzeContent(
+export function analyzeContent(
   markdown: string,
   plan: ArticlePlan,
   serpSignals?: SerpSignalBlob,

@@ -17,6 +17,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/core/ui/accordion';
 import { Badge } from '@/components/core/ui/badge';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Dialog, DialogContent, DialogTitle } from '@/components/core/ui/dialog';
@@ -51,6 +52,7 @@ import {
   AlertOctagon,
   Quote,
   BookOpen,
+  Undo2, Wand2,
 } from 'lucide-react';
 
 // ─── Types (matching seo-pipeline output / ArticleOutput) ───────
@@ -79,6 +81,7 @@ interface SEOArticle {
   overall_score: number | null;
   seo_score: number | null;
   readability_score: number | null;
+  previous_markdown_at?: string | null;
   word_count: number;
   reading_time_minutes: number;
   keyword_density: any;
@@ -110,6 +113,17 @@ interface SerpFeatures {
   hasKnowledgeGraph: boolean;
   hasPeopleAlsoAsk: boolean;
   serpFeatureTypes: string[];
+}
+
+/** A fix the analyzer located in ONE paragraph — the only kind that can be applied surgically. */
+interface ApplicableFix {
+  category: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  description: string;
+  suggestion: string;
+  affectedSection: string | null;
+  scope?: 'section' | 'document' | 'config';
+  anchor?: string | null;
 }
 
 // Matches ArticleOutput.optimize from seo-pipeline
@@ -420,6 +434,84 @@ function ScoreGauge({ score, label, size = 'lg' }: { score: number; label: strin
         <span className={`${textSize} font-bold tabular-nums ${tone.text}`}>{score}</span>
       </div>
       <span className="text-xs text-muted-foreground">{label}</span>
+    </div>
+  );
+}
+
+// ─── Applicable fixes ───────────────────────────────────────────
+
+/**
+ * The fixes that can be applied to one paragraph, each with its own button.
+ *
+ * Only `scope: 'section'` fixes get here. That is the point: the analyzer's document-wide
+ * and config findings still appear in the section breakdown below, but without a button,
+ * because there is nothing a button could edit — meta tags come from the plan and
+ * provenance from the brief, so an Apply on those would promise what it cannot do.
+ *
+ * Each row shows the paragraph it will touch. Applying a model rewrite to a customer's
+ * finished article without showing them which words are at stake is asking for a signature
+ * on a blank page.
+ */
+function ApplicableFixes({ fixes, applyingAnchor, onApply, canRevert, onRevert }: {
+  fixes: ApplicableFix[];
+  applyingAnchor: string | null;
+  onApply: (fix: { anchor: string; suggestion: string }) => void;
+  canRevert: boolean;
+  onRevert: () => void;
+}) {
+  if (fixes.length === 0 && !canRevert) return null;
+
+  return (
+    <div className="rounded-lg border border-hairline bg-card">
+      <div className="flex items-center justify-between gap-2 border-b border-hairline px-3 py-2">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold">
+            {fixes.length > 0 ? 'Fixes you can apply here' : 'Applied fixes'}
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            {fixes.length > 0
+              ? 'Each rewrites only the paragraph shown — the rest of the article is untouched.'
+              : 'Nothing further can be applied automatically.'}
+          </p>
+        </div>
+        {canRevert && (
+          <Button size="sm" variant="outline" onClick={onRevert} className="shrink-0 gap-1.5">
+            <Undo2 className="h-3.5 w-3.5" />
+            Revert last
+          </Button>
+        )}
+      </div>
+
+      <div className="divide-y divide-hairline">
+        {fixes.map((fix) => {
+          const busy = applyingAnchor === fix.anchor;
+          return (
+            <div key={fix.anchor} className="flex items-start gap-3 p-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium">{fix.suggestion}</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  {fix.description}
+                  {fix.affectedSection ? ` · under “${fix.affectedSection}”` : ''}
+                </p>
+                {/* The words at stake. */}
+                <p className="mt-1.5 line-clamp-2 rounded-sm bg-surface-sunken px-2 py-1 text-[11px] text-muted-foreground">
+                  {fix.anchor}
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={!!applyingAnchor}
+                onClick={() => onApply({ anchor: fix.anchor as string, suggestion: fix.suggestion })}
+                className="shrink-0 gap-1.5"
+              >
+                {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
+                {busy ? 'Applying' : 'Apply'}
+              </Button>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -2131,6 +2223,92 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
     return 'inserted';
   }, [article]);
 
+  /**
+   * Apply ONE fix to ONE paragraph.
+   *
+   * Goes through `seo-api` rather than writing markdown from here: the rewrite is a model
+   * call that has to be billed, refunded on failure, and snapshotted for Revert — none of
+   * which a client-side `.update()` can do. The whole revised article comes back, so the
+   * viewer never re-derives what the splice did.
+   */
+  const { toast } = useToast();
+  const [applyingAnchor, setApplyingAnchor] = useState<string | null>(null);
+  const applyFix = useCallback(async (fix: { anchor: string; suggestion: string }) => {
+    if (!article?.id || applyingAnchor) return;
+    setApplyingAnchor(fix.anchor);
+    try {
+      const { data, error } = await supabase.functions.invoke('seo-api', {
+        body: {
+          action: 'apply_fix',
+          article_id: article.id,
+          anchor: fix.anchor,
+          instruction: fix.suggestion,
+        },
+      });
+      if (error || !data?.success) {
+        toast({
+          title: 'Could not apply that fix',
+          // The edge function's own words: it distinguishes "the paragraph moved on" from
+          // "it appears twice" from "out of credits", and each needs a different response.
+          description: data?.error || error?.message || 'Nothing was changed.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      setArticle((prev) => (prev ? {
+        ...prev,
+        markdown_content: data.data.markdown_content,
+        seo_score: data.data.seo_score ?? prev.seo_score,
+        overall_score: data.data.seo_score ?? prev.overall_score,
+        readability_score: data.data.readability_score ?? prev.readability_score,
+        previous_markdown_at: data.data.reverts_to,
+      } : prev));
+      toast({
+        title: 'Applied',
+        description: data.data.seo_score != null
+          ? `Score is now ${data.data.seo_score}/100. You can revert this.`
+          : 'You can revert this.',
+      });
+    } finally {
+      setApplyingAnchor(null);
+    }
+  }, [article, applyingAnchor, toast]);
+
+  const revertFix = useCallback(async () => {
+    if (!article?.id) return;
+    const { data, error } = await supabase.functions.invoke('seo-api', {
+      body: { action: 'revert_fix', article_id: article.id },
+    });
+    if (error || !data?.success) {
+      toast({ title: 'Could not revert', description: data?.error || error?.message, variant: 'destructive' });
+      return;
+    }
+    setArticle((prev) => (prev ? {
+      ...prev,
+      markdown_content: data.data.markdown_content,
+      seo_score: data.data.seo_score ?? prev.seo_score,
+      overall_score: data.data.seo_score ?? prev.overall_score,
+      readability_score: data.data.readability_score ?? prev.readability_score,
+    } : prev));
+    toast({ title: 'Reverted', description: 'The previous draft is back.' });
+  }, [article, toast]);
+
+  /**
+   * The fixes that can actually be applied to a paragraph.
+   *
+   * `scope === 'section'` is the analyzer's own verdict and `anchor` is that paragraph
+   * verbatim. Document-wide and config fixes deliberately get NO button: meta tags come
+   * from the plan and provenance from the brief, so an Apply there would promise something
+   * it cannot do.
+   */
+  const applicableFixes = useMemo(() => {
+    const fixes = (article?.content_analysis as { fixes?: unknown })?.fixes;
+    if (!Array.isArray(fixes)) return [] as ApplicableFix[];
+    return (fixes as ApplicableFix[]).filter(
+      (f) => f?.scope === 'section' && typeof f.anchor === 'string' && !!f.anchor,
+    );
+  }, [article?.content_analysis]);
+
   if (loading) {
     return (
       <Card className="mt-3">
@@ -2333,7 +2511,14 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
                 </TabsContent>
 
                 {article.optimize_data && (
-                  <TabsContent value="optimize" className="mt-4">
+                  <TabsContent value="optimize" className="mt-4 space-y-4">
+                    <ApplicableFixes
+                      fixes={applicableFixes}
+                      applyingAnchor={applyingAnchor}
+                      onApply={applyFix}
+                      canRevert={!!article.previous_markdown_at}
+                      onRevert={revertFix}
+                    />
                     <OptimizeTab data={article.optimize_data} overallScore={article.overall_score || 0} />
                   </TabsContent>
                 )}
