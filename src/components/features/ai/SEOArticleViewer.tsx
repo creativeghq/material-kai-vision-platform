@@ -606,11 +606,42 @@ function OptimizeTab({ data, overallScore }: { data: OptimizeData; overallScore:
             ))}
           </div>
           {data.geoScore.recommendations.length > 0 && (
-            <div className="mt-2 pt-2 border-t space-y-1">
-              <h4 className="text-xs font-semibold text-muted-foreground">Recommendations</h4>
-              {data.geoScore.recommendations.map((rec, i) => (
-                <p key={i} className="text-xs text-muted-foreground">{rec}</p>
-              ))}
+            /*
+             * Recommendations are the only actionable thing on this tab, and they were five
+             * lines of 12px `text-muted-foreground` run together under a grey heading —
+             * lighter and smaller than the signal names above them, so the one part of the
+             * panel you are meant to DO something about read as a footnote. Each is now its
+             * own row: numbered, at body contrast, with the parenthetical example split off
+             * as a dimmer example line so the instruction is readable on its own.
+             */
+            <div className="mt-3 pt-3 border-t space-y-1.5">
+              <h4 className="text-xs font-semibold">
+                Recommendations
+                <span className="ml-1.5 font-normal text-muted-foreground">
+                  {data.geoScore.recommendations.length} to raise the GEO score
+                </span>
+              </h4>
+              <ol className="space-y-1.5">
+                {data.geoScore.recommendations.map((rec, i) => {
+                  // "Add X (e.g. "…")" — the instruction is the part before the example.
+                  const split = rec.match(/^(.*?)\s*\((e\.g\.|for|to)\s(.*)\)\s*$/i);
+                  const instruction = split ? split[1] : rec;
+                  const example = split ? `${split[2]} ${split[3]}` : null;
+                  return (
+                    <li key={i} className="flex gap-2 text-xs">
+                      <span className="mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-sm bg-primary/10 text-[10px] font-semibold tabular-nums text-primary">
+                        {i + 1}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="text-foreground">{instruction}</span>
+                        {example && (
+                          <span className="block text-[11px] text-muted-foreground">{example}</span>
+                        )}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ol>
             </div>
           )}
         </div>
