@@ -16,6 +16,7 @@ import {
   PanelRightClose, ArrowLeft, ArrowUpRight, LayoutPanelLeft, Sparkles, Radar, ClipboardList,
   Briefcase, Boxes, PackageCheck, MessageSquare, Bot, TrendingUp, Images,
   Wand2, Calculator, MessageSquareQuote, ShieldQuestion, MoreHorizontal, X, Trash2,
+  ListChecks,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -30,7 +31,7 @@ export type CanvasArtifactKind =
   | 'sheet' | 'staging' | 'products' | 'world' | 'board' | 'image' | 'video' | 'render'
   | 'inspiration' | 'radar' | 'result' | 'quote'
   | 'jobs' | 'sourcing' | 'order' | 'mentions' | 'llm' | 'seo' | 'catalog'
-  | 'demo' | 'calc' | 'clarify' | 'confirm';
+  | 'demo' | 'calc' | 'clarify' | 'confirm' | 'run';
 
 export interface CanvasArtifact {
   id: string;
@@ -86,6 +87,9 @@ const KIND_ICON: Record<CanvasArtifactKind, React.ComponentType<{ className?: st
   // card that BLOCKS the turn was the one that stayed in the chat rail — and on a phone the rail
   // is unmounted whenever the canvas is up.
   confirm: ShieldQuestion,
+  // The WORK, not its output. Every turn opens one of these, so the canvas says what is
+  // happening while it happens instead of holding its welcome copy for the whole run.
+  run: ListChecks,
 };
 
 const KIND_LABEL: Record<CanvasArtifactKind, string> = {
@@ -112,6 +116,7 @@ const KIND_LABEL: Record<CanvasArtifactKind, string> = {
   calc: 'Calculation',
   clarify: 'Needs your input',
   confirm: 'Needs your approval',
+  run: 'How it ran',
 };
 
 interface CanvasPanelProps {

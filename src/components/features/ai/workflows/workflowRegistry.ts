@@ -398,6 +398,28 @@ export const WORKFLOWS: WorkflowDefinition[] = [
   B2B_RESEARCH,
 ];
 
+/**
+ * Which toolkit owns each workflow's tools.
+ *
+ * The wizard auto-enables it so the first step does not come back "tools not available",
+ * and the canvas names it on the run card. One map, because the two used to be separate and
+ * a workflow named in one and not the other is silent in both directions.
+ */
+export const WORKFLOW_TOOLKIT: Record<string, string> = {
+  'catalog-build': 'catalogs',
+  'catalog-translate': 'catalogs',
+  'catalog-resume': 'catalogs',
+  'catalog-send': 'catalogs',
+  'seo-article': 'seo-article',
+  'mention-monitor': 'mentions',
+  'presentation-sheet': 'presentation-sheets',
+  'b2b-research': 'b2b',
+};
+
+export function toolkitForWorkflow(workflowId: string): string | undefined {
+  return WORKFLOW_TOOLKIT[workflowId];
+}
+
 export function getWorkflow(id: string): WorkflowDefinition | undefined {
   return WORKFLOWS.find((w) => w.id === id);
 }

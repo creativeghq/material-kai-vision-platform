@@ -67,9 +67,18 @@ interface Props {
   onSkip: (runId: string, stepId: string) => void;
   /** Dismiss the wizard entirely (workflow stays in runtime state but card unmounts). */
   onDismiss?: (runId: string) => void;
+  /**
+   * Rendered INSIDE the canvas run card, under the step that is asking.
+   *
+   * The run card already draws the pipeline name, the progress strip, the step title and its
+   * running/failed state, so in this mode the wizard contributes only the part nothing else
+   * can: the form, the free-form override and Skip. Rendering both copies read as the same
+   * card twice, one inside the other.
+   */
+  embedded?: boolean;
 }
 
-export const WorkflowWizardCard: React.FC<Props> = ({ runtime, onAdvance, onSkip, onDismiss }) => {
+export const WorkflowWizardCard: React.FC<Props> = ({ runtime, onAdvance, onSkip, onDismiss, embedded }) => {
   const definition = getWorkflow(runtime.definition_id);
 
   // Both useMemos must run before the `if (!definition) return null` bail-out —
@@ -125,6 +134,7 @@ export const WorkflowWizardCard: React.FC<Props> = ({ runtime, onAdvance, onSkip
       onAdvance={onAdvance}
       onSkip={onSkip}
       onDismiss={onDismiss}
+      embedded={embedded}
     />
   );
 };
@@ -141,7 +151,8 @@ const WizardStep: React.FC<{
   onAdvance: Props['onAdvance'];
   onSkip: Props['onSkip'];
   onDismiss?: Props['onDismiss'];
-}> = ({ runtime, definition, stepDef, stepRt, onAdvance, onSkip, onDismiss }) => {
+  embedded?: boolean;
+}> = ({ runtime, definition, stepDef, stepRt, onAdvance, onSkip, onDismiss, embedded }) => {
   const [useCustomPrompt, setUseCustomPrompt] = useState(false);
   const [customPrompt, setCustomPrompt] = useState('');
 
@@ -157,6 +168,11 @@ const WizardStep: React.FC<{
   const isRunning = stepRt?.status === 'running';
   const hasError = stepRt?.status === 'failed';
 
+  // Embedded in the canvas run card, the wizard contributes only the ASK. While the step is
+  // running there is nothing to ask, and the run card is already saying so — rendering here
+  // would put an empty bordered box under a live step.
+  if (embedded && isRunning) return null;
+
   const handleAdvance = (formValues?: Record<string, any>) => {
     if (useCustomPrompt && customPrompt.trim()) {
       onAdvance({ runId: runtime.run_id, stepId: stepDef.id, customPrompt: customPrompt.trim() });
@@ -166,8 +182,13 @@ const WizardStep: React.FC<{
   };
 
   return (
-    <div className="rounded-2xl border border-primary/30 bg-gradient-to-b from-primary/5 to-transparent overflow-hidden mb-3">
+    <div className={cn(
+      embedded
+        ? 'overflow-hidden rounded-sm border border-hairline bg-card'
+        : 'rounded-2xl border border-primary/30 bg-gradient-to-b from-primary/5 to-transparent overflow-hidden mb-3',
+    )}>
       {/* Header — workflow name + step indicator strip */}
+      {!embedded && (
       <div className="px-4 py-3 border-b border-primary/20 flex items-start gap-3">
         <div className="h-10 w-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
           <Sparkles className="h-5 w-5 text-primary" />
@@ -203,9 +224,11 @@ const WizardStep: React.FC<{
           </button>
         )}
       </div>
+      )}
 
       {/* Step body */}
-      <div className="p-4 space-y-3">
+      <div className={cn('space-y-3', embedded ? 'p-3' : 'p-4')}>
+        {!embedded && (
         <div className="flex items-start gap-3">
           <div className={cn(
             'h-9 w-9 rounded-lg flex items-center justify-center shrink-0 transition',
@@ -225,8 +248,9 @@ const WizardStep: React.FC<{
             #{stepDef.order}
           </Badge>
         </div>
+        )}
 
-        {hasError && stepRt?.error_message && (
+        {!embedded && hasError && stepRt?.error_message && (
           <div className="rounded border border-destructive/40 bg-destructive/10 p-2.5 text-xs text-destructive flex items-start gap-2">
             <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
             <div>
@@ -236,7 +260,7 @@ const WizardStep: React.FC<{
           </div>
         )}
 
-        {isRunning && (
+        {!embedded && isRunning && (
           <div className="rounded border border-primary/30 bg-primary/5 p-2.5 text-xs text-primary flex items-center gap-2">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
             <span>{stepRt?.status_line || 'Running…'}</span>

@@ -103,8 +103,11 @@ import { useEnabledModules } from '@/modules/_core';
 import { WorkflowTracker } from './workflows/WorkflowTracker';
 import { WorkflowInlineForm } from './workflows/WorkflowInlineForm';
 import { CommandPalette } from './workflows/CommandPalette';
-import { getWorkflow as getWorkflowDefinition } from './workflows/workflowRegistry';
+import { getWorkflow as getWorkflowDefinition, toolkitForWorkflow } from './workflows/workflowRegistry';
 import type { WorkflowRuntimeState } from './workflows/types';
+import { RunCanvas, RunChip } from './runs/RunCanvas';
+import { applyRunChunk, createRun, finishRun, runFromWorkflow, runTabTitle } from './runs/runDerivation';
+import type { AgentRunState } from './runs/runTypes';
 import { InspirationCard } from './InspirationCard';
 import { HeatPumpResultCard } from './HeatPumpResultCard';
 import { HeatingCostResultCard } from './HeatingCostResultCard';
@@ -1136,6 +1139,53 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [workflows, setWorkflows] = useState<Record<string, WorkflowRuntimeState>>({});
 
   /**
+   * Every unit of work this conversation has started — one per send, keyed by run id.
+   *
+   * The canvas renders these (RunCanvas), which is what makes a turn VISIBLE while it is
+   * happening instead of only once it produces an artifact. Eight toolkits had a hand-written
+   * pipeline and the other forty had nothing at all; a run is derived from the stream, so all
+   * forty-eight get the same surface without anyone authoring one per toolkit.
+   */
+  const [runs, setRuns] = useState<Record<string, AgentRunState>>({});
+  /** The run the in-flight turn is feeding. Read inside the stream loop. */
+  const activeRunIdRef = useRef<string | null>(null);
+  /** Set by the wizard immediately before it sends: this turn belongs to that workflow run. */
+  const pendingWorkflowRunIdRef = useRef<string | null>(null);
+
+  /**
+   * Fold one stream chunk into the active run.
+   *
+   * Called for EVERY chunk, before the branches below pick the ones they care about — the
+   * run is the surface that says what the turn is doing, so it cannot depend on some other
+   * branch happening to handle the chunk first.
+   */
+  const feedRunChunk = useCallback((chunk: Record<string, unknown>) => {
+    const runId = activeRunIdRef.current;
+    if (!runId) return;
+    setRuns((prev) => {
+      const run = prev[runId];
+      if (!run) return prev;
+      const next = applyRunChunk(run, chunk);
+      return next === run ? prev : { ...prev, [runId]: next };
+    });
+  }, []);
+
+  /**
+   * Close the active run. A step still open when the turn ends is marked `unreported`, not
+   * `done` — see finishRun. Only a run still marked running is touched, so the failure path
+   * (which closes it first, with the message) wins over the finally that follows it.
+   */
+  const endRun = useCallback((status: 'done' | 'failed' | 'aborted', errorMessage?: string) => {
+    const runId = activeRunIdRef.current;
+    if (!runId) return;
+    setRuns((prev) => {
+      const run = prev[runId];
+      if (!run || run.status !== 'running') return prev;
+      return { ...prev, [runId]: finishRun(run, status, errorMessage) };
+    });
+  }, []);
+
+  /**
    * Persist a message AND link the saved row id back onto the local one.
    *
    * Every save site goes through this rather than calling the service directly: a
@@ -1460,17 +1510,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     // workflow → toolkit by definition_id (catalog-* → catalogs, seo-* →
     // seo-article, b2b-* → b2b, etc.) so the user doesn't get a "tools not
     // available" reply when the agent runs the first step.
-    const toolkitForWorkflow: Record<string, string> = {
-      'catalog-build': 'catalogs',
-      'catalog-translate': 'catalogs',
-      'catalog-resume': 'catalogs',
-      'catalog-send': 'catalogs',
-      'seo-article': 'seo-article',
-      'mention-monitor': 'mentions',
-      'presentation-sheet': 'presentation-sheets',
-      'b2b-research': 'b2b',
-    };
-    const requiredToolkit = toolkitForWorkflow[workflowId];
+    const requiredToolkit = toolkitForWorkflow(workflowId);
     if (requiredToolkit && !activeToolkits.includes(requiredToolkit)) {
       updateActiveToolkits([...activeToolkits, requiredToolkit]);
     }
@@ -1554,6 +1594,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     // the prefix, pass it to every tool as `_workflow_run_id`, and emit all
     // workflow_step_progress chunks with that exact run_id.
     const wf = workflows[args.runId];
+    // The send this triggers is a step of THIS workflow, not a run of its own. Without the
+    // binding the canvas would draw two cards for one turn: the pipeline and the tools that
+    // execute it.
+    pendingWorkflowRunIdRef.current = args.runId;
     const prefix = `[workflow:${wf?.definition_id || 'unknown'}/${args.stepId}:${args.runId}] `;
     const message = args.customPrompt
       ? `${prefix}continue with: ${args.customPrompt}`
@@ -1600,6 +1644,51 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           awaiting_input_step_id: nextAwaiting,
           awaiting_input_schema: nextSchema,
           awaiting_input_prompt: nextAwaiting ? 'Continuing after skip' : undefined,
+        },
+      };
+    });
+  }, []);
+
+  /**
+   * Re-run / edit-input / skip on a planned step. Lived inline in the chat tracker; the canvas
+   * run card offers the same three, so it is one handler rather than a second copy that can
+   * come to disagree about what "re-run" does.
+   */
+  const handleWorkflowStepAction = useCallback((
+    runId: string,
+    stepId: string,
+    action: 'edit_input' | 'rerun' | 'skip',
+  ) => {
+    if (action === 'skip') {
+      setWorkflows((prev) => {
+        const wf = prev[runId];
+        if (!wf) return prev;
+        return {
+          ...prev,
+          [runId]: {
+            ...wf,
+            steps: {
+              ...wf.steps,
+              [stepId]: { ...(wf.steps[stepId] || { step_id: stepId, status: 'pending' }), status: 'skipped' },
+            },
+            awaiting_input_step_id: wf.awaiting_input_step_id === stepId ? null : wf.awaiting_input_step_id,
+          },
+        };
+      });
+      return;
+    }
+    setWorkflows((prev) => {
+      const wf = prev[runId];
+      if (!wf) return prev;
+      const stepDef = getWorkflowDefinition(wf.definition_id)?.steps.find((st) => st.id === stepId);
+      if (!stepDef?.input_schema) return prev;
+      return {
+        ...prev,
+        [runId]: {
+          ...wf,
+          awaiting_input_step_id: stepId,
+          awaiting_input_schema: stepDef.input_schema,
+          awaiting_input_prompt: `Edit input for "${stepDef.title}".`,
         },
       };
     });
@@ -2375,6 +2464,40 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     };
 
     setMessages((prev) => [...prev, userMessage]);
+
+    // Open a RUN for this turn. Every tool the agent calls, every workflow step it reports and
+    // every result it produces lands on it, and the canvas shows that live. A turn with no run
+    // is a turn the canvas cannot describe — which is what every toolkit outside the eight
+    // hand-written pipelines used to be.
+    const runId = `run-${userMessage.id}`;
+    const boundWorkflowRunId = pendingWorkflowRunIdRef.current;
+    pendingWorkflowRunIdRef.current = null;
+    activeRunIdRef.current = runId;
+    setRuns((prev) => ({
+      ...prev,
+      [runId]: createRun({
+        runId,
+        userMessageId: userMessage.id,
+        // A quick-start's caption is what the user pressed; a typed message is what they wrote.
+        // The `[workflow:…]` machine prefix is stripped — it is addressed to the agent, not the
+        // reader.
+        title: (directRun ? (directRun.quickStartLabel || directRun.say) : userInput)
+          .replace(/^\[workflow:[^\]]*\]\s*/, '')
+          .trim() || 'Request',
+        toolkitId: directRun?.toolkitId
+          || pendingToolkits.find((t) => !ALWAYS_ON_TOOLKIT_IDS.includes(t)),
+        agentId: selectedAgent,
+        // A pinned quick-start already knows its one tool, so the card can name the step the
+        // instant it is clicked rather than showing a blank panel until the first chunk lands.
+        plannedTools: directRun ? [directRun.toolName] : undefined,
+        workflowRunId: boundWorkflowRunId ?? undefined,
+      }),
+    }));
+    // Open the canvas ON the new run. The tab-validity effect below only moves focus when the
+    // current tab stops existing, so without this a second turn would leave the canvas parked
+    // on the previous turn's result while the new one ran unseen behind a tab.
+    setActiveCanvasId(`run:${runId}`);
+
     // The turn is committed, so the toolkit-onboarding focus has done its job. This is the
     // "or sends any message" clause the state's own comment has always claimed and never
     // implemented — the launchers used to clear it on CLICK instead, which is why cancelling a
@@ -2606,6 +2729,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
             try {
               const chunk = JSON.parse(line);
+
+              // The run sees every chunk, before any branch below claims one.
+              feedRunChunk(chunk);
 
               // Capture reasoning steps for Jarvis-style display
               if (chunk.type === 'agent_routed') {
@@ -3949,6 +4075,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       // matched once and the top-up card below has never rendered in its life. What the user got
       // instead was `Error: Agent execution failed: 402 - {"error":"insufficient_credits",...}`.
       const isCreditsError = looksInsufficientCredits(errText);
+      endRun('failed', isCreditsError ? 'The turn did not run: no credits left.' : errText);
       const errorMessage: Message = {
         id: `msg-${Date.now()}-error`,
         role: 'assistant',
@@ -3963,6 +4090,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+      endRun('done');
+      activeRunIdRef.current = null;
       // The finished message renders from `messages`; leaving the buffer set would flash the
       // previous answer under the next turn's working panel.
       setStreamingText('');
@@ -4437,10 +4566,35 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     [messages, hiddenArtifactIds],
   );
 
-  const canvasArtifacts = useMemo(
-    () => visibleMessages.map(getCanvasArtifact).filter(Boolean) as CanvasArtifact[],
-    [visibleMessages, getCanvasArtifact],
-  );
+  /**
+   * The runs the canvas draws, oldest first.
+   *
+   * A workflow run is drawn from its own runtime — its steps are PLANNED, so the user sees
+   * what is coming before it happens — and the tool run bound to it is suppressed, or one
+   * turn would put two cards on screen: the pipeline, and the tools executing it. A run whose
+   * workflow has since been dismissed is drawn normally rather than vanishing with it.
+   */
+  const displayRuns = useMemo<AgentRunState[]>(() => {
+    const fromWorkflows = Object.values(workflows)
+      .filter((wf) => wf.status !== 'aborted')
+      .map((wf) => {
+        const bound = Object.values(runs).find((r) => r.workflow_run_id === wf.run_id);
+        return runFromWorkflow(wf, {
+          userMessageId: bound?.user_message_id,
+          toolkitId: bound?.toolkit_id ?? toolkitForWorkflow(wf.definition_id),
+          startedAt: bound?.started_at,
+        });
+      });
+    const standalone = Object.values(runs)
+      .filter((r) => !(r.workflow_run_id && workflows[r.workflow_run_id]));
+    return [...fromWorkflows, ...standalone].sort((a, b) => a.started_at - b.started_at);
+  }, [runs, workflows]);
+
+  const runsByUserMessage = useMemo(() => {
+    const map = new Map<string, AgentRunState>();
+    for (const run of displayRuns) if (run.user_message_id) map.set(run.user_message_id, run);
+    return map;
+  }, [displayRuns]);
 
   /**
    * The canvas tab strip, one entry per TURN rather than per message.
@@ -4458,7 +4612,20 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     const groups: CanvasArtifactGroup[] = [];
     let members: CanvasArtifact[] | null = null;
     for (const m of visibleMessages) {
-      if (m.role === 'user') { members = null; continue; }
+      if (m.role === 'user') {
+        members = null;
+        // The turn's RUN opens its page: how the work happened, with whatever it produced
+        // behind it. A turn that produced nothing still gets a page, which is the whole
+        // point — 21 direct-run quick-starts finish with a cheerful "done" over an empty
+        // canvas, and that is now a page saying what ran and what it returned.
+        const run = runsByUserMessage.get(m.id);
+        if (run) {
+          const member: CanvasArtifact = { id: `run:${run.run_id}`, kind: 'run', title: runTabTitle(run) };
+          members = [member];
+          groups.push({ id: member.id, kind: member.kind, title: member.title, members });
+        }
+        continue;
+      }
       const artifact = getCanvasArtifact(m);
       if (!artifact) continue;
       if (!members) {
@@ -4467,11 +4634,28 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       }
       members.push(artifact);
     }
+    // A run with no user message of its own — a wizard booted from a quick-start, which
+    // renders its first form before anything is sent — is still a page.
+    for (const run of displayRuns) {
+      if (run.user_message_id && runsByUserMessage.get(run.user_message_id) === run
+          && visibleMessages.some((m) => m.id === run.user_message_id)) continue;
+      const member: CanvasArtifact = { id: `run:${run.run_id}`, kind: 'run', title: runTabTitle(run) };
+      groups.push({ id: member.id, kind: member.kind, title: member.title, members: [member] });
+    }
     return groups.map((g) => {
       const lead = g.members[g.members.length - 1];
       return { ...g, id: lead.id, kind: lead.kind, title: lead.title };
     });
-  }, [visibleMessages, getCanvasArtifact]);
+  }, [visibleMessages, getCanvasArtifact, runsByUserMessage, displayRuns]);
+
+  /**
+   * Every page the strip can show, flattened. Includes run pages — the tab-validity effect
+   * below reads this list, so a run missing from it would be a tab you cannot land on.
+   */
+  const canvasArtifacts = useMemo(
+    () => canvasGroups.flatMap((g) => g.members),
+    [canvasGroups],
+  );
 
   // Close an artifact from this conversation's view. The saved entry is untouched.
   const handleCloseArtifact = useCallback((id: string) => {
@@ -4520,7 +4704,33 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     setChatCollapsed(false);
     setActiveCanvasId(null);
     setHiddenArtifactIds([]);
+    // Runs are live state for THIS thread's turns — a reloaded conversation replays its
+    // messages, not its streams, so carrying them across would show the previous thread's
+    // work under the new one's tabs.
+    setRuns({});
+    activeRunIdRef.current = null;
+    yieldedRunsRef.current = new Set();
   }, [currentConversationId]);
+
+  /**
+   * A run page yields, ONCE, to what its turn produced.
+   *
+   * Watching the work is the point until there is an outcome; then the outcome is. Without
+   * this the canvas sits on a finished checklist while the article it wrote is one tab away,
+   * unopened. Once per run, because a user who clicks back to "how it ran" must be able to
+   * stay there — an effect that re-yields every render is a tab you cannot open.
+   */
+  const yieldedRunsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!activeCanvasId?.startsWith('run:')) return;
+    const runId = activeCanvasId.slice('run:'.length);
+    if (yieldedRunsRef.current.has(runId)) return;
+    const group = canvasGroups.find((g) => g.members.some((m) => m.id === activeCanvasId));
+    const produced = group?.members.filter((m) => m.kind !== 'run') ?? [];
+    if (produced.length === 0) return;
+    yieldedRunsRef.current.add(runId);
+    setActiveCanvasId(produced[produced.length - 1].id);
+  }, [canvasGroups, activeCanvasId]);
 
   // Keep the active tab valid; default to the newest artifact.
   useEffect(() => {
@@ -5522,6 +5732,25 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   };
 
   const activeCanvasMessage = activeCanvasId ? visibleMessages.find((m) => m.id === activeCanvasId) : undefined;
+  // A run page is addressed `run:<run_id>` — the only canvas id that is not a message id.
+  const activeRun = activeCanvasId?.startsWith('run:')
+    ? displayRuns.find((r) => `run:${r.run_id}` === activeCanvasId)
+    : undefined;
+  // Whatever the run's own turn produced, so the card can hand the reader its results.
+  const activeRunResults = activeRun
+    ? (canvasGroups
+        .find((g) => g.members.some((m) => m.id === `run:${activeRun.run_id}`))
+        ?.members.filter((m) => m.kind !== 'run') ?? [])
+    : [];
+  const activeRunWorkflow = activeRun?.workflow_run_id ? workflows[activeRun.workflow_run_id] : undefined;
+  /**
+   * Re-ask exactly what was asked. Offered only when we still hold the sentence — a run whose
+   * user message has been closed has nothing to re-send, and a button that guesses at it would
+   * send something the user never wrote.
+   */
+  const activeRunRetryText = activeRun?.user_message_id
+    ? visibleMessages.find((m) => m.id === activeRun.user_message_id)?.content?.replace(/^▶\s*/, '')
+    : undefined;
   // The canvas is the permanent middle workspace for every agent; the chat is a
   // right rail. `canvasHidden` is an escape hatch to reclaim a full-width chat.
   const canvasShown = !canvasHidden;
@@ -5565,7 +5794,32 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           onClose={() => (isMobile ? setChatCollapsed(false) : setCanvasHidden(true))}
           inspector={activeCanvasMessage ? renderCanvasInspector(activeCanvasMessage) : null}
         >
-          {activeCanvasMessage
+          {activeRun ? (
+            <RunCanvas
+              run={activeRun}
+              results={activeRunResults}
+              onOpenResult={focusCanvas}
+              onRetry={activeRunRetryText ? () => {
+                setInput(activeRunRetryText);
+                setTimeout(() => { void handleSendMessageRef.current?.(); }, 0);
+              } : undefined}
+              onStepAction={activeRunWorkflow
+                ? (stepId, action) => handleWorkflowStepAction(activeRunWorkflow.run_id, stepId, action)
+                : undefined}
+              // The step that is asking gets its form here, in place. A question about step 3
+              // belongs next to step 3, not in a rail on the other pane — which on a phone is
+              // unmounted entirely while the canvas is up.
+              formSlot={activeRunWorkflow ? (
+                <WorkflowWizardCard
+                  embedded
+                  runtime={activeRunWorkflow}
+                  onAdvance={handleWizardAdvance}
+                  onSkip={handleWizardSkip}
+                  onDismiss={handleWizardDismiss}
+                />
+              ) : undefined}
+            />
+          ) : activeCanvasMessage
             ? renderCanvasArtifact(activeCanvasMessage)
             : renderAgentStarters(visibleMessages.length === 0)}
         </CanvasPanel>
@@ -5703,15 +5957,33 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               Without this rendered above the empty/non-empty branch, booting
               a workflow locally would update state but show nothing because
               the empty state still wins until the first message arrives. */}
-          {Object.values(workflows).filter((wf) => wf.status !== 'aborted' && wf.status !== 'done').map((wf) => (
-            <WorkflowWizardCard
-              key={`wizard-${wf.run_id}`}
-              runtime={wf}
-              onAdvance={handleWizardAdvance}
-              onSkip={handleWizardSkip}
-              onDismiss={handleWizardDismiss}
-            />
-          ))}
+          {canvasPaneVisible ? (
+            // The canvas is hosting the run card (plan, steps, the step's form). The rail is
+            // 400px and the run card is a page — rendering it twice side by side was never the
+            // ask — so here it is one line saying work is happening, one tap from the page.
+            displayRuns.some((r) => r.status === 'running') && (
+              <div className="space-y-2">
+                {displayRuns.filter((r) => r.status === 'running').map((run) => (
+                  <RunChip
+                    key={`chip-${run.run_id}`}
+                    run={run}
+                    active={activeCanvasId === `run:${run.run_id}`}
+                    onOpen={() => focusCanvas(`run:${run.run_id}`)}
+                  />
+                ))}
+              </div>
+            )
+          ) : (
+            Object.values(workflows).filter((wf) => wf.status !== 'aborted' && wf.status !== 'done').map((wf) => (
+              <WorkflowWizardCard
+                key={`wizard-${wf.run_id}`}
+                runtime={wf}
+                onAdvance={handleWizardAdvance}
+                onSkip={handleWizardSkip}
+                onDismiss={handleWizardDismiss}
+              />
+            ))
+          )}
 
           {/* Just-enabled toolkit onboarding card — the moment a toolkit is
               enabled, surface its quick-starts. When the canvas is open and
@@ -5771,8 +6043,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             null
           ) : (
             <>
-              {/* Workflow trackers — pinned above messages, one per active run */}
-              {Object.values(workflows).length > 0 && (
+              {/* Workflow trackers — pinned above messages, one per active run. Suppressed
+                  while the canvas holds the run card, which says all of this at full size. */}
+              {!canvasPaneVisible && Object.values(workflows).length > 0 && (
                 <div className="space-y-2">
                   {Object.values(workflows)
                     .filter((wf) => wf.status !== 'aborted')
@@ -5787,32 +6060,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                             ...prev,
                             [wf.run_id]: { ...prev[wf.run_id], collapsed: !prev[wf.run_id].collapsed },
                           }))}
-                          onStepAction={(stepId, action) => {
-                            if (action === 'skip') {
-                              setWorkflows((prev) => ({
-                                ...prev,
-                                [wf.run_id]: {
-                                  ...prev[wf.run_id],
-                                  steps: { ...prev[wf.run_id].steps, [stepId]: { ...(prev[wf.run_id].steps[stepId] || { step_id: stepId, status: 'pending' }), status: 'skipped' } },
-                                  awaiting_input_step_id: prev[wf.run_id].awaiting_input_step_id === stepId ? null : prev[wf.run_id].awaiting_input_step_id,
-                                },
-                              }));
-                            } else if (action === 'rerun' || action === 'edit_input') {
-                              const def = getWorkflowDefinition(wf.definition_id);
-                              const stepDef = def?.steps.find((s) => s.id === stepId);
-                              if (stepDef?.input_schema) {
-                                setWorkflows((prev) => ({
-                                  ...prev,
-                                  [wf.run_id]: {
-                                    ...prev[wf.run_id],
-                                    awaiting_input_step_id: stepId,
-                                    awaiting_input_schema: stepDef.input_schema,
-                                    awaiting_input_prompt: `Edit input for "${stepDef.title}".`,
-                                  },
-                                }));
-                              }
-                            }
-                          }}
+                          onStepAction={(stepId, action) => handleWorkflowStepAction(wf.run_id, stepId, action)}
                           bottomSlot={showForm && (
                             <WorkflowInlineForm
                               prompt={wf.awaiting_input_prompt || `Step "${awaitingId}" needs input.`}
