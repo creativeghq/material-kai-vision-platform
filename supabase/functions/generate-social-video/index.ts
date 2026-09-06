@@ -178,6 +178,151 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
   if (req.method !== 'POST') return jsonResponse({ success: false, error: 'Method not allowed' }, 405);
 
   const body = await req.json();
+
+  // ── action: 'status' — collect a job that outran the 50s inline poll ──
+  //
+  // Everything below returns `status: 'processing'` with a job_id when Replicate has not
+  // finished inside the request, and until now NOTHING ever came back for that job. The only
+  // thing that touched those rows was `reconcile_stuck_generation_videos`, which after 30
+  // minutes marks them FAILED and refunds — so a video that Replicate finished at 90 seconds
+  // was thrown away and reported as a failure, with the credits handed back and the render
+  // paid for at the provider. A slow video was, structurally, always a lost video.
+  //
+  // This is the collector. It lives here rather than in the tool because completing a job means
+  // downloading the file into our bucket, attaching it to the post and writing the billing row
+  // — the same three steps the inline success path does, and they belong in one place.
+  if (body?.action === 'status') {
+    const jobId = typeof body.job_id === 'string' ? body.job_id : '';
+    if (!jobId) return jsonResponse({ success: false, error: 'job_id is required' }, 400);
+
+    const { data: job } = await supabase
+      .from('generation_videos')
+      .select('id, user_id, workspace_id, status, video_url, model, duration_s, credits_used, replicate_prediction_id, social_post_id, error_message')
+      .eq('id', jobId)
+      .maybeSingle();
+    // 404 on a job in another tenant, never 403 — same reason as the post check below.
+    if (!job || !(await userCanAccessWorkspace(supabase, userId, (job as { workspace_id: string }).workspace_id))) {
+      return jsonResponse({ success: false, error: 'Not found' }, 404);
+    }
+
+    if (job.status === 'completed' && job.video_url) {
+      return jsonResponse({ success: true, status: 'completed', video_url: job.video_url, job_id: jobId, post_id: job.social_post_id ?? null });
+    }
+    if (job.status === 'failed') {
+      return jsonResponse({ success: false, status: 'failed', error: job.error_message || 'The video generation failed.', job_id: jobId }, 200);
+    }
+    if (!job.replicate_prediction_id) {
+      // A delegated model tracks its own job elsewhere; this collector only owns the Replicate leg.
+      return jsonResponse({ success: true, status: job.status || 'processing', job_id: jobId, post_id: job.social_post_id ?? null });
+    }
+
+    // ONE poll, not a loop: the caller is asking "is it done yet", and blocking the request for
+    // another 50s would just move the same timeout somewhere else.
+    let pred: { status: string; output?: string | string[]; error?: string };
+    try {
+      const token = await replicateToken();
+      const res = await fetch(`https://api.replicate.com/v1/predictions/${job.replicate_prediction_id}`, {
+        headers: { 'Authorization': `Token ${token}` },
+      });
+      pred = await res.json() as typeof pred;
+    } catch (e) {
+      console.error('[generate-social-video] status poll failed:', e);
+      return jsonResponse({ success: true, status: 'processing', job_id: jobId, note: 'Could not reach the provider just now; the job is still tracked.' });
+    }
+
+    if (pred.status === 'failed') {
+      await supabase.from('generation_videos')
+        .update({ status: 'failed', error_message: pred.error || 'Provider reported failure', completed_at: new Date().toISOString() })
+        .eq('id', jobId);
+      // The cron refunds on its own sweep; refunding here too would pay it back twice.
+      return jsonResponse({ success: false, status: 'failed', error: pred.error || 'The video generation failed.', job_id: jobId }, 200);
+    }
+    if (pred.status !== 'succeeded') {
+      return jsonResponse({ success: true, status: 'processing', job_id: jobId, post_id: job.social_post_id ?? null });
+    }
+
+    const rawUrl = Array.isArray(pred.output) ? pred.output[0] : pred.output;
+    const storedUrl = rawUrl ? await storeVideo(supabase, rawUrl, `video-${Date.now()}.mp4`) : null;
+    if (!storedUrl) {
+      // Succeeded with nothing storable is a FAILURE, not a success carrying a null URL — the
+      // same rule the inline path applies.
+      await supabase.from('generation_videos')
+        .update({ status: 'failed', error_message: 'The model returned no usable video', completed_at: new Date().toISOString() })
+        .eq('id', jobId);
+      return jsonResponse({ success: false, status: 'failed', error: 'The model returned no usable video.', job_id: jobId }, 200);
+    }
+
+    await supabase.from('generation_videos')
+      .update({ status: 'completed', video_url: storedUrl, completed_at: new Date().toISOString() })
+      .eq('id', jobId);
+
+    // The attach is CHECKED and its failure is reported. Returning `completed` over a rejected
+    // update would tell the operator the reel is on the post while the post still has no video —
+    // the video exists either way, so the URL is still handed back, but the claim is not made.
+    let attachError: string | null = null;
+    if (job.social_post_id) {
+      const { data: post } = await supabase
+        .from('social_posts').select('credits_used, credits_breakdown').eq('id', job.social_post_id).single();
+      if (post) {
+        const { error: attachErr } = await supabase.from('social_posts').update({
+          video_url: storedUrl,
+          credits_used: (post.credits_used || 0) + (job.credits_used || 0),
+          credits_breakdown: { ...(post.credits_breakdown || {}), video: job.credits_used || 0 },
+        }).eq('id', job.social_post_id);
+        if (attachErr) {
+          console.error('[generate-social-video] status: video stored but the post attach FAILED', attachErr);
+          attachError = attachErr.message;
+        }
+      } else {
+        attachError = 'The post this video was made for no longer exists.';
+      }
+    }
+
+    // Billing, on the same terms as the inline path: priced from ai_model_pricing, never
+    // derived backwards from the credit price. Collected here because this is where the
+    // render actually completed.
+    try {
+      const pricing = await getServicePricing(supabase, job.model);
+      const units = pricing?.unit === 'second' ? (job.duration_s || 1) : 1;
+      const rawCostUsd = pricing ? pricing.cost_per_unit * units : null;
+      // Destructured and re-thrown: supabase-js RESOLVES with `{ error }` on an RLS denial and
+      // only REJECTS on transport, so an undestructured insert inside a try/catch never reaches
+      // the catch — the spend is charged and reported against nobody (#347).
+      const { error: usageErr } = await supabase.from('ai_usage_logs').insert({
+        user_id: job.user_id,
+        workspace_id: job.workspace_id ?? null,
+        operation_type: 'social_video_generation',
+        model_name: job.model,
+        api_provider: 'replicate',
+        input_tokens: 0, output_tokens: 0, input_cost_usd: 0, output_cost_usd: 0,
+        raw_cost_usd: rawCostUsd,
+        markup_multiplier: pricing?.markup_multiplier ?? null,
+        billed_cost_usd: pricing ? rawCostUsd! * pricing.markup_multiplier : null,
+        credits_debited: job.credits_used ?? 0,
+        metadata: {
+          model: job.model, duration_seconds: job.duration_s,
+          replicate_prediction_id: job.replicate_prediction_id,
+          billing_type: 'per_unit', units, unit: pricing?.unit ?? null,
+          collected_by: 'status',
+        },
+      });
+      if (usageErr) throw usageErr;
+    } catch (e) {
+      console.error('[generate-social-video] status: ai_usage_logs insert FAILED — spend unattributed', e);
+      await captureException(e instanceof Error ? e : new Error(String(e)), {
+        tags: { area: 'billing', operation: 'social_video_generation' },
+        extra: { job_id: jobId, workspace_id: job.workspace_id ?? null },
+        fingerprint: ['ai-usage-log-write-failed', 'social_video_generation'],
+      });
+    }
+
+    return jsonResponse({
+      success: true, status: 'completed', video_url: storedUrl, job_id: jobId,
+      post_id: attachError ? null : (job.social_post_id ?? null),
+      ...(attachError ? { attach_error: `The video is ready but could not be attached to the post: ${attachError}` } : {}),
+    });
+  }
+
   const {
     prompt,
     source_image_url,
@@ -297,10 +442,50 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
       if (!veoResult.success) {
         throw new Error(veoResult.error || `${model} generation failed`);
       }
+
+      // Attach it to the draft. This branch returned the URL and walked away, and it is the
+      // branch the DEFAULT model takes — so for every model except kling-3.0 (the one that
+      // currently cannot render at all), a social video was generated, charged, stored, and
+      // never written onto the post it was made for. `social_posts.video_url` was reachable
+      // only through the Replicate path.
+      // CHECKED: reporting `post_id` back over a rejected update would tell the caller the reel
+      // is on the draft when it is not, and the next step (publish) would send a post with no
+      // video and no error anywhere.
+      let attachError: string | null = null;
+      if (post_id && veoResult.video_url) {
+        const { data: existingPost } = await supabase
+          .from('social_posts').select('credits_used, credits_breakdown').eq('id', post_id).single();
+        if (existingPost) {
+          const spent = Number(veoResult.credits_used) || 0;
+          const { error: attachErr } = await supabase.from('social_posts').update({
+            video_url: veoResult.video_url,
+            credits_used: (existingPost.credits_used || 0) + spent,
+            credits_breakdown: { ...(existingPost.credits_breakdown || {}), video: spent },
+          }).eq('id', post_id);
+          if (attachErr) {
+            console.error('[generate-social-video] video generated but the post attach FAILED', attachErr);
+            attachError = attachErr.message;
+          }
+        } else {
+          attachError = 'That post does not exist.';
+        }
+      }
+      // …and point the generator's own job row back at the post, so a job that finishes later
+      // can still find where its video belongs. The generator does not know about social posts,
+      // so this is the only place the link can be made. Best-effort and logged: losing the link
+      // costs a later collection, it does not invalidate the video that was just made.
+      if (post_id && veoResult.job_id) {
+        const { error: linkErr } = await supabase.from('generation_videos')
+          .update({ social_post_id: post_id }).eq('id', veoResult.job_id);
+        if (linkErr) console.error('[generate-social-video] could not link job to post:', linkErr.message);
+      }
+
       return jsonResponse({
         success: true,
-        video_url: veoResult.video_url,
+        video_url: veoResult.video_url ?? null,
         job_id: veoResult.job_id,
+        post_id: attachError ? null : (post_id ?? null),
+        ...(attachError ? { attach_error: `The video is ready but could not be attached to the post: ${attachError}` } : {}),
         model_used: model,
         credits_used: veoResult.credits_used,
         status: veoResult.status,
@@ -437,6 +622,7 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
         success: true,
         video_url: videoUrl,
         prediction_id: predictionId,
+        post_id: post_id ?? null,
         model_used: model,
         credits_used: creditCost,
         status: 'completed',
@@ -479,9 +665,11 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
         status: 'processing',
         prediction_id: predictionId,
         job_id: videoRecord.id,
+        post_id: post_id ?? null,
         model_used: model,
         credits_used: creditCost,
-        message: 'Video is being generated. Poll using the job_id to check status.',
+        message: 'Video is being generated. Poll it with { action: "status", job_id } — that call '
+          + 'collects the finished render, stores it and attaches it to the post.',
       });
 
     } else {

@@ -510,6 +510,7 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   social_post_analytics: 'Post analytics',
   social_content_generated: 'Caption drafted',
   social_image_generated: 'Image generated',
+  social_video_generated: 'Video generated',
   // Quotes
   quotes_list: 'Quotes',
   // Misc

@@ -174,6 +174,7 @@ export const RESULT_TYPE_CAPABILITY: Record<string, string> = {
   // "connect an account" is the action there, not "open the posts page".
   social_content_generated: 'social-post',
   social_image_generated: 'social-post',
+  social_video_generated: 'social-post',
   social_post: 'social-post',
   social_insights: 'social-post',
   social_post_analytics: 'social-post',

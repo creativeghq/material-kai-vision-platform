@@ -1235,7 +1235,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     factory: 'createManageSocialTool',
     description: 'Publish/schedule social posts and read analytics over the workspace\'s ALREADY-CONNECTED social accounts.',
     params: [
-      { name: 'action', type: 'enum', enum: ['list_accounts', 'publish', 'schedule', 'best_time', 'account_insights', 'post_analytics', 'generate_content', 'generate_image'], optional: false },
+      { name: 'action', type: 'enum', enum: ['list_accounts', 'publish', 'schedule', 'best_time', 'account_insights', 'post_analytics', 'generate_content', 'generate_image', 'generate_video', 'video_status'], optional: false },
       { name: 'confirm', type: 'boolean', optional: true, description: 'Do NOT set — the Approve/Decline card sets confirm:true on approval.' },
       { name: 'account_id', type: 'string', optional: true, description: 'Target connected account id.' },
       { name: 'platform', type: 'string', optional: true, description: 'Platform name (e.g. \'instagram\', \'facebook\', \'linkedin\') to resolve the account, or the target platform for generate_content/generate_image.' },
@@ -1246,7 +1246,12 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'topic', type: 'string', optional: true, description: 'generate_content: what the post is about.' },
       { name: 'tone', type: 'string', optional: true, description: 'generate_content: optional tone (e.g. playful, professional).' },
       { name: 'prompt', type: 'string', optional: true, description: 'generate_image: the image description.' },
-      { name: 'post_id', type: 'string', optional: true, description: 'The draft post to write into. generate_content returns one; pass it straight back to generate_image so the caption and the picture land on the SAME draft. Omit it and each call files a separate half-finished draft.' },
+      { name: 'post_id', type: 'string', optional: true, description: 'The draft post to write into. generate_content returns one; pass it straight back to generate_image and generate_video so the caption, the picture and the reel land on the SAME draft. Omit it and each call files a separate half-finished draft.' },
+      { name: 'source_image_url', type: 'string', optional: true, description: 'generate_video: the still to animate. Defaults to the first image already on post_id, which is normally what you want — generate_image put it there.' },
+      { name: 'video_model', type: 'enum', enum: ['h3-max-768p', 'h3-max-480p', 'veo-2', 'kling-3.0', 'wan-3.0-480p', 'wan-3.0-720p', 'wan-3.0-1080p', 'seedance-2.5-480p', 'seedance-2.5-720p', 'ray-3.2-720p', 'ray-3.2-1080p'], optional: true, description: 'generate_video: which renderer. Defaults to h3-max-768p (25cr, 5-15s with stereo audio) — the reel format itself. Do NOT pick kling-3.0: it runs on Replicate, which is currently refusing every call.' },
+      { name: 'duration_seconds', type: 'number', optional: true, description: 'generate_video: clip length. Default 10. Wan and Seedance reach 30; the others clamp lower.' },
+      { name: 'aspect_ratio', type: 'string', optional: true, description: 'generate_video: default \'9:16\' (vertical reel).' },
+      { name: 'job_id', type: 'string', optional: true, description: 'video_status: the job id generate_video returned when the render did not finish inside the call.' },
     ],
   },
   {

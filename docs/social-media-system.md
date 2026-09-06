@@ -45,7 +45,7 @@ Admin Panel → /admin/social-media/* → Direct DB queries (social_posts, socia
 | `zernio-webhook-handler` | Receive Zernio webhooks (`post.published`, `post.failed`, `post.partial`, `post.cancelled`, `post.scheduled`, `account.disconnected`) | `ZERNIO_WEBHOOK_SECRET` |
 | `generate-social-content` | Claude Haiku generates 3 caption variants + hashtags | *(uses shared ANTHROPIC_API_KEY)* |
 | `generate-social-image` | Image generation — routes by type (lifestyle/product/artistic) | `XAI_API_KEY`, `GOOGLE_AI_API_KEY`, `REPLICATE_API_TOKEN` |
-| `generate-social-video` | Video generation via Kling 1.6 Pro or Veo | `REPLICATE_API_TOKEN`, `GOOGLE_AI_API_KEY` |
+| `generate-social-video` | Short-form reel. Delegates every model but `kling-3.0` to `generate-interior-video-v2`; attaches the result to the post. `{ action: 'status', job_id }` collects a render that outran the inline poll | `REPLICATE_API_TOKEN`, `GOOGLE_AI_API_KEY` |
 | `generate-interior-video-v2` | Multi-model interior video (Veo 2 / Kling / Wan / Runway) | `REPLICATE_API_TOKEN`, `GOOGLE_AI_API_KEY` |
 
 ---
@@ -93,34 +93,70 @@ Resolution is **env-first, then `platform_secrets` (DB)** — set via edge-funct
 
 ---
 
-## Video Generation (Interior Designer)
+## Video Generation
 
-| Trigger | Model auto-selected |
-|---------|-------------------|
-| `walkthrough` / `floorplan` | Google Veo 2 (30 cr) |
-| `product` / `before_after` / `social_reel` | Kling 1.6 Pro via Replicate (15 cr) |
+`generate-social-video` is **image-to-video**: it animates a still, so the draft needs an image
+first (`generate_image` puts one there, and `generate_video` reads it off the post).
 
-Replicate calls are async — if they exceed 50s the function stores the `replicate_prediction_id` and returns a `job_id` for frontend polling.
+| Model | Credits | Notes |
+|---|---|---|
+| `h3-max-768p` **(default)** | 25 | 5–15s with stereo audio. The reel format itself. |
+| `h3-max-480p` | 15 | Same, cheaper. |
+| `veo-2` | 50 | |
+| `wan-3.0-480p/720p/1080p` | 30 / 55 / 110 | Up to 30s, scored. |
+| `seedance-2.5-480p/720p` | 60 / 125 | Up to 30s in one pass. |
+| `ray-3.2-720p/1080p` | 20 / 70 | Interpolates to a LAST frame. |
+| `kling-3.0` | 20 | **Do not pick it.** The one model still run here through Replicate, which is answering `auth_failed` to every call. It is why the default moved off it. |
+
+Every model except `kling-3.0` is delegated to `generate-interior-video-v2`, which debits its own
+credits. `generate-social-video` adds what the generator cannot know: it writes `video_url` onto
+the post and stamps `generation_videos.social_post_id` so a job that finishes later can find its
+way back.
+
+**A render that outruns the 50s inline poll must be collected.** The call returns
+`status: 'processing'` and a `job_id`; `{ action: 'status', job_id }` polls the provider once and,
+on success, downloads the file into our bucket, attaches it to the post and writes the billing
+row. Nothing else does this: `reconcile_stuck_generation_videos` only marks a 30-minute-old job
+**failed** and refunds it, so before the collector existed a video Replicate finished at 90
+seconds was thrown away and reported as a failure. The agent reaches it through
+`manage_social`'s `video_status`.
 
 ---
 
-## JARVIS agent Tools (11 social tools)
+## Agent surface — ONE tool, `manage_social`
 
-All injected in `agent-chat/index.ts` under the `if (isAdmin)` RBAC gate:
+There are not eleven social tools. There is **one**, `manage_social`
+(`_shared/tools/social-tools.ts`), action-routed. The eleven names this table used to list —
+`generate_social_post`, `publish_social_post`, `connect_social_account` and the rest — were
+consolidated and **none of them exists**; an agent instructed to call one gets nothing back.
 
-| Tool name | Action |
-|-----------|--------|
-| `connect_social_account` | Returns Zernio OAuth URL for a platform |
-| `list_social_accounts` | Lists connected accounts for the user |
-| `disconnect_social_account` | Disconnects a social account |
-| `generate_social_post` | Claude generates 3 captions + hashtags (2 cr) |
-| `generate_social_image` | Routes to xAI / Gemini / FLUX |
-| `generate_social_video` | Kling 1.6 Pro or Veo video |
-| `publish_social_post` | Publishes immediately via Zernio |
-| `schedule_social_post` | Schedules for a future time via Zernio |
-| `get_best_posting_time` | Zernio ML-based best time suggestion |
-| `get_post_analytics` | Fetches engagement metrics for a post |
-| `get_account_insights` | Fetches account-level follower/reach data |
+| Action | What it does |
+|---|---|
+| `list_accounts` | Connected accounts (id, platform, handle). Start here when the target is unclear. |
+| `generate_content` | Claude drafts a caption + hashtags, **saves a draft post** and returns its `post_id`. |
+| `generate_image` | Image via Aurora / Gemini / FLUX. Pass `post_id` and it attaches to that draft. |
+| `generate_video` | Vertical reel FROM the draft's image (H3 Max default, 25 cr). Pass `post_id`. |
+| `video_status` | Collect a render that was still processing. **This is the call that stores the video and attaches it** — an uncollected job is abandoned and refunded after 30 minutes. |
+| `publish` / `schedule` | Send now / queue, via `zernio-api`. Both go through the Approve/Decline gate. |
+| `best_time` | Zernio's recommended posting window. |
+| `account_insights` / `post_analytics` | Follower + engagement reads. |
+
+**Connecting an account is NOT a tool** — it is an OAuth handshake with Meta/LinkedIn that
+exists only in the app UI (Profile → Social Accounts). The tool description says so, and
+`RESULT_SETUP_DESTINATION` links the card there rather than asking the model to do it.
+
+**`post_id` is the thread through the whole flow.** One post is one `social_posts` row: the
+caption, the image and the reel all land on the same draft. Drop it between calls and each
+action files its own half-finished draft instead.
+
+## Page surface
+
+Profile → Social Accounts → **Analytics** lists every post, drafts included, and a row opens
+`SocialPostEditorDialog`: edit the caption and hashtags, see the attached media, then publish,
+schedule or delete. Publishing goes through `zernio-api`, never a local write of
+`status: 'published'` — the status records a send that happened, so setting it here would invent
+one. A published post is read-only; editing its caption after the fact would leave our copy
+disagreeing with the live post.
 
 ---
 

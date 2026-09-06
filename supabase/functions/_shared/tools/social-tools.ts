@@ -117,7 +117,7 @@ export const createManageSocialTool = (
   }
 
   return tool(
-    async ({ action, account_id, platform, caption, hashtags, image_urls, scheduled_at, topic, tone, prompt, post_id, confirm }: any) => {
+    async ({ action, account_id, platform, caption, hashtags, image_urls, scheduled_at, topic, tone, prompt, post_id, source_image_url, video_model, duration_seconds, aspect_ratio, job_id, confirm }: any) => {
       const gate = await moduleReady();
       if (!gate.ok) return JSON.stringify({ success: false, error: gate.error });
       const ws = workspaceId!;
@@ -291,6 +291,67 @@ export const createManageSocialTool = (
         });
       }
 
+      if (action === 'generate_video') {
+        // `generate-social-video` is image-to-video: it REQUIRES a source frame. The draft
+        // almost always already has one — generate_image put it there — so read it off the post
+        // rather than making the model invent a URL it cannot know.
+        let sourceUrl: string | null = source_image_url ?? null;
+        if (!sourceUrl && post_id) {
+          const { data: draft } = await svc
+            .from('social_posts').select('image_urls').eq('id', post_id).eq('workspace_id', ws).maybeSingle();
+          sourceUrl = (draft?.image_urls ?? [])[0] ?? null;
+        }
+        if (!sourceUrl) {
+          return JSON.stringify({
+            success: false,
+            error: 'generate_video needs a still to animate. Run generate_image on this post first, or pass source_image_url.',
+          });
+        }
+        const res = await callEdge(jwt!, 'generate-social-video', {
+          source_image_url: sourceUrl, prompt, model: video_model, duration_seconds,
+          aspect_ratio, workspace_id: ws, post_id,
+        });
+        if (!res.ok || res.data?.success === false) return JSON.stringify({ success: false, error: res.data?.error || res.error });
+        const d = res.data ?? {};
+        onChunk?.({
+          type: 'social_video_generated', platform: platform ?? null, post_id: d.post_id ?? post_id ?? null,
+          video_url: d.video_url ?? null, job_id: d.job_id ?? null, status: d.status ?? 'completed',
+          model: d.model_used ?? null, timestamp: Date.now(),
+        });
+        return JSON.stringify({
+          success: true, video_url: d.video_url ?? null, job_id: d.job_id ?? null,
+          post_id: d.post_id ?? null, status: d.status ?? 'completed',
+          // A reel takes longer than one turn. Say so plainly and name the action that finishes
+          // it, instead of reporting a half-done render as done. And when the attach itself
+          // failed, say THAT rather than telling the user to publish a post with no video on it.
+          message: d.attach_error
+            ? `${d.attach_error} The video is at ${d.video_url} — tell the user, and do not claim the post has it.`
+            : d.status === 'processing'
+              ? `The video is still rendering. Tell the user it will take a minute, then call video_status with job_id ${d.job_id} — that attaches it to the post.`
+              : `Video generated and attached to post ${d.post_id}. Publish/schedule that post.`,
+        });
+      }
+
+      if (action === 'video_status') {
+        if (!job_id) return JSON.stringify({ success: false, error: 'video_status needs the job_id returned by generate_video.' });
+        const res = await callEdge(jwt!, 'generate-social-video', { action: 'status', job_id });
+        if (!res.ok) return JSON.stringify({ success: false, error: res.error });
+        const d = res.data ?? {};
+        onChunk?.({
+          type: 'social_video_generated', platform: platform ?? null, post_id: d.post_id ?? null,
+          video_url: d.video_url ?? null, job_id, status: d.status ?? 'processing', timestamp: Date.now(),
+        });
+        if (d.status === 'failed') return JSON.stringify({ success: false, status: 'failed', error: d.error || 'The video generation failed.' });
+        return JSON.stringify({
+          success: true, status: d.status ?? 'processing', video_url: d.video_url ?? null, post_id: d.post_id ?? null,
+          message: d.attach_error
+            ? `${d.attach_error} The video is at ${d.video_url} — tell the user, and do not claim the post has it.`
+            : d.status === 'completed'
+              ? `Video ready and attached to post ${d.post_id}.`
+              : 'Still rendering — check again shortly.',
+        });
+      }
+
       return JSON.stringify({ success: false, error: `unknown action: ${action}` });
     },
     {
@@ -312,14 +373,21 @@ export const createManageSocialTool = (
         '  generate_image   → AI-generate an image from a prompt. Pass the post_id from generate_content',
         '                     and the image is attached to that draft; omit it and you get a second,',
         '                     separate draft holding only the picture.',
+        '  generate_video   → AI-generate a short vertical reel FROM the post\'s image (25cr default).',
+        '                     Needs post_id. Often finishes inside the call; when it does not it returns',
+        '                     status "processing" + a job_id.',
+        '  video_status     → collect a render that was still processing (job_id). This is the call that',
+        '                     stores the finished video and attaches it to the post — a job nobody polls',
+        '                     is abandoned after 30 minutes and refunded, so DO come back for it.',
         '',
-        'Typical flow: generate_content → generate_image WITH the returned post_id → review with the',
-        'user → publish/schedule. One post is one draft: carry the post_id through the whole flow.',
+        'Typical flow: generate_content → generate_image WITH the returned post_id → optionally',
+        'generate_video with that same post_id → review with the user → publish/schedule.',
+        'One post is one draft: carry the post_id through the whole flow.',
         'publish/schedule ALWAYS show the user an Approve/Decline card first — never set confirm:true',
         'yourself; the UI sets it on approval.',
       ].join('\n'),
       schema: z.object({
-        action: z.enum(['list_accounts', 'publish', 'schedule', 'best_time', 'account_insights', 'post_analytics', 'generate_content', 'generate_image']),
+        action: z.enum(['list_accounts', 'publish', 'schedule', 'best_time', 'account_insights', 'post_analytics', 'generate_content', 'generate_image', 'generate_video', 'video_status']),
         confirm: z.boolean().optional().describe('Do NOT set — the Approve/Decline card sets confirm:true on approval.'),
         account_id: z.string().uuid().optional().describe('Target connected account id.'),
         platform: z.string().optional().describe("Platform name (e.g. 'instagram', 'facebook', 'linkedin') to resolve the account, or the target platform for generate_content/generate_image."),
@@ -332,9 +400,24 @@ export const createManageSocialTool = (
         prompt: z.string().optional().describe('generate_image: the image description.'),
         post_id: z.string().uuid().optional().describe(
           'The draft post to write into. generate_content returns one; pass it straight back to generate_image '
-          + 'so the caption and the picture land on the SAME draft. Omit it and each call files a separate '
-          + 'half-finished draft.',
+          + 'and generate_video so the caption, the picture and the reel land on the SAME draft. Omit it and each '
+          + 'call files a separate half-finished draft.',
         ),
+        source_image_url: z.string().optional().describe(
+          'generate_video: the still to animate. Defaults to the first image already on post_id, which is '
+          + 'normally what you want — generate_image put it there.',
+        ),
+        video_model: z.enum([
+          'h3-max-768p', 'h3-max-480p', 'veo-2', 'kling-3.0',
+          'wan-3.0-480p', 'wan-3.0-720p', 'wan-3.0-1080p',
+          'seedance-2.5-480p', 'seedance-2.5-720p', 'ray-3.2-720p', 'ray-3.2-1080p',
+        ]).optional().describe(
+          'generate_video: which renderer. Defaults to h3-max-768p (25cr, 5-15s with stereo audio) — the reel '
+          + 'format itself. Do NOT pick kling-3.0: it runs on Replicate, which is currently refusing every call.',
+        ),
+        duration_seconds: z.number().optional().describe('generate_video: clip length. Default 10. Wan and Seedance reach 30; the others clamp lower.'),
+        aspect_ratio: z.string().optional().describe("generate_video: default '9:16' (vertical reel)."),
+        job_id: z.string().uuid().optional().describe('video_status: the job id generate_video returned when the render did not finish inside the call.'),
       }),
     },
   );

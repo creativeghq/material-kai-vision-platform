@@ -30,6 +30,7 @@ import {
   type DailyPoint, type PlatformTotals, type DecayBucket, type FrequencyRow,
 } from './SocialInsightsCharts';
 import { PlatformIcon, platformLabel } from '@/components/core/icons/PlatformIcon';
+import { SocialPostEditorDialog } from './SocialPostEditorDialog';
 
 const SUPABASE_FUNCTIONS_URL = `${supabaseConfig.projectUrl}/functions/v1`;
 
@@ -288,6 +289,8 @@ export const SocialAnalyticsPanel: React.FC = () => {
    * readable with one account and stops being so at three.
    */
   const [activeTab, setActiveTab] = useState<string>('all');
+  /** The post open in the editor. A row is a record you can finish, not just a number. */
+  const [openPostId, setOpenPostId] = useState<string | null>(null);
 
   /** POST one zernio-api action for this workspace. Throws with the server's own message. */
   const callAction = useCallback(async (action: string, extra: Record<string, unknown> = {}) => {
@@ -956,7 +959,14 @@ export const SocialAnalyticsPanel: React.FC = () => {
                   {visiblePosts.map(post => {
                     const m = metrics[post.id];
                     return (
-                      <TableRow key={post.id}>
+                      // The whole row opens the post. Every one of these was written by the agent
+                      // and could only be changed by going back to chat and describing which row
+                      // you meant — for a record the screen was already showing.
+                      <TableRow
+                        key={post.id}
+                        className="cursor-pointer"
+                        onClick={() => setOpenPostId(post.id)}
+                      >
                         <TableCell className="max-w-xs">
                           <div className="flex items-start gap-2">
                             <PlatformIcon platform={post.platform} className="mt-0.5 h-4 w-4 shrink-0" />
@@ -971,6 +981,9 @@ export const SocialAnalyticsPanel: React.FC = () => {
                                     href={post.metadata.platform_post_url}
                                     target="_blank"
                                     rel="noopener noreferrer"
+                                    // The row opens the editor; this opens the live post. Without
+                                    // stopping the bubble one click would do both.
+                                    onClick={(e) => e.stopPropagation()}
                                     className="inline-flex items-center gap-1 truncate text-sm text-primary hover:underline"
                                   >
                                     View on {platformLabel(post.platform)} <ExternalLink className="h-3 w-3 shrink-0" />
@@ -1017,6 +1030,13 @@ export const SocialAnalyticsPanel: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+      <SocialPostEditorDialog
+        postId={openPostId}
+        accounts={accounts.map((a) => ({ id: a.id, platform: a.platform, handle: a.handle }))}
+        onClose={() => setOpenPostId(null)}
+        onChanged={() => { void loadCore(); }}
+      />
     </div>
   );
 };
