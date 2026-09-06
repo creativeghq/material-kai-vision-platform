@@ -34,6 +34,7 @@ import { Label } from '@/components/core/ui/label';
 import { cn } from '@/lib/utils';
 import { WorkflowInlineForm } from './WorkflowInlineForm';
 import { getWorkflow } from './workflowRegistry';
+import { isWorkflowAllDone, resolveWizardStepId } from './wizardState';
 import type {
   WorkflowDefinition, WorkflowRuntimeState, WorkflowStepDefinition, WorkflowStepRuntimeState,
 } from './types';
@@ -91,32 +92,15 @@ export const WorkflowWizardCard: React.FC<Props> = ({ runtime, onAdvance, onSkip
   //   2. First step with status='running'
   //   3. First step with status='pending'
   //   4. None — workflow is done; render the success state
-  const activeStepId = useMemo(() => {
-    if (runtime.awaiting_input_step_id) return runtime.awaiting_input_step_id;
-    for (const id of runtime.step_order) {
-      const status = runtime.steps[id]?.status || 'pending';
-      if (status === 'running' || status === 'awaiting_input') return id;
-    }
-    for (const id of runtime.step_order) {
-      const status = runtime.steps[id]?.status || 'pending';
-      if (status === 'pending') return id;
-    }
-    return null;
-  }, [runtime]);
+  const activeStepId = useMemo(() => resolveWizardStepId(runtime), [runtime]);
 
-  const allDone = useMemo(() => {
-    if (runtime.step_order.length === 0) return false;
-    return runtime.step_order.every((id) => {
-      const s = runtime.steps[id]?.status;
-      return s === 'done' || s === 'skipped';
-    });
-  }, [runtime]);
+  const allDone = useMemo(() => isWorkflowAllDone(runtime), [runtime]);
 
   // Bail-out AFTER the hooks (see note above) — everything below dereferences `definition`.
   if (!definition) return null;
 
   if (allDone) {
-    return <WorkflowCompleteCard runtime={runtime} definition={definition} onDismiss={onDismiss} />;
+    return <WorkflowCompleteCard runtime={runtime} definition={definition} onDismiss={onDismiss} embedded={embedded} />;
   }
 
   if (!activeStepId) return null;
@@ -351,13 +335,23 @@ const WorkflowCompleteCard: React.FC<{
   runtime: WorkflowRuntimeState;
   definition: WorkflowDefinition;
   onDismiss?: (runId: string) => void;
-}> = ({ runtime, definition, onDismiss }) => {
+  embedded?: boolean;
+}> = ({ runtime, definition, onDismiss, embedded }) => {
   const stepCount = runtime.step_order.length;
   return (
-    <div className="rounded-2xl border border-green-500/30 bg-green-500/5 p-4 mb-3">
+    <div className={cn(
+      // Inside the run card this is a footer note, not a second full-size card: the run card
+      // already carries the finished badge and the completed step list above it.
+      embedded
+        ? 'rounded-sm border border-hairline bg-card p-3'
+        : 'rounded-2xl border border-green-500/30 bg-green-500/5 p-4 mb-3',
+    )}>
       <div className="flex items-start gap-3">
-        <div className="h-10 w-10 rounded-xl bg-green-500/15 flex items-center justify-center shrink-0">
-          <Check className="h-5 w-5 text-green-500" />
+        <div className={cn(
+          'flex items-center justify-center shrink-0 rounded-xl bg-green-500/15',
+          embedded ? 'h-8 w-8' : 'h-10 w-10',
+        )}>
+          <Check className={cn('text-green-500', embedded ? 'h-4 w-4' : 'h-5 w-5')} />
         </div>
         <div className="flex-1">
           <div className="font-medium">{definition.name} — complete</div>

@@ -180,7 +180,11 @@ export const CanvasPanel: React.FC<CanvasPanelProps> = ({ groups, activeId, onSe
             const active = g === activeGroup;
             // The kebab addresses ONE artifact. On a grouped tab the sub-strip carries it
             // instead, so a "Delete entry" can never silently mean "delete four of them".
-            const hasTabMenu = Boolean((onCloseArtifact || onDeleteArtifact) && g.members.length === 1);
+            // A RUN page is not a saved entry: both items address a message id, so Close
+            // toasted "still saved" over nothing and Delete returned in silence.
+            const hasTabMenu = Boolean(
+              (onCloseArtifact || onDeleteArtifact) && g.members.length === 1 && g.kind !== 'run',
+            );
             return (
               // The tab is a container, not a button: the kebab is a second control
               // and a button inside a button is invalid markup (and unclickable).
@@ -295,7 +299,7 @@ export const CanvasPanel: React.FC<CanvasPanelProps> = ({ groups, activeId, onSe
                   <MemberIcon className="h-3 w-3 shrink-0" />
                   <span className="max-w-[130px] truncate">{m.title}</span>
                 </button>
-                {(onCloseArtifact || onDeleteArtifact) && (
+                {(onCloseArtifact || onDeleteArtifact) && m.kind !== 'run' && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button

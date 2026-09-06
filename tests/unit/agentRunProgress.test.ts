@@ -28,6 +28,10 @@ import {
 } from '@/components/features/ai/runs/runDerivation';
 import { runProgress, type AgentRunState } from '@/components/features/ai/runs/runTypes';
 import { iconNameForCategory } from '@/components/features/ai/runs/stepIcons';
+import {
+  isWorkflowAllDone, resolveWizardStepId, wizardHasSomethingToShow,
+} from '@/components/features/ai/workflows/wizardState';
+import type { WorkflowRuntimeState } from '@/components/features/ai/workflows/types';
 import { AGENTS, TOOLKITS } from '@/components/features/ai/agentToolsCatalog';
 import { WORKFLOWS, WORKFLOW_TOOLKIT } from '@/components/features/ai/workflows/workflowRegistry';
 import { stripComments } from '../helpers/stripComments';
@@ -198,6 +202,39 @@ describe('a run is derived from the stream', () => {
   });
 });
 
+describe('the wizard and the run card agree on when there is an ask', () => {
+  const wf = (steps: Record<string, string>, awaiting?: string): WorkflowRuntimeState => ({
+    definition_id: 'seo-article',
+    run_id: 'wf-1',
+    step_order: ['research', 'plan', 'write', 'analyze'],
+    steps: Object.fromEntries(
+      ['research', 'plan', 'write', 'analyze'].map((id) => [
+        id, { step_id: id, status: (steps[id] ?? 'pending') as never },
+      ]),
+    ),
+    status: 'running',
+    metadata: {},
+    awaiting_input_step_id: awaiting ?? null,
+  });
+
+  it('says nothing while the active step is running — the run card is telling that story', () => {
+    // The slot carries its own separator and padding, so a null render paints an empty strip
+    // under the step list for the whole length of every running step.
+    expect(wizardHasSomethingToShow(wf({ research: 'running' }))).toBe(false);
+    expect(wizardHasSomethingToShow(wf({ research: 'done', plan: 'awaiting_input' }))).toBe(true);
+  });
+
+  it('an explicit ask outranks "everything finished"', () => {
+    const done = { research: 'done', plan: 'done', write: 'done', analyze: 'done' };
+    expect(isWorkflowAllDone(wf(done))).toBe(true);
+    // Re-run / Edit input on a finished step sets awaiting_input_step_id. Short-circuiting to
+    // the completion card here meant both buttons produced no form at all.
+    expect(isWorkflowAllDone(wf(done, 'write'))).toBe(false);
+    expect(resolveWizardStepId(wf(done, 'write'))).toBe('write');
+    expect(wizardHasSomethingToShow(wf(done, 'write'))).toBe(true);
+  });
+});
+
 describe('every toolkit is covered, because nothing lists toolkits', () => {
   it('the run module names no toolkit and no workflow — coverage is structural', () => {
     const body = stripComments(read(RUN_DERIVATION)) + stripComments(read(RUN_CANVAS));
@@ -264,6 +301,60 @@ describe('the run is wired to the stream and to the canvas', () => {
     // The chat rail is 400px and the run card is a page. Both at once was never the ask.
     expect(hub).toContain('<RunChip');
     expect(hub).toMatch(/!canvasPaneVisible && Object\.values\(workflows\)\.length > 0/);
+  });
+
+  it('an aborted workflow does not take its turn page down with it', () => {
+    // Suppression keyed on "the workflow exists" hid the aborted card AND the tool run under
+    // it, leaving the turn with no page at all.
+    expect(hub).toContain('const drawn = new Set(fromWorkflows.map((r) => r.run_id));');
+    expect(hub).toMatch(/drawn\.has\(r\.workflow_run_id\)/);
+  });
+
+  it('focuses the page the turn actually draws, not the one it suppresses', () => {
+    expect(hub).toMatch(/setActiveCanvasId\(`run:\$\{boundWorkflowRunId \?\? runId\}`\)/);
+  });
+
+  it('consumes the workflow binding above the early returns', () => {
+    // Cleared after them, a send that returns early (empty composer) left the binding set and
+    // folded the NEXT unrelated turn into that workflow's card.
+    const top = hub.slice(hub.indexOf('const handleSendMessage = useCallback'));
+    const consumed = top.indexOf('pendingWorkflowRunIdRef.current = null;');
+    const firstGuard = top.indexOf('if (!directRun && !input.trim()');
+    expect(consumed).toBeGreaterThan(-1);
+    expect(consumed).toBeLessThan(firstGuard);
+  });
+
+  it('the wizard advance sends through the ref, not a closure copy', () => {
+    // The other `handleSendMessage()` call sites are in the render body, where it is the
+    // current render's value. This one is inside a useCallback keyed on `workflows`, so it
+    // held whichever copy that render made — with the previous step's `input`.
+    const body = hub.slice(
+      hub.indexOf('const handleWizardAdvance = useCallback'),
+      hub.indexOf('const handleWizardSkip = useCallback'),
+    );
+    expect(body).toContain('handleSendMessageRef.current');
+    expect(body).not.toMatch(/setTimeout\(\(\) => handleSendMessage\(\), 0\)/);
+  });
+
+  it('both workflow continue paths bind their send to the workflow', () => {
+    // Unbound, the send opens a run of its own and the turn draws two cards: the pipeline,
+    // and the tools executing it.
+    expect(hub.split('pendingWorkflowRunIdRef.current = ').length - 1).toBe(3);
+  });
+
+  it('offers the wizard slot only when the wizard has something to put in it', () => {
+    expect(hub).toContain('wizardHasSomethingToShow(activeRunWorkflow)');
+  });
+
+  it('a run page carries no Close / Delete — there is no saved row behind it', () => {
+    const canvas = stripComments(read(CANVAS));
+    expect(canvas).toMatch(/g\.members\.length === 1 && g\.kind !== 'run'/);
+    expect(canvas).toMatch(/\(onCloseArtifact \|\| onDeleteArtifact\) && m\.kind !== 'run'/);
+  });
+
+  it('never prints an elapsed time it did not measure', () => {
+    // A workflow runtime records no end time, so a finished pipeline printed a confident "0s".
+    expect(stripComments(read(RUN_CANVAS))).toContain('if (!live && !run.ended_at) return null;');
   });
 
   it('the step-action handler is one function, not one per surface', () => {

@@ -97,6 +97,7 @@ import {
 } from './agentToolsCatalog';
 import { ToolkitOnboardingCard } from './workflows/ToolkitOnboardingCard';
 import { WorkflowWizardCard } from './workflows/WorkflowWizardCard';
+import { wizardHasSomethingToShow } from './workflows/wizardState';
 // PromptBuilderModal removed — Interior processes + discovery now
 // live entirely under the toolkit picker. The separate ✨ "prompts" surface is gone.
 import { useEnabledModules } from '@/modules/_core';
@@ -1603,7 +1604,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       ? `${prefix}continue with: ${args.customPrompt}`
       : `${prefix}continue with input: ${JSON.stringify(args.formValues || {})}`;
     setInput(message);
-    setTimeout(() => handleSendMessage(), 0);
+    // `handleSendMessageRef.current`, not the closure copy: this was the one call site still
+    // holding a `handleSendMessage` from whichever render last changed `workflows`, so it read
+    // a stale `input` and could send the previous step's continuation.
+    setTimeout(() => { void handleSendMessageRef.current?.(); }, 0);
   }, [workflows]);
 
   const handleWizardSkip = useCallback((runId: string, stepId: string) => {
@@ -2419,6 +2423,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     // LLM turn — the same stream pipeline below renders the same result cards.
     const directRun = pendingDirectRunRef.current;
     pendingDirectRunRef.current = null;
+    // Read with `directRun`, above the guards below: cleared after them, a send that returns
+    // early (empty composer, no user) left the binding set and the NEXT, unrelated turn was
+    // folded into that workflow's card.
+    const boundWorkflowRunId = pendingWorkflowRunIdRef.current;
+    pendingWorkflowRunIdRef.current = null;
     // Toolkits queued by a quick-start launcher for this send (race-proof).
     const pendingToolkits = pendingToolkitsRef.current;
     pendingToolkitsRef.current = [];
@@ -2470,8 +2479,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     // is a turn the canvas cannot describe — which is what every toolkit outside the eight
     // hand-written pipelines used to be.
     const runId = `run-${userMessage.id}`;
-    const boundWorkflowRunId = pendingWorkflowRunIdRef.current;
-    pendingWorkflowRunIdRef.current = null;
     activeRunIdRef.current = runId;
     setRuns((prev) => ({
       ...prev,
@@ -2493,10 +2500,12 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         workflowRunId: boundWorkflowRunId ?? undefined,
       }),
     }));
-    // Open the canvas ON the new run. The tab-validity effect below only moves focus when the
-    // current tab stops existing, so without this a second turn would leave the canvas parked
-    // on the previous turn's result while the new one ran unseen behind a tab.
-    setActiveCanvasId(`run:${runId}`);
+    // Open the canvas ON the page this turn draws. The tab-validity effect below only moves
+    // focus when the current tab stops existing, so without this a second turn would leave the
+    // canvas parked on the previous turn's result while the new one ran unseen behind a tab.
+    // For a workflow step that page is the PIPELINE's — the tool run is deliberately
+    // suppressed, so focusing its id would be focusing a tab that does not exist.
+    setActiveCanvasId(`run:${boundWorkflowRunId ?? runId}`);
 
     // The turn is committed, so the toolkit-onboarding focus has done its job. This is the
     // "or sends any message" clause the state's own comment has always claimed and never
@@ -4585,8 +4594,12 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           startedAt: bound?.started_at,
         });
       });
+    // Suppress a tool run only when the workflow it belongs to is actually ON SCREEN. Keyed
+    // on "the workflow exists", an ABORTED one — filtered out just above — hid its own card
+    // AND the tool run underneath it, so the turn had no page at all.
+    const drawn = new Set(fromWorkflows.map((r) => r.run_id));
     const standalone = Object.values(runs)
-      .filter((r) => !(r.workflow_run_id && workflows[r.workflow_run_id]));
+      .filter((r) => !(r.workflow_run_id && drawn.has(r.workflow_run_id)));
     return [...fromWorkflows, ...standalone].sort((a, b) => a.started_at - b.started_at);
   }, [runs, workflows]);
 
@@ -5809,7 +5822,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               // The step that is asking gets its form here, in place. A question about step 3
               // belongs next to step 3, not in a rail on the other pane — which on a phone is
               // unmounted entirely while the canvas is up.
-              formSlot={activeRunWorkflow ? (
+              formSlot={activeRunWorkflow && wizardHasSomethingToShow(activeRunWorkflow) ? (
                 <WorkflowWizardCard
                   embedded
                   runtime={activeRunWorkflow}
@@ -6081,6 +6094,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                                     steps: { ...prev[wf.run_id].steps, [awaitingId!]: { ...(prev[wf.run_id].steps[awaitingId!] || { step_id: awaitingId!, status: 'pending' }), input: values, status: 'running' } },
                                   },
                                 }));
+                                // Same binding the wizard sets: this send is a step of THIS
+                                // workflow, not a run of its own.
+                                pendingWorkflowRunIdRef.current = wf.run_id;
                                 setInput(continuation);
                                 // Auto-send so the user doesn't have to click again
                                 setTimeout(() => handleSendMessage(), 0);

@@ -114,7 +114,11 @@ function useElapsed(run: AgentRunState): string | null {
     return () => window.clearInterval(t);
   }, [live]);
   if (!run.started_at) return null;
-  return elapsedLabel(run.started_at, run.ended_at ?? (live ? now : run.started_at));
+  // A workflow run is adapted from a runtime that records no end time, so a finished one has
+  // nothing to measure against — and `started_at → started_at` printed a confident "0s" on
+  // every completed pipeline. No figure beats a wrong one.
+  if (!live && !run.ended_at) return null;
+  return elapsedLabel(run.started_at, run.ended_at ?? now);
 }
 
 interface RunCanvasProps {
