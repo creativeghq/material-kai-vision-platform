@@ -28,6 +28,7 @@ import { getSpec, resolveColorsHex, toPdfColors, type TemplateSpec, type Invoice
 import {
   resolvePrintedCounterparty, applyAddressUnit, partyAddressLines,
 } from '../_shared/finance/invoice-party.ts';
+import { normalizeVat } from '../_shared/crm/vatNormalize.generated.ts';
 import { mydataExemptionLabel } from '../_shared/finance/vat-exemptions.ts';
 import { lineDetailLabel } from '../_shared/finance/configured-options.ts';
 
@@ -819,7 +820,13 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; add
   // onto the document at issue wins over the live CRM row, and a separate billing identity wins
   // over the party's own. This function used to read the live row, so a renamed customer
   // rewrote every past PDF and a re-homed one rendered with no name at all.
-  const billTo = resolvePrintedCounterparty(inv.counterparty_snapshot?.row ?? null, customer);
+  const billToRaw = resolvePrintedCounterparty(inv.counterparty_snapshot?.row ?? null, customer);
+  // The VAT number is normalized to the spelling the ENVELOPE carries. `partyFromCrm` strips the
+  // Greek EL/GR prefix before transmitting (the provider 401s on the prefixed form), and this
+  // file's contract is that the printed document says what the transmitted one says
+  // (CLAUDE.md §1c). It is applied here rather than inside `resolvePrintedCounterparty` because
+  // that module is a byte-mirrored source and has to stay import-free.
+  const billTo = billToRaw ? { ...billToRaw, vatNumber: normalizeVat(billToRaw.vatNumber) } : null;
   const custName = billTo?.name || '—';
   const custLines = billTo ? partyAddressLines(billTo, L) : [];
   // Where the goods GO, when that is not where the bill goes.

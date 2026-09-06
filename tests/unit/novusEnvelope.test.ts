@@ -189,6 +189,51 @@ describe('a movement document is a different envelope, not an invoice with zero 
   });
 });
 
+describe('a movement document is addressed to somebody even when they have no VAT number', () => {
+  it('keeps the counterpart block for a 9.3 to a private customer — 204 needs the name', () => {
+    const d = doc(invoice({
+      counterpart: { vatNumber: '', country: 'GR', branch: 0, name: 'Ιδιώτης πελάτης' },
+      header: {
+        series: 'MK', aa: '1', issueDate: '2026-09-06', invoiceType: '9.3', currency: 'EUR',
+        movePurpose: 1,
+        loadingAddress: { street: 'ΧΑΡΙΣΗ', number: '10', postalCode: '54352', city: 'ΘΕΣΣΑΛΟΝΙΚΗ' },
+        deliveryAddress: { street: 'Ζωγράφου', number: '500', postalCode: '11527', city: 'Ζωγράφου' },
+      },
+      lines: [line({ unitPrice: 0, netValue: 0, vatCategory: 8, vatPercent: 0, vatAmount: 0 })],
+      summary: { totalNetValue: 0, totalVatAmount: 0, totalGrossValue: 0 },
+    } as any));
+    expect(d.counterpart).toBeTruthy();
+    expect(d.counterpart.name).toBe('Ιδιώτης πελάτης');
+  });
+
+  it('still drops the counterpart on a RETAIL invoice — that is what makes it retail', () => {
+    const d = doc(invoice({
+      counterpart: { vatNumber: '', country: 'GR', branch: 0, name: 'Λιανική' },
+      header: { series: 'MK', aa: '1', issueDate: '2026-09-06', invoiceType: '11.1', currency: 'EUR' },
+    } as any));
+    expect(d.counterpart).toBeUndefined();
+  });
+});
+
+describe('the unit code resolves the way units are actually written', () => {
+  it('matches unaccented Greek capitals — ΚΙΛΑ is how a document spells it', () => {
+    const movementWith = (unit: string) => doc(invoice({
+      header: {
+        series: 'MK', aa: '1', issueDate: '2026-09-06', invoiceType: '9.3', currency: 'EUR',
+        movePurpose: 1,
+        loadingAddress: { street: 'ΧΑΡΙΣΗ', number: '10', postalCode: '54352', city: 'ΘΕΣΣΑΛΟΝΙΚΗ' },
+        deliveryAddress: { street: 'Ζωγράφου', number: '500', postalCode: '11527', city: 'Ζωγράφου' },
+      },
+      lines: [line({ measurementUnitLabel: unit, unitPrice: 0, netValue: 0, vatCategory: 8, vatPercent: 0, vatAmount: 0 })],
+      summary: { totalNetValue: 0, totalVatAmount: 0, totalGrossValue: 0 },
+    } as any));
+    expect(movementWith('ΚΙΛΑ').invoiceDetails[0].measurementUnit).toBe(2);
+    expect(movementWith('κιλά').invoiceDetails[0].measurementUnit).toBe(2);
+    expect(movementWith('ΛΙΤΡΑ').invoiceDetails[0].measurementUnit).toBe(3);
+    expect(movementWith('Τ.Μ.').invoiceDetails[0].measurementUnit).toBe(5);
+  });
+});
+
 describe('income classification is derived from the document type, not defaulted flat', () => {
   it.each([
     ['1.1', 'E3_561_001', 'category1_1'],

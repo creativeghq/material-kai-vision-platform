@@ -4,6 +4,8 @@ import { jsonResponse as json } from '../_shared/http.ts';
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { normalizeVat } from '../_shared/crm/vatNormalize.generated.ts';
+import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 import { resolveWorkspaceConnector } from '../_shared/fiscal/registry.ts';
 import { buildInvoiceInputFromDb, buildCreditNoteInputFromDb, buildDeliveryNoteInputFromDb, type FiscalOverrides } from '../_shared/fiscal/invoice-builder.ts';
 import { emitDocumentIssued } from '../_shared/fiscal/document-issued.ts';
@@ -642,19 +644,19 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
     // The only cancellation myDATA offers. An invoice is never withdrawn — it is corrected by a
     // credit note (5.1 wholesale / 11.4 retail), which is the immutability rule, not a gap.
     //
-    // THE PROVIDER WILL CANCEL THE SAME NOTE TWICE AND BILL TWICE. Sending one MARK to
-    // CancelDeliveryNote a second time answers Success again with a *new* cancellation MARK
-    // (measured against the sandbox, #319). So the stored mark is the CLAIM: we take it with a
-    // conditional update BEFORE calling out, and a caller that lost the race — or is retrying a
-    // request whose response never arrived — is told the note is already cancelled instead of
-    // cancelling it again.
+    // THE PROVIDER'S DUPLICATE GUARD IS RACY. A second CancelDeliveryNote for the same MARK
+    // usually comes back 251 "already been cancelled" — but a fast retry got Success twice, a
+    // second cancellation MARK and a second 0.25-credit charge (both observed, #319). A guard
+    // that holds except under retry is no guard, so the stored mark is OURS: taken with a
+    // conditional update BEFORE calling out, so a caller that lost the race — or is retrying a
+    // request whose response never arrived — is told the note is already cancelled.
     if (body.cancel_delivery_note) {
       const dnId = body.cancel_delivery_note.delivery_note_id;
       if (!dnId) return json({ error: 'cancel_delivery_note.delivery_note_id is required' }, 400);
 
       const { data: note } = await supabase
         .from('delivery_notes')
-        .select('id, workspace_id, fiscal_status, fiscal_mark, fiscal_cancellation_mark')
+        .select('id, workspace_id, fiscal_status, fiscal_mark, fiscal_cancellation_mark, delivery_note_number')
         .eq('id', dnId).maybeSingle();
       if (!note) return json({ error: 'delivery note not found' }, 404);
       if (!(await userCanAccessWorkspace(supabase, auth.userId, (note as any).workspace_id))) {
@@ -674,6 +676,16 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
           error: 'This delivery note has no myDATA MARK, so there is nothing to cancel at AADE.' }, 400);
       }
 
+      // The same gate the credit-note, delivery-note and invoice paths apply. Filing a
+      // cancellation with AADE through the operator's connector is the module's work like any
+      // other transmission, and it spends credits.
+      const { data: cancelEntitled } = await supabase.rpc('is_workspace_entitled', {
+        p_workspace_id: (note as any).workspace_id, p_module_slug: 'sales-finance',
+      });
+      if (!cancelEntitled) {
+        return json({ ok: false, code: 'not_entitled', error: 'Workspace not entitled to e-Invoicing.' }, 402);
+      }
+
       const resolvedCancel: any = await resolveWorkspaceConnector(supabase, (note as any).workspace_id, 'legal_invoice');
       if (!resolvedCancel.ok) return json({ ok: false, code: resolvedCancel.code, error: resolvedCancel.error }, 400);
       if (!resolvedCancel.resolved.connector.cancelDeliveryNote) {
@@ -682,7 +694,10 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
 
       const { data: fsRow } = await supabase
         .from('finance_settings').select('business_vat').eq('workspace_id', (note as any).workspace_id).maybeSingle();
-      const issuerVat = String((fsRow as any)?.business_vat ?? '').replace(/^EL/i, '').trim();
+      // `normalizeVat`, not a local `replace(/^EL/i,'')`: `business_vat` is free text and
+      // 'GR 800 370 260' survives that regex untouched, so the provider answers 401 for a
+      // workspace that is perfectly authorized. One rule, one implementation.
+      const issuerVat = normalizeVat((fsRow as any)?.business_vat) ?? '';
       if (!issuerVat) {
         return json({ ok: false, code: 'issuer_vat_missing',
           error: 'This workspace has no business VAT number in Finance → Settings, so AADE cannot be told who is cancelling.' }, 400);
@@ -722,7 +737,12 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
           document_id: noteId,
           connector_slug: resolvedCancel.resolved.slug,
           capability: 'legal_invoice',
-          status: cancelRes.ok ? 'accepted' : 'rejected',
+          // 'cancelled', NOT 'accepted'. `findAcceptedSubmission` replays the newest
+          // accepted/offline row for a document onto that document as its fiscal MARK, to repair
+          // a lost stamp. An 'accepted' row here holds the CANCELLATION mark, so the next
+          // transmit attempt on this note would overwrite its real AADE MARK with the
+          // cancellation's and report the cancelled document as accepted.
+          status: cancelRes.ok ? 'cancelled' : 'rejected',
           mark: cancelRes.cancellationMark ?? null,
           fiscal_invoice_type: 'cancel_9.3',
           is_offline: false,
@@ -757,6 +777,20 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
         await supabase.from('delivery_notes')
           .update({ fiscal_error: `Cancellation failed mid-flight: ${err?.message ?? err}`, updated_at: new Date().toISOString() })
           .eq('id', noteId);
+        // The claim stays, so every retry from here answers 'already_in_progress' — a
+        // success-shaped response for a permanently stuck document. Nothing else would ever
+        // surface it, so say so out loud: a person has to check AADE and clear it.
+        await emitFlowEventToWorkspaceRoles(
+          (note as any).workspace_id, ['owner', 'admin', 'accountant'], 'fiscal_document_rejected',
+          (uid) => ({
+            type: 'fiscal_document_rejected',
+            user_id: uid,
+            title: 'A delivery-note cancellation did not come back',
+            body: `The cancellation for delivery note ${(note as any).delivery_note_number ?? noteId} was sent to myDATA but the provider did not answer. It may have gone through. Check the note at AADE before doing anything else with it — it will not be retried automatically.`,
+            action_url: `/finance?tab=doc_delivery&id=${noteId}`,
+            workspace_id: (note as any).workspace_id,
+          }),
+        );
         return json({ ok: false, code: 'cancel_indeterminate',
           error: 'The cancellation was sent but the provider did not answer. It may have gone through - check the note at AADE before retrying.' }, 502);
       }

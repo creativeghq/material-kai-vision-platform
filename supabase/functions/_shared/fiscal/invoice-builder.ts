@@ -372,11 +372,17 @@ export async function buildInvoiceInputFromDb(
     ?? (derivedIncType === 'E3_561_001' ? (fs?.default_income_classification_type ?? derivedIncType) : derivedIncType);
   const incCat = overrides.incomeClassificationCategory
     ?? (derivedIncCat === 'category1_1' ? (fs?.default_income_classification_category ?? derivedIncCat) : derivedIncCat);
+  // A RETAIL DOCUMENT NEVER FALLS BACK TO THE PRODUCT'S WHOLESALE CODE.
+  // Falling back to `mydata_income_classification_type` when the `_retail` twin is NULL — the
+  // state every product configured before those columns existed is in — puts `E3_561_001` on an
+  // 11.x line and AADE refuses the whole document (313), which is the exact failure the
+  // derivation above exists to prevent. On a retail document the retail column is the only
+  // product answer; with none, the derived retail code stands.
   const productIncomeType = (p: any) => (isRetailDoc
-    ? (p?.mydata_income_classification_type_retail ?? p?.mydata_income_classification_type)
+    ? p?.mydata_income_classification_type_retail
     : p?.mydata_income_classification_type);
   const productIncomeCategory = (p: any) => (isRetailDoc
-    ? (p?.mydata_income_classification_category_retail ?? p?.mydata_income_classification_category)
+    ? p?.mydata_income_classification_category_retail
     : p?.mydata_income_classification_category);
 
   const lines: FiscalLine[] = (items ?? []).map((it: any, i: number) => {
@@ -615,8 +621,15 @@ export async function buildCreditNoteInputFromDb(
   // Same derivation as the invoice path, keyed on the CREDIT note's own type: an 11.4 reverses
   // a retail receipt and must classify as retail, and the flat wholesale pair was refused there
   // for exactly the reason it was refused on 11.1.
+  // The TYPE axis (retail vs wholesale) comes from the credit note, which knows it — an 11.4
+  // reverses a retail receipt. The CATEGORY axis (goods vs services) cannot: 5.1 and 11.4 say
+  // nothing about what was sold, so both derive to `category1_1` and a whole-amount credit
+  // against a service invoice would be filed under Commodity Sale Income while the original sits
+  // under Provision of Services Income. Both codes are valid, so AADE accepts the pair and the
+  // two documents disagree on the E3 form forever. The credited INVOICE is the thing that knows,
+  // so the category is derived from its type.
   const derivedCnType = mydataIncomeClassificationType(creditDocType);
-  const derivedCnCat = mydataIncomeClassificationCategory(creditDocType);
+  const derivedCnCat = mydataIncomeClassificationCategory(String(inv.document_type ?? creditDocType));
   const defaultIncType = derivedCnType === 'E3_561_001'
     ? (fs?.default_income_classification_type ?? derivedCnType)
     : derivedCnType;

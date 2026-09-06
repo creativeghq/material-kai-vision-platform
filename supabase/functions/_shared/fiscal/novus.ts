@@ -96,11 +96,11 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
   // and the counterpart is resolved from that customer, so the combination is reachable from the
   // UI and comes back as a bare 286 nobody can act on. Name it instead: either the purpose is
   // wrong or the recipient is.
-  if (isMovement && header.movePurpose === 8 && counterpart.vatNumber && counterpart.vatNumber !== issuer.vatNumber) {
+  if (isMovement && header.movePurpose === 8 && counterpart.vatNumber !== issuer.vatNumber) {
     throw new Error(
       `Refusing to transmit a movement document: purpose 8 (Ενδοδιακίνηση / internal transfer) ` +
         `moves goods between the issuer's own establishments, so myDATA requires the recipient to ` +
-        `be the issuer — this note is addressed to ${counterpart.vatNumber}. Either pick the ` +
+        `be the issuer — this note is addressed to ${counterpart.vatNumber || 'a party with no VAT number'}. Either pick the ` +
         `purpose that describes the movement (1 Sale, 5 Return, 14 Storage by third parties …) ` +
         `or address the note to your own VAT number and set the delivery branch.`,
     );
@@ -238,7 +238,11 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
               }
             : {}),
         },
-        counterpart: counterpart.vatNumber
+        // A retail document (11.x) deliberately has NO counterpart block — that is what makes it
+        // retail. A MOVEMENT document always has one, because AADE requires the recipient's name
+        // on it (204) and goods are always going TO somebody: a delivery note to a private
+        // customer has no VAT number, and gating the whole block on one filed it to nobody.
+        counterpart: (counterpart.vatNumber || isMovement)
           ? {
               vatNumber: counterpart.vatNumber,
               country: counterpart.country,
@@ -474,19 +478,24 @@ function interpret(entry: any, httpStatus: number): FiscalSubmissionResult {
       //
       // The MARK is surfaced separately rather than returned as `accepted`, because the same 228
       // is ALSO what a numbering collision looks like — two different documents sharing a
-      // series+AA. Adopting the MARK blindly would stamp one invoice with another's. The caller
-      // must confirm the filed document is really this one (fetchTransmitted → compare totals)
-      // before adopting it; see the invoice path in `finance-issue-invoice`.
-      const dup = /MARK:\s*(\d+)\s*,\s*AUTHENTICATION_CODE:\s*([0-9A-F]+)/i.exec(
-        String(firstError(entry).message ?? ''),
-      );
-      if (firstError(entry).code === '228' && dup) {
+      // series+AA. Adopting the MARK blindly would stamp one invoice with another's.
+      //
+      // NOTHING CONSUMES THIS YET. Adopting it safely means fetching the filed document and
+      // confirming it is really ours (series + AA + totals) before writing the MARK down, and
+      // that branch is not built — so today a 228 still lands in the plain `rejected` path and
+      // the operator has to reconcile by hand. Tracked on #319.
+      // The MARK alone is the recovery handle; the authentication code is a bonus, so it is
+      // matched optionally rather than being required for the branch to fire at all.
+      const dupMessage = String(firstError(entry).message ?? '');
+      const dup = /MARK:\s*(\d+)/i.exec(dupMessage);
+      const dupAuth = /AUTHENTICATION_CODE:\s*([0-9A-F]+)/i.exec(dupMessage);
+      if (String(firstError(entry).code) === '228' && dup) {
         return {
           status: 'rejected',
           isOffline: false,
           errorCode: '228',
           errorMessage: firstError(entry).message,
-          duplicateOf: { mark: dup[1], authenticationCode: dup[2] },
+          duplicateOf: { mark: dup[1], authenticationCode: dupAuth?.[1] },
           raw: entry,
         };
       }
@@ -579,10 +588,18 @@ export const novusConnector: FiscalConnector = {
     // Required by the provider. Default to a window wide enough to cover any document still in
     // the offline queue (the provider must transmit within 1 day of issue; 30 days is the
     // sandbox retention) rather than leaving them unset, which is a hard 400.
-    const today = new Date();
-    const from = query.issuedFrom ?? new Date(today.getTime() - 60 * 86_400_000).toISOString().slice(0, 10);
-    qs.set('issuedFrom', from);
-    qs.set('issuedTo', query.issuedTo ?? today.toISOString().slice(0, 10));
+    //
+    // The window is deliberately generous at BOTH ends rather than precise. There is no
+    // workspace business timezone (CLAUDE.md §1b), so a date computed here is a UTC date while
+    // the document's `issueDate` is the operator's calendar day: a "today" upper bound drops a
+    // document issued in the Athens evening, and the cron then reports it as still offline. A
+    // day of slack past today costs nothing — the results are filtered by identifier below — and
+    // removes the whole class of off-by-one-day misses.
+    const dayMs = 86_400_000;
+    const now = Date.now();
+    const isoDay = (t: number) => new Date(t).toISOString().slice(0, 10);
+    qs.set('issuedFrom', query.issuedFrom ?? isoDay(now - 60 * dayMs));
+    qs.set('issuedTo', query.issuedTo ?? isoDay(now + dayMs));
     const url = `${ctx.baseUrl}/api/v1/Provider/RequestTransmittedDocs?${qs.toString()}`;
     try {
       const res = await fetch(url, { method: 'GET', headers: { 'API-KEY': ctx.apiKey, 'content-type': 'application/json' } });
@@ -593,7 +610,26 @@ export const novusConnector: FiscalConnector = {
         return { status: 'error', isOffline: false, transmissionFailure: res.status >= 500, errorMessage: problemDetail(body) ?? `Novus ${res.status}`, raw: body };
       }
       const docs = Array.isArray(body?.providerTransmittedDocs) ? body.providerTransmittedDocs : [];
-      const doc = docs.find((d: any) => d?.mark && String(d.mark) !== '0') ?? docs[0];
+
+      // THE ANSWER MUST BE ABOUT THE DOCUMENT WE ASKED ABOUT.
+      // `issuerVatNumber` + a date window is a legitimate query on its own, and it returns
+      // EVERYTHING that workspace transmitted in the window. Taking the first row with a MARK
+      // would hand the recovery cron an unrelated invoice's legal number to stamp onto this one
+      // — the same hazard the 228 branch above refuses to take, and worse because it is silent.
+      // So a row only counts when it matches an identifier we actually sent.
+      const wanted = (d: any) => (
+        (query.uid && String(d?.uid ?? '') === query.uid) ||
+        (query.invoiceMark && String(d?.mark ?? '') === query.invoiceMark) ||
+        (query.aa && String(d?.invoiceHeader?.aa ?? '') === query.aa)
+      );
+      const discriminated = Boolean(query.uid || query.invoiceMark || query.aa);
+      if (!discriminated) {
+        // Nothing to match on. Reporting `offline` keeps the document queued; reporting a MARK
+        // would be a guess, and a guessed legal number is not recoverable.
+        return { status: 'offline', isOffline: true, uid: query.uid, raw: body };
+      }
+      const matches = docs.filter(wanted);
+      const doc = matches.find((d: any) => d?.mark && String(d.mark) !== '0') ?? matches[0];
       const mark = doc?.mark && String(doc.mark) !== '0' ? String(doc.mark) : undefined;
       if (!mark) {
         return { status: 'offline', isOffline: true, uid: doc?.uid ?? query.uid, raw: body };
@@ -616,11 +652,14 @@ export const novusConnector: FiscalConnector = {
   // POST /CancelDeliveryNote — REST v2.3. Verified against the sandbox 2026-09-06 (#319):
   // returns `statusCode:"Success"` with a `cancellationMark` and costs 0.25 credits.
   //
-  // THIS CALL IS NOT IDEMPOTENT AND THE PROVIDER WILL NOT STOP YOU. Sending the same MARK twice
-  // answers Success BOTH times, mints a SECOND cancellationMark, and bills 0.25 credits again —
-  // measured, not assumed. So the "one thing, and a retry must not do it twice" rule applies at
-  // the caller: claim the note locally (`where fiscal_cancellation_mark is null`) before calling,
-  // and never re-send on a retry that finds a mark already stored. See `finance-issue-invoice`.
+  // THE PROVIDER'S OWN DUPLICATE GUARD IS RACY — DO NOT RELY ON IT. Sending the same MARK twice
+  // usually answers 251 "Invoice with MARK … has already been cancelled", but a fast retry got
+  // Success BOTH times: a second cancellationMark was minted and 0.25 credits billed again.
+  // Both outcomes observed against the sandbox on 2026-09-06 (#319) with the same code, which is
+  // the worst kind of guard — it works while you are testing it. So the "one thing, and a retry
+  // must not do it twice" rule is enforced at OUR end: claim the note (`where
+  // fiscal_cancellation_mark is null`) before calling, and never re-send once a mark is stored.
+  // See `finance-issue-invoice`.
   async cancelDeliveryNote(input, ctx) {
     try {
       const res = await fetch(`${ctx.baseUrl}/api/v1/Provider/CancelDeliveryNote`, {

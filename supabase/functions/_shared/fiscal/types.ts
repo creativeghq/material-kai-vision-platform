@@ -106,18 +106,36 @@ export const MYDATA_UNIT_BY_CODE: Record<number, string> = {
  * transmission, the same stance `UNCODED_MYDATA_UNITS` takes going out: a wrong unit on a
  * document AADE has registered is not recoverable, and a refusal is.
  */
-const MYDATA_UNIT_CODE_BY_LABEL: Record<string, number> = {
-  pcs: 1, pc: 1, piece: 1, pieces: 1, item: 1, items: 1, unit: 1, 'τεμ': 1, 'τεμ.': 1, 'τμχ': 1,
-  kg: 2, kgs: 2, kilo: 2, kilos: 2, kilogram: 2, kilograms: 2, 'κγ': 2, 'κιλ': 2, 'κιλά': 2,
-  lt: 3, l: 3, lit: 3, liter: 3, liters: 3, litre: 3, litres: 3, 'λτ': 3, 'λίτρα': 3,
-  m: 4, mtr: 4, meter: 4, meters: 4, metre: 4, metres: 4, 'μ': 4, 'μέτρα': 4,
-  m2: 5, sqm: 5, sqmt: 5, 'm²': 5, 'τμ': 5, 'τ.μ.': 5, 'τετραγωνικά': 5,
-  m3: 6, cbm: 6, 'm³': 6, 'κμ': 6, 'κ.μ.': 6, 'κυβικά': 6,
+const MYDATA_UNIT_ALIASES: Record<string, number> = {
+  pc: 1, piece: 1, pieces: 1, item: 1, items: 1, unit: 1, τεμ: 1, 'τεμ.': 1, τμχ: 1, τεμαχια: 1,
+  kgs: 2, kilo: 2, kilos: 2, kilogram: 2, kilograms: 2, κγ: 2, κιλ: 2, κιλα: 2,
+  l: 3, lit: 3, liter: 3, liters: 3, litre: 3, litres: 3, λτ: 3, λιτρα: 3,
+  mtr: 4, meter: 4, meters: 4, metre: 4, metres: 4, μ: 4, μετρα: 4,
+  sqm: 5, sqmt: 5, 'm²': 5, τμ: 5, 'τ.μ.': 5, τετραγωνικα: 5,
+  cbm: 6, 'm³': 6, κμ: 6, 'κ.μ.': 6, κυβικα: 6,
 };
 
-/** AADE `measurementUnit` code for a unit label / canonical key, or null when unrecognised. */
+/**
+ * The canonical half is DERIVED from `MYDATA_UNIT_BY_CODE` above rather than restated, so the
+ * two directions cannot disagree and `fiscalUnitParity.test.ts` keeps covering both through the
+ * one map it already pins. Only the aliases — the spellings that map is not responsible for —
+ * are written out.
+ */
+const MYDATA_UNIT_CODE_BY_LABEL: Record<string, number> = {
+  ...Object.fromEntries(Object.entries(MYDATA_UNIT_BY_CODE).map(([code, key]) => [key, Number(code)])),
+  ...MYDATA_UNIT_ALIASES,
+};
+
+/**
+ * AADE `measurementUnit` code for a unit label / canonical key, or null when unrecognised.
+ *
+ * Accents are stripped before matching. Greek uppercase DROPS them — the ordinary way a unit is
+ * written on a document is `ΚΙΛΑ`, and `'ΚΙΛΑ'.toLowerCase()` is `κιλα`, which never matches a
+ * key spelled `κιλά`. Keeping the accented spelling as the key would have refused every movement
+ * document whose unit was typed in normal Greek capitals.
+ */
 export function mydataUnitCode(unit: string | null | undefined): number | null {
-  const key = String(unit ?? '').trim().toLowerCase();
+  const key = String(unit ?? '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
   if (!key) return null;
   return MYDATA_UNIT_CODE_BY_LABEL[key] ?? null;
 }

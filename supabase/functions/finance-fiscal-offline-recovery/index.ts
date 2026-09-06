@@ -248,9 +248,20 @@ Deno.serve(withApiLogging('finance-fiscal-offline-recovery', async (req) => {
         }
 
         // ── The document was REFUSED on delayed transmission (#193 / M6) ───────────────
-        // Only terminal on a real provider verdict AND after the grace period: `interpret()`
-        // funnels everything non-Success into 'rejected', so a document the provider simply
-        // hasn't transmitted yet arrives here looking identical to a refusal.
+        // Only terminal on a real provider verdict AND after the grace period: a document the
+        // provider simply hasn't transmitted yet must never look identical to a refusal.
+        //
+        // AS OF 2026-09-06 THIS BRANCH IS UNREACHABLE FOR NOVUS, AND THAT IS CORRECT.
+        // RequestTransmittedDocs LISTS transmitted documents; a refused one simply is not in the
+        // list, so the endpoint cannot express "AADE said no" — only "not there (yet)". The old
+        // parser appeared to reach this branch because it mis-read the response envelope and
+        // returned `rejected` for EVERYTHING, which after the 6h grace would have condemned
+        // every healthy queued document. Do not restore that by loosening `fetchTransmitted`.
+        // The real safety net is the stuck-offline alert below: it fires at 24h, re-fires on a
+        // cadence, is never terminal, and tells a human to check the provider portal. So
+        // `rejected_late` and `credits_refunded` sitting at 0 is the expected reading here, not
+        // a silent zero — `stuck_alerted` is the counter that moves. A genuine late-rejection
+        // detector needs a signal the provider does not currently offer (ask at certification).
         const definitiveRejection =
           res?.status === 'rejected'
           && !!res.errorCode

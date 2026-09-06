@@ -8,6 +8,7 @@ import type {
   InvoiceRenderData, InvoiceLineRow, VatAnalysisRow, TotalsExtraRow, VatExemptionNote,
 } from './types';
 import { resolvePrintedCounterparty, applyAddressUnit, partyAddressLines } from './counterparty';
+import { normalizeVat } from '@/services/crm/vatNormalize';
 import { round2 as r2 } from '@/utils/decimal';
 import { vatOf } from '@/modules/finance/lib/vatMath';
 import { mydataExemptionLabel } from '@/lib/mydataExemptionCategories';
@@ -87,7 +88,13 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
   // The BILLING party, resolved exactly as the myDATA envelope resolves it: the identity frozen
   // onto the document at issue wins over the live CRM row, and a separate billing identity wins
   // over the party's own. Printing the live row is how the paper and the transmission drift.
-  const billTo = resolvePrintedCounterparty(inv.counterparty_snapshot?.row ?? null, customer);
+  const billToRaw = resolvePrintedCounterparty(inv.counterparty_snapshot?.row ?? null, customer);
+  // The VAT number is normalized to the spelling the ENVELOPE carries. `partyFromCrm` strips the
+  // Greek EL/GR prefix before transmitting (the provider 401s on the prefixed form), and this
+  // file's contract is that the printed document says what the transmitted one says
+  // (CLAUDE.md §1c). It is applied here rather than inside `resolvePrintedCounterparty` because
+  // that module is a byte-mirrored source and has to stay import-free.
+  const billTo = billToRaw ? { ...billToRaw, vatNumber: normalizeVat(billToRaw.vatNumber) } : null;
   const custName = billTo?.name || '—';
   const custLines = billTo ? partyAddressLines(billTo, L) : [];
 
