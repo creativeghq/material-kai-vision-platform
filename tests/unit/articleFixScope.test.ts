@@ -121,6 +121,33 @@ describe('a fix says what it can be applied to', () => {
   });
 });
 
+describe('the score measures the article, not how many rows the analyzer emitted', () => {
+  // Anchoring the long paragraphs individually turned one finding into four applicable
+  // fixes plus an overflow summary — and the score of an article nobody had touched fell
+  // from 66 to 48, because the loop subtracted a penalty per FIX. A derived number that
+  // moves when the presentation changes is not measuring what it claims to.
+  it('charges a finding once, however many places it was located', () => {
+    expect(src).toContain('function totalPenalty(fixes: ContentFix[]): number {');
+    expect(src).toContain('if (chargedGroups.has(fix.penaltyGroup)) continue;');
+    expect(src).toContain('const score = Math.max(0, Math.min(100, 100 - totalPenalty(fixes)));');
+    // The old per-fix subtraction must be gone, not merely bypassed.
+    expect(src).not.toContain('score -= SEVERITY_PENALTY[fix.severity]');
+  });
+
+  it('groups every fix an anchored check splits apart', () => {
+    // Each anchored row AND its overflow summary carry the group, or the summary is a
+    // second charge for the problem the rows already paid for.
+    expect((src.match(/penaltyGroup: 'readability:long-paragraphs'/g) ?? []).length).toBe(2);
+    expect((src.match(/penaltyGroup: 'readability:long-sentences'/g) ?? []).length).toBe(2);
+  });
+
+  it('reachableScore uses the same grouped arithmetic as the score', () => {
+    // Two ways of adding up penalties is two answers to one question — the money-derivation
+    // rule, applied to a score.
+    expect(src).toContain('return Math.min(100, analysis.overallScore + totalPenalty(unfixable));');
+  });
+});
+
 describe('the auto-fix loop runs on the score the reader sees', () => {
   it('enters on overallScore, not on reachableScore', () => {
     expect(src).toContain('if (autoFix && analysis.overallScore < MIN_ACCEPTABLE_SCORE) {');

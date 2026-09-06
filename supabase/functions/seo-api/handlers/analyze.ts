@@ -312,6 +312,28 @@ const SEVERITY_PENALTY: Record<ContentFix['severity'], number> = {
 };
 
 /**
+ * What a set of fixes costs the score, counting each FINDING once.
+ *
+ * The score used to be `100 - sum(every fix's penalty)`, which made it a function of how
+ * many rows the analyzer chose to emit rather than of the article. Anchoring the long
+ * paragraphs individually — four applicable fixes plus an overflow summary where there had
+ * been one row — dropped a finished article from 66 to 48 without a word of it changing.
+ * Fixes carrying the same `penaltyGroup` are facets of one problem and are charged once.
+ */
+function totalPenalty(fixes: ContentFix[]): number {
+  const chargedGroups = new Set<string>();
+  let penalty = 0;
+  for (const fix of fixes) {
+    if (fix.penaltyGroup) {
+      if (chargedGroups.has(fix.penaltyGroup)) continue;
+      chargedGroups.add(fix.penaltyGroup);
+    }
+    penalty += SEVERITY_PENALTY[fix.severity] ?? 0;
+  }
+  return penalty;
+}
+
+/**
  * The score the auto-fix loop could reach if it fixed everything it is able to —
  * i.e. the current score with the penalties from NON-auto-fixable fixes added back.
  * Used to decide whether another paid fix iteration is worth running.
@@ -319,8 +341,8 @@ const SEVERITY_PENALTY: Record<ContentFix['severity'], number> = {
 function reachableScore(analysis: ContentAnalysisResult): number {
   const unfixable = analysis.fixes
     .filter((f) => !f.autoFixable)
-    .reduce((sum, f) => sum + (SEVERITY_PENALTY[f.severity] ?? 0), 0);
-  return Math.min(100, analysis.overallScore + unfixable);
+    ;
+  return Math.min(100, analysis.overallScore + totalPenalty(unfixable));
 }
 
 /**
@@ -637,6 +659,7 @@ export function analyzeContent(
       applied: false,
       scope: 'section',
       anchor: para,
+      penaltyGroup: 'readability:long-paragraphs',
     });
   }
   if (longParagraphs.length > MAX_ANCHORED_FIXES_PER_CHECK) {
@@ -649,6 +672,7 @@ export function analyzeContent(
       autoFixable: true,
       applied: false,
       scope: 'document',
+      penaltyGroup: 'readability:long-paragraphs',
     });
   }
 
@@ -677,6 +701,7 @@ export function analyzeContent(
         applied: false,
         scope: 'section',
         anchor: para,
+        penaltyGroup: 'readability:long-sentences',
       });
     }
     if (anchored.size === 0) {
@@ -689,6 +714,7 @@ export function analyzeContent(
         autoFixable: true,
         applied: false,
         scope: 'document',
+        penaltyGroup: 'readability:long-sentences',
       });
     }
   }
@@ -918,11 +944,7 @@ export function analyzeContent(
   }
 
   // ── Calculate overall score ──
-  let score = 100;
-  for (const fix of fixes) {
-    score -= SEVERITY_PENALTY[fix.severity] ?? 0;
-  }
-  score = Math.max(0, Math.min(100, score));
+  const score = Math.max(0, Math.min(100, 100 - totalPenalty(fixes)));
 
   // ── Build section scores ──
   // Classify anything that did not classify itself. A fix that carries an `anchor` IS

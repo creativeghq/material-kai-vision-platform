@@ -313,6 +313,17 @@ export interface ContentFix {
    * location away.
    */
   anchor?: string | null;
+  /**
+   * Facets of ONE finding, penalised ONCE between them.
+   *
+   * "5 paragraphs exceed 80 words" is one problem with the article. Reporting it as four
+   * individually-applicable fixes plus an overflow summary made it four penalties plus one,
+   * and the score fell 66 → 48 for an article nobody had touched. The score measures the
+   * ARTICLE; it must not move because the analyzer changed how it presents a finding.
+   *
+   * Fixes sharing a group cost the group's severity once. Absent means a fix stands alone.
+   */
+  penaltyGroup?: string;
 }
 
 export interface GEOScore {
