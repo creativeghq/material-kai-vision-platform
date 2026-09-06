@@ -3,6 +3,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { round2 as r2 } from '@/utils/decimal';
 import { Home, ClipboardList, User, Truck } from 'lucide-react';
 
+import { mydataPaymentLabel } from '@/modules/finance/paymentVocabulary';
 import {
   formatInvoiceMoney,
   type InvoiceColors,
@@ -460,6 +461,38 @@ export function InvoiceDocument({
     );
   };
 
+  /**
+   * The payment that unlocked the document — the Unique Payment Identity and the provider
+   * signature used to complete the charge, one entry per amount payable. Required on the printed
+   * document, and therefore here: the operator approves this view, the customer gets the PDF, and
+   * the two must not differ.
+   */
+  const PosPayments = () => {
+    if (!data.posPayments?.length) return null;
+    return (
+      <div style={{ marginTop: 12 }}>
+        <div style={{ fontSize: 9, fontWeight: 700, ...muted }}>{L.posPayment}</div>
+        {data.posPayments.map((pmt, i) => (
+          <div key={i} style={{ marginTop: 3 }}>
+            <div style={{ fontSize: 9, ...muted }}>
+              {[
+                `${L.posTxn}: ${pmt.transactionId ?? '—'}`,
+                pmt.methodCode != null ? mydataPaymentLabel(pmt.methodCode, data.lang) : null,
+                pmt.amount != null ? money(pmt.amount) : null,
+                pmt.terminalId ? `${L.posTerminal} ${pmt.terminalId}` : null,
+              ].filter(Boolean).join(' · ')}
+            </div>
+            {pmt.signature && (
+              <div style={{ fontSize: 7, ...muted, wordBreak: 'break-all' }}>
+                {L.posSignature}: {pmt.signature}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   const Fiscal = () => {
     if (!data.fiscal) return null;
     return (
@@ -469,6 +502,12 @@ export function InvoiceDocument({
           <div style={{ fontSize: 11, fontWeight: 700 }}>{data.fiscal.mark}</div>
           {data.fiscal.authCode && <div style={{ fontSize: 9, ...muted }}>{L.authCode}: {data.fiscal.authCode}</div>}
           {data.fiscal.uid && <div style={{ fontSize: 9, ...muted }}>{L.uid}: {data.fiscal.uid}</div>}
+          {/* Mandatory under the provider's own rules: every document issued through their
+              service names them. Shown here as well as on the PDF because this preview is what
+              the operator approves before the customer's copy goes out. */}
+          {data.fiscal.transmittedVia && (
+            <div style={{ fontSize: 9, ...muted }}>{L.transmittedVia}: {data.fiscal.transmittedVia}</div>
+          )}
         </div>
         {data.fiscal.qrUrl && (
           <div style={{ textAlign: 'center' }}>
@@ -496,6 +535,7 @@ export function InvoiceDocument({
       <Shipping />
       <Notes />
       <PayOnline />
+      <PosPayments />
       <Fiscal />
     </>
   );
@@ -664,6 +704,9 @@ export function InvoiceDocument({
             <div style={{ fontSize: 11, fontWeight: 700 }}>{data.fiscal.mark}</div>
             {data.fiscal.authCode && <div style={{ fontSize: 9, ...muted }}>{L.authCode}: {data.fiscal.authCode}</div>}
             {data.fiscal.uid && <div style={{ fontSize: 9, ...muted }}>{L.uid}: {data.fiscal.uid}</div>}
+            {data.fiscal.transmittedVia && (
+              <div style={{ fontSize: 9, ...muted }}>{L.transmittedVia}: {data.fiscal.transmittedVia}</div>
+            )}
           </div>
         )}
       </div>

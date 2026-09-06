@@ -49,6 +49,9 @@ export const FINANCE_TAB = {
   reports: 'reports',
   /** AADE's own aggregate book — a read-only mirror, deliberately not a Reports entry. */
   mydataBook: 'mydata_book',
+  /** OUR transmission log — every attempt, with the MARK or the reason there is none. The Book
+   *  above is AADE's aggregate answer; this is the per-document record behind it. */
+  transmissions: 'mydata_transmissions',
   settings: 'settings',
   /** The AI Assessment pane — its own paid module (`finance-assessment`). */
   assessment: 'assessment',

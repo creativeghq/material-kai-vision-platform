@@ -118,5 +118,18 @@ export interface InvoiceRenderData {
   priorBalance?: number | null;
   /** Hosted /pay/{token} URL — prints a "Pay / view online" link + QR. */
   payUrl?: string | null;
-  fiscal?: { mark?: string; uid?: string; authCode?: string | null; qrUrl?: string | null } | null;
+  fiscal?: {
+    mark?: string; uid?: string; authCode?: string | null; qrUrl?: string | null;
+    /** The provider that carried this document to AADE, as it must appear on the paper. */
+    transmittedVia?: string | null;
+  } | null;
+  /** Card / IRIS payments completed against a Law-5155 provider signature. The transaction id
+   *  and the signature belong on the printed document, one entry per amount payable. */
+  posPayments?: Array<{
+    transactionId: string | null;
+    signature: string | null;
+    amount: number | null;
+    methodCode: number | null;
+    terminalId: string | null;
+  }>;
 }

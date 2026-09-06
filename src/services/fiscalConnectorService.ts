@@ -29,23 +29,72 @@ export interface FiscalBinding {
 export interface FiscalSubmission {
   id: string;
   invoice_id: string | null;
+  /** Which table the document lives in. `invoice_id` alone cannot say it — a credit note and a
+   *  delivery note are documents too, and the pair is what identifies one. */
+  document_table: 'invoices' | 'credit_notes' | 'delivery_notes' | null;
+  document_id: string | null;
   connector_slug: string;
   capability: string;
   status: 'pending' | 'accepted' | 'offline' | 'rejected' | 'error' | 'cancelled';
   mark: string | null;
   uid: string | null;
+  authentication_code: string | null;
   qr_url: string | null;
   invoice_url: string | null;
+  /** The myDATA type this attempt declared (1.1, 11.1, 9.3, `cancel_9.3` …). */
+  fiscal_invoice_type: string | null;
   series: string | null;
   aa: string | null;
   is_offline: boolean;
+  transmission_failure: boolean;
+  attempt: number | null;
   provider_credits: number | null;
   error_code: string | null;
   error_message: string | null;
   created_at: string;
 }
 
+export type TransmissionStatusFilter = 'all' | 'accepted' | 'offline' | 'rejected' | 'error' | 'cancelled';
+
 export const fiscalConnectorService = {
+  /**
+   * Every transmission ATTEMPT for a workspace, newest first.
+   *
+   * One row per attempt is the point: the accepted row and the three rejections before it are
+   * all the record, and a list that showed only the current state of each document would hide
+   * exactly what an operator needs when something is not landing. The payload columns
+   * (`request_payload` / `response_payload`) are deliberately NOT selected — they are the whole
+   * envelope, they are large, and nothing on this surface reads them.
+   */
+  async listTransmissions(
+    workspaceId: string,
+    opts: { status?: TransmissionStatusFilter; limit?: number } = {},
+  ): Promise<FiscalSubmission[]> {
+    let q = supabase
+      .from('fiscal_submissions')
+      .select('id, invoice_id, document_table, document_id, connector_slug, capability, status, mark, uid, authentication_code, qr_url, invoice_url, fiscal_invoice_type, series, aa, is_offline, transmission_failure, attempt, provider_credits, error_code, error_message, created_at')
+      .eq('workspace_id', workspaceId)
+      .order('created_at', { ascending: false })
+      .limit(opts.limit ?? 200);
+    if (opts.status && opts.status !== 'all') q = q.eq('status', opts.status);
+    const { data, error } = await q;
+    if (error) throw error;
+    return (data ?? []) as FiscalSubmission[];
+  },
+
+  /** Re-send a document that did not land. Routed by the table it came from, because the edge
+   *  function takes a different key for each. */
+  async retransmit(sub: FiscalSubmission): Promise<any> {
+    const body =
+      sub.document_table === 'credit_notes' ? { credit_note_id: sub.document_id }
+      : sub.document_table === 'delivery_notes' ? { delivery_note_id: sub.document_id, submit_fiscal: true }
+      : { invoice_id: sub.document_id ?? sub.invoice_id, submit_fiscal: true };
+    const { data, error } = await supabase.functions.invoke('finance-issue-invoice', { body });
+    if (error) throw await edgeError(error);
+    if (data && data.ok === false) throw new Error(data.error || 'Retransmission failed');
+    return data;
+  },
+
   async listConnectors(): Promise<FiscalConnector[]> {
     const { data, error } = await supabase
       .from('fiscal_connectors')

@@ -128,6 +128,8 @@ const LABELS: Record<Lang, Record<string, string>> = {
     receiptDetails: 'ΣΤΟΙΧΕΙΑ ΑΠΟΔΕΙΞΗΣ', paidTo: 'ΣΤΟΙΧΕΙΑ ΔΙΚΑΙΟΥΧΟΥ', settledDocs: 'ΣΤΟΙΧΕΙΑ ΕΞΟΦΛΗΣΗΣ',
     lineNo: '#', lineDiscount: 'Έκπτωση', lineOtherTaxes: 'Λοιποί Φόροι', totalValue: 'Συνολική Αξία',
     authCode: 'Κωδ. Αυθεντικοποίησης', docType: 'Είδος Παραστατικού', time: 'Ώρα',
+    transmittedVia: 'Διαβίβαση μέσω', posPayment: 'ΠΛΗΡΩΜΗ ΜΕΣΩ POS',
+    posTxn: 'Ταυτότητα Πληρωμής', posTerminal: 'Τερματικό', posSignature: 'Υπογραφή Παρόχου',
     correlated: 'Συσχετιζόμενα Παραστατικά', currency: 'Νόμισμα', fxRate: 'Ισοτιμία',
     payable: 'Πληρωτέο Ποσό', charges: 'Επιβαρύνσεις', exemptionNote: 'Αιτία απαλλαγής ΦΠΑ',
     deliveryInfo: 'ΣΤΟΙΧΕΙΑ ΠΑΡΑΔΟΣΗΣ',
@@ -166,6 +168,8 @@ const LABELS: Record<Lang, Record<string, string>> = {
     receiptDetails: 'RECEIPT DETAILS', paidTo: 'PAID TO', settledDocs: 'SETTLEMENT DETAILS',
     lineNo: '#', lineDiscount: 'Discount', lineOtherTaxes: 'Other taxes', totalValue: 'Total value',
     authCode: 'Auth code', docType: 'Document type', time: 'Time',
+    transmittedVia: 'Transmitted via', posPayment: 'CARD / IRIS PAYMENT',
+    posTxn: 'Payment identity', posTerminal: 'Terminal', posSignature: 'Provider signature',
     correlated: 'Correlated documents', currency: 'Currency', fxRate: 'Exchange rate',
     payable: 'Payable amount', charges: 'Charges', exemptionNote: 'VAT exemption ground',
     deliveryInfo: 'DELIVERY INFORMATION',
@@ -505,19 +509,54 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
     // AADE authentication code — issued alongside the MARK and stored on the submission row.
     // It belongs on the printed document: it is what verifies the document off-line.
     let authCode: string | null = null;
+    let transmittedBy: string | null = null;
+    let providerAttribution: string | null = null;
+    let posPayments: any[] = [];
     if (inv.fiscal_mark && kind !== 'delivery_note') {
       // Keyed on the document ITSELF, not on the correlated source invoice. Keying on
       // `invoice_id` meant a credit note and the invoice it corrects shared one lookup: after
       // issuing invoice I and credit notes C1 and C2 against it, this returned the newest
       // submission for I — so I could print C2's authentication code beside I's own MARK.
       const { data } = await supabase.from('fiscal_submissions')
-        .select('authentication_code, created_at')
+        .select('authentication_code, connector_slug, created_at')
         .eq('document_table', kind === 'credit_note' ? 'credit_notes' : 'invoices')
         .eq('document_id', docId)
         .not('authentication_code', 'is', null)
         .order('created_at', { ascending: false })
         .limit(1).maybeSingle();
       authCode = (data as any)?.authentication_code ?? null;
+      transmittedBy = (data as any)?.connector_slug ?? null;
+    }
+
+    // WHO TRANSMITTED IT, named on the paper.
+    // The provider's General Provider Rules require every document issued through their service
+    // to display the provider's name and website. Read from the connector that ACTUALLY carried
+    // this document (`fiscal_submissions.connector_slug`) rather than from the workspace's
+    // current binding — a document transmitted last year through one provider must keep crediting
+    // that provider after the binding changes — and never hardcoded here, which would credit
+    // Novus for a document Novus never saw.
+    if (transmittedBy) {
+      const { data } = await supabase.from('fiscal_connectors')
+        .select('legal_display_name, legal_website')
+        .eq('slug', transmittedBy).maybeSingle();
+      if ((data as any)?.legal_display_name) {
+        providerAttribution = [(data as any).legal_display_name, (data as any).legal_website]
+          .filter(Boolean).join(' | ');
+      }
+    }
+
+    // THE PAYMENT THAT UNLOCKED THE DOCUMENT.
+    // Same rules: when a payment was completed against a provider signature, the document must
+    // carry the Unique Payment Identity — the transaction id — together with the signature that
+    // was used to complete it, FOR EACH AMOUNT PAYABLE SEPARATELY. Hence every completed
+    // signature, not just the newest: a receipt settled in two card taps has two of them.
+    if (kind !== 'delivery_note' && kind !== 'credit_note') {
+      const { data } = await supabase.from('pos_signatures')
+        .select('transaction_id, signature_token, payment_amount, tip_amount, final_payment_type, payment_type, terminal_id, completed_at')
+        .eq('invoice_id', docId)
+        .eq('status', 'completed')
+        .order('completed_at', { ascending: true });
+      posPayments = (data as any[]) ?? [];
     }
 
     let branch: any = null;
@@ -602,7 +641,7 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
       } catch { /* RF is best-effort — never block the PDF */ }
     }
 
-    const pdfBytes = await buildPdf({ inv, items, fs, customer, addressUnit, authCode, branch, lang, logo, spec, colors, priorBalance, payUrl, rfCode });
+    const pdfBytes = await buildPdf({ inv, items, fs, customer, addressUnit, authCode, providerAttribution, posPayments, branch, lang, logo, spec, colors, priorBalance, payUrl, rfCode });
 
     const path = `${OUT}/${docId}/${PREFIX}-${docId}.pdf`;
     const { error: upErr } = await supabase.storage.from('pdf-documents').upload(path, pdfBytes, { upsert: true, contentType: 'application/pdf' });
@@ -620,8 +659,22 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
   }
 }));
 
-async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; addressUnit?: any; authCode?: string | null; branch: any; lang: Lang; logo?: Uint8Array | null; spec: TemplateSpec; colors: InvoicePdfColors; priorBalance?: number | null; payUrl?: string | null; rfCode?: string | null }): Promise<Uint8Array> {
-  const { inv, items, fs, customer, addressUnit, authCode, branch, lang, logo, spec, colors, priorBalance, payUrl, rfCode } = d;
+/**
+ * Which clock a fiscal document is dated by — the ISSUER's, wherever the server happens to run.
+ *
+ * Deliberately tiny: this module serves the Greek AADE/myDATA regime, so `GR` is the case that
+ * matters and the rest are here only so a foreign-established issuer is not silently dated in
+ * UTC. Adding a country means adding its zone here, not defaulting it.
+ */
+const FISCAL_TIMEZONE_BY_COUNTRY: Record<string, string> = {
+  GR: 'Europe/Athens', CY: 'Asia/Nicosia', BG: 'Europe/Sofia', RO: 'Europe/Bucharest',
+  DE: 'Europe/Berlin', FR: 'Europe/Paris', IT: 'Europe/Rome', ES: 'Europe/Madrid',
+  NL: 'Europe/Amsterdam', BE: 'Europe/Brussels', AT: 'Europe/Vienna', PL: 'Europe/Warsaw',
+  GB: 'Europe/London', IE: 'Europe/Dublin', PT: 'Europe/Lisbon',
+};
+
+async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; addressUnit?: any; authCode?: string | null; providerAttribution?: string | null; posPayments?: any[]; branch: any; lang: Lang; logo?: Uint8Array | null; spec: TemplateSpec; colors: InvoicePdfColors; priorBalance?: number | null; payUrl?: string | null; rfCode?: string | null }): Promise<Uint8Array> {
+  const { inv, items, fs, customer, addressUnit, authCode, providerAttribution, posPayments, branch, lang, logo, spec, colors, priorBalance, payUrl, rfCode } = d;
   const L = LABELS[lang];
   const isCommercial = spec.headerStyle === 'commercial';
 
@@ -711,6 +764,18 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; add
   ].filter(Boolean) as string[];
   const locale = lang === 'el' ? 'el-GR' : 'en-GB';
   const issuedAt = inv.issued_at ? new Date(inv.issued_at) : null;
+  // THE PRINTED DATE AND TIME ARE THE ISSUER'S, NOT THE SERVER'S.
+  // Edge functions run in UTC, so `toLocaleDateString()` with no timezone renders the UTC day —
+  // and a Greek business issuing at 00:30 Athens time would print YESTERDAY on a fiscal document
+  // that AADE numbered under today. That is the CLAUDE.md §1b defect landing on the paper the
+  // customer keeps. There is no per-workspace timezone column, so it is derived from the
+  // issuer's country; Greece is the regime this module serves and is the fallback.
+  const fiscalTz = FISCAL_TIMEZONE_BY_COUNTRY[String(fs?.business_country_code ?? 'GR').toUpperCase()]
+    ?? 'Europe/Athens';
+  const fmtIssueDate = (d: Date) => d.toLocaleDateString(locale, { timeZone: fiscalTz });
+  const fmtIssueTime = (d: Date) => d.toLocaleTimeString(locale, {
+    timeZone: fiscalTz, hour: '2-digit', minute: '2-digit', second: '2-digit',
+  });
   const paymentMethodLabel = mydataPaymentLabel(inv.payment_method_code, lang);
   const metaRows: [string, string][] = [
     // The myDATA document-type code (1.1, 2.1, 11.2 …) is what an auditor matches against the
@@ -718,9 +783,9 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; add
     inv.document_type ? [L.docType, String(inv.document_type)] : ['', ''],
     [L.number, String(inv.internal_number ?? inv.legal_number ?? '')],
     inv.series ? [L.series, String(inv.series)] : ['', ''],
-    [L.date, issuedAt ? issuedAt.toLocaleDateString(locale) : ''],
+    [L.date, issuedAt ? fmtIssueDate(issuedAt) : ''],
     // Issue TIME orders two documents numbered on the same day. Stored all along, never printed.
-    issuedAt ? [L.time, issuedAt.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' })] : ['', ''],
+    issuedAt ? [L.time, fmtIssueTime(issuedAt)] : ['', ''],
     inv.order_number ? [L.order, String(inv.order_number)] : ['', ''],
     inv.due_at ? [L.due, String(inv.due_at)] : ['', ''],
     paymentMethodLabel ? [L.paymentMethod, paymentMethodLabel] : ['', ''],
@@ -1366,6 +1431,34 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; add
     for (const nl of wrap(inv.info_box, font, 8, right - M - 130)) { text(nl, M, y, 8, font, MUTED); y -= 10; }
   }
 
+  // ── The payment that unlocked the document (Law 5155 / provider signature) ──────────
+  // Also mandatory: when a card or IRIS payment was completed against a provider signature, the
+  // document must carry the Unique Payment Identity — the transaction id — together with the
+  // signature used to complete it, FOR EACH AMOUNT PAYABLE SEPARATELY. So every completed
+  // signature gets its own line: a receipt settled in two taps has two.
+  if (Array.isArray(posPayments) && posPayments.length) {
+    if (y < M + 70) newPage();
+    text(L.posPayment, M, y, 8, bold, MUTED); y -= 12;
+    for (const pmt of posPayments) {
+      const parts = [
+        `${L.posTxn}: ${pmt.transaction_id ?? '—'}`,
+        mydataPaymentLabel(pmt.final_payment_type ?? pmt.payment_type, lang),
+        pmt.payment_amount != null ? money(Number(pmt.payment_amount)) : null,
+        pmt.terminal_id ? `${L.posTerminal} ${pmt.terminal_id}` : null,
+      ].filter(Boolean).join(' · ');
+      text(parts, M, y, 8, font, MUTED); y -= 11;
+      // The signature is long and is the point — it is what proves the charge was authorised
+      // against THIS document, so it is printed in full rather than abbreviated.
+      if (pmt.signature_token) {
+        for (const sl of wrap(`${L.posSignature}: ${pmt.signature_token}`, font, 6.5, right - M)) {
+          if (y < M + 20) newPage();
+          text(sl, M, y, 6.5, font, MUTED); y -= 8;
+        }
+      }
+      y -= 3;
+    }
+  }
+
   // ── MARK + auth code + QR (bottom of the last page; QR gated by print_online_code) ──
   if (inv.fiscal_mark) {
     const qy = Math.max(M + 90, 120);
@@ -1375,7 +1468,14 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; add
     // document off-line. Stored on `fiscal_submissions` since day one, printed since never.
     let fy = qy + 4;
     if (authCode) { text(`${L.authCode}: ${authCode}`, M, fy, 8, font, MUTED); fy -= 11; }
-    if (inv.fiscal_uid) { text(`${L.uid}: ${inv.fiscal_uid}`, M, fy, 8, font, MUTED); }
+    if (inv.fiscal_uid) { text(`${L.uid}: ${inv.fiscal_uid}`, M, fy, 8, font, MUTED); fy -= 11; }
+    // WHO CARRIED IT TO AADE. Mandatory under the provider's General Provider Rules: every
+    // document issued through their service must display their name and website. It sits with
+    // the MARK because it is the same fact — this document exists at AADE, and here is who put
+    // it there. Printed only when a provider actually transmitted it (`manual` names nobody).
+    if (providerAttribution) {
+      text(`${L.transmittedVia}: ${providerAttribution}`, M, fy, 8, font, MUTED);
+    }
     if (inv.fiscal_qr_url && inv.print_online_code !== false && !isCommercial) {
       drawQr(page, String(inv.fiscal_qr_url), right - 90, qy - 10, 86);
       textR(L.verify, right, qy - 22, 7, font, MUTED);

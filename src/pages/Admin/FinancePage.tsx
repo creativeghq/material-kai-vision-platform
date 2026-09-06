@@ -77,6 +77,7 @@ import { ExpensePaymentsDialog } from '@/modules/finance/components/ExpensePayme
 import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog';
 import { PlanningTab } from '@/modules/finance/tabs/PlanningTab';
 import { ReportsTab } from '@/modules/finance/tabs/ReportsTab';
+import { TransmissionsTab } from '@/modules/finance/tabs/TransmissionsTab';
 import { MydataBookTab } from '@/modules/finance/tabs/MydataBookTab';
 import { ExpenseSuppliersTab } from '@/modules/finance/tabs/ExpenseSuppliersTab';
 import { TimeBillingTab } from '@/modules/finance/tabs/TimeBillingTab';
@@ -622,6 +623,11 @@ const FinancePage: React.FC = () => {
                   Filing it beside them invites exactly the confusion it exists to prevent. */}
               <TabsTrigger value="mydata_book" className="w-full justify-start">
                 <BookOpen className="h-4 w-4 mr-2" /> myDATA Book (ΑΑΔΕ)
+              </TabsTrigger>
+              {/* Sits with the Book because they answer the same question from opposite ends:
+                  the Book is what AADE holds, this is what we sent to get it there. */}
+              <TabsTrigger value="mydata_transmissions" className="w-full justify-start">
+                <SendIcon className="h-4 w-4 mr-2" /> myDATA Transmissions
               </TabsTrigger>
               <TabsTrigger value="parties" className="w-full justify-start">
                 <Users className="h-4 w-4 mr-2" /> Customers &amp; Suppliers
@@ -1327,6 +1333,11 @@ const FinancePage: React.FC = () => {
           {/* ─────────── myDATA BOOK (read-only AADE mirror) ─────────── */}
           <TabsContent value="mydata_book" className="space-y-4">
             {workspaceId && <MydataBookTab workspaceId={workspaceId} />}
+          </TabsContent>
+
+          {/* ─────────── myDATA TRANSMISSIONS (our own attempt log) ─────────── */}
+          <TabsContent value="mydata_transmissions" className="space-y-4">
+            <TransmissionsTab workspaceId={workspaceId} />
           </TabsContent>
 
           {/* ─────────── PARTIES ─────────── */}

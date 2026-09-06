@@ -102,19 +102,42 @@ export function InvoicePreviewModal({
 
         // AADE authentication code — issued with the MARK, stored on the submission row.
         let authCode: string | null = null;
+        let transmittedBy: string | null = null;
         if (invoice.fiscal_mark) {
           // Keyed on the document itself: `invoice_id` on a credit note's submission row is the
           // CORRELATED source invoice, so matching on it would let a credit note's code print
           // on the invoice it corrects.
           const { data } = await supabase.from('fiscal_submissions')
-            .select('authentication_code, created_at')
+            .select('authentication_code, connector_slug, created_at')
             .eq('document_table', 'invoices')
             .eq('document_id', invoice.id)
             .not('authentication_code', 'is', null)
             .order('created_at', { ascending: false })
             .limit(1).maybeSingle();
           authCode = (data as any)?.authentication_code ?? null;
+          transmittedBy = (data as any)?.connector_slug ?? null;
         }
+
+        // The same two reads `finance-invoice-pdf` makes, for the same reason: this preview is
+        // what the operator checks BEFORE sending, so anything the customer's copy will carry
+        // has to be here too. A preview that omits them is a preview of a different document.
+        let providerAttribution: string | null = null;
+        if (transmittedBy) {
+          const { data } = await supabase.from('fiscal_connectors')
+            .select('legal_display_name, legal_website')
+            .eq('slug', transmittedBy).maybeSingle();
+          if ((data as any)?.legal_display_name) {
+            providerAttribution = [(data as any).legal_display_name, (data as any).legal_website]
+              .filter(Boolean).join(' | ');
+          }
+        }
+
+        const { data: posRows } = await supabase.from('pos_signatures')
+          .select('transaction_id, signature_token, payment_amount, final_payment_type, payment_type, terminal_id')
+          .eq('invoice_id', invoice.id)
+          .eq('status', 'completed')
+          .order('completed_at', { ascending: true });
+        const posPayments = (posRows as any[]) ?? [];
 
         let logoUrl: string | null = null;
         if (settings?.business_logo_path) {
@@ -155,6 +178,7 @@ export function InvoicePreviewModal({
         }
 
         const data = buildInvoiceRenderData({
+          providerAttribution, posPayments,
           invoice, items: items ?? [], settings, customer, addressUnit, authCode,
           branch, order, logoUrl, bankAccounts, payUrl, priorBalance,
         });

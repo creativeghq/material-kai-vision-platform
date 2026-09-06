@@ -27,6 +27,21 @@ export interface BuildRenderInput {
   addressUnit?: Record<string, any> | null;
   /** fiscal_submissions.authentication_code for this document, when it has been transmitted. */
   authCode?: string | null;
+  /** "Novus Conceptus | https://timologisi.online" — the provider that CARRIED this document,
+   *  from `fiscal_connectors.legal_display_name`/`legal_website`. Mandatory on the printed
+   *  document under the provider's own rules, and therefore mandatory on the preview too: this
+   *  module exists so the two cannot say different things. */
+  providerAttribution?: string | null;
+  /** Completed Law-5155 provider signatures for this document. The Unique Payment Identity and
+   *  the signature that unlocked the charge must appear on the paper, for each amount separately. */
+  posPayments?: Array<{
+    transaction_id: string | null;
+    signature_token: string | null;
+    payment_amount: number | null;
+    final_payment_type: number | null;
+    payment_type: number | null;
+    terminal_id: string | null;
+  }>;
   /** finance_branches row when invoice.branch_code > 0. */
   branch?: Record<string, any> | null;
   /** Linked order (orders row) when invoice.order_id is set — for the order number + note. */
@@ -54,7 +69,7 @@ export function formatInvoiceMoney(value: any, currency: string, lang: Lang): st
 export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderData {
   const {
     invoice: inv, items, settings: fs, customer, addressUnit, authCode, branch, order,
-    logoUrl, bankAccounts, priorBalance, payUrl,
+    logoUrl, bankAccounts, priorBalance, payUrl, providerAttribution, posPayments,
   } = input;
   // English is the default; Greek only when explicitly chosen (until translations launch).
   const lang: Lang = inv.doc_language === 'el' ? 'el' : 'en';
@@ -312,6 +327,15 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
       // to verify the document off-line. Stored on `fiscal_submissions` since day one.
       authCode: authCode ?? null,
       qrUrl: inv.print_online_code !== false ? (inv.fiscal_qr_url || null) : null,
+      transmittedVia: providerAttribution ?? null,
     } : null,
+    /** Card / IRIS payments completed against a provider signature. Empty for everything else. */
+    posPayments: (posPayments ?? []).map((pmt) => ({
+      transactionId: pmt.transaction_id ?? null,
+      signature: pmt.signature_token ?? null,
+      amount: pmt.payment_amount ?? null,
+      methodCode: pmt.final_payment_type ?? pmt.payment_type ?? null,
+      terminalId: pmt.terminal_id ?? null,
+    })),
   };
 }
