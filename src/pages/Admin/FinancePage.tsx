@@ -10,26 +10,20 @@ import {
   Loader2,
   Receipt,
   Activity,
-  PieChart,
   LineChart,
   Bell,
-  CalendarClock,
   BarChart3,
-  Users,
   Package,
-  Settings as SettingsIcon,
   Banknote as BanknoteIcon,
-  Plane,
   Award,
   Boxes,
-  Landmark,
   Send as SendIcon,
-  BookOpen, Gauge,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { BankFeedTab } from '@/modules/finance/tabs/BankFeedTab';
 import { FINANCE_BASE, FINANCE_TAB, AR_FILTER_KEY, AP_FILTER_KEY } from '@/modules/finance/routes';
+import { financeRailRows, FINANCE_DOC_SECTIONS } from '@/modules/finance/sections';
 import { loadAgingLedger, summarizeAging, aggregateCurrency } from '@/modules/finance/services/agingLedger';
 import { PayViaRevolutDialog } from '@/modules/banking-revolut/components/PayViaRevolutDialog';
 import { callRevolutApi } from '@/modules/banking-revolut/services/revolutConfigService';
@@ -91,7 +85,7 @@ import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsM
 import DocumentsView from '@/modules/finance/pages/DocumentsPage';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
 import SupplierPortalPage from '@/pages/SupplierPortalPage';
-import { FileText, FileMinus, Banknote, Truck, FileSignature, PackageCheck, ShoppingCart, PackageSearch, Pencil, Layers, CheckCircle2, Building2 } from 'lucide-react';
+import { FileText, FileMinus, Banknote, PackageCheck, ShoppingCart, Pencil, Layers, CheckCircle2 } from 'lucide-react';
 import { HubEmptyState, HubRailSectionLabel } from '@/components/core/hub';
 import { EditSupplierBillDialog } from '@/modules/finance/components/EditSupplierBillDialog';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -103,18 +97,11 @@ import { buildExpensePrefill, buildInvoicePrefill, type ExpensePrefill, type Inv
 import { TemplatePickerDialog } from '@/components/features/templates/TemplatePickerDialog';
 import { SaveAsTemplateDialog } from '@/components/features/templates/SaveAsTemplateDialog';
 import { formatDate, toLocalISODate, todayLocalISO } from '@/utils/datetime';
-const DOC_TABS: { value: string; type: any; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { value: FINANCE_TAB.orders, type: 'orders', label: 'Orders', icon: ShoppingCart },
-  { value: FINANCE_TAB.invoices, type: 'invoices', label: 'Invoices', icon: FileText },
-  { value: FINANCE_TAB.receipts, type: 'receipts', label: 'Receipts', icon: Receipt },
-  { value: FINANCE_TAB.creditNotes, type: 'credit_notes', label: 'Credit Notes', icon: FileMinus },
-  { value: FINANCE_TAB.payments, type: 'payments', label: 'Payments', icon: Banknote },
-  { value: FINANCE_TAB.expenses, type: 'expenses', label: 'Expenses', icon: ArrowUpCircle },
-  // Dispatch board lives in the Warehouse module (it's a loading/fulfilment surface, not a
-  // finance document). Reachable from the WH shortcut at the top of this sidebar.
-  { value: FINANCE_TAB.deliveryNotes, type: 'delivery_notes', label: 'Delivery Notes', icon: Truck },
-  { value: FINANCE_TAB.cheques, type: 'cheques', label: 'Cheques', icon: FileSignature },
-];
+/**
+ * The rail below and the App Launcher's Finance chips are ONE list — `FINANCE_SECTIONS`, in
+ * src/modules/finance/sections.ts. The document panes are the subset carrying a `docType`.
+ * A `DOC_TABS` array used to live here and the launcher kept its own hand-written 10 of these 25.
+ */
 
 const AGE_BUCKETS: AgeBucket[] = ['current', '0-30', '31-60', '61-90', '90+'];
 
@@ -496,6 +483,10 @@ const FinancePage: React.FC = () => {
     );
   }
 
+  // The one thing the rail knows and the launcher does not. Keyed by `FinanceSection.count`,
+  // so a section asking for a count it cannot be given is a type error rather than `undefined`.
+  const RAIL_COUNTS = { ar: ar.length, ap: ap.length, followups: followUps.length };
+
   return (
     <div className="min-h-screen">
       <GlobalAdminHeader title="Finance" description="Revenue, profit, receivables, payables, and follow-up queue." badge="Finance" />
@@ -556,95 +547,20 @@ const FinancePage: React.FC = () => {
               </div>
             )}
 
+            {/* Rendered from `FINANCE_SECTIONS`, which the App Launcher's Finance chips are built
+                from too — see src/modules/finance/sections.ts. Twenty-five sections were written
+                out here and ten of them were written out AGAIN in the launcher; the other fifteen
+                were in the product and in no menu. The counts are the one thing the rail knows and
+                the launcher does not, so they are looked up here rather than stored there. */}
             <TabsList className="section-rail flex h-auto w-full flex-row flex-wrap gap-1 bg-transparent p-0 lg:flex-col lg:flex-nowrap">
-              <TabsTrigger value="dashboard" className="w-full justify-start">
-                <PieChart className="h-4 w-4 mr-2" /> Dashboard
-              </TabsTrigger>
-              <TabsTrigger value="ar" className="w-full justify-start">
-                <ArrowDownCircle className="h-4 w-4 mr-2" /> Receivables ({ar.length})
-              </TabsTrigger>
-              <TabsTrigger value="ap" className="w-full justify-start">
-                <ArrowUpCircle className="h-4 w-4 mr-2" /> Payables ({ap.length})
-              </TabsTrigger>
-              <TabsTrigger value="bank_feed" className="w-full justify-start">
-                <Landmark className="h-4 w-4 mr-2" /> Bank feed
-              </TabsTrigger>
-              {!isAccountant && (
-                <TabsTrigger value="supplier_portal" className="w-full justify-start">
-                  <Truck className="h-4 w-4 mr-2" /> Supplier Portal
+              {financeRailRows({ isAccountant }).map((row) => (row.kind === 'heading' ? (
+                <HubRailSectionLabel key={`group:${row.label}`}>{row.label}</HubRailSectionLabel>
+              ) : (
+                <TabsTrigger key={row.section.value} value={row.section.value} className="w-full justify-start">
+                  <row.section.icon className="h-4 w-4 mr-2" /> {row.section.label}
+                  {row.section.count ? ` (${RAIL_COUNTS[row.section.count]})` : ''}
                 </TabsTrigger>
-              )}
-
-              <HubRailSectionLabel>Documents</HubRailSectionLabel>
-              {DOC_TABS.map((d) => (
-                <React.Fragment key={d.value}>
-                  <TabsTrigger value={d.value} className="w-full justify-start">
-                    <d.icon className="h-4 w-4 mr-2" /> {d.label}
-                  </TabsTrigger>
-                  {/* Sits next to Expenses because it is the same inbox read the other way
-                      round — by issuer rather than by document. It used to be a panel ON the
-                      Expenses list, where it pushed the documents that tab exists to show below
-                      the fold. */}
-                  {d.value === FINANCE_TAB.expenses && (
-                    <TabsTrigger value={FINANCE_TAB.expenseSuppliers} className="w-full justify-start">
-                      <Building2 className="h-4 w-4 mr-2" /> By Supplier
-                    </TabsTrigger>
-                  )}
-                </React.Fragment>
-              ))}
-              <HubRailSectionLabel>Tools</HubRailSectionLabel>
-
-              <TabsTrigger value="planning" className="w-full justify-start">
-                <CalendarClock className="h-4 w-4 mr-2" /> Planning
-              </TabsTrigger>
-              <TabsTrigger value="trip_cards" className="w-full justify-start">
-                <Plane className="h-4 w-4 mr-2" /> Expense Cards
-              </TabsTrigger>
-              <TabsTrigger value="assets" className="w-full justify-start">
-                <Boxes className="h-4 w-4 mr-2" /> Assets
-              </TabsTrigger>
-              {!isAccountant && (
-                <TabsTrigger value="time" className="w-full justify-start">
-                  <Clock className="h-4 w-4 mr-2" /> Time &amp; Billing
-                </TabsTrigger>
-              )}
-              {/* AI Assessment sits above Reports on purpose: everything below is a number you
-                  read yourself, and this is the one that reads them for you and says what to do.
-                  Its own paid module, so the pane gates rather than the rail entry — a hidden
-                  entry cannot explain what it is you are not being offered. */}
-              <TabsTrigger value="assessment" className="w-full justify-start">
-                <Gauge className="h-4 w-4 mr-2" /> AI Assessment
-              </TabsTrigger>
-              <TabsTrigger value="reports" className="w-full justify-start">
-                <BarChart3 className="h-4 w-4 mr-2" /> Reports
-              </TabsTrigger>
-              {/* Deliberately its own section and not a 25th entry in Reports: everything in
-                  that dropdown is derived from OUR tables, and this one is AADE's answer.
-                  Filing it beside them invites exactly the confusion it exists to prevent. */}
-              <TabsTrigger value="mydata_book" className="w-full justify-start">
-                <BookOpen className="h-4 w-4 mr-2" /> myDATA Book (ΑΑΔΕ)
-              </TabsTrigger>
-              {/* Sits with the Book because they answer the same question from opposite ends:
-                  the Book is what AADE holds, this is what we sent to get it there. */}
-              <TabsTrigger value="mydata_transmissions" className="w-full justify-start">
-                <SendIcon className="h-4 w-4 mr-2" /> myDATA Transmissions
-              </TabsTrigger>
-              <TabsTrigger value="parties" className="w-full justify-start">
-                <Users className="h-4 w-4 mr-2" /> Customers &amp; Suppliers
-              </TabsTrigger>
-              <TabsTrigger value="followups" className="w-full justify-start">
-                <Bell className="h-4 w-4 mr-2" /> Follow-Ups ({followUps.length})
-              </TabsTrigger>
-              {!isAccountant && (
-                <TabsTrigger value="sourcing" className="w-full justify-start">
-                  <PackageSearch className="h-4 w-4 mr-2" /> Sourcing
-                </TabsTrigger>
-              )}
-              {!isAccountant && (
-                <TabsTrigger value="settings" className="w-full justify-start">
-                  <SettingsIcon className="h-4 w-4 mr-2" /> Settings
-                </TabsTrigger>
-              )}
+              )))}
             </TabsList>
           </div>
 
@@ -1296,9 +1212,9 @@ const FinancePage: React.FC = () => {
           </TabsContent>
 
           {/* ─────────── DOCUMENTS (folded in) ─────────── */}
-          {DOC_TABS.map((d) => (
+          {FINANCE_DOC_SECTIONS.map((d) => (
             <TabsContent key={d.value} value={d.value} className="space-y-4">
-              {d.type === 'orders' ? <OrdersPanel workspaceId={workspaceId} /> : <DocumentsView embeddedType={d.type} />}
+              {d.docType === 'orders' ? <OrdersPanel workspaceId={workspaceId} /> : <DocumentsView embeddedType={d.docType} />}
             </TabsContent>
           ))}
 

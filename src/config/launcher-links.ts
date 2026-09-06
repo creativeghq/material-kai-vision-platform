@@ -33,6 +33,34 @@ export interface LinkGate {
   isModuleAvailable: (slug: string) => boolean;
   can: (c: Capability) => boolean;
   isWorkspaceManager: boolean;
+  /**
+   * The invited external accountant. A workspace ROLE, not a capability and not a purchase, which
+   * is why it needs its own field: Finance's page drops its operational rows for that role, so a
+   * chip without the same gate opens a tab that renders nothing.
+   */
+  isAccountant: boolean;
+}
+
+/** A run of consecutive sections sharing a heading. `label` is undefined for the ungrouped run. */
+export interface LauncherSectionGroup {
+  label?: string;
+  items: LauncherSection[];
+}
+
+/**
+ * Segment a gated section list into its headed runs, so the desktop popover and the mobile panel
+ * present Finance's 24 chips the way its own rail does — Documents, then Tools — instead of as one
+ * undifferentiated wall. Order is preserved, and a list with no `group` anywhere comes back as a
+ * single unlabelled run, which is exactly what every other app gets today.
+ */
+export function groupSections(sections: readonly LauncherSection[]): LauncherSectionGroup[] {
+  const out: LauncherSectionGroup[] = [];
+  for (const s of sections) {
+    const last = out[out.length - 1];
+    if (last && last.label === s.group) last.items.push(s);
+    else out.push({ label: s.group, items: [s] });
+  }
+  return out;
 }
 
 /** An agent quick-start, already resolved to the URL that opens the studio primed on it. */
@@ -57,7 +85,8 @@ export function gateLinks(list: readonly LauncherSection[], gate: LinkGate): Lau
   return list.filter((s) =>
     (!s.moduleSlug || gate.isModuleAvailable(s.moduleSlug))
     && (!s.requireAnyCapability || s.requireAnyCapability.some(gate.can))
-    && (!s.requireWorkspaceAdmin || gate.isWorkspaceManager));
+    && (!s.requireWorkspaceAdmin || gate.isWorkspaceManager)
+    && !(s.hideForAccountant && gate.isAccountant));
 }
 
 /**

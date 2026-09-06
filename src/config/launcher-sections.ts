@@ -15,10 +15,10 @@
 // Neither is machine-checkable cheaply, so re-read the target page's TabsTrigger list by hand
 // whenever you touch its tabs.
 import {
-  Users, Contact, Building2, Tags, ArrowDownCircle, ArrowUpCircle, ShoppingCart,
+  Users, Contact, Building2, Tags, ArrowUpCircle, ShoppingCart,
   FileText, Banknote, BarChart3, Plane, CalendarDays, Clock, Briefcase, Wallet,
   FolderOpen, Send, Settings, UserPlus, Receipt, FilePlus, FolderPlus,
-  MessageSquarePlus, Megaphone, LayoutTemplate, Store, Landmark, BellRing,
+  MessageSquarePlus, Megaphone, LayoutTemplate, Store, Landmark, UserMinus,
   CalendarClock, Timer, ClipboardCheck,
   Boxes, TrendingUp, Ship, Truck, ArrowLeftRight, ClipboardList,
   Calculator, Flame, Thermometer,
@@ -33,6 +33,9 @@ import { PRODUCT_BROWSE_ANY, type Capability } from '@/auth/capabilities';
 // A filtered list is spelled ONE way. Hand-writing `?f={"source":…}` here is a URL every router
 // resolves and the Inbox reads as "no filter" — the exact silent shape filterUrl exists to stop.
 import { filterUrl } from '@/components/core/filters/filterUrl';
+// Finance's rail IS its launcher list — one declaration, two surfaces. See the `finance:` entry.
+import { FINANCE_SECTIONS, FINANCE_SECTION_GROUPS } from '@/modules/finance/sections';
+import { financeTabUrl } from '@/modules/finance/routes';
 
 export interface LauncherSection {
   label: string;
@@ -61,6 +64,18 @@ export interface LauncherSection {
    * to a plain member is a live link to a wall.
    */
   requireWorkspaceAdmin?: boolean;
+  /**
+   * Persona gate for the INVITED EXTERNAL accountant, whose workspace role deliberately hides the
+   * operational half of Finance. Not a capability and not a purchase: the page itself drops these
+   * rows for that role, so a chip without the same gate opens a tab that renders nothing.
+   */
+  hideForAccountant?: boolean;
+  /**
+   * Optional heading this chip sits under, for an app whose own page groups its rail. Finance has
+   * 24 sections; ungrouped they are a wall of chips that reads nothing like the page they open.
+   * Entries sharing a group must be CONTIGUOUS — the renderers segment the list in order.
+   */
+  group?: string;
 }
 
 /**
@@ -87,38 +102,51 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
     { label: 'Sales', to: '/properties?tab=sales', icon: Banknote },
     { label: 'Property Mgmt', to: '/properties?tab=lettings', icon: FolderOpen, moduleSlug: 'real-estate-management' },
     { label: 'Investments', to: '/properties?tab=investments', icon: BarChart3, moduleSlug: 'real-estate-investments' },
+    // The page shows this tab on `can('realestate.listings.manage')`, so the chip asks the same
+    // question. The note above used to say Syndication had "no slug to hang it on" and dropped it
+    // entirely — but a capability gate is exactly what `requireAnyCapability` is for.
+    { label: 'Syndication', to: '/properties?tab=syndication', icon: Share2, requireAnyCapability: ['realestate.listings.manage'] },
   ],
   crm: [
+    // The deal board is the FIRST tab on the page and was in no menu. It carries its own add-on
+    // (`ModuleTabGate moduleSlug="deals"` on the pane), so the chip carries the same slug rather
+    // than being omitted — a workspace that has paid for Deals should get the shortcut.
+    { label: 'Pipeline', to: '/crm?tab=pipeline', icon: ClipboardList, moduleSlug: 'deals' },
     { label: 'Users', to: '/crm?tab=users', icon: Users },
     { label: 'Contacts', to: '/crm?tab=contacts', icon: Contact },
     { label: 'Companies', to: '/crm?tab=companies', icon: Building2 },
     { label: 'Categories', to: '/crm?tab=categories', icon: Tags },
   ],
-  finance: [
-    { label: 'Receivables', to: '/finance?tab=ar', icon: ArrowDownCircle },
-    { label: 'Payables', to: '/finance?tab=ap', icon: ArrowUpCircle },
-    // The Revolut bank feed shipped with no launcher presence at all — reconciliation is a daily
-    // surface and the only way in was the Finance sidebar. `bank_feed` is ungated (the BYOK
-    // connection prompt lives inside the tab, so it is never blank).
-    { label: 'Bank feed', to: '/finance?tab=bank_feed', icon: Landmark },
-    { label: 'Orders', to: '/finance?tab=doc_orders', icon: ShoppingCart },
-    { label: 'Invoices', to: '/finance?tab=doc_invoices', icon: FileText },
-    { label: 'Payments', to: '/finance?tab=doc_payments', icon: Banknote },
-    { label: 'Follow-ups', to: '/finance?tab=followups', icon: BellRing },
-    { label: 'Reports', to: '/finance?tab=reports', icon: BarChart3 },
-    { label: 'Customers & Suppliers', to: '/finance?tab=parties', icon: Users },
-    { label: 'Expense cards', to: '/finance?tab=trip_cards', icon: Plane },
-  ],
+  // DERIVED, not listed. This entry was ten hand-written chips against a rail of twenty-five, so
+  // Receipts, Credit Notes, Expenses, Delivery Notes, Cheques, Planning, Assets, Time & Billing,
+  // AI Assessment, the myDATA Book, myDATA Transmissions, Sourcing, Settings and the Supplier
+  // Portal were in the app and in no menu. Every chip it DID hold resolved, so the deep-link guard
+  // was green throughout. Add a section to FINANCE_SECTIONS and it appears here; there is no
+  // second list to remember. The landing pane is dropped — "Open Finance" already goes there.
+  finance: FINANCE_SECTIONS.filter((s) => !s.landing).map((s) => ({
+    label: s.label,
+    to: financeTabUrl(s.value),
+    icon: s.icon,
+    ...(s.group ? { group: FINANCE_SECTION_GROUPS[s.group] } : {}),
+    ...(s.hideForAccountant ? { hideForAccountant: true } : {}),
+  })),
+  // In HRPage's own rail order. Departments, Assets, Accounting, Departures and Ergani were on the
+  // page and in no menu — Ergani especially, which is the ministry filing surface.
   hr: [
     { label: 'Employees', to: '/hr?tab=employees', icon: Users },
+    { label: 'Departments', to: '/hr?tab=departments', icon: Share2 },
     { label: 'Time Off', to: '/hr?tab=timeoff', icon: CalendarDays },
     { label: 'Attendance', to: '/hr?tab=attendance', icon: Clock },
     { label: 'Schedules', to: '/hr?tab=schedules', icon: CalendarClock },
     { label: 'Overtime', to: '/hr?tab=overtime', icon: Timer },
     { label: 'Jobs & Applicants', to: '/hr?tab=recruitment', icon: Briefcase },
     { label: 'Onboarding', to: '/hr?tab=onboarding', icon: ClipboardCheck },
-    { label: 'Payroll', to: '/hr?tab=payroll', icon: Wallet },
     { label: 'Documents', to: '/hr?tab=documents', icon: FolderOpen },
+    { label: 'Assets', to: '/hr?tab=assets', icon: Boxes },
+    { label: 'Payroll', to: '/hr?tab=payroll', icon: Wallet },
+    { label: 'Accounting', to: '/hr?tab=accounting', icon: Receipt },
+    { label: 'Departures', to: '/hr?tab=separations', icon: UserMinus },
+    { label: 'Ergani', to: '/hr?tab=ergani', icon: Landmark },
   ],
   'email-marketing': [
     { label: 'Campaigns', to: '/marketing/email?tab=campaigns', icon: Send },

@@ -38,7 +38,7 @@ import { Sheet, SheetClose, SheetContent, SheetTitle } from '@/components/core/u
 import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useLauncherApps, groupAppsByHub, type LauncherApp, type HubGroup } from '@/hooks/useLauncherApps';
-import { useLauncherLinks } from '@/hooks/useLauncherLinks';
+import { useLauncherLinks, groupSections } from '@/hooks/useLauncherLinks';
 import { matchAppForLocation } from '@/config/launcher-location';
 import { readRecentApps, pushRecentApp } from '@/services/launcherRecent';
 import { cn } from '@/lib/utils';
@@ -359,16 +359,19 @@ export const MobileAppsMenu: React.FC<MobileAppsMenuProps> = ({ open, onOpenChan
             </ul>
           </section>
         )}
-        {sections.length > 0 && (
-          <section>
-            <GroupLabel className="px-4">In {app.label}</GroupLabel>
+        {/* One headed block per run — Finance's rail is Documents then Tools, and 24 undivided
+            rows on a phone is the scroll this panel exists to replace. An app that does not group
+            its rail comes back as a single run and keeps the "In <app>" heading it had. */}
+        {groupSections(sections).map((g) => (
+          <section key={g.label ?? '—'}>
+            <GroupLabel className="px-4">{g.label ?? `In ${app.label}`}</GroupLabel>
             <ul className="divide-y divide-hairline border-y border-hairline">
-              {sections.map((s) => (
+              {g.items.map((s) => (
                 <li key={s.to}><MenuRow icon={s.icon} label={s.label} trailing="open" to={s.to} onClick={() => leave(app.id)} /></li>
               ))}
             </ul>
           </section>
-        )}
+        ))}
         {quickStarts.length > 0 && (
           <section>
             <GroupLabel className="px-4">Quick starts</GroupLabel>

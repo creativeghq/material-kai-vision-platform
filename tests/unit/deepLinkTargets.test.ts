@@ -202,6 +202,18 @@ function resolveConstRef(file: string, name: string, member: string): string | u
   return target ? constMembers(target).get(name)?.get(member) : undefined;
 }
 
+/** `{ value: 'doc_orders' }` / `{ value: FINANCE_TAB.orders }` entries in a pane catalog. */
+function catalogValues(file: string): Set<string> {
+  const src = readSource(file);
+  const keys = new Set<string>();
+  for (const m of src.matchAll(/value:\s*'([A-Za-z0-9_-]+)'/g)) keys.add(m[1]);
+  for (const m of src.matchAll(/value:\s*([A-Z][A-Za-z0-9_]*)\.([A-Za-z0-9_]+)/g)) {
+    const v = resolveConstRef(file, m[1], m[2]);
+    if (v) keys.add(v);
+  }
+  return keys;
+}
+
 function tabKeys(file: string, depth = 0, seen = new Set<string>(), followDelegation = true): Set<string> {
   if (seen.has(file) || depth > 2) return new Set();
   seen.add(file);
@@ -215,15 +227,17 @@ function tabKeys(file: string, depth = 0, seen = new Set<string>(), followDelega
   }
   // Catalog-driven panes: <TabsContent value={d.value}> fed by an array of { value: '…' }.
   if (/<TabsContent\s+[^>]*value=\{/.test(src)) {
-    for (const m of src.matchAll(/value:\s*'([A-Za-z0-9_-]+)'/g)) keys.add(m[1]);
-    // …and the same catalog written against a shared constant: { value: FINANCE_TAB.orders, … }.
-    for (const m of src.matchAll(/value:\s*([A-Z][A-Za-z0-9_]*)\.([A-Za-z0-9_]+)/g)) {
-      const v = resolveConstRef(file, m[1], m[2]);
-      if (v) keys.add(v);
-    }
+    for (const k of catalogValues(file)) keys.add(k);
     for (const m of src.matchAll(/from\s+'([^']+)'/g)) {
       const r = resolveSpec(m[1], file);
-      if (r) for (const k of tabKeys(r, depth + 1, seen)) keys.add(k);
+      if (!r) continue;
+      for (const k of tabKeys(r, depth + 1, seen)) keys.add(k);
+      // The catalog may live in a module of its OWN, which renders no `<TabsContent>` and so
+      // never reaches the scan above. Finance's document panes moved to
+      // src/modules/finance/sections.ts when the page's rail and the App Launcher's Finance
+      // chips were made one list; without this hop, `?tab=doc_orders` — a live link since the
+      // day the tab was named — reported as a tab that renders nothing.
+      for (const k of catalogValues(r)) keys.add(k);
     }
   }
   // A page that DELEGATES its body: the route component is a thin shell (guard + PageHeader) and

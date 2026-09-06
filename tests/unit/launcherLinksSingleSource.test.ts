@@ -79,7 +79,7 @@ describe('launcher links have one derivation', () => {
 
 // ─────────────────────────── the derivation, against the real tables ───────────────────────────
 
-const OPEN: LinkGate = { isModuleAvailable: () => true, can: () => true, isWorkspaceManager: true };
+const OPEN: LinkGate = { isModuleAvailable: () => true, can: () => true, isWorkspaceManager: true, isAccountant: false };
 
 function app(id: string, active = true): LauncherApp {
   const item = SIDEBAR_NAV_ITEMS.find((i) => i.id === id);

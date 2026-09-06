@@ -17,7 +17,7 @@ import { useLauncherApps, groupAppsByHub, type LauncherApp } from '@/hooks/useLa
 // The inner links (sections · create actions · quick-starts · per-hub shortcuts) and the recent
 // list are SHARED with the mobile Apps panel — one derivation, one localStorage key — so the two
 // surfaces cannot drift. Guarded by tests/unit/launcherLinksSingleSource.test.ts.
-import { useLauncherLinks } from '@/hooks/useLauncherLinks';
+import { useLauncherLinks, groupSections } from '@/hooks/useLauncherLinks';
 import { readRecentApps, pushRecentApp } from '@/services/launcherRecent';
 import type { LauncherSection } from '@/config/launcher-sections';
 
@@ -165,15 +165,26 @@ export const AppLauncher: React.FC = () => {
                 <Plus className="h-3.5 w-3.5 text-primary/80" /> {a.label}
               </button>
             ))}
-            {sections.map((s) => (
-              <button
-                key={s.to}
-                type="button"
-                onClick={() => go(s.to, app.id)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-muted/60 px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
-              >
-                <s.icon className="h-3.5 w-3.5 text-primary/80" /> {s.label}
-              </button>
+            {/* Headed runs (Finance: Documents, then Tools) come back as one unlabelled run for
+                every app that does not group its rail, so this is the old flat list there. */}
+            {groupSections(sections).map((g) => (
+              <React.Fragment key={g.label ?? '—'}>
+                {g.label && (
+                  <span className="mt-1 basis-full text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+                    {g.label}
+                  </span>
+                )}
+                {g.items.map((s) => (
+                  <button
+                    key={s.to}
+                    type="button"
+                    onClick={() => go(s.to, app.id)}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-muted/60 px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
+                  >
+                    <s.icon className="h-3.5 w-3.5 text-primary/80" /> {s.label}
+                  </button>
+                ))}
+              </React.Fragment>
             ))}
             {quickStarts.map((qs) => (
               <button

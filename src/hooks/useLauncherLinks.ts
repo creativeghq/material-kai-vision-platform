@@ -10,14 +10,17 @@ import { usePermissions } from '@/hooks/usePermissions';
 import type { LauncherApp } from '@/hooks/useLauncherApps';
 import { appLinkSet, hubShortcutSet, type LinkGate } from '@/config/launcher-links';
 
-export type { AppLinkSet, LauncherQuickStart, LinkGate } from '@/config/launcher-links';
+export type { AppLinkSet, LauncherQuickStart, LinkGate, LauncherSectionGroup } from '@/config/launcher-links';
+// Re-exported so both Apps surfaces reach the derivation through this hook and nothing else —
+// the same reason `appLinks` lives here rather than being rebuilt per surface.
+export { groupSections } from '@/config/launcher-links';
 
 export function useLauncherLinks() {
   const { isModuleAvailable } = useEntitlements();
-  const { can, isWorkspaceManager } = usePermissions();
+  const { can, isWorkspaceManager, isAccountant } = usePermissions();
   const gate = useMemo<LinkGate>(
-    () => ({ isModuleAvailable, can, isWorkspaceManager }),
-    [isModuleAvailable, can, isWorkspaceManager],
+    () => ({ isModuleAvailable, can, isWorkspaceManager, isAccountant }),
+    [isModuleAvailable, can, isWorkspaceManager, isAccountant],
   );
   const appLinks = useCallback((app: LauncherApp) => appLinkSet(app, gate), [gate]);
   const hubShortcuts = useCallback((hubKey: string | null) => hubShortcutSet(hubKey, gate), [gate]);

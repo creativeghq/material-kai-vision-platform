@@ -35,6 +35,8 @@ export const FINANCE_TAB = {
   receivables: 'ar',
   payables: 'ap',
   bankFeed: 'bank_feed',
+  /** Purchase orders sent TO us, seen from the supplier's side of the same rail. */
+  supplierPortal: 'supplier_portal',
   orders: 'doc_orders',
   invoices: 'doc_invoices',
   receipts: 'doc_receipts',
@@ -46,6 +48,12 @@ export const FINANCE_TAB = {
   deliveryNotes: 'doc_delivery',
   cheques: 'doc_cheques',
   parties: 'parties',
+  planning: 'planning',
+  tripCards: 'trip_cards',
+  assets: 'assets',
+  time: 'time',
+  followUps: 'followups',
+  sourcing: 'sourcing',
   reports: 'reports',
   /** AADE's own aggregate book — a read-only mirror, deliberately not a Reports entry. */
   mydataBook: 'mydata_book',
