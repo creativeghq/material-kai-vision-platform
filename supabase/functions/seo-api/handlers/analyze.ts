@@ -1056,9 +1056,26 @@ async function applyFixes(
   const result = await generateWithGemini(prompt, {
     task: 'seo_analyze_revise',
     temperature: 0.3,
-    maxTokens: 8192,
+    // This call returns the WHOLE article rewritten, so its ceiling has to clear the whole
+    // article. At 8192 it did not: the first pipeline article measured 2,077 Greek words —
+    // 9,934 output tokens from the writer — so an auto-fix pass would have handed back a
+    // document cut off mid-sentence, and `handleAnalyze` writes the result straight onto
+    // `content`. `auto_fix` defaults to TRUE, so this was one fixable issue away from
+    // silently destroying a finished article. Same defect the writer had, one stage later.
+    maxTokens: 32000,
     thinkingLevel: 'low',
   });
+
+  // A truncated rewrite is a valid string and would replace a complete article with a
+  // partial one. Auto-fix is an ENHANCEMENT: when it cannot finish, keep the good article
+  // rather than banking a broken improvement.
+  if (result.finishReason === 'length') {
+    console.error(
+      `[seo-analyze] fixer hit the token ceiling (${result.usage.outputTokens} output tokens) — `
+      + 'keeping the unfixed article rather than saving a truncated rewrite.',
+    );
+    return content;
+  }
 
   let fixed = result.text;
   // Strip markdown fences

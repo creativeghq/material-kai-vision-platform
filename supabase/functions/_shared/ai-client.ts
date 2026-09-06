@@ -511,6 +511,7 @@ export async function generateWithGemini(
         totalTokens: inputTokens + outputTokens,
       },
       model: modelId,
+      finishReason: await result.finishReason,
     };
   } catch (err) {
     void _logTrackedCall({
