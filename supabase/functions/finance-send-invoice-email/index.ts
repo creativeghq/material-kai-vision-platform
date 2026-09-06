@@ -18,8 +18,21 @@ Deno.serve(withApiLogging('finance-send-invoice-email', async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
-  const auth = await authenticate(req, { requireUser: true, allowedRoles: ['admin', 'super_admin', 'owner', 'finance'] });
+  // A TRUSTED INTERNAL CALLER IS ALLOWED, because the seeded "Invoice Issued" flow is one.
+  //
+  // `requireUser: true` rejected the flow engine, which runs as the service role — so the only
+  // way to send a customer their actual invoice was for a person to press Send. The automatic
+  // path emitted a one-line "your invoice has been issued" with no document attached, which is
+  // a notification about an invoice, not the invoice.
+  //
+  // `secret` level is only reachable by something already holding the service-role key, i.e.
+  // another edge function; there is no route to it from a browser. The tenancy check below still
+  // applies to every human caller, and the workspace is read off the INVOICE either way — never
+  // from the request body.
+  const auth = await authenticate(req, { requireUser: false, allowedRoles: ['admin', 'super_admin', 'owner', 'finance'] });
   if (!auth.success) return json({ error: auth.error ?? 'Unauthorized' }, 401);
+  const internal = auth.level === 'secret';
+  if (!internal && !auth.userId) return json({ error: 'Unauthorized' }, 401);
 
   const { invoice_id, to } = await req.json().catch(() => ({}));
   if (!invoice_id) return json({ error: 'invoice_id is required' }, 400);
@@ -30,7 +43,7 @@ Deno.serve(withApiLogging('finance-send-invoice-email', async (req) => {
   if (!inv) return json({ error: 'invoice not found' }, 404);
   // Tenancy: bind to the caller's workspace so one tenant can't email another's invoice
   // (with full PII + myDATA MARK) to an arbitrary address by iterating invoice ids.
-  if (!(await userCanAccessWorkspace(supabase, auth.userId, inv.workspace_id))) {
+  if (!internal && !(await userCanAccessWorkspace(supabase, auth.userId, inv.workspace_id))) {
     return json({ error: 'Not authorized for this document' }, 403);
   }
 

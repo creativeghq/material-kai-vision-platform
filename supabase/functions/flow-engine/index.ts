@@ -1899,6 +1899,10 @@ const LOG_EVENT_ALLOWED_TABLES = new Set<string>([]);
 const RUN_EDGE_FUNCTION_ALLOWED = new Set<string>([
   'real-estate-listing-social',
   'finance-digest-aggregate',
+  // The seeded "Invoice Issued" / "Receipt Issued" flows. It renders the document, attaches the
+  // PDF and links AADE's verification page — everything the generic `send_email` node could not,
+  // which is why those flows used to mail a bare "your invoice has been issued" with nothing in it.
+  'finance-send-invoice-email',
 ]);
 
 const MAX_FLOW_RUNS_PER_MINUTE = 120;
