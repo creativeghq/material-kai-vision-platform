@@ -27,6 +27,8 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { stripComments } from '../helpers/stripComments';
+
 import { buildNovusPayload } from '../../supabase/functions/_shared/fiscal/novus.ts';
 import type { FiscalInvoiceInput } from '../../supabase/functions/_shared/fiscal/types.ts';
 import {
@@ -268,6 +270,53 @@ describe('the provider routes and body shapes, as the swagger declares them', ()
 
   it('reads the provider credit pool directly instead of inferring it from a spend', () => {
     expect(src).toContain('GetCreditsBalance');
+  });
+});
+
+describe('a 228 is resolved by CHECKING, never by taking the provider at its word', () => {
+  const edge = stripComments(readFileSync(
+    join(__dirname, '..', '..', 'supabase', 'functions', 'finance-issue-invoice', 'index.ts'), 'utf8'));
+
+  it('adopts the filed MARK only when series, AA and gross all match', () => {
+    // The same 228 is what a numbering collision looks like. Adopting on the MARK alone would
+    // stamp this invoice with a different document's legal number.
+    expect(edge).toMatch(/duplicateOf\?\.mark/);
+    expect(edge).toMatch(/invoiceHeader\?\.series/);
+    expect(edge).toMatch(/invoiceHeader\?\.aa/);
+    expect(edge).toMatch(/totalGrossValue/);
+    expect(edge).toMatch(/sameDocument/);
+  });
+
+  it('reports a numbering collision as one, rather than failing quietly', () => {
+    expect(edge).toMatch(/numbering collision/i);
+  });
+
+  it('marks a recovered transmission as recovered, so it is not mistaken for a fresh one', () => {
+    expect(edge).toContain('recoveredFromDuplicate');
+  });
+});
+
+describe('a movement cancellation goes to the route for its own direction of goods', () => {
+  const edge = stripComments(readFileSync(
+    join(__dirname, '..', '..', 'supabase', 'functions', 'finance-issue-invoice', 'index.ts'), 'utf8'));
+  const conn = stripComments(readFileSync(
+    join(__dirname, '..', '..', 'supabase', 'functions', '_shared', 'fiscal', 'novus.ts'), 'utf8'));
+
+  it('the connector implements BOTH cancellation routes', () => {
+    expect(conn).toContain('CancelDeliveryNote');
+    expect(conn).toContain('CancelReceivingNote');
+  });
+
+  it('shares one body between them rather than duplicating the success contract', () => {
+    expect(conn).toMatch(/function cancelMovement/);
+  });
+
+  it('the edge function picks the route from the note kind, not from a single hardcoded one', () => {
+    // A goods RECEIPT sent to the delivery route comes back 301 "not found" — on precisely the
+    // notes nobody tests, because the inbound ones are the rarer half.
+    expect(edge).toMatch(/kind === 'receipt'/);
+    expect(edge).toMatch(/cancelReceivingNote/);
+    expect(edge).toMatch(/cancelFn\(/);
   });
 });
 

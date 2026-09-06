@@ -27,6 +27,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/core/ui/badge';
 import { Dialog, DialogContent, DialogTitle } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/core/ui/alert-dialog';
 import { Input } from '@/components/core/ui/input';
 import {
   userWebsitesService,
@@ -77,6 +81,27 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
   // cadence and any snooze, so there is no second opinion about what "due" means here.
   const dueForRefresh = freshness.filter((f) => f.is_due);
   const freshnessById = new Map(freshness.map((f) => [f.article_id, f]));
+
+  // Deleting an article is irreversible and the row is the only copy, so it is confirmed rather
+  // than done on a click — and the confirmation names the article, because "are you sure?" on a
+  // list of twenty is not a question anyone can answer.
+  const [deleting, setDeleting] = useState<SeoArticleRow | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const removeArticle = async () => {
+    if (!deleting) return;
+    setDeleteBusy(true);
+    try {
+      await userWebsitesService.deleteArticle(deleting.id);
+      // Drop it from BOTH lists: the freshness table is a second view of the same rows, and
+      // leaving it there would show a deleted article as still due for review.
+      setArticles((prev) => prev.filter((a) => a.id !== deleting.id));
+      setFreshness((prev) => prev.filter((f) => f.article_id !== deleting.id));
+      toast({ title: 'Article deleted' });
+      setDeleting(null);
+    } catch (err: any) {
+      toast({ title: 'Could not delete the article', description: err?.message, variant: 'destructive' });
+    } finally { setDeleteBusy(false); }
+  };
 
   const markReviewed = async (articleId: string) => {
     setReviewing(articleId);
@@ -529,6 +554,7 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
                       <TableHead>Status</TableHead>
                       <TableHead>Created</TableHead>
                       <TableHead>Content age</TableHead>
+                      <TableHead className="text-right"><span className="sr-only">Actions</span></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -559,6 +585,19 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
                             // An unpublished draft has no content age — that is not the same
                             // as being fresh, and it is not the same as being stale either.
                             : '—'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            title="Delete article"
+                            // The row itself opens the viewer; without this the delete would open
+                            // it too, behind the dialog.
+                            onClick={(e) => { e.stopPropagation(); setDeleting(a); }}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span className="sr-only">Delete</span>
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -1107,6 +1146,32 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
           {openArticleId && <SEOArticleViewer articleId={openArticleId} />}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleting} onOpenChange={(v) => { if (!v && !deleteBusy) setDeleting(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this article?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>
+                  <span className="font-medium">{deleting?.title || deleting?.target_keyword || 'Untitled article'}</span>
+                  {' '}will be removed permanently, along with its research and score.
+                </p>
+                <p>
+                  If it has been published to the site, deleting it here does not take it down
+                  there — remove it on the site as well.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteBusy}>Keep it</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); void removeArticle(); }} disabled={deleteBusy}>
+              {deleteBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

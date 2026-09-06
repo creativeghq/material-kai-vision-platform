@@ -356,6 +356,10 @@ export interface FiscalSubmissionResult {
    * (`fetchTransmitted` and compare the totals) before writing it down.
    */
   duplicateOf?: { mark: string; authenticationCode?: string };
+  /** Set when a 228 was RESOLVED: the filed document was fetched, proved to be this one
+   *  (series + AA + gross all match) and its MARK adopted. The transmission is genuine — it
+   *  simply happened on an earlier attempt whose response never came back. */
+  recoveredFromDuplicate?: boolean;
 }
 
 /** Result of completing a POS/IRIS card payment (CompletionPosInvoices). */
@@ -415,6 +419,17 @@ export interface FiscalConnector {
    * be cancelled outright and answers with a `cancellationMark` of its own.
    */
   cancelDeliveryNote?(
+    input: { invoiceMark: string; issuerVatNumber: string },
+    ctx: FiscalConnectorContext,
+  ): Promise<{ ok: boolean; cancellationMark?: string; providerCredits?: number; errorCode?: string; errorMessage?: string; raw?: unknown }>;
+  /**
+   * The same cancellation for goods ARRIVING rather than leaving.
+   *
+   * myDATA keeps two routes and answers "not found" when a MARK is sent to the wrong one, so a
+   * caller must route by the note's own kind — a dispatch note through `cancelDeliveryNote`, a
+   * goods receipt through this. They are otherwise identical, down to the 0.25-credit charge.
+   */
+  cancelReceivingNote?(
     input: { invoiceMark: string; issuerVatNumber: string },
     ctx: FiscalConnectorContext,
   ): Promise<{ ok: boolean; cancellationMark?: string; providerCredits?: number; errorCode?: string; errorMessage?: string; raw?: unknown }>;

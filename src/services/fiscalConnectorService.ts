@@ -99,7 +99,7 @@ export const fiscalConnectorService = {
    */
   async retransmit(sub: FiscalSubmission): Promise<any> {
     const body =
-      sub.fiscal_invoice_type === 'cancel_9.3'
+      sub.fiscal_invoice_type === 'cancel_9.3' || sub.fiscal_invoice_type === 'cancel_receiving'
         ? { cancel_delivery_note: { delivery_note_id: sub.document_id } }
       : sub.document_table === 'credit_notes' ? { credit_note_id: sub.document_id, submit_fiscal: true }
       : sub.document_table === 'delivery_notes' ? { delivery_note_id: sub.document_id, submit_fiscal: true }

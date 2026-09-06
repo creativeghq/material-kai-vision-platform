@@ -656,7 +656,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
 
       const { data: note } = await supabase
         .from('delivery_notes')
-        .select('id, workspace_id, fiscal_status, fiscal_mark, fiscal_cancellation_mark, delivery_note_number')
+        .select('id, workspace_id, kind, fiscal_status, fiscal_mark, fiscal_cancellation_mark, delivery_note_number')
         .eq('id', dnId).maybeSingle();
       if (!note) return json({ error: 'delivery note not found' }, 404);
       if (!(await userCanAccessWorkspace(supabase, auth.userId, (note as any).workspace_id))) {
@@ -688,8 +688,16 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
 
       const resolvedCancel: any = await resolveWorkspaceConnector(supabase, (note as any).workspace_id, 'legal_invoice');
       if (!resolvedCancel.ok) return json({ ok: false, code: resolvedCancel.code, error: resolvedCancel.error }, 400);
-      if (!resolvedCancel.resolved.connector.cancelDeliveryNote) {
-        return json({ ok: false, error: 'Connector does not support delivery-note cancellation' }, 400);
+      // ROUTED BY THE NOTE'S OWN KIND. myDATA keeps two cancellation routes — one for goods
+      // leaving (a dispatch note) and one for goods arriving (a receipt) — and answers 301
+      // "not found" when a MARK reaches the wrong one. Sending every note through the delivery
+      // route would have failed on exactly the notes nobody tests: the inbound ones.
+      const isReceivingNote = (note as any).kind === 'receipt';
+      const cancelFn = isReceivingNote
+        ? resolvedCancel.resolved.connector.cancelReceivingNote
+        : resolvedCancel.resolved.connector.cancelDeliveryNote;
+      if (!cancelFn) {
+        return json({ ok: false, error: `Connector does not support ${isReceivingNote ? 'receiving' : 'delivery'}-note cancellation` }, 400);
       }
 
       const { data: fsRow } = await supabase
@@ -726,7 +734,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
       }
 
       try {
-        const cancelRes = await resolvedCancel.resolved.connector.cancelDeliveryNote(
+        const cancelRes = await cancelFn(
           { invoiceMark: String((note as any).fiscal_mark), issuerVatNumber: issuerVat },
           resolvedCancel.resolved.ctx,
         );
@@ -744,7 +752,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
           // cancellation's and report the cancelled document as accepted.
           status: cancelRes.ok ? 'cancelled' : 'rejected',
           mark: cancelRes.cancellationMark ?? null,
-          fiscal_invoice_type: 'cancel_9.3',
+          fiscal_invoice_type: isReceivingNote ? 'cancel_receiving' : 'cancel_9.3',
           is_offline: false,
           provider_credits: cancelRes.providerCredits ?? null,
           request_payload: { mark: (note as any).fiscal_mark, entityVatNumber: issuerVat },
@@ -1041,10 +1049,61 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
               };
             }
             const input = await buildInvoiceInputFromDb(supabase, invoiceId, effOverrides);
-            const result = await resolved.resolved.connector.submitInvoice(input, resolved.resolved.ctx, {
+            let result = await resolved.resolved.connector.submitInvoice(input, resolved.resolved.ctx, {
               // POS receipts must be signed (skipSignature=false) to obtain the Law-5155 token.
               skipSignature: body.pos_payment ? false : body.skip_signature,
             });
+
+            // ── ERROR 228: THE DOCUMENT IS ALREADY FILED, AND THE PROVIDER JUST TOLD US ITS MARK
+            //
+            // The dangerous case is not the double-click — it is the send whose RESPONSE WAS
+            // LOST. The first call reached AADE, no submission row was written because nothing
+            // came back, the operator retries, and 228 arrives looking like a refusal: credits
+            // refunded, `fiscal_status='rejected'`, while the document sits registered at AADE
+            // with a MARK nobody recorded.
+            //
+            // The MARK is NOT adopted on the provider's word alone. The same 228 is what a
+            // NUMBERING COLLISION produces — two different documents issued under one series+AA —
+            // and adopting it there would stamp this invoice with another document's legal
+            // number. So we fetch the filed document and adopt only when it is demonstrably the
+            // same one: same series, same AA, and the same gross total. Anything else is reported
+            // as the collision it is, for a human to resolve.
+            if (result.status === 'rejected' && result.duplicateOf?.mark && resolved.resolved.connector.fetchTransmitted) {
+              const filed = await resolved.resolved.connector.fetchTransmitted(
+                { invoiceMark: result.duplicateOf.mark, issuerVatNumber: input.issuer.vatNumber },
+                resolved.resolved.ctx,
+              );
+              const doc = (filed.raw as any)?.providerTransmittedDocs?.[0];
+              const sameDocument =
+                filed.status === 'accepted'
+                && String(doc?.invoiceHeader?.series ?? '') === String(input.header.series)
+                && String(doc?.invoiceHeader?.aa ?? '') === String(input.header.aa)
+                && Math.abs(Number(doc?.invoiceSummary?.totalGrossValue ?? NaN) - Number(input.summary.totalGrossValue)) < 0.01;
+
+              if (sameDocument) {
+                result = {
+                  ...result,
+                  status: 'accepted',
+                  mark: filed.mark,
+                  uid: filed.uid ?? result.uid,
+                  authenticationCode: filed.authenticationCode,
+                  invoiceUrl: filed.invoiceUrl,
+                  errorCode: undefined,
+                  errorMessage: undefined,
+                  recoveredFromDuplicate: true,
+                };
+              } else {
+                // Same series+AA, different document. Naming it is the whole point: silently
+                // failing here leaves two documents fighting over one legal number.
+                result = {
+                  ...result,
+                  errorMessage:
+                    `myDATA already holds a document under series ${input.header.series} / ${input.header.aa} ` +
+                    `(MARK ${result.duplicateOf.mark}) and it is NOT this one — the totals do not match. ` +
+                    `This is a numbering collision: give this document a new number before re-sending.`,
+                };
+              }
+            }
 
             await supabase.from('fiscal_submissions').insert({
               workspace_id: invRow!.workspace_id,

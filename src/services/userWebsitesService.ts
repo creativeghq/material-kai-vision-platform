@@ -820,6 +820,30 @@ export const userWebsitesService = {
     if (error) throw error;
   },
 
+  /**
+   * Delete an article.
+   *
+   * RLS is the boundary: `seo_articles_owner` lets the person who generated it delete, and
+   * `seo_articles_ws_delete` extends that to the workspace the website belongs to — a website is
+   * the workspace's, so an article written for it should not outlive the colleague who left.
+   *
+   * The deleted row is SELECTED back rather than trusted. supabase-js resolves on a policy
+   * refusal instead of throwing, so `await delete()` with no check reports success for a delete
+   * that removed nothing — the row stays on screen until the next reload and the operator is
+   * told it went. That is the one failure this method exists to make impossible.
+   */
+  async deleteArticle(articleId: string): Promise<void> {
+    const { data, error } = await supabase
+      .from('seo_articles')
+      .delete()
+      .eq('id', articleId)
+      .select('id');
+    if (error) throw error;
+    if (!data?.length) {
+      throw new Error('That article was not deleted — you may not have permission, or it is already gone.');
+    }
+  },
+
   async keywordResearch(websiteId: string, limit = 50): Promise<SeoKeywordResearchRow[]> {
     const { data, error } = await supabase
       .from('seo_keyword_research')

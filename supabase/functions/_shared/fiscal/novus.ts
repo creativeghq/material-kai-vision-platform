@@ -569,6 +569,42 @@ function interpret(entry: any, httpStatus: number): FiscalSubmissionResult {
   }
 }
 
+/**
+ * The body both cancellation routes share — they differ only in the URL, and duplicating it is
+ * how the two would drift into disagreeing about what a Success looks like.
+ */
+async function cancelMovement(
+  url: string,
+  input: { invoiceMark: string; issuerVatNumber: string },
+  ctx: FiscalConnectorContext,
+): Promise<{ ok: boolean; cancellationMark?: string; providerCredits?: number; errorCode?: string; errorMessage?: string; raw?: unknown }> {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'API-KEY': ctx.apiKey, 'content-type': 'application/json' },
+        body: JSON.stringify({ mark: String(input.invoiceMark), entityVatNumber: input.issuerVatNumber }),
+      });
+      const body = await res.json().catch(() => null);
+      const entry = body?.response?.[0] ?? body;
+      const cancellationMark = entry?.cancellationMark && entry.cancellationMark !== 0
+        ? String(entry.cancellationMark)
+        : undefined;
+      const ok = res.ok && entry?.statusCode === 'Success' && !!cancellationMark;
+      if (ok) {
+        return { ok, cancellationMark, providerCredits: parseCredits(entry?.credits), raw: body };
+      }
+      const { code, message } = firstError(entry);
+      return {
+        ok: false,
+        errorCode: code ?? entry?.statusCode ?? String(res.status),
+        errorMessage: message ?? problemDetail(body) ?? entry?.statusCode ?? `HTTP ${res.status}`,
+        raw: body,
+      };
+    } catch (e) {
+      return { ok: false, errorMessage: String(e) };
+    }
+  }
+
 export const novusConnector: FiscalConnector = {
   slug: 'novus',
   capabilities: ['legal_invoice', 'pre_invoice_notice', 'tax_submission', 'pdf_render'],
@@ -754,31 +790,17 @@ export const novusConnector: FiscalConnector = {
   // fiscal_cancellation_mark is null`) before calling, and never re-send once a mark is stored.
   // See `finance-issue-invoice`.
   async cancelDeliveryNote(input, ctx) {
-    try {
-      const res = await fetch(`${ctx.baseUrl}/api/v1/Provider/CancelDeliveryNote`, {
-        method: 'POST',
-        headers: { 'API-KEY': ctx.apiKey, 'content-type': 'application/json' },
-        body: JSON.stringify({ mark: String(input.invoiceMark), entityVatNumber: input.issuerVatNumber }),
-      });
-      const body = await res.json().catch(() => null);
-      const entry = body?.response?.[0] ?? body;
-      const cancellationMark = entry?.cancellationMark && entry.cancellationMark !== 0
-        ? String(entry.cancellationMark)
-        : undefined;
-      const ok = res.ok && entry?.statusCode === 'Success' && !!cancellationMark;
-      if (ok) {
-        return { ok, cancellationMark, providerCredits: parseCredits(entry?.credits), raw: body };
-      }
-      const { code, message } = firstError(entry);
-      return {
-        ok: false,
-        errorCode: code ?? entry?.statusCode ?? String(res.status),
-        errorMessage: message ?? problemDetail(body) ?? entry?.statusCode ?? `HTTP ${res.status}`,
-        raw: body,
-      };
-    } catch (e) {
-      return { ok: false, errorMessage: String(e) };
-    }
+    return await cancelMovement(`${ctx.baseUrl}/api/v1/Provider/CancelDeliveryNote`, input, ctx);
+  },
+
+  // POST /CancelReceivingNote — the same call for the OTHER direction of goods.
+  //
+  // A movement document we ISSUE for goods leaving is cancelled by CancelDeliveryNote; one filed
+  // for goods ARRIVING is cancelled here. The provider keeps two routes and answers 301
+  // "Invoice with MARK … not found" if you use the wrong one, so the caller has to route by the
+  // note's own kind rather than by which cancellation it happens to have imported.
+  async cancelReceivingNote(input, ctx) {
+    return await cancelMovement(`${ctx.baseUrl}/api/v1/Provider/CancelReceivingNote`, input, ctx);
   },
 
   // Law 5155 — after the POS terminal charge, finalize the held card/IRIS invoice → AADE → MARK.
