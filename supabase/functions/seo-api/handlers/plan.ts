@@ -31,6 +31,7 @@ import {
   briefExtraContextBlock,
   type NormalizedBrief,
 } from './content-brief.ts';
+import { outputLanguageBlock } from './output-language.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -191,7 +192,8 @@ export async function handlePlan(req: Request, body: any): Promise<Response> {
 
     // Load base system prompt from DB, then append dynamic context
     const baseSystemPrompt = await getToolPrompt(supabase, 'seo_planner');
-    const systemPrompt = buildPlanningSystemPrompt(baseSystemPrompt, brief, research);
+    const systemPrompt = buildPlanningSystemPrompt(baseSystemPrompt, brief, research)
+      + outputLanguageBlock(body.language_code);
     const userPrompt = buildPlanningUserPrompt(body.topic, body.target_keyword, research, brief);
 
     // Call Gemini with structured output (auto-tracked)

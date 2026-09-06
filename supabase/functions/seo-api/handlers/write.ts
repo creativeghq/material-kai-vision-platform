@@ -23,6 +23,7 @@ import {
   briefExtraContextBlock,
   type NormalizedBrief,
 } from './content-brief.ts';
+import { outputLanguageBlock } from './output-language.ts';
 import { getToolPrompt, getGenerationPrompt, renderPromptTemplate } from '../../_shared/prompt-utils.ts';
 import { generateWithClaude } from '../../_shared/ai-client.ts';
 import type {
@@ -120,7 +121,8 @@ export async function handleWrite(req: Request, body: any): Promise<Response> {
 
     // Load base system prompt from DB, then append dynamic context
     const baseSystemPrompt = await getToolPrompt(supabase, 'seo_writer');
-    const systemPrompt = await buildWritingSystemPrompt(supabase, baseSystemPrompt, plan, brief, research);
+    const systemPrompt = (await buildWritingSystemPrompt(supabase, baseSystemPrompt, plan, brief, research))
+      + outputLanguageBlock(body.language_code);
     const userPrompt = await buildWritingUserPrompt(supabase, plan, brief, research);
 
     // Call Claude Opus for writing (auto-tracked)

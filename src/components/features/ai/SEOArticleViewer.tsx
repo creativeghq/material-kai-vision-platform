@@ -1343,10 +1343,10 @@ const CALLOUT_META: Record<CalloutKind, {
   iconClass: string;
 }> = {
   tldr:       { label: 'TL;DR',         Icon: Zap,         borderClass: 'border-primary/40',     bgClass: 'bg-primary/5',         iconClass: 'text-primary' },
-  key:        { label: 'Key Takeaways', Icon: ListChecks,  borderClass: 'border-emerald-500/30', bgClass: 'bg-emerald-500/5',     iconClass: 'text-emerald-500' },
+  key:        { label: 'Key Takeaways', Icon: ListChecks,  borderClass: 'border-emerald-500/30', bgClass: 'bg-emerald-500/5',     iconClass: 'text-emerald-700 dark:text-emerald-400' },
   definition: { label: 'Definition',    Icon: BookOpen,    borderClass: 'border-blue-500/30',    bgClass: 'bg-blue-500/5',        iconClass: 'text-blue-700 dark:text-blue-400' },
   example:    { label: 'Example',       Icon: Lightbulb,   borderClass: 'border-amber-500/30',   bgClass: 'bg-amber-500/5',       iconClass: 'text-amber-800 dark:text-amber-400' },
-  info:       { label: 'Note',          Icon: Info,        borderClass: 'border-sky-500/30',     bgClass: 'bg-sky-500/5',         iconClass: 'text-sky-500' },
+  info:       { label: 'Note',          Icon: Info,        borderClass: 'border-sky-500/30',     bgClass: 'bg-sky-500/5',         iconClass: 'text-sky-700 dark:text-sky-400' },
   warning:    { label: 'Heads up',      Icon: AlertOctagon, borderClass: 'border-red-500/30',     bgClass: 'bg-red-500/5',         iconClass: 'text-red-700 dark:text-red-400' },
   quote:      { label: 'Quote',         Icon: Quote,       borderClass: 'border-muted-foreground/30', bgClass: 'bg-muted/40',     iconClass: 'text-muted-foreground' },
 };

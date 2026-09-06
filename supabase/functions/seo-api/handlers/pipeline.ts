@@ -347,8 +347,14 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
       keyword_research: research,
       content_brief: brief,
       additional_instructions: body.additional_instructions,
+      language_code: body.language_code || undefined,
       user_id: userId,
-    }, 60_000);
+      // 180s, like write and analyze. It was 60 — set when the plan call had a 4096-token
+      // budget that could not finish anyway. A reasoning model with room to think takes
+      // longer, and losing the race here does NOT cancel `handlePlan`: it completes, keeps
+      // its 2 credits (its own catch never fires, so nothing refunds), and the pipeline
+      // fails holding a plan that exists.
+    }, 180_000);
 
     const plan: ArticlePlan = planResult.data.plan;
     totalCredits += planResult.data.credits_used || 2;
@@ -376,6 +382,7 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
     const writeResult = await callStage('write', req, {
       article_plan: plan,
       content_brief: brief,
+      language_code: body.language_code || undefined,
       keyword_research_summary: {
         targetKeyword: research.targetKeyword,
         recommendedPrimary: research.recommendedPrimary,

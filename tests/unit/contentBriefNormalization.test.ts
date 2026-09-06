@@ -146,6 +146,34 @@ describe('normalizeContentBrief', () => {
     }
   });
 
+  it('is idempotent — the pipeline normalizes, then every stage normalizes again', () => {
+    // The pipeline stores the normalized brief on the article row and hands it to each
+    // stage, so this function sees its own output on every real run. Without `extraContext`
+    // being a known key the second pass folds the whole list back into one run-on bullet.
+    const once = normalizeContentBrief(BRIEF_THAT_CRASHED_THE_PIPELINE)!;
+    const twice = normalizeContentBrief(once)!;
+    const thrice = normalizeContentBrief(twice)!;
+
+    expect(twice).toEqual(once);
+    expect(thrice).toEqual(once);
+    expect(briefExtraContextBlock(twice)).toBe(briefExtraContextBlock(once));
+    expect(twice.extraContext.join('\n')).not.toContain('Extra context');
+  });
+
+  it('keeps an invented key whose value has structure', () => {
+    // `asText` returns null for an object, so a one-level renderer flattened
+    // `{ competitors: [{...}] }` to nothing and dropped it — the same defect one level down.
+    const brief = normalizeContentBrief({
+      competitors: [{ name: 'Tile Co', url: 'https://tile.example' }],
+      constraints: { budget: 'mid', deadline: '2026-10-01' },
+    })!;
+    const block = briefExtraContextBlock(brief);
+    expect(block).toContain('Tile Co');
+    expect(block).toContain('tile.example');
+    expect(block).toContain('mid');
+    expect(block).not.toContain('[object Object]');
+  });
+
   it('treats a brief sent as bare prose as business context, not as nothing', () => {
     const brief = normalizeContentBrief('We sell wholesale tiles in Thessaloniki.')!;
     expect(briefExtraContextBlock(brief)).toContain('Thessaloniki');
@@ -236,5 +264,35 @@ describe('create_seo_article can say which market it is for', () => {
     const tool = src.slice(src.indexOf('createSEOPipelineTool'));
     expect(tool).toContain('language_code');
     expect(tool).toContain('location_code');
+  });
+
+  it('reaches the stages that WRITE, not only the one that researches', () => {
+    // `language_code` is a DataForSEO parameter, so it was wired to research and nowhere
+    // else: the output language was an emergent property of Greek research rather than an
+    // instruction. The tool description promises "researched and written in".
+    const src = readFileSync(
+      join(process.cwd(), 'supabase/functions/seo-api/handlers/pipeline.ts'),
+      'utf-8',
+    );
+    for (const stage of ["'plan'", "'write'"]) {
+      const at = src.indexOf(`callStage(${stage}`);
+      expect(at, `pipeline no longer calls callStage(${stage})`).toBeGreaterThan(-1);
+      const call = src.slice(at, src.indexOf('}, ', at));
+      expect(call, `${stage} stage is not told the language`).toContain('language_code');
+    }
+  });
+
+  it('gives the plan stage as long as the stages either side of it', () => {
+    // The 60s cap was set when the plan call had a budget it could not finish in anyway.
+    // Losing this race does not cancel handlePlan: it completes, keeps its 2 credits, and
+    // the pipeline fails holding a plan that exists.
+    const src = readFileSync(
+      join(process.cwd(), 'supabase/functions/seo-api/handlers/pipeline.ts'),
+      'utf-8',
+    );
+    const planCall = src.slice(src.indexOf("callStage('plan'"));
+    const timeout = planCall.match(/\}, (\d[\d_]*)\);/);
+    expect(timeout, 'plan stage has no explicit timeout').not.toBeNull();
+    expect(Number(timeout![1].replace(/_/g, ''))).toBeGreaterThanOrEqual(180_000);
   });
 });

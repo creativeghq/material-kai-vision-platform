@@ -95,11 +95,19 @@ const KNOWLEDGE_LEVELS = ['beginner', 'intermediate', 'advanced', 'expert'] as c
 const DECISION_STAGES = ['awareness', 'consideration', 'decision'] as const;
 const AI_DISCLOSURES = ['ai_generated', 'ai_assisted', 'human_written'] as const;
 
-/** Keys `ContentBrief` declares. Everything else becomes `extraContext`. */
+/**
+ * Keys `ContentBrief` declares. Everything else becomes `extraContext`.
+ *
+ * `extraContext` is in here because normalizing must be IDEMPOTENT: the pipeline normalizes
+ * once and stores the result on the article row, then hands it to each stage, which
+ * normalizes again. Without this the second pass sees `extraContext` as a key it does not
+ * know and folds the whole list back into a single run-on `Extra context: a; b; c` bullet —
+ * on every pipeline run, which is the only way this code is normally reached.
+ */
 const KNOWN_KEYS = new Set([
   'businessObjective', 'conversionGoal', 'audience', 'brandVoice', 'contentType',
   'callToAction', 'requiredPoints', 'internalLinksContext', 'provenance',
-  'firsthandExperience', 'clusterContext', 'performanceFeedback',
+  'firsthandExperience', 'clusterContext', 'performanceFeedback', 'extraContext',
 ]);
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
@@ -136,28 +144,42 @@ function humanizeKey(key: string): string {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1).toLowerCase();
 }
 
-/** One line of prose for an unknown key. Returns null when there is nothing to say —
- *  an empty array or an object of nulls must not become `Market: ` with a blank after it. */
-function renderUnknown(key: string, value: unknown): string | null {
-  const label = humanizeKey(key);
-
+/**
+ * Flatten a value into prose, one nesting level at a time. Returns null when there is
+ * nothing to say — an empty array or an object of nulls must not become `Market: ` with a
+ * blank after it.
+ *
+ * `depth` exists because the first version stopped at scalars and one-level objects, so an
+ * unknown key holding structure — `{ competitors: [{ name, url }] }`, the shape a model
+ * reaches for constantly — flattened to nothing and was dropped. Dropping a structured
+ * value is the same defect as dropping an unknown key, one level down.
+ */
+function renderValue(value: unknown, depth = 0): string | null {
   if (Array.isArray(value)) {
-    const items = asTextArray(value);
-    return items.length > 0 ? `${label}: ${items.join('; ')}` : null;
+    const items = value
+      .map((v) => (depth < 2 ? renderValue(v, depth + 1) : asText(v)))
+      .filter((s): s is string => s !== null);
+    return items.length > 0 ? items.join('; ') : null;
   }
 
   if (isPlainObject(value)) {
+    if (depth >= 2) return null;
     const parts = Object.entries(value)
       .map(([k, v]) => {
-        const t = Array.isArray(v) ? asTextArray(v).join(', ') : asText(v);
+        const t = renderValue(v, depth + 1);
         return t ? `${humanizeKey(k)} ${t}` : null;
       })
       .filter((p): p is string => p !== null);
-    return parts.length > 0 ? `${label}: ${parts.join('; ')}` : null;
+    return parts.length > 0 ? parts.join(', ') : null;
   }
 
-  const scalar = asText(value);
-  return scalar ? `${label}: ${scalar}` : null;
+  return asText(value);
+}
+
+/** One line of prose for an unknown key. */
+function renderUnknown(key: string, value: unknown): string | null {
+  const rendered = renderValue(value);
+  return rendered ? `${humanizeKey(key)}: ${rendered}` : null;
 }
 
 /**
@@ -185,10 +207,15 @@ export function normalizeContentBrief(raw: unknown): NormalizedBrief | null {
   const voiceRaw = isPlainObject(raw.brandVoice) ? raw.brandVoice : {};
   const voiceProse = isPlainObject(raw.brandVoice) ? null : asText(raw.brandVoice);
 
-  const extraContext = Object.entries(raw)
-    .filter(([k]) => !KNOWN_KEYS.has(k))
-    .map(([k, v]) => renderUnknown(k, v))
-    .filter((line): line is string => line !== null);
+  // Lines an earlier normalization already produced come through as-is; re-rendering them
+  // would nest them under a second label. See KNOWN_KEYS on why this runs twice.
+  const extraContext = [
+    ...asTextArray(raw.extraContext),
+    ...Object.entries(raw)
+      .filter(([k]) => !KNOWN_KEYS.has(k))
+      .map(([k, v]) => renderUnknown(k, v))
+      .filter((line): line is string => line !== null),
+  ];
 
   return emptyBrief({
     businessObjective: asText(raw.businessObjective),
