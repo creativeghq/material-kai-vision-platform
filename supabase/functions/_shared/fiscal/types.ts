@@ -175,6 +175,17 @@ export interface FiscalLine {
   /** myDATA income classification, e.g. E3_561_001 / category1_1 */
   incomeClassificationType?: string;
   incomeClassificationCategory?: string;
+  /**
+   * myDATA EXPENSE classification, e.g. E3_102_002 / category2_1.
+   *
+   * A Τίτλος Κτήσης (3.1/3.2) records money we PAID to someone not obliged to invoice us, so it
+   * classifies into the expense ledger and AADE refuses an income classification on it outright
+   * (231). There is no sensible default: `category2_1` (commodity purchases) and `category2_3`
+   * (services receipt) are different tax facts about the same amount, so the document has to say
+   * which — the connector refuses rather than picking one.
+   */
+  expenseClassificationType?: string;
+  expenseClassificationCategory?: string;
   /** myDATA VAT exemption category (1..31) — required when vatCategory is 7 (0%). */
   vatExemptionCategory?: number;
   /** Per-line taxes (Novus invoiceDetails). Amounts in document currency. */
@@ -281,6 +292,9 @@ export interface FiscalInvoiceInput {
     totalDeductionsAmount?: number;
     incomeClassificationType?: string;
     incomeClassificationCategory?: string;
+    /** Document-level fallback for an expense document, when no line carries its own. */
+    expenseClassificationType?: string;
+    expenseClassificationCategory?: string;
   };
   documentLabel?: string;
   documentComments?: string;

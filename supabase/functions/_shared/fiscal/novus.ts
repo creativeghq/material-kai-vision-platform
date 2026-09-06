@@ -14,6 +14,7 @@ import type {
 } from './types.ts';
 import { isUncodedMydataUnit, isUnnamedLineName, mydataUnitCode } from './types.ts';
 import { mydataPaymentLabel } from '../paymentVocabulary.generated.ts';
+import { mydataClassificationLedger } from './fiscalVocabulary.generated.ts';
 
 export const NOVUS_SANDBOX_BASE = 'https://provider-dev.timologisi.online';
 export const NOVUS_PRODUCTION_BASE = 'https://provider.timologisi.online';
@@ -90,6 +91,29 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
   // offline sweep had nothing to find for one.
   const isMovement = header.movePurpose != null;
 
+  // WHICH LEDGER THIS DOCUMENT CLASSIFIES INTO — income, expenses, or neither.
+  // Emitting `incomeClassification` unconditionally is why three document families could never
+  // be transmitted: a self-billed invoice (231), a Τίτλος Κτήσης (231) and a self-delivery (331)
+  // are all refused by AADE for declaring the wrong ledger. See `mydataClassificationLedger`.
+  const ledger = isMovement ? 'income' : mydataClassificationLedger(header.invoiceType, { selfPricing: header.selfPricing });
+
+  // An expense document has to SAY what kind of expense it was — `category2_1` (goods bought)
+  // and `category2_3` (a service received) are different tax facts about the same money, and
+  // guessing one on a document AADE registers is not recoverable. Refuse instead.
+  if (ledger === 'expenses') {
+    const unclassified = lines
+      .filter((l) => !l.expenseClassificationType || !l.expenseClassificationCategory)
+      .map((l) => l.lineNumber);
+    if (unclassified.length && !(summary.expenseClassificationType && summary.expenseClassificationCategory)) {
+      throw new Error(
+        `Refusing to transmit a ${header.invoiceType} (proof of expenditure): line(s) ` +
+          `${unclassified.join(', ')} have no myDATA EXPENSE classification. This document records ` +
+          `what you paid, so AADE needs the expense category — commodity purchases, services ` +
+          `received, general expenses — and it must be stated rather than assumed.`,
+      );
+    }
+  }
+
   // AN INTERNAL TRANSFER MOVES YOUR OWN GOODS BETWEEN YOUR OWN PREMISES, so AADE requires the
   // counterpart to BE the issuer — "Issuer must be same with counterpart", error 286. The
   // platform lets an operator pick Ενδοδιακίνηση (8) on a delivery note addressed to a customer,
@@ -153,7 +177,7 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
     // an income type on a zero-valued transport line is error 331.
     incomeClassification: isMovement
       ? [{ classificationCategory: 'category3', amount: 0 }]
-      : l.incomeClassificationType
+      : ledger === 'income' && l.incomeClassificationType
         ? [
             {
               classificationType: l.incomeClassificationType,
@@ -162,6 +186,19 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
             },
           ]
         : undefined,
+    // The other ledger. Present only on an expense document, and never alongside the income one:
+    // AADE refuses whichever of the two does not belong to the type.
+    ...(ledger === 'expenses' && (l.expenseClassificationType ?? summary.expenseClassificationType)
+      ? {
+          expensesClassification: [
+            {
+              classificationType: l.expenseClassificationType ?? summary.expenseClassificationType,
+              classificationCategory: l.expenseClassificationCategory ?? summary.expenseClassificationCategory ?? 'category2_1',
+              amount: l.netValue,
+            },
+          ],
+        }
+      : {}),
   }));
 
   const addr = (p: typeof issuer) => ({
@@ -206,6 +243,9 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
   }
   const summaryClassification = isMovement
     ? [{ classificationCategory: 'category3', amount: 0 }]
+    // A self-billed document declares NEITHER ledger — see `mydataClassificationLedger`.
+    : ledger !== 'income'
+    ? undefined
     : byClassification.size
     ? [...byClassification.values()].map((c) => ({ ...c, amount: Math.round(c.amount * 100) / 100 }))
     : summary.incomeClassificationType
@@ -217,6 +257,24 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
           amount: summary.totalNetValue,
         }]
       : undefined;
+
+  // The expense ledger's summary, derived from the lines exactly as the income one is — AADE
+  // cross-checks this pair too, and a summary that does not add up to its rows is the same 312.
+  const byExpense = new Map<string, { classificationType: string; classificationCategory: string; amount: number }>();
+  if (ledger === 'expenses') {
+    for (const l of lines) {
+      const type = l.expenseClassificationType ?? summary.expenseClassificationType;
+      if (!type) continue;
+      const category = l.expenseClassificationCategory ?? summary.expenseClassificationCategory ?? 'category2_1';
+      const key = `${type}|${category}`;
+      const acc = byExpense.get(key);
+      if (acc) acc.amount += l.netValue;
+      else byExpense.set(key, { classificationType: type, classificationCategory: category, amount: l.netValue });
+    }
+  }
+  const summaryExpenseClassification = byExpense.size
+    ? [...byExpense.values()].map((c) => ({ ...c, amount: Math.round(c.amount * 100) / 100 }))
+    : undefined;
 
   return {
     invoice: [
@@ -393,6 +451,7 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
           totalDeductionsAmount: summary.totalDeductionsAmount ?? 0,
           totalGrossValue: summary.totalGrossValue,
           incomeClassification: summaryClassification,
+          ...(summaryExpenseClassification ? { expensesClassification: summaryExpenseClassification } : {}),
         },
       },
     ],

@@ -157,10 +157,42 @@ export function isMydataMovePurpose(code: unknown): boolean {
  * nothing more specific was recorded.
  */
 export function mydataIncomeClassificationType(documentType: string | null | undefined): string {
-  return String(documentType ?? '').startsWith('11.') ? 'E3_561_003' : 'E3_561_001';
+  const t = String(documentType ?? '');
+  // A self-delivery / self-supply (6.x) is not a sale to anybody — AADE refuses the sales pair
+  // on it (331) and validates `E3_595` + `category1_6` instead. Verified against the sandbox.
+  if (t.startsWith('6.')) return 'E3_595';
+  return t.startsWith('11.') ? 'E3_561_003' : 'E3_561_001';
 }
 
 export function mydataIncomeClassificationCategory(documentType: string | null | undefined): string {
   const t = String(documentType ?? '');
+  if (t.startsWith('6.')) return 'category1_6';
   return t.startsWith('2.') || t === '11.2' ? 'category1_3' : 'category1_1';
+}
+
+/**
+ * WHICH LEDGER A DOCUMENT TYPE CLASSIFIES INTO — or neither.
+ *
+ * Not every document declares income. AADE rejects the wrong ledger outright, and all three
+ * verdicts below were read off the sandbox rather than inferred (2026-09-06, #319):
+ *
+ *  - `expenses` — a Τίτλος Κτήσης (3.1/3.2) records what WE paid someone not obliged to invoice.
+ *    Sending `incomeClassification` on one is error 231 "incomeClassification is forbidden";
+ *    `expensesClassification` is accepted.
+ *  - `none` — a SELF-BILLED document (αυτοτιμολόγηση, the `selfPricing` header flag). The issuer
+ *    is not declaring their own income on a document the buyer drew up, so BOTH ledgers are
+ *    refused — 231 for income, 313 for expenses — and it transmits cleanly with neither.
+ *  - `income` — everything else, including 6.x once it uses its own pair (above).
+ *
+ * A movement document (9.3) is a fourth case handled at the envelope, where it classifies as
+ * `category3` (Transport) with no type at all.
+ */
+export type MydataClassificationLedger = 'income' | 'expenses' | 'none';
+
+export function mydataClassificationLedger(
+  documentType: string | null | undefined,
+  opts: { selfPricing?: boolean } = {},
+): MydataClassificationLedger {
+  if (opts.selfPricing) return 'none';
+  return String(documentType ?? '').startsWith('3.') ? 'expenses' : 'income';
 }

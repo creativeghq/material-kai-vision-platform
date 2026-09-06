@@ -546,6 +546,11 @@ export async function buildInvoiceInputFromDb(
       totalDeductionsAmount: Number(inv.total_deductions_amount ?? 0),
       incomeClassificationType: incType,
       incomeClassificationCategory: incCat,
+      // The expense ledger, for a proof-of-expenditure document (3.1/3.2). Stated once on the
+      // document because it is one tax fact about the whole thing, and the connector refuses to
+      // transmit such a document without it rather than guessing which kind of expense it was.
+      expenseClassificationType: inv.expense_classification_type ?? undefined,
+      expenseClassificationCategory: inv.expense_classification_category ?? undefined,
     } as any,
     documentLabel: overrides.documentLabel,
     documentComments: inv.notes ?? undefined,

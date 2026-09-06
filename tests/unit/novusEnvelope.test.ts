@@ -271,6 +271,54 @@ describe('the provider routes and body shapes, as the swagger declares them', ()
   });
 });
 
+describe('a document declares the right ledger, or none at all', () => {
+  // All three verdicts were read off the sandbox: sending the wrong ledger is a hard rejection,
+  // and until this existed the connector sent `incomeClassification` on everything — so
+  // self-billing (231), a Titlos Ktisis (231) and a self-delivery (331) could never transmit.
+  const withHeader = (header: Record<string, unknown>, over: Record<string, unknown> = {}) =>
+    doc(invoice({
+      header: { series: 'MK', aa: '1', issueDate: '2026-09-06', currency: 'EUR', invoiceType: '1.1', ...header },
+      ...over,
+    } as any));
+
+  it('a SELF-BILLED document declares neither ledger', () => {
+    const d = withHeader({ selfPricing: true });
+    expect(d.invoiceSummary.incomeClassification).toBeUndefined();
+    expect(d.invoiceSummary.expensesClassification).toBeUndefined();
+    expect(d.invoiceDetails[0].incomeClassification).toBeUndefined();
+    expect(d.invoiceDetails[0].expensesClassification).toBeUndefined();
+  });
+
+  it('a proof of expenditure (3.1) declares EXPENSES, never income', () => {
+    const d = withHeader({ invoiceType: '3.1' }, {
+      lines: [line({ expenseClassificationType: 'E3_102_002', expenseClassificationCategory: 'category2_1' })],
+    });
+    expect(d.invoiceDetails[0].incomeClassification).toBeUndefined();
+    expect(d.invoiceDetails[0].expensesClassification).toEqual([
+      { classificationType: 'E3_102_002', classificationCategory: 'category2_1', amount: 100 },
+    ]);
+    expect(d.invoiceSummary.expensesClassification).toEqual([
+      { classificationType: 'E3_102_002', classificationCategory: 'category2_1', amount: 100 },
+    ]);
+    expect(d.invoiceSummary.incomeClassification).toBeUndefined();
+  });
+
+  it('REFUSES a proof of expenditure that does not say what kind of expense it was', () => {
+    expect(() => withHeader({ invoiceType: '3.1' })).toThrow(/EXPENSE classification/i);
+  });
+
+  it('a self-delivery (6.1) uses its own income pair, not the sales one', () => {
+    expect(mydataIncomeClassificationType('6.1')).toBe('E3_595');
+    expect(mydataIncomeClassificationCategory('6.1')).toBe('category1_6');
+  });
+
+  it('an ordinary sales invoice still declares income only', () => {
+    const d = withHeader({});
+    expect(d.invoiceSummary.incomeClassification).toBeTruthy();
+    expect(d.invoiceSummary.expensesClassification).toBeUndefined();
+  });
+});
+
 describe('income classification is derived from the document type, not defaulted flat', () => {
   it.each([
     ['1.1', 'E3_561_001', 'category1_1'],

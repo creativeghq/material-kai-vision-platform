@@ -12317,6 +12317,8 @@ export type Database = {
           document_type: string | null
           due_at: string | null
           exchange_rate: number | null
+          expense_classification_category: string | null
+          expense_classification_type: string | null
           fiscal_alerted_at: string | null
           fiscal_connector_slug: string | null
           fiscal_credits_refunded_at: string | null
@@ -12408,6 +12410,8 @@ export type Database = {
           document_type?: string | null
           due_at?: string | null
           exchange_rate?: number | null
+          expense_classification_category?: string | null
+          expense_classification_type?: string | null
           fiscal_alerted_at?: string | null
           fiscal_connector_slug?: string | null
           fiscal_credits_refunded_at?: string | null
@@ -12499,6 +12503,8 @@ export type Database = {
           document_type?: string | null
           due_at?: string | null
           exchange_rate?: number | null
+          expense_classification_category?: string | null
+          expense_classification_type?: string | null
           fiscal_alerted_at?: string | null
           fiscal_connector_slug?: string | null
           fiscal_credits_refunded_at?: string | null
