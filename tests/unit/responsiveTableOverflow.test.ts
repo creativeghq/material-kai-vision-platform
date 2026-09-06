@@ -306,3 +306,79 @@ describe('a section rail is a strip on a phone, not a wall', () => {
     expect(block.slice(0, block.indexOf('\n}\n\n') + 1)).toContain('.section-rail');
   });
 });
+
+/**
+ * The bottom of the page, on a phone.
+ *
+ * `<main>` reserved room for the fixed tab bar with `padding-bottom` and had done since the bar
+ * shipped — and the last ~56px of every page still sat underneath it. Reported on
+ * /finance?tab=mydata_book, where the closing rows of the myDATA book could not be read.
+ *
+ * The reservation was real; it was being SPENT. `<main>` is a column flex scroll container, so a
+ * page root is a flex item with the default `flex-shrink: 1`. An item's automatic minimum size
+ * (`min-height: auto`) is its content, which is why most pages were fine — but an explicit
+ * `min-height` REPLACES that floor, and `min-h-screen` is the root of 67 pages here, FinancePage
+ * among them. Chromium then shrinks the root by exactly the padding, the scrollable height comes
+ * out unchanged, and the reservation buys nothing.
+ *
+ * Measured in headless Chromium at 390×844 on a replica of this shell, scrolled to the bottom, as
+ * the gap between the last row and the bar's top edge:
+ *
+ *     page root                         gap
+ *     no min-height                      0px    padding honoured
+ *     min-h-screen                     -56px    padding swallowed
+ *     min-h-screen + a spacer element  -56px    the root absorbs the spacer too
+ *     min-h-screen + margin-bottom     -56px    …and the margin
+ *     min-h-screen + flex-shrink: 0      0px    the fix
+ *
+ * So the padding and the shrink lock are ONE rule in two declarations: either alone reserves
+ * nothing, and a future edit that keeps the obvious half is the regression this guards.
+ */
+describe('page content clears the mobile tab bar', () => {
+  const css = readFileSync(join(SRC, 'index.css'), 'utf8').replace(/\r\n/g, '\n');
+  const MOBILE = '@media (max-width: 767px)';
+  const mobileBlock = (() => {
+    const start = css.indexOf(MOBILE);
+    expect(start, 'the phone media block is gone — this whole describe is scanning nothing').toBeGreaterThan(-1);
+    const rest = css.slice(start + MOBILE.length);
+    const next = rest.indexOf('\n@media');
+    return next === -1 ? rest : rest.slice(0, next);
+  })();
+
+  it('reserves the bar height, the safe area, and a cushion above it', () => {
+    // 3.5rem is the bar (`h-14`); env() is the iOS home indicator; the cushion is so the last
+    // table row CLEARS the bar rather than touching it, which is what was asked for.
+    expect(mobileBlock).toMatch(
+      /\.mobile-content\s*\{\s*padding-bottom:\s*calc\(3\.5rem \+ env\(safe-area-inset-bottom\)\s*\+\s*[\d.]+rem\);/,
+    );
+  });
+
+  it('stops the page root spending that reservation by shrinking', () => {
+    expect(
+      mobileBlock,
+      'Without `.mobile-content > * { flex-shrink: 0 }` the padding above is absorbed by any page '
+      + 'root carrying an explicit min-height (min-h-screen: 67 pages), and the bottom of the page '
+      + 'goes back under the tab bar. Measured, not reasoned — see the block comment.',
+    ).toMatch(/\.mobile-content > \*\s*\{\s*flex-shrink:\s*0;/);
+  });
+
+  it('the reserved height is the bar height', () => {
+    // A bar that grows without the reservation growing is the same bug with a different number.
+    const nav = readFileSync(join(SRC, 'components/core/MobileBottomNav.tsx'), 'utf8');
+    expect(nav, 'the bar is no longer h-14 (3.5rem); the reservation above must follow it').toContain('<ul className="grid h-14"');
+    expect(nav, 'the bar must stay hidden from md up, where the reservation stops').toContain('md:hidden');
+  });
+
+  it('<main> is still the column flex scroll container that makes the lock necessary', () => {
+    // If this ever stops being a flex container the shrink lock is harmless but pointless, and
+    // the comment above should be revisited rather than left as folklore.
+    const layout = readFileSync(join(SRC, 'components/core/Layout.tsx'), 'utf8');
+    // `<main id=` — a prose `<main>` in the comment above it is the first hit otherwise.
+    const open = layout.indexOf('<main id=');
+    expect(open, 'no <main id=…> in Layout — this check is scanning nothing').toBeGreaterThan(-1);
+    const main = layout.slice(open, layout.indexOf('>', open));
+    for (const cls of ['overflow-y-auto', 'flex', 'flex-col', 'mobile-content']) {
+      expect(main, `<main> lost "${cls}"`).toContain(cls);
+    }
+  });
+});

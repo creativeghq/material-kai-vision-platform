@@ -767,9 +767,33 @@ All colors MUST be HSL.
 
 @media (max-width: 767px) {
   /* Reserve room for the fixed bottom tab bar so page content (and any
-     sticky composer like the Agent Hub) never sits beneath it. */
+     sticky composer like the Agent Hub) never sits beneath it.
+     +1rem so the last table row CLEARS the bar rather than touching it. */
   .mobile-content {
-    padding-bottom: calc(3.5rem + env(safe-area-inset-bottom));
+    padding-bottom: calc(3.5rem + env(safe-area-inset-bottom) + 1rem);
+  }
+
+  /* …and the half that makes the reservation above actually hold.
+     ----------------------------------------------------------------
+     <main> is a COLUMN FLEX scroll container, so the page root is a flex ITEM with the
+     default `flex-shrink: 1`. An item's automatic minimum size (`min-height: auto`) is its
+     content, which is why most pages were fine — but any explicit `min-height` REPLACES
+     that floor, and `min-h-screen` is the root of 67 pages here. Chromium then shrinks the
+     root by exactly the padding we just reserved, so the scrollable height comes out
+     unchanged and the last ~56px of the page sits UNDER the bar.
+
+     Measured in headless Chromium (390×844) on a replica of this shell, scrolled to the
+     bottom, as the gap between the last row and the bar's top edge:
+        page root with no min-height   →   0px   (padding honoured)
+        page root with min-h-screen    → -56px   (padding swallowed)
+        same, plus the rule below      →   0px
+     Adding a spacer element or a bottom margin does NOT fix it — the shrinkable root simply
+     absorbs those too (both measured at -56px). Only refusing to shrink does.
+
+     Reported on /finance?tab=mydata_book, where the last rows of the myDATA book were
+     unreachable behind the tab bar. */
+  .mobile-content > * {
+    flex-shrink: 0;
   }
 
   /* Horizontal tab rows become a single swipeable strip instead of a ragged,
