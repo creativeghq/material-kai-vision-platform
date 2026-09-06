@@ -88,6 +88,9 @@ export async function handlePlan(req: Request, body: any): Promise<Response> {
     return jsonResponse({ success: false, error: 'user_id is required' }, 400);
   }
 
+  // Outside the try: the refund lives in the catch and has to know which wallet was charged.
+  let workspaceId: string | null = null;
+
   try {
 
     if (!body.topic || !body.target_keyword || !body.keyword_research) {
@@ -129,7 +132,8 @@ export async function handlePlan(req: Request, body: any): Promise<Response> {
     }
 
     // Paid module — refuse before the debit and the LLM call (#212 + invariant 10).
-    const { response: entResponse } = await resolveAndAssertSeoEntitled(supabase, userId);
+    const { workspaceId: resolvedWs, response: entResponse } = await resolveAndAssertSeoEntitled(supabase, userId);
+    workspaceId = resolvedWs ?? null;
     if (entResponse) return entResponse;
 
     // Debit credits
@@ -141,7 +145,7 @@ export async function handlePlan(req: Request, body: any): Promise<Response> {
         p_operation_type: 'seo_plan',
         p_description: `SEO article planning: "${body.target_keyword}"`,
         p_metadata: { topic: body.topic, target_keyword: body.target_keyword },
-        p_workspace_id: null,
+        p_workspace_id: workspaceId,
       },
     );
 
@@ -198,7 +202,7 @@ export async function handlePlan(req: Request, body: any): Promise<Response> {
         p_operation_type: 'seo_plan_refund',
         p_description: 'Refund: SEO planning failed',
         p_metadata: { error: error.message },
-        p_workspace_id: null,
+        p_workspace_id: workspaceId,
       });
       console.log('[seo-plan] Credits refunded');
     } catch (refundErr) {

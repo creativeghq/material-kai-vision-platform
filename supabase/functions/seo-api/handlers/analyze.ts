@@ -68,6 +68,9 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
   // handler, so no refund ever happened.
   let fixCreditsDebited = 0;
 
+  // Outside the try: the refund lives in the catch and has to know which wallet was charged.
+  let workspaceId: string | null = null;
+
   try {
 
     if (!body.content_markdown || !body.article_plan) {
@@ -89,7 +92,8 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
     }
 
     // Paid module — refuse before the debit and the LLM call (#212 + invariant 10).
-    const { response: entResponse } = await resolveAndAssertSeoEntitled(supabase, userId);
+    const { workspaceId: resolvedWs, response: entResponse } = await resolveAndAssertSeoEntitled(supabase, userId);
+    workspaceId = resolvedWs ?? null;
     if (entResponse) return entResponse;
 
     // Debit credits for initial analysis
@@ -101,7 +105,7 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
         p_operation_type: 'seo_analyze',
         p_description: `SEO content analysis: "${body.article_plan.title}"`,
         p_metadata: { target_keyword: body.article_plan.primaryKeyword },
-        p_workspace_id: null,
+        p_workspace_id: workspaceId,
       },
     );
 
@@ -156,7 +160,7 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
             p_operation_type: 'seo_fix',
             p_description: `SEO auto-fix iteration ${i + 1}`,
             p_metadata: { iteration: i + 1, fixes_count: autoFixableFixes.length },
-            p_workspace_id: null,
+            p_workspace_id: workspaceId,
           },
         );
 
@@ -207,7 +211,7 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
         p_operation_type: 'seo_analyze_refund',
         p_description: 'Refund: SEO analysis failed',
         p_metadata: { error: error.message, fix_credits_refunded: fixCreditsDebited },
-        p_workspace_id: null,
+        p_workspace_id: workspaceId,
       });
     } catch (refundErr) {
       console.error('[seo-analyze] Refund failed:', refundErr);

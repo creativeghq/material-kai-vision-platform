@@ -55,6 +55,9 @@ export async function handleWrite(req: Request, body: any): Promise<Response> {
     return jsonResponse({ success: false, error: 'user_id is required' }, 400);
   }
 
+  // Outside the try: the refund lives in the catch and has to know which wallet was charged.
+  let workspaceId: string | null = null;
+
   try {
 
     if (!body.article_plan) {
@@ -76,7 +79,8 @@ export async function handleWrite(req: Request, body: any): Promise<Response> {
     }
 
     // Paid module — refuse before the debit and the LLM call (#212 + invariant 10).
-    const { response: entResponse } = await resolveAndAssertSeoEntitled(supabase, userId);
+    const { workspaceId: resolvedWs, response: entResponse } = await resolveAndAssertSeoEntitled(supabase, userId);
+    workspaceId = resolvedWs ?? null;
     if (entResponse) return entResponse;
 
     // Debit credits
@@ -91,7 +95,7 @@ export async function handleWrite(req: Request, body: any): Promise<Response> {
           title: body.article_plan.title,
           target_keyword: body.article_plan.primaryKeyword,
         },
-        p_workspace_id: null,
+        p_workspace_id: workspaceId,
       },
     );
 
@@ -160,7 +164,7 @@ export async function handleWrite(req: Request, body: any): Promise<Response> {
         p_operation_type: 'seo_write_refund',
         p_description: 'Refund: SEO writing failed',
         p_metadata: { error: error.message },
-        p_workspace_id: null,
+        p_workspace_id: workspaceId,
       });
       console.log('[seo-write] Credits refunded');
     } catch (refundErr) {

@@ -85,6 +85,10 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
     return jsonResponse({ success: false, error: 'user_id is required' }, 400);
   }
 
+  // Declared OUTSIDE the try because the refund lives in the catch: a refund that cannot see
+  // which wallet was charged would hand the money back to the wrong one.
+  let workspaceId: string | null = null;
+
   try {
 
     if (!body.topic || !body.target_keyword) {
@@ -117,10 +121,25 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
     // Entitlement gate BEFORE the debit and the upstream calls (#212 + invariant 10).
     // Also resolves the workspace the research is filed under (was a late `.single()`
     // lookup, which errors → null for multi-workspace users — same bug pipeline.ts fixed).
-    const { workspaceId, response: entResponse } = await resolveAndAssertSeoEntitled(supabase, userId);
+    const { workspaceId: resolvedWs, response: entResponse } = await resolveAndAssertSeoEntitled(supabase, userId);
+    workspaceId = resolvedWs ?? null;
     if (entResponse) return entResponse;
 
-    // Debit credits
+    // Billed to the WORKSPACE, not to whoever pressed the button.
+    //
+    // All four article stages passed `p_workspace_id: null` — research, plan, write and analyze,
+    // debit and refund alike, nine call sites — while the line above had just resolved the
+    // workspace. Null means `debit_credits` never consults the pool at all: it goes straight to
+    // the clicker's personal wallet. So the module is entitled per workspace, the article is
+    // filed under `workspace_id`, and a 42-52 credit run came out of one person's own balance.
+    // Every other paid path here (toolkit_audit, social) routes to the workspace.
+    //
+    // Passing the id is safe rather than a change of policy: `debit_credits` tries the pool,
+    // and on `no_pool` / `not_a_member` falls back to the personal wallet — which is every
+    // workspace today, since `workspace_credits` has no rows at all. It only starts mattering
+    // the day someone funds a pool, which is exactly when getting it wrong would be expensive.
+    // `refund_credits` re-derives the same way, so a failed stage pays back the wallet it took
+    // from instead of moving money between the two.
     const { data: debitResult, error: debitError } = await supabase.rpc(
       'debit_credits',
       {
@@ -133,7 +152,7 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
           target_keyword: body.target_keyword,
           location_code: locationCode,
         },
-        p_workspace_id: null,
+        p_workspace_id: workspaceId,
       },
     );
 
@@ -243,7 +262,7 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
         p_operation_type: 'seo_research_refund',
         p_description: `Refund: SEO research failed`,
         p_metadata: { error: error.message },
-        p_workspace_id: null,
+        p_workspace_id: workspaceId,
       });
       console.log('[seo-research] Credits refunded');
     } catch (refundErr) {
