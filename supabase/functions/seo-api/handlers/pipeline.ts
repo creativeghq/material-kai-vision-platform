@@ -506,7 +506,16 @@ async function runPipelineStages(ctx: {
         serpSignals: research.serpSignals,
       },
       user_id: userId,
-    }, 180_000);
+      // 300s, measured not guessed. Claude Opus 5 writing this pipeline's own plan — 2,200
+      // Greek words over 7 sections — took 217s and 9,934 output tokens against the live API
+      // on 2026-09-06 (Sonnet 5 took 154s for the same brief, so the model choice does not
+      // rescue a 180s budget either). At 180s the stage was killed mid-generation and the run
+      // died as `The write stage did not finish within 180s.`
+      //
+      // This only works because the stages run under EdgeRuntime.waitUntil: a request-bound
+      // call is capped by the gateway at `{"code":"IDLE_TIMEOUT","message":"Request idle
+      // timeout limit (150s) reached"}`, which a direct `write` call hits every time.
+    }, 300_000);
 
     const contentMarkdown = writeResult.data.content_markdown;
     const wordCount = writeResult.data.word_count;
