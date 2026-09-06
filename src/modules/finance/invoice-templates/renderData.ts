@@ -38,6 +38,7 @@ export interface BuildRenderInput {
     transaction_id: string | null;
     signature_token: string | null;
     payment_amount: number | null;
+    tip_amount?: number | null;
     final_payment_type: number | null;
     payment_type: number | null;
     terminal_id: string | null;
@@ -55,6 +56,15 @@ export interface BuildRenderInput {
   priorBalance?: number | null;
   /** Hosted /pay/{token} URL (reused from invoice.pay_token; not minted in preview). */
   payUrl?: string | null;
+  /**
+   * The workspace's IANA timezone (`hr_settings.timezone`, default Europe/Athens).
+   *
+   * The fiscal date and time are the ISSUER's, not the viewer's. Without this the preview
+   * formats in the BROWSER's zone while the PDF formats in the workspace's — so an operator on
+   * a UTC machine approves a document dated the day before the one the customer receives, and
+   * cannot see the difference. Same defect the PDF had against the server clock.
+   */
+  timezone?: string | null;
 }
 
 export function formatInvoiceMoney(value: any, currency: string, lang: Lang): string {
@@ -69,7 +79,7 @@ export function formatInvoiceMoney(value: any, currency: string, lang: Lang): st
 export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderData {
   const {
     invoice: inv, items, settings: fs, customer, addressUnit, authCode, branch, order,
-    logoUrl, bankAccounts, priorBalance, payUrl, providerAttribution, posPayments,
+    logoUrl, bankAccounts, priorBalance, payUrl, providerAttribution, posPayments, timezone,
   } = input;
   // English is the default; Greek only when explicitly chosen (until translations launch).
   const lang: Lang = inv.doc_language === 'el' ? 'el' : 'en';
@@ -136,10 +146,17 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
   if (inv.series) meta.push({ label: L.series, value: String(inv.series) });
   if (inv.issued_at) {
     const d = new Date(inv.issued_at);
-    meta.push({ label: L.date, value: d.toLocaleDateString(locale) });
+    // Dated by the WORKSPACE's clock, not the viewer's — the PDF does the same, and a preview
+    // that formats in the browser's zone shows a different day to an operator abroad or on a
+    // machine set to UTC than the customer's copy carries.
+    const fiscalTz = timezone || 'Europe/Athens';
+    meta.push({ label: L.date, value: d.toLocaleDateString(locale, { timeZone: fiscalTz }) });
     // Issue TIME is part of the record for a document numbered sequentially by date — two
     // invoices on the same day are ordered by it. It was already stored and never printed.
-    meta.push({ label: L.time, value: d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' }) });
+    meta.push({
+      label: L.time,
+      value: d.toLocaleTimeString(locale, { timeZone: fiscalTz, hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+    });
   }
   if (order?.order_number) meta.push({ label: L.order, value: String(order.order_number) });
   if (inv.due_at) meta.push({ label: L.due, value: String(inv.due_at) });
@@ -333,7 +350,8 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
     posPayments: (posPayments ?? []).map((pmt) => ({
       transactionId: pmt.transaction_id ?? null,
       signature: pmt.signature_token ?? null,
-      amount: pmt.payment_amount ?? null,
+      // What the terminal actually took: the payment plus any tip.
+      amount: pmt.payment_amount != null ? Number(pmt.payment_amount) + Number(pmt.tip_amount ?? 0) : null,
       methodCode: pmt.final_payment_type ?? pmt.payment_type ?? null,
       terminalId: pmt.terminal_id ?? null,
     })),

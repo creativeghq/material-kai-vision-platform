@@ -59,10 +59,23 @@ describe('the issue date and time are the issuer\'s clock, not the server\'s', (
     expect(pdfSrc).toMatch(/timeZone:\s*fiscalTz/);
   });
 
-  it('derives the zone from the issuer country and falls back to Athens, never to UTC', () => {
-    expect(pdfSrc).toContain('FISCAL_TIMEZONE_BY_COUNTRY');
-    expect(pdfSrc).toMatch(/business_country_code/);
+  it('uses the timezone the WORKSPACE stores, and falls back to Athens rather than UTC', () => {
+    // `hr_settings.timezone` is NOT NULL with an Athens default and is what payroll and the
+    // Ergani filings are already timed by. A country->zone map beside it would be a second
+    // mechanism, and a worse one: most `finance_settings` rows have no country code at all.
+    expect(pdfSrc).toMatch(/from\('hr_settings'\)/);
     expect(pdfSrc).toMatch(/'Europe\/Athens'/);
+    expect(pdfSrc).not.toContain('FISCAL_TIMEZONE_BY_COUNTRY');
+  });
+
+  it('dates the on-screen preview by that same clock', () => {
+    // The operator approves the preview and the customer receives the PDF; formatting one in the
+    // browser's zone and the other in the workspace's is a difference nobody can see.
+    const renderSrc = stripComments(
+      readFileSync(join(ROOT, 'src/modules/finance/invoice-templates/renderData.ts'), 'utf8'),
+    );
+    expect(renderSrc).toMatch(/timeZone: fiscalTz/);
+    expect(renderSrc).not.toMatch(/toLocaleDateString\(locale\)/);
   });
 
   it('never formats the fiscal date or time without a timezone again', () => {

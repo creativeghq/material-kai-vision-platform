@@ -698,6 +698,11 @@ export function InvoiceDocument({
         <VatSuspended />
         <Payment />
         <PayOnline />
+        {/* The commercial layout returns its own tail rather than <Body />, so the POS payment
+            block has to be repeated here — and it MUST be: this is the delivery-style receipt
+            look, i.e. exactly the register template a card payment is taken on. Leaving it out
+            put the payment identity on the customer's PDF and not on the preview approving it. */}
+        <PosPayments />
         {data.fiscal && (
           <div style={{ marginTop: 12 }}>
             <div style={{ fontSize: 9, fontWeight: 700, ...muted }}>{L.mark}</div>

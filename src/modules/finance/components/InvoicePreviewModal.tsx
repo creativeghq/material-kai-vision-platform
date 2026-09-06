@@ -132,8 +132,13 @@ export function InvoicePreviewModal({
           }
         }
 
+        // The workspace's clock, so this preview dates the document exactly as the PDF will.
+        const { data: tzRow } = await supabase.from('hr_settings')
+          .select('timezone').eq('workspace_id', invoice.workspace_id).maybeSingle();
+        const timezone: string | null = (tzRow as any)?.timezone ?? null;
+
         const { data: posRows } = await supabase.from('pos_signatures')
-          .select('transaction_id, signature_token, payment_amount, final_payment_type, payment_type, terminal_id')
+          .select('transaction_id, signature_token, payment_amount, tip_amount, final_payment_type, payment_type, terminal_id')
           .eq('invoice_id', invoice.id)
           .eq('status', 'completed')
           .order('completed_at', { ascending: true });
@@ -178,7 +183,7 @@ export function InvoicePreviewModal({
         }
 
         const data = buildInvoiceRenderData({
-          providerAttribution, posPayments,
+          providerAttribution, posPayments, timezone,
           invoice, items: items ?? [], settings, customer, addressUnit, authCode,
           branch, order, logoUrl, bankAccounts, payUrl, priorBalance,
         });

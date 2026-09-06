@@ -518,14 +518,33 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
       // issuing invoice I and credit notes C1 and C2 against it, this returned the newest
       // submission for I — so I could print C2's authentication code beside I's own MARK.
       const { data } = await supabase.from('fiscal_submissions')
-        .select('authentication_code, connector_slug, created_at')
+        .select('authentication_code, created_at')
         .eq('document_table', kind === 'credit_note' ? 'credit_notes' : 'invoices')
         .eq('document_id', docId)
         .not('authentication_code', 'is', null)
         .order('created_at', { ascending: false })
         .limit(1).maybeSingle();
       authCode = (data as any)?.authentication_code ?? null;
-      transmittedBy = (data as any)?.connector_slug ?? null;
+    }
+
+    // WHICH CONNECTOR CARRIED IT — resolved independently of the authentication code.
+    // Chaining this onto the auth-code lookup made the attribution vanish in two real cases: a
+    // DELIVERY NOTE (excluded from that lookup, yet it carries a MARK and prints one) and any
+    // document whose accepted submission stored no authentication code — the POS completion row
+    // stores none at all. A mandatory field that disappears whenever a neighbouring one is null
+    // is not a field, it is a coincidence.
+    if (inv.fiscal_mark) {
+      transmittedBy = inv.fiscal_connector_slug ?? null;
+      if (!transmittedBy) {
+        const { data } = await supabase.from('fiscal_submissions')
+          .select('connector_slug, created_at')
+          .eq('document_table', kind === 'credit_note' ? 'credit_notes' : kind === 'delivery_note' ? 'delivery_notes' : 'invoices')
+          .eq('document_id', docId)
+          .not('connector_slug', 'is', null)
+          .order('created_at', { ascending: false })
+          .limit(1).maybeSingle();
+        transmittedBy = (data as any)?.connector_slug ?? null;
+      }
     }
 
     // WHO TRANSMITTED IT, named on the paper.
@@ -544,6 +563,12 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
           .filter(Boolean).join(' | ');
       }
     }
+
+    // The workspace's own clock — see `fiscalTz` in the renderer for why the document is dated
+    // by it and not by the server.
+    const { data: hrTz } = await supabase.from('hr_settings')
+      .select('timezone').eq('workspace_id', inv.workspace_id).maybeSingle();
+    const workspaceTz: string | null = (hrTz as any)?.timezone ?? null;
 
     // THE PAYMENT THAT UNLOCKED THE DOCUMENT.
     // Same rules: when a payment was completed against a provider signature, the document must
@@ -641,7 +666,7 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
       } catch { /* RF is best-effort — never block the PDF */ }
     }
 
-    const pdfBytes = await buildPdf({ inv, items, fs, customer, addressUnit, authCode, providerAttribution, posPayments, branch, lang, logo, spec, colors, priorBalance, payUrl, rfCode });
+    const pdfBytes = await buildPdf({ inv, items, fs, customer, addressUnit, authCode, providerAttribution, posPayments, tz: workspaceTz, branch, lang, logo, spec, colors, priorBalance, payUrl, rfCode });
 
     const path = `${OUT}/${docId}/${PREFIX}-${docId}.pdf`;
     const { error: upErr } = await supabase.storage.from('pdf-documents').upload(path, pdfBytes, { upsert: true, contentType: 'application/pdf' });
@@ -659,22 +684,8 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
   }
 }));
 
-/**
- * Which clock a fiscal document is dated by — the ISSUER's, wherever the server happens to run.
- *
- * Deliberately tiny: this module serves the Greek AADE/myDATA regime, so `GR` is the case that
- * matters and the rest are here only so a foreign-established issuer is not silently dated in
- * UTC. Adding a country means adding its zone here, not defaulting it.
- */
-const FISCAL_TIMEZONE_BY_COUNTRY: Record<string, string> = {
-  GR: 'Europe/Athens', CY: 'Asia/Nicosia', BG: 'Europe/Sofia', RO: 'Europe/Bucharest',
-  DE: 'Europe/Berlin', FR: 'Europe/Paris', IT: 'Europe/Rome', ES: 'Europe/Madrid',
-  NL: 'Europe/Amsterdam', BE: 'Europe/Brussels', AT: 'Europe/Vienna', PL: 'Europe/Warsaw',
-  GB: 'Europe/London', IE: 'Europe/Dublin', PT: 'Europe/Lisbon',
-};
-
-async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; addressUnit?: any; authCode?: string | null; providerAttribution?: string | null; posPayments?: any[]; branch: any; lang: Lang; logo?: Uint8Array | null; spec: TemplateSpec; colors: InvoicePdfColors; priorBalance?: number | null; payUrl?: string | null; rfCode?: string | null }): Promise<Uint8Array> {
-  const { inv, items, fs, customer, addressUnit, authCode, providerAttribution, posPayments, branch, lang, logo, spec, colors, priorBalance, payUrl, rfCode } = d;
+async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; addressUnit?: any; authCode?: string | null; providerAttribution?: string | null; posPayments?: any[]; tz?: string | null; branch: any; lang: Lang; logo?: Uint8Array | null; spec: TemplateSpec; colors: InvoicePdfColors; priorBalance?: number | null; payUrl?: string | null; rfCode?: string | null }): Promise<Uint8Array> {
+  const { inv, items, fs, customer, addressUnit, authCode, providerAttribution, posPayments, tz, branch, lang, logo, spec, colors, priorBalance, payUrl, rfCode } = d;
   const L = LABELS[lang];
   const isCommercial = spec.headerStyle === 'commercial';
 
@@ -768,10 +779,13 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; add
   // Edge functions run in UTC, so `toLocaleDateString()` with no timezone renders the UTC day —
   // and a Greek business issuing at 00:30 Athens time would print YESTERDAY on a fiscal document
   // that AADE numbered under today. That is the CLAUDE.md §1b defect landing on the paper the
-  // customer keeps. There is no per-workspace timezone column, so it is derived from the
-  // issuer's country; Greece is the regime this module serves and is the fallback.
-  const fiscalTz = FISCAL_TIMEZONE_BY_COUNTRY[String(fs?.business_country_code ?? 'GR').toUpperCase()]
-    ?? 'Europe/Athens';
+  // customer keeps.
+  //
+  // The zone is the one the WORKSPACE already stores (`hr_settings.timezone`, NOT NULL, default
+  // Europe/Athens) — the same value payroll and the Ergani filings are timed by. Deriving it from
+  // the issuer's country instead would have been a second mechanism beside a working one, and a
+  // worse one: `business_country_code` is null on most rows.
+  const fiscalTz = tz || 'Europe/Athens';
   const fmtIssueDate = (d: Date) => d.toLocaleDateString(locale, { timeZone: fiscalTz });
   const fmtIssueTime = (d: Date) => d.toLocaleTimeString(locale, {
     timeZone: fiscalTz, hour: '2-digit', minute: '2-digit', second: '2-digit',
@@ -1437,13 +1451,21 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; add
   // signature used to complete it, FOR EACH AMOUNT PAYABLE SEPARATELY. So every completed
   // signature gets its own line: a receipt settled in two taps has two.
   if (Array.isArray(posPayments) && posPayments.length) {
-    if (y < M + 70) newPage();
+    // The fiscal footer below is drawn at a FIXED y near the page bottom, so flowing content has
+    // to stop above it — guarding against the page margin instead let a signature token print
+    // straight over the MARK and the authentication code.
+    const footerTop = Math.max(M + 90, 120) + 40;
+    if (y < footerTop + 30) newPage();
     text(L.posPayment, M, y, 8, bold, MUTED); y -= 12;
     for (const pmt of posPayments) {
       const parts = [
         `${L.posTxn}: ${pmt.transaction_id ?? '—'}`,
         mydataPaymentLabel(pmt.final_payment_type ?? pmt.payment_type, lang),
-        pmt.payment_amount != null ? money(Number(pmt.payment_amount)) : null,
+        // The amount CHARGED, which is the payment plus any tip — the terminal took both, and
+        // an "amount payable" line that quietly omits the tip understates what the customer paid.
+        pmt.payment_amount != null
+          ? money(Number(pmt.payment_amount) + Number(pmt.tip_amount ?? 0))
+          : null,
         pmt.terminal_id ? `${L.posTerminal} ${pmt.terminal_id}` : null,
       ].filter(Boolean).join(' · ');
       text(parts, M, y, 8, font, MUTED); y -= 11;
@@ -1451,7 +1473,7 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; add
       // against THIS document, so it is printed in full rather than abbreviated.
       if (pmt.signature_token) {
         for (const sl of wrap(`${L.posSignature}: ${pmt.signature_token}`, font, 6.5, right - M)) {
-          if (y < M + 20) newPage();
+          if (y < footerTop) newPage();
           text(sl, M, y, 6.5, font, MUTED); y -= 8;
         }
       }

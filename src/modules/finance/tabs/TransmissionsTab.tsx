@@ -27,7 +27,7 @@ import { HubEmptyState } from '@/components/core/hub';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/utils/datetime';
-import { FINANCE_BASE } from '@/modules/finance/routes';
+import { FINANCE_BASE, FINANCE_TAB, financeTabUrl } from '@/modules/finance/routes';
 import {
   fiscalConnectorService,
   type FiscalSubmission,
@@ -60,7 +60,10 @@ const STATUS_HELP: Record<string, string> = {
   accepted: 'Registered at AADE with a MARK.',
   offline: 'AADE was down; the provider will transmit it and the MARK arrives later.',
   rejected: 'AADE refused the document. It has no MARK — fix it and send again.',
-  error: 'The provider could not be reached. Nothing was filed; it is safe to retry.',
+  // NOT "nothing was filed". `transmission_failure` is set on a thrown fetch, a non-JSON body or
+  // any 5XX — cases where the provider may well have filed the document and simply failed to say
+  // so. Telling an operator it is safe to retry is how one sale becomes two legal documents.
+  error: 'The provider could not be reached, so we do not know whether it was filed. Check before re-sending.',
   cancelled: 'A cancellation filed at AADE for a movement document.',
   pending: 'Sent, no verdict recorded yet.',
 };
@@ -75,8 +78,12 @@ const DOC_LABEL: Record<string, string> = {
 function documentHref(s: FiscalSubmission): string | null {
   const id = s.document_id ?? s.invoice_id;
   if (!id) return null;
-  if (s.document_table === 'credit_notes') return `${FINANCE_BASE}?tab=doc_credit_notes&id=${id}`;
-  if (s.document_table === 'delivery_notes') return `${FINANCE_BASE}?tab=doc_delivery&id=${id}`;
+  // An invoice has a page of its own. A credit note and a delivery note do not — they live in
+  // their list — so the link goes to the LIST, through `financeTabUrl` rather than a hand-built
+  // `?tab=` string. It deliberately carries no `?id=`: nothing reads one, and a parameter that
+  // silently does nothing reads as a broken link rather than an honest one.
+  if (s.document_table === 'credit_notes') return financeTabUrl(FINANCE_TAB.creditNotes);
+  if (s.document_table === 'delivery_notes') return financeTabUrl(FINANCE_TAB.deliveryNotes);
   return `${FINANCE_BASE}/invoices/${id}`;
 }
 
@@ -86,18 +93,33 @@ export const TransmissionsTab: React.FC<Props> = ({ workspaceId }) => {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<TransmissionStatusFilter>('all');
   const [busy, setBusy] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
-  const load = useCallback(async () => {
-    if (!workspaceId) return;
-    setLoading(true);
-    try {
-      setRows(await fiscalConnectorService.listTransmissions(workspaceId, { status }));
-    } catch (err: any) {
-      toast({ title: 'Could not load transmissions', description: err?.message, variant: 'destructive' });
-    } finally { setLoading(false); }
-  }, [workspaceId, status, toast]);
+  // `loading` is cleared on EVERY path including the no-workspace one — returning early before
+  // the `finally` left the pane spinning for ever when it was opened before the workspace
+  // resolved, with no empty state and nothing to retry.
+  //
+  // The `cancelled` latch is why the filter can be changed quickly: two overlapping queries would
+  // otherwise race, and an earlier "All" response landing after a later "Rejected" one would fill
+  // the table with rows the filter excludes while the Select still reads Rejected.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!workspaceId) { setRows([]); setLoading(false); return; }
+      setLoading(true);
+      try {
+        const next = await fiscalConnectorService.listTransmissions(workspaceId, { status });
+        if (!cancelled) setRows(next);
+      } catch (err: any) {
+        if (!cancelled) toast({ title: 'Could not load transmissions', description: err?.message, variant: 'destructive' });
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [workspaceId, status, reloadKey, toast]);
 
-  useEffect(() => { void load(); }, [load]);
+  const load = useCallback(() => setReloadKey((k) => k + 1), []);
 
   const retry = async (s: FiscalSubmission) => {
     setBusy(s.id);
@@ -107,7 +129,7 @@ export const TransmissionsTab: React.FC<Props> = ({ workspaceId }) => {
         title: r?.fiscal?.mark ? `Transmitted · MARK ${r.fiscal.mark}` : 'Sent to myDATA',
         description: r?.fiscal?.skipped ? 'Already transmitted — the stamp was repaired.' : undefined,
       });
-      void load();
+      load();
     } catch (err: any) {
       toast({ title: 'Retransmission failed', description: err?.message, variant: 'destructive' });
     } finally { setBusy(null); }
@@ -142,7 +164,7 @@ export const TransmissionsTab: React.FC<Props> = ({ workspaceId }) => {
               {STATUS_FILTERS.map((f) => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
+          <Button variant="outline" size="sm" onClick={() => load()} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
           </Button>
         </div>
@@ -187,16 +209,19 @@ export const TransmissionsTab: React.FC<Props> = ({ workspaceId }) => {
                   const failed = s.status === 'rejected' || s.status === 'error';
                   return (
                     <tr key={s.id} className="border-b border-hairline align-top">
-                      <td className="px-3 py-2 whitespace-nowrap">{formatDate(s.created_at)}</td>
+                      {/* WITH THE TIME. Retries land seconds apart, so a date alone renders
+                          every attempt of a document identically — and the order of attempts is
+                          the one thing this table exists to show. */}
+                      <td className="px-3 py-2 whitespace-nowrap">{formatDate(s.created_at, { withTime: true })}</td>
                       <td className="px-3 py-2">
                         {href ? (
                           <Link to={href} className="underline underline-offset-2">
                             {DOC_LABEL[s.document_table ?? ''] ?? 'Document'}
                           </Link>
                         ) : (DOC_LABEL[s.document_table ?? ''] ?? 'Document')}
-                        {s.attempt != null && s.attempt > 1 && (
-                          <span className="ml-1 text-[10px] text-muted-foreground">attempt {s.attempt}</span>
-                        )}
+                        {/* `fiscal_submissions.attempt` defaults to 1 and no writer ever sets
+                            it, so a badge reading it could never appear. The timestamp above
+                            carries the time, which orders the attempts honestly. */}
                       </td>
                       <td className="px-3 py-2 font-mono text-xs">{s.fiscal_invoice_type ?? '—'}</td>
                       <td className="px-3 py-2 font-mono text-xs">
@@ -230,7 +255,11 @@ export const TransmissionsTab: React.FC<Props> = ({ workspaceId }) => {
                         {/* Only for an attempt that did not land. A retransmission of an accepted
                             document is refused by the provider anyway (the UID is already filed),
                             so offering it would only invite a confusing error. */}
-                        {failed && (s.document_id || s.invoice_id) && (
+                        {/* A rejection is a verdict: nothing was filed, re-sending is right.
+                            An attempt whose connection dropped is NOT — the document may already
+                            be at AADE — so it gets no one-click retry and the status text says
+                            to check first. */}
+                        {failed && !s.transmission_failure && (s.document_id || s.invoice_id) && (
                           <Button size="sm" variant="outline" disabled={busy === s.id} onClick={() => void retry(s)}>
                             {busy === s.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Send again'}
                           </Button>
