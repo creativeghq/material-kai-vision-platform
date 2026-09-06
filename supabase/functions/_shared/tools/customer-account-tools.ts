@@ -41,6 +41,7 @@ const { tool } = await import('npm:@langchain/core@1.2.9/tools') as {
 const { z } = await import('npm:zod@3.25.76');
 
 import type { DbClient } from '../supabase-client.ts';
+import { listCustomerSalesOrders } from '../customer-orders.ts';
 
 /** Names of the tools this module builds. The clamp allowlist and the guard test both read it. */
 export const CUSTOMER_ACCOUNT_TOOL_NAMES = [
@@ -54,6 +55,8 @@ export interface CustomerAccountScope {
   workspaceId: string;
   /** The CRM contact resolved from the THREAD's customer participant. Never from a message. */
   contactId: string;
+  /** The company the platform links that contact to (`threadCustomerParty`), or null. */
+  companyId: string | null;
   /** Public app origin, for building a payment link out of a token a tool returned. */
   publicAppUrl: string;
 }
@@ -156,31 +159,27 @@ export function createCustomerAccountTools(db: DbClient, scope: CustomerAccountS
 
     tool(
       async () => {
-        // Sales orders only: on a purchase order this contact would be the SUPPLIER, and "where
-        // is my order" from a supplier is a different question with a different answer.
-        const { data } = await db.from('orders')
-          .select('id, order_number, status, total, currency, created_at')
-          .eq('workspace_id', scope.workspaceId).eq('customer_contact_id', scope.contactId)
-          .eq('order_type', 'sales')
-          .order('created_at', { ascending: false }).limit(8);
-        const rows = (data || []) as Array<Record<string, unknown>>;
-        if (!rows.length) return JSON.stringify([]);
-        // Settlement from the ONE derivation of "how much is still owed on an order"
-        // (`get_order_settlements`) — never `total − paid` re-done here.
-        const { data: st } = await db.rpc('get_order_settlements', { p_order_ids: rows.map((r) => String(r.id)) });
-        const settled = new Map(
-          ((st || []) as Array<{ order_id: string; outstanding: number; payment_status: string }>)
-            .map((s) => [s.order_id, s]),
-        );
-        return JSON.stringify(rows.map((r) => ({
-          number: r.order_number,
-          status: r.status,
-          payment_status: settled.get(String(r.id))?.payment_status ?? null,
-          outstanding: settled.get(String(r.id))?.outstanding ?? null,
-          total: Number(r.total || 0),
-          currency: r.currency || 'EUR',
-          placed_at: r.created_at,
-        })));
+        // The same read the member's context rail makes (`listCustomerSalesOrders`): sales
+        // orders of this contact OR their company, settlement from `get_order_settlements`. One
+        // derivation, so the assistant cannot deny an order the rail beside it shows.
+        try {
+          const orders = await listCustomerSalesOrders(db, {
+            workspaceId: scope.workspaceId,
+            party: { contactId: scope.contactId, companyId: scope.companyId },
+          });
+          return JSON.stringify(orders.map((o) => ({
+            number: o.order_number,
+            status: o.status,
+            payment_status: o.payment_status,
+            outstanding: o.outstanding,
+            total: o.total,
+            currency: o.currency,
+            placed_at: o.created_at,
+          })));
+        } catch (e) {
+          // A failed read is not "no orders" — say so, so the reply hands off instead of denying.
+          return JSON.stringify({ error: `orders could not be read: ${(e as Error).message}` });
+        }
       },
       {
         name: 'list_orders',

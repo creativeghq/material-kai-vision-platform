@@ -14099,10 +14099,14 @@
                       },
                       "cards": {
                         "type": "array",
-                        "description": "Catalog cards to send: [{kind: product|service, product_id}]. Members only, ids only — name, image, link and the customer's price are resolved server-side and relayed as a WhatsApp interactive card, an email table, or text lines."
+                        "description": "Catalog cards to send: [{kind: product|service, product_id}]. Members only, customer-facing only, ids only — name, image, link and the customer's price are resolved server-side and relayed as one WhatsApp interactive card per product, an email table, or text lines."
+                      },
+                      "client_token": {
+                        "type": "string",
+                        "description": "Minted by the composer once per send and kept across a failure. A retry carrying the token of a message that was stored but only partly delivered to WhatsApp resumes the missing sends and returns that message (`resumed: true`) instead of storing a second one. (string (uuid))"
                       }
                     },
-                    "description": "Returns: {data: message}"
+                    "description": "Returns: {data: message, resumed?: boolean}"
                   },
                   {
                     "type": "object",
@@ -14363,9 +14367,13 @@
                       "thread_id": {
                         "type": "string",
                         "description": "string (uuid)"
+                      },
+                      "peek": {
+                        "type": "boolean",
+                        "description": "Members only. A pure read for the assistant: no last_read_at stamp, no read receipt to the customer, the newest 40 messages, plus `transcript` (the same derivation the assistant's replies use) and `message_count`."
                       }
                     },
-                    "description": "Returns: {data: {thread, participants, messages}}"
+                    "description": "Returns: {data: {thread, participants, messages, transcript?, message_count?}}"
                   },
                   {
                     "type": "object",

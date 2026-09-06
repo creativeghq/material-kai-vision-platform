@@ -450,7 +450,7 @@ describe('social lands in the inbox, and public stays public', () => {
     // guard cannot pass by checking a file that stopped making the decision.
     const agentChat = code(readFileSync(join(FUNCTIONS_DIR, 'agent-chat', 'index.ts'), 'utf-8'));
     expect(agentChat).toMatch(/customerPublicThread = t\.channel === 'social'/);
-    expect(agentChat).toMatch(/allowAccountData && contactId && !customerPublicThread/);
+    expect(agentChat).toMatch(/allowAccountData && party\.contactId && !customerPublicThread/);
     expect(agentChat).toMatch(/THIS REPLY IS PUBLIC|publicThread/);
   });
 

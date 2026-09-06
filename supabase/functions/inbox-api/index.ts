@@ -44,11 +44,16 @@ import {
   ensureZernioSecrets, fetchLastInboundAt, publicAppUrl,
 } from '../_shared/zernio.ts';
 import {
-  buildEmailCardsHtml, buildEmailCardsText, buildWhatsAppCardMessages, cardsPreview, cardsToText,
-  safeCardUrl, INBOX_CARD_MAX, type InboxCard, type InboxCardKind,
+  buildEmailCardsHtml, buildEmailCardsText, buildWhatsAppCardMessages, cardPriceLine, cardsPreview,
+  fitTextWithCards, INBOX_CARD_MAX, type InboxCard, type InboxCardKind, type WhatsAppCardMessage,
 } from '../_shared/inbox-cards.ts';
+import { isInboxCardKind } from '../_shared/inboxCardKinds.generated.ts';
+import { safeImageSrc } from '../_shared/safeUrl.generated.ts';
 import { imageFromMetadata } from '../_shared/product-media.ts';
 import { grossFromNet } from '../_shared/money.ts';
+import { threadCustomerParty, partyFilter } from '../_shared/inbox-customer-party.ts';
+import { listCustomerSalesOrders } from '../_shared/customer-orders.ts';
+import { OPERATOR_INSTRUCTION_MAX } from '../_shared/customer-audience.ts';
 import {
   allocateUserEmailAddress,
   buildOutboundMessageId,
@@ -65,8 +70,8 @@ import {
   type IntakeItem,
   type OrderIntake,
 } from '../_shared/order-intake/index.ts';
-import { matchByText } from '../_shared/order-intake/match.ts';
-import { resolveLinePrice } from '../_shared/order-intake/price.ts';
+import { matchByText, postgrestSafeIlikeTerm } from '../_shared/order-intake/match.ts';
+import { defaultVatPercent, resolveLinePrice } from '../_shared/order-intake/price.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
 import { isWorkspaceEntitled } from '../_shared/entitlement.ts';
@@ -382,22 +387,18 @@ async function inboxAgentSettings(db: DbClient, workspaceId: string): Promise<In
   return await inboxAutopilotSettings(db, workspaceId);
 }
 
-/** The customer this thread is about: the active customer participant's CRM contact + their company. */
+/**
+ * The customer this thread is about: the active customer participant's CRM contact + their
+ * company. Delegates to the ONE derivation (`_shared/inbox-customer-party.ts`) that the context
+ * rail, the card resolver and agent-chat's account scope also read — three copies of this had
+ * drifted into three different companies for one contact.
+ */
 async function resolveThreadCustomerScope(
   db: DbClient,
   threadId: string,
 ): Promise<{ contactId: string | null; companyId: string | null }> {
-  const { data: custP } = await db
-    .from('inbox_participants').select('contact_id')
-    .eq('thread_id', threadId).eq('participant_type', 'customer').eq('status', 'active')
-    .not('contact_id', 'is', null).limit(1).maybeSingle();
-  const contactId = (custP as { contact_id?: string } | null)?.contact_id ?? null;
-  if (!contactId) return { contactId: null, companyId: null };
-  const { data: q } = await db
-    .from('quotes').select('customer_company_id')
-    .eq('customer_contact_id', contactId).not('customer_company_id', 'is', null)
-    .order('created_at', { ascending: false }).limit(1).maybeSingle();
-  return { contactId, companyId: (q as { customer_company_id?: string } | null)?.customer_company_id ?? null };
+  const party = await threadCustomerParty(db, threadId);
+  return { contactId: party.contactId, companyId: party.companyId };
 }
 
 /**
@@ -623,6 +624,7 @@ async function buildTranscript(
   threadId: string,
   rows: Array<{
     body: string | null; message_type: string; attachments: Json | null; sender_participant_id: string | null;
+    metadata?: Json | null;
   }>,
 ): Promise<string> {
   // One read for every speaker in the window, rather than one per message.
@@ -659,16 +661,29 @@ async function buildTranscript(
     return lines.length ? ` ${lines.join(' ')}` : '';
   };
 
+  // The catalog cards a message carried, as the customer saw them (name and the price line they
+  // were quoted). Without this a cards-only message reads as "sent something with no text" and
+  // the assistant does not know what was just offered, or at what price.
+  const offered = (meta: Json | null | undefined): string => {
+    const cards = (meta as { cards?: unknown } | null)?.cards;
+    if (!Array.isArray(cards) || !cards.length) return '';
+    const items = (cards as Array<{ name?: string; price_line?: string }>)
+      .slice(0, INBOX_CARD_MAX)
+      .map((c) => `${c.name ?? 'item'}${c.price_line ? ` — ${c.price_line}` : ''}`);
+    return ` [offered: ${items.join('; ')}]`;
+  };
+
   return rows.slice().reverse().map((m) => {
     const raw = (m.body || '').trim();
+    const cards = offered(m.metadata);
     let body = raw;
     if (!raw) {
-      body = '[sent something with no text]';
+      body = cards ? '' : '[sent something with no text]';
     } else if (PROVIDER_PLACEHOLDER_BODIES.has(raw.toLowerCase())) {
       body = '[sent a file or media that did not reach us in a readable form — these are NOT their '
         + 'words, so do not quote them back or argue about them]';
     }
-    return `${speaker(m)}: ${body}${files(m.attachments)}`;
+    return `${speaker(m)}: ${body}${cards}${files(m.attachments)}`;
   }).join('\n');
 }
 
@@ -701,7 +716,7 @@ async function buildAgentDraft(
   const workspaceId = String(thread.workspace_id);
   const { data: history } = await db
     .from('inbox_messages')
-    .select('body, message_type, attachments, sender_participant_id')
+    .select('body, message_type, attachments, sender_participant_id, metadata')
     .eq('thread_id', threadId)
     .is('deleted_at', null)
     .neq('message_type', 'note')
@@ -709,6 +724,7 @@ async function buildAgentDraft(
     .limit(20);
   const rows = (history || []) as Array<{
     body: string | null; message_type: string; attachments: Json | null; sender_participant_id: string | null;
+    metadata: Json | null;
   }>;
   const transcript = await buildTranscript(db, threadId, rows);
   if (!transcript.trim()) return '';
@@ -1052,52 +1068,23 @@ async function normalizeAttachments(
 }
 
 /**
- * Who the customer on a thread IS, for pricing and for the account rail: the CRM contact of the
- * first active customer participant, and the company the platform already links them to — the
- * most recent quote or project, the same derivation `get_thread_context` uses for the rail. A
- * VAT number on either makes them a VAT-registered buyer, which decides net vs gross exactly the
- * way `derive_invoice_document_type` decides 1.1 vs 11.1.
- */
-async function threadCustomerParty(
-  db: DbClient,
-  thread: Record<string, unknown>,
-): Promise<{ contactId: string | null; companyId: string | null; vatRegistered: boolean }> {
-  const { data: custP } = await db
-    .from('inbox_participants').select('contact_id')
-    .eq('thread_id', String(thread.id)).eq('participant_type', 'customer').eq('status', 'active')
-    .not('contact_id', 'is', null).limit(1).maybeSingle();
-  const contactId = (custP as { contact_id?: string } | null)?.contact_id ?? null;
-  if (!contactId) return { contactId: null, companyId: null, vatRegistered: false };
-
-  const [{ data: contact }, { data: q }, { data: p }] = await Promise.all([
-    db.from('crm_contacts').select('vat_number').eq('id', contactId).maybeSingle(),
-    db.from('quotes').select('customer_company_id').eq('customer_contact_id', contactId)
-      .not('customer_company_id', 'is', null).order('created_at', { ascending: false }).limit(1).maybeSingle(),
-    db.from('projects').select('client_company_id').eq('client_contact_id', contactId)
-      .not('client_company_id', 'is', null).order('created_at', { ascending: false }).limit(1).maybeSingle(),
-  ]);
-  const companyId = (q as { customer_company_id?: string } | null)?.customer_company_id
-    ?? (p as { client_company_id?: string } | null)?.client_company_id ?? null;
-  let vatRegistered = !!(contact as { vat_number?: string | null } | null)?.vat_number;
-  if (!vatRegistered && companyId) {
-    const { data: co } = await db.from('crm_companies').select('vat_number').eq('id', companyId).maybeSingle();
-    vatRegistered = !!(co as { vat_number?: string | null } | null)?.vat_number;
-  }
-  return { contactId, companyId, vatRegistered };
-}
-
-/**
  * The client's picks (a kind and a product id each) → cards the customer can be shown.
  *
  * Everything but the id is derived HERE, for THIS thread's customer:
- *   • the product must belong to the thread's workspace — a foreign id is simply not a card;
- *   • the PRICE is `get_product_price_for_workspace` for the customer party, through the same
- *     `resolveLinePrice` an intake line and a quote line use (one derivation per money quantity —
- *     a member cannot type a price into a card), shown gross to a consumer and net to a
- *     VAT-registered buyer;
- *   • the LINK is the workspace storefront when the product is published there, the seller's
- *     public profile for a listed service, and nothing otherwise — never an app route the
- *     customer cannot open.
+ *   • the product must belong to the thread's workspace — a foreign id is simply not a card —
+ *     and the kind is the product's own `item_type`, not the client's word for it;
+ *   • the PRICE is `get_product_price_for_workspace` for the customer party (the ONE derivation
+ *     of who that is: `threadCustomerParty`), through the same `resolveLinePrice` an intake line
+ *     and a quote line use (one derivation per money quantity — a member cannot type a price
+ *     into a card), shown gross to a consumer and net to a business buyer, with VAT at the
+ *     product's own category when it has one — the rate the invoice will apply — and the
+ *     workspace default otherwise;
+ *   • the LINK is the workspace storefront only when the store is OPEN, the product is published
+ *     there with a list price, AND the storefront would show this customer the same number the
+ *     card does — a customer-specific price is not what the store charges, and a button to a
+ *     page that disagrees with the card is worse than no button. A listed service links to the
+ *     seller's public profile when that profile is public. Otherwise: no link, never an app
+ *     route the customer cannot open.
  */
 async function resolveInboxCards(
   db: DbClient,
@@ -1107,61 +1094,248 @@ async function resolveInboxCards(
   if (!Array.isArray(raw) || raw.length === 0) return [];
   const ids: string[] = [];
   for (const r of raw) {
-    const id = String((r as { product_id?: unknown })?.product_id ?? '');
-    if (!/^[0-9a-f-]{36}$/i.test(id) || ids.includes(id)) continue;
+    const pick = (r || {}) as { product_id?: unknown; kind?: unknown };
+    const id = String(pick.product_id ?? '');
+    // The kind is checked against the mirrored vocabulary; the product's own item_type wins below.
+    if (!isInboxCardKind(pick.kind) || !/^[0-9a-f-]{36}$/i.test(id) || ids.includes(id)) continue;
     ids.push(id);
     if (ids.length >= INBOX_CARD_MAX) break;
   }
   if (!ids.length) return [];
 
   const workspaceId = String(thread.workspace_id);
-  const [{ data: rows }, party, { data: ws }, { data: pub }, { data: fs }] = await Promise.all([
-    db.from('products').select('id, name, description, sku, metadata, item_type, profile_user_id')
+  const [{ data: rows }, party, { data: ws }, { data: store }, { data: pub }, wsVat] = await Promise.all([
+    db.from('products')
+      .select('id, name, description, sku, metadata, item_type, profile_user_id, mydata_vat_category')
       .eq('workspace_id', workspaceId).in('id', ids),
-    threadCustomerParty(db, thread),
+    threadCustomerParty(db, String(thread.id)),
     db.from('workspaces').select('slug').eq('id', workspaceId).maybeSingle(),
-    db.from('product_prices').select('product_id, unit')
-      .eq('workspace_id', workspaceId).eq('storefront_published', true).in('product_id', ids),
-    db.from('finance_settings').select('default_vat_rate').eq('workspace_id', workspaceId).maybeSingle(),
+    db.from('workspace_storefront').select('enabled').eq('workspace_id', workspaceId).maybeSingle(),
+    // The base price row only (`variant_key IS NULL`): a variant row is a different price.
+    db.from('product_prices').select('product_id, unit, list_price')
+      .eq('workspace_id', workspaceId).eq('storefront_published', true).is('variant_key', null)
+      .not('list_price', 'is', null).in('product_id', ids),
+    defaultVatPercent(db, workspaceId),
   ]);
   type ProductRow = {
-    id: string; name: string | null; description: string | null; sku: string | null;
+    id: string; name: string; description: string | null; sku: string | null;
     metadata: unknown; item_type: string | null; profile_user_id: string | null;
+    mydata_vat_category: number | null;
   };
   const byId = new Map(((rows || []) as ProductRow[]).map((r) => [r.id, r]));
-  const published = new Map(((pub || []) as Array<{ product_id: string; unit: string | null }>).map((r) => [r.product_id, r]));
+  const published = new Map(
+    ((pub || []) as Array<{ product_id: string; unit: string | null; list_price: number }>).map((r) => [r.product_id, r]),
+  );
   const slug = (ws as { slug?: string | null } | null)?.slug || null;
+  const storeOpen = !!(store as { enabled?: boolean } | null)?.enabled && !!slug;
   // Same default the storefront applies when the workspace has not set a rate.
-  const vatPct = Number((fs as { default_vat_rate?: number | null } | null)?.default_vat_rate ?? 24);
+  const workspaceVatPct = wsVat ?? 24;
   const base = publicAppUrl();
 
-  const out: InboxCard[] = [];
-  for (const id of ids) {
-    const p = byId.get(id);
-    if (!p) continue;
+  // A listed service links to its seller's profile only if that profile is public.
+  const profileIds = [...new Set(
+    [...byId.values()].filter((p) => p.item_type === 'service' && p.profile_user_id).map((p) => String(p.profile_user_id)),
+  )];
+  const publicProfiles = new Set<string>();
+  if (profileIds.length) {
+    const { data: profs } = await db.from('user_profiles').select('user_id').in('user_id', profileIds).eq('is_public', true);
+    for (const pr of (profs || []) as Array<{ user_id: string }>) publicProfiles.add(pr.user_id);
+  }
+
+  // Ten independent price resolutions: one wave, not ten round trips.
+  const present = ids.map((id) => byId.get(id)).filter((p): p is ProductRow => !!p);
+  const prices = await Promise.all(present.map((p) => resolveLinePrice(db, {
+    workspaceId, productId: p.id, companyId: party.companyId, contactId: party.contactId,
+  })));
+
+  return present.map((p, i) => {
     const kind: InboxCardKind = p.item_type === 'service' ? 'service' : 'product';
-    const price = await resolveLinePrice(db, {
-      workspaceId, productId: p.id, companyId: party.companyId, contactId: party.contactId,
-    });
+    const price = prices[i];
     const net = price.unpriced ? null : price.unit_price;
-    const url = published.has(p.id) && slug
-      ? `${base}/store/${encodeURIComponent(slug)}?product=${p.id}`
-      : kind === 'service' && p.profile_user_id ? `${base}/u/${p.profile_user_id}` : null;
-    out.push({
+    const vatPct = p.mydata_vat_category != null ? vatPctForCat(p.mydata_vat_category) ?? workspaceVatPct : workspaceVatPct;
+    const shown = net == null ? null : party.isBusiness ? net : grossFromNet(net, vatPct);
+    const pubRow = published.get(p.id);
+    // The storefront shows and charges list price (gross at the workspace rate); link there only
+    // when that is the number on the card.
+    const storeShows = pubRow ? grossFromNet(pubRow.list_price, workspaceVatPct) : null;
+    const storeAgrees = pubRow != null && shown != null && !party.isBusiness && storeShows === shown;
+    const url = storeOpen && storeAgrees
+      ? `${base}/store/${encodeURIComponent(slug!)}?product=${p.id}`
+      : kind === 'service' && p.profile_user_id && publicProfiles.has(String(p.profile_user_id))
+        ? `${base}/u/${p.profile_user_id}`
+        : null;
+    const card: Omit<InboxCard, 'price_line'> = {
       kind,
       product_id: p.id,
-      name: String(p.name || (kind === 'service' ? 'Service' : 'Product')),
+      name: p.name,
       description: p.description ? String(p.description).slice(0, 400) : null,
       sku: p.sku ? String(p.sku) : null,
-      image_url: safeCardUrl(imageFromMetadata(p.metadata)),
-      price: net == null ? null : party.vatRegistered ? net : grossFromNet(net, vatPct),
+      image_url: safeImageSrc(imageFromMetadata(p.metadata)),
+      price: shown,
       currency: price.currency || 'EUR',
-      unit: price.measurement_unit_code || published.get(p.id)?.unit || null,
-      price_basis: net == null ? null : party.vatRegistered ? 'net' : 'gross',
+      unit: price.measurement_unit_code || pubRow?.unit || null,
+      price_basis: net == null ? null : party.isBusiness ? 'net' : 'gross',
       url,
-    });
+    };
+    return { ...card, price_line: cardPriceLine(card) };
+  });
+}
+
+/**
+ * The WhatsApp sends one stored message needs, and the record of which of them went.
+ *
+ * A message with cards is SEVERAL sends for ONE row (a text, then a card each; an attachment
+ * after). That makes partial delivery a real state, and CLAUDE.md anti-regression rule 4 says
+ * what to do with one: record each leg as it completes, name the half that failed, and let a
+ * retry RESUME at the first leg that did not run instead of storing a second message and
+ * delivering the first legs twice.
+ *
+ * `metadata.relay_legs[i]` is written after every leg — one write per leg, so a crash between
+ * two of them still leaves the truth on the row. `wamid` is the first leg's provider id (what
+ * every existing reader expects) and `wamids` all of them, so a delivery receipt or an outbound
+ * echo for ANY leg matches this row.
+ */
+interface WhatsAppRelayLeg {
+  ok: boolean;
+  wamid?: string | null;
+  error?: string;
+}
+
+/** One send: a card message, or the plain text / file message a message without cards is. */
+type WhatsAppLeg = Omit<WhatsAppCardMessage, 'attachmentType'> & {
+  attachmentType?: 'image' | 'video' | 'audio' | 'file';
+};
+
+async function whatsAppLegsFor(
+  db: DbClient,
+  body: string | null,
+  cards: InboxCard[],
+  attachments: Attachment[],
+): Promise<WhatsAppLeg[]> {
+  // Attachments live in a PRIVATE bucket as bucket + object path (never a persisted URL —
+  // storage convention #7), so the relay needs a freshly signed one. Zernio accepts a single
+  // attachment per message; extras stay visible in the inbox transcript.
+  let attachmentUrl: string | undefined;
+  let attachmentType: 'image' | 'video' | 'audio' | 'file' | undefined;
+  const first = attachments[0];
+  if (first?.storage_bucket && first?.storage_object_path) {
+    const { data: signed, error: signErr } = await db.storage
+      .from(first.storage_bucket)
+      .createSignedUrl(first.storage_object_path, 60 * 60 * 24);
+    if (signErr || !signed?.signedUrl) {
+      throw new HttpError(502, `Message stored but its attachment could not be prepared for WhatsApp: ${signErr?.message ?? 'no signed url'}`);
+    }
+    attachmentUrl = signed.signedUrl;
+    const ct = String(first.content_type || '');
+    attachmentType = ct.startsWith('image/') ? 'image'
+      : ct.startsWith('video/') ? 'video'
+      : ct.startsWith('audio/') ? 'audio'
+      : 'file';
   }
-  return out;
+  if (!cards.length) return [{ message: body ?? undefined, attachmentUrl, attachmentType }];
+  return [
+    ...buildWhatsAppCardMessages(cards, body),
+    ...(attachmentUrl ? [{ attachmentUrl, attachmentType }] : []),
+  ];
+}
+
+async function relayWhatsAppLegs(
+  db: DbClient,
+  opts: {
+    messageId: string;
+    accountId: string;
+    conversationId: string;
+    legs: WhatsAppLeg[];
+    /** Legs already recorded on the row — a resume skips the ones that went. */
+    done: WhatsAppRelayLeg[];
+    replyToWamid?: string;
+    baseMetadata: Record<string, unknown>;
+  },
+): Promise<{ legs: WhatsAppRelayLeg[]; failedAt: number | null }> {
+  const legs: WhatsAppRelayLeg[] = opts.legs.map((_, i) => opts.done[i] ?? { ok: false });
+  let failedAt: number | null = null;
+  const write = async (status: 'sent' | 'partial' | 'relay_failed') => {
+    const wamids = legs.filter((l) => l.ok && l.wamid).map((l) => String(l.wamid));
+    await db.from('inbox_messages').update({
+      metadata: {
+        ...opts.baseMetadata,
+        channel: 'whatsapp',
+        wamid: wamids[0] ?? null,
+        wamids,
+        relay_legs: legs,
+        // Explicit failure marker (pipeline convention #1) — emptiness alone is ambiguous, and
+        // `partial` is its own word because "some of it reached the customer" is neither.
+        delivery_status: status,
+      },
+    }).eq('id', opts.messageId);
+  };
+  for (let i = 0; i < opts.legs.length; i++) {
+    if (legs[i].ok) continue;
+    const res = await sendWhatsAppReply({
+      accountId: opts.accountId,
+      conversationId: opts.conversationId,
+      ...opts.legs[i],
+      // Quoting applies to the first send only; the rest follow it.
+      replyTo: i === 0 ? opts.replyToWamid : undefined,
+    });
+    const ok = !!(res as { success?: boolean })?.success;
+    legs[i] = ok
+      ? { ok: true, wamid: (res as { messageId?: string })?.messageId ?? null }
+      : { ok: false, error: String((res as { error?: unknown })?.error ?? 'WhatsApp relay failed') };
+    if (!ok) { failedAt = i; break; } // a leg that could not be sent must not be followed by the rest as if it had
+    await write(i === opts.legs.length - 1 ? 'sent' : 'partial');
+  }
+  const okCount = legs.filter((l) => l.ok).length;
+  await write(okCount === opts.legs.length ? 'sent' : okCount > 0 ? 'partial' : 'relay_failed');
+  return { legs, failedAt };
+}
+
+/** What the member is told when a leg failed: which part, and that a retry resumes there. */
+function whatsAppLegFailure(legs: WhatsAppRelayLeg[], failedAt: number, total: number): string {
+  const detail = legs[failedAt]?.error ?? 'WhatsApp relay failed';
+  const went = legs.filter((l) => l.ok).length;
+  if (went === 0) return `Message stored but NOT delivered to WhatsApp: ${detail}`;
+  return `Message stored; ${went} of ${total} parts reached WhatsApp and part ${failedAt + 1} did not (${detail}). `
+    + 'Press Send again to retry only the missing parts — nothing already delivered is repeated.';
+}
+
+/**
+ * A retry of a message that was already STORED: resume its WhatsApp legs, or return it as it is.
+ *
+ * `client_token` is minted by the composer once per send and kept across a failure, so the
+ * second click names the first message. A row whose relay is complete is returned unchanged (the
+ * first request succeeded and only its response was lost); a row with legs missing gets them
+ * sent, and nothing that already went is sent again.
+ */
+async function resumeStoredMessage(
+  db: DbClient,
+  thread: Record<string, unknown>,
+  clientToken: string,
+): Promise<Record<string, unknown> | null> {
+  const { data: existing } = await db
+    .from('inbox_messages').select('*')
+    .eq('thread_id', String(thread.id)).eq('metadata->>client_token', clientToken)
+    .is('deleted_at', null).limit(1).maybeSingle();
+  if (!existing) return null;
+  const row = existing as Record<string, unknown>;
+  const meta = ((row.metadata as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+  const status = String(meta.delivery_status ?? '');
+  if (thread.channel !== 'whatsapp' || status === 'sent' || !Array.isArray(meta.relay_legs)) return row;
+
+  const tmeta = (thread.metadata as Json) || {};
+  const accountId = String(tmeta.zernio_account_id || '');
+  const conversationId = String(tmeta.zernio_conversation_id || '');
+  if (!accountId || !conversationId) return row;
+  const cards = (Array.isArray(meta.cards) ? meta.cards : []) as InboxCard[];
+  const legs = await whatsAppLegsFor(db, (row.body as string | null) ?? null, cards, (row.attachments as Attachment[]) ?? []);
+  const { relay_legs: _legs, wamid: _w, wamids: _ws, delivery_status: _ds, channel: _c, ...baseMetadata } = meta;
+  const result = await relayWhatsAppLegs(db, {
+    messageId: String(row.id), accountId, conversationId, legs,
+    done: meta.relay_legs as WhatsAppRelayLeg[], baseMetadata,
+  });
+  if (result.failedAt !== null) throw new HttpError(502, whatsAppLegFailure(result.legs, result.failedAt, legs.length));
+  const { data: fresh } = await db.from('inbox_messages').select('*').eq('id', String(row.id)).maybeSingle();
+  return (fresh as Record<string, unknown> | null) ?? row;
 }
 
 /** Persist a message, bump the thread, fan out the channel relay + the in-app bell. */
@@ -1184,6 +1358,8 @@ async function insertMessageAndNotify(
      * the client's picks. Stored on the message and relayed in each channel's own rich shape.
      */
     cards?: InboxCard[];
+    /** The composer's per-send token, so a retry can find and resume THIS message. */
+    clientToken?: string | null;
   },
 ): Promise<Record<string, unknown>> {
   const { thread, senderParticipantId, body, attachments, messageType, replyToWamid, replyToMessageId } = opts;
@@ -1201,10 +1377,11 @@ async function insertMessageAndNotify(
       // Recorded so the transcript can render the quoted block locally. WhatsApp shows it on the
       // customer's side from `replyTo`; without this OUR side would show a bare reply and the
       // operator could not see what they had answered.
-      ...((replyToMessageId || cards.length) ? {
+      ...((replyToMessageId || cards.length || opts.clientToken) ? {
         metadata: {
           ...(replyToMessageId ? { reply_to: replyToMessageId } : {}),
           ...(cards.length ? { cards } : {}),
+          ...(opts.clientToken ? { client_token: opts.clientToken } : {}),
         },
       } : {}),
     })
@@ -1251,82 +1428,30 @@ async function insertMessageAndNotify(
     const accountId = String(meta.zernio_account_id || '');
     const conversationId = String(meta.zernio_conversation_id || '');
     if (accountId && conversationId) {
-      // Attachments live in a PRIVATE bucket as bucket + object path (never a persisted URL —
-      // storage convention #7), so the relay needs a freshly signed one. Zernio accepts a
-      // single attachment per message; extras stay visible in the inbox transcript.
-      let attachmentUrl: string | undefined;
-      let attachmentType: 'image' | 'video' | 'audio' | 'file' | undefined;
-      const first = attachments[0];
-      if (first?.storage_bucket && first?.storage_object_path) {
-        const { data: signed, error: signErr } = await db.storage
-          .from(first.storage_bucket)
-          .createSignedUrl(first.storage_object_path, 60 * 60 * 24);
-        if (signErr || !signed?.signedUrl) {
-          throw new HttpError(502, `Message stored but its attachment could not be prepared for WhatsApp: ${signErr?.message ?? 'no signed url'}`);
-        }
-        attachmentUrl = signed.signedUrl;
-        const ct = String(first.content_type || '');
-        attachmentType = ct.startsWith('image/') ? 'image'
-          : ct.startsWith('video/') ? 'video'
-          : ct.startsWith('audio/') ? 'audio'
-          : 'file';
-      }
       /*
        * Catalog cards go out in WhatsApp's OWN shape — an interactive `cta_url` message (image
-       * header, body, link button) or a media carousel — never as a pasted URL. The member's
-       * text rides inside the first card's body, so the customer reads one thing, not a
-       * paragraph followed by a stray box. A file attachment sent alongside cards follows as
-       * its own message, because Zernio carries one attachment per send.
+       * header, body, link button) per card — never as a pasted URL. The member's text rides in
+       * the first card's body when it fits, so the customer reads one thing, not a paragraph
+       * followed by a stray box. A file attachment sent alongside cards follows as its own
+       * message, because Zernio carries one attachment per send.
        *
-       * Several sends for one stored message: the first send's id is the one delivery receipts
-       * match on (`metadata->>wamid`), and every result is kept under `relay` so a failure of
-       * the third card is visible rather than averaged away.
+       * Several sends for one stored message: `relayWhatsAppLegs` records each as it goes
+       * (`relay_legs`, `wamids`), stores the first id as `wamid` for the receipt matcher, and
+       * stops at the first failure — the message the member then sees names WHICH part did not
+       * go, and a retry with the same client token resumes there (anti-regression rule 4).
+       *
+       * sendWhatsAppReply NEVER throws — _shared/zernio.ts catches everything and returns
+       * { success: false, error }. Before the result was read, a Zernio rejection (expired
+       * token, missing add-on, closed 24h window, rate limit) still produced a message bubble in
+       * the operator's thread and a cleared composer, while the customer received nothing.
        */
-      const sends = cards.length
-        ? [
-          ...buildWhatsAppCardMessages(cards, body).map((m) => ({ ...m, replyTo: undefined as string | undefined })),
-          ...(attachmentUrl ? [{ attachmentUrl, attachmentType, replyTo: undefined as string | undefined }] : []),
-        ]
-        : [{ message: body ?? undefined, attachmentUrl, attachmentType, replyTo: replyToWamid }];
-      if (sends.length && replyToWamid) sends[0].replyTo = replyToWamid;
-
-      const results: unknown[] = [];
-      let firstFailure: string | null = null;
-      for (const s of sends) {
-        const res = await sendWhatsAppReply({ accountId, conversationId, ...s });
-        results.push(res);
-        if (!(res as { success?: boolean })?.success) {
-          firstFailure = String((res as { error?: unknown })?.error ?? 'WhatsApp relay failed');
-          break; // a card that could not be sent must not be followed by the rest as if it had
-        }
-      }
-      const res = results[0] ?? { success: false, error: 'nothing to send' };
-      // Store the returned message id as `wamid` so the zernio-webhook-handler's
-      // message.delivered|read|failed handler (which matches `metadata->>wamid`) can apply
-      // delivery/read receipts to THIS outbound message. Keep `relay` for debugging.
-      const relayOk = firstFailure === null && !!(res as { success?: boolean })?.success;
-      await db
-        .from('inbox_messages')
-        .update({
-          metadata: {
-            ...storedMetadata,
-            channel: 'whatsapp',
-            wamid: (res as { messageId?: string })?.messageId ?? null,
-            relay: results.length === 1 ? res : results,
-            // Explicit failure marker (pipeline convention #1) — emptiness alone is ambiguous.
-            delivery_status: relayOk ? 'sent' : 'relay_failed',
-          },
-        })
-        .eq('id', (msg as { id: string }).id);
-
-      // sendWhatsAppReply NEVER throws — _shared/zernio.ts catches everything and returns
-      // { success: false, error }. `res.success` was never read, so a Zernio rejection
-      // (expired token, missing add-on, closed 24h window, rate limit) still produced a
-      // message bubble in the operator's thread and a cleared composer, while the customer
-      // received nothing. The failure text sat in metadata.relay.error with no reader.
-      if (!relayOk) {
-        const detail = firstFailure ?? String((res as { error?: unknown })?.error ?? 'WhatsApp relay failed');
-        throw new HttpError(502, `Message stored but NOT delivered to WhatsApp: ${detail}`);
+      const legs = await whatsAppLegsFor(db, body, cards, attachments);
+      const result = await relayWhatsAppLegs(db, {
+        messageId: (msg as { id: string }).id,
+        accountId, conversationId, legs, done: [], replyToWamid, baseMetadata: storedMetadata,
+      });
+      if (result.failedAt !== null) {
+        throw new HttpError(502, whatsAppLegFailure(result.legs, result.failedAt, legs.length));
       }
     }
   }
@@ -1339,8 +1464,10 @@ async function insertMessageAndNotify(
     const meta = (thread.metadata as Json) || {};
     const accountId = String(meta.zernio_account_id || '');
     const kind = String(meta.social_kind || '');
-    // A social DM or comment has no card layout of its own: the cards go as lines under the text.
-    const socialText = [body, cards.length ? cardsToText(cards) : ''].filter(Boolean).join('\n\n');
+    // A social DM or comment has no card layout of its own: the cards go as lines under the
+    // text, fitted to the tightest platform cap (Instagram DMs take 1,000 characters) — the
+    // member's words are never cut, and cards that do not fit are counted, not dropped silently.
+    const socialText = cards.length ? fitTextWithCards(body, cards, 1000) : String(body);
     let res: { success?: boolean; messageId?: string; error?: string } = { success: false, error: 'unrouted' };
 
     if (!accountId) {
@@ -1376,6 +1503,8 @@ async function insertMessageAndNotify(
     // message and the failure marker is gone — so read the error rather than assume.
     const { error: metaErr } = await db.from('inbox_messages').update({
       metadata: {
+        // Merge, never replace: the insert already stored `cards` / `reply_to` here.
+        ...storedMetadata,
         channel: 'social',
         direction: 'outgoing',
         social_kind: kind,
@@ -1514,7 +1643,7 @@ async function insertMessageAndNotify(
       .eq('thread_id', threadId)
       .eq('status', 'active')
       .not('user_id', 'is', null);
-    const preview = (body || '[attachment]').slice(0, 200);
+    const preview = (body || (cards.length ? cardsPreview(cards) : '[attachment]')).slice(0, 200);
     const subject = (thread.subject as string) || 'New message';
     // Notes go to members only; nobody is told about their own message.
     const recipients = ((parts || []) as Array<{ user_id: string; participant_type: string }>)
@@ -2040,14 +2169,9 @@ async function handleJwtAction(
         throw new HttpError(403, 'Only members may leave private notes');
       }
       const body = payload.body != null ? String(payload.body) : null;
-      const attachments = await normalizeAttachments(db, threadId, payload.attachments);
-      // Catalog cards (`/product`, `/service` in the composer). Members only — a customer has no
-      // catalog to offer — and ids only: the card the customer sees is resolved server-side.
-      const cards = access.isMember ? await resolveInboxCards(db, thread, payload.cards) : [];
-      if (!body && attachments.length === 0 && cards.length === 0) {
-        throw new HttpError(400, 'message body, attachment or catalog card required');
-      }
       // WhatsApp: freeform replies only inside Meta's 24h service window. Notes (internal) exempt.
+      // Checked FIRST — it is the cheap refusal, and everything below (uploads, card pricing) is
+      // work thrown away when it fails.
       if (thread.channel === 'whatsapp' && messageType !== 'note') {
         const w = await whatsappWindow(db, threadId, thread);
         if (!w.open) {
@@ -2062,6 +2186,28 @@ async function handleJwtAction(
               : 'this customer has never written to us, so no window has opened';
           throw new HttpError(409, `WhatsApp 24h service window is closed (${why}) — an approved template is required to message this customer again.`);
         }
+      }
+      // A retry of a message that was already STORED (the composer keeps its token across a
+      // failure): resume what did not go, never store it twice. Members' customer-facing
+      // messages only — that is the only path with several sends per row.
+      const clientToken = typeof payload.client_token === 'string' && /^[0-9a-f-]{36}$/i.test(payload.client_token)
+        ? payload.client_token : null;
+      if (clientToken && access.isMember && messageType !== 'note') {
+        const resumed = await resumeStoredMessage(db, thread, clientToken);
+        if (resumed) return json({ message: resumed, resumed: true });
+      }
+      // Catalog cards (`/product`, `/service` in the composer). Members only — a customer has no
+      // catalog to offer — customer-facing only (a private note relays nowhere), and ids only:
+      // the card the customer sees is resolved server-side. Independent of the uploads, so both
+      // run at once.
+      const [attachments, cards] = await Promise.all([
+        normalizeAttachments(db, threadId, payload.attachments),
+        access.isMember && messageType !== 'note'
+          ? resolveInboxCards(db, thread, payload.cards)
+          : Promise.resolve([] as InboxCard[]),
+      ]);
+      if (!body && attachments.length === 0 && cards.length === 0) {
+        throw new HttpError(400, 'message body, attachment or catalog card required');
       }
       // A member replying to a shared workspace thread they hadn't joined becomes a participant.
       let senderParticipantId = access.participant?.id ?? null;
@@ -2094,6 +2240,7 @@ async function handleJwtAction(
         replyToWamid,
         replyToMessageId: replyToWamid ? replyToId : undefined,
         cards,
+        clientToken,
       });
       // Mark the sender as caught up.
       if (senderParticipantId) {
@@ -2577,6 +2724,15 @@ async function handleJwtAction(
       const access = await resolveThreadAccess(db, userId, thread, operator);
       assertThreadVisible(access);
       const isMember = access.isMember;
+      /**
+       * `peek` is a READ and nothing else. Opening a thread on screen stamps the caller's
+       * `last_read_at` and sends the customer a read receipt, which is right for a person looking
+       * at it and wrong for the assistant summarising it ("brief me on this thread" must not show
+       * the customer blue ticks). A peek also returns the NEWEST messages and the same transcript
+       * the assistant's own replies are built from. Members only — the customer projection has
+       * no transcript to give.
+       */
+      const peek = payload.peek === true && isMember;
 
       /**
        * A customer gets the same projection the PUBLIC token path gives them (#359 CM-10).
@@ -2599,15 +2755,21 @@ async function handleJwtAction(
         .eq('thread_id', threadId)
         .neq('status', 'removed');
 
+      // `cards:metadata->cards` projects ONE key out of `metadata` — the catalog cards the
+      // business sent them, which are theirs to see — and nothing else in it (delivery state,
+      // provider ids, the addresses the relay uses stay behind the column list).
       let mq = db
         .from('inbox_messages')
-        .select(isMember ? '*' : 'id, body, attachments, message_type, sender_participant_id, created_at')
+        .select(isMember ? '*' : 'id, body, attachments, message_type, sender_participant_id, created_at, cards:metadata->cards')
         .eq('thread_id', threadId)
         .is('deleted_at', null)
-        .order('created_at', { ascending: true })
-        .limit(500);
+        // A peek wants the LATEST forty, not the oldest five hundred; read newest-first and put
+        // them back in order below.
+        .order('created_at', { ascending: !peek })
+        .limit(peek ? 40 : 500);
       if (!isMember) mq = mq.neq('message_type', 'note'); // customers never see notes
-      const { data: messages } = await mq;
+      const { data: messagesRaw } = await mq;
+      const messages = peek ? (messagesRaw || []).slice().reverse() : messagesRaw;
 
       // The thread row itself carries the routing metadata the relay reads — the mailbox we send
       // from, the provider conversation id — plus assignment and internal counters.
@@ -2668,7 +2830,7 @@ async function handleJwtAction(
         created_at: thread.created_at,
       };
 
-      if (access.participant) {
+      if (access.participant && !peek) {
         await db.from('inbox_participants').update({ last_read_at: new Date().toISOString() }).eq('id', access.participant.id);
 
         // ...and tell the PLATFORM, not just our own table.
@@ -2710,6 +2872,22 @@ async function handleJwtAction(
         const { data: stars } = await db.from('inbox_message_stars')
           .select('message_id').eq('user_id', userId).in('message_id', messageIds);
         starredMessageIds = ((stars || []) as Array<{ message_id: string }>).map((r) => r.message_id);
+      }
+      if (peek) {
+        // The one transcript derivation (attachments named, provider placeholders rewritten,
+        // offered cards listed) — `buildTranscript` takes newest-first rows, as the draft path
+        // passes them.
+        type TranscriptRow = {
+          body: string | null; message_type: string; attachments: Json | null; sender_participant_id: string | null; metadata: Json | null;
+        };
+        const rows = ((messages || []) as unknown as TranscriptRow[]).filter((m) => m.message_type !== 'note');
+        const transcript = await buildTranscript(db, threadId, rows.slice().reverse());
+        const { count } = await db.from('inbox_messages').select('id', { count: 'exact', head: true })
+          .eq('thread_id', threadId).is('deleted_at', null);
+        return json({
+          thread: threadForCaller, participants: participantsForCaller, messages: messages || [],
+          whatsapp_window: wa, starred_message_ids: starredMessageIds, transcript, message_count: count ?? null,
+        });
       }
       return json({ thread: threadForCaller, participants: participantsForCaller, messages: messages || [], whatsapp_window: wa, starred_message_ids: starredMessageIds });
     }
@@ -3027,18 +3205,11 @@ async function handleJwtAction(
       assertThreadVisible(access);
       if (!access.isMember) throw new HttpError(403, 'Only thread members may view conversation context');
 
-      // The customer participant's CRM contact id (first active customer on the thread).
-      const { data: custP } = await db
-        .from('inbox_participants')
-        .select('contact_id')
-        .eq('thread_id', threadId)
-        .eq('participant_type', 'customer')
-        .eq('status', 'active')
-        .not('contact_id', 'is', null)
-        .limit(1)
-        .maybeSingle();
-      const contactId = (custP as { contact_id?: string } | null)?.contact_id ?? null;
-      if (!contactId) return json({ contact: null, company: null, quotes: [], projects: [], invoices: [], metrics: null });
+      // WHO the customer is — contact and linked company — from the ONE derivation the card
+      // resolver and the assistant's account scope also read (`threadCustomerParty`).
+      const party = await threadCustomerParty(db, threadId);
+      const contactId = party.contactId;
+      if (!contactId) return json({ contact: null, company: null, quotes: [], projects: [], invoices: [], orders: [], metrics: null });
 
       const { data: contact } = await db
         .from('crm_contacts')
@@ -3059,10 +3230,9 @@ async function handleJwtAction(
           .limit(8),
       ]);
 
-      // Company: prefer the most recent quote/project link, fall back to the contact's text name.
-      const companyId =
-        (quotes || []).map((q: { customer_company_id?: string }) => q.customer_company_id).find(Boolean) ||
-        (projects || []).map((p: { client_company_id?: string }) => p.client_company_id).find(Boolean) || null;
+      // Company: the party's linked company (most recent quote, then project) — the same one the
+      // card was priced for and the assistant answers about.
+      const companyId = party.companyId;
       let company: Record<string, unknown> | null = null;
       if (companyId) {
         const { data: c } = await db
@@ -3078,15 +3248,19 @@ async function handleJwtAction(
       // balance; the open (amount_due > 0) invoices drive the rail list. Open-
       // ness is derived from amount_due, not a status string, so it's robust to
       // the finance status vocabulary.
-      const invFilter = [`customer_contact_id.eq.${contactId}`];
-      if (companyId) invFilter.push(`customer_company_id.eq.${companyId}`);
-      const { data: invRows } = await db
-        .from('invoices')
-        .select('id, total, amount_due, status, currency, due_at, issued_at, internal_number, legal_number')
-        .eq('workspace_id', thread.workspace_id)
-        .or(invFilter.join(','))
-        .order('issued_at', { ascending: false })
-        .limit(200);
+      // Invoices and orders are independent reads of the same party: one wave.
+      const [{ data: invRows }, orders] = await Promise.all([
+        db
+          .from('invoices')
+          .select('id, total, amount_due, status, currency, due_at, issued_at, internal_number, legal_number')
+          .eq('workspace_id', thread.workspace_id)
+          .or(partyFilter(party, 'customer_contact_id', 'customer_company_id'))
+          .order('issued_at', { ascending: false })
+          .limit(200),
+        // The customer's SALES orders with what is still owed — the same read the assistant's
+        // `list_orders` makes, settlement from `get_order_settlements` (rule 1).
+        listCustomerSalesOrders(db, { workspaceId: String(thread.workspace_id), party }),
+      ]);
       const allInv = (invRows || []) as Array<Record<string, unknown>>;
       const num = (v: unknown) => (typeof v === 'number' ? v : Number(v) || 0);
       const openInv = allInv.filter((i) => num(i.amount_due) > 0);
@@ -3109,36 +3283,6 @@ async function handleJwtAction(
           status: (i.status as string) || null,
           due_at: (i.due_at as string) || null,
         }));
-
-      // Orders: the customer's SALES orders in this workspace, newest first. Settlement comes from
-      // `get_order_settlements` — the one derivation of "how much is still owed on an order" —
-      // never from `total − paid` re-done here.
-      const { data: ordRows } = await db
-        .from('orders')
-        .select('id, order_number, status, total, currency, created_at')
-        .eq('workspace_id', thread.workspace_id)
-        .eq('order_type', 'sales')
-        .or(invFilter.join(','))
-        .order('created_at', { ascending: false })
-        .limit(8);
-      const orderRows = (ordRows || []) as Array<Record<string, unknown>>;
-      const settlements = new Map<string, { outstanding: number; payment_status: string }>();
-      if (orderRows.length) {
-        const { data: st } = await db.rpc('get_order_settlements', { p_order_ids: orderRows.map((o) => String(o.id)) });
-        for (const s of (st || []) as Array<{ order_id: string; outstanding: number; payment_status: string }>) {
-          settlements.set(s.order_id, { outstanding: num(s.outstanding), payment_status: String(s.payment_status) });
-        }
-      }
-      const orders = orderRows.map((o) => ({
-        id: String(o.id),
-        order_number: (o.order_number as string | null) ?? null,
-        status: (o.status as string | null) ?? null,
-        payment_status: settlements.get(String(o.id))?.payment_status ?? null,
-        total: num(o.total),
-        outstanding: settlements.get(String(o.id))?.outstanding ?? null,
-        currency: (o.currency as string | null) ?? metrics.currency,
-        created_at: String(o.created_at),
-      }));
 
       return json({ contact: contact || null, company, quotes: quotes || [], projects: projects || [], invoices, orders, metrics });
     }
@@ -3917,7 +4061,7 @@ async function handleJwtAction(
       // What the MEMBER wants the reply to do ("offer the oak decking", "say the order ships
       // Monday"). Optional; trusted because it comes from the member's own JWT-authenticated
       // request, and passed to agent-chat OUTSIDE the customer-data fence for that reason.
-      const instruction = typeof payload.instruction === 'string' ? payload.instruction.trim().slice(0, 1000) : '';
+      const instruction = typeof payload.instruction === 'string' ? payload.instruction.trim().slice(0, OPERATOR_INSTRUCTION_MAX) : '';
       const draft = await buildAgentDraft(db, thread, {
         userId, task: 'inbox_agent_suggest', operatorInstruction: instruction || undefined,
       });
@@ -4168,23 +4312,25 @@ async function handleJwtAction(
       assertThreadVisible(access);
       if (!access.isMember) throw new HttpError(403, 'Only thread members may browse the catalog');
       const workspaceId = String(thread.workspace_id);
-      const kind: InboxCardKind = payload.kind === 'service' ? 'service' : 'product';
-      // The query reaches a PostgREST filter grammar: strip the operator characters (`,` `.` `(`
-      // `)` `*`), same as the intake matcher — escapeHtml is not a filter sanitizer.
-      const q = String(payload.query || '').replace(/[^\p{L}\p{N}\s\-]/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
+      const kind: InboxCardKind = isInboxCardKind(payload.kind) ? payload.kind : 'product';
+      // The query reaches a PostgREST filter grammar: the ONE sanitizer the intake matcher uses
+      // (operator characters become wildcards, so `28.145` still finds `OAK-28.145`).
+      const q = postgrestSafeIlikeTerm(String(payload.query || ''));
 
       let query = db.from('products')
         .select('id, name, sku, description, metadata, item_type')
         .eq('workspace_id', workspaceId);
       query = kind === 'service' ? query.eq('item_type', 'service') : query.neq('item_type', 'service');
-      if (q) query = query.or(`name.ilike.%${q}%,sku.ilike.%${q}%`);
+      if (q.replace(/%/g, '').length) query = query.or(`name.ilike.%${q}%,sku.ilike.%${q}%`);
       const { data: rows, error: qErr } = await query.order('updated_at', { ascending: false }).limit(12);
       if (qErr) throw new HttpError(500, `catalog search failed: ${qErr.message}`);
 
       const ids = ((rows || []) as Array<{ id: string }>).map((r) => r.id);
+      // The base price row only: `product_prices` is unique per (product, variant_key), and a
+      // variant's price is not the product's list price.
       const { data: prices } = ids.length
         ? await db.from('product_prices').select('product_id, list_price, currency, unit')
-          .eq('workspace_id', workspaceId).in('product_id', ids)
+          .eq('workspace_id', workspaceId).is('variant_key', null).in('product_id', ids)
         : { data: [] as Array<Record<string, unknown>> };
       const priceById = new Map(
         ((prices || []) as Array<{ product_id: string; list_price: number | null; currency: string | null; unit: string | null }>)
@@ -4199,7 +4345,7 @@ async function handleJwtAction(
             name: r.name,
             sku: r.sku,
             description: r.description ? String(r.description).slice(0, 160) : null,
-            image_url: safeCardUrl(imageFromMetadata(r.metadata)),
+            image_url: safeImageSrc(imageFromMetadata(r.metadata)),
             list_price: pr?.list_price ?? null,
             currency: pr?.currency ?? null,
             unit: pr?.unit ?? null,
@@ -4419,7 +4565,9 @@ async function handleTokenAction(db: DbClient, action: string, payload: Json): P
       const thread = await getThreadOrThrow(db, String(tok.thread_id));
       const { data: messages } = await db
         .from('inbox_messages')
-        .select('id, body, attachments, message_type, sender_participant_id, created_at')
+        // Same projection `get_thread` gives a customer: the column list plus the ONE metadata
+        // key that is theirs — the catalog cards the business sent them.
+        .select('id, body, attachments, message_type, sender_participant_id, created_at, cards:metadata->cards')
         .eq('thread_id', thread.id)
         .is('deleted_at', null)
         .neq('message_type', 'note') // customers never see private notes

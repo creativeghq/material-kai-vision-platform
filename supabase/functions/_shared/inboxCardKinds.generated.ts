@@ -5,12 +5,15 @@
 /**
  * What a catalog card in an Inbox message can be — written ONCE.
  *
- * A member types `/product` or `/service` in the composer, picks from the workspace catalog, and
- * the card goes to the customer in the channel's own rich shape (a WhatsApp interactive card, a
- * table in an email, a card in the thread). The CLIENT needs this list for the slash-command menu
- * and the chips; the EDGE needs it to validate the pick and to label the button on the card.
+ * A member picks a product or a service from the workspace catalog and the card goes to the
+ * customer in the channel's own rich shape (a WhatsApp interactive card, a table in an email, a
+ * card in the thread). The CLIENT needs these to build a pick and render the card; the EDGE
+ * validates the pick against the same list, prices it, and labels the card's button from it.
  * Two runtimes, one declaration — mirrored by `npm run vocab:mirror`
  * (tests/unit/vocabularyMirrors.test.ts holds the copy to this source).
+ *
+ * Only the closed value-sets live here. The composer's slash commands and their UI copy are in
+ * `src/pages/Inbox/inboxSlashCommands.ts`, because no edge function reads them.
  *
  * THIS FILE IS IMPORT-FREE, ON PURPOSE — it is byte-mirrored to the edge.
  */
@@ -18,23 +21,22 @@
 export const INBOX_CARD_KINDS = ['product', 'service'] as const;
 export type InboxCardKind = (typeof INBOX_CARD_KINDS)[number];
 
-/** The most cards one message carries — WhatsApp's carousel cap, and plenty for an email. */
+export function isInboxCardKind(v: unknown): v is InboxCardKind {
+  return typeof v === 'string' && (INBOX_CARD_KINDS as readonly string[]).includes(v);
+}
+
+/**
+ * Whether the card's price includes VAT. A consumer is quoted gross, a business buyer net — the
+ * same split the invoice makes between a retail receipt (11.x) and a wholesale invoice (1.x).
+ */
+export const INBOX_PRICE_BASES = ['net', 'gross'] as const;
+export type InboxPriceBasis = (typeof INBOX_PRICE_BASES)[number];
+
+/** The most cards one message carries. */
 export const INBOX_CARD_MAX = 10;
 
-/** The composer's slash commands, each with the kind it opens a picker for. */
-export const INBOX_CARD_SLASH_COMMANDS: ReadonlyArray<{
-  command: string;
-  kind: InboxCardKind;
-  label: string;
-  hint: string;
-}> = [
-  { command: 'product', kind: 'product', label: '/product', hint: 'Suggest a product from the catalog' },
-  { command: 'service', kind: 'service', label: '/service', hint: 'Suggest one of your services' },
-];
-
-/** `/products` and `/services` mean the same thing as the singular; a typo is not a refusal. */
-export function inboxCardKindForCommand(token: string): InboxCardKind | null {
-  const t = token.trim().toLowerCase().replace(/^\//, '').replace(/s$/, '');
-  const hit = INBOX_CARD_SLASH_COMMANDS.find((c) => c.command === t);
-  return hit ? hit.kind : null;
-}
+/** The button under a card, in the chat, the email and the WhatsApp card alike. ≤ 20 chars (Meta). */
+export const INBOX_CARD_BUTTON_LABEL: Record<InboxCardKind, string> = {
+  product: 'View product',
+  service: 'View service',
+};

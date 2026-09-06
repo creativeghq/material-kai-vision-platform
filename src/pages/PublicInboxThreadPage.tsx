@@ -281,7 +281,7 @@ const PublicBubble: React.FC<{ m: InboxMessage }> = ({ m }) => {
     <div className="rounded-lg px-3 py-2 bg-white/5 max-w-[80%]">
       {m.body && <div className="text-sm whitespace-pre-wrap break-words">{m.body}</div>}
       {/* Products or services the business suggested — the same card the member's transcript shows. */}
-      <InboxCatalogCards cards={readInboxCards(m.metadata)} />
+      <InboxCatalogCards cards={readInboxCards(m)} />
       {(m.attachments || []).map((a, i) => {
         const k = a.storage_object_path || a.url || '';
         return (

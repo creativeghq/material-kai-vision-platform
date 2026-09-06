@@ -102,17 +102,34 @@ async function mivaaSearch(
   }
 }
 
+/**
+ * Free text → a term safe inside a PostgREST `ilike` filter.
+ *
+ * The text reaches a filter GRAMMAR: `,` `.` `(` `)` are operators there, `*` is the wildcard,
+ * and escapeHtml is NOT a PostgREST sanitizer (separate contract, see CLAUDE.md). Anything that is
+ * not a letter, digit, space or hyphen becomes `%` — a wildcard, not a space — so an SKU typed
+ * as `OAK-28.145` still matches `OAK-28.145` instead of looking for a literal space. One helper
+ * for every ilike built from user text (the intake matcher, the catalog picker).
+ */
+export function postgrestSafeIlikeTerm(text: string, max = 80): string {
+  return text
+    .replace(/[^\p{L}\p{N}\s\-]/gu, '%')
+    .replace(/\s+/g, ' ')
+    .replace(/%{2,}/g, '%')
+    .trim()
+    .slice(0, max);
+}
+
 /** Direct DB fallback. Deliberately dumb — it exists so a MIVAA outage still produces a match. */
 async function ilikeSearch(
   db: DbClient,
   workspaceId: string,
   description: string,
 ): Promise<MatchCandidate[]> {
-  // The description is model output derived from customer text, so it reaches a PostgREST
-  // filter grammar. Strip everything that could alter it: `,` `.` `(` `)` `*` are operators
-  // there, and escapeHtml is NOT a PostgREST sanitizer (separate contract, see CLAUDE.md).
-  const safe = description.replace(/[^\p{L}\p{N}\s\-]/gu, ' ').trim().slice(0, 80);
-  if (safe.length < 3) return [];
+  // The description is model output derived from customer text: it reaches a PostgREST filter
+  // grammar, so it goes through the one sanitizer.
+  const safe = postgrestSafeIlikeTerm(description);
+  if (safe.replace(/%/g, '').length < 3) return [];
   const { data } = await db
     .from('products')
     .select('id, name')

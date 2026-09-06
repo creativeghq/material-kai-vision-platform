@@ -1651,7 +1651,7 @@ async function executeAgent(
   // Resolved here, once, because three separate things need it: the account tools' scope, whether
   // this is a PUBLIC comment thread (which changes what is safe to say), and the workspace's
   // `allow_account_data` switch.
-  let customerAccountScope: { workspaceId: string; contactId: string; publicAppUrl: string } | null = null;
+  let customerAccountScope: { workspaceId: string; contactId: string; companyId: string | null; publicAppUrl: string } | null = null;
   let customerPublicThread = false;
   if (forCustomer && customerThreadId) {
     try {
@@ -1670,18 +1670,19 @@ async function executeAgent(
 
       const { autoRespond: _ar, allowAccountData } = await inboxAutopilotSettings(supabase, threadWorkspace);
 
-      const { data: custP } = await supabase
-        .from('inbox_participants').select('contact_id')
-        .eq('thread_id', customerThreadId).eq('participant_type', 'customer').eq('status', 'active')
-        .not('contact_id', 'is', null).limit(1).maybeSingle();
-      const contactId = (custP as { contact_id?: string } | null)?.contact_id ?? null;
+      // The ONE derivation of who the customer on a thread is — contact AND the company the
+      // platform links them to — shared with inbox-api's rail and card resolver, so the account
+      // tools answer about the same party the member sees.
+      const { threadCustomerParty } = await import('../_shared/inbox-customer-party.ts');
+      const party = await threadCustomerParty(supabase, customerThreadId);
 
       // Withheld entirely on a public thread. Refusing in the prompt is not enough while the tool
       // is still callable — a balance is one sentence away from being published under a post.
-      if (allowAccountData && contactId && !customerPublicThread) {
+      if (allowAccountData && party.contactId && !customerPublicThread) {
         customerAccountScope = {
           workspaceId: threadWorkspace,
-          contactId,
+          contactId: party.contactId,
+          companyId: party.companyId,
           publicAppUrl: Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr',
         };
       }

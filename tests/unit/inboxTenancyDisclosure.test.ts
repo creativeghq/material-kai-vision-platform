@@ -150,7 +150,11 @@ describe('#359 CM-10 — a customer sees the customer projection', () => {
     // and each message's delivery metadata and provider ids.
     const get = sliceCase("case 'get_thread'");
     expect(get).toMatch(/select\(isMember \? '\*' : 'id, participant_type, thread_role'\)/);
-    expect(get).toMatch(/select\(isMember \? '\*' : 'id, body, attachments, message_type, sender_participant_id, created_at'\)/);
+    // `cards:metadata->cards` is a projection of ONE json key (the catalog cards the business
+    // sent this customer), not the `metadata` column — delivery state, provider ids and relay
+    // addresses stay behind the list. A bare `metadata` here is the leak this test exists for.
+    expect(get).toMatch(/select\(isMember \? '\*' : 'id, body, attachments, message_type, sender_participant_id, created_at, cards:metadata->cards'\)/);
+    expect(get).not.toMatch(/: 'id, body, attachments[^']*\bmetadata,/);
   });
 
   it('the thread row is projected too', () => {
@@ -182,7 +186,7 @@ describe('#359 CM-10 — a customer sees the customer projection', () => {
     // `token_get_thread` is this screen without an account. Two projections for one audience is
     // how the narrower one comes to be treated as the special case.
     const token = api.slice(api.indexOf("case 'token_get_thread'"), api.indexOf("case 'token_request_code'"));
-    for (const field of ['id, participant_type, thread_role', 'id, body, attachments, message_type, sender_participant_id, created_at']) {
+    for (const field of ['id, participant_type, thread_role', 'id, body, attachments, message_type, sender_participant_id, created_at, cards:metadata->cards']) {
       expect(token, field).toContain(field);
     }
   });

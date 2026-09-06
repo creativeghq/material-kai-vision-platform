@@ -7090,10 +7090,16 @@
             "name": "cards",
             "type": "array",
             "required": false,
-            "desc": "Catalog cards to send: [{kind: product|service, product_id}]. Members only, ids only — name, image, link and the customer's price are resolved server-side and relayed as a WhatsApp interactive card, an email table, or text lines."
+            "desc": "Catalog cards to send: [{kind: product|service, product_id}]. Members only, customer-facing only, ids only — name, image, link and the customer's price are resolved server-side and relayed as one WhatsApp interactive card per product, an email table, or text lines."
+          },
+          {
+            "name": "client_token",
+            "type": "string (uuid)",
+            "required": false,
+            "desc": "Minted by the composer once per send and kept across a failure. A retry carrying the token of a message that was stored but only partly delivered to WhatsApp resumes the missing sends and returns that message (`resumed: true`) instead of storing a second one."
           }
         ],
-        "response": "{data: message}"
+        "response": "{data: message, resumed?: boolean}"
       },
       {
         "name": "mark_read",
@@ -7291,9 +7297,15 @@
             "name": "thread_id",
             "type": "string (uuid)",
             "required": true
+          },
+          {
+            "name": "peek",
+            "type": "boolean",
+            "required": false,
+            "desc": "Members only. A pure read for the assistant: no last_read_at stamp, no read receipt to the customer, the newest 40 messages, plus `transcript` (the same derivation the assistant's replies use) and `message_count`."
           }
         ],
-        "response": "{data: {thread, participants, messages}}"
+        "response": "{data: {thread, participants, messages, transcript?, message_count?}}"
       },
       {
         "name": "create_marketplace_inquiry",

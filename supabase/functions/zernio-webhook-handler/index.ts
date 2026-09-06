@@ -965,6 +965,13 @@ async function findInboxMessageByProviderId(supabase: any, msg: any): Promise<{ 
       .from('inbox_messages').select('id, metadata')
       .eq('metadata->>wamid', wamid).limit(1).maybeSingle();
     if (data) return data as { id: string; metadata: any };
+    // A message sent with catalog cards is SEVERAL WhatsApp sends for one row: `wamid` holds
+    // the first id, `wamids` all of them. An echo or receipt for any later leg is that row too —
+    // otherwise the echo files as a fresh outgoing bubble and the receipt matches nothing.
+    const { data: leg } = await supabase
+      .from('inbox_messages').select('id, metadata')
+      .contains('metadata', { wamids: [wamid] }).limit(1).maybeSingle();
+    if (leg) return leg as { id: string; metadata: any };
   }
   return null;
 }

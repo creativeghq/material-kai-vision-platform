@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { parseEdgeError } from '@/utils/edgeError';
 import type { InboxDocumentKind } from '@/modules/messaging/inboxDocumentKinds';
-import type { InboxCardKind } from '@/modules/messaging/inboxCardKinds';
+import type { InboxCardKind, InboxPriceBasis } from '@/modules/messaging/inboxCardKinds';
 
 /**
  * Multi-Tenant Inbox client. Thin wrapper over the single `inbox-api` edge function
@@ -183,6 +183,12 @@ export interface InboxMessage {
   attachments: InboxAttachment[];
   message_type: InboxMessageType;
   metadata: Record<string, unknown>;
+  /**
+   * The customer projection (a client-role `get_thread`, `token_get_thread`) has no `metadata`
+   * and carries the catalog cards here instead, projected from that one json key. Members read
+   * them from `metadata.cards`. `readInboxCards` accepts both.
+   */
+  cards?: InboxCard[];
   created_at: string;
   edited_at: string | null;
   deleted_at: string | null;
@@ -289,7 +295,9 @@ export interface InboxCard {
   price: number | null;
   currency: string;
   unit: string | null;
-  price_basis: 'net' | 'gross' | null;
+  price_basis: InboxPriceBasis | null;
+  /** The price as printed everywhere ("€45.00 / m² incl. VAT"), derived once server-side. */
+  price_line: string;
   url: string | null;
 }
 
@@ -524,6 +532,12 @@ export const inboxApi = {
     reply_to_message_id?: string;
     /** Catalog cards to send with the message — picks only; the card itself is resolved server-side. */
     cards?: InboxCardPick[];
+    /**
+     * Minted once per composer send and kept across a failure. A message with cards is several
+     * WhatsApp sends; if one fails after others went, a retry with the same token RESUMES the
+     * missing parts instead of storing a second message and delivering the first ones twice.
+     */
+    client_token?: string;
   }) {
     return call<{ message: InboxMessage }>('send_message', input);
   },

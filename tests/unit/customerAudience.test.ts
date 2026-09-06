@@ -211,13 +211,19 @@ describe('agent-chat applies the audience clamp', () => {
   it('withholds account data on a PUBLIC comment thread', () => {
     // Refusing in the prompt is not enough while the tool is callable: a balance is one sentence
     // away from being published under our own post for the account's whole audience.
-    expect(chat()).toMatch(/allowAccountData && contactId && !customerPublicThread/);
+    expect(chat()).toMatch(/allowAccountData && party\.contactId && !customerPublicThread/);
   });
 
   it('derives the customer scope from the thread row, never from the message', () => {
     const src = chat();
-    expect(src).toMatch(/from\('inbox_participants'\)/);
-    expect(src).toMatch(/participant_type'?,?\s*'customer'/);
+    // The derivation lives in `_shared/inbox-customer-party.ts` — the ONE place the rail, the card
+    // resolver and this scope read who the customer is — and it reads the thread's participant
+    // row, never a message.
+    expect(src).toMatch(/threadCustomerParty\(supabase, customerThreadId\)/);
+    const party = code('supabase/functions/_shared/inbox-customer-party.ts');
+    expect(party).toMatch(/from\('inbox_participants'\)/);
+    expect(party).toMatch(/participant_type'?,?\s*'customer'/);
+    expect(party).not.toMatch(/inbox_messages/);
     // The thread's own workspace wins over anything the caller passed, so a service-role caller
     // naming thread A and workspace B cannot read B.
     expect(src).toMatch(/const threadWorkspace = t\.workspace_id \|\| workspaceId/);

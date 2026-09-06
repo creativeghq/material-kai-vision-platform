@@ -72,10 +72,17 @@ export const VOCABULARIES = [
     'supabase/functions/_shared/inboxDocumentKinds.generated.ts',
   ],
   [
-    // A catalog card in an Inbox message: product or service, and how many one message carries.
-    // The composer's slash menu offers these; inbox-api validates the pick against the same list.
+    // A catalog card in an Inbox message: product or service, the price basis, the button label,
+    // and how many one message carries. The composer offers these; inbox-api validates the pick
+    // against the same list and the edge renderers label the card's button from it.
     'src/modules/messaging/inboxCardKinds.ts',
     'supabase/functions/_shared/inboxCardKinds.generated.ts',
+  ],
+  [
+    // The http(s) allowlist for an href/src assembled by hand — a different contract from
+    // escapeHtml (invariant 11), needed wherever tenant-supplied URLs reach an email or a card.
+    'src/utils/safeUrl.ts',
+    'supabase/functions/_shared/safeUrl.generated.ts',
   ],
   [
     // How a golden-case run failed. `agent_eval_runs_failure_class_check` is the enforcer; the

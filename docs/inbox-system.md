@@ -488,13 +488,28 @@ message. Several cards go in one message, up to `INBOX_CARD_MAX` (10).
 The resolved cards are stored on the message (`inbox_messages.metadata.cards`) and rendered by
 `InboxCatalogCards` in the member's transcript and on the customer's `/i/:token` page.
 
+The card's `price_line` ("€54.50 / m² incl. VAT") is derived once at resolve time; every rendering
+prints it. VAT is the product's own `mydata_vat_category` rate when set, the workspace default
+otherwise — the rate the invoice will apply. **Who the customer is** comes from ONE derivation,
+`_shared/inbox-customer-party.ts` (`threadCustomerParty`): the thread's customer contact, the
+company the platform links them to, and `isBusiness` following the SQL predicate
+`invoice_buyer_is_business`. The rail, the card resolver and agent-chat's account scope all read it.
+
 ### One shape, three renderings (`_shared/inbox-cards.ts`)
 
 | Channel | What goes out |
 |---|---|
-| WhatsApp | Meta's interactive **`cta_url`** message: image header (or a text header when there is no image), body = the member's words + name + price, footer = SKU/unit, one link button. Two to ten cards that all carry an image and a link go as one **media carousel**; a mixed set goes as the text, then one message per card. No public link → image with caption; no image either → plain text. All are session messages, gated by the same 24h-window check as any reply. Relay stops at the first failed card and records every result under `metadata.relay`. |
-| Email | The member's words, then an HTML **table** (thumbnail · name · description · SKU · price · button), every field through the canonical `escapeHtml`, `href`/`src` refused unless http(s), plus a text alternative listing the same cards. |
-| Social DM / comment | The cards as text lines under the message. |
+| WhatsApp | Meta's interactive **`cta_url`** message, **one per card**: image header (or a text header when there is no image), body = the member's words + name + price, footer = SKU/unit, one link button. The words ride in the first card when they fit Meta's body cap and go out first as their own message when they do not — they are never cut. No public link → image with caption; no image either → plain text. All are session messages, gated by the same 24h-window check as any reply. Meta's media carousel is deliberately not used: Zernio accepts it, but whether Meta delivers it as a session message could not be verified, and its failure would arrive asynchronously. |
+| Email | The member's words, then an HTML **table** (thumbnail · name · description · SKU · price · button), every field through the canonical `escapeHtml`, `href`/`src` through the `safeUrl` allowlist, plus a text alternative listing the same cards. |
+| Social DM / comment | The cards as text lines under the message, fitted to the 1,000-character DM cap: the words are never cut, cards that do not fit are counted ("…and 3 more"). |
+
+**Several WhatsApp sends for one stored message** (anti-regression rule 4): `relayWhatsAppLegs`
+records each leg as it completes (`metadata.relay_legs`, `wamids`; `wamid` stays the first id),
+stops at the first failure, and the error names WHICH part did not go. The composer mints a
+`client_token` once per send and keeps it across a failure; a retry with the same token finds the
+stored message and **resumes the missing legs** — nothing already delivered is sent twice. A
+delivery receipt or an outbound echo for any leg matches the row (`apply_inbox_delivery_receipt`
+and the webhook's `findInboxMessageByProviderId` both read `wamids`).
 
 Guarded by [tests/unit/inboxCatalogCards.test.ts](../tests/unit/inboxCatalogCards.test.ts).
 
@@ -503,12 +518,17 @@ Guarded by [tests/unit/inboxCatalogCards.test.ts](../tests/unit/inboxCatalogCard
 `get_thread_context` returns the customer's recent **sales orders** (number, status, ledger-derived
 payment status and outstanding from `get_order_settlements`), shown as an *Orders* section on the
 Customer profile rail with a link to the order. The customer-audience assistant has a fourth
-account tool, `list_orders`, for "where is my order" — scoped by the thread like the other three.
+account tool, `list_orders`. Both read `_shared/customer-orders.ts` — one query, contact OR
+company — so the assistant cannot deny an order the rail beside it shows.
 
 ### Steering "Draft with AI", and asking JARVIS about a conversation
 
 *Draft with AI* opens a small popover: an optional instruction ("offer the oak decking, say it
 ships Monday") goes to agent-chat as `operator_instruction`, appended **after** the customer-data
-fence and labelled as the operator's words. The *Ask JARVIS* button in the thread header opens the
-Agent Hub with a prompt naming the thread; `manage_inbox action:"read"` returns the transcript
-(customer text wrapped as untrusted data) with the same orders/quotes/invoices context the rail shows.
+fence and labelled as the operator's words; the fence neutralises its own markers inside customer
+text so the block cannot be forged from the other side. The *Ask JARVIS* button in the thread
+header opens the Agent Hub with a prompt naming the thread by id (never its subject — on an email
+thread that is the customer's text); `manage_inbox action:"read"` calls `get_thread` with
+`peek: true` — no read stamp, no read receipt to the customer, the newest 40 messages — and returns
+the same transcript the assistant's own replies are built from, wrapped as untrusted data together
+with the subject, plus the orders/quotes/invoices context the rail shows.

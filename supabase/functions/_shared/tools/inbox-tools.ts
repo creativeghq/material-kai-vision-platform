@@ -196,39 +196,33 @@ export const createManageInboxTool = (
 
       if (action === 'read') {
         // "What is this conversation about, and what is their order status?" — the transcript
-        // and the same customer context the Inbox rail shows, in one call. The customer's words
-        // are the other party's and go back to the model fenced as DATA (invariant 9); the
+        // and the same customer context the Inbox rail shows, in one call.
+        //
+        // `peek: true` is what makes this a READ: inbox-api's `get_thread` otherwise stamps the
+        // caller's last_read_at and sends the customer a read receipt, and "brief me on this
+        // thread" must not show the customer blue ticks for a message nobody has looked at.
+        // The transcript is the SAME derivation the assistant's own reply uses (attachments
+        // named, provider placeholders rewritten, offered cards listed), newest messages, and
+        // it comes back to the model fenced as DATA — all of it, including the subject, because
+        // the other party wrote parts of it and a sender the platform could not identify (a
+        // social DM, a removed participant) is still the other party (invariant 9). The
         // context figures are ours and go back plain.
         if (!thread_id) return JSON.stringify({ success: false, error: 'read needs thread_id.' });
         const [t, c] = await Promise.all([
-          callInbox('get_thread', { thread_id }, jwt),
+          callInbox('get_thread', { thread_id, peek: true }, jwt),
           callInbox('get_thread_context', { thread_id }, jwt),
         ]);
         if (!t.ok) return JSON.stringify({ success: false, error: t.error || `inbox-api ${t.status}` });
-        const participants = (t.data?.participants ?? []) as Array<{ id: string; participant_type: string }>;
-        const kindOf = new Map(participants.map((p) => [p.id, p.participant_type]));
-        const messages = ((t.data?.messages ?? []) as Array<Record<string, unknown>>).slice(-30).map((m) => {
-          const from = m.message_type === 'agent' ? 'assistant'
-            : m.message_type === 'system' ? 'system'
-            : m.message_type === 'note' ? 'internal_note'
-            : (kindOf.get(String(m.sender_participant_id)) ?? 'unknown');
-          const cards = (m.metadata as { cards?: Array<{ name?: string }> } | null)?.cards;
-          return {
-            at: m.created_at,
-            from,
-            text: typeof m.body === 'string' && m.body
-              ? (from === 'customer' ? wrapUntrusted('customer message', m.body, 600) : m.body.slice(0, 600))
-              : null,
-            attachments: Array.isArray(m.attachments) ? m.attachments.length : 0,
-            ...(Array.isArray(cards) && cards.length ? { cards: cards.map((x) => x?.name).filter(Boolean) } : {}),
-          };
-        });
         const th = (t.data?.thread ?? {}) as Record<string, unknown>;
+        const transcript = typeof t.data?.transcript === 'string' ? t.data.transcript : '';
         return JSON.stringify({
           success: true,
           thread: {
-            id: th.id, subject: th.subject, channel: th.channel, status: th.status,
+            id: th.id,
+            subject: th.subject ? wrapUntrusted('conversation subject', String(th.subject), 200) : null,
+            channel: th.channel, status: th.status,
             agent_state: th.agent_state, last_message_at: th.last_message_at,
+            message_count: t.data?.message_count ?? null,
           },
           customer: c.ok ? {
             contact: c.data?.contact ?? null,
@@ -238,7 +232,9 @@ export const createManageInboxTool = (
             open_invoices: c.data?.invoices ?? [],
             metrics: c.data?.metrics ?? null,
           } : null,
-          messages,
+          transcript: transcript
+            ? wrapUntrusted('conversation transcript (newest last; "Our team" lines are ours, the rest is the other party)', transcript, 8000)
+            : '(no messages)',
         });
       }
 

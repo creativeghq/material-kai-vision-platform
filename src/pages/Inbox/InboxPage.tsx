@@ -16,9 +16,8 @@ import {
   Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem,
 } from '@/components/core/ui/command';
 import { InboxCatalogCards, readInboxCards } from '@/modules/messaging/components/InboxCatalogCards';
-import {
-  INBOX_CARD_SLASH_COMMANDS, INBOX_CARD_MAX, type InboxCardKind,
-} from '@/modules/messaging/inboxCardKinds';
+import { INBOX_CARD_MAX, type InboxCardKind } from '@/modules/messaging/inboxCardKinds';
+import { INBOX_SLASH_COMMANDS, slashCommandMatches, slashTokenAtCaret } from './inboxSlashCommands';
 import { splitMessageLinks, messageUrls, shortenUrlForDisplay } from '@/utils/messageLinks';
 import { projectPlansService } from '@/services/projectPlansService';
 import { supabase } from '@/integrations/supabase/client';
@@ -336,8 +335,17 @@ const InboxPage: React.FC = () => {
    * or the catalog picker once a command (or the toolbar button) chose a kind.
    */
   const [slashMenu, setSlashMenu] = useState<
-    null | { mode: 'commands'; query: string } | { mode: 'picker'; kind: InboxCardKind }
+    null
+    | { mode: 'commands'; query: string; start: number; end: number }
+    | { mode: 'picker'; kind: InboxCardKind }
   >(null);
+  /**
+   * One token per composer send, minted on the first attempt and kept across a failure. A
+   * message with cards is several WhatsApp sends; if one fails after others went, the retry
+   * carries the same token and inbox-api resumes the missing parts instead of storing a second
+   * message and delivering the first parts twice.
+   */
+  const sendToken = useRef<string | null>(null);
 
   const [showNew, setShowNew] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
@@ -362,6 +370,10 @@ const InboxPage: React.FC = () => {
     setActiveThread(null);
     setMessages([]);
     setShowDetails(false);
+    setPendingCards([]);
+    setSlashMenu(null);
+    setDraftSteer('');
+    sendToken.current = null;
     setSearchParams((p) => { p.delete('thread'); return p; }, { replace: true });
   }, [setSearchParams]);
 
@@ -472,6 +484,13 @@ const InboxPage: React.FC = () => {
     setSearchParams((p) => { p.set('thread', id); return p; }, { replace: true });
     setLoadingThread(true);
     setContext(null);
+    // The composer's queued cards, slash menu, AI steer and send token belong to the thread they
+    // were started on — carried over, three products picked for one customer go to the next.
+    setPendingCards([]);
+    setSlashMenu(null);
+    setDraftSteer('');
+    setDraftSteerOpen(false);
+    sendToken.current = null;
     try {
       const { thread, participants, messages, whatsapp_window, starred_message_ids } = await inboxApi.getThread(id);
       setActiveThread(thread);
@@ -692,6 +711,7 @@ const InboxPage: React.FC = () => {
     if (sendInFlight.current) return;
     sendInFlight.current = true;
     setSending(true);
+    if (!sendToken.current) sendToken.current = crypto.randomUUID();
     try {
       let attachments;
       if (attachment) {
@@ -708,8 +728,10 @@ const InboxPage: React.FC = () => {
         // A private note quotes nothing on the platform — there is no platform message to quote.
         reply_to_message_id: !isNote && replyTo ? replyTo.id : undefined,
         // Picks only. The card the customer sees — price included — is resolved by inbox-api.
-        cards: pendingCards.length ? pendingCards.map((c) => ({ kind: c.kind, product_id: c.product_id })) : undefined,
+        cards: !isNote && pendingCards.length ? pendingCards.map((c) => ({ kind: c.kind, product_id: c.product_id })) : undefined,
+        client_token: sendToken.current ?? undefined,
       });
+      sendToken.current = null;
       setDraft('');
       setAttachment(null);
       setPendingCards([]);
@@ -746,10 +768,18 @@ const InboxPage: React.FC = () => {
     }
   }, [activeId, draftSteer, toast]);
 
-  /** `/product` chosen (by Enter, Tab or click): drop the typed token and open the picker. */
+  /**
+   * `/product` chosen (by Enter, Tab or click): drop exactly the token that opened the menu —
+   * wherever in the draft it was typed — and open the picker.
+   */
   const chooseSlashCommand = useCallback((kind: InboxCardKind) => {
-    setDraft((d) => d.replace(/(^|\n)\/[a-z]*$/i, '$1'));
-    setSlashMenu({ mode: 'picker', kind });
+    setSlashMenu((menu) => {
+      if (menu?.mode === 'commands') {
+        const { start, end } = menu;
+        setDraft((d) => d.slice(0, start) + d.slice(end));
+      }
+      return { mode: 'picker', kind };
+    });
   }, []);
 
   const togglePendingCard = useCallback((item: InboxCatalogItem) => {
@@ -1687,7 +1717,8 @@ const InboxPage: React.FC = () => {
                         <Send className="w-3 h-3" /> Reply
                       </button>
                       <button
-                        onClick={() => setIsNote(true)}
+                        // A private note relays nowhere, so it carries no cards for a customer.
+                        onClick={() => { setIsNote(true); setPendingCards([]); setSlashMenu(null); }}
                         aria-pressed={isNote}
                         className={`inline-flex items-center gap-1 text-xs px-2.5 py-1.5 border-l border-hairline transition-colors ${isNote ? 'bg-[hsl(var(--warning-bg))] text-warning' : 'text-muted-foreground hover:bg-surface-hover'}`}
                       >
@@ -1715,7 +1746,8 @@ const InboxPage: React.FC = () => {
                           <Textarea
                             id="inbox-draft-steer"
                             value={draftSteer}
-                            onChange={(e) => setDraftSteer(e.target.value.slice(0, 1000))}
+                            maxLength={1000}
+                            onChange={(e) => setDraftSteer(e.target.value)}
                             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void aiSuggest(); } }}
                             placeholder="e.g. Offer the oak decking at the price on file and say we can deliver next week."
                             className="min-h-[72px] text-sm bg-card"
@@ -1816,7 +1848,7 @@ const InboxPage: React.FC = () => {
                         onChange={(e) => setAttachment(e.target.files?.[0] ?? null)}
                       />
                     </label>
-                    {isMember && (
+                    {isMember && !isNote && (
                       <button
                         type="button"
                         onClick={() => setSlashMenu((m) => (m?.mode === 'picker' ? null : { mode: 'picker', kind: 'product' }))}
@@ -1834,11 +1866,11 @@ const InboxPage: React.FC = () => {
                       onChange={(e) => {
                         const v = e.target.value;
                         setDraft(v);
-                        // A slash command is `/`, `/pro`, `/product` at the START of a line. A
-                        // slash anywhere else is a slash (a URL, "and/or").
-                        const caret = e.target.selectionStart ?? v.length;
-                        const m = /(?:^|\n)\/([a-z]*)$/i.exec(v.slice(0, caret));
-                        if (isMember && m) setSlashMenu({ mode: 'commands', query: m[1] });
+                        // A slash command is `/`, `/pro`, `/product` at the START of a line, under
+                        // the caret. A slash anywhere else is a slash (a URL, "and/or"). The token's
+                        // range is kept so choosing a command removes exactly that text.
+                        const tok = isMember && !isNote ? slashTokenAtCaret(v, e.target.selectionStart ?? v.length) : null;
+                        if (tok) setSlashMenu({ mode: 'commands', ...tok });
                         else if (slashMenu?.mode === 'commands') setSlashMenu(null);
                       }}
                       onKeyDown={(e) => {
@@ -2370,19 +2402,14 @@ const COMPOSER_EMOJI: Array<{ group: string; emoji: string[] }> = [
 // Composer · slash commands and the catalog picker
 // ──────────────────────────────────────────────────────────────────────────
 
-/** `/pro` → the product command; `/services` → the service one; `/` → both. */
-function slashCommandMatches(query: string) {
-  const q = query.toLowerCase().replace(/s$/, '');
-  return INBOX_CARD_SLASH_COMMANDS.filter((c) => c.command.startsWith(q));
-}
-
 /**
  * What the Ask-JARVIS button sends. JARVIS reads the thread itself through `manage_inbox`
- * action:"read", so this only has to name the conversation and say what a brief looks like.
+ * action:"read", so this only has to name the conversation by id and say what a brief looks
+ * like. The subject is deliberately NOT interpolated: on an email thread it is the customer's
+ * own subject line, and this prompt is the operator's turn, where nothing is fenced.
  */
 function askJarvisAboutThreadPrompt(t: InboxThread): string {
-  const who = t.subject ? ` ("${t.subject}")` : '';
-  return `Read Inbox conversation ${t.id}${who} with manage_inbox action:"read" and brief me: what it is about, `
+  return `Read Inbox conversation ${t.id} with manage_inbox action:"read" and brief me: what it is about, `
     + 'who the customer is, the status of their orders, quotes and open invoices, and what you suggest I reply.';
 }
 
@@ -2436,8 +2463,10 @@ const CatalogPicker: React.FC<{
 
   useEffect(() => {
     let alive = true;
-    setLoading(true);
+    // Debounced: the search (an edge invocation) runs once the typing has settled, and only
+    // then does the list show as loading.
     const t = setTimeout(async () => {
+      setLoading(true);
       try {
         const res = await inboxApi.searchCatalog(threadId, query, kind);
         if (alive) { setItems(res.items); setFailed(null); }
@@ -2456,7 +2485,7 @@ const CatalogPicker: React.FC<{
   return (
     <div className="rounded-sm border border-hairline bg-card shadow-overlay overflow-hidden">
       <div className="flex items-center gap-1 border-b border-hairline bg-surface-sunken px-2 py-1.5 text-xs">
-        {INBOX_CARD_SLASH_COMMANDS.map((c) => (
+        {INBOX_SLASH_COMMANDS.map((c) => (
           <button
             key={c.command}
             type="button"
@@ -3340,7 +3369,7 @@ const MessageBubble: React.FC<{
             <MessageBody body={m.body} threadId={m.thread_id} />
           ))}
           {/* Catalog cards, as the customer saw them: name, image, THEIR price, the same link. */}
-          <InboxCatalogCards cards={readInboxCards(m.metadata)} />
+          <InboxCatalogCards cards={readInboxCards(m)} />
           {/* A public comment answered in public stays public. These are the two ways out:
               answer the person privately, or take the comment down. Both are one-shot at the
               platform (Meta allows a single private reply per comment, inside a window), so
