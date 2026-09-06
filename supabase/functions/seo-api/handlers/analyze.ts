@@ -14,6 +14,7 @@ import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace } from '../../_shared/auth.ts';
 import { resolveAndAssertSeoEntitled } from './entitlement.ts';
 import { missingArticlePlanFields, ANALYZE_PLAN_FIELDS } from './article-plan-guard.ts';
+import { readingEase } from './readability.ts';
 import { normalizeContentBrief, briefList, type NormalizedBrief } from './content-brief.ts';
 import { getToolPrompt, getGenerationPrompt, renderPromptTemplate } from '../../_shared/prompt-utils.ts';
 import { generateWithGemini } from '../../_shared/ai-client.ts';
@@ -35,6 +36,55 @@ const ANALYSIS_CREDIT_COST = 2;
 const FIX_CREDIT_COST = 5;
 const DEFAULT_MAX_ITERATIONS = 3;
 const MIN_ACCEPTABLE_SCORE = 70;
+
+/**
+ * How many individually-applicable fixes one check may raise.
+ *
+ * A check that finds twelve long paragraphs should not put twelve Apply buttons on the
+ * screen — past a handful the article wants an editing pass, not a click each. Whatever is
+ * over the cap is still REPORTED, as a document-scoped summary naming the real count, so
+ * the number is never quietly short (anti-regression rule 3).
+ */
+const MAX_ANCHORED_FIXES_PER_CHECK = 4;
+
+/**
+ * Which `## Heading` a block sits under, for labelling only.
+ *
+ * The apply path keys off `anchor` (the verbatim block), never this — a heading name is not
+ * unique and these articles are in Greek. This exists so the card can say "under 'Πόσο
+ * κοστίζει;'" instead of showing a naked paragraph.
+ */
+function headingAbove(markdown: string, block: string): string | null {
+  const at = markdown.indexOf(block);
+  if (at < 0) return null;
+  const before = markdown.slice(0, at);
+  const headings = before.match(/^#{1,6}\s+.*$/gm);
+  if (!headings || headings.length === 0) return null;
+  return headings[headings.length - 1].replace(/^#+\s+/, '').trim() || null;
+}
+
+/**
+ * Fixes that no rewrite of the prose can close.
+ *
+ * `config` ones are answered somewhere else entirely — meta tags come from the plan,
+ * provenance and firsthand experience from the content brief — which is exactly why they
+ * sit in the score forever while the fixer runs and runs. Offering an Apply button on them
+ * would be offering to fix something the button cannot reach.
+ */
+const FIX_SCOPE_BY_CATEGORY: Record<string, 'document' | 'config'> = {
+  meta_tags: 'config',
+  provenance: 'config',
+  firsthand_experience: 'config',
+  intent_alignment: 'config',
+  keyword_density: 'document',
+  secondary_keywords: 'document',
+  content_depth: 'document',
+  geo_entities: 'document',
+  entity_authority: 'document',
+  links: 'document',
+  ai_overview_alignment: 'document',
+  related_search_coverage: 'document',
+};
 
 
 export async function handleAnalyze(req: Request, body: any): Promise<Response> {
@@ -147,7 +197,20 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
     // unfixable never reached 70 and burned every paid iteration (5 credits each)
     // re-editing prose that was already done. Compare against the best score the loop
     // could actually achieve instead.
-    if (autoFix && reachableScore(analysis) < MIN_ACCEPTABLE_SCORE) {
+    // Gate on the score the reader sees, not on `reachableScore`.
+    //
+    // `reachableScore` is `overallScore + the penalties of the UNFIXABLE fixes`, and the gate
+    // was `reachableScore < 70`. That inverts: the more unfixable problems an article has,
+    // the higher its reachable score climbs, and the less likely the fixer is to touch the
+    // problems it CAN fix. Measured on the first article this pipeline produced — 66/100,
+    // five auto-fixable issues, `auto_fix: true` — the loop declined to run at all and
+    // returned `fix_iterations: 0`.
+    //
+    // The incident the old gate was reaching for is real (burning paid iterations re-editing
+    // prose whose only remaining faults are unfixable) and is still prevented, by the two
+    // breaks below: nothing auto-fixable left, or an iteration that did not move the score.
+    // Those stop the loop on evidence rather than on a prediction made before it starts.
+    if (autoFix && analysis.overallScore < MIN_ACCEPTABLE_SCORE) {
       for (let i = 0; i < maxIterations; i++) {
         const autoFixableFixes = analysis.fixes.filter(
           (f) => f.autoFixable && !f.applied,
@@ -180,12 +243,21 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
         fixIterations++;
 
         // Re-analyze
+        const scoreBefore = analysis.overallScore;
         analysis = analyzeContent(
           content, body.article_plan, body.serp_signals, brief, contentDatedAt,
         );
         console.log(`[seo-analyze] Post-fix score: ${analysis.overallScore}/100 (reachable: ${reachableScore(analysis)})`);
 
-        if (reachableScore(analysis) >= MIN_ACCEPTABLE_SCORE) break;
+        if (analysis.overallScore >= MIN_ACCEPTABLE_SCORE) break;
+        // No progress — the remaining fixes are ones this loop cannot actually land, so
+        // paying for another identical pass would burn credits to re-edit finished prose.
+        // This is the evidence-based version of what the old `reachableScore` gate was
+        // guessing at before the first iteration had run.
+        if (analysis.overallScore <= scoreBefore) {
+          console.log('[seo-analyze] Iteration did not raise the score — stopping rather than paying for another.');
+          break;
+        }
       }
     }
 
@@ -547,31 +619,78 @@ function analyzeContent(
   const longParagraphs = paragraphs.filter(
     (p) => p.split(/\s+/).length > 80,
   );
-  if (longParagraphs.length > 0) {
+  // One fix PER paragraph, each carrying the paragraph verbatim.
+  //
+  // This used to be a single "N paragraphs exceed 80 words" with `affectedSection: null` —
+  // the check had already isolated the offending paragraphs and then discarded them, so the
+  // only way to act on it was to rewrite the whole article. Capped: past a handful the
+  // article needs an editing pass, not five buttons, and the cap is stated in the summary
+  // fix below so the count is never silently short.
+  for (const para of longParagraphs.slice(0, MAX_ANCHORED_FIXES_PER_CHECK)) {
     fixes.push({
       category: 'readability',
       severity: 'medium',
-      description: `${longParagraphs.length} paragraphs exceed 80 words`,
+      description: `A paragraph runs to ${para.split(/\s+/).length} words`,
+      suggestion: 'Break this paragraph into two or three shorter ones. Keep every fact and figure.',
+      affectedSection: headingAbove(markdown, para),
+      autoFixable: true,
+      applied: false,
+      scope: 'section',
+      anchor: para,
+    });
+  }
+  if (longParagraphs.length > MAX_ANCHORED_FIXES_PER_CHECK) {
+    fixes.push({
+      category: 'readability',
+      severity: 'medium',
+      description: `${longParagraphs.length} paragraphs exceed 80 words — ${MAX_ANCHORED_FIXES_PER_CHECK} listed individually above`,
       suggestion: 'Break long paragraphs into shorter ones for readability',
       affectedSection: null,
       autoFixable: true,
       applied: false,
+      scope: 'document',
     });
   }
 
   // ── Check 14: Sentence length ──
-  const sentences = markdown.split(/[.!?]+/).filter((s) => s.trim().length > 0);
+  // Greek uses `;` as its question mark and `·` as a semicolon, so an English-only
+  // `[.!?]` split runs whole questions together and under-counts the sentences it is
+  // meant to be measuring.
+  const sentences = markdown.split(/[.!?;·;]+/).filter((s) => s.trim().length > 0);
   const longSentences = sentences.filter((s) => s.split(/\s+/).length > 35);
   if (longSentences.length > 3) {
-    fixes.push({
-      category: 'readability',
-      severity: 'low',
-      description: `${longSentences.length} sentences exceed 35 words`,
-      suggestion: 'Break long sentences for better readability',
-      affectedSection: null,
-      autoFixable: true,
-      applied: false,
-    });
+    // The PARAGRAPH is the anchor, not the sentence: a sentence has no unique position in
+    // the document, and rewriting one in isolation loses the flow either side of it.
+    const anchored = new Set<string>();
+    for (const sentence of longSentences) {
+      if (anchored.size >= MAX_ANCHORED_FIXES_PER_CHECK) break;
+      const para = paragraphs.find((p) => p.includes(sentence.trim().slice(0, 60)));
+      if (!para || anchored.has(para)) continue;
+      anchored.add(para);
+      fixes.push({
+        category: 'readability',
+        severity: 'low',
+        description: 'A sentence here runs past 35 words',
+        suggestion: 'Split the long sentence. Keep every fact and figure, and keep the language as written.',
+        affectedSection: headingAbove(markdown, para),
+        autoFixable: true,
+        applied: false,
+        scope: 'section',
+        anchor: para,
+      });
+    }
+    if (anchored.size === 0) {
+      fixes.push({
+        category: 'readability',
+        severity: 'low',
+        description: `${longSentences.length} sentences exceed 35 words`,
+        suggestion: 'Break long sentences for better readability',
+        affectedSection: null,
+        autoFixable: true,
+        applied: false,
+        scope: 'document',
+      });
+    }
   }
 
   // ── Check 15: GEO entity coverage ──
@@ -806,6 +925,16 @@ function analyzeContent(
   score = Math.max(0, Math.min(100, score));
 
   // ── Build section scores ──
+  // Classify anything that did not classify itself. A fix that carries an `anchor` IS
+  // section-scoped by construction; everything else falls to the category map, and an
+  // unmapped category lands on `document` — which offers no targeted apply, so a new check
+  // that forgets to declare a scope degrades to "cannot be applied surgically" rather than
+  // to "applied to the wrong paragraph".
+  for (const fix of fixes) {
+    if (fix.scope) continue;
+    fix.scope = fix.anchor ? 'section' : (FIX_SCOPE_BY_CATEGORY[fix.category] ?? 'document');
+  }
+
   const sectionScores = buildSectionScores(fixes, plan, headings, wordCount, markdown);
 
   // ── GEO Score (AI-citation-friendliness) ──
@@ -814,7 +943,7 @@ function analyzeContent(
   return {
     overallScore: score,
     wordCount,
-    readabilityScore: null, // Could be enhanced with Flesch-Kincaid
+    readabilityScore: readingEase(markdown),
     sentimentPolarity: null,
     keywordDensity,
     topEntities: plan.entityMentions.filter((e) => content.includes(e.toLowerCase())),

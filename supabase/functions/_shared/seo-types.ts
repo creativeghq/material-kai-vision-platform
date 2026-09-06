@@ -288,6 +288,31 @@ export interface ContentFix {
   affectedSection: string | null;
   autoFixable: boolean;
   applied: boolean;
+  /**
+   * What this fix can actually be applied TO.
+   *
+   *  - `section` — one located block, carried verbatim in `anchor`. Applying it rewrites
+   *    that block and nothing else, so a bad edit can only damage the paragraph it touched.
+   *  - `document` — a property of the article as a whole (keyword density, depth, entity
+   *    coverage). There is no single paragraph to rewrite.
+   *  - `config` — not in the body at all. Meta tags come from the plan; provenance and
+   *    firsthand experience come from the content brief. Rewriting prose cannot fix these,
+   *    which is why they are the ones that keep the score down no matter how often the
+   *    fixer runs.
+   *
+   * Absent means `document`, so an unclassified fix is never offered a targeted apply.
+   */
+  scope?: 'section' | 'document' | 'config';
+  /**
+   * The exact block this fix is about, VERBATIM, when `scope` is `section`.
+   *
+   * Verbatim rather than a heading name on purpose: applying a fix is then a string
+   * replace, not a fuzzy search for "the section called Introduction" in a document whose
+   * headings are in Greek and may repeat. The analyzer already computes these — it found
+   * the paragraphs over 80 words and then set `affectedSection: null` and threw the
+   * location away.
+   */
+  anchor?: string | null;
 }
 
 export interface GEOScore {
