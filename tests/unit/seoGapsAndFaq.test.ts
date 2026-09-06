@@ -61,9 +61,9 @@ describe('a gap is a topic, not a competitor page title', () => {
       { term: 'ειδη υγιεινησ θεσσαλονικη', searchVolume: 0, opportunityScore: 20 },
     ],
     competitors: [
-      { title: 'Πλακάκια τιμές Θεσσαλονίκη', domain: 'psaradellis.gr' },
-      { title: 'Πλακάκια μπάνιου τιμές', domain: 'ravenna.gr' },
-      { title: 'Praktiker πλακάκια', domain: 'praktiker.gr' },
+      { title: 'Πλακάκια τιμές Θεσσαλονίκη', domain: 'psaradellis.gr', headings: ['Τιμές πλακιδίων'] },
+      { title: 'Πλακάκια μπάνιου τιμές', domain: 'ravenna.gr', headings: ['Κατάλογος'] },
+      { title: 'Praktiker πλακάκια', domain: 'praktiker.gr', headings: ['Προσφορές'] },
     ],
     questions: [{ question: 'Πόσο κοστίζει η τοποθέτηση;' }],
   };
@@ -92,13 +92,25 @@ describe('a gap is a topic, not a competitor page title', () => {
     expect(result.all.find((t) => t.source === 'question')?.searchVolume).toBeNull();
   });
 
-  it('counts the competitors that actually mention the term', () => {
-    // Not the flat 3 every row used to carry. Two of the three ranked titles say "πλακάκια
+  it('counts the competitors that actually cover the term', () => {
+    // Not the flat 3 every row used to carry. Two of the three ranked pages say "πλακάκια
     // τιμές"; none of them mentions a clearance sale.
     expect(result.all.find((t) => t.topic === 'πλακακια τιμες')?.competitorCount).toBe(2);
     expect(result.all.find((t) => t.topic === 'ξεπουλημα πλακακια θεσσαλονικη')?.competitorCount).toBe(0);
     const counts = new Set(result.all.map((t) => t.competitorCount));
     expect(counts.size, 'every row has the same competitor count — it is hardcoded again').toBeGreaterThan(1);
+  });
+
+  it('reports NULL, not 0, when there is nothing to count in', () => {
+    // The live run: ten competitors, zero headings between them, so every count came back 0 — a
+    // confident "no competitor covers any of this" built from no evidence, which is the fake
+    // constant this rewrite removed wearing a different hat. A title is a marketing headline, not
+    // a page's coverage; with no headings the honest answer is that we did not look.
+    const titlesOnly = buildGapsGains('# Άρθρο', {
+      keyTerms: [{ term: 'πλακακια μπανιου', searchVolume: 100 }],
+      competition: [{ title: 'Πλακάκια μπάνιου Θεσσαλονίκη', domain: 'www.ravenna.gr' }],
+    });
+    expect(titlesOnly.all[0].competitorCount).toBeNull();
   });
 
   it('splits gap from gain on what the article actually says', () => {
@@ -266,7 +278,11 @@ describe('what the first live run got wrong', () => {
     // exact "every number is the same constant" shape this rewrite existed to remove.
     const stored = buildGapsGains('# Άρθρο', {
       keyTerms: [{ term: 'πλακακια μπανιου', searchVolume: 100 }],
-      competition: [{ title: 'Πλακάκια μπάνιου Θεσσαλονίκη', domain: 'www.ravenna.gr' }],
+      competition: [{
+        title: 'Πλακάκια μπάνιου Θεσσαλονίκη',
+        domain: 'www.ravenna.gr',
+        headings: ['Πλακάκια μπάνιου'],
+      }],
     });
     expect(stored.all[0].competitorCount).toBe(1);
   });

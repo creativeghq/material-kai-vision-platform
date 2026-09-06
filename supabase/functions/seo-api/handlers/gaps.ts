@@ -134,8 +134,21 @@ function namesACompetitor(term: string, brands: string[]): boolean {
   });
 }
 
-/** How many of the ranked pages mention this term, in their title or their headings. Measured. */
-function competitorsMentioning(term: string, competitors: GapCompetitor[]): number {
+/**
+ * How many of the ranked pages cover this term — or null when that cannot be measured.
+ *
+ * Measured over titles AND section headings. With no headings anywhere there is nothing to
+ * measure against: a title is four or five words of marketing, so every multi-word local keyword
+ * scores 0 against every competitor, and a column of zeroes reads as "no competitor covers any of
+ * this" when what it means is "we did not look". Measured on the real article: ten competitors,
+ * zero headings between them, and every count 0.
+ *
+ * `CompetitorData.headings` is declared in seo-types and the SERP client never fills it. The day
+ * it does, this starts answering — no further change needed here.
+ */
+function competitorsMentioning(term: string, competitors: GapCompetitor[]): number | null {
+  const measurable = competitors.some((c) => (c.headings ?? []).length > 0);
+  if (!measurable) return null;
   let n = 0;
   for (const c of competitors) {
     const haystack = normalizeText([c.title ?? '', ...(c.headings ?? [])].join(' '));

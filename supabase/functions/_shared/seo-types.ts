@@ -405,8 +405,17 @@ export interface MissingTopic {
    * time they get here and neither is a number to rank decisions by.
    */
   searchVolume: number | null;
-  /** How many ranked competitors mention it, counted — not the flat `3` this used to carry. */
-  competitorCount: number;
+  /**
+   * How many ranked competitors cover it — counted over their titles AND section headings.
+   *
+   * NULL when it cannot be measured, which today is always: `CompetitorData.headings` is declared
+   * and the SERP client never populates it, and a page's TITLE is its marketing headline, not its
+   * coverage. Counting from titles alone returns 0 for every multi-word keyword, which is a
+   * confident "no competitor covers this" built from no evidence — the fake constant this rewrite
+   * removed, wearing a different hat. A stated "not measured" is the honest answer until headings
+   * are collected.
+   */
+  competitorCount: number | null;
   /** 0-1, from the keyword's opportunity score where research computed one. */
   relevanceScore: number;
   /** The query names a competitor's brand: worth seeing, rarely worth writing. */

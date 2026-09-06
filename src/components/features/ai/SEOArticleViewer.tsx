@@ -173,7 +173,7 @@ interface GapsGainsData {
 interface MissingTopic {
   topic: string;
   type: 'gap' | 'gain';
-  competitorCount: number;
+  competitorCount: number | null;
   relevanceScore: number;
   /** Absent on rows written before gaps became topics rather than competitor page titles. */
   source?: 'keyword' | 'question' | 'competitor_heading';
@@ -1069,7 +1069,13 @@ function GapsGainsTab({ data, onAddToContent, onReanalyze }: {
               </div>
               <p className="mt-1 text-[11px] text-muted-foreground">
                 {topic.source ? GAP_SOURCE_LABEL[topic.source] : 'Competitor page title (unmeasured)'}
-                {topic.source && ` · ${topic.competitorCount} of the ranked pages mention it`}
+                {/* Null means we could not look, which is a different sentence from zero. The SERP
+                    client declares competitor headings and never collects them, so today it is
+                    always null — saying so beats a column of confident zeroes. */}
+                {topic.source && topic.competitorCount != null
+                  && ` · ${topic.competitorCount} of the ranked pages cover it`}
+                {topic.source && topic.competitorCount == null
+                  && ' · competitor coverage not measured'}
               </p>
             </div>
 
