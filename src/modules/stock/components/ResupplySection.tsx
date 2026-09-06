@@ -3,6 +3,7 @@ import { Loader2, Sparkles, ShoppingCart, TrendingUp, TrendingDown, Minus, Alert
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { CreditTopUpDialog, type CreditTopUpRequest } from '@/components/core/CreditTopUpDialog';
 import { TablePagination, paginate } from '@/components/core/ui/table-pagination';
 import { stockService, type ForecastCandidate } from '../services/stockService';
 
@@ -21,6 +22,8 @@ export const ResupplySection: React.FC<{ workspaceId: string }> = ({ workspaceId
   const [reordering, setReordering] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [page, setPage] = useState(1);
+  /** Out of credits is an offer, not a wall — see CreditTopUpDialog. */
+  const [topUpRequest, setTopUpRequest] = useState<CreditTopUpRequest | null>(null);
 
   // Flagged = will run short (stockout risk or below reorder point) AND has a supplier to order from.
   const flagged = rows.filter((c) => c.has_supplier && (c.stockout_before_reorder || c.below_reorder));
@@ -38,7 +41,9 @@ export const ResupplySection: React.FC<{ workspaceId: string }> = ({ workspaceId
     setAiBusy(true);
     try {
       const res = await stockService.aiForecast(workspaceId);
-      if ((res as any)?.code === 'insufficient_credits') { toast({ title: 'Not enough credits', variant: 'destructive' }); return; }
+      // The offer, not a dead-end toast: 5 credits is the smallest thing in the app to be
+      // refused for, and the forecast is one click away once they are bought.
+      if ((res as any)?.code === 'insufficient_credits') { setTopUpRequest({ action: 'run the resupply forecast', required: 5 }); return; }
       // Prefer the AI-ranked list when present; else keep the deterministic order.
       setRows(res.recommendations.length ? res.recommendations : res.candidates);
       setAiRan(res.recommendations.length > 0);
@@ -184,6 +189,12 @@ export const ResupplySection: React.FC<{ workspaceId: string }> = ({ workspaceId
           </div>
         )}
         {!loading && <TablePagination page={page} total={rows.length} onPageChange={setPage} label="items" />}
+
+      <CreditTopUpDialog
+        open={!!topUpRequest}
+        request={topUpRequest ?? undefined}
+        onClose={() => setTopUpRequest(null)}
+      />
       </CardContent>
     </Card>
   );

@@ -4,9 +4,7 @@
 // from product metadata) and carries full myDATA detail — measurement unit, VAT category,
 // income classification — set per line OR via the GLOBAL defaults bar above the rows.
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Plus, Trash2, Loader2, ChevronDown, ChevronRight, ChevronLeft, Search, Package, MapPin, Eye } from 'lucide-react';
-import { ToastAction } from '@/components/core/ui/toast';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
@@ -19,6 +17,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/core/ui/popover';
 import { useToast } from '@/hooks/use-toast';
+import { CreditTopUpDialog, type CreditTopUpRequest } from '@/components/core/CreditTopUpDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 import { invoicingSetupService, type FinanceBranch } from '@/services/invoicingSetupService';
@@ -199,7 +198,8 @@ function pickFromMeta(meta: any): { unit?: string; color?: string; size?: string
 
 export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenChange, onCreated, initialCustomer, initialItems, initialDocType, initialNotes }) => {
   const { toast } = useToast();
-  const navigate = useNavigate();
+  /** Out of credits is an offer, not a wall — see CreditTopUpDialog. */
+  const [topUpRequest, setTopUpRequest] = useState<CreditTopUpRequest | null>(null);
   const [busy, setBusy] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   // Inner tabs split the dense myDATA form into Details / Items / Taxes / Options.
@@ -297,6 +297,12 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [docTypes, setDocTypes] = useState<{ code: string; description: string }[]>([]);
   const [incTypes, setIncTypes] = useState<{ code: string; description: string }[]>([]);
   const [incCats, setIncCats] = useState<{ code: string; description: string }[]>([]);
+  // The EXPENSE ledger, for a proof-of-expenditure document (3.1/3.2 Τίτλος Κτήσης) — money we
+  // paid to someone not obliged to invoice us. AADE refuses an income classification on one.
+  const [expTypes, setExpTypes] = useState<{ code: string; description: string }[]>([]);
+  const [expCats, setExpCats] = useState<{ code: string; description: string }[]>([]);
+  const [expenseType, setExpenseType] = useState('');
+  const [expenseCategory, setExpenseCategory] = useState('');
   const [units, setUnits] = useState<{ code: string; description: string }[]>([]);
   const [withholdings, setWithholdings] = useState<TaxRef[]>([]);
   const [feesRefs, setFeesRefs] = useState<TaxRef[]>([]);
@@ -367,7 +373,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   useEffect(() => {
     if (!open) return;
     (async () => {
-      const [allTypes, enabled, ic, cat, wh, mu, pm, feesR, stampR, otherR, fs, allSeries] = await Promise.all([
+      const [allTypes, enabled, ic, cat, wh, mu, pm, feesR, stampR, otherR, fs, allSeries, expT, expC] = await Promise.all([
         invoicingSetupService.listReference('invoice_type'),
         invoicingSetupService.getDocTypeSettings(workspaceId),
         invoicingSetupService.listReference('income_classification_type'),
@@ -380,6 +386,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         invoicingSetupService.listReference('other_taxes'),
         supabase.from('finance_settings').select('*').eq('workspace_id', workspaceId).maybeSingle(),
         invoicingSetupService.listSeries(workspaceId),
+        invoicingSetupService.listReference('expense_classification_type'),
+        invoicingSetupService.listReference('expense_classification_category'),
       ]);
       const toTaxRef = (r: { code: string; description: string; rate: number | null; rate_kind: 'percent' | 'amount' }): TaxRef => ({ code: r.code, description: r.description, rate: r.rate, rate_kind: r.rate_kind });
       // Only offer enabled categories — deprecated myDATA codes (e.g. other-taxes 1/2,
@@ -406,6 +414,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       setDocTypes(visible.map((t) => ({ code: t.code, description: t.description })));
       setIncTypes(ic.map((t) => ({ code: t.code, description: t.description })));
       setIncCats(cat.map((t) => ({ code: t.code, description: t.description })));
+      setExpTypes(expT.map((t) => ({ code: t.code, description: t.description })));
+      setExpCats(expC.map((t) => ({ code: t.code, description: t.description })));
       setDocDefaults(Object.fromEntries(Object.values(enabled).map((e) => [e.code, { type: e.default_income_classification_type, category: e.default_income_classification_category, wh: e.default_withholding_code }])));
       if (visible.length && !visible.some((t) => t.code === '1.1')) setDocumentType(visible[0].code);
     })();
@@ -774,6 +784,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   // goods/other document clears any chosen code so a hidden withholding can never
   // ride along on a non-service invoice.
   const isServiceDoc = documentType.split('.')[0] === '2';
+  /** 3.x — Τίτλος Κτήσης. Classifies into the EXPENSE ledger, not the income one. */
+  const isExpenseDoc = documentType.split('.')[0] === '3';
 
   // Apply the configured default withholding for the active doc type once the doc-type
   // defaults have loaded (covers the common case where the operator never changes the
@@ -855,6 +867,10 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         info_box: infoBox || null, logo_mode: logoMode,
         payment_terms_days: parseInt(paymentTermsDays, 10) || 30, notes: notes || null,
         document_type: documentType, category_id: categoryId || null, branch_code: parseInt(branchCode, 10) || 0,
+        // Only meaningful on a proof-of-expenditure document; null everywhere else so an income
+        // document never carries a stray expense code.
+        expense_classification_type: isExpenseDoc ? (expenseType || null) : null,
+        expense_classification_category: isExpenseDoc ? (expenseCategory || null) : null,
         doc_language: docLanguage,
         template_id: snapshotTemplateId, template_colors: snapshotTemplateColors,
         customer_address_unit_id: addrUnitId,
@@ -1000,12 +1016,16 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             });
           }
           if (fr && fr.ok === false && fr.code === 'insufficient_credits') {
+            // The toast still says what happened to the DOCUMENT — it is issued and untransmitted,
+            // and that is a legal fact the operator must not miss. The top-up itself moves to the
+            // shared dialog: `navigate('/billing/credits')` from here left the finance flow to buy
+            // the credits that would have finished it.
             toast({
               title: 'Out of credits — not sent to myDATA',
               description: `The invoice was issued but couldn't be transmitted (balance ${fr.balance ?? 0}). Top up, then retransmit from the invoice page.`,
-              action: <ToastAction altText="Top up credits" onClick={() => navigate('/billing/credits')}>Top up</ToastAction>,
               variant: 'destructive',
             });
+            setTopUpRequest({ action: 'transmit this invoice to myDATA', balance: fr.balance ?? null });
           }
         } catch (e: any) { toast({ title: 'myDATA submission deferred', description: e?.message, variant: 'destructive' }); }
       }
@@ -1641,6 +1661,37 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                   Self-pricing
                 </label>
               </div>
+              {/* A Τίτλος Κτήσης records what WE paid someone not obliged to invoice us, so AADE
+                  classifies it in the expense ledger and refuses an income classification (231).
+                  Which expense it was — goods bought, a service received — is a tax fact only the
+                  operator knows, so it is asked here rather than guessed; without it the document
+                  cannot be transmitted. */}
+              {isExpenseDoc && (
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Expense category (myDATA)</Label>
+                    <Select value={expenseCategory} onValueChange={setExpenseCategory}>
+                      <SelectTrigger><SelectValue placeholder="Required for a proof of expenditure" /></SelectTrigger>
+                      <SelectContent>
+                        {expCats.map((c) => (
+                          <SelectItem key={c.code} value={c.code}>{c.code} — {c.description}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Expense type (myDATA)</Label>
+                    <Select value={expenseType} onValueChange={setExpenseType}>
+                      <SelectTrigger><SelectValue placeholder="Required for a proof of expenditure" /></SelectTrigger>
+                      <SelectContent>
+                        {expTypes.map((t) => (
+                          <SelectItem key={t.code} value={t.code}>{t.code} — {t.description}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
             </section>
               </TabsContent>
 
@@ -1762,6 +1813,12 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       title="New client"
       description="Look the VAT / ΑΦΜ up to pull the registered name and address — the buyer identity that goes on the invoice and into myDATA."
       onCreated={adoptCreatedClient}
+    />
+
+    <CreditTopUpDialog
+      open={!!topUpRequest}
+      request={topUpRequest ?? undefined}
+      onClose={() => setTopUpRequest(null)}
     />
     </>
   );

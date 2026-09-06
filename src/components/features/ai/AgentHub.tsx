@@ -32,6 +32,7 @@ import {
   Loader2,
   ChevronDown,
   Check,
+  Coins,
 } from 'lucide-react';
 import { logger } from '@/config';
 
@@ -144,6 +145,8 @@ import { onEnterOrSpace } from '@/utils/a11y';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
 import { formatDate, formatTime } from '@/utils/datetime';
 import { formatNumber } from '@/utils/decimal';
+import { looksInsufficientCredits, balanceFromCreditsError } from '@/utils/edgeError';
+import { CreditTopUpDialog, type CreditTopUpRequest } from '@/components/core/CreditTopUpDialog';
 import { safeHref } from '@/utils/safeUrl';
 import { GENERATION_MODELS } from '@/config/generationModels.generated';
 // Agent definitions with RBAC and default models
@@ -538,6 +541,8 @@ interface Message {
   model?: string;
   images?: string[]; // uploaded images attached to user messages
   insufficientCredits?: boolean; // true when generation failed due to credit exhaustion
+  /** Balance the 402 reported, so the top-up offer can say what you have. */
+  creditBalance?: number | null;
   /**
    * Set on the reply to a quick-start `run`. A direct run has no model turn, so
    * nothing offers the obvious next step ("…want me to schedule one?"); the
@@ -998,6 +1003,12 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const isMobile = useIsMobile();
   const [chatCollapsed, setChatCollapsed] = useState(false);
   const [activeCanvasId, setActiveCanvasId] = useState<string | null>(null);
+  /**
+   * The top-up offer, when a turn was refused for credits. A dialog rather than a route: the
+   * refusal always lands mid-task, and navigating to /billing throws away the conversation you
+   * were buying the credits to finish.
+   */
+  const [topUpRequest, setTopUpRequest] = useState<CreditTopUpRequest | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<string>(initialAgent || 'orchestrator');
   /**
    * The specialist JARVIS picked for the turn IN FLIGHT. Deliberately NOT `setSelectedAgent`:
@@ -3933,14 +3944,21 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     } catch (error) {
       console.error('Error executing agent:', error);
       const errText = error instanceof Error ? error.message : 'Unknown error';
-      const isCreditsError = /insufficient credits/i.test(errText);
+      // `looksInsufficientCredits`, not a local regex. This tested `/insufficient credits/i` — with
+      // a SPACE — against a body that says `insufficient_credits` with an UNDERSCORE, so it never
+      // matched once and the top-up card below has never rendered in its life. What the user got
+      // instead was `Error: Agent execution failed: 402 - {"error":"insufficient_credits",...}`.
+      const isCreditsError = looksInsufficientCredits(errText);
       const errorMessage: Message = {
         id: `msg-${Date.now()}-error`,
         role: 'assistant',
-        content: isCreditsError ? errText : `Error: ${errText}`,
+        content: isCreditsError
+          ? 'You have run out of credits, so this turn did not run. Top up and I will pick up where we left off.'
+          : `Error: ${errText}`,
         timestamp: new Date(),
         agentId: selectedAgent,
         insufficientCredits: isCreditsError,
+        creditBalance: isCreditsError ? balanceFromCreditsError(errText) : undefined,
       };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
@@ -6326,22 +6344,32 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                         {/* Credit exhaustion error — prompt user to top up */}
                         {message.insufficientCredits ? (
                           <div className="flex flex-col gap-3">
-                            <div className="flex items-start gap-3 p-3 rounded-xl bg-amber-500/15 border border-amber-400/30">
-                              <span className="text-amber-400 text-lg leading-none mt-0.5">⚡</span>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-semibold text-amber-300 mb-0.5">Not enough credits</p>
-                                <p className="text-xs text-amber-200/80">
-                                  This generation requires more credits than your current balance.
-                                  Top up to continue generating designs.
+                            {/* Light/dark PAIRS on every shade. This card was written in
+                                dark-only amber — `text-amber-300` on the light themes' cream
+                                measures 1.23:1, i.e. invisible (design system → raw palette
+                                shades are a pair, never one set of classes). */}
+                            <div className="flex items-start gap-3 rounded-sm border border-[hsl(var(--warning)/0.3)] bg-[hsl(var(--warning-bg))] p-3">
+                              <Coins className="mt-0.5 h-4 w-4 shrink-0 text-amber-800 dark:text-amber-300" aria-hidden="true" />
+                              <div className="min-w-0 flex-1">
+                                <p className="mb-0.5 text-sm font-semibold text-amber-900 dark:text-amber-200">Out of credits</p>
+                                <p className="text-xs text-amber-800 dark:text-amber-300/90">
+                                  {message.creditBalance != null
+                                    ? <>You have {formatNumber(message.creditBalance)} credits left, which is not enough for this turn.</>
+                                    : <>This needs more credits than your balance has.</>}
+                                  {' '}Top up and send it again — nothing was charged.
                                 </p>
                               </div>
                             </div>
-                            <button
-                              onClick={() => window.location.href = '/billing/credits'}
-                              className="self-start flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-white text-xs font-semibold transition-colors shadow-md"
+                            <Button
+                              size="sm"
+                              className="self-start"
+                              onClick={() => setTopUpRequest({
+                                action: 'run this',
+                                balance: message.creditBalance ?? null,
+                              })}
                             >
-                              Buy Credits
-                            </button>
+                              <Coins className="mr-1 h-4 w-4" /> Top up
+                            </Button>
                           </div>
                         ) : message.role === 'assistant' ? (
                           <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
@@ -7478,11 +7506,16 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               const data = await res.json();
               if (!data.success) {
                 // Keep canvas open so user can retry or adjust
+                if (data.insufficient_credits || looksInsufficientCredits(data.error)) {
+                  // Out of credits is an OFFER, not a destructive toast. The canvas stays open
+                  // behind the dialog, so buying and then pressing the same button is the whole
+                  // recovery — the mask and the prompt are still there.
+                  setTopUpRequest({ action: 'edit this area', required: 20, balance: data.balance ?? null });
+                  return;
+                }
                 toast({
-                  title: data.insufficient_credits ? 'Insufficient credits' : 'Region edit failed',
-                  description: data.insufficient_credits
-                    ? 'Not enough credits — 20 required.'
-                    : data.error ?? 'Unknown error',
+                  title: 'Region edit failed',
+                  description: data.error ?? 'Unknown error',
                   variant: 'destructive',
                 });
                 return;
@@ -7640,6 +7673,12 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           )}
         </div>
       )}
+
+      <CreditTopUpDialog
+        open={!!topUpRequest}
+        request={topUpRequest ?? undefined}
+        onClose={() => setTopUpRequest(null)}
+      />
     </div>
     </ActiveMoodboardProvider>
   );

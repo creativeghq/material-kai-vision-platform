@@ -30,6 +30,7 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { HubEmptyState } from '@/components/core/hub';
 import { useToast } from '@/hooks/use-toast';
+import { CreditTopUpDialog, type CreditTopUpRequest } from '@/components/core/CreditTopUpDialog';
 import { formatDate } from '@/utils/datetime';
 import { humanizeLabel } from '@/utils/humanize';
 import {
@@ -176,6 +177,8 @@ const SignalRow: React.FC<{
 export const AssessmentPanel: React.FC<Props> = ({ subject, subjectId, canRun, subjectName }) => {
   const { toast } = useToast();
   const [snapshot, setSnapshot] = useState<AssessmentSnapshot | null>(null);
+  /** Out of credits is an offer, not a wall — see CreditTopUpDialog. */
+  const [topUpRequest, setTopUpRequest] = useState<CreditTopUpRequest | null>(null);
   const [report, setReport] = useState<AssessmentRecord | null>(null);
   const [actions, setActions] = useState<AssessmentAction[]>([]);
   const [history, setHistory] = useState<AssessmentRecord[]>([]);
@@ -227,8 +230,14 @@ export const AssessmentPanel: React.FC<Props> = ({ subject, subjectId, canRun, s
       await load();
     } catch (e) {
       if (e instanceof AssessmentBlocked) {
+        // Out of credits opens the top-up offer rather than a destructive toast — it is the one
+        // refusal here the user can clear themselves, in about ten seconds.
+        if (e.code === 'insufficient_credits') {
+          setTopUpRequest({ action: 'run this assessment' });
+          return;
+        }
         setBlocked(e.message);
-        toast({ title: e.code === 'insufficient_credits' ? 'Not enough credits' : 'Not available', description: e.message, variant: 'destructive' });
+        toast({ title: 'Not available', description: e.message, variant: 'destructive' });
       } else {
         toast({ title: 'The assessment failed', description: (e as Error).message, variant: 'destructive' });
       }
@@ -588,6 +597,12 @@ export const AssessmentPanel: React.FC<Props> = ({ subject, subjectId, canRun, s
           </CardContent>
         </Card>
       )}
+
+      <CreditTopUpDialog
+        open={!!topUpRequest}
+        request={topUpRequest ?? undefined}
+        onClose={() => setTopUpRequest(null)}
+      />
     </div>
   );
 };

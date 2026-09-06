@@ -71,6 +71,42 @@ export function isNotEntitledError(parsed: ParsedEdgeError): boolean {
   return parsed.code === 'not_entitled';
 }
 
+/**
+ * True when the refusal is "you are out of credits" — the twin of `isNotEntitledError`, and the
+ * cue to open the top-up flow instead of printing a failure.
+ *
+ * Running out of credits is not an error the user made; it is the moment to sell them more. Every
+ * surface was hand-rolling its own test for it and getting a different answer: AgentHub matched
+ * `/insufficient credits/i` — with a SPACE — against a body that says `insufficient_credits` with
+ * an UNDERSCORE, so its top-up card, which has existed all along, could never once have rendered.
+ * The user got the raw JSON of the 402 instead. One test, in the same file as the entitlement one.
+ */
+export function isInsufficientCreditsError(parsed: ParsedEdgeError): boolean {
+  return parsed.code === 'insufficient_credits';
+}
+
+/**
+ * The same question for a refusal that reached us as TEXT rather than as a `functions.invoke`
+ * error — a streamed agent turn, a raw `fetch`, an `Error` re-thrown by a service. Matches the
+ * machine code in either spelling and the English sentence, because all three are in the wild:
+ * `insufficient_credits` (agent-chat, seo-api), `Insufficient credits` (generate-* functions),
+ * and `Not enough credits to run this audit.` (toolkit-audit).
+ */
+export function looksInsufficientCredits(text: unknown): boolean {
+  if (!text) return false;
+  const s = text instanceof Error ? text.message : String(text);
+  return /insufficient[_\s]credits|not enough credits/i.test(s);
+}
+
+/** The balance the refusal reported, when it carried one — for "you have X, this needs Y". */
+export function balanceFromCreditsError(text: unknown): number | null {
+  if (!text) return null;
+  const s = text instanceof Error ? text.message : String(text);
+  const m = s.match(/"current_balance"\s*:\s*(-?[\d.]+)/);
+  const n = m ? Number(m[1]) : NaN;
+  return Number.isFinite(n) ? n : null;
+}
+
 export async function edgeErrorMessage(error: unknown, fallback = 'Request failed'): Promise<string> {
   if (!error) return fallback;
   return (await parseEdgeError(error, fallback)).message;
