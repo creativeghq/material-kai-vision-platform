@@ -343,7 +343,8 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
       // The AADE authentication code is issued alongside the MARK and is what a reader uses
       // to verify the document off-line. Stored on `fiscal_submissions` since day one.
       authCode: authCode ?? null,
-      qrUrl: inv.print_online_code !== false ? (inv.fiscal_qr_url || null) : null,
+      // AADE's URL, never the provider's — see the PDF generator. No AADE URL, no QR.
+      qrUrl: inv.print_online_code !== false ? (inv.fiscal_aade_qr_url || null) : null,
       transmittedVia: providerAttribution ?? null,
     } : null,
     /** Card / IRIS payments completed against a provider signature. Empty for everything else. */

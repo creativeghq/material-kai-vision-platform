@@ -108,7 +108,10 @@ describe('a card or IRIS payment puts its identity on the document', () => {
 });
 
 describe('the fiscal identifiers that were already right stay right', () => {
-  it.each(['fiscal_mark', 'authentication_code', 'fiscal_uid', 'fiscal_qr_url'])(
+  // `fiscal_aade_qr_url`, not `fiscal_qr_url`: the QR now encodes AADE's validation URL. The
+  // provider's own link opens THEIR rendering of the document, which is never shown — see
+  // tests/unit/providerCopyNeverSurfaced.test.ts.
+  it.each(['fiscal_mark', 'authentication_code', 'fiscal_uid', 'fiscal_aade_qr_url'])(
     'still prints %s',
     (field) => { expect(pdfSrc).toContain(field); },
   );

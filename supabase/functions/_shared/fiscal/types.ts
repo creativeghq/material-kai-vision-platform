@@ -330,7 +330,12 @@ export interface FiscalSubmissionResult {
   mark?: string;
   uid?: string;
   authenticationCode?: string;
+  /** The PROVIDER's own link to its rendering of the document. Recorded, never shown to a
+   *  customer — we serve our own PDF and theirs is never surfaced. */
   qrUrl?: string;
+  /** AADE's official validation URL. THIS is the one that goes on the printed QR and in the
+   *  customer's email; without it the document carries no QR at all rather than the provider's. */
+  aadeQrUrl?: string;
   invoiceUrl?: string;
   providerCredits?: number;
   isOffline: boolean;

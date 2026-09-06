@@ -606,8 +606,11 @@ const InvoiceDetailPage: React.FC = () => {
                   <span className="text-xs">{formatDate(f.fiscal_submitted_at, { withTime: true })}</span>
                 </div>
               )}
-              {f.fiscal_qr_url && (
-                <Button size="sm" variant="outline" onClick={() => window.open(f.fiscal_qr_url, '_blank')}>
+              {/* AADE's URL, which is what the button has always claimed. It opened
+                  `fiscal_qr_url` — the PROVIDER's rendering of the document — so the label was
+                  wrong and it showed the one copy we never surface. */}
+              {f.fiscal_aade_qr_url && (
+                <Button size="sm" variant="outline" onClick={() => window.open(f.fiscal_aade_qr_url, '_blank')}>
                   <ExternalLink className="h-3 w-3 mr-1" /> View on AADE
                 </Button>
               )}

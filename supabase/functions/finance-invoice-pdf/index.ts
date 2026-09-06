@@ -847,9 +847,12 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; add
     if (logoImg) { page.drawImage(logoImg, { x: M, y: topY - logoH, width: logoW, height: logoH }); leftBottom = topY - logoH; }
     textR(title, right, topY - 11, 12, bold, colors.accent);
     let qrBottom = topY - 18;
-    if (inv.fiscal_qr_url && inv.print_online_code !== false) {
+    // AADE's URL, never the provider's — `fiscal_qr_url` opens NOVUS'S rendering of this
+    // document, and their copy is not shown to a customer anywhere. A document with no AADE URL
+    // (one still queued offline, which has no MARK either) simply carries no QR.
+    if (inv.fiscal_aade_qr_url && inv.print_online_code !== false) {
       const qs = 68;
-      drawQr(page, String(inv.fiscal_qr_url), right - qs, topY - 22 - qs, qs);
+      drawQr(page, String(inv.fiscal_aade_qr_url), right - qs, topY - 22 - qs, qs);
       textR(L.verify, right, topY - 22 - qs - 9, 6.5, font, MUTED);
       qrBottom = topY - 22 - qs - 12;
     }
@@ -1498,8 +1501,8 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; add
     if (providerAttribution) {
       text(`${L.transmittedVia}: ${providerAttribution}`, M, fy, 8, font, MUTED);
     }
-    if (inv.fiscal_qr_url && inv.print_online_code !== false && !isCommercial) {
-      drawQr(page, String(inv.fiscal_qr_url), right - 90, qy - 10, 86);
+    if (inv.fiscal_aade_qr_url && inv.print_online_code !== false && !isCommercial) {
+      drawQr(page, String(inv.fiscal_aade_qr_url), right - 90, qy - 10, 86);
       textR(L.verify, right, qy - 22, 7, font, MUTED);
     }
   }

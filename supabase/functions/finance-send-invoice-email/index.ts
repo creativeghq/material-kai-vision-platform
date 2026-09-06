@@ -57,7 +57,10 @@ Deno.serve(withApiLogging('finance-send-invoice-email', async (req) => {
   const mark = inv.fiscal_mark ? `<p style="margin:4px 0;color:#666">myDATA MARK: <strong>${esc(inv.fiscal_mark)}</strong></p>` : '';
   // The fiscal QR/URL proves the document to the tax authority — label it as such, not as a
   // generic "view the invoice" link (that's the pay link below).
-  const qr = inv.fiscal_qr_url ? `<p style="margin:12px 0"><a href="${inv.fiscal_qr_url}" style="color:#7a1f5c">Verify on myDATA (government) »</a></p>` : '';
+  // AADE's own validation URL. This link said "Verify on myDATA (government)" and pointed at
+  // `fiscal_qr_url` — the PROVIDER's rendering of the invoice. The label was false and the
+  // customer was being sent to a copy of the document we never surface. No AADE URL, no link.
+  const qr = inv.fiscal_aade_qr_url ? `<p style="margin:12px 0"><a href="${inv.fiscal_aade_qr_url}" style="color:#7a1f5c">Verify on myDATA (government) »</a></p>` : '';
 
   // Pay / view-online link → the hosted /pay/{token} page (pay online or just view).
   // The PDF step above mints a token when the invoice is payable; reuse it, mint as fallback.
@@ -172,7 +175,7 @@ Deno.serve(withApiLogging('finance-send-invoice-email', async (req) => {
         pay_url: payUrl,
         rf_code: rfCode,
         fiscal_mark: inv.fiscal_mark,
-        fiscal_qr_url: inv.fiscal_qr_url,
+        fiscal_qr_url: inv.fiscal_aade_qr_url,
       })
     : undefined;
 

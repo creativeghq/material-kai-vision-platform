@@ -322,6 +322,7 @@ interface AcceptedSubmission {
   mark: string | null;
   uid: string | null;
   qr_url: string | null;
+  aade_qr_url: string | null;
   invoice_url: string | null;
   connector_slug: string | null;
   is_offline: boolean | null;
@@ -345,7 +346,7 @@ async function findAcceptedSubmission(
 ): Promise<{ row: AcceptedSubmission | null; failed: boolean }> {
   const { data, error } = await supabase
     .from('fiscal_submissions')
-    .select('status, mark, uid, qr_url, invoice_url, connector_slug, is_offline')
+    .select('status, mark, uid, qr_url, aade_qr_url, invoice_url, connector_slug, is_offline')
     .eq('document_table', documentTable)
     .eq('document_id', documentId)
     .in('status', ['accepted', 'offline'])
@@ -371,6 +372,7 @@ async function stampInvoiceFromSubmission(
       fiscal_mark: sub.mark,
       fiscal_uid: sub.uid,
       fiscal_qr_url: sub.qr_url,
+      fiscal_aade_qr_url: sub.aade_qr_url,
       fiscal_connector_slug: sub.connector_slug,
       fiscal_error: null,
     })
@@ -602,6 +604,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
           uid: result.uid ?? null,
           authentication_code: result.authenticationCode ?? null,
           qr_url: result.qrUrl ?? null,
+          aade_qr_url: result.aadeQrUrl ?? null,
           invoice_url: result.invoiceUrl ?? null,
           fiscal_invoice_type: input.header.invoiceType,
           series: input.header.series,
@@ -621,6 +624,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
           fiscal_mark: result.mark ?? null,
           fiscal_uid: result.uid ?? null,
           fiscal_qr_url: result.qrUrl ?? null,
+          fiscal_aade_qr_url: result.aadeQrUrl ?? null,
           // Offline documents are aged from here by finance-fiscal-offline-recovery, which
           // cannot tell "submitted 5 minutes ago" from "stuck since last month" without it.
           fiscal_submitted_at: new Date().toISOString(),
@@ -868,6 +872,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
           uid: result.uid ?? null,
           authentication_code: result.authenticationCode ?? null,
           qr_url: result.qrUrl ?? null,
+          aade_qr_url: result.aadeQrUrl ?? null,
           invoice_url: result.invoiceUrl ?? null,
           fiscal_invoice_type: input.header.invoiceType,
           series: input.header.series,
@@ -887,6 +892,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
           fiscal_mark: result.mark ?? null,
           fiscal_uid: result.uid ?? null,
           fiscal_qr_url: result.qrUrl ?? null,
+          fiscal_aade_qr_url: result.aadeQrUrl ?? null,
           // See the credit-note path: the offline-recovery sweep ages documents from this.
           fiscal_submitted_at: new Date().toISOString(),
           fiscal_error: result.errorMessage ?? null,
@@ -1117,6 +1123,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
               uid: result.uid ?? null,
               authentication_code: result.authenticationCode ?? null,
               qr_url: result.qrUrl ?? null,
+              aade_qr_url: result.aadeQrUrl ?? null,
               invoice_url: result.invoiceUrl ?? null,
               fiscal_invoice_type: input.header.invoiceType,
               series: input.header.series,
@@ -1165,6 +1172,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
                   fiscal_mark: result.mark ?? null,
                   fiscal_uid: result.uid ?? null,
                   fiscal_qr_url: result.qrUrl ?? null,
+                  fiscal_aade_qr_url: result.aadeQrUrl ?? null,
                   fiscal_connector_slug: resolved.resolved.slug,
                   fiscal_submitted_at: new Date().toISOString(),
                   fiscal_error: null,

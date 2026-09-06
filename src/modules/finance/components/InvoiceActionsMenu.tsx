@@ -387,8 +387,10 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
               <dt className="text-muted-foreground">Connector</dt>
               <dd className="col-span-2">{(detail as any).fiscal_connector_slug ?? '—'}</dd>
             </dl>
-            {(detail as any).fiscal_qr_url && (
-              <a href={(detail as any).fiscal_qr_url} target="_blank" rel="noreferrer" className="text-primary hover:underline text-xs break-all">{(detail as any).fiscal_qr_url}</a>
+            {/* AADE's validation URL. This printed the PROVIDER's link, which is their copy of
+                the document — never shown, here or anywhere else. */}
+            {(detail as any).fiscal_aade_qr_url && (
+              <a href={(detail as any).fiscal_aade_qr_url} target="_blank" rel="noreferrer" className="text-primary hover:underline text-xs break-all">{(detail as any).fiscal_aade_qr_url}</a>
             )}
             <div>
               <div className="text-[10px] uppercase text-muted-foreground mb-1">Characterizations (income classification)</div>

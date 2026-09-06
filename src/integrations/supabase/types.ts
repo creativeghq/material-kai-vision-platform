@@ -3702,6 +3702,7 @@ export type Database = {
           fiscal_credits_refunded_at: string | null
           fiscal_error: string | null
           fiscal_mark: string | null
+          fiscal_aade_qr_url: string | null
           fiscal_qr_url: string | null
           fiscal_status: string | null
           fiscal_submitted_at: string | null
@@ -3737,6 +3738,7 @@ export type Database = {
           fiscal_credits_refunded_at?: string | null
           fiscal_error?: string | null
           fiscal_mark?: string | null
+          fiscal_aade_qr_url?: string | null
           fiscal_qr_url?: string | null
           fiscal_status?: string | null
           fiscal_submitted_at?: string | null
@@ -3772,6 +3774,7 @@ export type Database = {
           fiscal_credits_refunded_at?: string | null
           fiscal_error?: string | null
           fiscal_mark?: string | null
+          fiscal_aade_qr_url?: string | null
           fiscal_qr_url?: string | null
           fiscal_status?: string | null
           fiscal_submitted_at?: string | null
@@ -6190,6 +6193,7 @@ export type Database = {
           fiscal_credits_refunded_at: string | null
           fiscal_error: string | null
           fiscal_mark: string | null
+          fiscal_aade_qr_url: string | null
           fiscal_qr_url: string | null
           fiscal_status: string | null
           fiscal_submitted_at: string | null
@@ -6241,6 +6245,7 @@ export type Database = {
           fiscal_credits_refunded_at?: string | null
           fiscal_error?: string | null
           fiscal_mark?: string | null
+          fiscal_aade_qr_url?: string | null
           fiscal_qr_url?: string | null
           fiscal_status?: string | null
           fiscal_submitted_at?: string | null
@@ -6292,6 +6297,7 @@ export type Database = {
           fiscal_credits_refunded_at?: string | null
           fiscal_error?: string | null
           fiscal_mark?: string | null
+          fiscal_aade_qr_url?: string | null
           fiscal_qr_url?: string | null
           fiscal_status?: string | null
           fiscal_submitted_at?: string | null
@@ -8944,6 +8950,7 @@ export type Database = {
           is_offline: boolean
           mark: string | null
           provider_credits: number | null
+          aade_qr_url: string | null
           qr_url: string | null
           request_payload: Json | null
           response_payload: Json | null
@@ -8972,6 +8979,7 @@ export type Database = {
           is_offline?: boolean
           mark?: string | null
           provider_credits?: number | null
+          aade_qr_url?: string | null
           qr_url?: string | null
           request_payload?: Json | null
           response_payload?: Json | null
@@ -9000,6 +9008,7 @@ export type Database = {
           is_offline?: boolean
           mark?: string | null
           provider_credits?: number | null
+          aade_qr_url?: string | null
           qr_url?: string | null
           request_payload?: Json | null
           response_payload?: Json | null
@@ -12324,6 +12333,7 @@ export type Database = {
           fiscal_credits_refunded_at: string | null
           fiscal_error: string | null
           fiscal_mark: string | null
+          fiscal_aade_qr_url: string | null
           fiscal_qr_url: string | null
           fiscal_status: string | null
           fiscal_submitted_at: string | null
@@ -12417,6 +12427,7 @@ export type Database = {
           fiscal_credits_refunded_at?: string | null
           fiscal_error?: string | null
           fiscal_mark?: string | null
+          fiscal_aade_qr_url?: string | null
           fiscal_qr_url?: string | null
           fiscal_status?: string | null
           fiscal_submitted_at?: string | null
@@ -12510,6 +12521,7 @@ export type Database = {
           fiscal_credits_refunded_at?: string | null
           fiscal_error?: string | null
           fiscal_mark?: string | null
+          fiscal_aade_qr_url?: string | null
           fiscal_qr_url?: string | null
           fiscal_status?: string | null
           fiscal_submitted_at?: string | null

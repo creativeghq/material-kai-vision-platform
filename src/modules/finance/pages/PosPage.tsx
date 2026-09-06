@@ -583,8 +583,9 @@ const PosPage: React.FC = () => {
     let uid: string | null = null; let qrUrl: string | null = null; let finalMark = mark;
     try {
       const { data: inv } = await supabase.from('invoices')
-        .select('fiscal_mark, fiscal_uid, fiscal_qr_url').eq('id', invoiceId).maybeSingle();
-      if (inv) { finalMark = inv.fiscal_mark ?? mark; uid = inv.fiscal_uid ?? null; qrUrl = inv.fiscal_qr_url ?? null; }
+        .select('fiscal_mark, fiscal_uid, fiscal_aade_qr_url').eq('id', invoiceId).maybeSingle();
+      // The receipt the customer walks out with carries AADE's link, not the provider's.
+      if (inv) { finalMark = inv.fiscal_mark ?? mark; uid = inv.fiscal_uid ?? null; qrUrl = inv.fiscal_aade_qr_url ?? null; }
     } catch { /* non-fatal — fall back to the passed mark */ }
     // Every POS sale becomes a (completed, paid, delivered) sales order — best-effort.
     // This RPC is the ONLY stock-out path a POS sale has. mark_invoice_issued cannot

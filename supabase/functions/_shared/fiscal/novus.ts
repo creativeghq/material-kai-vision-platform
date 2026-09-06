@@ -506,6 +506,11 @@ function interpret(entry: any, httpStatus: number): FiscalSubmissionResult {
         uid: entry?.invoiceUid ?? undefined,
         authenticationCode: entry?.authenticationCode ?? undefined,
         qrUrl: entry?.qrUrl ?? undefined,
+        // AADE's OWN validation URL. From v2.3 `qrUrl` and `invoiceUrl` are the same thing —
+        // the provider's rendering — so this is the only link that belongs on a document we
+        // hand to a customer. Kept separate rather than overwriting `qrUrl`, because the
+        // provider's copy is still worth having in the submission record for support.
+        aadeQrUrl: entry?.aadeQrUrl ?? undefined,
         invoiceUrl: entry?.invoiceUrl ?? undefined,
         providerCredits: parseCredits(entry?.credits),
         raw: entry,
@@ -518,6 +523,11 @@ function interpret(entry: any, httpStatus: number): FiscalSubmissionResult {
         isOffline: true,
         uid: entry?.invoiceUid ?? undefined,
         qrUrl: entry?.qrUrl ?? undefined,
+        // AADE's OWN validation URL. From v2.3 `qrUrl` and `invoiceUrl` are the same thing —
+        // the provider's rendering — so this is the only link that belongs on a document we
+        // hand to a customer. Kept separate rather than overwriting `qrUrl`, because the
+        // provider's copy is still worth having in the submission record for support.
+        aadeQrUrl: entry?.aadeQrUrl ?? undefined,
         invoiceUrl: entry?.invoiceUrl ?? undefined,
         providerCredits: parseCredits(entry?.credits),
         raw: entry,
