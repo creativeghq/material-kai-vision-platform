@@ -229,12 +229,20 @@ describe('an FAQ entry goes into the FAQ section', () => {
   });
 
   it('recognises the FAQ heading in the article’s own language', () => {
-    // The writer currently emits the English heading even in a Greek article. Matching the
-    // localised forms too costs nothing and stops this breaking the day that is fixed.
-    for (const h of ['FAQ', 'faqs', 'Frequently Asked Questions', 'Συχνές Ερωτήσεις', 'Preguntas Frecuentes']) {
+    // The writer forced the English heading into every article until the prompt rows were fixed;
+    // these localised forms are what it emits now, and the detector has to answer for all of them
+    // or the FAQ accordion disappears from every non-English article at once.
+    for (const h of [
+      'FAQ', 'faqs', 'Frequently Asked Questions',
+      'Συχνές Ερωτήσεις', 'Preguntas Frecuentes', 'Domande Frequenti',
+      // The keyword-bearing form. The planner asks for it and it is the better heading for
+      // search — this is what the article's own plan said, verbatim.
+      'Συχνές Ερωτήσεις (FAQ) για πλακάκια μπάνιου Θεσσαλονίκη',
+      'Frequently Asked Questions About Tiles',
+    ]) {
       expect(isFaqHeading(h), `${h} should be an FAQ heading`).toBe(true);
     }
-    for (const h of ['Conclusion', 'Τιμές', 'Frequently Asked Questions About Tiles']) {
+    for (const h of ['Conclusion', 'Τιμές', 'Συμπέρασμα', 'How to lay a tile']) {
       expect(isFaqHeading(h), `${h} is not the FAQ heading`).toBe(false);
     }
   });

@@ -26,6 +26,7 @@ import {
 } from './article-access.ts';
 import { buildGapsGains, type GapSources } from './gaps.ts';
 import { insertFaqEntry, STRIP_ACCENTS as stripAccents } from './faq-insert.ts';
+import { sectionLabelsFor } from '../../_shared/seo/articleSections.generated.ts';
 import type { ArticlePlan, ContentAnalysisResult } from '../../_shared/seo-types.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -130,7 +131,15 @@ export async function handleAddFaq(req: Request, body: any): Promise<Response> {
       if (!answer) throw new Error('The model returned an empty answer — nothing was added.');
     }
 
-    const inserted = insertFaqEntry(markdown, question, answer);
+    // Only matters when the article has no FAQ section yet and one has to be created — but that
+    // is the single path where WE choose the heading, so it is the single path that can put an
+    // English heading into a Greek article. Stored code first, the document's own script second.
+    const inserted = insertFaqEntry(
+      markdown,
+      question,
+      answer,
+      sectionLabelsFor(articleLanguageOf(article), markdown),
+    );
     if (inserted.markdown === markdown) {
       throw new Error('The FAQ entry could not be placed — nothing was changed.');
     }
@@ -208,6 +217,12 @@ export async function handleAddFaq(req: Request, body: any): Promise<Response> {
     console.error('[seo-add-faq] Error:', error);
     return jsonResponse({ success: false, error: error?.message || 'Could not add the FAQ' }, 500);
   }
+}
+
+/** The language the article was commissioned in, or null for a row written before it was stored. */
+function articleLanguageOf(article: { stages_data: Record<string, unknown> | null }): string | null {
+  const extra = (article.stages_data as { extra?: { language_code?: unknown } } | null)?.extra;
+  return typeof extra?.language_code === 'string' ? extra.language_code : null;
 }
 
 /** The article's own title, for the answer prompt's context. */

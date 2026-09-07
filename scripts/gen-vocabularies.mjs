@@ -214,6 +214,15 @@ export const VOCABULARIES = [
     'supabase/functions/_shared/characterAvatar.generated.ts',
   ],
   [
+    // How an article names its FAQ and closing sections, in the language it is written in.
+    // Both runtimes have to agree or the fix that made those headings Greek breaks the reader:
+    // the viewer decides whether to render the FAQ accordion, and `analyze` decides whether the
+    // article HAS an FAQ at all. Three copies before this — a regex in the viewer, a pattern list
+    // in faq-insert, and a `content.includes('frequently asked')` in analyze.
+    'src/services/seo/articleSections.ts',
+    'supabase/functions/_shared/seo/articleSections.generated.ts',
+  ],
+  [
     // #395 — the same, and this pair had ALREADY diverged: the tool's copy hardcoded the
     // calorific values and efficiencies the canonical version accepts as overrides, so the
     // web page could be told "our oil is 10.2 kWh/L" and the agent could not.

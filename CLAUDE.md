@@ -197,6 +197,25 @@ copy was 900 lines of `CATEGORY_DISPLAY_REGISTRY`, disagreeing with the DB on 12
 [tests/unit/test_field_registry_is_the_source.py](mivaa-pdf-extractor/tests/unit/test_field_registry_is_the_source.py)
 and [tests/unit/categoryFieldRegistry.test.ts](tests/unit/categoryFieldRegistry.test.ts).
 
+**A prompt that names a SECTION names its PURPOSE, never the words to print.** Three writer rows
+(`seo_writer`, `seo_writer_article_structure`, `seo_writer_user`) said the FAQ heading was
+`## Frequently Asked Questions` — "H2 heading exactly" — and a specific instruction beats "write
+EVERY word in Greek", which `outputLanguageBlock` appends a few blocks below it. So both live Greek
+articles shipped with `## Frequently Asked Questions` and `## Conclusion` inside them while every
+other heading was Greek, and the PLANNER had already got it right (its outline said `Συχνές
+Ερωτήσεις (FAQ) για …`) — the writer overrode the plan. **Fixing the prompt alone breaks four
+readers at once**, because each keyed off the English string: the viewer's `FAQ_HEADING_REGEX` (the
+FAQ accordion silently disappears), `analyze`'s `content.includes('frequently asked')` — twice, so a
+HIGH-severity "FAQ section not found but planned" is raised against an article that has one and five
+AEO points go missing — the PAA fix's `affectedSection`, and `insertFaqEntry`'s fallback heading,
+which writes English back in. [src/services/seo/articleSections.ts](src/services/seo/articleSections.ts)
+is the one table (mirrored to Deno by `vocab:mirror`), keyed by language so a label the writer can
+produce is always one the reader can find; recognition is CONTAINS, not equals, because the good
+heading carries the keyword too. An article now records its own `language_code` in
+`stages_data.extra` — it reached the stages and was thrown away, so nothing acting on the article
+afterwards could tell what language to write a new heading in. Guarded by
+[tests/unit/articleSectionHeadings.test.ts](tests/unit/articleSectionHeadings.test.ts).
+
 **`sensitivity` decides what a viewer may see, and the gate must match the RENDERER's granularity.**
 A surface that walks `attributes`/`metadata`/`properties`/`specifications` and renders every key it
 finds is gated **per key** — section-level permission checks do not reach it, and supplier XML and AI

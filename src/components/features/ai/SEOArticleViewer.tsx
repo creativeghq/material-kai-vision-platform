@@ -17,6 +17,9 @@ import { supabase } from '@/integrations/supabase/client';
 // Import-free so it can be unit-tested as a value — importing this file boots the Supabase
 // client, which is why the verdict was never covered while it lived here.
 import { fixListState, FIX_STATE_COPY, type FixListState } from './seoFixState';
+import {
+  findConclusionLine, findFaqSection, sectionLabelsFor, type SectionLabels,
+} from '@/services/seo/articleSections';
 import { Link } from 'react-router-dom';
 import { Input } from '@/components/core/ui/input';
 import { Textarea } from '@/components/core/ui/textarea';
@@ -72,6 +75,13 @@ interface SEOArticle {
   content_type: string;
   markdown_content: string | null;
   html_content: string | null;
+  /**
+   * The language the article was commissioned in, folded up from `stages_data.extra`.
+   *
+   * Null on every row written before the pipeline started recording it — `sectionLabelsFor`
+   * falls back to the document's own script, then to English.
+   */
+  language_code?: string | null;
   meta_title: string | null;
   meta_description: string | null;
   article_plan: any;
@@ -1001,7 +1011,8 @@ const GAP_SOURCE_LABEL: Record<NonNullable<MissingTopic['source']>, string> = {
  * A row written before that change has no `source`, so it is shown for what it is rather than
  * dressed up with numbers that were never measured. Re-analyse rebuilds it.
  */
-function GapsGainsTab({ data, onAddToContent, onReanalyze }: {
+function GapsGainsTab({ data, labels, onAddToContent, onReanalyze }: {
+  labels: SectionLabels;
   data: GapsGainsData;
   onAddToContent?: (snippet: string) => Promise<'inserted' | 'exists' | 'notfound'>;
   onReanalyze?: () => void;
@@ -1092,9 +1103,12 @@ function GapsGainsTab({ data, onAddToContent, onReanalyze }: {
               </div>
               {topic.type === 'gap' && topic.source && onAddToContent && (
                 <AddToContentButton
+                  /* The note goes INTO the customer's article, under a heading that is already in
+                     their language — so an English sentence here is the same defect one button
+                     along from the one we just fixed. */
                   snippet={topic.source === 'question'
-                    ? `## ${topic.topic}\n\n_TODO: answer this — searchers ask it and this article does not._`
-                    : `## ${topic.topic}\n\n_TODO: cover this — it is searched for and this article does not mention it._`}
+                    ? `## ${topic.topic}\n\n_${labels.todo.answer}_`
+                    : `## ${topic.topic}\n\n_${labels.todo.cover}_`}
                   onAdd={onAddToContent}
                   label="Add section"
                 />
@@ -1165,7 +1179,8 @@ function AddToContentButton({ snippet, onAdd, label = 'Add' }: {
   );
 }
 
-function ResearchTab({ data, onAddToContent }: {
+function ResearchTab({ data, labels, onAddToContent }: {
+  labels: SectionLabels;
   data: ResearchTabData;
   onAddToContent?: (snippet: string) => Promise<'inserted' | 'exists' | 'notfound'>;
 }) {
@@ -1401,7 +1416,7 @@ function ResearchTab({ data, onAddToContent }: {
                   to-write marker, so the draft carries the gap rather than the panel remembering it. */}
               {!q.answered && (
                 <AddToContentButton
-                  snippet={`## ${q.question}\n\n_TODO: answer this — it is a People Also Ask question this article does not cover._`}
+                  snippet={`## ${q.question}\n\n_${labels.todo.answer}_`}
                   onAdd={onAddToContent}
                   label="Add section"
                 />
@@ -1754,7 +1769,14 @@ interface PlainSection {
 type ArticleBlock = CalloutBlock | FaqSection | PlainSection;
 
 const CALLOUT_TAG_REGEX = /^\[!(tldr|key|definition|example|info|warning|quote)\](?:\s+(.+))?$/i;
-const FAQ_HEADING_REGEX = /^##\s+(?:frequently\s+asked\s+questions|faqs?)\s*$/i;
+/**
+ * WHICH H2 is the FAQ section is decided in `@/services/seo/articleSections`, shared with the
+ * edge. This line was `/^##\s+(?:frequently\s+asked\s+questions|faqs?)\s*$/i` — English only,
+ * and anchored, so it also rejected the keyword-bearing heading the planner asks for. The moment
+ * the writer prompt stopped forcing an English label, that regex matched nothing: the accordion
+ * would have vanished from every Greek article and the section rendered as flat markdown, with no
+ * error anywhere.
+ */
 
 const CALLOUT_META: Record<CalloutKind, {
   label: string;
@@ -1820,9 +1842,9 @@ function extractLead(markdown: string): { lead: string | null; rest: string } {
 }
 
 /**
- * Extract FAQ entries from a contiguous slice of markdown that lives inside an
- * `## Frequently Asked Questions` section. We try several question shapes since
- * the writer model isn't always consistent:
+ * Extract FAQ entries from a contiguous slice of markdown that lives inside the article's FAQ
+ * section — whatever that article calls it, in whatever language it is written in. We try several
+ * question shapes since the writer model isn't always consistent:
  *
  *   1. `### Question?`        (preferred)
  *   2. `#### Question?`       (one level off)
@@ -1901,12 +1923,13 @@ function extractFaqEntries(sectionLines: string[]): FaqEntry[] {
 /**
  * Walk the markdown line by line, splitting into:
  *  - callout blocks (blockquotes whose first inner line is `[!tag]`)
- *  - FAQ sections (H2 "Frequently Asked Questions" → consume until next H2)
+ *  - the FAQ section (located by `findFaqSection` → consume until the next H2)
  *  - plain markdown chunks (rendered with ReactMarkdown)
  */
 function parseArticle(markdown: string): ArticleBlock[] {
   const blocks: ArticleBlock[] = [];
   const lines = markdown.split('\n');
+  const faq = findFaqSection(markdown);
   let buffer: string[] = [];
 
   const flushBuffer = () => {
@@ -1926,20 +1949,13 @@ function parseArticle(markdown: string): ArticleBlock[] {
     //   - #### What is X?  (sometimes drops a level)
     //   - **What is X?**   (bold paragraph)
     //   - **Q:** What is X? / Q: What is X?
-    if (FAQ_HEADING_REGEX.test(trimmed)) {
+    if (faq && i === faq.headingLine) {
       flushBuffer();
-      const headingText = trimmed.replace(/^##\s+/, '');
+      const headingText = faq.headingText;
       const sectionStart = i + 1;
-      i++;
+      i = faq.endLine;
 
-      // Slurp the FAQ section into a contiguous block
-      const sectionLines: string[] = [];
-      while (i < lines.length) {
-        const innerTrim = lines[i].trim();
-        if (/^##\s+/.test(innerTrim) && !FAQ_HEADING_REGEX.test(innerTrim)) break;
-        sectionLines.push(lines[i]);
-        i++;
-      }
+      const sectionLines = lines.slice(sectionStart, faq.endLine);
 
       const entries = extractFaqEntries(sectionLines);
 
@@ -2419,20 +2435,41 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
   }, [article]);
 
   /**
+   * How to name a section, and what to write under one, in THIS article's language.
+   *
+   * The two "Add section" buttons write straight into the customer's markdown, so anything they
+   * paste is part of the document — not UI chrome that gets to stay English.
+   */
+  const articleLabels = useMemo(
+    () => sectionLabelsFor(article?.language_code, article?.markdown_content),
+    [article?.language_code, article?.markdown_content],
+  );
+
+  /**
    * Take something the Research tab found and put it IN the draft.
    *
    * The research tabs were read-only: they told you a term was under-used or that a PAA question
    * went unanswered and then left you to retype it into the body yourself, which is the point at
    * which people stop using the panel. A question becomes an H2 with a to-write marker (an empty
    * heading would score as thin content and read as finished); a key term becomes a line you edit
-   * in place. Appended at the end so nothing already written is disturbed — moving it is one drag
-   * in the editor, whereas a bad insertion in the middle costs a paragraph.
+   * in place.
+   *
+   * It goes ABOVE the closing section, in the article's own language. Both of those were wrong:
+   * it appended, so every added section landed below the conclusion and its call to action, and
+   * the marker was an English sentence pasted under a Greek heading.
    */
   const addToContent = useCallback(async (snippet: string): Promise<'inserted' | 'exists' | 'notfound'> => {
     if (!article?.id) return 'notfound';
     const md = article.markdown_content ?? '';
     if (md.includes(snippet.trim())) return 'exists';
-    const next = `${md.replace(/\s+$/, '')}\n\n${snippet.trim()}\n`;
+    // Above the closing section, not after it. Appending put every new section BELOW the
+    // conclusion and its call to action, which reads as an afterthought and is where the old
+    // Research → Questions button dumped things — the placement `insertFaqEntry` exists to avoid.
+    const lines = md.replace(/\s+$/, '').split('\n');
+    const closing = findConclusionLine(md);
+    const next = closing === -1
+      ? `${lines.join('\n')}\n\n${snippet.trim()}\n`
+      : [...lines.slice(0, closing), snippet.trim(), '', ...lines.slice(closing)].join('\n');
     const { error } = await supabase.from('seo_articles').update({ markdown_content: next }).eq('id', article.id);
     if (error) return 'notfound';
     setArticle({ ...article, markdown_content: next });
@@ -2831,13 +2868,18 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
 
                 {article.gaps_gains_data && (
                   <TabsContent value="gaps" className="mt-4">
-                    <GapsGainsTab data={article.gaps_gains_data} onAddToContent={addToContent} onReanalyze={reanalyze} />
+                    <GapsGainsTab
+                      data={article.gaps_gains_data}
+                      labels={articleLabels}
+                      onAddToContent={addToContent}
+                      onReanalyze={reanalyze}
+                    />
                   </TabsContent>
                 )}
 
                 {article.research_tab_data && (
                   <TabsContent value="research" className="mt-4">
-                    <ResearchTab data={article.research_tab_data} onAddToContent={addToContent} />
+                    <ResearchTab data={article.research_tab_data} labels={articleLabels} onAddToContent={addToContent} />
                   </TabsContent>
                 )}
 

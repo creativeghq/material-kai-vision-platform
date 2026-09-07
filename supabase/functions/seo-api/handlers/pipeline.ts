@@ -283,7 +283,12 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
         progress_percentage: 0,
         current_stage: 'research',
         pipeline_log: [`[${new Date().toISOString()}] Pipeline started for "${body.target_keyword}"`],
-        stages_data: {},
+        // The language reached the stages and was then thrown away, so nothing that touches the
+        // article AFTERWARDS could know what language it is in — which is exactly what an
+        // "add a question to the FAQ" needs before it can name a section it has to create.
+        // `stages_data.extra` because `seo_articles` has no such column and updateArticle's
+        // merge keeps `extra` across every later stage.
+        stages_data: { extra: { language_code: body.language_code || 'en' } },
       })
       .select('id')
       .single();

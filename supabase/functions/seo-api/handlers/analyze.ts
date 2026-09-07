@@ -15,6 +15,9 @@ import { authenticate, userCanAccessWorkspace } from '../../_shared/auth.ts';
 import { resolveAndAssertSeoEntitled } from './entitlement.ts';
 import { missingArticlePlanFields, ANALYZE_PLAN_FIELDS } from './article-plan-guard.ts';
 import { readingEase } from './readability.ts';
+import {
+  findFaqSection, isQuestionHeading,
+} from '../../_shared/seo/articleSections.generated.ts';
 import { normalizeContentBrief, briefList, type NormalizedBrief } from './content-brief.ts';
 import { getToolPrompt, getGenerationPrompt, renderPromptTemplate } from '../../_shared/prompt-utils.ts';
 import { generateWithGemini } from '../../_shared/ai-client.ts';
@@ -392,6 +395,16 @@ export function analyzeContent(
   const wordCount = words.length;
   const primaryKw = plan.primaryKeyword.toLowerCase();
 
+  // Does the article have an FAQ section, and what does it CALL it?
+  //
+  // Was `content.includes('faq') || content.includes('frequently asked')`, written out twice —
+  // and wrong in both directions at once. It says NO for a Greek article headed
+  // `## Συχνές Ερωτήσεις`, which raises a high-severity "FAQ section not found but planned" fix
+  // against an article that has one and docks the AEO score for a section sitting right there;
+  // and it says YES for an article that merely uses the word "FAQ" in a sentence. A heading is
+  // the thing being asked about, so a heading is what gets tested.
+  const faqSection = findFaqSection(markdown);
+
   // Extract headings
   const headingMatches = [...markdown.matchAll(/^(#{1,6})\s+(.+)$/gm)];
   const headings = headingMatches.map((m) => ({
@@ -594,8 +607,7 @@ export function analyzeContent(
 
   // ── Check 10: FAQ section presence ──
   if (plan.faqQuestions.length > 0) {
-    const hasFaq = content.includes('faq') || content.includes('frequently asked');
-    if (!hasFaq) {
+    if (!faqSection) {
       fixes.push({
         category: 'faq_section',
         severity: 'high',
@@ -813,7 +825,10 @@ export function analyzeContent(
           severity: missing.length >= 3 ? 'high' : 'medium',
           description: `${missing.length} PAA questions not addressed in any heading: ${missing.slice(0, 3).join('; ')}`,
           suggestion: 'Add an H3 (under FAQ) for each missing PAA question with a self-contained 40-80 word answer.',
-          affectedSection: 'Frequently Asked Questions',
+          // The article's own heading, not the English label. Display-only (the apply path keys
+          // off `anchor`), but a fix that says "under Frequently Asked Questions" about a Greek
+          // article is pointing at a section the reader cannot find.
+          affectedSection: faqSection?.headingText ?? null,
           autoFixable: true,
           applied: false,
         });
@@ -1018,6 +1033,7 @@ function buildSectionScores(
 // stale article with strong writing signals would have kept a perfect score and the new
 // signal would only ever have bitten pages that were already scoring badly.
 function analyzeGEO(markdown: string, plan: ArticlePlan, contentDatedAt?: string): GEOScore {
+  const headingTexts = [...markdown.matchAll(/^#{1,6}\s+(.+)$/gm)].map((m) => m[1].trim());
   const content = markdown.toLowerCase();
   const recommendations: string[] = [];
 
@@ -1046,9 +1062,18 @@ function analyzeGEO(markdown: string, plan: ArticlePlan, contentDatedAt?: string
   if (quoteCount < 2) recommendations.push('Add expert quotes or attributed statements for authority signals');
 
   // 5. FAQ Q&A pairs (10 pts)
-  const faqPresent = content.includes('faq') || content.includes('frequently asked');
-  const questionMarks = (markdown.match(/\?/g) || []).length;
-  const faqCoverage = faqPresent ? Math.min(10, 5 + Math.min(5, questionMarks)) : Math.min(5, questionMarks);
+  //
+  // Both halves used to assume English. The presence test was a substring of the whole document,
+  // so a Greek article headed `## Συχνές Ερωτήσεις` scored as having no FAQ; and the pair count
+  // was every `?` in the file, while Greek ends a question with `;` — so the same article counted
+  // ZERO questions and took half the available points, with nothing to show for it but a lower
+  // number. Counting question-shaped HEADINGS is what this metric was always trying to say
+  // ("Q&A pairs"), and it is the version that does not depend on the alphabet.
+  const faqPresent = findFaqSection(markdown) !== null;
+  const questionCount = headingTexts.filter(isQuestionHeading).length;
+  const faqCoverage = faqPresent
+    ? Math.min(10, 5 + Math.min(5, questionCount))
+    : Math.min(5, questionCount);
   if (!faqPresent) recommendations.push('Add a clear FAQ section with structured Q&A pairs');
 
   // 6. Schema markup coverage (10 pts) — check plan.recommendedSchema

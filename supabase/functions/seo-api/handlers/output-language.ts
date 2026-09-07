@@ -44,5 +44,11 @@ export function outputLanguageBlock(code: string | null | undefined): string {
 Write EVERY word of the output in ${name} (${trimmed}) — headings, meta title, meta
 description, body copy, FAQ questions and answers. The slug stays latin-alphabet.
 Keep proper nouns, brand names and technical standards (R-ratings, EN/ISO codes) in
-their original form. Do not translate the target keyword: use it exactly as given.`;
+their original form. Do not translate the target keyword: use it exactly as given.
+
+This includes the STRUCTURAL section headings. Where these rules name a section in
+English — "Frequently Asked Questions", "Conclusion", "Next Steps" — that names the
+section's PURPOSE, not the words to print. Write each of those headings in ${name},
+the way a native publication in ${name} would title it. An English heading in the
+middle of a ${name} article is a defect, not a convention.`;
 }

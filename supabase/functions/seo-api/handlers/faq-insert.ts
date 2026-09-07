@@ -4,39 +4,23 @@
  * Separated from the handler so it can be tested without a Deno runtime or a model call. The
  * handler reads `Deno.env` at module load, so importing it from a unit test throws before a
  * single case runs; this is the same split as `readability.ts` and for the same reason.
- */
-
-export const STRIP_ACCENTS = (s: string) =>
-  s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-
-/**
- * Headings that mean "this is the FAQ section".
  *
- * The writer emits `## Frequently Asked Questions` even in a Greek article (a separate defect —
- * the heading is English in a Greek document), so English has to be here; the localised forms are
- * here because that heading should be, and will be, the article's own language. Matching more
- * than the writer currently produces costs nothing and stops this from breaking the day the
- * prompt is fixed.
+ * WHICH heading counts as the FAQ section is not decided here — that lives in
+ * `_shared/seo/articleSections.generated.ts`, because the viewer and the analyzer have to answer
+ * it the same way. This file only decides where the text lands.
  */
-export const FAQ_HEADING_PATTERNS = [
-  'frequently asked questions',
-  'faq',
-  'faqs',
-  'common questions',
-  'συχνές ερωτήσεις',
-  'συχνες ερωτησεις',
-  'preguntas frecuentes',
-  'domande frequenti',
-  'häufige fragen',
-  'questions fréquentes',
-];
 
-const stripAccents = STRIP_ACCENTS;
+import {
+  findConclusionLine,
+  findFaqSection,
+  stripAccents,
+  type SectionLabels,
+} from '../../_shared/seo/articleSections.generated.ts';
 
-export function isFaqHeading(headingText: string): boolean {
-  const h = stripAccents(headingText).replace(/[:：?;·]+$/, '').trim();
-  return FAQ_HEADING_PATTERNS.some((p) => h === stripAccents(p));
-}
+export { isFaqHeading, findFaqSection } from '../../_shared/seo/articleSections.generated.ts';
+
+/** Kept as a named export because callers outside this file compare questions with it. */
+export const STRIP_ACCENTS = stripAccents;
 
 export interface FaqInsertion {
   markdown: string;
@@ -57,50 +41,43 @@ export function insertFaqEntry(
   markdown: string,
   question: string,
   answer: string,
-  fallbackHeading = 'Frequently Asked Questions',
+  /**
+   * How to NAME an FAQ section that does not exist yet. Defaults to English, and the caller is
+   * expected to pass the article's own language — writing `## Frequently Asked Questions` into a
+   * Greek article is the exact defect this pair of changes removes, and creating the section is
+   * the one path that gets to choose the words.
+   */
+  labels?: Pick<SectionLabels, 'faq'>,
 ): FaqInsertion {
+  const fallbackHeading = labels?.faq ?? 'Frequently Asked Questions';
   const q = question.trim().replace(/\s+/g, ' ');
   const entry = `### ${q}\n\n${answer.trim()}\n`;
   const lines = markdown.split('\n');
 
-  let faqStart = -1;
-  let heading = '';
-  for (let i = 0; i < lines.length; i++) {
-    const m = lines[i].match(/^##\s+(.+?)\s*$/);
-    if (m && isFaqHeading(m[1])) { faqStart = i; heading = m[1]; break; }
-  }
+  const section = findFaqSection(markdown);
 
-  if (faqStart === -1) {
+  if (!section) {
     // No FAQ section. Create one — before the conclusion if there is one, since an FAQ after the
     // closing paragraph reads as an afterthought and pushes the call to action off the end.
-    let insertAt = lines.length;
-    for (let i = 0; i < lines.length; i++) {
-      const m = lines[i].match(/^##\s+(.+?)\s*$/);
-      if (m && /^(conclusion|συμπέρασμα|συμπερασμα|summary)$/i.test(stripAccents(m[1]))) { insertAt = i; break; }
-    }
+    const closing = findConclusionLine(markdown);
+    const insertAt = closing === -1 ? lines.length : closing;
     const block = [`## ${fallbackHeading}`, '', entry.trimEnd(), ''];
     const next = [...lines.slice(0, insertAt), ...block, ...lines.slice(insertAt)];
     return { markdown: next.join('\n'), createdSection: true, heading: fallbackHeading };
   }
 
-  // The section ends at the next H2 (or H1), or at the end of the document.
-  let faqEnd = lines.length;
-  for (let i = faqStart + 1; i < lines.length; i++) {
-    if (/^#{1,2}\s+/.test(lines[i])) { faqEnd = i; break; }
-  }
-
   // Trim the blank lines the section ends with, add the entry, put one blank line back.
-  let tail = faqEnd;
-  while (tail > faqStart + 1 && lines[tail - 1].trim() === '') tail -= 1;
+  let tail = section.endLine;
+  while (tail > section.headingLine + 1 && lines[tail - 1].trim() === '') tail -= 1;
 
   const next = [
     ...lines.slice(0, tail),
     '',
     entry.trimEnd(),
     '',
-    ...lines.slice(faqEnd),
+    ...lines.slice(section.endLine),
   ];
-  return { markdown: next.join('\n'), createdSection: false, heading };
+  return { markdown: next.join('\n'), createdSection: false, heading: section.headingText };
 }
 
 
