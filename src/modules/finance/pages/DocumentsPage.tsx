@@ -44,10 +44,11 @@ import { MydataTypeLabel } from '@/modules/finance/components/MydataTypeLabel';
 import { useMydataTypeLabels } from '@/modules/finance/components/mydataTypes';
 import { inboundOutcomes } from '@/modules/finance/components/inboundStatus';
 import {
-  INBOUND_SOURCE_CHIP, inboundDocumentNumber, invoicedTotal, isReverseCharged, needsLineDetail,
+  INBOUND_SOURCE_CHIP, inboundDocumentNumber, invoicedTotal, isReverseCharged,
   selfAccountedVat,
 } from '@/modules/finance/utils/inboundProvenance';
-import type { InboundSource } from '@/modules/finance/services/inboundService';
+import type { InboundSource, InboundLinkSummary } from '@/modules/finance/services/inboundService';
+import { InboundDetailCell } from '@/modules/finance/components/InboundDetailCell';
 import { DispatchBoard } from '@/modules/finance/components/DispatchBoard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { supabase } from '@/integrations/supabase/client';
@@ -134,6 +135,8 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
   const [inbound, setInbound] = useState<InboundDocument[]>([]);
   /** Everything the workspace HAS, not just what was fetched — see the cap notice below. */
   const [inboundTotal, setInboundTotal] = useState(0);
+  /** Best correlation per inbound document — keyed by doc id, empty when there is none. */
+  const [inboundLinks, setInboundLinks] = useState<Record<string, InboundLinkSummary>>({});
   const [recurring, setRecurring] = useState<RecurringExpense[]>([]);
   const [newExpenseOpen, setNewExpenseOpen] = useState(false);
   const [payments, setPayments] = useState<PaymentWithAllocation[]>([]);
@@ -232,7 +235,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
       const failed: Record<string, string> = {};
       const guard = <T,>(key: string, pr: Promise<T>, empty: T): Promise<T> =>
         pr.catch((e: any) => { failed[key] = e?.message ?? 'could not be loaded'; return empty; });
-      const [inv, cn, inb, pmts, dns, chq, cats] = await Promise.all([
+      const [inv, cn, inb, pmts, dns, chq, cats, links] = await Promise.all([
         // Paged client-side below, so the fetch cap is a safety ceiling, not a page size —
         // 200 silently hid older documents once a workspace crossed it.
         financeService.listInvoices({ workspaceId: activeWorkspaceId, limit: 1000 }),
@@ -242,6 +245,9 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
         guard('delivery_notes', deliveryNotesService.list(activeWorkspaceId), [] as any[]),
         guard('cheques', chequesService.list(activeWorkspaceId), [] as any[]),
         guard('categories', financeCategoriesService.list(activeWorkspaceId), [] as FinanceCategory[]),
+        // A ΔΑ and the ΤΙΜ that bills it. Guarded like the rest: a correlation we could not load
+        // must leave the row saying "Needs detail" — which is true — rather than blanking the tab.
+        guard('document_links', inboundService.linkSummary(activeWorkspaceId), {} as Record<string, InboundLinkSummary>),
       ]);
       setLoadErrors(failed);
       // Recurring templates — Expenses tab only.
@@ -257,6 +263,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
       );
       setInbound(inb.rows);
       setInboundTotal(inb.total);
+      setInboundLinks(links);
       setPayments(pmts);
       setDeliveryNotes(dns);
       setCheques(chq);
@@ -529,7 +536,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                         Older ones are not loaded — narrow the issue-date filter to reach them.
                       </p>
                     )}
-                    <InboundTable rows={paginate(filteredInbound, page)} financeBase={financeBase} workspaceId={activeWorkspaceId} readOnly={!canOperateFinance} onChanged={load} categories={sideCategories} categoryName={categoryName} onOpenExpense={setPaymentsExpenseId} />
+                    <InboundTable rows={paginate(filteredInbound, page)} financeBase={financeBase} workspaceId={activeWorkspaceId} readOnly={!canOperateFinance} onChanged={load} categories={sideCategories} categoryName={categoryName} onOpenExpense={setPaymentsExpenseId} links={inboundLinks} />
                   </>
                 ) : type === 'payments' ? (
                   <PaymentsTable rows={paginate(filteredPayments, page)} categoryName={categoryName} financeBase={financeBase} {...emptyState} />
@@ -1281,7 +1288,7 @@ const IssuerCell: React.FC<{ doc: InboundDocument; crmCompanyId?: string }> = ({
   );
 };
 
-const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; workspaceId: string | null; readOnly: boolean; onChanged: () => void; categories: FinanceCategory[]; categoryName: (id: any) => string; onOpenExpense: (billId: string) => void }> = ({ rows, financeBase, workspaceId, readOnly, onChanged, categories, categoryName, onOpenExpense }) => {
+const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; workspaceId: string | null; readOnly: boolean; onChanged: () => void; categories: FinanceCategory[]; categoryName: (id: any) => string; onOpenExpense: (billId: string) => void; links: Record<string, InboundLinkSummary> }> = ({ rows, financeBase, workspaceId, readOnly, onChanged, categories, categoryName, onOpenExpense, links }) => {
   const { toast } = useToast();
   const [localCat, setLocalCat] = React.useState<Record<string, string | null>>({});
   // VAT → CRM company id, so a known issuer's name links straight to their record instead of
@@ -1430,9 +1437,7 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
               {formatMoney(invoicedTotal(d), d.currency)}
             </td>
             <td className="px-4 py-2 text-center">
-              {needsLineDetail(d)
-                ? <span className="text-[10px] text-amber-800 dark:text-amber-300" title="Value-only lines — nothing here can be received to the warehouse or turned into a product until someone says what was on it.">Needs detail</span>
-                : <span className="text-[10px] text-muted-foreground/50">—</span>}
+              <InboundDetailCell doc={d} link={links[d.id]} readOnly={readOnly} onChanged={onChanged} />
             </td>
             <td className="px-4 py-2 text-center">
               {outcomes.length > 0

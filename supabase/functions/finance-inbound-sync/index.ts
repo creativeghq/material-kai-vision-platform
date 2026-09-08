@@ -473,6 +473,38 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
       await supabase.from('finance_settings').update(marks).eq('workspace_id', workspaceId);
     }
 
+    // ── Correlate the two halves of one delivery ──────────────────────────────────────
+    // A ΔΑ (9.3) and the ΤΙΜ that bills it are one purchase that myDATA is required to file as
+    // two documents: the delivery note carries the items at zero money — it is not a tax
+    // document — and the invoice carries the money with its itemisation collapsed to a single
+    // value-only line, because the detail already reached AADE on the delivery note. Held
+    // apart, the Inbox shows 104 deliveries worth nothing next to 701 invoices of nothing.
+    //
+    // The issuer may state the link outright in `<correlatedInvoices>`, which has been sitting
+    // unread in `raw.xml` since the first sync — every one of the 11 present resolves to a
+    // document we already hold. Suppliers who leave it empty (ALKYON among them) get a scored
+    // candidate instead, which is a SUGGESTION and stays one until an operator accepts it.
+    //
+    // Cheap, deterministic and no model call, so it runs here rather than in `enrich` below:
+    // the operator who clicked "Sync from myDATA" should see the pair joined when the pull
+    // returns, not two minutes later.
+    let aadeLinks = 0;
+    let suggestedLinks = 0;
+    {
+      const { data: n, error } = await supabase.rpc('import_inbound_document_links_from_aade', {
+        p_workspace_id: workspaceId,
+      });
+      if (error) console.error('[inbound-sync] aade link import failed', error.message);
+      else aadeLinks = Number(n) || 0;
+    }
+    {
+      const { data: n, error } = await supabase.rpc('suggest_inbound_document_links', {
+        p_workspace_id: workspaceId,
+      });
+      if (error) console.error('[inbound-sync] link suggestion failed', error.message);
+      else suggestedLinks = Number(n) || 0;
+    }
+
     // ── Auto-convert to expenses (opt-in per workspace) ──
     // A document the supplier filed against us IS an obligation, so the "Add to Expenses" click
     // is ceremony. The RPC re-reads the workspace setting itself and applies the family rule
@@ -606,7 +638,19 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
           const pendingRows = usable.map((l: any, i: number) => {
             const s = byIdx.get(i);
             const qty = l.quantity != null && Number(l.quantity) > 0 ? Number(l.quantity) : 1;
-            const netValue = l.net_value != null ? Number(l.net_value) : null;
+            // A DELIVERY NOTE STATES ZERO AND MEANS "NOT MY JOB", AND ZERO IS NOT NULL.
+            //
+            // A ΔΑ carries no money by law — every line is `netValue 0`, and the money arrives
+            // later on the ΤΙΜ that bills it. The `!= null` test below reads that as a stated
+            // price of nothing, so all 205 warehouse items ever received from a delivery note
+            // sat at `unit_cost = 0`: a valid number, on its way to stock valuation and margin,
+            // indistinguishable from goods somebody genuinely got for free.
+            //
+            // The discriminator is the DOCUMENT, not the line. A zero line on a real invoice is
+            // a real zero — a free sample, a replacement under warranty — and must stay one. A
+            // zero line on a document that carries no money at all says nothing about price.
+            const carriesNoMoney = family(d.doc_type) === '9';
+            const netValue = !carriesNoMoney && l.net_value != null ? Number(l.net_value) : null;
             const unitCost = netValue != null ? r2(netValue / qty) : null;
             // A myDATA line is not just a description. It states the unit, the supplier's own
             // article code and the VAT category, and those are FACTS about the document — read
@@ -724,6 +768,10 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
           }
         : { error: transmitted.error ?? 'RequestTransmittedDocs failed' },
       auto_billed: autoBilled,
+      // Reported separately because they are different claims: `aade` is the issuer's own
+      // statement and needs nobody, `suggested` is ours and is waiting on an operator. One
+      // combined number would read as "143 documents joined up" when 132 of them are questions.
+      document_links: { aade: aadeLinks, suggested: suggestedLinks },
       ...enrichment,
       ...(dated ? { date_from: dateFrom, date_to: dateTo } : {}),
     });

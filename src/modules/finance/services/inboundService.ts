@@ -7,6 +7,47 @@ import { supabase } from '@/integrations/supabase/client';
 // One normalised VAT key (#353 CRM-4).
 import { normalizeVat, CRM_VAT_COLUMN } from '@/components/business/crm/companyIdentity';
 import { edgeError } from '@/utils/edgeError';
+import type {
+  InboundLineCostStatus, InboundLinkRelation, InboundLinkSource, InboundLinkSummary,
+} from '@/modules/finance/utils/inboundCorrelation';
+
+export type { InboundLinkSummary } from '@/modules/finance/utils/inboundCorrelation';
+
+/**
+ * `get_inbound_document_detail` — what was on a document, merged with the delivery note that
+ * itemises it when the document names nothing itself.
+ *
+ * `detail.status` and `money.line_costs` are the two fields that must never be dropped on the way
+ * to a component: the first says whether these lines are the document's own or borrowed and from
+ * where, and the second says whether the per-item cost is real. A reader that ignores either sees
+ * two zero-valued lines under a 505.19 invoice and has no way to tell that the split is unknown
+ * rather than free.
+ */
+export interface InboundDocumentDetail {
+  document: {
+    id: string; mark: string | null; doc_type: string | null; label: string;
+    issue_date: string | null; dispatch_date: string | null;
+    issuer_vat: string | null; issuer_name: string | null;
+    currency: string | null; vehicle_number: string | null; download_url: string | null;
+  };
+  detail:
+    | { status: 'own' }
+    | {
+        status: 'linked'; source_doc_id: string; source_mark: string; source_label: string;
+        source_doc_type: string | null; link_source: InboundLinkSource;
+        relation: InboundLinkRelation;
+      }
+    /** Absence with a stated reason — never an empty list standing in for "we do not know". */
+    | { status: 'none'; reason: string };
+  lines: InboundDocLine[];
+  money: {
+    total_net: number | null; total_vat: number | null; total_gross: number | null;
+    line_costs: InboundLineCostStatus;
+  };
+  correlations: InboundLinkSummary[];
+  /** Candidates nobody has ruled on. Deliberately NOT folded into `lines`. */
+  suggestions: InboundLinkSummary[];
+}
 
 export interface InboundDocLine {
   line_number: number | null;
@@ -462,6 +503,61 @@ export const inboundService = {
     });
     if (error) throw error;
     return Number(data ?? 0);
+  },
+
+  /**
+   * The best correlation for every document in the workspace that has one — a ΔΑ and the ΤΙΜ that
+   * bills it, an invoice and the credit note that corrects it.
+   *
+   * ONE call for the whole list. Asking per row would be 500 round trips, and picking the "best"
+   * edge here would be a second copy of the precedence rule `get_inbound_document_detail` already
+   * applies — so SQL decides and this only carries the answer across.
+   */
+  async linkSummary(workspaceId: string): Promise<Record<string, InboundLinkSummary>> {
+    const { data, error } = await supabase.rpc('get_inbound_link_summary', {
+      p_workspace_id: workspaceId,
+    });
+    if (error) throw error;
+    const byDoc: Record<string, InboundLinkSummary> = {};
+    for (const row of (data ?? []) as InboundLinkSummary[]) byDoc[row.doc_id] = row;
+    return byDoc;
+  },
+
+  /**
+   * What was on a document, taking its itemisation from a correlated delivery note when the
+   * document itself names nothing.
+   *
+   * `money.line_costs === 'unallocated'` is the value that matters: the document total is real and
+   * the per-item split is NOT KNOWN. Never divide the total by the line count to fill it in.
+   */
+  async documentDetail(docId: string): Promise<InboundDocumentDetail | null> {
+    const { data, error } = await supabase.rpc('get_inbound_document_detail', { p_doc_id: docId });
+    if (error) throw error;
+    return (data ?? null) as InboundDocumentDetail | null;
+  },
+
+  /** Accept a suggested correlation. Records WHO accepted it — that is what makes it readable. */
+  async confirmLink(linkId: string): Promise<void> {
+    const { error } = await supabase.rpc('confirm_inbound_document_link', { p_link_id: linkId });
+    if (error) throw error;
+  },
+
+  /**
+   * Dismiss a correlation. Marks it rejected rather than deleting it, so the next sync does not
+   * propose it again — and so an issuer's own (wrong) declaration stays on the record.
+   */
+  async rejectLink(linkId: string): Promise<void> {
+    const { error } = await supabase.rpc('reject_inbound_document_link', { p_link_id: linkId });
+    if (error) throw error;
+  },
+
+  /** Link two documents by hand, from the money document towards what it was for. */
+  async linkDocuments(fromDocId: string, toDocId: string): Promise<void> {
+    const { error } = await supabase.rpc('link_inbound_documents', {
+      p_from_doc_id: fromDocId,
+      p_to_doc_id: toDocId,
+    });
+    if (error) throw error;
   },
 
   /** Assign / clear the internal finance category on an inbound (myDATA) document. */

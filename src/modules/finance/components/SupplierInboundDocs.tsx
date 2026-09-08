@@ -21,13 +21,14 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { formatMoney } from '@/modules/finance/services/financeService';
-import { inboundService, type InboundDocument, type IssuerMoney } from '@/modules/finance/services/inboundService';
+import { inboundService, type InboundDocument, type InboundLinkSummary, type IssuerMoney } from '@/modules/finance/services/inboundService';
+import { InboundDetailCell } from '@/modules/finance/components/InboundDetailCell';
 import { inboundOutcomes } from '@/modules/finance/components/inboundStatus';
 import { MydataTypeLabel } from '@/modules/finance/components/MydataTypeLabel';
 import { useInboundDocActions } from '@/modules/finance/components/useInboundDocActions';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { formatDate } from '@/utils/datetime';
-import { inboundDocumentNumber, invoicedTotal, isReverseCharged, needsLineDetail, selfAccountedVat } from '@/modules/finance/utils/inboundProvenance';
+import { inboundDocumentNumber, invoicedTotal, isReverseCharged, selfAccountedVat } from '@/modules/finance/utils/inboundProvenance';
 
 /** What the host needs to describe the list it is framing, without re-fetching it. */
 export interface SupplierInboundCounts {
@@ -163,6 +164,13 @@ export const SupplierInboundDocs: React.FC<{
    */
   const [money, setMoney] = useState<IssuerMoney | null | undefined>(undefined);
   /**
+   * Best correlation per document — the ΔΑ that itemises an invoice, or the invoice that gives a
+   * ΔΑ its money. Loaded for the whole workspace rather than this supplier, because the map is
+   * keyed by document id and the list is already scoped: a per-supplier variant would be a second
+   * query answering the same question.
+   */
+  const [links, setLinks] = useState<Record<string, InboundLinkSummary>>({});
+  /**
    * The issue-date window. Empty by default and bounded by the supplier's own span, because a
    * prefilled window is a filter nobody set: it would silently drop any document carrying NO
    * issue date, and the header's all-time counts would stop agreeing with the table for a reason
@@ -185,14 +193,17 @@ export const SupplierInboundDocs: React.FC<{
     if (!workspaceId || !vatNumber) { setRows([]); setTotal(0); setLoading(false); return; }
     setLoading(true);
     try {
-      const [list, sums] = await Promise.all([
+      const [list, sums, linkMap] = await Promise.all([
         inboundService.listForIssuerVat(workspaceId, vatNumber, { from, to }),
         // A failed total is UNKNOWN, not zero — the tiles say so rather than reporting 0 spend.
         inboundService.issuerMoney(workspaceId, vatNumber, { from, to }).catch(() => null),
+        // A correlation we could not load leaves the cell saying "Needs detail", which is true.
+        inboundService.linkSummary(workspaceId).catch(() => ({} as Record<string, InboundLinkSummary>)),
       ]);
       setRows(list.rows);
       setTotal(list.total);
       setMoney(sums);
+      setLinks(linkMap);
     }
     catch { setRows([]); setTotal(0); setMoney(null); }
     finally { setLoading(false); }
@@ -348,13 +359,11 @@ export const SupplierInboundDocs: React.FC<{
                     : formatMoney(d.total_vat ?? 0, d.currency)}
                 </td>
                 <td className="px-4 py-2 text-right font-medium">{formatMoney(invoicedTotal(d), d.currency)}</td>
-                {/* Value-only lines: the money is transmitted, the detail never was. Said out
-                    loud, because it is the one thing standing between this document and every
-                    downstream consumer that keys on a line description. */}
+                {/* Value-only lines: the money is transmitted, the detail never was — and on a
+                    supplier who files a ΔΑ alongside, the detail IS transmitted, on the OTHER
+                    document. One cell answers both, and names which. */}
                 <td className="px-4 py-2 text-center">
-                  {needsLineDetail(d)
-                    ? <span className="text-[10px] text-amber-800 dark:text-amber-300" title="Value-only lines — nothing here can be received to the warehouse or turned into a product until someone says what was on it.">Needs detail</span>
-                    : <span className="text-[10px] text-muted-foreground/50">—</span>}
+                  <InboundDetailCell doc={d} link={links[d.id]} readOnly={readOnly} onChanged={load} />
                 </td>
                 <td className="px-4 py-2 text-center">
                   {outcomes.length > 0
