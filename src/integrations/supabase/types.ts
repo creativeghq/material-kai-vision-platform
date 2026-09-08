@@ -34568,6 +34568,10 @@ export type Database = {
         Args: { p_invoice_id: string }
         Returns: Json
       }
+      set_invoice_document_taxes: {
+        Args: { p_invoice_id: string; p_rows?: Json }
+        Returns: Json
+      }
       stamp_credit_note_tax_payable_delta: {
         Args: { p_credit_note_id: string }
         Returns: number

@@ -439,23 +439,28 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
      */
     let documentTaxes: any[] = [];
     if (kind === 'invoice') {
-      const [{ data }, { data: dt }] = await Promise.all([
+      const [{ data }, { data: dt, error: dtErr }] = await Promise.all([
         supabase.from('invoice_items').select('*').eq('invoice_id', docId).order('added_at'),
         supabase.from('invoice_taxes')
           .select('tax_type, tax_category, tax_amount, reduces_payable, label')
           .eq('invoice_id', docId).order('sort_order'),
       ]);
+      // A FAILED read is not "no charges". Falling through prints a document missing every levy
+      // we filed with AADE, and nothing about it looks wrong — the same reasoning that makes
+      // `assertFiscalLines` refuse rather than transmit an empty document.
+      if (dtErr) throw new Error(`could not read document-level taxes for invoice ${docId}: ${dtErr.message}`);
       items = data ?? [];
       documentTaxes = dt ?? [];
       await attachVariantLabels(supabase, items);
     } else if (kind === 'credit_note') {
-      const [{ data: cnItems }, { data: srcInv }, { data: cnTaxes }] = await Promise.all([
+      const [{ data: cnItems }, { data: srcInv }, { data: cnTaxes, error: cnTaxErr }] = await Promise.all([
         supabase.from('credit_note_items').select('*').eq('credit_note_id', docId).order('created_at'),
         row.invoice_id ? supabase.from('invoices').select('customer_company_id, customer_contact_id, vat_rate').eq('id', row.invoice_id).maybeSingle() : Promise.resolve({ data: null } as any),
         supabase.from('credit_note_taxes')
           .select('tax_type, tax_category, tax_amount, reduces_payable, label')
           .eq('credit_note_id', docId).order('sort_order'),
       ]);
+      if (cnTaxErr) throw new Error(`could not read document-level taxes for credit note ${docId}: ${cnTaxErr.message}`);
       items = cnItems ?? [];
       documentTaxes = cnTaxes ?? [];
       inv = {

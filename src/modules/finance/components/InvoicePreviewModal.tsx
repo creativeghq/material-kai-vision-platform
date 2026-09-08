@@ -54,7 +54,7 @@ export function InvoicePreviewModal({
       try {
         const { data: invoice, error } = await supabase.from('invoices').select('*').eq('id', invoiceId).single();
         if (error || !invoice) throw error ?? new Error('Invoice not found');
-        const [{ data: items }, { data: settings }, { data: documentTaxes }] = await Promise.all([
+        const [{ data: items }, { data: settings }, { data: documentTaxes, error: docTaxErr }] = await Promise.all([
           // Explicit columns: the preview renders what the CUSTOMER will see, so it has no
           // business asking for the cost snapshot — and could not get it anyway (#358).
           supabase.from('invoice_items')
@@ -74,6 +74,9 @@ export function InvoicePreviewModal({
             .select('tax_type, tax_category, tax_amount, reduces_payable, label')
             .eq('invoice_id', invoiceId).order('sort_order'),
         ]);
+        // A failed read is not "no charges" — the preview would then show the operator a
+        // document with fewer levies than the one the customer receives, and both look fine.
+        if (docTaxErr) throw docTaxErr;
 
         let customer: Record<string, any> | null = null;
         if (invoice.customer_company_id) {

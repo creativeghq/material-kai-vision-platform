@@ -20,7 +20,7 @@ import { useToast } from '@/hooks/use-toast';
 import { CreditTopUpDialog, type CreditTopUpRequest } from '@/components/core/CreditTopUpDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
-import { invoicingSetupService, type FinanceBranch } from '@/services/invoicingSetupService';
+import { invoicingSetupService, type FinanceBranch, type RefRow } from '@/services/invoicingSetupService';
 import { AddressUnitSelect } from '@/modules/crm/components/AddressUnitSelect';
 import { formatAddressLine } from '@/services/crm.service';
 import { QuickAddCompanyDialog } from '@/components/business/crm/QuickAddCompanyDialog';
@@ -195,6 +195,12 @@ interface DocTaxRow {
   tax_type: string;
   /** Code within that bucket's table. Empty for deductions, which AADE gives no table. */
   tax_category: string;
+  /**
+   * How many pieces a 'per_unit' category applies to. STATED, never summed off the lines: a
+   * document mixes units, so "total quantity" adds 2 m² of tile to 3 appliances and calls the
+   * result pieces. Ignored by every other rate kind.
+   */
+  units: string;
   amount: string;
   /** myDATA `taxTypeLabel` — free text; where "Φόρος Ανακύκλωσης ΑΗΗΕ-5Γ01" goes. */
   label: string;
@@ -410,7 +416,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     setPaymentMethodCode('3'); setPaymentMethodInfo(''); setVatSuspension(false); setSelfPricing(false); setExchangeRate('');
     setPricesIncludeVat(false); setDigitalFee(''); setRelatedDocument(''); setPrintTerms(true); setIncludeInMyf(true); setMoveStock(true);
     setPrintOnlineCode(true); setInfoBox(''); setLogoMode('auto'); setSubmitNow(false); setSendEmail(false); setNextNumber(null);
-    setGUnit(''); setGVat(''); setGIncType(''); setGIncCat('');
+    setGUnit(''); setGVat(''); setGIncType(''); setGIncCat(''); setDocTaxes([]);
     setLines(initialItems && initialItems.length ? initialItems.map((it) => emptyLine(it)) : [emptyLine()]);
     setHasShipping(false); setShipFrom(''); setShipTo(''); setTransportDate(''); setTransportTime('');
     setVehicleNumber(''); setResponsible(''); setMovePurpose('1');
@@ -439,7 +445,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         invoicingSetupService.listReference('expense_classification_type'),
         invoicingSetupService.listReference('expense_classification_category'),
       ]);
-      const toTaxRef = (r: { code: string; description: string; rate: number | null; rate_kind: 'percent' | 'amount' }): TaxRef => ({ code: r.code, description: r.description, rate: r.rate, rate_kind: r.rate_kind });
+      const toTaxRef = (r: RefRow): TaxRef => ({ code: r.code, description: r.description, rate: r.rate, rate_kind: r.rate_kind });
       // Only offer enabled categories — deprecated myDATA codes (e.g. other-taxes 1/2,
       // which v1.0.9 forbids transmitting) are flagged is_enabled=false in mydata_reference.
       setWithholdings(wh.filter((r) => r.is_enabled).map(toTaxRef));
@@ -712,10 +718,10 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
    * the document NET, 'per_unit' over the document's total QUANTITY (a per-piece eco-levy), and
    * a typed amount for a category AADE publishes no rate for.
    */
-  const docTaxAmountOf = useCallback((r: DocTaxRow, docNet: number, docQty: number): number => {
+  const docTaxAmountOf = useCallback((r: DocTaxRow, docNet: number): number => {
     const ref = refsForTaxType(r.tax_type).find((x) => x.code === r.tax_category);
     if (ref?.rate_kind === 'percent') return docNet * (Number(ref.rate) || 0) / 100;
-    if (ref?.rate_kind === 'per_unit' && ref.rate != null) return Number(ref.rate) * docQty;
+    if (ref?.rate_kind === 'per_unit' && ref.rate != null) return Number(ref.rate) * parseDecimalOr(r.units, 0);
     return parseDecimalOr(r.amount, 0);
   }, [refsForTaxType]);
 
@@ -725,9 +731,10 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
    * tax is a valid number, so nothing downstream would ever raise.
    */
   const lineTaxesUsed = useMemo(
-    () => lines.some((l) => l.fees_category || l.stamp_duty_category || l.other_taxes_category
-      || parseDecimalOr(l.deductions, 0) !== 0),
-    [lines],
+    () => !!withholdingCode
+      || lines.some((l) => l.fees_category || l.stamp_duty_category || l.other_taxes_category
+        || parseDecimalOr(l.deductions, 0) !== 0),
+    [lines, withholdingCode],
   );
 
   const totals = useMemo(() => {
@@ -804,13 +811,12 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
      * `recompute_invoice_tax_totals` to derive from.
      */
     if (docTaxes.length) {
-      const totalQty = lines.reduce((a, l) => a + parseDecimalOr(l.quantity, 0), 0);
       const bucket = [0, 0, 0, 0, 0, 0];
       let delta = 0;
       for (const r of docTaxes) {
         const tt = parseInt(r.tax_type, 10);
         if (!tt) continue;
-        const amt = docTaxAmountOf(r, net, totalQty);
+        const amt = round2(docTaxAmountOf(r, net));
         bucket[tt] += amt;
         delta += mydataTaxPayableDelta(tt, amt, r.reduces_payable);
       }
@@ -936,7 +942,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       setTab('taxes');
       toast({
         title: 'Taxes are declared twice',
-        description: 'This document has both per-line taxes and document-level charges. myDATA accepts one or the other — clear the per-line "Advanced taxes" boxes, or remove the document-level rows.',
+        description: 'This document has both document-level charges and a per-line tax (an "Advanced taxes" box, or the document withholding, which is stored on every line). myDATA accepts one declaration or the other — clear one of them.',
         variant: 'destructive',
       });
       return;
@@ -1123,40 +1129,42 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
        * `tax_payable_delta`, which is the number the envelope builder transmits as the gross —
        * so the amounts stamped on the invoice above are provisional until this returns.
        */
-      if (docTaxes.length) {
-        const totalQty = clean.reduce((a, l) => a + parseDecimalOr(l.quantity, 0), 0);
-        const taxRows = docTaxes
-          .map((r, i) => {
-            const taxType = parseInt(r.tax_type, 10);
-            const amount = round2(docTaxAmountOf(r, totals.net, totalQty));
-            const ref = refsForTaxType(r.tax_type).find((x) => x.code === r.tax_category);
-            return {
-              invoice_id: invoice.id,
-              tax_type: taxType,
-              // Deductions is the one bucket AADE publishes no category table for.
-              tax_category: taxType === 5 || !r.tax_category ? null : parseInt(r.tax_category, 10),
-              // The base the amount was computed on — what makes the row auditable rather than
-              // an unexplained figure. Only meaningful where a rate produced it.
-              underlying_value: ref?.rate_kind === 'percent'
-                ? round2(totals.net)
-                : ref?.rate_kind === 'per_unit' ? totalQty : null,
-              tax_amount: amount,
-              reduces_payable: r.reduces_payable,
-              label: r.label.trim() || ref?.description || null,
-              sort_order: i,
-            };
-          })
-          .filter((r) => r.tax_type > 0 && r.tax_amount !== 0);
-        if (taxRows.length) {
-          const { error: taxErr } = await supabase.from('invoice_taxes').insert(taxRows);
-          if (taxErr) throw taxErr;
-        }
-      }
-
-      // Derive the header totals from whichever declaration the document ended up in. SQL is
-      // the authority for every one of these numbers; what was stamped above is the preview.
-      const { error: recomputeErr } = await supabase.rpc('recompute_invoice_tax_totals', { p_invoice_id: invoice.id });
-      if (recomputeErr) throw recomputeErr;
+      /**
+       * ONE call, so the rows and the totals they imply commit together (rule 4).
+       *
+       * As two statements, a failure between them left the document in taxesTotals mode with
+       * `tax_payable_delta = 0` — the envelope would then carry the levy rows AND a gross that
+       * excludes them, which AADE accepts — while the operator saw an error and retried into a
+       * second set of rows. `set_invoice_document_taxes` REPLACES, so a retry converges, and it
+       * recomputes the five header totals and the delta in the same transaction. Called with an
+       * empty array on a line-mode document, which is how those get their totals derived too.
+       */
+      const taxRows = docTaxes
+        .map((r, i) => {
+          const taxType = parseInt(r.tax_type, 10);
+          const ref = refsForTaxType(r.tax_type).find((x) => x.code === r.tax_category);
+          return {
+            tax_type: taxType,
+            tax_category: taxType === 5 || !r.tax_category ? null : parseInt(r.tax_category, 10),
+            /**
+             * myDATA `underlyingValue` is the MONETARY base a tax was computed on — the
+             * provider's own template shows 0.30 withheld on an underlying 1.00. A piece count
+             * is not that, so a per-unit levy states no base rather than transmitting a
+             * quantity in a money field where nobody could tell the two apart.
+             */
+            underlying_value: ref?.rate_kind === 'percent' ? round2(totals.net) : null,
+            tax_amount: round2(docTaxAmountOf(r, totals.net)),
+            reduces_payable: r.reduces_payable,
+            label: r.label.trim() || ref?.description || null,
+            sort_order: i,
+          };
+        })
+        .filter((r) => r.tax_type > 0 && r.tax_amount !== 0);
+      const { error: taxErr } = await supabase.rpc('set_invoice_document_taxes', {
+        p_invoice_id: invoice.id,
+        p_rows: taxRows,
+      });
+      if (taxErr) throw taxErr;
 
       // Issue now → allocate the gapless legal_number + issued_at + due_at via
       // the same RPC the quote flow uses. (Draft stays unnumbered.)
@@ -1282,7 +1290,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           return {
             tax_type: taxType,
             tax_category: taxType === 5 || !r.tax_category ? null : parseInt(r.tax_category, 10),
-            tax_amount: round2(docTaxAmountOf(r, totals.net, lines.reduce((a, l) => a + parseDecimalOr(l.quantity, 0), 0))),
+            tax_amount: round2(docTaxAmountOf(r, totals.net)),
             reduces_payable: r.reduces_payable,
             label: r.label.trim() || ref?.description || null,
           };
@@ -1849,7 +1857,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 <Button
                   type="button" size="sm" variant="outline" className="h-7 text-xs"
                   onClick={() => setDocTaxes((rows) => [...rows, {
-                    tax_type: '2', tax_category: '', amount: '', label: '',
+                    tax_type: '2', tax_category: '', units: '', amount: '', label: '',
                     reduces_payable: defaultReducesPayable(2),
                   }])}
                 >
@@ -1875,7 +1883,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                       const refs = refsForTaxType(r.tax_type);
                       const ref = refs.find((x) => x.code === r.tax_category);
                       const derived = !!ref && (ref.rate_kind === 'percent' || (ref.rate_kind === 'per_unit' && ref.rate != null));
-                      const amount = docTaxAmountOf(r, totals.net, lines.reduce((a, l) => a + parseDecimalOr(l.quantity, 0), 0));
+                      const amount = docTaxAmountOf(r, totals.net);
+                      const perUnit = ref?.rate_kind === 'per_unit' && ref.rate != null;
                       const patch = (v: Partial<DocTaxRow>) => setDocTaxes((rows) => rows.map((x, j) => (j === i ? { ...x, ...v } : x)));
                       return (
                         <div key={i} className="grid grid-cols-1 gap-2 rounded-sm border border-hairline p-2 sm:grid-cols-[8rem_1fr_1fr_7rem_auto]">
@@ -1884,7 +1893,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                             <Select
                               value={r.tax_type}
                               onValueChange={(v) => patch({
-                                tax_type: v, tax_category: '', amount: '',
+                                tax_type: v, tax_category: '', units: '', amount: '',
                                 // The default is the bucket's natural sign, which reproduces the
                                 // arithmetic that was hardcoded before this existed.
                                 reduces_payable: defaultReducesPayable(parseInt(v, 10)),
@@ -1903,7 +1912,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                             {MYDATA_TAX_TYPE_REF_CATEGORY[parseInt(r.tax_type, 10)] === null ? (
                               <p className="pt-1.5 text-[10px] text-muted-foreground">AADE publishes no table for deductions.</p>
                             ) : (
-                              <Select value={r.tax_category || 'none'} onValueChange={(v) => patch({ tax_category: v === 'none' ? '' : v, amount: '' })}>
+                              <Select value={r.tax_category || 'none'} onValueChange={(v) => patch({ tax_category: v === 'none' ? '' : v, units: '', amount: '' })}>
                                 <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="None" /></SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="none">None</SelectItem>
@@ -1921,14 +1930,31 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                             />
                           </div>
                           <div className="space-y-1">
-                            <Label className="text-[10px] text-muted-foreground">Amount ({currency})</Label>
-                            <Input
-                              className="h-7 text-xs text-right" type="text" inputMode="decimal"
-                              value={derived ? amount.toFixed(2) : r.amount}
-                              readOnly={derived}
-                              onChange={(e) => patch({ amount: e.target.value })}
-                              placeholder="0.00"
-                            />
+                            <Label className="text-[10px] text-muted-foreground">
+                              {perUnit ? `Units x ${ref?.rate}` : `Amount (${currency})`}
+                            </Label>
+                            {perUnit ? (
+                              // A per-piece levy applies to a COUNT the operator states. It is not
+                              // the sum of the lines: a document mixes units, and adding m² to
+                              // appliances produces a confident number that means nothing.
+                              <Input
+                                className="h-7 text-xs text-right" type="text" inputMode="decimal"
+                                value={r.units}
+                                onChange={(e) => patch({ units: e.target.value })}
+                                placeholder="0"
+                              />
+                            ) : (
+                              <Input
+                                className="h-7 text-xs text-right" type="text" inputMode="decimal"
+                                value={derived ? amount.toFixed(2) : r.amount}
+                                readOnly={derived}
+                                onChange={(e) => patch({ amount: e.target.value })}
+                                placeholder="0.00"
+                              />
+                            )}
+                            {perUnit && (
+                              <p className="text-right text-[10px] text-muted-foreground">= {amount.toFixed(2)} {currency}</p>
+                            )}
                           </div>
                           <div className="flex items-end gap-2 pb-1">
                             <label className="flex items-center gap-1 text-[10px] text-muted-foreground">

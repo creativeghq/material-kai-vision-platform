@@ -290,6 +290,10 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
       const deductive = t.tax_type === 1 || t.tax_type === 5;
       const counts = deductive ? t.reduces_payable : !t.reduces_payable;
       if (!counts) continue;
+      // Skipped in the PDF renderer too. Two renderers of ONE document listing different
+      // charges is the drift this pair exists to avoid.
+      const amount = Math.abs(Number(t.tax_amount ?? 0));
+      if (!amount) continue;
       const fallback = t.tax_type === 1 ? L.withheld
         : t.tax_type === 2 ? L.fees
         : t.tax_type === 3 ? L.otherTaxes
@@ -297,7 +301,7 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
         : L.deductions;
       extras.push({
         label: String(t.label ?? '').trim() || fallback,
-        value: Math.abs(Number(t.tax_amount ?? 0)),
+        value: amount,
         negative: deductive,
       });
     }

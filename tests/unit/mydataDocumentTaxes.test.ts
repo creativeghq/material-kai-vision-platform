@@ -201,6 +201,19 @@ describe('the printed document names every charge it transmits', () => {
     expect(data.totals.extras.map((e) => e.label)).toContain('Stamp duty');
   });
 
+  it('a zero-amount row is printed by neither renderer', () => {
+    // The PDF renderer skips these. A charge listed on one copy of a document and absent from
+    // the other is the drift this pair of renderers exists to avoid, and it is invisible until
+    // somebody holds both.
+    const data = build([
+      { tax_type: 2, tax_category: 17, tax_amount: 0, reduces_payable: false, label: 'Nil levy' },
+      { tax_type: 2, tax_category: 17, tax_amount: 0.3, reduces_payable: false, label: 'Real levy' },
+    ]);
+    const labels = data.totals.extras.map((e) => e.label);
+    expect(labels).not.toContain('Nil levy');
+    expect(labels).toContain('Real levy');
+  });
+
   it('a document with no document-level rows still prints the per-line bucket totals', () => {
     // The line-mode path is untouched; this is what every existing invoice uses.
     const labels = build(null).totals.extras.map((e) => e.label);
