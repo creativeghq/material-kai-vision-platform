@@ -11,8 +11,8 @@ import { ExternalLink, QrCode, Truck } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { formatMoney } from '@/modules/finance/services/financeService';
 import { MydataTypeLabel } from '@/modules/finance/components/MydataTypeLabel';
-import { inboundService, type InboundAddress, type InboundDocument, type InboundDocumentDetail, type IssuerProfile } from '@/modules/finance/services/inboundService';
-import { INBOUND_LINE_COST_NOTE } from '@/modules/finance/utils/inboundCorrelation';
+import { inboundService, type InboundAddress, type InboundDocLine, type InboundDocument, type InboundDocumentDetail, type IssuerProfile } from '@/modules/finance/services/inboundService';
+import { INBOUND_LINE_COST_NOTE, type InboundLineCost } from '@/modules/finance/utils/inboundCorrelation';
 import { unitSuffix, unitFromMydataCode } from '@/lib/units';
 import { formatDate } from '@/utils/datetime';
 import { invoicedTotal, isReverseCharged, selfAccountedVat } from '@/modules/finance/utils/inboundProvenance';
@@ -91,18 +91,23 @@ export const InboundDocPreviewDialog: React.FC<{
     return () => { live = false; };
   }, [open, doc.id]);
 
-  const lines = detail ? detail.lines : ((full ?? doc).lines ?? []);
+  // Annotated: the fallback path is a plain InboundDocLine[], so the union would widen the
+  // element type and lose `line_cost` — which is the field the whole money column reads.
+  const lines: (InboundDocLine & { line_cost?: InboundLineCost })[] =
+    detail ? detail.lines : ((full ?? doc).lines ?? []);
   /** Set when these lines were BORROWED, so the table can say whose they are. */
   const borrowed = detail?.detail.status === 'linked' ? detail.detail : null;
   /**
-   * TRUE when the per-item cost is UNKNOWN rather than zero.
+   * How far the money on these lines is actually known. SQL decides; this only formats it.
    *
-   * A delivery note's lines are zero-valued by law. The unit-price column below is `net ÷ qty`,
-   * which turns that into a confident €0.00 per item — a fabricated price, on a screen an operator
-   * reads to decide what the goods cost. There is no honest split to compute: the invoice's total
-   * over two zero-share lines is a division by zero, and halving it invents the answer.
+   *   stated / derived  — a real figure, printed
+   *   unallocated       — several delivery-note lines against one invoice total, no basis to split
+   *
+   * The per-LINE verdict is what the table reads, because a document can legitimately mix them.
+   * The document-level value only picks the note above the table.
    */
-  const costsUnknown = detail?.money.line_costs === 'unallocated';
+  const lineCosts = detail?.money.line_costs;
+  const costNote = lineCosts ? INBOUND_LINE_COST_NOTE[lineCosts] : null;
   const number = [doc.series, doc.aa].filter(Boolean).join(' ');
 
   // The issuer's business identity, which myDATA does not transmit — resolved from their CRM
@@ -231,9 +236,9 @@ export const InboundDocPreviewDialog: React.FC<{
               </span>
             )}
           </p>
-          {costsUnknown && lines.length > 0 && (
-            <p className="mb-1 text-[11px] text-amber-800 dark:text-amber-300">
-              {INBOUND_LINE_COST_NOTE.unallocated}
+          {costNote && lines.length > 0 && (
+            <p className={`mb-1 text-[11px] ${lineCosts === 'unallocated' ? 'text-amber-800 dark:text-amber-300' : 'text-muted-foreground'}`}>
+              {costNote}
             </p>
           )}
           <div className="overflow-x-auto rounded-md border border-border/60">
@@ -264,9 +269,11 @@ export const InboundDocPreviewDialog: React.FC<{
                 {lines.map((l, i) => {
                   // Unit price is not transmitted; it is net ÷ quantity, which is exactly how
                   // the myDATA viewer derives the ΤΙΜ. ΜΟΝ. column.
-                  // `costsUnknown` short-circuits it: on borrowed delivery-note lines the stated
-                  // net is a legal zero, so net / qty is a fabricated 0.00 per item, not a price.
-                  const unitPrice = !costsUnknown && l.quantity && Number(l.quantity) !== 0 && l.net_value != null
+                  // Per LINE, not per document. `unknown` means the delivery note stated a legal
+                  // zero and one invoice total cannot be split, so net / qty would be a fabricated
+                  // 0.00 per item rather than a price. Anything else is a real figure.
+                  const unknown = l.line_cost === 'unknown';
+                  const unitPrice = !unknown && l.quantity && Number(l.quantity) !== 0 && l.net_value != null
                     ? Number(l.net_value) / Number(l.quantity)
                     : null;
                   const unitKey = unitFromMydataCode(l.measurement_unit);
@@ -282,20 +289,39 @@ export const InboundDocPreviewDialog: React.FC<{
                       <td className="px-3 py-2 text-center">{unitKey ? unitSuffix(unitKey) : '—'}</td>
                       <td className="px-3 py-2 text-right">{l.quantity ?? '—'}</td>
                       <td className="px-3 py-2 text-right">{unitPrice != null ? formatMoney(unitPrice, doc.currency) : '—'}</td>
-                      {/* An unknown figure is a dash. Printing 0.00 here would be the same
-                          fabricated number three columns wide, and it would foot to a total. */}
-                      <td className="px-3 py-2 text-right">{costsUnknown ? '—' : formatMoney(Number(l.net_value ?? 0), doc.currency)}</td>
+                      {/* An unknown AMOUNT is a dash. The VAT RATE beside it is still printed:
+                          it belongs to the invoice, not to the delivery note, and is known in
+                          every case here — the borrowed line's own `vatCategory 8` ("records
+                          without VAT") is true of a delivery note and false of the goods. */}
+                      <td className="px-3 py-2 text-right">{unknown ? '—' : formatMoney(Number(l.net_value ?? 0), doc.currency)}</td>
                       <td className="px-3 py-2 text-right">
-                        {costsUnknown ? '—' : formatMoney(Number(l.vat_amount ?? 0), doc.currency)}
+                        {unknown ? '—' : formatMoney(Number(l.vat_amount ?? 0), doc.currency)}
                         {l.vat_category != null && (
                           <span className="block text-[10px] text-muted-foreground">{VAT_RATE[l.vat_category] ?? `cat ${l.vat_category}`}</span>
                         )}
                       </td>
-                      <td className="px-3 py-2 text-right font-medium">{costsUnknown ? '—' : formatMoney(total, doc.currency)}</td>
+                      <td className="px-3 py-2 text-right font-medium">{unknown ? '—' : formatMoney(total, doc.currency)}</td>
                     </tr>
                   );
                 })}
               </tbody>
+              {/* The dashes above are only honest if the real money is right here. Without this
+                  footer the answer to "so what did it cost?" is three columns of nothing, and the
+                  operator has to go and find the other document to learn a number we already hold. */}
+              {detail && lines.length > 0 && detail.money.billed_net != null && lineCosts !== 'stated' && (
+                <tfoot className="border-t border-border/60 bg-surface-sunken text-xs">
+                  <tr>
+                    <td colSpan={6} className="px-3 py-2 text-right text-muted-foreground">
+                      {lineCosts === 'unallocated'
+                        ? `Billed as one total on ${detail.money.billed_on}`
+                        : `Total on ${detail.money.billed_on}`}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums">{formatMoney(Number(detail.money.billed_net), doc.currency)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{formatMoney(Number(detail.money.billed_vat ?? 0), doc.currency)}</td>
+                    <td className="px-3 py-2 text-right font-medium tabular-nums">{formatMoney(Number(detail.money.billed_gross ?? 0), doc.currency)}</td>
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
         </div>
@@ -337,6 +363,16 @@ export const InboundDocPreviewDialog: React.FC<{
           </div>
 
           <div className="text-xs">
+            {/* A delivery note's own totals are zero BY LAW, and they stay zero here — this column
+                is summed, and the amount already sits on the invoice row. What was missing was a
+                NAME for the money, not the money. */}
+            {detail && detail.money.billed_on && Number(doc.total_gross ?? 0) === 0 && detail.money.billed_gross != null && (
+              <Row label="Billed on">
+                <span title="A delivery note carries no money. This is the invoice that bills these goods.">
+                  {detail.money.billed_on} — {formatMoney(Number(detail.money.billed_gross), doc.currency)}
+                </span>
+              </Row>
+            )}
             <Row label="Net value">{formatMoney(doc.total_net ?? 0, doc.currency)}</Row>
             {isReverseCharged(doc.doc_type)
               ? <Row label="VAT">

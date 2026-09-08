@@ -8,7 +8,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { normalizeVat, CRM_VAT_COLUMN } from '@/components/business/crm/companyIdentity';
 import { edgeError } from '@/utils/edgeError';
 import type {
-  InboundLineCostStatus, InboundLinkRelation, InboundLinkSource, InboundLinkSummary,
+  InboundLineCost, InboundLineCostStatus, InboundLinkRelation, InboundLinkSource,
+  InboundLinkSummary,
 } from '@/modules/finance/utils/inboundCorrelation';
 
 export type { InboundLinkSummary } from '@/modules/finance/utils/inboundCorrelation';
@@ -39,9 +40,16 @@ export interface InboundDocumentDetail {
       }
     /** Absence with a stated reason — never an empty list standing in for "we do not know". */
     | { status: 'none'; reason: string };
-  lines: InboundDocLine[];
+  /** Each line carries its own `line_cost` verdict; `net_value`/`vat_amount` are ABSENT when unknown. */
+  lines: (InboundDocLine & { line_cost?: InboundLineCost })[];
   money: {
+    /** The document's OWN totals. A ΔΑ is worth zero and stays worth zero. */
     total_net: number | null; total_vat: number | null; total_gross: number | null;
+    /** What these goods were billed at, and on which document — may be the correlated one. */
+    billed_net: number | null; billed_vat: number | null; billed_gross: number | null;
+    billed_on: string | null;
+    /** The single VAT category the billing document states, when it states exactly one. */
+    vat_category: number | null;
     line_costs: InboundLineCostStatus;
   };
   correlations: InboundLinkSummary[];

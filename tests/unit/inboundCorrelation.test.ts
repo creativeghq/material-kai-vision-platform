@@ -119,11 +119,26 @@ describe('an unheld MARK is an answer, not an absence', () => {
   });
 });
 
-describe('per-item cost from a delivery note is unknown, never zero', () => {
-  it('carries a note explaining that only the document total is real', () => {
+describe('per-item cost is derived when it can be, unknown when it cannot', () => {
+  /**
+   * The first cut suppressed EVERY per-line figure on borrowed lines. That hid a number we
+   * actually knew on 74 of 134 linked pairs: with a single line on the delivery note, the invoice
+   * total IS that line's money — nothing is apportioned. Suppressing a known figure is its own
+   * way of lying about the data, so `derived` and `unallocated` must stay distinct.
+   */
+  it('keeps derived and unallocated apart, and only warns about the second', () => {
+    expect(INBOUND_LINE_COST_NOTE.derived).toBeTruthy();
+    expect(INBOUND_LINE_COST_NOTE.derived).toMatch(/single item/i);
     expect(INBOUND_LINE_COST_NOTE.unallocated).toBeTruthy();
     expect(INBOUND_LINE_COST_NOTE.unallocated).toMatch(/not stated/i);
+    expect(INBOUND_LINE_COST_NOTE.derived).not.toBe(INBOUND_LINE_COST_NOTE.unallocated);
     expect(INBOUND_LINE_COST_NOTE.stated).toBeNull();
+    expect(INBOUND_LINE_COST_NOTE.none).toBeNull();
+  });
+
+  it('says the VAT rate and the document total are still real when the split is not', () => {
+    expect(INBOUND_LINE_COST_NOTE.unallocated).toMatch(/VAT rate/i);
+    expect(INBOUND_LINE_COST_NOTE.unallocated).toMatch(/total/i);
   });
 
   /**
@@ -244,12 +259,22 @@ describe('the preview never prints a cost nobody stated', () => {
    * stated net is a legal zero, so that renders a confident 0.00 per item on the screen an
    * operator reads to decide what goods cost.
    */
-  it('gates every money column on line_costs rather than formatting the zero', () => {
+  it('gates the money columns PER LINE, so a derived figure is not suppressed with an unknown one', () => {
     const src = read('src/modules/finance/components/InboundDocPreviewDialog.tsx');
-    expect(src).toMatch(/const costsUnknown = detail\?\.money\.line_costs === 'unallocated'/);
-    expect(src).toMatch(/!costsUnknown && l\.quantity/);
-    // net, VAT and total all dash out together — a subset would still foot to a wrong total.
-    expect(src.match(/costsUnknown \? '—'/g) ?? []).toHaveLength(3);
+    expect(src).toMatch(/const unknown = l\.line_cost === 'unknown'/);
+    expect(src).toMatch(/!unknown && l\.quantity/);
+    // net, VAT and total dash out together — a subset would still foot to a wrong total.
+    expect(src.match(/unknown \? '—'/g) ?? []).toHaveLength(3);
+    // The VAT RATE is NOT suppressed: it belongs to the invoice and is known in every case.
+    expect(src).toMatch(/l\.vat_category != null && \(/);
+  });
+
+  it('shows the real money under the dashes rather than leaving the question unanswered', () => {
+    const src = read('src/modules/finance/components/InboundDocPreviewDialog.tsx');
+    // A footer carrying the billed totals, named with the document they are on.
+    expect(src).toContain('billed_net');
+    expect(src).toContain('billed_on');
+    expect(src).toMatch(/<tfoot/);
   });
 
   it('names the document the borrowed lines came from', () => {

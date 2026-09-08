@@ -221,21 +221,47 @@ export function correlationCellLabel(link: InboundLinkSummary | undefined): {
 }
 
 /**
- * Whether the per-item cost on a set of lines is a real figure or an artefact of the lines having
- * come off a delivery note.
+ * Whether a line's money is a real figure, and if not, why not.
  *
- * `unallocated` is the load-bearing answer and it must never be flattened to zero: an invoice
- * total of 505.19 over two zero-valued delivery-note lines has NO basis to split. Pro-rating by
- * net share divides by zero; splitting evenly invents 252.60 twice. Both are valid numbers that
- * would reach stock valuation and margin, and nothing downstream could ever tell them from a
- * price somebody actually paid.
+ *   stated       the line carries its own money, as an ordinary invoice line does
+ *   derived      the lines came off a delivery note, but there is only ONE of them — so the
+ *                invoice total IS that line's money. Nothing is apportioned and nothing guessed.
+ *   unallocated  several delivery-note lines against one invoice total, and the delivery note's
+ *                own line values are all zero, so there is no share to pro-rate by. A boiler and
+ *                its flue are not half the invoice each. THIS is where a dash is the honest answer.
+ *   none         there are no lines at all
+ *
+ * The first cut collapsed `derived` into `unallocated` and hid a figure we actually knew on 74 of
+ * 134 linked pairs. Suppressing a known number is its own kind of lying about the data.
  */
-export type InboundLineCostStatus = 'stated' | 'unallocated' | 'none';
+export type InboundLineCostStatus = 'stated' | 'derived' | 'unallocated' | 'none';
+
+/** Per-line verdict, so a reader never has to infer it from whether a number happens to be null. */
+export type InboundLineCost = 'stated' | 'derived' | 'unknown';
 
 export const INBOUND_LINE_COST_NOTE: Record<InboundLineCostStatus, string | null> = {
   stated: null,
+  derived:
+    'This delivery note carries a single item, so the invoice total is that line in full — ' +
+    'nothing here is apportioned.',
   unallocated:
-    'Per-item cost is not stated — these lines come from a delivery note, which carries no money. ' +
-    'The document total is the only figure here that is real.',
+    'Per-item cost is not stated — these lines come from a delivery note, which carries no money, ' +
+    'and one invoice total cannot be split between them without inventing the split. The VAT rate ' +
+    'and the document total below are real; the per-item figures are not known.',
   none: null,
 };
+
+/**
+ * Where the money for these goods actually sits.
+ *
+ * A ΔΑ is worth zero and stays worth zero — its own totals are never overwritten, because the
+ * money column is summed and the amount already sits on the invoice row. `billed_*` is the
+ * separate answer to "what were these goods billed at, and on which document".
+ */
+export interface InboundBilledElsewhere {
+  billed_net: number | null;
+  billed_vat: number | null;
+  billed_gross: number | null;
+  /** The document number the money is on, e.g. `ΤΙΜ 2734`. */
+  billed_on: string | null;
+}
