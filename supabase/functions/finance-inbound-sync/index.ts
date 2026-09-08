@@ -306,7 +306,7 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
      */
     const ingest = async (blocks: string[], source: 'mydata' | 'mydata_self', fromMark: string) => {
       let maxMark = fromMark;
-      let upserted = 0;
+      let inserted = 0;
       /** Counted, not silently dropped: on the transmitted endpoint most documents are our own
        *  sales and skipping them is correct, but the number has to be visible. */
       const skippedByFamily: Record<string, number> = {};
@@ -441,13 +441,20 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
           .upsert(row, { onConflict: 'workspace_id,source,mark', ignoreDuplicates: true })
           .select('id');
         if (error) console.error('[inbound-sync] upsert failed', source, mark, error.message);
-        else upserted++;
         const newId = (ins as Array<{ id: string }> | null)?.[0]?.id;
-        if (newId) freshDocIds.push(newId);
+        // `inserted` counts rows that were ACTUALLY WRITTEN, which is the only thing a reader
+        // means by "new documents". It used to increment once per non-error upsert — and with
+        // `ignoreDuplicates: true` an already-held document is not an error, so the counter was
+        // identical to `found` on every run and the UI's "N new documents" toast reported the
+        // size of the WINDOW. Re-pulling September said "10 new documents" and added none; a
+        // window with genuinely nothing new was indistinguishable from one where everything was
+        // new. The insert set is already in hand two lines down — auto-convert has always used
+        // exactly it — so the honest number was there the whole time and nothing read it.
+        if (newId) { inserted++; freshDocIds.push(newId); }
         if (Number(mark) > Number(maxMark)) maxMark = mark;
       }
 
-      return { found: blocks.length, upserted, maxMark, skippedByFamily };
+      return { found: blocks.length, inserted, maxMark, skippedByFamily };
     };
 
     const receivedResult = await ingest(received.blocks, 'mydata', watermark);
@@ -665,21 +672,23 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
 
     summary.push({
       workspaceId,
-      // `found` and `upserted` stay top-level and mean what they always meant: every document
-      // this run saw, from both endpoints.
+      // Two different facts, and the caller needs both: `found` is every document this run SAW
+      // across both endpoints, `inserted` is the subset that was actually new to us. A dated
+      // re-pull of a window we already hold is `found: 10, inserted: 0` — a healthy run that
+      // added nothing, which is not the same event as an endpoint that returned nothing.
       found: receivedResult.found + (transmittedResult?.found ?? 0),
-      upserted: receivedResult.upserted + (transmittedResult?.upserted ?? 0),
+      inserted: receivedResult.inserted + (transmittedResult?.inserted ?? 0),
       received: {
-        found: receivedResult.found, upserted: receivedResult.upserted,
+        found: receivedResult.found, inserted: receivedResult.inserted,
         pages: received.pages, new_watermark: receivedResult.maxMark,
         // Never silent. A capped list looks exactly like a complete one.
         ...(received.capped ? { truncated_at_pages: MAX_PAGES } : {}),
       },
       transmitted: transmitted.ok
         ? {
-            found: transmittedResult!.found, upserted: transmittedResult!.upserted,
+            found: transmittedResult!.found, inserted: transmittedResult!.inserted,
             pages: transmitted.pages, new_watermark: transmittedResult!.maxMark,
-            // Our own sales, deliberately not ingested — reported so "0 upserted" is never
+            // Our own sales, deliberately not ingested — reported so "0 inserted" is never
             // mistaken for "the endpoint returned nothing".
             skipped_own_sales: transmittedResult!.skippedByFamily,
             ...(transmitted.capped ? { truncated_at_pages: MAX_PAGES } : {}),

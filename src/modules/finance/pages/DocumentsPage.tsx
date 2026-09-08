@@ -183,12 +183,23 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
     setSyncing(true);
     try {
       const res = await inboundService.syncNow(range);
-      const pulled = (res?.results ?? []).reduce((n: number, r: any) => n + (r?.upserted ?? 0), 0);
+      const results: any[] = res?.results ?? [];
+      const sum = (k: string) => results.reduce((n: number, r: any) => n + (r?.[k] ?? 0), 0);
+      const seen = sum('found');
+      const added = sum('inserted');
+      // Both numbers, always. "N new documents" alone cannot tell the operator apart the two
+      // reasons a window adds nothing — AADE holds nothing there, or we already have all of it —
+      // and those call for opposite next steps (chase the supplier vs. nothing to do). An
+      // endpoint that failed is neither, so it is named rather than folded into a zero.
+      const failed = results.filter((r: any) => r?.error || r?.transmitted?.error).length;
       toast({
         title: 'myDATA sync ran',
         description: res?.skipped
           ? 'No inbound credentials configured yet (Settings → Documents).'
-          : `${pulled} new document${pulled === 1 ? '' : 's'} for ${range.dateFrom} → ${range.dateTo}.`,
+          : `${range.dateFrom} → ${range.dateTo}: ${added} new document${added === 1 ? '' : 's'}` +
+            ` (${seen} in the window at AADE${seen > 0 && added === 0 ? ', all already filed here' : ''}).` +
+            (failed > 0 ? ' One or more AADE endpoints failed — the count above is incomplete.' : ''),
+        variant: failed > 0 ? 'destructive' : undefined,
       });
       setSyncDialogOpen(false);
       await load();
