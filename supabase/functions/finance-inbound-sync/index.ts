@@ -208,6 +208,8 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
   const metaById = new Map((wsMeta ?? []).map((w: any) => [w.id, w]));
 
   const summary: any[] = [];
+  /** Enrichment started but deliberately not awaited before responding — see `enrich` below. */
+  const deferredEnrichment: Promise<unknown>[] = [];
   for (const c of creds) {
     const workspaceId = c.workspace_id as string;
     const baseUrl = c.base_url || defaultBase;
@@ -486,6 +488,23 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
       else autoBilled = Number(n) || 0;
     }
 
+    // ── Everything below is ENRICHMENT, and the caller must not be held for it ──────────
+    // It reads documents already stored and committed above; the operator who clicked "Sync
+    // from myDATA" is waiting for the PULL, not for this. It is also the slow half — up to 30
+    // model calls plus ΓΕΜΗ/ΑΑΔΕ name lookups — and Supabase's REQUEST IDLE TIMEOUT is 150s,
+    // separate from the 400s wall clock: at 150s the gateway hands the caller a 504 while the
+    // worker runs happily on and finishes. On 2026-09-08 a run took 162s, so the browser got
+    // `POST | 504` at 151.4s and the toast said "Sync failed" — for a run that had already
+    // committed its documents, its watermark and its auto-converted expenses, and which then
+    // logged its own 200 into `api_usage_logs`. The operator did the only thing offered and
+    // clicked again, paying for the whole 162s a second time. Same shape as the `docs is not
+    // defined` 500 recorded a few lines down: the work lands and the caller is told it failed.
+    //
+    // So the enrichment is packaged here and, on the interactive path, started AFTER the
+    // response via `EdgeRuntime.waitUntil` — which keeps the isolate alive to the wall clock
+    // without keeping the caller on the line. The cron awaits it inline: nothing reads a
+    // 504 there, and its counts belong in the run's own summary.
+    const enrich = async () => {
     // ── Background AI product extraction → pending-products queue (credit-gated) ──
     // For each not-yet-extracted inbound doc with line detail, run the cheapest model to
     // turn raw supplier lines into clean products and queue them for the operator's ✓/✗.
@@ -670,6 +689,16 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
       });
     } catch (e) { console.error('[inbound-sync] issuer name resolution failed', String(e)); }
 
+      return { extraction_batch: extractionBatch, extracted, auto_stocked: autoStocked, issuers };
+    };
+
+    // The cron reports its enrichment counts; the interactive caller is told the work is
+    // running rather than handed a zero, because "0 extracted" and "not finished yet" are
+    // different facts and only one of them means something is wrong.
+    const enrichment = cronOk
+      ? await enrich()
+      : (deferredEnrichment.push(enrich()), { follow_up: 'extraction and issuer names are running in the background' });
+
     summary.push({
       workspaceId,
       // Two different facts, and the caller needs both: `found` is every document this run SAW
@@ -695,10 +724,23 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
           }
         : { error: transmitted.error ?? 'RequestTransmittedDocs failed' },
       auto_billed: autoBilled,
-      extraction_batch: extractionBatch, extracted, auto_stocked: autoStocked,
-      issuers,
+      ...enrichment,
       ...(dated ? { date_from: dateFrom, date_to: dateTo } : {}),
     });
+  }
+
+  // Hand the enrichment to the runtime so the isolate outlives the response instead of the
+  // response outliving the gateway's patience. `waitUntil` is the documented way to do this;
+  // `allSettled` because one workspace's failed enrichment must not cancel another's, and
+  // every one of them already reports its own errors to the log.
+  const runtime = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
+  if (deferredEnrichment.length > 0) {
+    const pending = Promise.allSettled(deferredEnrichment);
+    // No `waitUntil` (a local `supabase functions serve`, a future runtime) must not mean the
+    // work is silently dropped — awaiting is slower but correct, and it is the same code path
+    // the cron takes anyway.
+    if (runtime?.waitUntil) runtime.waitUntil(pending);
+    else await pending;
   }
 
   return json({ ok: true, workspaces: summary.length, results: summary });
