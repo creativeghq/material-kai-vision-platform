@@ -303,7 +303,10 @@ export function InvoiceDocument({
         <div style={{ fontSize: 9, fontWeight: 700, ...muted, textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: 4 }}>{L.charges}</div>
         {data.totals.extras.map((e, i) => (
           <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 16, fontSize: 9, ...muted, padding: '1px 0' }}>
-            <span>{e.negative ? '(-)' : '(+)'} {e.label}</span>
+            {/* A charge label is operator free text since document-level taxes landed — a levy
+                name runs 30-50 Greek characters. `minWidth: 0` is what lets it wrap instead of
+                squeezing the amount, which flex will otherwise do before it breaks a word. */}
+            <span style={{ flex: 1, minWidth: 0 }}>{e.negative ? '(-)' : '(+)'} {e.label}</span>
             <span style={{ whiteSpace: 'nowrap' }}>{money(e.value)}</span>
           </div>
         ))}
@@ -563,7 +566,7 @@ export function InvoiceDocument({
       },
     ];
     return (
-      <div style={sheet} data-invoice-template={spec.id}>
+      <div lang={data.lang} style={sheet} data-invoice-template={spec.id}>
         {/* Header: logo left, title + QR right */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
           <div>
@@ -721,7 +724,7 @@ export function InvoiceDocument({
   // Sidebar (Modern): a narrow left gutter holding the vertical accent wordmark, body to its right.
   if (spec.headerStyle === 'sidebar') {
     return (
-      <div style={sheet} data-invoice-template={spec.id}>
+      <div lang={data.lang} style={sheet} data-invoice-template={spec.id}>
         <div style={{ display: 'flex', gap: '7mm' }}>
           <div style={{ flexShrink: 0, width: 24 }}>
             <div
@@ -747,7 +750,7 @@ export function InvoiceDocument({
   }
 
   return (
-    <div style={sheet} data-invoice-template={spec.id}>
+    <div lang={data.lang} style={sheet} data-invoice-template={spec.id}>
       <Body />
     </div>
   );

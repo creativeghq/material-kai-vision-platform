@@ -271,7 +271,14 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
   const digitalFee = Number(inv.digital_transaction_fee ?? 0);
   const deductions = Number(inv.total_deductions_amount ?? 0);
   const withheld = Number(inv.total_withheld_amount ?? 0);
-  const grand = Number(inv.total ?? (netAfter + vatAfter + fees + stamp + otherTax + digitalFee - withheld - deductions));
+  // In DOCUMENT mode the buckets do not carry their own sign — a row flagged `reducesPayable`
+  // is declared to AADE at its full amount and left out of the payable — so the fallback reads
+  // the delta SQL already derived rather than re-adding the buckets and contradicting the
+  // charge list printed above.
+  const taxDelta = documentTaxes?.length
+    ? Number(inv.tax_payable_delta ?? 0) + digitalFee
+    : fees + stamp + otherTax + digitalFee - withheld - deductions;
+  const grand = Number(inv.total ?? r2(netAfter + vatAfter + taxDelta));
   const extras: TotalsExtraRow[] = [];
   if (documentTaxes?.length) {
     /**

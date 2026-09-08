@@ -253,6 +253,18 @@ describe('document language — English unless the document says Greek', () => {
 
   const TEMPLATES = ['classic', 'modern', 'minimal', 'commercial'];
 
+  /**
+   * Greek orthography has no accented capitals: ΕΠΙΒΑΡΥΝΣΕΙΣ, not ΕΠΙΒΑΡΎΝΣΕΙΣ. The document
+   * sets `text-transform: uppercase` on its section headings and table headers, and a browser
+   * only applies the Greek casing rule when the element says it is Greek — so without `lang`
+   * every Greek invoice printed accented capitals in its chrome. Not a preference, and not
+   * something a colour or layout check would ever look at.
+   */
+  it.each(TEMPLATES)('%s: the sheet declares its language so Greek capitals lose their accents', (id) => {
+    expect(renderTemplate(id, 'el')).toContain('lang="el"');
+    expect(renderTemplate(id, 'en')).toContain('lang="en"');
+  });
+
   // Greek belongs in `INVOICE_LABELS.el`, which is reached only when doc_language is 'el'.
   // A glyph written straight into a renderer bypasses that switch entirely and prints on every
   // document in every language — which is exactly what a bare Σ in the VAT-table sum row did.

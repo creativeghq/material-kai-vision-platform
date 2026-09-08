@@ -24,6 +24,7 @@ import {
   defaultReducesPayable, isDeductiveTaxType, mydataTaxPayableDelta,
 } from '@/modules/finance/mydataTaxPayable';
 import { buildInvoiceRenderData } from '@/modules/finance/invoice-templates/renderData';
+import { round2 } from '@/utils/decimal';
 import { buildNovusPayload } from '../../supabase/functions/_shared/fiscal/novus';
 
 const SETTINGS = { business_name: 'Kai Materials A.E.', business_vat: '090000045', base_currency: 'EUR' };
@@ -148,8 +149,11 @@ describe('recType 3 — a levy line says it is a levy', () => {
 });
 
 describe('the printed document names every charge it transmits', () => {
-  const build = (documentTaxes: unknown) => buildInvoiceRenderData({
-    invoice: { currency: 'EUR', doc_language: 'en', total_fees_amount: 0.46, total_other_taxes_amount: 1.2 },
+  const build = (documentTaxes: unknown, invoiceExtra: Record<string, unknown> = {}) => buildInvoiceRenderData({
+    invoice: {
+      currency: 'EUR', doc_language: 'en', total_fees_amount: 0.46, total_other_taxes_amount: 1.2,
+      ...invoiceExtra,
+    },
     items: [{ description: 'Washing machine', quantity: 2, unit_price: 300, net_value: 600, vat_percent: 24, vat_amount: 144 }],
     settings: SETTINGS,
     customer: CUSTOMER,
@@ -212,6 +216,31 @@ describe('the printed document names every charge it transmits', () => {
     const labels = data.totals.extras.map((e) => e.label);
     expect(labels).not.toContain('Nil levy');
     expect(labels).toContain('Real levy');
+  });
+
+  it('the grand total foots to the charges printed above it', () => {
+    // Rendered and read: net 660.16 + VAT 158.44 + charges 2.22 = 820.82. The point is not the
+    // arithmetic but that the reader can DO it — the charge list, the "Charges" total and the
+    // grand total all have to come from the same rows.
+    const data = build([
+      { tax_type: 2, tax_category: 17, tax_amount: 0.16, reduces_payable: false, label: 'ΑΗΗΕ-5Γ01' },
+      { tax_type: 2, tax_category: 17, tax_amount: 0.3, reduces_payable: false, label: 'ΑΗΗΕ-6' },
+      { tax_type: 3, tax_category: 19, tax_amount: 1.2, reduces_payable: false, label: 'ΕΦΚ Καφές' },
+    ], { tax_payable_delta: 1.66 });
+    const printed = data.totals.extras.reduce((t, e) => t + (e.negative ? -e.value : e.value), 0);
+    expect(round2(printed)).toBe(1.66);
+    expect(data.totals.grand).toBe(round2(data.totals.priceAfterDiscount + data.totals.totalVat + 1.66));
+  });
+
+  it('a row declared but not charged is left out of the grand total, not just the list', () => {
+    // The bucket total keeps the full amount — AADE wants it — so re-adding the buckets to get
+    // a grand total would charge the customer for a levy the same page says is not charged.
+    // The fallback reads `tax_payable_delta`, which SQL derived with the reducesPayable rule.
+    const data = build([
+      { tax_type: 2, tax_category: 17, tax_amount: 0.3, reduces_payable: false, label: 'Charged' },
+      { tax_type: 2, tax_category: 10, tax_amount: 9.99, reduces_payable: true, label: 'Declared only' },
+    ], { tax_payable_delta: 0.3 });
+    expect(data.totals.grand).toBe(round2(data.totals.priceAfterDiscount + data.totals.totalVat + 0.3));
   });
 
   it('a document with no document-level rows still prints the per-line bucket totals', () => {

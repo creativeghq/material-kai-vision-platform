@@ -1260,14 +1260,23 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
     if (withheld > 0) chargeRows.push([L.withheld, -withheld]);
   }
   const chargesNet = r2n(chargeRows.reduce((t, [, v]) => t + v, 0));
+  const CHARGES_W = 190;
   const drawCharges = (x: number, topY: number): number => {
     if (!chargeRows.length) return topY;
     let ty = topY;
     text(L.charges, x, ty, 8, bold, MUTED); ty -= 12;
+    // Reserve the widest amount in the block, so every label wraps against the same edge and
+    // the money column stays a column.
+    const moneyW = Math.max(...chargeRows.map(([, v]) => font.widthOfTextAtSize(money(Math.abs(v)), 8)));
+    const labelW = CHARGES_W - moneyW - 10;
     for (const [label, value] of chargeRows) {
-      text(`${value < 0 ? '(-)' : '(+)'} ${label}`, x, ty, 8, font, MUTED);
-      textR(money(Math.abs(value)), x + 190, ty, 8, font, MUTED);
+      const lines = wrap(`${value < 0 ? '(-)' : '(+)'} ${label}`, font, 8, labelW);
+      text(lines[0], x, ty, 8, font, MUTED);
+      textR(money(Math.abs(value)), x + CHARGES_W, ty, 8, font, MUTED);
       ty -= 11;
+      // Continuation lines are indented past the (+)/(-) marker so the sign reads as belonging
+      // to the whole charge rather than to the first fragment of its name.
+      for (const cont of lines.slice(1)) { text(`    ${cont}`, x, ty, 8, font, MUTED); ty -= 10; }
     }
     return ty - 4;
   };
@@ -1323,9 +1332,13 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
   // The stored total is authoritative (it is the myDATA/MARK figure). The fallback — for a
   // document that never stored one — is built from the SAME post-discount figures printed
   // above, not from the raw pre-discount line sums, which disagreed with them.
-  const grand = Number(
-    inv.total ?? r2n(netAfter + vatAfter + fees + stamp + otherTax + digitalFee - withheld - deductions),
-  );
+  // In DOCUMENT mode a row flagged `reducesPayable` is declared at its full amount in the
+  // bucket total AND left out of the payable, so re-adding the buckets here would contradict
+  // the charge list printed on the left. `tax_payable_delta` is that number, derived in SQL.
+  const taxDelta = docTaxRows.length
+    ? Number(inv.tax_payable_delta ?? 0) + digitalFee
+    : fees + stamp + otherTax + digitalFee - withheld - deductions;
+  const grand = Number(inv.total ?? r2n(netAfter + vatAfter + taxDelta));
   if (chargesNet !== 0) row(L.charges, `${chargesNet < 0 ? '- ' : ''}${money(Math.abs(chargesNet))}`);
   // Grand total — presentation per template.
   if (isCommercial) {
