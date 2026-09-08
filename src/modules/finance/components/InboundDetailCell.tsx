@@ -47,14 +47,36 @@ export const InboundDetailCell: React.FC<{
       : <span className="text-[10px] text-muted-foreground/50">—</span>;
   }
 
+  /**
+   * The warning STAYS UP unless this correlation is the thing that answers it.
+   *
+   * A credit note correlating this invoice, or a cited MARK we never received, tells the operator
+   * something real and tells them NOTHING about the missing lines. Rendering it in the detail
+   * column in place of "Needs detail" silently clears the one flag saying the document still needs
+   * a human — 12 live documents were in that state.
+   */
+  const stillNeedsDetail = needsLineDetail(doc) && !cell.suppliesDetail;
+  const warning = stillNeedsDetail ? (
+    <span
+      className="text-[10px] text-amber-800 dark:text-amber-300"
+      title="Value-only lines — nothing here can be received to the warehouse or turned into a product until someone says what was on it."
+    >
+      Needs detail
+    </span>
+  ) : null;
+  const sep = warning ? <span className="text-[10px] text-muted-foreground/50"> · </span> : null;
+
   // A settled fact: AADE's own declaration, or a link somebody already accepted.
   if (!cell.actionable) {
     return (
-      <span
-        className="text-[10px] text-muted-foreground cursor-help border-b border-dotted border-muted-foreground/40"
-        title={cell.title}
-      >
-        {cell.text}
+      <span className="inline-flex items-center">
+        {warning}{sep}
+        <span
+          className="text-[10px] text-muted-foreground cursor-help border-b border-dotted border-muted-foreground/40"
+          title={cell.title}
+        >
+          {cell.text}
+        </span>
       </span>
     );
   }
@@ -77,6 +99,7 @@ export const InboundDetailCell: React.FC<{
 
   return (
     <span className="inline-flex items-center gap-1">
+      {warning}{sep}
       <span
         className="text-[10px] text-amber-800 dark:text-amber-300 cursor-help border-b border-dotted border-amber-800/40 dark:border-amber-300/40"
         title={cell.title}

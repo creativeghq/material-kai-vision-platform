@@ -22,6 +22,7 @@ import {
   INBOUND_LINE_COST_NOTE,
   INBOUND_LINK_SOURCE_LABEL,
   correlationCellLabel,
+  documentLabel,
   type InboundLinkSummary,
 } from '@/modules/finance/utils/inboundCorrelation';
 
@@ -45,6 +46,7 @@ const base: InboundLinkSummary = {
   confidence: 0.95,
   reason: 'Only invoice from this supplier carrying the same dispatch date (2026-09-08).',
   alternatives: 0,
+  other_claimants: 0,
 };
 
 const link = (over: Partial<InboundLinkSummary> = {}): InboundLinkSummary => ({ ...base, ...over });
@@ -160,5 +162,99 @@ describe('one cell, not one per table', () => {
       expect(src).not.toMatch(/>\s*Needs detail\s*</);
     }
     expect(read('src/modules/finance/components/InboundDetailCell.tsx')).toMatch(/>\s*Needs detail\s*</);
+  });
+});
+
+describe('only an itemising link answers "does this still need me?"', () => {
+  /**
+   * `suppliesDetail` is the whole guard. A credit note correlating this invoice, or a MARK we
+   * never received, is real information that says NOTHING about the missing lines — and rendering
+   * it in the detail column in place of "Needs detail" silently clears the one flag telling the
+   * operator to look. Twelve live documents were in that state.
+   */
+  it('supplies detail only for a confirmed itemised_by link', () => {
+    expect(correlationCellLabel(link({ relation: 'itemised_by', status: 'linked' }))!.suppliesDetail).toBe(true);
+    // Offered, not accepted: nothing is supplying anything yet.
+    expect(correlationCellLabel(link({ relation: 'itemised_by', status: 'suggested' }))!.suppliesDetail).toBe(false);
+    for (const relation of ['invoiced_by', 'corrects', 'corrected_by', 'related'] as const) {
+      expect(correlationCellLabel(link({ relation, status: 'linked' }))!.suppliesDetail).toBe(false);
+    }
+    expect(correlationCellLabel(link({ other_is_held: false }))!.suppliesDetail).toBe(false);
+  });
+
+  it('keeps the warning renderable beside a non-itemising correlation', () => {
+    const src = read('src/modules/finance/components/InboundDetailCell.tsx');
+    // The warning is computed from BOTH facts, not from the absence of a correlation.
+    expect(src).toMatch(/needsLineDetail\(doc\)\s*&&\s*!cell\.suppliesDetail/);
+  });
+});
+
+describe('a contested counterpart is visible before anyone clicks yes', () => {
+  /**
+   * Live, one ΔΑ is offered to EIGHTEEN invoices and each showed `alternatives: 0`, because that
+   * count only ever looked along the invoice's own edges. Accept two and one pallet itemises two
+   * supplier bills, with every individual figure still right.
+   */
+  it('warns when the same delivery note is offered to other documents', () => {
+    const cell = correlationCellLabel(link({ other_claimants: 17 }))!;
+    expect(cell.title).toContain('17 other document');
+    expect(cell.title).toMatch(/only be the detail for one/i);
+  });
+
+  it('says nothing about claimants when there are none', () => {
+    expect(correlationCellLabel(link({ other_claimants: 0 }))!.title).not.toContain('also offered');
+  });
+});
+
+describe('every guess is worded as a question, for every relation', () => {
+  it('never renders a suggested link in the same words as a confirmed one', () => {
+    for (const relation of ['itemised_by', 'invoiced_by', 'corrects', 'corrected_by', 'related'] as const) {
+      const guessed = correlationCellLabel(link({ relation, status: 'suggested' }))!;
+      const settled = correlationCellLabel(link({ relation, status: 'linked', link_source: 'aade' }))!;
+      expect(guessed.text).not.toBe(settled.text);
+      expect(guessed.actionable).toBe(true);
+      expect(settled.actionable).toBe(false);
+      // The evidence travels with every question, not just the two that had it first.
+      expect(guessed.title).toContain('dispatch date');
+    }
+  });
+});
+
+describe('the other document is named in a way the operator can act on', () => {
+  /**
+   * `other_label` is the issuer's own `series aa`, which is free text. This workspace holds
+   * documents labelled `0 000008` and `1 1` — "Detail on 0 000008" gives the person confirming
+   * nothing to confirm.
+   */
+  it('adds the document kind when the label has no letters to speak for itself', () => {
+    expect(documentLabel(link({ other_label: '0 000008', other_doc_type: '1.1' }))).toBe('invoice 0 000008');
+    expect(documentLabel(link({ other_label: '1 1', other_doc_type: '9.3' }))).toBe('delivery note 1 1');
+    expect(documentLabel(link({ other_label: '', other_doc_type: '9.3' }))).toBe('delivery note 400015175778744');
+  });
+
+  it('leaves a Greek series alone rather than saying "invoice invoice"', () => {
+    expect(documentLabel(link({ other_label: 'ΔΑ 2944', other_doc_type: '9.3' }))).toBe('ΔΑ 2944');
+    expect(documentLabel(link({ other_label: 'ΤΙΜ 2734', other_doc_type: '1.1' }))).toBe('ΤΙΜ 2734');
+  });
+});
+
+describe('the preview never prints a cost nobody stated', () => {
+  /**
+   * The preview's unit-price column is `net / quantity`. On borrowed delivery-note lines the
+   * stated net is a legal zero, so that renders a confident 0.00 per item on the screen an
+   * operator reads to decide what goods cost.
+   */
+  it('gates every money column on line_costs rather than formatting the zero', () => {
+    const src = read('src/modules/finance/components/InboundDocPreviewDialog.tsx');
+    expect(src).toMatch(/const costsUnknown = detail\?\.money\.line_costs === 'unallocated'/);
+    expect(src).toMatch(/!costsUnknown && l\.quantity/);
+    // net, VAT and total all dash out together — a subset would still foot to a wrong total.
+    expect(src.match(/costsUnknown \? '—'/g) ?? []).toHaveLength(3);
+  });
+
+  it('names the document the borrowed lines came from', () => {
+    const src = read('src/modules/finance/components/InboundDocPreviewDialog.tsx');
+    expect(src).toContain('borrowed');
+    expect(src).toMatch(/detail\.status === 'none'/);
   });
 });

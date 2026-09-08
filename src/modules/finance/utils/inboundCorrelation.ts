@@ -59,6 +59,13 @@ export interface InboundLinkSummary {
   reason: string | null;
   /** Other live candidates for the same document. One of four is a different claim from one of one. */
   alternatives: number;
+  /**
+   * Other documents competing for the SAME counterpart. Live, one ΔΑ is offered to EIGHTEEN
+   * invoices; each of them showed `alternatives: 0` because that count only ever looked along its
+   * own edges. Accept two and one pallet itemises two supplier bills, with every figure still
+   * individually right — so a contested counterpart has to be visible before anyone clicks yes.
+   */
+  other_claimants: number;
 }
 
 /** Where a link came from, in the operator's words rather than the enum's. */
@@ -67,6 +74,33 @@ export const INBOUND_LINK_SOURCE_LABEL: Record<InboundLinkSource, string> = {
   derived: 'Matched by us',
   user: 'Linked by an operator',
 };
+
+/** myDATA family word, for a document whose own series does not say what it is. */
+const typeWord = (docType: string | null | undefined): string => {
+  const family = String(docType ?? '').split('.')[0];
+  if (family === '9') return 'delivery note';
+  if (family === '5' || String(docType ?? '').startsWith('13.3')) return 'credit note';
+  if (family === '11') return 'receipt';
+  return 'invoice';
+};
+
+/**
+ * What to CALL the other document.
+ *
+ * `other_label` is the issuer's own `series aa`, and for a Greek series that is already the whole
+ * answer — ΔΑ 2944 and ΤΙΜ 2734 tell an operator what they are looking at. But a series is free
+ * text and plenty of issuers use digits: this workspace holds documents labelled `0 000008` and
+ * `1 1`, and "Detail on 0 000008" gives the person confirming nothing to confirm.
+ *
+ * So the type word is added exactly when the label cannot speak for itself — no letters in it —
+ * rather than always, which would produce "Invoiced by invoice ΤΙΜ 2734".
+ */
+export function documentLabel(link: InboundLinkSummary): string {
+  const label = (link.other_label ?? '').trim();
+  if (!label) return `${typeWord(link.other_doc_type)} ${link.other_mark}`;
+  if (/\p{L}/u.test(label)) return label;
+  return `${typeWord(link.other_doc_type)} ${label}`;
+}
 
 /**
  * The detail-column cell for a document that takes part in a correlation.
@@ -80,6 +114,15 @@ export function correlationCellLabel(link: InboundLinkSummary | undefined): {
   title: string;
   /** A question the operator can answer. `false` = a statement of record. */
   actionable: boolean;
+  /**
+   * Whether this correlation is the one that answers "what was on this document".
+   *
+   * Only an `itemised_by` edge does. A credit note or an unheld MARK says nothing about the
+   * missing lines, so the caller must keep its own "Needs detail" warning visible — otherwise a
+   * correlation of an entirely different kind silently clears the one flag telling the operator
+   * the document still needs them. Twelve live documents were in exactly that state.
+   */
+  suppliesDetail: boolean;
 } | null {
   if (!link) return null;
 
@@ -93,32 +136,40 @@ export function correlationCellLabel(link: InboundLinkSummary | undefined): {
         'not received from myDATA. Nothing is missing on our side — that document was either never ' +
         'filed against us or has not been synced yet.',
       actionable: false,
+      suppliesDetail: false,
     };
   }
 
-  const others = link.alternatives > 0
-    ? ` One of ${link.alternatives + 1} candidates.`
+  const name = documentLabel(link);
+  const others = link.alternatives > 0 ? ` One of ${link.alternatives + 1} candidates.` : '';
+  // The half that was missing: a counterpart everybody is being offered.
+  const contested = link.other_claimants > 0
+    ? ` Careful — ${name} is also offered to ${link.other_claimants} other document(s), and it can ` +
+      'only be the detail for one of them.'
     : '';
+  const evidence = `${link.reason ?? ''}${others}${contested}`;
 
   if (link.relation === 'itemised_by') {
     // The document has no lines of its own and the delivery note has them.
     if (link.status === 'linked') {
       return {
-        text: `Detail on ${link.other_label}`,
+        text: `Detail on ${name}`,
         title:
           `${INBOUND_LINK_SOURCE_LABEL[link.link_source]}. The ${link.other_line_count} item(s) on ` +
-          `${link.other_label} are what this invoice bills. Per-item cost is not stated on a ` +
-          'delivery note, so the money here stays a document total.',
+          `${name} are what this invoice bills. Per-item cost is not stated on a delivery note, ` +
+          'so the money here stays a document total.',
         actionable: false,
+        suppliesDetail: true,
       };
     }
     return {
-      text: `${link.other_label}?`,
+      text: `${name}?`,
       title:
-        `Possible match — not confirmed by anyone. ${link.reason ?? ''}${others} ` +
-        `Accept it and the ${link.other_line_count} item(s) on ${link.other_label} become this ` +
-        'invoice\'s detail.',
+        `Possible match — not confirmed by anyone. ${evidence} ` +
+        `Accept it and the ${link.other_line_count} item(s) on ${name} become this document's detail.`,
       actionable: true,
+      // Offered, not accepted. Nothing is supplying the detail yet.
+      suppliesDetail: false,
     };
   }
 
@@ -129,35 +180,43 @@ export function correlationCellLabel(link: InboundLinkSummary | undefined): {
     const amount = typeof money === 'number' ? ` (${money.toFixed(2)})` : '';
     if (link.status === 'linked') {
       return {
-        text: `Invoiced by ${link.other_label}`,
+        text: `Invoiced by ${name}`,
         title:
           `${INBOUND_LINK_SOURCE_LABEL[link.link_source]}. This delivery note is worth zero because ` +
-          `a delivery note carries no money by law; ${link.other_label}${amount} is the invoice for ` +
-          'it, and that is where the amount is counted.',
+          `a delivery note carries no money by law; ${name}${amount} is the invoice for it, and ` +
+          'that is where the amount is counted.',
         actionable: false,
+        // The delivery note already names its own items; the invoice supplies money, not detail.
+        suppliesDetail: false,
       };
     }
     return {
-      text: `${link.other_label}?`,
-      title:
-        `Possible invoice for this delivery — not confirmed by anyone. ${link.reason ?? ''}${others}`,
+      text: `${name}?`,
+      title: `Possible invoice for this delivery — not confirmed by anyone. ${evidence}`,
       actionable: true,
+      suppliesDetail: false,
     };
   }
 
-  if (link.relation === 'corrects' || link.relation === 'corrected_by') {
-    const verb = link.relation === 'corrects' ? 'Corrects' : 'Corrected by';
+  // A credit note, or a correlation whose kind two type codes cannot establish. These say nothing
+  // about missing lines, so they never claim to supply detail — and, like every other relation,
+  // a guess is worded as a question and carries its evidence.
+  const verb = link.relation === 'corrects' ? 'Corrects'
+    : link.relation === 'corrected_by' ? 'Corrected by'
+    : 'Related to';
+  if (link.status === 'linked') {
     return {
-      text: `${verb} ${link.other_label}`,
+      text: `${verb} ${name}`,
       title: `${INBOUND_LINK_SOURCE_LABEL[link.link_source]}.`,
-      actionable: link.status === 'suggested',
+      actionable: false,
+      suppliesDetail: false,
     };
   }
-
   return {
-    text: `Related to ${link.other_label}`,
-    title: `${INBOUND_LINK_SOURCE_LABEL[link.link_source]}.`,
-    actionable: link.status === 'suggested',
+    text: `${verb} ${name}?`,
+    title: `Possible correlation — not confirmed by anyone. ${evidence}`,
+    actionable: true,
+    suppliesDetail: false,
   };
 }
 

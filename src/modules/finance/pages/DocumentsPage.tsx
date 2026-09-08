@@ -519,6 +519,19 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                     <Button size="sm" variant="outline" onClick={() => void load()}>Retry</Button>
                   </div>
                 )}
+                {/* Correlations degrade independently of the list: the documents load fine and
+                    every one of them says "Needs detail", which is TRUE but hides that we could
+                    not check whether a delivery note answers it. Keyed by its own name, so it is
+                    not swallowed by the tab-keyed banner above. */}
+                {type === 'expenses' && loadErrors.document_links && (
+                  <div className="flex items-center justify-between gap-3 border-b border-amber-500/40 bg-amber-500/10 px-4 py-2 text-xs text-amber-700 dark:text-amber-400">
+                    <span>
+                      Could not load document correlations — <span className="opacity-80">{loadErrors.document_links}</span>.
+                      Delivery notes are <strong>not</strong> being matched to the invoices that bill them.
+                    </span>
+                    <Button size="sm" variant="outline" onClick={() => void load()}>Retry</Button>
+                  </div>
+                )}
                 {loading || wsLoading ? (
                   <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
                 ) : type === 'credit_notes' ? (

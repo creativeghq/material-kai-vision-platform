@@ -490,18 +490,22 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
     // returns, not two minutes later.
     let aadeLinks = 0;
     let suggestedLinks = 0;
+    // A failure here reports 0 links, which is byte-identical to "nothing to correlate" — the
+    // silent-zero shape this handler already names twice. So the error goes in the summary
+    // beside the count, the way `extraction_error` does.
+    let linkError: string | null = null;
     {
       const { data: n, error } = await supabase.rpc('import_inbound_document_links_from_aade', {
         p_workspace_id: workspaceId,
       });
-      if (error) console.error('[inbound-sync] aade link import failed', error.message);
+      if (error) { console.error('[inbound-sync] aade link import failed', error.message); linkError = error.message; }
       else aadeLinks = Number(n) || 0;
     }
     {
       const { data: n, error } = await supabase.rpc('suggest_inbound_document_links', {
         p_workspace_id: workspaceId,
       });
-      if (error) console.error('[inbound-sync] link suggestion failed', error.message);
+      if (error) { console.error('[inbound-sync] link suggestion failed', error.message); linkError = error.message; }
       else suggestedLinks = Number(n) || 0;
     }
 
@@ -771,7 +775,7 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
       // Reported separately because they are different claims: `aade` is the issuer's own
       // statement and needs nobody, `suggested` is ours and is waiting on an operator. One
       // combined number would read as "143 documents joined up" when 132 of them are questions.
-      document_links: { aade: aadeLinks, suggested: suggestedLinks },
+      document_links: { aade: aadeLinks, suggested: suggestedLinks, ...(linkError ? { error: linkError } : {}) },
       ...enrichment,
       ...(dated ? { date_from: dateFrom, date_to: dateTo } : {}),
     });
