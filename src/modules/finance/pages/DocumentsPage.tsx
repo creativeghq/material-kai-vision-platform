@@ -184,22 +184,34 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
     try {
       const res = await inboundService.syncNow(range);
       const results: any[] = res?.results ?? [];
-      const sum = (k: string) => results.reduce((n: number, r: any) => n + (r?.[k] ?? 0), 0);
-      const seen = sum('found');
-      const added = sum('inserted');
-      // Both numbers, always. "N new documents" alone cannot tell the operator apart the two
-      // reasons a window adds nothing — AADE holds nothing there, or we already have all of it —
-      // and those call for opposite next steps (chase the supplier vs. nothing to do). An
-      // endpoint that failed is neither, so it is named rather than folded into a zero.
-      const failed = results.filter((r: any) => r?.error || r?.transmitted?.error).length;
+      const added = results.reduce((n: number, r: any) => n + (r?.inserted ?? 0), 0);
+      // `found` counts every block BOTH endpoints returned, and RequestTransmittedDocs returns
+      // our own sales, which are deliberately never ingested. Counting those as "in the window"
+      // would tell the operator AADE holds eight expense documents we already have when it holds
+      // none at all — so the skipped families come back off, from the number the sync itself
+      // reports rather than a second guess at which they were.
+      const ownSales = (r: any): number =>
+        Object.values(r?.transmitted?.skipped_own_sales ?? {}).reduce<number>((a, b) => a + (Number(b) || 0), 0);
+      const seen = results.reduce((n: number, r: any) => n + (r?.found ?? 0) - ownSales(r), 0);
+      // Both numbers, always. "N new documents" alone cannot tell apart the two reasons a window
+      // adds nothing — AADE holds nothing there, or we already hold all of it — and those call
+      // for opposite next steps (chase the supplier vs. nothing to do). A workspace that never
+      // reached AADE is neither: an entitlement skip, a credit skip or a failed endpoint all
+      // produce a result carrying no counts at all, which would otherwise render as a calm
+      // "0 new documents (0 in the window at AADE)" — the exact silent zero this is here to stop.
+      const blocked = results.filter((r: any) => r?.skipped || r?.error || r?.transmitted?.error);
       toast({
         title: 'myDATA sync ran',
         description: res?.skipped
           ? 'No inbound credentials configured yet (Settings → Documents).'
           : `${range.dateFrom} → ${range.dateTo}: ${added} new document${added === 1 ? '' : 's'}` +
             ` (${seen} in the window at AADE${seen > 0 && added === 0 ? ', all already filed here' : ''}).` +
-            (failed > 0 ? ' One or more AADE endpoints failed — the count above is incomplete.' : ''),
-        variant: failed > 0 ? 'destructive' : undefined,
+            (blocked.length > 0
+              ? ` ${blocked.length} workspace${blocked.length === 1 ? '' : 's'} could not be synced` +
+                ` (${[...new Set(blocked.map((r: any) => r.skipped || r.error || r.transmitted?.error))].join('; ')})` +
+                ' — this count is partial.'
+              : ''),
+        variant: blocked.length > 0 ? 'destructive' : undefined,
       });
       setSyncDialogOpen(false);
       await load();
