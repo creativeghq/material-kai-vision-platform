@@ -1,6 +1,15 @@
 import { supabase } from '@/integrations/supabase/client';
 
-export interface RefRow { category: string; code: string; description: string; rate: number | null; rate_kind: 'percent' | 'amount'; is_enabled: boolean; sort_order: number | null; }
+/**
+ * `rate_kind` says how a tax category's amount is arrived at:
+ *   percent  — net × rate% (AADE publishes the percentage)
+ *   per_unit — rate × quantity (AADE publishes a PER-PIECE amount: fees 16 at €0.04 and
+ *              fees 17, the recycling levy, at €0.08. Both rows carried `rate = NULL` and the
+ *              picker just said "(amount)", so the operator typed a figure from memory and did
+ *              the × quantity in their head.)
+ *   amount   — AADE publishes no rate; the operator states it.
+ */
+export interface RefRow { category: string; code: string; description: string; rate: number | null; rate_kind: 'percent' | 'amount' | 'per_unit'; is_enabled: boolean; sort_order: number | null; }
 export interface DocTypeSetting { code: string; enabled: boolean; default_income_classification_type: string | null; default_income_classification_category: string | null; default_withholding_code: string | null; }
 export interface DocSeries { id: string; doc_code: string; series: string; next_number: number; is_active: boolean; branch_id: string | null; }
 export interface FinanceBranch {

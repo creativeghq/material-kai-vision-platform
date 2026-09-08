@@ -5,7 +5,7 @@
 // myDATA type / income-classification use sensible defaults that the caller can
 // override (they are business-activity specific and become a per-workspace config later).
 
-import type { FiscalInvoiceInput, FiscalLine, FiscalParty } from './types.ts';
+import type { FiscalInvoiceInput, FiscalLine, FiscalParty, FiscalTaxTotal } from './types.ts';
 import { isUnnamedLineName } from './types.ts';
 import {
   movePurposeLabel,
@@ -301,10 +301,30 @@ export async function buildInvoiceInputFromDb(
   const { data: inv, error: invErr } = await supabase.from('invoices').select('*').eq('id', invoiceId).single();
   if (invErr || !inv) throw new Error(`invoice ${invoiceId} not found`);
 
-  const [{ data: items, error: itemsErr }, { data: fs }] = await Promise.all([
+  const [{ data: items, error: itemsErr }, { data: fs }, { data: docTaxRows, error: docTaxErr }] = await Promise.all([
     supabase.from('invoice_items').select('*').eq('invoice_id', invoiceId).order('added_at'),
     supabase.from('finance_settings').select('*').eq('workspace_id', inv.workspace_id).maybeSingle(),
+    supabase.from('invoice_taxes').select('*').eq('invoice_id', invoiceId).order('sort_order'),
   ]);
+  // Same fiscal-safety rule as the lines below: a document-level tax declaration that FAILED
+  // to read is not "no taxes". Falling through would transmit an invoice missing every levy it
+  // actually charges — a valid document stating the wrong money, which nothing downstream can
+  // detect. A read we did not confirm never becomes an empty list.
+  if (docTaxErr) {
+    throw new Error(`invoice ${invoiceId}: could not read document-level taxes (${docTaxErr.message ?? docTaxErr})`);
+  }
+  /** A document declares its taxes at document level OR on its lines — never both. */
+  const docTaxMode = (docTaxRows ?? []).length > 0;
+  const taxesTotals: FiscalTaxTotal[] | undefined = docTaxMode
+    ? (docTaxRows as any[]).map((t) => ({
+        taxType: Number(t.tax_type),
+        taxCategory: t.tax_category ?? undefined,
+        underlyingValue: t.underlying_value == null ? undefined : Number(t.underlying_value),
+        taxAmount: round2(Number(t.tax_amount ?? 0)),
+        reducesPayable: Boolean(t.reduces_payable),
+        label: t.label ?? undefined,
+      }))
+    : undefined;
   // FISCAL SAFETY: the header above throws on error, but this read used to drop `error`
   // and fall through to `(items ?? [])` — so a failed/RLS-blocked invoice_items read
   // produced lines=[], totalNet=0, totalVat=0, and finance-issue-invoice TRANSMITTED A
@@ -427,18 +447,26 @@ export async function buildInvoiceInputFromDb(
       vatPercent: linePct,
       vatAmount: vat,
       vatExemptionCategory: it.vat_exemption_category ?? undefined,
-      withheldAmount: Number(it.withheld_amount ?? 0) || undefined,
-      withheldCategory: it.withheld_category ?? undefined,
-      feesAmount: Number(it.fees_amount ?? 0) || undefined,
-      feesCategory: it.fees_category ?? undefined,
-      stampDutyAmount: Number(it.stamp_duty_amount ?? 0) || undefined,
-      stampDutyCategory: it.stamp_duty_category ?? undefined,
-      otherTaxesAmount: Number(it.other_taxes_amount ?? 0) || undefined,
-      otherTaxesCategory: it.other_taxes_category ?? undefined,
-      deductionsAmount: Number(it.deductions_amount ?? 0) || undefined,
+      // Per-line taxes are SUPPRESSED in document mode. myDATA offers the two declarations as
+      // alternatives, so a levy stated on the line AND in `taxesTotals` is filed twice — and a
+      // doubled tax is a valid number, which is why nothing downstream would catch it.
+      ...(docTaxMode ? {} : {
+        withheldAmount: Number(it.withheld_amount ?? 0) || undefined,
+        withheldCategory: it.withheld_category ?? undefined,
+        feesAmount: Number(it.fees_amount ?? 0) || undefined,
+        feesCategory: it.fees_category ?? undefined,
+        stampDutyAmount: Number(it.stamp_duty_amount ?? 0) || undefined,
+        stampDutyCategory: it.stamp_duty_category ?? undefined,
+        otherTaxesAmount: Number(it.other_taxes_amount ?? 0) || undefined,
+        otherTaxesCategory: it.other_taxes_category ?? undefined,
+        deductionsAmount: Number(it.deductions_amount ?? 0) || undefined,
+      }),
       lineComments: it.line_comments ?? undefined,
       // 1.5 clearance-of-third-party-sales line kind (1 = clearance, 2 = commission fee).
       invoiceDetailType: Number(it.invoice_detail_type ?? 0) || undefined,
+      // AADE recType 3 — "Other Taxes Line with VAT". A levy charged to the customer as its own
+      // VAT-bearing line says so; without it the line reads to AADE as ordinary goods.
+      recType: Number(it.rec_type ?? 0) || undefined,
       incomeClassificationType: it.income_classification_type ?? productIncomeType(prod) ?? incType,
       incomeClassificationCategory: it.income_classification_category ?? productIncomeCategory(prod) ?? incCat,
     };
@@ -458,7 +486,20 @@ export async function buildInvoiceInputFromDb(
   // Digital transaction fee (Ψηφιακό Τέλος Συναλλαγής) rides in the other-taxes bucket for myDATA.
   const digitalFee = Number(inv.digital_transaction_fee ?? 0);
   const otherTaxesTotal = Number(inv.total_other_taxes_amount ?? 0) + digitalFee;
-  const grossTotal = round2(totalGross + Number(inv.total_fees_amount ?? 0) + Number(inv.total_stamp_duty_amount ?? 0) + otherTaxesTotal - Number(inv.total_withheld_amount ?? 0) - Number(inv.total_deductions_amount ?? 0));
+  /**
+   * What the document's taxes do to the payable.
+   *
+   * In LINE mode this is the arithmetic it always was — every bucket at its natural sign.
+   * In DOCUMENT mode each row decides its own sign through `reducesPayable`, and that rule is
+   * NOT restated here: `mydata_tax_payable_delta` in SQL is where it is written down, and
+   * `recompute_invoice_tax_totals` stamps its result onto `invoices.tax_payable_delta`. A
+   * second copy in TypeScript is exactly how "how much is settled" came to have five.
+   */
+  const taxPayableDelta = docTaxMode
+    ? Number(inv.tax_payable_delta ?? 0) + digitalFee
+    : Number(inv.total_fees_amount ?? 0) + Number(inv.total_stamp_duty_amount ?? 0) + otherTaxesTotal
+      - Number(inv.total_withheld_amount ?? 0) - Number(inv.total_deductions_amount ?? 0);
+  const grossTotal = round2(totalGross + taxPayableDelta);
 
   // Combined invoice + delivery note (Τιμολόγιο – Δελτίο Αποστολής): emit the movement
   // block so myDATA receives the transport details, same shape as a standalone 9.3.
@@ -535,6 +576,7 @@ export async function buildInvoiceInputFromDb(
       ? [{ type: Number(inv.payment_method_code), amount: grossTotal, ...(inv.payment_method_info ? { info: inv.payment_method_info } : {}) } as any]
       : undefined,
     lines,
+    ...(taxesTotals ? { taxesTotals } : {}),
     summary: {
       totalNetValue: totalNet,
       totalVatAmount: totalVat,
@@ -583,13 +625,30 @@ export async function buildCreditNoteInputFromDb(
   const { data: cn, error: cnErr } = await supabase.from('credit_notes').select('*').eq('id', creditNoteId).single();
   if (cnErr || !cn) throw new Error(`credit note ${creditNoteId} not found`);
 
-  const [{ data: items, error: itemsErr }, { data: inv }, { data: fs }] = await Promise.all([
+  const [{ data: items, error: itemsErr }, { data: inv }, { data: fs }, { data: docTaxRows, error: docTaxErr }] = await Promise.all([
     supabase.from('credit_note_items').select('*').eq('credit_note_id', creditNoteId).order('created_at'),
     supabase.from('invoices').select('*').eq('id', cn.invoice_id).single(),
     supabase.from('finance_settings').select('*').eq('workspace_id', cn.workspace_id).maybeSingle(),
+    supabase.from('credit_note_taxes').select('*').eq('credit_note_id', creditNoteId).order('sort_order'),
   ]);
   if (!inv) throw new Error(`source invoice for credit note ${creditNoteId} not found`);
   assertFiscalLines(items, itemsErr, `credit note ${creditNoteId}`);
+  if (docTaxErr) {
+    throw new Error(`credit note ${creditNoteId}: could not read document-level taxes (${docTaxErr.message ?? docTaxErr})`);
+  }
+  /** Mirrors the invoice: document-level OR per-line, never both. `issue_credit_note`
+   *  pro-rates whichever the credited invoice used, so a reversal reverses the same shape. */
+  const docTaxMode = (docTaxRows ?? []).length > 0;
+  const taxesTotals: FiscalTaxTotal[] | undefined = docTaxMode
+    ? (docTaxRows as any[]).map((t) => ({
+        taxType: Number(t.tax_type),
+        taxCategory: t.tax_category ?? undefined,
+        underlyingValue: t.underlying_value == null ? undefined : Number(t.underlying_value),
+        taxAmount: round2(Number(t.tax_amount ?? 0)),
+        reducesPayable: Boolean(t.reduces_payable),
+        label: t.label ?? undefined,
+      }))
+    : undefined;
 
   const issuer: FiscalParty = {
     vatNumber: fiscalVatNumber(fs?.business_vat, fs?.business_country_code ?? 'GR'),
@@ -674,16 +733,21 @@ export async function buildCreditNoteInputFromDb(
       vatExemptionCategory: it.vat_exemption_category ?? undefined,
       // Per-line taxes, PRO-RATED onto the credited share by `issue_credit_note`. Without
       // these a reversal of a services invoice restates net + VAT and silently forgets the
-      // 20% withholding the original declared.
-      withheldAmount: Number(it.withheld_amount ?? 0) || undefined,
-      withheldCategory: it.withheld_category ?? undefined,
-      feesAmount: Number(it.fees_amount ?? 0) || undefined,
-      feesCategory: it.fees_category ?? undefined,
-      stampDutyAmount: Number(it.stamp_duty_amount ?? 0) || undefined,
-      stampDutyCategory: it.stamp_duty_category ?? undefined,
-      otherTaxesAmount: Number(it.other_taxes_amount ?? 0) || undefined,
-      otherTaxesCategory: it.other_taxes_category ?? undefined,
-      deductionsAmount: Number(it.deductions_amount ?? 0) || undefined,
+      // 20% withholding the original declared. Suppressed in document mode for the same
+      // reason as the invoice: two declarations of one tax file it twice.
+      ...(docTaxMode ? {} : {
+        withheldAmount: Number(it.withheld_amount ?? 0) || undefined,
+        withheldCategory: it.withheld_category ?? undefined,
+        feesAmount: Number(it.fees_amount ?? 0) || undefined,
+        feesCategory: it.fees_category ?? undefined,
+        stampDutyAmount: Number(it.stamp_duty_amount ?? 0) || undefined,
+        stampDutyCategory: it.stamp_duty_category ?? undefined,
+        otherTaxesAmount: Number(it.other_taxes_amount ?? 0) || undefined,
+        otherTaxesCategory: it.other_taxes_category ?? undefined,
+        deductionsAmount: Number(it.deductions_amount ?? 0) || undefined,
+      }),
+      // A reversal of an "Other Taxes Line with VAT" is still one — copied by issue_credit_note.
+      recType: Number(it.rec_type ?? 0) || undefined,
       incomeClassificationType: it.income_classification_type ?? defaultIncType,
       incomeClassificationCategory: it.income_classification_category ?? defaultIncCat,
     };
@@ -698,6 +762,11 @@ export async function buildCreditNoteInputFromDb(
   // must add up.
   const sumLines = (pick: (l: FiscalLine) => number | undefined) =>
     round2(lines.reduce((acc, l) => acc + (pick(l) ?? 0), 0));
+  /** One bucket's total, read from whichever declaration this document uses. */
+  const sumBucket = (taxType: number, pick: (l: FiscalLine) => number | undefined) =>
+    (docTaxMode
+      ? round2((taxesTotals ?? []).reduce((acc, t) => acc + (t.taxType === taxType ? t.taxAmount : 0), 0))
+      : sumLines(pick));
   const correlatedMark = cn.correlated_mark ?? inv.fiscal_mark ?? null;
   const isCorrelated = !!correlatedMark;
 
@@ -713,25 +782,33 @@ export async function buildCreditNoteInputFromDb(
     },
     correlatedInvoices: isCorrelated ? [Number(correlatedMark)] : undefined,
     lines,
+    ...(taxesTotals ? { taxesTotals } : {}),
     summary: {
       totalNetValue: totalNet,
       totalVatAmount: totalVat,
-      totalWithheldAmount: sumLines((l) => l.withheldAmount),
-      totalFeesAmount: sumLines((l) => l.feesAmount),
-      totalStampDutyAmount: sumLines((l) => l.stampDutyAmount),
-      totalOtherTaxesAmount: sumLines((l) => l.otherTaxesAmount),
-      totalDeductionsAmount: sumLines((l) => l.deductionsAmount),
-      // The same formula the invoice path uses, over the same summed lines. It was net + VAT,
+      // Whichever declaration the document is in, summed from the rows it actually transmits —
+      // never from a second stored copy. In document mode the lines carry no tax amounts, so
+      // summing them would declare five zeros beside a taxesTotals block that is not zero.
+      totalWithheldAmount: sumBucket(1, (l) => l.withheldAmount),
+      totalFeesAmount: sumBucket(2, (l) => l.feesAmount),
+      totalStampDutyAmount: sumBucket(4, (l) => l.stampDutyAmount),
+      totalOtherTaxesAmount: sumBucket(3, (l) => l.otherTaxesAmount),
+      totalDeductionsAmount: sumBucket(5, (l) => l.deductionsAmount),
+      // The same formula the invoice path uses, over the same summed rows. It was net + VAT,
       // which contradicted the five component totals declared immediately above it: a credit note
       // reversing a line with withholding transmitted a gross nobody could reconstruct from its
       // own rows. A credit note is the invoice it corrects, in reverse — including this sum.
+      // In document mode the per-row sign is `reducesPayable`, derived in SQL and read off
+      // `credit_notes.tax_payable_delta` rather than re-decided here.
       totalGrossValue: round2(
         totalNet + totalVat
-        + sumLines((l) => l.feesAmount)
-        + sumLines((l) => l.stampDutyAmount)
-        + sumLines((l) => l.otherTaxesAmount)
-        - sumLines((l) => l.withheldAmount)
-        - sumLines((l) => l.deductionsAmount),
+        + (docTaxMode
+          ? Number(cn.tax_payable_delta ?? 0)
+          : sumLines((l) => l.feesAmount)
+            + sumLines((l) => l.stampDutyAmount)
+            + sumLines((l) => l.otherTaxesAmount)
+            - sumLines((l) => l.withheldAmount)
+            - sumLines((l) => l.deductionsAmount)),
       ),
       incomeClassificationType: defaultIncType,
       incomeClassificationCategory: defaultIncCat,

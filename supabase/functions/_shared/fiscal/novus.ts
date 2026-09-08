@@ -28,7 +28,7 @@ function parseCredits(v: unknown): number | undefined {
 
 /** Map our normalized invoice into the Novus `{ invoice: [ … ] }` request body. */
 export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unknown> {
-  const { issuer, counterpart, header, lines, summary } = input;
+  const { issuer, counterpart, header, lines, summary, taxesTotals } = input;
 
   // Refuse to transmit a legal document whose line carries no real product name — one of our
   // synthetic fallbacks ('(line item)' / 'Item') or an empty description. Better to block with
@@ -42,7 +42,7 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
   }
 
   // Refuse to transmit a packaging or labour unit as the line's measurement unit. AADE codes
-  // exactly six (pieces, kg, litres, metres, m², m³); 'box' / 'pallet' / 'hour' have no code, and
+  // exactly seven (pieces, kg, litres, metres, m², m³, pieces-other); 'box' / 'pallet' / 'hour' have no code, and
   // the platform's own UoM ladder exists to restate them — `convert_to_base_unit(product, qty,
   // unit)` is the one conversion entry point. Sending the label verbatim would file a legal
   // document whose stated unit AADE does not recognise. Blocking is recoverable; a wrong unit on
@@ -156,6 +156,9 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
     // Emitted whenever it is set rather than silently dropped off-type — a line kind the
     // operator recorded must either reach myDATA or be rejected loudly, never vanish.
     ...(l.invoiceDetailType ? { invoiceDetailType: l.invoiceDetailType } : {}),
+    // AADE Appendix §12. 3 = "Other Taxes Line with VAT" — this line IS a levy carrying VAT,
+    // not a goods line with a tax attached. Same rule as above: recorded means transmitted.
+    ...(l.recType ? { recType: l.recType } : {}),
     lineUnitPrice: l.unitPrice,
     totalNetPriceBeforeDiscount: l.netValue + (l.discountValue ?? 0),
     totalDiscountValue: l.discountValue ?? 0,
@@ -370,6 +373,26 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
           ...(pm.posNspId != null ? { posNspId: pm.posNspId } : {}),
         })) }),
         invoiceDetails,
+        // ── Document-level taxes (myDATA `taxesTotals`) ───────────────────────────────
+        // The alternative to per-line tax fields, and the only one of the two that can carry
+        // several rows of the SAME bucket — a recycling levy is one AADE code (fees 17) charged
+        // at a different rate per ΑΗΗΕ appliance class, which a line, holding one category per
+        // bucket, cannot state. `taxTypeLabel` is what names the class.
+        //
+        // Emitted only when the document is in that mode; the builder leaves every line's tax
+        // amount unset there, because declaring a tax in both places files it twice.
+        ...(taxesTotals?.length
+          ? {
+              taxesTotals: taxesTotals.map((t) => ({
+                taxType: t.taxType,
+                ...(t.taxCategory ? { taxCategory: t.taxCategory } : {}),
+                ...(t.underlyingValue != null ? { underlyingValue: t.underlyingValue } : {}),
+                taxAmount: t.taxAmount,
+                reducesPayable: t.reducesPayable,
+                ...(t.label ? { taxTypeLabel: t.label } : {}),
+              })),
+            }
+          : {}),
         // ── Novus's PDF-RENDERING block — NOT tax data ────────────────────────────────
         // Everything above (issuer/counterpart VAT, header, details, summary) is what AADE
         // registers and what earns the MARK. This block only feeds the letterhead of the PDF

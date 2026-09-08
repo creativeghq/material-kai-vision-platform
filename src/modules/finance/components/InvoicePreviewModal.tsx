@@ -54,7 +54,7 @@ export function InvoicePreviewModal({
       try {
         const { data: invoice, error } = await supabase.from('invoices').select('*').eq('id', invoiceId).single();
         if (error || !invoice) throw error ?? new Error('Invoice not found');
-        const [{ data: items }, { data: settings }] = await Promise.all([
+        const [{ data: items }, { data: settings }, { data: documentTaxes }] = await Promise.all([
           // Explicit columns: the preview renders what the CUSTOMER will see, so it has no
           // business asking for the cost snapshot — and could not get it anyway (#358).
           supabase.from('invoice_items')
@@ -64,9 +64,15 @@ export function InvoicePreviewModal({
               + 'income_classification_category, selected_attributes, selected_size, selected_color, '
               + 'withheld_amount, withheld_category, fees_amount, fees_category, stamp_duty_amount, '
               + 'stamp_duty_category, other_taxes_amount, other_taxes_category, deductions_amount, '
-              + 'line_comments, taric_code, country_of_origin, net_mass_kg, invoice_detail_type, added_at')
+              + 'line_comments, taric_code, country_of_origin, net_mass_kg, invoice_detail_type, rec_type, added_at')
             .eq('invoice_id', invoiceId).order('added_at'),
           supabase.from('finance_settings').select('*').eq('workspace_id', workspaceId).maybeSingle(),
+          // Document-level charges (myDATA taxesTotals). The preview renders what the customer
+          // will see, and each of these rows is printed under its OWN name — folding them into
+          // one "Fees" figure would show the customer less than we filed with AADE.
+          supabase.from('invoice_taxes')
+            .select('tax_type, tax_category, tax_amount, reduces_payable, label')
+            .eq('invoice_id', invoiceId).order('sort_order'),
         ]);
 
         let customer: Record<string, any> | null = null;
@@ -186,6 +192,7 @@ export function InvoicePreviewModal({
           providerAttribution, posPayments, timezone,
           invoice, items: items ?? [], settings, customer, addressUnit, authCode,
           branch, order, logoUrl, bankAccounts, payUrl, priorBalance,
+          documentTaxes: documentTaxes ?? null,
         });
 
         if (!cancelled) setResolved({ spec, colors, data });

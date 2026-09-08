@@ -3,7 +3,7 @@
 // catalog product (price via get_product_price_for_workspace; color/size/unit prefilled
 // from product metadata) and carries full myDATA detail — measurement unit, VAT category,
 // income classification — set per line OR via the GLOBAL defaults bar above the rows.
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2, Loader2, ChevronDown, ChevronRight, ChevronLeft, Search, Package, MapPin, Eye } from 'lucide-react';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
@@ -39,6 +39,10 @@ import { fiscalConnectorService } from '@/services/fiscalConnectorService';
 import { validateVatViaVies } from '@/services/viesService';
 import { parseDecimalOr } from '@/utils/decimal';
 import { MYDATA_PAYMENT_CODE } from '@/modules/finance/paymentVocabulary';
+import {
+  MYDATA_TAX_TYPE_LABEL, MYDATA_TAX_TYPE_REF_CATEGORY,
+  defaultReducesPayable, mydataTaxPayableDelta,
+} from '@/modules/finance/mydataTaxPayable';
 import { SELECTABLE_MOVE_PURPOSES } from '@/services/fiscal/fiscalVocabulary';
 import { toLocalISODate, todayLocalISO } from '@/utils/datetime';
 import { LineIdentityPicker } from '@/components/business/lines/LineIdentityPicker';
@@ -90,6 +94,13 @@ interface LineItem {
   line_comments: string;
   /** myDATA invoiceDetailType — '1' clearance / '2' fee. Only offered on doc type 1.5. */
   invoice_detail_type: string;
+  /**
+   * myDATA recType 3 — "Other Taxes Line with VAT" (AADE Appendix §12). True when this line IS
+   * a levy that carries VAT (an eco-fee charged on to the customer), rather than a goods line
+   * with a tax hanging off it. Only 3 is offered: 2, 6 and 7 are separate features with their
+   * own machinery, and 7 is valid only on 17.3–17.6.
+   */
+  is_other_taxes_line: boolean;
   product_id?: string | null;
   /** `products.item_type` for the picked product. Absent on a hand-typed line, which votes
    *  for NOTHING when the document type is proposed — "we do not know" is not "goods". */
@@ -147,22 +158,54 @@ const COMMON_DOC_CODES = ['1.1', '2.1', '11.1', '9.3'];
 
 
 /** A myDATA tax-category reference row (withholding / fees / other taxes / stamp duty). */
-type TaxRef = { code: string; description: string; rate: number | null; rate_kind: 'percent' | 'amount' };
+type TaxRef = { code: string; description: string; rate: number | null; rate_kind: 'percent' | 'amount' | 'per_unit' };
 
-/** Resolve a line's tax amount for one bucket: a 'percent' category computes net × rate%,
- *  an 'amount' category (or an unknown one) uses the operator-entered manual amount. */
-const taxAmountOf = (refs: TaxRef[], code: string, manualAmount: string, lineNet: number): number => {
+/**
+ * Resolve a line's tax amount for one bucket.
+ *
+ *   percent  → net × rate%
+ *   per_unit → rate × QUANTITY. A Greek eco-levy is charged per piece — AADE publishes fees 16
+ *              at €0.04 and fees 17 (recycling) at €0.08 each — so selling 50 appliances is 50
+ *              × the rate, not the rate. Before this the row had no rate at all and the whole
+ *              multiplication lived in the operator's head, which is a wrong number that looks
+ *              exactly like a right one.
+ *   amount   → AADE publishes no rate; the operator states it.
+ */
+const taxAmountOf = (refs: TaxRef[], code: string, manualAmount: string, lineNet: number, quantity = 1): number => {
   if (!code) return 0;
   const r = refs.find((x) => x.code === code);
   if (r && r.rate_kind === 'percent') return lineNet * (Number(r.rate) || 0) / 100;
+  if (r && r.rate_kind === 'per_unit' && r.rate != null) return Number(r.rate) * quantity;
   return parseDecimalOr(manualAmount, 0);
 };
-/** True when the chosen category auto-computes from a percentage (so the amount is read-only). */
-const isPercentCat = (refs: TaxRef[], code: string): boolean => {
+/** True when the chosen category derives its own amount, so the box is read-only. */
+const isDerivedCat = (refs: TaxRef[], code: string): boolean => {
   const r = refs.find((x) => x.code === code);
-  return !!r && r.rate_kind === 'percent';
+  return !!r && (r.rate_kind === 'percent' || (r.rate_kind === 'per_unit' && r.rate != null));
 };
-const taxOptionLabel = (r: TaxRef): string => `${r.description}${r.rate_kind === 'percent' ? ` — ${r.rate}%` : ' (amount)'}`;
+/**
+ * One row of the document-level tax declaration (myDATA `taxesTotals`).
+ *
+ * `amount` is only ever typed by hand for a category AADE publishes no rate for; a 'percent'
+ * category derives it from the document net and a 'per_unit' one from the document's total
+ * quantity, exactly as the per-line boxes do.
+ */
+interface DocTaxRow {
+  /** AADE taxType 1..5, as a string because that is what a Select gives back. */
+  tax_type: string;
+  /** Code within that bucket's table. Empty for deductions, which AADE gives no table. */
+  tax_category: string;
+  amount: string;
+  /** myDATA `taxTypeLabel` — free text; where "Φόρος Ανακύκλωσης ΑΗΗΕ-5Γ01" goes. */
+  label: string;
+  reduces_payable: boolean;
+}
+
+const taxOptionLabel = (r: TaxRef): string => {
+  if (r.rate_kind === 'percent') return `${r.description} — ${r.rate}%`;
+  if (r.rate_kind === 'per_unit' && r.rate != null) return `${r.description} — ${r.rate}/unit`;
+  return `${r.description} (amount)`;
+};
 
 const emptyLine = (g?: Partial<LineItem>): LineItem => ({
   description: '', sku: '', quantity: '1', unit_price: '0', unit_cost: '', discount: '', unit: '',
@@ -172,7 +215,7 @@ const emptyLine = (g?: Partial<LineItem>): LineItem => ({
   income_classification_category: '',
   fees_category: '', stamp_duty_category: '', other_taxes_category: '',
   fees: '', stamp_duty: '', other_taxes: '', deductions: '', line_comments: '',
-  invoice_detail_type: '',
+  invoice_detail_type: '', is_other_taxes_line: false,
   // Merge any provided fields last so globals (unit/VAT/income class) AND prefills
   // (a real-estate commission line's description + unit_price) both apply.
   ...g,
@@ -305,6 +348,13 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [expenseCategory, setExpenseCategory] = useState('');
   const [units, setUnits] = useState<{ code: string; description: string }[]>([]);
   const [withholdings, setWithholdings] = useState<TaxRef[]>([]);
+  /**
+   * Document-level taxes (myDATA `taxesTotals`). The ALTERNATIVE to the per-line tax boxes,
+   * and the only declaration that can carry several rows of the same bucket — a recycling levy
+   * is ONE AADE code (fees 17) charged at a different rate per ΑΗΗΕ appliance class, which a
+   * line, holding one category per bucket, cannot state. `label` is what names the class.
+   */
+  const [docTaxes, setDocTaxes] = useState<DocTaxRow[]>([]);
   const [feesRefs, setFeesRefs] = useState<TaxRef[]>([]);
   const [stampRefs, setStampRefs] = useState<TaxRef[]>([]);
   const [otherTaxRefs, setOtherTaxRefs] = useState<TaxRef[]>([]);
@@ -646,6 +696,40 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     const gross = Math.max(0, q * p - disc);
     return pricesIncludeVat ? extractNet(gross, pct) : gross;
   };
+  /** The reference table a document-tax bucket picks its category from. Deductions has none. */
+  const refsForTaxType = useCallback((taxType: string): TaxRef[] => {
+    switch (parseInt(taxType, 10)) {
+      case 1: return withholdings;
+      case 2: return feesRefs;
+      case 3: return otherTaxRefs;
+      case 4: return stampRefs;
+      default: return [];
+    }
+  }, [withholdings, feesRefs, otherTaxRefs, stampRefs]);
+
+  /**
+   * A document-tax row's amount, on the same three rules the per-line boxes use: 'percent' over
+   * the document NET, 'per_unit' over the document's total QUANTITY (a per-piece eco-levy), and
+   * a typed amount for a category AADE publishes no rate for.
+   */
+  const docTaxAmountOf = useCallback((r: DocTaxRow, docNet: number, docQty: number): number => {
+    const ref = refsForTaxType(r.tax_type).find((x) => x.code === r.tax_category);
+    if (ref?.rate_kind === 'percent') return docNet * (Number(ref.rate) || 0) / 100;
+    if (ref?.rate_kind === 'per_unit' && ref.rate != null) return Number(ref.rate) * docQty;
+    return parseDecimalOr(r.amount, 0);
+  }, [refsForTaxType]);
+
+  /**
+   * True when any line carries a tax of its own. myDATA takes ONE declaration per document:
+   * the per-line fields OR `taxesTotals`. Stating a levy in both files it twice, and a doubled
+   * tax is a valid number, so nothing downstream would ever raise.
+   */
+  const lineTaxesUsed = useMemo(
+    () => lines.some((l) => l.fees_category || l.stamp_duty_category || l.other_taxes_category
+      || parseDecimalOr(l.deductions, 0) !== 0),
+    [lines],
+  );
+
   const totals = useMemo(() => {
     let net = 0, vat = 0, fees = 0, stamp = 0, other = 0, deduct = 0;
     for (const l of lines) {
@@ -674,11 +758,12 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
        * they are the same numbers.
        */
       net += lineNet; vat += round2(vatOfRaw(lineNet, pct));
-      // fees / stamp / other are category-driven: a 'percent' category computes net × rate%,
-      // an 'amount' category uses the typed amount.
-      fees += taxAmountOf(feesRefs, l.fees_category, l.fees, lineNet);
-      stamp += taxAmountOf(stampRefs, l.stamp_duty_category, l.stamp_duty, lineNet);
-      other += taxAmountOf(otherTaxRefs, l.other_taxes_category, l.other_taxes, lineNet);
+      // fees / stamp / other are category-driven: 'percent' computes net × rate%, 'per_unit'
+      // computes rate × quantity (a per-piece eco-levy), 'amount' uses the typed amount.
+      const lineQty = parseDecimalOr(l.quantity, 0);
+      fees += taxAmountOf(feesRefs, l.fees_category, l.fees, lineNet, lineQty);
+      stamp += taxAmountOf(stampRefs, l.stamp_duty_category, l.stamp_duty, lineNet, lineQty);
+      other += taxAmountOf(otherTaxRefs, l.other_taxes_category, l.other_taxes, lineNet, lineQty);
       deduct += parseDecimalOr(l.deductions, 0);
     }
     // paid-upfront (cash) discount: scale net + vat proportionally (preserves per-line VAT rates).
@@ -708,9 +793,39 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     // category uses the manually-entered withholding amount.
     const wh = withholdings.find((w) => w.code === withholdingCode);
     const withheld = !wh ? 0 : wh.rate_kind === 'percent' ? net * (Number(wh.rate) || 0) / 100 : parseDecimalOr(withholdingAmount, 0);
+
+    /**
+     * DOCUMENT MODE overrides every per-line bucket.
+     *
+     * myDATA offers the two declarations as alternatives — a tax stated on the line AND in
+     * `taxesTotals` is filed twice — so when document rows exist they ARE the declaration.
+     * Each row's sign comes from `mydataTaxPayableDelta`, whose authority is the SQL function
+     * of the same name; this preview exists only because there is no invoice row yet for
+     * `recompute_invoice_tax_totals` to derive from.
+     */
+    if (docTaxes.length) {
+      const totalQty = lines.reduce((a, l) => a + parseDecimalOr(l.quantity, 0), 0);
+      const bucket = [0, 0, 0, 0, 0, 0];
+      let delta = 0;
+      for (const r of docTaxes) {
+        const tt = parseInt(r.tax_type, 10);
+        if (!tt) continue;
+        const amt = docTaxAmountOf(r, net, totalQty);
+        bucket[tt] += amt;
+        delta += mydataTaxPayableDelta(tt, amt, r.reduces_payable);
+      }
+      return {
+        net, vat,
+        withheld: bucket[1], fees: bucket[2], other: bucket[3], stamp: bucket[4], deduct: bucket[5],
+        digital, cashDiscount,
+        total: net + vat + digital + delta,
+        docMode: true,
+      };
+    }
+
     const total = net + vat + fees + stamp + other + digital - withheld - deduct;
-    return { net, vat, fees, stamp, other, deduct, digital, withheld, cashDiscount, total };
-  }, [lines, vatRate, withholdingCode, withholdingAmount, withholdings, feesRefs, stampRefs, otherTaxRefs, pricesIncludeVat, digitalFee, paidUpfront, cashPct]);
+    return { net, vat, fees, stamp, other, deduct, digital, withheld, cashDiscount, total, docMode: false };
+  }, [lines, vatRate, withholdingCode, withholdingAmount, withholdings, feesRefs, stampRefs, otherTaxRefs, pricesIncludeVat, digitalFee, paidUpfront, cashPct, docTaxes, docTaxAmountOf]);
 
   // Buyer risk evaluation against the workspace rules. `vat_validated===false` means ΑΑΔΕ flagged
   // the ΑΦΜ inactive (or VIES rejected it); `null` means it was never checked. Credit limit lives
@@ -811,6 +926,21 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     if (!customer) { setTab('details'); toast({ title: 'Pick a customer', variant: 'destructive' }); return; }
     const clean = lines.filter((l) => l.description.trim() && parseDecimalOr(l.quantity, 0) > 0);
     if (clean.length === 0) { setTab('items'); toast({ title: 'Add at least one line item', variant: 'destructive' }); return; }
+    /**
+     * ONE tax declaration per document. myDATA offers the per-line fields and `taxesTotals` as
+     * alternatives; a levy stated in both is transmitted twice, and a doubled tax is a valid
+     * number that no typecheck, no integrity probe and no AADE validation would ever flag.
+     * Blocking is recoverable; a registered document overstating its taxes is not.
+     */
+    if (docTaxes.length && lineTaxesUsed) {
+      setTab('taxes');
+      toast({
+        title: 'Taxes are declared twice',
+        description: 'This document has both per-line taxes and document-level charges. myDATA accepts one or the other — clear the per-line "Advanced taxes" boxes, or remove the document-level rows.',
+        variant: 'destructive',
+      });
+      return;
+    }
     if (buyerRisk.hardBlocked) {
       setTab('details');
       toast({
@@ -958,11 +1088,11 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           income_classification_category: l.income_classification_category || null,
           // myDATA per-line tax categories + amounts (a 'percent' category computes net × rate%).
           fees_category: l.fees_category ? parseInt(l.fees_category, 10) : null,
-          fees_amount: Number(taxAmountOf(feesRefs, l.fees_category, l.fees, net).toFixed(2)),
+          fees_amount: Number(taxAmountOf(feesRefs, l.fees_category, l.fees, net, q).toFixed(2)),
           stamp_duty_category: l.stamp_duty_category ? parseInt(l.stamp_duty_category, 10) : null,
-          stamp_duty_amount: Number(taxAmountOf(stampRefs, l.stamp_duty_category, l.stamp_duty, net).toFixed(2)),
+          stamp_duty_amount: Number(taxAmountOf(stampRefs, l.stamp_duty_category, l.stamp_duty, net, q).toFixed(2)),
           other_taxes_category: l.other_taxes_category ? parseInt(l.other_taxes_category, 10) : null,
-          other_taxes_amount: Number(taxAmountOf(otherTaxRefs, l.other_taxes_category, l.other_taxes, net).toFixed(2)),
+          other_taxes_amount: Number(taxAmountOf(otherTaxRefs, l.other_taxes_category, l.other_taxes, net, q).toFixed(2)),
           deductions_amount: parseDecimalOr(l.deductions, 0),
           // Document-level withholding distributed by net share, with its category, so the
           // myDATA envelope carries per-line withheldCategory + withheldAmount (not summary-only).
@@ -975,11 +1105,58 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           invoice_detail_type: DETAIL_TYPE_DOC_CODES.has(documentType) && l.invoice_detail_type
             ? parseInt(l.invoice_detail_type, 10)
             : null,
+          // AADE recType 3 — "Other Taxes Line with VAT". Stored so the envelope can say what
+          // this line is; a levy filed as ordinary goods is a valid line stating the wrong fact.
+          rec_type: l.is_other_taxes_line ? 3 : null,
           product_id: l.product_id || null,
         };
       });
       const { error: itemsErr } = await supabase.from('invoice_items').insert(itemsPayload);
       if (itemsErr) throw itemsErr;
+
+      /**
+       * Document-level taxes (myDATA `taxesTotals`).
+       *
+       * Written AFTER the lines and BEFORE the totals are recomputed, because
+       * `recompute_invoice_tax_totals` decides the declaration mode by asking whether any row
+       * exists. It is also the ONE derivation of the five header totals and of
+       * `tax_payable_delta`, which is the number the envelope builder transmits as the gross —
+       * so the amounts stamped on the invoice above are provisional until this returns.
+       */
+      if (docTaxes.length) {
+        const totalQty = clean.reduce((a, l) => a + parseDecimalOr(l.quantity, 0), 0);
+        const taxRows = docTaxes
+          .map((r, i) => {
+            const taxType = parseInt(r.tax_type, 10);
+            const amount = round2(docTaxAmountOf(r, totals.net, totalQty));
+            const ref = refsForTaxType(r.tax_type).find((x) => x.code === r.tax_category);
+            return {
+              invoice_id: invoice.id,
+              tax_type: taxType,
+              // Deductions is the one bucket AADE publishes no category table for.
+              tax_category: taxType === 5 || !r.tax_category ? null : parseInt(r.tax_category, 10),
+              // The base the amount was computed on — what makes the row auditable rather than
+              // an unexplained figure. Only meaningful where a rate produced it.
+              underlying_value: ref?.rate_kind === 'percent'
+                ? round2(totals.net)
+                : ref?.rate_kind === 'per_unit' ? totalQty : null,
+              tax_amount: amount,
+              reduces_payable: r.reduces_payable,
+              label: r.label.trim() || ref?.description || null,
+              sort_order: i,
+            };
+          })
+          .filter((r) => r.tax_type > 0 && r.tax_amount !== 0);
+        if (taxRows.length) {
+          const { error: taxErr } = await supabase.from('invoice_taxes').insert(taxRows);
+          if (taxErr) throw taxErr;
+        }
+      }
+
+      // Derive the header totals from whichever declaration the document ended up in. SQL is
+      // the authority for every one of these numbers; what was stamped above is the preview.
+      const { error: recomputeErr } = await supabase.rpc('recompute_invoice_tax_totals', { p_invoice_id: invoice.id });
+      if (recomputeErr) throw recomputeErr;
 
       // Issue now → allocate the gapless legal_number + issued_at + due_at via
       // the same RPC the quote flow uses. (Draft stays unnumbered.)
@@ -1095,7 +1272,24 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     settings: issuer,
     customer: customerAddr ?? (customer ? { name: customer.label.replace(' (company)', '') } : null),
     branch: null, logoUrl: null, bankAccounts: previewBanks,
-  }), [issuer, previewBanks, previewColors, currency, documentType, nextNumber, issueDate, dueDatePreview, relatedDocument, vatRate, paidUpfront, cashPct, totals, paymentMethodCode, paymentMethodInfo, hasShipping, shipFrom, shipTo, vehicleNumber, movePurpose, printTerms, printOnlineCode, infoBox, notes, logoMode, lines, customer, customerAddr]);
+    // The document-level charges, as they will be stored — so what the operator approves on
+    // screen names the same levies the customer's copy will, rather than one folded "Fees" row.
+    documentTaxes: docTaxes.length
+      ? docTaxes
+        .map((r) => {
+          const taxType = parseInt(r.tax_type, 10);
+          const ref = refsForTaxType(r.tax_type).find((x) => x.code === r.tax_category);
+          return {
+            tax_type: taxType,
+            tax_category: taxType === 5 || !r.tax_category ? null : parseInt(r.tax_category, 10),
+            tax_amount: round2(docTaxAmountOf(r, totals.net, lines.reduce((a, l) => a + parseDecimalOr(l.quantity, 0), 0))),
+            reduces_payable: r.reduces_payable,
+            label: r.label.trim() || ref?.description || null,
+          };
+        })
+        .filter((r) => r.tax_type > 0 && r.tax_amount !== 0)
+      : null,
+  }), [issuer, previewBanks, previewColors, currency, documentType, nextNumber, issueDate, dueDatePreview, relatedDocument, vatRate, paidUpfront, cashPct, totals, paymentMethodCode, paymentMethodInfo, hasShipping, shipFrom, shipTo, vehicleNumber, movePurpose, printTerms, printOnlineCode, infoBox, notes, logoMode, lines, customer, customerAddr, docTaxes, docTaxAmountOf, refsForTaxType]);
 
   const itemCount = useMemo(() => lines.filter((l) => l.description.trim()).length, [lines]);
 
@@ -1565,8 +1759,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                                   { key: 'stamp', label: 'Stamp duty', refs: stampRefs, cat: l.stamp_duty_category, amt: l.stamp_duty, setCat: (v: string) => update(idx, { stamp_duty_category: v, stamp_duty: '' }), setAmt: (v: string) => update(idx, { stamp_duty: v }) },
                                   { key: 'other', label: 'Other taxes', refs: otherTaxRefs, cat: l.other_taxes_category, amt: l.other_taxes, setCat: (v: string) => update(idx, { other_taxes_category: v, other_taxes: '' }), setAmt: (v: string) => update(idx, { other_taxes: v }) },
                                 ] as const).map((b) => {
-                                  const pctCat = isPercentCat(b.refs, b.cat);
-                                  const computed = taxAmountOf(b.refs, b.cat, b.amt, lineNetOf(l));
+                                  const pctCat = isDerivedCat(b.refs, b.cat);
+                                  const computed = taxAmountOf(b.refs, b.cat, b.amt, lineNetOf(l), parseDecimalOr(l.quantity, 0));
                                   return (
                                     <div key={b.key} className="grid grid-cols-[1fr_7rem] gap-2">
                                       <div className="space-y-1">
@@ -1591,6 +1785,20 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                                   <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Deductions</Label><p className="pt-1.5 text-[10px] text-muted-foreground">Retained amount (no myDATA category).</p></div>
                                   <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Amount ({currency})</Label><Input className="h-7 text-xs text-right" type="text" inputMode="decimal" value={l.deductions} onChange={(e) => update(idx, { deductions: e.target.value })} placeholder="0.00" /></div>
                                 </div>
+                                {/* AADE recType 3. A levy billed on to the customer as its own
+                                    VAT-bearing line has to say so, or myDATA reads it as goods. */}
+                                <label className="flex items-start gap-2 pt-1">
+                                  <input
+                                    type="checkbox"
+                                    className="mt-0.5"
+                                    checked={l.is_other_taxes_line}
+                                    onChange={(e) => update(idx, { is_other_taxes_line: e.target.checked })}
+                                  />
+                                  <span className="text-[10px] text-muted-foreground">
+                                    This line is a levy that carries VAT (myDATA recType 3) — e.g. a recycling
+                                    or eco-fee billed to the customer, not a product.
+                                  </span>
+                                </label>
                               </div>
                             )}
                           </div>
@@ -1615,7 +1823,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                     <SelectContent><SelectItem value="none">None</SelectItem>{withholdings.map((w) => <SelectItem key={w.code} value={w.code}>{taxOptionLabel(w)}</SelectItem>)}</SelectContent>
                   </Select>
                   {/* 'amount'-kind withholding (wage/solidarity/termination/…) has no rate to compute from. */}
-                  {withholdingCode && !isPercentCat(withholdings, withholdingCode) && (
+                  {withholdingCode && !isDerivedCat(withholdings, withholdingCode) && (
                     <Input className="h-8 text-right text-sm" type="text" inputMode="decimal" value={withholdingAmount} onChange={(e) => setWithholdingAmount(e.target.value)} placeholder={`Withholding amount (${currency})`} />
                   )}
                 </div>
@@ -1629,6 +1837,120 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 <Label className="text-xs">Digital transaction fee</Label>
                 <Input className="h-9 text-right" type="text" inputMode="decimal" value={digitalFee} onChange={(e) => setDigitalFee(e.target.value)} placeholder="0.00" />
               </div>
+            </section>
+
+            {/* -- Document-level charges (myDATA taxesTotals) -----------------------------
+                The declaration a per-line box cannot make: SEVERAL rows of the same bucket,
+                each named. A recycling levy is one AADE code (fees 17) charged at a different
+                rate per AHHE appliance class, so the class lives in the row's own label. */}
+            <section className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">Charges &amp; levies (document level)</Label>
+                <Button
+                  type="button" size="sm" variant="outline" className="h-7 text-xs"
+                  onClick={() => setDocTaxes((rows) => [...rows, {
+                    tax_type: '2', tax_category: '', amount: '', label: '',
+                    reduces_payable: defaultReducesPayable(2),
+                  }])}
+                >
+                  Add charge
+                </Button>
+              </div>
+              {docTaxes.length === 0 ? (
+                <p className="text-[11px] text-muted-foreground">
+                  None. Use these for a levy the document charges as a whole &mdash; a recycling fee per
+                  &Alpha;&Eta;&Eta;&Epsilon; class, &Epsilon;&Phi;&Kappa;, a stamp duty. Adding one here replaces the per-line
+                  &ldquo;Advanced taxes&rdquo; boxes: myDATA takes one declaration or the other, never both.
+                </p>
+              ) : (
+                <>
+                  {lineTaxesUsed && (
+                    <p className="rounded-sm border border-hairline bg-surface-sunken p-2 text-[11px] text-destructive">
+                      Some lines also carry per-line taxes. myDATA accepts ONE declaration per
+                      document &mdash; clear the per-line &ldquo;Advanced taxes&rdquo; boxes, or remove these rows.
+                    </p>
+                  )}
+                  <div className="space-y-2">
+                    {docTaxes.map((r, i) => {
+                      const refs = refsForTaxType(r.tax_type);
+                      const ref = refs.find((x) => x.code === r.tax_category);
+                      const derived = !!ref && (ref.rate_kind === 'percent' || (ref.rate_kind === 'per_unit' && ref.rate != null));
+                      const amount = docTaxAmountOf(r, totals.net, lines.reduce((a, l) => a + parseDecimalOr(l.quantity, 0), 0));
+                      const patch = (v: Partial<DocTaxRow>) => setDocTaxes((rows) => rows.map((x, j) => (j === i ? { ...x, ...v } : x)));
+                      return (
+                        <div key={i} className="grid grid-cols-1 gap-2 rounded-sm border border-hairline p-2 sm:grid-cols-[8rem_1fr_1fr_7rem_auto]">
+                          <div className="space-y-1">
+                            <Label className="text-[10px] text-muted-foreground">Bucket</Label>
+                            <Select
+                              value={r.tax_type}
+                              onValueChange={(v) => patch({
+                                tax_type: v, tax_category: '', amount: '',
+                                // The default is the bucket's natural sign, which reproduces the
+                                // arithmetic that was hardcoded before this existed.
+                                reduces_payable: defaultReducesPayable(parseInt(v, 10)),
+                              })}
+                            >
+                              <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {[1, 2, 3, 4, 5].map((t) => (
+                                  <SelectItem key={t} value={String(t)}>{MYDATA_TAX_TYPE_LABEL[t]}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-[10px] text-muted-foreground">AADE category</Label>
+                            {MYDATA_TAX_TYPE_REF_CATEGORY[parseInt(r.tax_type, 10)] === null ? (
+                              <p className="pt-1.5 text-[10px] text-muted-foreground">AADE publishes no table for deductions.</p>
+                            ) : (
+                              <Select value={r.tax_category || 'none'} onValueChange={(v) => patch({ tax_category: v === 'none' ? '' : v, amount: '' })}>
+                                <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="None" /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">None</SelectItem>
+                                  {refs.map((x) => <SelectItem key={x.code} value={x.code}>{taxOptionLabel(x)}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            )}
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-[10px] text-muted-foreground">Label on the document</Label>
+                            <Input
+                              className="h-7 text-xs" value={r.label}
+                              onChange={(e) => patch({ label: e.target.value })}
+                              placeholder={ref?.description ?? 'e.g. Recycling fee AHHE-5G01'}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-[10px] text-muted-foreground">Amount ({currency})</Label>
+                            <Input
+                              className="h-7 text-xs text-right" type="text" inputMode="decimal"
+                              value={derived ? amount.toFixed(2) : r.amount}
+                              readOnly={derived}
+                              onChange={(e) => patch({ amount: e.target.value })}
+                              placeholder="0.00"
+                            />
+                          </div>
+                          <div className="flex items-end gap-2 pb-1">
+                            <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                              <input type="checkbox" checked={r.reduces_payable} onChange={(e) => patch({ reduces_payable: e.target.checked })} />
+                              reduces payable
+                            </label>
+                            <Button type="button" size="sm" variant="ghost" className="h-7 text-xs"
+                              onClick={() => setDocTaxes((rows) => rows.filter((_, j) => j !== i))}>
+                              Remove
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    &ldquo;Reduces payable&rdquo; is AADE&rsquo;s own flag: on a withholding or deduction it means the
+                    amount is subtracted; on a fee, other tax or stamp duty it means the amount is
+                    declared but NOT added. The default is what the bucket does by nature.
+                  </p>
+                </>
+              )}
             </section>
 
             {/* Payment */}

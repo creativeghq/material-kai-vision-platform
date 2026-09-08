@@ -1,8 +1,8 @@
 /**
  * Fiscal measurement-unit twin-parity guard (#347, defect 15).
  *
- * AADE codes exactly six measurement units (`mydata_reference` category `measurement_unit`:
- * pieces, kg, litres, metres, m², m³). Our catalogue deliberately offers more — a tile order is
+ * AADE codes exactly seven measurement units (`mydata_reference` category `measurement_unit`:
+ * pieces, kg, litres, metres, m², m³, pieces-other). Our catalogue deliberately offers more — a tile order is
  * placed in boxes and pallets, a survey line is priced by the hour — and those carry
  * `mydataCode: null` with a comment saying they must be converted before transmission.
  *
@@ -38,14 +38,20 @@ const payloadWithUnit = (unit: string) => () => buildNovusPayload({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } as any);
 
-/** The six units AADE actually codes. Mirrors `mydata_reference` category `measurement_unit`. */
-const EXPECTED_CODED = ['pcs', 'kg', 'lt', 'm', 'm2', 'm3'];
+/**
+ * The units AADE actually codes. Mirrors `mydata_reference` category `measurement_unit`.
+ *
+ * SEVEN, not six. Code 7 "Pieces_Other Cases" was published by AADE and was missing from all
+ * three copies — this list, `MYDATA_UNIT_BY_CODE`, and the reference table — until the Novus
+ * Appendix of 15/07/2025 was read against them. The note below is what said to check.
+ */
+const EXPECTED_CODED = ['pcs', 'kg', 'lt', 'm', 'm2', 'm3', 'pcs_other'];
 
 describe('fiscal measurement units — edge twin matches src/lib/units.ts', () => {
   const codedKeys = UNITS.filter((u) => u.mydataCode != null).map((u) => u.key).sort();
   const uncodedKeys = UNITS.filter((u) => u.mydataCode == null).map((u) => u.key).sort();
 
-  it('src/lib/units.ts still codes exactly the six AADE units', () => {
+  it('src/lib/units.ts still codes exactly the seven AADE units', () => {
     // A seventh coded unit means AADE published one — `mydata_reference` needs the row too,
     // or the transmission will carry a code the provider rejects.
     expect(codedKeys).toEqual([...EXPECTED_CODED].sort());

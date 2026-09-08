@@ -92,6 +92,10 @@ export function isUncodedMydataUnit(unit: string | null | undefined): boolean {
  */
 export const MYDATA_UNIT_BY_CODE: Record<number, string> = {
   1: 'pcs', 2: 'kg', 3: 'lt', 4: 'm', 5: 'm2', 6: 'm3',
+  // 7 = "Pieces_Other Cases" (AADE Appendix §9). AADE codes SEVEN units, not six; this row
+  // was missing on both sides and in `mydata_reference` until the Appendix of 15/07/2025 was
+  // read against them. It is a distinct code, not an alias of 1 — do not fold it into 'pcs'.
+  7: 'pcs_other',
 };
 
 /**
@@ -211,6 +215,51 @@ export interface FiscalLine {
    * (αυτοτιμολόγηση). Self-billing is the header flag `header.selfPricing`. See issue #278.
    */
   invoiceDetailType?: number;
+  /**
+   * myDATA `recType` (AADE Appendix §12 "Record Type"). Only **3** — "Other Taxes Line with
+   * VAT" — is ever produced here: the line IS a levy that itself carries VAT, rather than a
+   * goods line that happens to have `otherTaxesAmount` hanging off it. A recycling or eco-fee
+   * charged to the customer is exactly that, and until this existed it could only ride on a
+   * product line, which states a different fact to AADE.
+   *
+   * The other three values are separate features with their own machinery — 2 is a totals-line
+   * marker, 6 a gift certificate, 7 the negative-sign flag valid ONLY on 17.3–17.6 — so they
+   * are refused rather than offered. Emitting a code we cannot honour end to end is how
+   * `movePurpose` came to file unclassified movements as sales.
+   */
+  recType?: number;
+}
+
+/**
+ * One row of myDATA `taxesTotals` — a tax declared at DOCUMENT level instead of on a line.
+ *
+ * This is the alternative myDATA offers to the per-line tax fields, and it is the only one of
+ * the two that can express what a Greek levy actually looks like: a line carries exactly ONE
+ * category per bucket, while a document routinely charges the SAME AADE code (fees 17,
+ * recycling) at a different rate per ΑΗΗΕ appliance class. Each row names its own category and
+ * carries a free-text `label`, which is where "Φόρος Ανακύκλωσης ΑΗΗΕ-5Γ01" goes.
+ *
+ * The two are mutually exclusive per document. Declaring a tax in both places files it twice.
+ */
+export interface FiscalTaxTotal {
+  /** AADE Appendix §23: 1 withheld · 2 fees · 3 other taxes · 4 stamp duty · 5 deductions. */
+  taxType: number;
+  /** The code within that bucket's own table. Deductions (5) has no table, so it has none. */
+  taxCategory?: number;
+  /** The base the amount was computed on — what makes a percentage row auditable. */
+  underlyingValue?: number;
+  taxAmount: number;
+  /**
+   * AADE Appendix §23. ONE boolean whose effect depends on the tax's inherent sign: for a
+   * deductive tax (1, 5) true means it SUBTRACTS from the payable; for an additive tax
+   * (2, 3, 4) true means it does NOT add. Either way true leaves the payable smaller.
+   *
+   * The arithmetic itself is NOT restated here — `mydata_tax_payable_delta` in SQL is the one
+   * place it is written down, and its result reaches this builder as `invoices.tax_payable_delta`.
+   */
+  reducesPayable: boolean;
+  /** myDATA `taxTypeLabel` — free text, and what the customer reads on the printed document. */
+  label?: string;
 }
 
 export interface FiscalInvoiceInput {
@@ -274,6 +323,12 @@ export interface FiscalInvoiceInput {
     deliveryDetails?: { street?: string; city?: string; postalCode?: string };
   };
   lines: FiscalLine[];
+  /**
+   * Document-level taxes (myDATA `taxesTotals`). Present ONLY when the document declares its
+   * taxes at document level, in which case no line carries a tax amount — the two are
+   * alternatives, and a tax stated in both places is filed twice.
+   */
+  taxesTotals?: FiscalTaxTotal[];
   /** myDATA payment method (AADE table 8.12 — `MYDATA_PAYMENT_CODE` in the payment
    *  vocabulary is the one place those integers are named). 7 = POS / e-POS and 8 = IRIS
    *  carry the EFT-POS terminal id + NSP for the Law 5155 signature. */

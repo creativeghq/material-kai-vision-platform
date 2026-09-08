@@ -65,6 +65,17 @@ export interface BuildRenderInput {
    * cannot see the difference. Same defect the PDF had against the server clock.
    */
   timezone?: string | null;
+  /**
+   * Document-level taxes (myDATA `taxesTotals`), when the invoice declares its taxes that way.
+   *
+   * A figure that is STORED and TRANSMITTED is PRINTED (CLAUDE.md rule 1c), and the fact these
+   * rows add over the header totals is the LABEL: collapsing four ΑΗΗΕ recycling classes into
+   * one "Fees" line tells the customer less than the envelope told AADE.
+   */
+  documentTaxes?: {
+    tax_type: number; tax_category?: number | null; tax_amount: number;
+    reduces_payable: boolean; label?: string | null;
+  }[] | null;
 }
 
 export function formatInvoiceMoney(value: any, currency: string, lang: Lang): string {
@@ -80,6 +91,7 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
   const {
     invoice: inv, items, settings: fs, customer, addressUnit, authCode, branch, order,
     logoUrl, bankAccounts, priorBalance, payUrl, providerAttribution, posPayments, timezone,
+    documentTaxes,
   } = input;
   // English is the default; Greek only when explicitly chosen (until translations launch).
   const lang: Lang = inv.doc_language === 'el' ? 'el' : 'en';
@@ -261,12 +273,43 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
   const withheld = Number(inv.total_withheld_amount ?? 0);
   const grand = Number(inv.total ?? (netAfter + vatAfter + fees + stamp + otherTax + digitalFee - withheld - deductions));
   const extras: TotalsExtraRow[] = [];
-  if (fees > 0) extras.push({ label: L.fees, value: fees });
-  if (stamp > 0) extras.push({ label: L.stamp, value: stamp });
-  if (otherTax > 0) extras.push({ label: L.otherTaxes, value: otherTax });
-  if (digitalFee > 0) extras.push({ label: L.digitalFee, value: digitalFee });
-  if (deductions > 0) extras.push({ label: L.deductions, value: deductions, negative: true });
-  if (withheld > 0) extras.push({ label: L.withheld, value: withheld, negative: true });
+  if (documentTaxes?.length) {
+    /**
+     * DOCUMENT MODE — one printed row per declared charge, under the name it was declared with.
+     *
+     * The five bucket totals are still correct here, but printing them would fold every ΑΗΗΕ
+     * recycling class into a single "Fees" figure. The label is a fact we stored and
+     * transmitted, so the customer's copy has to carry it too — and a reader who can see four
+     * charges has to be able to add them up to the four we filed.
+     *
+     * A row flagged `reduces_payable` on an ADDITIVE bucket is declared but not charged, so it
+     * prints at zero effect rather than silently inflating the visible total: `negative` here
+     * only ever means "this makes the payable smaller", which is exactly the flag's meaning.
+     */
+    for (const t of documentTaxes) {
+      const deductive = t.tax_type === 1 || t.tax_type === 5;
+      const counts = deductive ? t.reduces_payable : !t.reduces_payable;
+      if (!counts) continue;
+      const fallback = t.tax_type === 1 ? L.withheld
+        : t.tax_type === 2 ? L.fees
+        : t.tax_type === 3 ? L.otherTaxes
+        : t.tax_type === 4 ? L.stamp
+        : L.deductions;
+      extras.push({
+        label: String(t.label ?? '').trim() || fallback,
+        value: Math.abs(Number(t.tax_amount ?? 0)),
+        negative: deductive,
+      });
+    }
+    if (digitalFee > 0) extras.push({ label: L.digitalFee, value: digitalFee });
+  } else {
+    if (fees > 0) extras.push({ label: L.fees, value: fees });
+    if (stamp > 0) extras.push({ label: L.stamp, value: stamp });
+    if (otherTax > 0) extras.push({ label: L.otherTaxes, value: otherTax });
+    if (digitalFee > 0) extras.push({ label: L.digitalFee, value: digitalFee });
+    if (deductions > 0) extras.push({ label: L.deductions, value: deductions, negative: true });
+    if (withheld > 0) extras.push({ label: L.withheld, value: withheld, negative: true });
+  }
 
   // ── Payment + bank accounts (treasury accounts flagged "Show on invoice" only) ──
   const accounts: string[] = [];

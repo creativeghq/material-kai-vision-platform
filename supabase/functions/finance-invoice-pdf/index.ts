@@ -431,16 +431,33 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
     // Normalize each document kind into the shape buildPdf expects.
     let inv: any = row;
     let items: any[] = [];
+    /**
+     * Document-level charges (myDATA `taxesTotals`), when the document declares its taxes that
+     * way. Each is PRINTED under its own name: a figure that is stored and transmitted is
+     * printed (CLAUDE.md rule 1c), and here the label is the part the header totals cannot
+     * carry — four ΑΗΗΕ recycling classes collapse into one "Fees" number without it.
+     */
+    let documentTaxes: any[] = [];
     if (kind === 'invoice') {
-      const { data } = await supabase.from('invoice_items').select('*').eq('invoice_id', docId).order('added_at');
+      const [{ data }, { data: dt }] = await Promise.all([
+        supabase.from('invoice_items').select('*').eq('invoice_id', docId).order('added_at'),
+        supabase.from('invoice_taxes')
+          .select('tax_type, tax_category, tax_amount, reduces_payable, label')
+          .eq('invoice_id', docId).order('sort_order'),
+      ]);
       items = data ?? [];
+      documentTaxes = dt ?? [];
       await attachVariantLabels(supabase, items);
     } else if (kind === 'credit_note') {
-      const [{ data: cnItems }, { data: srcInv }] = await Promise.all([
+      const [{ data: cnItems }, { data: srcInv }, { data: cnTaxes }] = await Promise.all([
         supabase.from('credit_note_items').select('*').eq('credit_note_id', docId).order('created_at'),
         row.invoice_id ? supabase.from('invoices').select('customer_company_id, customer_contact_id, vat_rate').eq('id', row.invoice_id).maybeSingle() : Promise.resolve({ data: null } as any),
+        supabase.from('credit_note_taxes')
+          .select('tax_type, tax_category, tax_amount, reduces_payable, label')
+          .eq('credit_note_id', docId).order('sort_order'),
       ]);
       items = cnItems ?? [];
+      documentTaxes = cnTaxes ?? [];
       inv = {
         ...row, internal_number: row.credit_note_number, vat_rate: srcInv?.vat_rate ?? 24,
         customer_company_id: srcInv?.customer_company_id ?? null, customer_contact_id: srcInv?.customer_contact_id ?? null,
@@ -666,7 +683,7 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
       } catch { /* RF is best-effort — never block the PDF */ }
     }
 
-    const pdfBytes = await buildPdf({ inv, items, fs, customer, addressUnit, authCode, providerAttribution, posPayments, tz: workspaceTz, branch, lang, logo, spec, colors, priorBalance, payUrl, rfCode });
+    const pdfBytes = await buildPdf({ inv, items, documentTaxes, fs, customer, addressUnit, authCode, providerAttribution, posPayments, tz: workspaceTz, branch, lang, logo, spec, colors, priorBalance, payUrl, rfCode });
 
     const path = `${OUT}/${docId}/${PREFIX}-${docId}.pdf`;
     const { error: upErr } = await supabase.storage.from('pdf-documents').upload(path, pdfBytes, { upsert: true, contentType: 'application/pdf' });
@@ -684,7 +701,7 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
   }
 }));
 
-async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; addressUnit?: any; authCode?: string | null; providerAttribution?: string | null; posPayments?: any[]; tz?: string | null; branch: any; lang: Lang; logo?: Uint8Array | null; spec: TemplateSpec; colors: InvoicePdfColors; priorBalance?: number | null; payUrl?: string | null; rfCode?: string | null }): Promise<Uint8Array> {
+async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: any; customer: any; addressUnit?: any; authCode?: string | null; providerAttribution?: string | null; posPayments?: any[]; tz?: string | null; branch: any; lang: Lang; logo?: Uint8Array | null; spec: TemplateSpec; colors: InvoicePdfColors; priorBalance?: number | null; payUrl?: string | null; rfCode?: string | null }): Promise<Uint8Array> {
   const { inv, items, fs, customer, addressUnit, authCode, providerAttribution, posPayments, tz, branch, lang, logo, spec, colors, priorBalance, payUrl, rfCode } = d;
   const L = LABELS[lang];
   const isCommercial = spec.headerStyle === 'commercial';
@@ -1209,12 +1226,34 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; add
   const digitalFee = Number(inv.digital_transaction_fee ?? 0);
   const withheld = Number(inv.total_withheld_amount ?? 0);
   const chargeRows: [string, number][] = [];
-  if (fees > 0) chargeRows.push([L.fees, fees]);
-  if (stamp > 0) chargeRows.push([L.stamp, stamp]);
-  if (otherTax > 0) chargeRows.push([L.otherTaxes, otherTax]);
-  if (digitalFee > 0) chargeRows.push([L.digitalFee, digitalFee]);
-  if (deductions > 0) chargeRows.push([L.deductions, -deductions]);
-  if (withheld > 0) chargeRows.push([L.withheld, -withheld]);
+  const docTaxRows = d.documentTaxes ?? [];
+  if (docTaxRows.length) {
+    // DOCUMENT MODE — one row per declared charge, named as it was declared and transmitted.
+    // A row whose `reduces_payable` flag cancels its natural effect is declared but not
+    // charged, so it does not appear in a column the reader adds up.
+    for (const t of docTaxRows) {
+      const taxType = Number(t.tax_type);
+      const deductive = taxType === 1 || taxType === 5;
+      const counts = deductive ? !!t.reduces_payable : !t.reduces_payable;
+      if (!counts) continue;
+      const fallback = taxType === 1 ? L.withheld
+        : taxType === 2 ? L.fees
+        : taxType === 3 ? L.otherTaxes
+        : taxType === 4 ? L.stamp
+        : L.deductions;
+      const amount = Math.abs(Number(t.tax_amount ?? 0));
+      if (!amount) continue;
+      chargeRows.push([String(t.label ?? '').trim() || fallback, deductive ? -amount : amount]);
+    }
+    if (digitalFee > 0) chargeRows.push([L.digitalFee, digitalFee]);
+  } else {
+    if (fees > 0) chargeRows.push([L.fees, fees]);
+    if (stamp > 0) chargeRows.push([L.stamp, stamp]);
+    if (otherTax > 0) chargeRows.push([L.otherTaxes, otherTax]);
+    if (digitalFee > 0) chargeRows.push([L.digitalFee, digitalFee]);
+    if (deductions > 0) chargeRows.push([L.deductions, -deductions]);
+    if (withheld > 0) chargeRows.push([L.withheld, -withheld]);
+  }
   const chargesNet = r2n(chargeRows.reduce((t, [, v]) => t + v, 0));
   const drawCharges = (x: number, topY: number): number => {
     if (!chargeRows.length) return topY;

@@ -27,6 +27,11 @@ export const UNITS: UnitDef[] = [
   { key: 'm', label: 'metres', mydataCode: 4 },
   { key: 'm2', label: 'm² (square metres)', mydataCode: 5, isArea: true },
   { key: 'm3', label: 'm³ (cubic metres)', mydataCode: 6 },
+  // AADE Appendix §9 code 7, "Pieces_Other Cases" — the seventh coded unit, published by AADE
+  // and missing here (and from `mydata_reference`) until the Appendix of 15/07/2025 was read
+  // against them. A DISTINCT code, not an alias of `pcs`: AADE separates the two on purpose,
+  // so `normalizeUnit` must not fold one into the other.
+  { key: 'pcs_other', label: 'pieces (other cases)', mydataCode: 7 },
   // No AADE code — packaging/commercial units. They must be converted to a coded unit
   // before a line is transmitted, which is why mydataCode is explicitly null.
   { key: 'box', label: 'box', mydataCode: null },

@@ -3615,6 +3615,7 @@ export type Database = {
       }
       credit_note_items: {
         Row: {
+          rec_type: number | null
           created_at: string
           credit_note_id: string
           description: string
@@ -3634,6 +3635,7 @@ export type Database = {
           vat_percent: number | null
         }
         Insert: {
+          rec_type?: number | null
           created_at?: string
           credit_note_id: string
           description?: string
@@ -3653,6 +3655,7 @@ export type Database = {
           vat_percent?: number | null
         }
         Update: {
+          rec_type?: number | null
           created_at?: string
           credit_note_id?: string
           description?: string
@@ -3690,6 +3693,7 @@ export type Database = {
       }
       credit_notes: {
         Row: {
+          tax_payable_delta: number
           amount: number
           branch_code: number
           correlated_mark: string | null
@@ -3726,6 +3730,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          tax_payable_delta?: number
           amount: number
           branch_code?: number
           correlated_mark?: string | null
@@ -3762,6 +3767,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          tax_payable_delta?: number
           amount?: number
           branch_code?: number
           correlated_mark?: string | null
@@ -12042,8 +12048,56 @@ export type Database = {
           },
         ]
       }
+      credit_note_taxes: {
+        Row: {
+          created_at: string
+          credit_note_id: string
+          id: string
+          label: string | null
+          reduces_payable: boolean
+          sort_order: number
+          tax_amount: number
+          tax_category: number | null
+          tax_type: number
+          underlying_value: number | null
+        }
+        Insert: {
+          created_at?: string
+          credit_note_id: string
+          id?: string
+          label?: string | null
+          reduces_payable: boolean
+          sort_order?: number
+          tax_amount?: number
+          tax_category?: number | null
+          tax_type: number
+          underlying_value?: number | null
+        }
+        Update: {
+          created_at?: string
+          credit_note_id?: string
+          id?: string
+          label?: string | null
+          reduces_payable?: boolean
+          sort_order?: number
+          tax_amount?: number
+          tax_category?: number | null
+          tax_type?: number
+          underlying_value?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_note_taxes_credit_note_id_fkey"
+            columns: ["credit_note_id"]
+            isOneToOne: false
+            referencedRelation: "credit_notes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_items: {
         Row: {
+          rec_type: number | null
           added_at: string
           cost_code_id: string | null
           country_of_origin: string | null
@@ -12088,6 +12142,7 @@ export type Database = {
           withheld_category: number | null
         }
         Insert: {
+          rec_type?: number | null
           added_at?: string
           cost_code_id?: string | null
           country_of_origin?: string | null
@@ -12132,6 +12187,7 @@ export type Database = {
           withheld_category?: number | null
         }
         Update: {
+          rec_type?: number | null
           added_at?: string
           cost_code_id?: string | null
           country_of_origin?: string | null
@@ -12304,8 +12360,56 @@ export type Database = {
           },
         ]
       }
+      invoice_taxes: {
+        Row: {
+          created_at: string
+          invoice_id: string
+          id: string
+          label: string | null
+          reduces_payable: boolean
+          sort_order: number
+          tax_amount: number
+          tax_category: number | null
+          tax_type: number
+          underlying_value: number | null
+        }
+        Insert: {
+          created_at?: string
+          invoice_id: string
+          id?: string
+          label?: string | null
+          reduces_payable: boolean
+          sort_order?: number
+          tax_amount?: number
+          tax_category?: number | null
+          tax_type: number
+          underlying_value?: number | null
+        }
+        Update: {
+          created_at?: string
+          invoice_id?: string
+          id?: string
+          label?: string | null
+          reduces_payable?: boolean
+          sort_order?: number
+          tax_amount?: number
+          tax_category?: number | null
+          tax_type?: number
+          underlying_value?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_taxes_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
+          tax_payable_delta: number
           amount_credited: number
           amount_due: number | null
           amount_paid: number
@@ -12400,6 +12504,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          tax_payable_delta?: number
           amount_credited?: number
           amount_due?: number | null
           amount_paid?: number
@@ -12494,6 +12599,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          tax_payable_delta?: number
           amount_credited?: number
           amount_due?: number | null
           amount_paid?: number
@@ -34454,6 +34560,18 @@ export type Database = {
       }
     }
     Functions: {
+      mydata_tax_payable_delta: {
+        Args: { p_tax_type: number; p_tax_amount: number; p_reduces_payable: boolean }
+        Returns: number
+      }
+      recompute_invoice_tax_totals: {
+        Args: { p_invoice_id: string }
+        Returns: Json
+      }
+      stamp_credit_note_tax_payable_delta: {
+        Args: { p_credit_note_id: string }
+        Returns: number
+      }
       __plpgsql_show_dependency_tb:
         | {
             Args: {
