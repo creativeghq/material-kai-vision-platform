@@ -1950,19 +1950,28 @@ async function executeAgent(
   // Kept as its own list rather than merged into `conversationImages`: that array means "images
   // this agent MADE", several tools take `.at(-1)` of it as "the thing we were last working on",
   // and an upload is not that.
-  const priorUploadedImages: string[] = messages
+  // Grouped BY MESSAGE, not flattened. What the user attached in one go is a set with a shape —
+  // slot 0 the material, slot 1 the room (see _shared/tools/image-slots.ts) — and flattening it
+  // to take the last URL keeps the room and throws the tile away, so "now put that tile on the
+  // wall" a turn later has nothing to apply.
+  const priorUploadGroups: string[][] = messages
     .filter((m: any) => m.role === 'user')
-    .flatMap((m: any) => {
+    .map((m: any) => {
       const raw = m.images ?? m.metadata?.attachedImages;
-      return Array.isArray(raw) ? raw.filter((u: unknown) => typeof u === 'string' && u) : [];
-    });
+      return Array.isArray(raw) ? raw.filter((u: unknown): u is string => typeof u === 'string' && !!u) : [];
+    })
+    .filter((group: string[]) => group.length > 0);
+  const priorUploadedImages: string[] = priorUploadGroups.flat();
 
   // What the image tools should treat as "the user's image". This turn's uploads win; when the
-  // user attached nothing this turn we fall back to what they attached before. Deliberately NOT
+  // user attached nothing this turn we fall back to the last SET they attached — the whole set,
+  // so a tile and a room stay a tile and a room. Deliberately NOT
   // used for vision blocks, tool binding, or model routing — those must keep keying off a real
   // upload on THIS turn, or every subsequent turn would re-bill the image and `visual_search`
   // would bind forever after a single photo.
-  const toolImages: string[] = images.length > 0 ? images : priorUploadedImages.slice(-1);
+  const toolImages: string[] = images.length > 0
+    ? images
+    : (priorUploadGroups[priorUploadGroups.length - 1] ?? []);
 
   // Collect material results from search tool calls
   let collectedProducts: any[] = [];

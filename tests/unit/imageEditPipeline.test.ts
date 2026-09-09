@@ -287,6 +287,14 @@ describe('the images stay reachable on the next turn', () => {
     expect(src).toContain('if (m.geminiImageData?.image_url)');
   });
 
+  it('an earlier upload comes back as the SET it was, not as its last URL', () => {
+    const src = read(AGENT_CHAT);
+    // Flattening loses the pair: `.slice(-1)` over [tile, room] keeps the room and drops the
+    // tile, so "now put that tile on the wall" a turn later has nothing to apply.
+    expect(src).toContain('const priorUploadGroups: string[][]');
+    expect(src).toMatch(/toolImages: string\[\] = images\.length > 0\s*\?\s*images\s*:\s*\(priorUploadGroups\[priorUploadGroups\.length - 1\] \?\? \[\]\)/);
+  });
+
   it('a finished turn is recorded even when the client is gone', () => {
     const src = read(AGENT_CHAT);
     // The claim is checked before the write — not a blind insert. And the check is the WINDOW,
