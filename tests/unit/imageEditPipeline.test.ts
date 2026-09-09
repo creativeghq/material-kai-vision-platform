@@ -23,6 +23,8 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
+import { stripComments } from '../helpers/stripComments';
+
 import {
   resolveImageSlots,
   SLOT_REFERENCE,
@@ -350,6 +352,91 @@ describe('the agent reports what ran, because it cannot see what it made', () =>
     expect(desc).toMatch(/NEVER write that .* is\s*\n?unchanged, preserved or identical/s);
     // The tool's own success copy must not assert the edit worked either — it primes the reply.
     expect(tools).toContain('`Edit run on ${edited.base_image_origin}.`');
+  });
+});
+
+describe('every media tool on the agent, not just the one that broke', () => {
+  // generate_gemini was fixed first; these six had the identical shape and were left. Each
+  // produces something the model cannot look at, and each was describing it anyway.
+  const MEDIA_TOOLS = [
+    'generate_3d',
+    'generate_gemini',
+    'virtual_staging',
+    'apply_lighting_preset',
+    'generate_vr_world',
+  ] as const;
+
+  it('every one of them tells the model it cannot see what it produced', () => {
+    const tools = read(GENERATION_TOOLS);
+    for (const name of MEDIA_TOOLS) {
+      const at = tools.indexOf(`name: '${name}'`);
+      expect(at, `${name} not found`).toBeGreaterThan(-1);
+      // The description runs from the name to the schema.
+      const desc = tools.slice(at, tools.indexOf('schema: z.object', at));
+      expect(desc, `${name} does not warn that the model cannot see its output`)
+        .toMatch(/CANNOT SEE THE IMAGE THIS RETURNS|\$\{CANNOT_SEE_NOTE\}/);
+    }
+    // The video tool lives in another file and produces a video, not an image.
+    expect(read('supabase/functions/_shared/tools/background-tools.ts'))
+      .toContain('YOU CANNOT SEE THE VIDEO THIS RETURNS');
+  });
+
+  it('every one of them returns WHICH image it ran on', () => {
+    const tools = read(GENERATION_TOOLS);
+    // `source_image_url` in an onChunk is for the screen; the model only reads the return.
+    for (const marker of [
+      'source_image_url: resolvedImageUrl ?? null',   // generate_3d
+      'base_image_url: result.source_image_url',      // generate_gemini
+      'source_image_url: resolvedImageUrl,',          // staging / lighting / VR
+      'source_image_origin: picked.origin,',
+    ]) {
+      expect(tools).toContain(marker);
+    }
+    // The video tool's own param is snake_case, so it echoes it back by shorthand.
+    const bg = read('supabase/functions/_shared/tools/background-tools.ts');
+    const ret = bg.slice(bg.indexOf('return JSON.stringify({'), bg.indexOf("name: 'generate_video'"));
+    expect(ret).toContain('source_image_url,');
+  });
+
+  it('a tool that acts on "your room" can actually reach the room the user attached', () => {
+    const agentChat = read(AGENT_CHAT);
+    // All three took only `conversationImages` — images WE generated — so an uploaded photo was
+    // unreachable and the tool refused while the user was looking at it in the composer.
+    for (const factory of [
+      'createVirtualStagingTool',
+      'createApplyLightingPresetTool',
+      'createGenerateVRWorldTool',
+    ]) {
+      const call = agentChat.slice(agentChat.indexOf(`tools.push(${factory}(`));
+      expect(call.slice(0, 220), `${factory} is not handed the user's attachments`)
+        .toContain('toolImages');
+    }
+    expect(read(GENERATION_TOOLS)).toContain('function resolveMediaSource(');
+  });
+
+  it('generate_3d picks the room by the shared convention, not by index 0', () => {
+    const tools = read(GENERATION_TOOLS);
+    // Comments explain the OLD code by quoting it; only the code counts.
+    const body = stripComments(
+      tools.slice(tools.indexOf('export const create3DGenerationTool'), tools.indexOf('export const EDIT_INTENT_PATTERNS')),
+    );
+    // `userImages[0]` is the INSPIRATION slot — this tool fans a wrong pick across every model
+    // in the grid at once.
+    expect(body).not.toMatch(/userImages\[0\]/);
+    expect(body).toContain('resolveImageSlots(userImages.length, { baseImageIndex })');
+  });
+
+  it('a tool that reads a page does not imply it looked at the pictures', () => {
+    const search = read('supabase/functions/_shared/tools/search-tools.ts');
+    expect(search).toContain('derived_from:');
+    expect(search).toContain('No image was analysed');
+    expect(search).toContain('it does NOT look at the images on it');
+  });
+
+  it('no tool tells the model to poll a tool that does not exist', () => {
+    const bg = read('supabase/functions/_shared/tools/background-tools.ts');
+    expect(bg).not.toContain('generate_3d_status');
+    expect(bg).toContain('check_generation_status');
   });
 });
 

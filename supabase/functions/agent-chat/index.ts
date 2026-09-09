@@ -3101,7 +3101,7 @@ async function executeAgent(
       tools.push(create3DGenerationTool(userId, workspaceId, onChunk, toolImages, conversationImages));
     }
     tools.push(createGeminiGenerationTool(userId, workspaceId, toolImages, conversationImages, onChunk, pinnedMaterialImages, generationMode, conversation_id ?? undefined));
-    tools.push(createVirtualStagingTool(userId, workspaceId, conversationImages, onChunk, conversation_id ?? undefined));
+    tools.push(createVirtualStagingTool(userId, workspaceId, conversationImages, onChunk, conversation_id ?? undefined, toolImages));
     if (config.tools.includes('check_generation_status')) {
       tools.push(createGenerationStatusTool(workspaceId ?? null));
     }
@@ -3109,12 +3109,12 @@ async function executeAgent(
 
   // Lighting variants — re-render an existing room under a different lighting preset
   if (config.tools.includes('apply_lighting_preset') && createApplyLightingPresetTool) {
-    tools.push(createApplyLightingPresetTool(userId, workspaceId, conversationImages, onChunk, conversation_id ?? undefined));
+    tools.push(createApplyLightingPresetTool(userId, workspaceId, conversationImages, onChunk, conversation_id ?? undefined, toolImages));
   }
 
   // VR world generation — turn a room image into an explorable 3D Gaussian Splat
   if (config.tools.includes('generate_vr_world') && createGenerateVRWorldTool) {
-    tools.push(createGenerateVRWorldTool(userId, workspaceId, conversationImages, onChunk));
+    tools.push(createGenerateVRWorldTool(userId, workspaceId, conversationImages, onChunk, toolImages));
   }
 
   // Interior video — animate a room image. createInteriorVideoV2Tool has existed since

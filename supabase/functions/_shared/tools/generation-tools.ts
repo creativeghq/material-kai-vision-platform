@@ -28,6 +28,64 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 /**
+ * Which image a media tool acts on — and, just as important, a NAME for it.
+ *
+ * `virtual_staging`, `apply_lighting_preset` and `generate_vr_world` each resolved their own
+ * source as `sourceImageUrl || conversationImages.at(-1)`, and each was handed only
+ * `conversationImages` — images WE generated. So a photo the user had just attached was
+ * unreachable by all three, and the tools refused with "no image available" while the user was
+ * looking at their room in the composer. They also returned nothing about which image they used,
+ * so the model narrated an outcome it had no evidence for (see the `edited` block on
+ * generate_gemini for the same fix).
+ */
+type MediaSourceChoice = 'auto' | 'my_upload' | 'last_generated';
+
+interface ResolvedMediaSource {
+  url?: string;
+  /** How to describe the choice to the user. Always set, including when nothing was found. */
+  origin: string;
+}
+
+/** The room the user ATTACHED, under the one slot convention (see ./image-slots.ts). */
+function resolveUploadedRoom(userImages: string[]): string | undefined {
+  const slots = resolveImageSlots(userImages.length);
+  return slots.baseIndex >= 0 ? userImages[slots.baseIndex] : undefined;
+}
+
+function resolveMediaSource(opts: {
+  sourceImageUrl?: string;
+  source?: MediaSourceChoice;
+  conversationImages: string[];
+  uploadedRoom?: string;
+}): ResolvedMediaSource {
+  const lastGenerated = opts.conversationImages[opts.conversationImages.length - 1];
+  if (opts.sourceImageUrl) {
+    return { url: opts.sourceImageUrl, origin: 'a URL supplied in the tool call' };
+  }
+  // An explicit ask wins. Falling back the other way rather than failing is deliberate: the
+  // user asked for the work, not for a lecture about which image was available.
+  if (opts.source === 'my_upload' && opts.uploadedRoom) {
+    return { url: opts.uploadedRoom, origin: "the photo the user attached" };
+  }
+  if (opts.source === 'last_generated' && lastGenerated) {
+    return { url: lastGenerated, origin: 'the image generated most recently in this conversation' };
+  }
+  if (lastGenerated) {
+    return { url: lastGenerated, origin: 'the image generated most recently in this conversation' };
+  }
+  if (opts.uploadedRoom) {
+    return { url: opts.uploadedRoom, origin: "the photo the user attached" };
+  }
+  return { url: undefined, origin: 'no image was available' };
+}
+
+/** Every media tool says this, because none of them can look at what they made. */
+const CANNOT_SEE_NOTE =
+  'YOU CANNOT SEE THE IMAGE THIS RETURNS. `source_image_url` / `source_image_origin` in the '
+  + 'result are your only evidence about what it ran on — report those, and never describe or '
+  + 'vouch for what the picture looks like.';
+
+/**
  * LangChain Tool: Interior Design Generation
  *
  * Calls MIVAA API to create generation job
@@ -41,19 +99,27 @@ export const create3DGenerationTool = (
   conversationImages: string[] = [], // Previously generated image URLs (for edit intent detection)
 ) => {
   return tool(
-    async ({ prompt, roomType, style, referenceImageUrl, models }) => {
+    async ({ prompt, roomType, style, referenceImageUrl, baseImageIndex, models }) => {
       try {
 
         // Resolve the reference image:
         // 1. Agent-provided URL takes priority (public HTTP URL)
-        // 2. Fall back to the user's first attached image
+        // 2. Fall back to the attachment the shared slot resolver says is the ROOM
         // 3. If edit intent detected and no other image, use most recent generated image
         // 4. If it's a data URL, upload to Supabase storage to get a public URL
         //    (Replicate models require a public HTTP URL, not a base64 data URL)
+        //
+        // Step 2 used to be `userImages[0]`, which is the slot the composer labels
+        // "Inspiration" — so a user attaching a tile swatch and their room sent the SWATCH to
+        // MIVAA as the img2img control, and this tool fans that across every model in the grid
+        // at once. Same defect as generate_gemini's (see _shared/tools/image-slots.ts); it was
+        // fixed there and left here, in the file the resolver already lives next to.
+        const slots = resolveImageSlots(userImages.length, { baseImageIndex });
+        const slotBaseImage = slots.baseIndex >= 0 ? userImages[slots.baseIndex] : undefined;
         let resolvedImageUrl = referenceImageUrl || undefined;
 
-        if (!resolvedImageUrl && userImages.length > 0) {
-          const firstImage = userImages[0];
+        if (!resolvedImageUrl && slotBaseImage) {
+          const firstImage = slotBaseImage;
           if (firstImage.startsWith('data:')) {
             // Upload data URL to Supabase storage → get public URL for Replicate
             try {
@@ -182,6 +248,17 @@ export const create3DGenerationTool = (
           model_count: result.model_count,
           models: result.models,
           async_job: true,
+          // WHICH image every model in the grid is working from. `modeLabel` said only whether
+          // one was used at all, so a run on the wrong attachment was indistinguishable from a
+          // run on the right one — in a result the model then describes to the user.
+          source_image_url: resolvedImageUrl ?? null,
+          source_image_origin: referenceImageUrl
+            ? 'a URL supplied in the tool call'
+            : slotBaseImage && resolvedImageUrl
+              ? `the user's attachment ${slots.baseIndex + 1} of ${userImages.length}`
+              : resolvedImageUrl
+                ? 'the most recent generated image'
+                : 'no source image — this is text-to-image',
           message: `Started generating ${result.model_count} interior design variations (${modeLabel}) for your ${roomType || 'space'}${style ? ` in ${style} style` : ''}. Watch progress in the panel below.`,
         });
       } catch (error) {
@@ -194,7 +271,7 @@ export const create3DGenerationTool = (
     },
     {
       name: 'generate_3d',
-      description: `Generate multiple interior design style variations in parallel using Replicate AI models + Gemini. Results appear progressively in the generation panel grid.
+      description: `Generate multiple interior design style variations in parallel using Replicate AI models + Gemini. Results appear progressively in the generation panel grid. ${CANNOT_SEE_NOTE}
 The grid already includes a Gemini tile, so do NOT also call generate_gemini for the same request — that would double-bill the user.
 
 Good for:
@@ -211,6 +288,7 @@ Do NOT call this tool when:
         roomType: z.string().optional().describe('Room type (bedroom, living_room, kitchen, bathroom, office, etc.)'),
         style: z.string().optional().describe('Design style (modern, minimalist, industrial, scandinavian, traditional, etc.)'),
         referenceImageUrl: z.string().optional().describe('Public HTTP URL of a reference image — only needed if NOT using the user uploaded image. Leave empty to use the uploaded image automatically.'),
+        baseImageIndex: z.number().int().optional().describe('1-based index of the attached image that is the ROOM to work from. Default with two attachments is image 2 ("Your Room" in the composer); pass it when the user attached the room first and a material/inspiration second.'),
         models: z.array(z.string()).optional().describe('Specific model IDs to restrict generation to. Omit to use all models for the selected mode.'),
       }),
     }
@@ -695,14 +773,23 @@ export const createVirtualStagingTool = (
   conversationImages: string[],
   onChunk?: (chunk: any) => void,
   conversationId?: string, // Per-session storage folder key
+  // `userImages` — the room the user ATTACHED. Without it this tool could only ever act on an
+  // image WE generated (`conversationImages` is generated output only), so "stage the photo I
+  // just uploaded" had nothing to work on and the tool refused with "no image available" on a
+  // turn where the user was looking at their own photo in the composer. Added as a FALLBACK,
+  // below the last generation, so "now stage it" after a render keeps meaning the render.
+  userImages: string[] = [],
 ) => {
   return tool(
-    async ({ sourceImageUrl, room, furnitureStyle, furnitureItems }) => {
+    async ({ sourceImageUrl, source, room, furnitureStyle, furnitureItems }) => {
       try {
 
-        // Fall back to most recent conversation image if no explicit URL given
-        const resolvedImageUrl =
-          sourceImageUrl || conversationImages[conversationImages.length - 1];
+        // The room to stage: an explicit URL, else the last thing we generated, else the photo
+        // the user attached. `source` lets the model override when the user says which they mean.
+        const picked = resolveMediaSource({
+          sourceImageUrl, source, conversationImages, uploadedRoom: resolveUploadedRoom(userImages),
+        });
+        const resolvedImageUrl = picked.url;
 
         if (!resolvedImageUrl) {
           return JSON.stringify({
@@ -764,7 +851,9 @@ export const createVirtualStagingTool = (
           room: result.room,
           furniture_style: result.furniture_style,
           credits_used: result.credits_used,
-          message: `Virtual staging complete! The ${result.room} has been staged in ${result.furniture_style} style. ${result.credits_used} credits used.`,
+          source_image_url: resolvedImageUrl,
+          source_image_origin: picked.origin,
+          message: `Staged ${picked.origin}, as a ${result.room} in ${result.furniture_style} style. ${result.credits_used} credits used.`,
         });
       } catch (error) {
         console.error('Virtual staging error:', error);
@@ -779,7 +868,9 @@ export const createVirtualStagingTool = (
     },
     {
       name: 'virtual_staging',
-      description: `Stage an empty room with AI-generated furniture. Use this when the user wants to:
+      description: `Stage an empty room with AI-generated furniture. ${CANNOT_SEE_NOTE}
+
+Use this when the user wants to:
 - See how an empty room would look with furniture
 - Stage a property for real estate
 - Visualize a room layout before buying furniture
@@ -787,7 +878,8 @@ Requires a room photo URL (from a previous generation or uploaded image). Ask th
 
 The source room must be EMPTY — this model furnishes bare space and will fight anything already in the photo. If the user's photo is FURNISHED, first call generate_gemini with mode='unstage' to strip it back to bare architecture, then stage the image that returns.`,
       schema: z.object({
-        sourceImageUrl: z.string().optional().describe('Public URL of the empty room image. If omitted, uses the most recently generated image.'),
+        sourceImageUrl: z.string().optional().describe('Public URL of the empty room image. If omitted, uses the most recently generated image, else the photo the user attached.'),
+        source: z.enum(['auto', 'my_upload', 'last_generated']).optional().describe('Which image to act on. Default "auto" = the most recent image generated in this conversation, falling back to the photo the user attached. Pass "my_upload" when the user means the photo they attached rather than a render.'),
         room: z.enum(['Living Room', 'Bedroom', 'Balcony', 'Dining Room', 'Office', 'Kitchen', 'Bathroom', 'Garden', 'Swimming Pool']).describe('Room type to stage'),
         furnitureStyle: z.enum(['Default (AI decides)', 'Modern', 'Scandinavian', 'Transitional', 'Rustic', 'Mid-Century Modern', 'Urban Industrial', 'Farmhouse', 'Coastal', 'Traditional', 'Modern Organic', 'Scandinavian Oasis', 'Transitional Luxury', 'B&W Modern', 'Farmhouse Hacienda', 'Metro Industrial', 'NYC Modern']).optional().describe('Furniture style'),
         furnitureItems: z.string().optional().describe('Specific furniture items to include, comma-separated'),
@@ -898,6 +990,9 @@ export const createApplyLightingPresetTool = (
   conversationImages: string[],
   onChunk?: (chunk: any) => void,
   conversationId?: string, // Per-session storage folder key
+  /** The room the user ATTACHED — see resolveMediaSource. Without it this tool can only ever
+   *  act on something we generated, and its own schema claimed otherwise. */
+  userImages: string[] = [],
 ) => {
   const PRESET_PROMPTS: Record<string, string> = {
     golden_hour:    'golden hour — warm amber sunlight at a low angle, long soft shadows, cosy',
@@ -909,9 +1004,12 @@ export const createApplyLightingPresetTool = (
   };
 
   return tool(
-    async ({ sourceImageUrl, preset }) => {
+    async ({ sourceImageUrl, source, preset }) => {
       try {
-        const resolvedImageUrl = sourceImageUrl || conversationImages[conversationImages.length - 1];
+        const picked = resolveMediaSource({
+          sourceImageUrl, source, conversationImages, uploadedRoom: resolveUploadedRoom(userImages),
+        });
+        const resolvedImageUrl = picked.url;
         if (!resolvedImageUrl) {
           return JSON.stringify({
             success: false,
@@ -981,7 +1079,9 @@ export const createApplyLightingPresetTool = (
           image_url: result.image_url,
           preset,
           credits_used: result.credits_used,
-          message: `Re-lit the room with the "${preset.replace(/_/g, ' ')}" preset. ${result.credits_used} credits used.`,
+          source_image_url: resolvedImageUrl,
+          source_image_origin: picked.origin,
+          message: `Re-lit ${picked.origin} with the "${preset.replace(/_/g, ' ')}" preset. ${result.credits_used} credits used.`,
         });
       } catch (error) {
         console.error('Lighting preset error:', error);
@@ -996,7 +1096,9 @@ export const createApplyLightingPresetTool = (
     },
     {
       name: 'apply_lighting_preset',
-      description: `Re-render the same room under a different lighting condition without changing furniture, walls, or layout. Use this when the user asks things like:
+      description: `Re-render the same room under a different lighting condition without changing furniture, walls, or layout. ${CANNOT_SEE_NOTE}
+
+Use this when the user asks things like:
 - "show this room at night" / "golden hour" / "sunset" / "bright daylight"
 - "make it warmer / dimmer / brighter"
 - "what does it look like at evening / overcast / with spotlights"
@@ -1006,7 +1108,8 @@ Requires an existing room image — uses the most recent conversation image if n
       schema: z.object({
         preset: z.enum(['golden_hour', 'bright_midday', 'soft_overcast', 'warm_evening', 'night', 'dramatic_spots'])
           .describe('Lighting preset. Map natural language: sunset/sunrise→golden_hour, daylight/noon→bright_midday, cloudy/diffused→soft_overcast, evening/lamps/cosy→warm_evening, night/moonlit→night, showroom/dramatic/accent→dramatic_spots.'),
-        sourceImageUrl: z.string().optional().describe('Public URL of the room image. If omitted, uses the most recently generated/uploaded image.'),
+        sourceImageUrl: z.string().optional().describe('Public URL of the room image. If omitted, uses the most recently generated image, else the photo the user attached.'),
+        source: z.enum(['auto', 'my_upload', 'last_generated']).optional().describe('Which image to act on. Default "auto" = the most recent image generated in this conversation, falling back to the photo the user attached. Pass "my_upload" when the user means the photo they attached rather than a render.'),
       }),
     }
   );
@@ -1024,6 +1127,9 @@ export const createGenerateVRWorldTool = (
   workspaceId: string,
   conversationImages: string[],
   onChunk?: (chunk: any) => void,
+  /** The room the user ATTACHED — see resolveMediaSource. 190 credits is a bad price to pay
+   *  for whichever image happened to be last, with nothing in the result naming it. */
+  userImages: string[] = [],
 ) => {
   // Mirror CREDIT_COSTS in generate-vr-world/index.ts
   const VR_CREDIT_COSTS: Record<string, number> = {
@@ -1032,9 +1138,12 @@ export const createGenerateVRWorldTool = (
   };
 
   return tool(
-    async ({ sourceImageUrl, prompt, roomType, style, model }) => {
+    async ({ sourceImageUrl, source, prompt, roomType, style, model }) => {
       try {
-        const resolvedImageUrl = sourceImageUrl || conversationImages[conversationImages.length - 1];
+        const picked = resolveMediaSource({
+          sourceImageUrl, source, conversationImages, uploadedRoom: resolveUploadedRoom(userImages),
+        });
+        const resolvedImageUrl = picked.url;
         if (!resolvedImageUrl) {
           return JSON.stringify({
             success: false,
@@ -1105,7 +1214,9 @@ export const createGenerateVRWorldTool = (
           vr_world_id: world.id,
           model: resolvedModel,
           credits_used: creditsUsed,
-          message: `Your VR world is ready. ${creditsUsed} credits used. Open the WorldViewer to walk through it.`,
+          source_image_url: resolvedImageUrl,
+          source_image_origin: picked.origin,
+          message: `Your VR world is ready, built from ${picked.origin}. ${creditsUsed} credits used. Open the WorldViewer to walk through it.`,
         });
       } catch (error) {
         console.error('VR world generation error:', error);
@@ -1120,14 +1231,17 @@ export const createGenerateVRWorldTool = (
     },
     {
       name: 'generate_vr_world',
-      description: `Turn a room image into an explorable 3D VR world (Gaussian Splat) the user can walk through. Use this when the user asks to:
+      description: `Turn a room image into an explorable 3D VR world (Gaussian Splat) the user can walk through. ${CANNOT_SEE_NOTE}
+
+Use this when the user asks to:
 - "explore this in VR" / "walk through it" / "see it in 3D"
 - "make this into a VR world" / "turn this room into something I can navigate"
 
 Requires an existing room image — uses the most recent conversation image if no URL is given.
 Model: marble-1.1 (~5min, 190 credits). The faster marble-1.0-draft tier was retired.`,
       schema: z.object({
-        sourceImageUrl: z.string().optional().describe('Public URL of the room image. If omitted, uses the most recently generated/uploaded image.'),
+        sourceImageUrl: z.string().optional().describe('Public URL of the room image. If omitted, uses the most recently generated image, else the photo the user attached.'),
+        source: z.enum(['auto', 'my_upload', 'last_generated']).optional().describe('Which image to act on. Default "auto" = the most recent image generated in this conversation, falling back to the photo the user attached. Pass "my_upload" when the user means the photo they attached rather than a render.'),
         prompt: z.string().optional().describe('Optional caption for the world (e.g. "Modern Scandinavian living room"). Auto-derived from roomType+style if omitted.'),
         roomType: z.string().optional().describe('Room type for caption (bedroom, living_room, kitchen, etc.)'),
         style: z.string().optional().describe('Design style for caption (modern, scandinavian, etc.)'),

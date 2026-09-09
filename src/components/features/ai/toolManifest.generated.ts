@@ -141,7 +141,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     name: 'analyze_inspiration_url',
     file: 'supabase/functions/_shared/tools/search-tools.ts',
     factory: 'createInspirationUrlTool',
-    description: 'Analyze a design inspiration URL (Houzz, Pinterest, Dezeen, ArchDaily, manufacturer sites, or any page with room/material images).',
+    description: 'Analyze a design inspiration URL (Houzz, Pinterest, Dezeen, ArchDaily, manufacturer sites).',
     params: [
       { name: 'url', type: 'string', optional: false, description: 'The URL to analyze for design inspiration' },
       { name: 'focus', type: 'enum', enum: ['all', 'floor', 'wall', 'countertop', 'ceiling', 'furniture'], optional: true, description: 'Which surfaces to focus the analysis on' },
@@ -164,7 +164,8 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     description: 'Re-render the same room under a different lighting condition without changing furniture, walls, or layout.',
     params: [
       { name: 'preset', type: 'enum', enum: ['golden_hour', 'bright_midday', 'soft_overcast', 'warm_evening', 'night', 'dramatic_spots'], optional: false, description: 'Lighting preset. Map natural language: sunset/sunrise→golden_hour, daylight/noon→bright_midday, cloudy/diffused→soft_overcast, evening/lamps/cosy→warm_evening, night/moonlit→night, showroom/dramatic/accent→dramatic_spots.' },
-      { name: 'sourceImageUrl', type: 'string', optional: true, description: 'Public URL of the room image. If omitted, uses the most recently generated/uploaded image.' },
+      { name: 'sourceImageUrl', type: 'string', optional: true, description: 'Public URL of the room image. If omitted, uses the most recently generated image, else the photo the user attached.' },
+      { name: 'source', type: 'enum', enum: ['auto', 'my_upload', 'last_generated'], optional: true, description: 'Which image to act on. Default "auto" = the most recent image generated in this conversation, falling back to the photo the user attached. Pass "my_upload" when the user means the photo they attached rather than a render.' },
     ],
   },
   {
@@ -641,6 +642,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'roomType', type: 'string', optional: true, description: 'Room type (bedroom, living_room, kitchen, bathroom, office, etc.)' },
       { name: 'style', type: 'string', optional: true, description: 'Design style (modern, minimalist, industrial, scandinavian, traditional, etc.)' },
       { name: 'referenceImageUrl', type: 'string', optional: true, description: 'Public HTTP URL of a reference image — only needed if NOT using the user uploaded image. Leave empty to use the uploaded image automatically.' },
+      { name: 'baseImageIndex', type: 'number', optional: true, description: '1-based index of the attached image that is the ROOM to work from. Default with two attachments is image 2 ("Your Room" in the composer); pass it when the user attached the room first and a material/inspiration second.' },
       { name: 'models', type: 'array', optional: true, description: 'Specific model IDs to restrict generation to. Omit to use all models for the selected mode.' },
     ],
   },
@@ -734,7 +736,8 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     factory: 'createGenerateVRWorldTool',
     description: 'Turn a room image into an explorable 3D VR world (Gaussian Splat) the user can walk through.',
     params: [
-      { name: 'sourceImageUrl', type: 'string', optional: true, description: 'Public URL of the room image. If omitted, uses the most recently generated/uploaded image.' },
+      { name: 'sourceImageUrl', type: 'string', optional: true, description: 'Public URL of the room image. If omitted, uses the most recently generated image, else the photo the user attached.' },
+      { name: 'source', type: 'enum', enum: ['auto', 'my_upload', 'last_generated'], optional: true, description: 'Which image to act on. Default "auto" = the most recent image generated in this conversation, falling back to the photo the user attached. Pass "my_upload" when the user means the photo they attached rather than a render.' },
       { name: 'prompt', type: 'string', optional: true, description: 'Optional caption for the world (e.g. "Modern Scandinavian living room"). Auto-derived from roomType+style if omitted.' },
       { name: 'roomType', type: 'string', optional: true, description: 'Room type for caption (bedroom, living_room, kitchen, etc.)' },
       { name: 'style', type: 'string', optional: true, description: 'Design style for caption (modern, scandinavian, etc.)' },
@@ -2396,7 +2399,8 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     factory: 'createVirtualStagingTool',
     description: 'Stage an empty room with AI-generated furniture.',
     params: [
-      { name: 'sourceImageUrl', type: 'string', optional: true, description: 'Public URL of the empty room image. If omitted, uses the most recently generated image.' },
+      { name: 'sourceImageUrl', type: 'string', optional: true, description: 'Public URL of the empty room image. If omitted, uses the most recently generated image, else the photo the user attached.' },
+      { name: 'source', type: 'enum', enum: ['auto', 'my_upload', 'last_generated'], optional: true, description: 'Which image to act on. Default "auto" = the most recent image generated in this conversation, falling back to the photo the user attached. Pass "my_upload" when the user means the photo they attached rather than a render.' },
       { name: 'room', type: 'enum', enum: ['Living Room', 'Bedroom', 'Balcony', 'Dining Room', 'Office', 'Kitchen', 'Bathroom', 'Garden', 'Swimming Pool'], optional: false, description: 'Room type to stage' },
       { name: 'furnitureStyle', type: 'enum', enum: ['Default (AI decides)', 'Modern', 'Scandinavian', 'Transitional', 'Rustic', 'Mid-Century Modern', 'Urban Industrial', 'Farmhouse', 'Coastal', 'Traditional', 'Modern Organic', 'Scandinavian Oasis', 'Transitional Luxury', 'B&W Modern', 'Farmhouse Hacienda', 'Metro Industrial', 'NYC Modern'], optional: true, description: 'Furniture style' },
       { name: 'furnitureItems', type: 'string', optional: true, description: 'Specific furniture items to include, comma-separated' },

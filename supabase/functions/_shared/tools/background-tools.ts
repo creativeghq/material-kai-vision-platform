@@ -286,7 +286,14 @@ export const createInteriorVideoV2Tool = (userId: string, workspaceId: string, o
           });
         }
 
-        return JSON.stringify(result);
+        // Echo the frame this animated. The whole upstream body used to be passed through
+        // unfiltered, so the model learned nothing about WHAT was animated and described the
+        // video anyway. `source_image_url` is required in the schema, so this is always known.
+        return JSON.stringify({
+          ...result,
+          source_image_url,
+          ...(before_image_url ? { before_image_url } : {}),
+        });
       } catch (error) {
         const isAbort = error instanceof Error && error.name === 'AbortError';
         return JSON.stringify({
@@ -320,7 +327,7 @@ Long-form, with sound (the only models here that pass 10 seconds):
   interpolates from a first frame to a LAST frame: use it when the clip has to end on a
   specific image (before/after reveals), not just start from one.
 
-Returns video_url when complete, or prediction_id if still processing (poll generate_3d_status).`,
+Returns video_url when complete, or prediction_id if still processing (poll check_generation_status). YOU CANNOT SEE THE VIDEO THIS RETURNS — report the source_image_url it echoes back and never describe what happens on screen.`,
       schema: z.object({
         source_image_url: z.string().describe('Source image URL to animate or base the video on'),
         video_type: z.enum(['walkthrough', 'product_spotlight', 'before_after', 'floorplan_flythrough', 'social_reel'])

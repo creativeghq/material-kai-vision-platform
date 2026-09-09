@@ -1182,6 +1182,12 @@ ${scrapeResult.markdown.substring(0, 8000)}
           total_results: totalResults,
           source_url: url,
           hero_image: scrapeResult.images[0] || null,
+          // NOBODY LOOKED AT THE PICTURES. The tokens above come from a text pass over the
+          // page's markdown — no image is sent to a vision model anywhere in this tool — but the
+          // name, the description and `color_hex` all read as though the photo was analysed, so
+          // the agent said it had looked at it. Stated here because the alternative is a
+          // confident sentence about colours that were read out of alt text and prose.
+          derived_from: 'the page TEXT only (title, description, markdown). No image was analysed — do not tell the user you looked at the photo.',
         });
       } catch (error) {
         console.error('Inspiration URL analysis error:', error);
@@ -1193,7 +1199,7 @@ ${scrapeResult.markdown.substring(0, 8000)}
     },
     {
       name: 'analyze_inspiration_url',
-      description: 'Analyze a design inspiration URL (Houzz, Pinterest, Dezeen, ArchDaily, manufacturer sites, or any page with room/material images). Extracts design tokens (colors, materials, textures, styles) and searches the catalog for matching products. Use this when a user pastes a URL and wants to find materials that match that design.',
+      description: 'Analyze a design inspiration URL (Houzz, Pinterest, Dezeen, ArchDaily, manufacturer sites). Reads the page TEXT — it does NOT look at the images on it — and infers design tokens (colors, materials, textures, styles) from what the page SAYS, then searches the catalog for matching products. Use when a user pastes a URL and wants materials matching that design; do not claim to have viewed the photographs.',
       schema: z.object({
         url: z.string().url().describe('The URL to analyze for design inspiration'),
         focus: z.enum(['all', 'floor', 'wall', 'countertop', 'ceiling', 'furniture']).default('all').describe('Which surfaces to focus the analysis on'),
