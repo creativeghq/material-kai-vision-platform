@@ -95,11 +95,24 @@ returns nothing once the day's work is done and the leg makes no upstream call a
 the sweep was one leg of 60 against 129 keywords — the panel said "followed daily" over figures that
 blended three capture dates, and a failed check waited a full day for its retry.
 
-**`seo_keywords_due` is the one derivation of what to check next** (service_role only): latest check
-failed first, then never-checked, then least-recently-checked; `p_only_stale` skips what today's
-earlier legs covered; `p_website_id` NULL orders the whole platform at once, so a big site cannot
-starve a small one by sorting first every leg. It replaced `seo_keywords_to_recheck` plus two
-PostgREST reads in the edge function — two places deciding one thing.
+**`seo_keywords_due` is the one derivation of what to check next** (service_role only): a check that
+failed on an EARLIER day first, then never-checked, then least-recently-checked; `p_only_stale` skips
+what today's earlier legs covered; `p_website_id` NULL orders the whole platform at once, so a big
+site cannot starve a small one by sorting first every leg. It replaced `seo_keywords_to_recheck` plus
+two PostgREST reads in the edge function — two places deciding one thing.
+- **The module gate is IN the queue**, not in the caller's loop. The cap is global, so keywords
+  belonging to a lapsed workspace were taken from the platform's 60 rows and then skipped without
+  being stamped — which left them the least recently checked, so they won the next leg too. One
+  workspace could have stopped rank tracking for everybody while every run reported `ok`. The edge
+  function asks `isWorkspaceEntitled` again before spending (invariant 10); the queue is what stops
+  the cap being eaten.
+- **A failure from TODAY does not jump the queue.** Jumping it is for a failure from an earlier day
+  ("8 of 129 failed" sitting on the panel across a two-day rotation); a keyword that failed three
+  deep reads and a shallow one twenty minutes ago is retried with whatever capacity a later leg has
+  spare. Otherwise a permanently unreadable keyword holds a slot at the head of every leg forever.
+- **One queue for the whole batch, not a pool per site.** Each row carries its own website, so the
+  twelve workers stay busy whoever the work belongs to. Per-site pools run in sequence give a site
+  with two due keywords a concurrency of two.
 
 **Time is the other constraint, and it was the binding one.** One keyword takes ~19 s end to
 end (a 7–15 s live SERP call per `ai_usage_logs.metadata.latency_ms`, plus two writes), so
