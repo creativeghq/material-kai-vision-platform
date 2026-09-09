@@ -570,13 +570,38 @@ export const createGeminiGenerationTool = (
           'unstage': 'emptied the room',
         };
 
+        // What was ACTUALLY edited. The model never sees the picture — it gets a URL — so
+        // without this it can only assert or hedge, and it did both in one conversation: it
+        // reported "the base photo was locked in as the edit source" on a run that had edited a
+        // tile swatch, and then "I can't tell you whether the base photo actually got through"
+        // on a run that had worked. Every field here is a fact the run can produce.
+        const edited = SINGLE_SOURCE_MODES.includes(resolvedMode)
+          ? {
+              base_image_url: result.source_image_url ?? resolvedReferenceUrl ?? null,
+              // Where that image came from, in the user's terms. `images` is the attachment
+              // list the turn was given, so "attachment 2 of 2" is true whether they attached
+              // it on this turn or an earlier one.
+              base_image_origin: referenceImageUrl
+                ? 'a URL supplied in the tool call'
+                : slots.baseIndex >= 0
+                  ? `the user's attachment ${slots.baseIndex + 1} of ${images.length}`
+                  : 'the most recent image in this conversation',
+              material_reference_url: result.material_reference_url ?? styleReferenceUrl ?? null,
+              source_size: result.source_size ?? null,
+              output_size: result.output_size ?? null,
+            }
+          : undefined;
+
         return JSON.stringify({
           success: true,
           job_id: result.job_id,
           image_url: result.image_url,
           model: result.model,
           credits_used: result.credits_used,
-          message: `I've ${modeLabels[resolvedMode] || 'generated the image'}! ${modelTier === 'pro' ? 'Using Gemini Pro for maximum quality.' : 'You can ask me to refine it — e.g., "change the floor to marble" or "make it warmer".'}`,
+          ...(edited ? { edited } : {}),
+          message: edited
+            ? `Edit run on ${edited.base_image_origin}.`
+            : `I've ${modeLabels[resolvedMode] || 'generated the image'}! ${modelTier === 'pro' ? 'Using Gemini Pro for maximum quality.' : 'You can ask me to refine it — e.g., "change the floor to marble" or "make it warmer".'}`,
         });
       } catch (error) {
         console.error('Gemini generation error:', error);
@@ -592,6 +617,14 @@ export const createGeminiGenerationTool = (
     {
       name: 'generate_gemini',
       description: `Generate or edit interior design images. Provides an immediate single result in the chat.
+
+YOU CANNOT SEE THE IMAGE THIS RETURNS. You get a URL. On an edit, the result's \`edited\` block is
+your ONLY evidence about what happened — it names the image that was used as the base, where it
+came from, and the size in and out. Report that, in those terms ("edited your attachment 2 of 2").
+NEVER write that the cabinets, the camera, the lighting or anything else in the picture is
+unchanged, preserved or identical: you have not looked at it, and saying so once turned a
+generated stranger's kitchen into a confident "your room, floor swapped". If there is no \`edited\`
+block, no edit happened — say that plainly rather than describing a result.
 
 PARAMETER EXTRACTION — always do this before calling:
 1. Extract roomType from user message (bedroom, living_room, kitchen, bathroom, dining_room, home_office, etc.)

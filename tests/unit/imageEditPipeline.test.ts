@@ -321,6 +321,38 @@ describe('the images stay reachable on the next turn', () => {
   });
 });
 
+describe('the agent reports what ran, because it cannot see what it made', () => {
+  it('the edge function returns the provenance of the run', () => {
+    const fn = read(GEMINI_FN);
+    const response = fn.slice(fn.lastIndexOf('success: true,'));
+    for (const field of ['source_image_url', 'material_reference_url', 'source_size', 'output_size']) {
+      expect(response).toContain(field);
+    }
+    // Measured on the way past rather than by decoding the image a second time, and null —
+    // "unknown" — rather than a guess when the header cannot be read.
+    expect(fn).toContain('const persistMeasured = async');
+    expect(fn).toContain('outputSize = null;');
+  });
+
+  it('the tool hands that evidence to the model on every edit', () => {
+    const tools = read(GENERATION_TOOLS);
+    expect(tools).toContain('const edited = SINGLE_SOURCE_MODES.includes(resolvedMode)');
+    expect(tools).toMatch(/base_image_origin:/);
+    expect(tools).toMatch(/the user's attachment \$\{slots\.baseIndex \+ 1\} of \$\{images\.length\}/);
+  });
+
+  it('and is told, in the tool it calls, that it has not seen the picture', () => {
+    const tools = read(GENERATION_TOOLS);
+    const desc = tools.slice(tools.indexOf("name: 'generate_gemini'"), tools.indexOf('PARAMETER EXTRACTION'));
+    expect(desc).toContain('YOU CANNOT SEE THE IMAGE THIS RETURNS');
+    // The specific sentence that cost the user 30 credits and their trust: a claim of
+    // preservation about pixels nobody in the loop had looked at.
+    expect(desc).toMatch(/NEVER write that .* is\s*\n?unchanged, preserved or identical/s);
+    // The tool's own success copy must not assert the edit worked either — it primes the reply.
+    expect(tools).toContain('`Edit run on ${edited.base_image_origin}.`');
+  });
+});
+
 describe('a form must be able to change what happens', () => {
   it('request_input tells the model not to ask for something no parameter takes', () => {
     const src = read('supabase/functions/_shared/tools/input-request-tools.ts');

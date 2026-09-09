@@ -38,7 +38,7 @@ import {
   type GeminiImageModel,
   type ImageAspectRatio,
 } from '../_shared/ai-client.ts';
-import { aspectRatioOfImage } from '../_shared/image-dimensions.ts';
+import { aspectRatioOfImage, readImageSize, type ImageSize } from '../_shared/image-dimensions.ts';
 import {
   buildNarrativePrompt,
   buildFloorPlanRenderPrompt,
@@ -673,6 +673,32 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
 
     let imageUrl: string;
 
+    // ── Provenance for the caller ─────────────────────────────────────────────────────────
+    // What this run ACTUALLY edited. The agent never sees the picture it produced — it gets a
+    // URL — so with nothing else in the response it can only assert or hedge. It did both:
+    // "the base photo was locked in as the edit source" on a run that had edited a tile swatch,
+    // then, once that was genuinely fixed, "I can't tell you whether the base photo actually got
+    // through this time" on a run that had worked (conversation b520cc11). Neither sentence was
+    // available as a FACT to the thing writing it. These fields are.
+    let sourceSize: ImageSize | null = null;
+    let outputSize: ImageSize | null = null;
+
+    /**
+     * Upload, and measure what we are uploading on the way past.
+     *
+     * Reads the header off the first 3KB of the base64 rather than decoding the whole image a
+     * second time — enough for PNG/JPEG/WebP, and `readImageSize` returns null rather than a
+     * guess when it is not, which reports as "unknown" instead of as a wrong number.
+     */
+    const persistMeasured = async (b64: string, mimeType: string): Promise<string> => {
+      try {
+        outputSize = readImageSize(Uint8Array.from(atob(b64.slice(0, 4096)), (c) => c.charCodeAt(0)));
+      } catch {
+        outputSize = null;
+      }
+      return uploadToStorage(supabase, b64, mimeType, jobId, uploadCtx);
+    };
+
     // ── Mode 1: text-to-image ──────────────────────────────────────────────
     if (mode === 'text-to-image') {
       const narrative = await buildNarrativePrompt(supabase, {
@@ -806,13 +832,14 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
       const sourceBuffer = await fetchImageBuffer(body.reference_image_url);
       const instruction = body.edit_instruction ?? body.prompt ?? 'Redesign this room with updated materials and finishes';
       const editAspectRatio = aspectRatioForSource(sourceBuffer);
+      sourceSize = readImageSize(sourceBuffer);
 
       if (useGrok) {
         // Grok Aurora edit — sends image directly, superior spatial accuracy
         const grokPrompt = renderPromptTemplate(await getGenerationPrompt(supabase, 'interior_targeted_edit'), { instruction: instruction });
 
         const result = await editImageWithGrok(grokPrompt, sourceBuffer);
-        imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
+        imageUrl = await persistMeasured(result.base64, result.mimeType);
       } else if (useOpenAI) {
         // ChatGPT (gpt-image-1) edit — the source photo goes to /v1/images/edits with the
         // same targeted-edit template Grok uses; no mask, so the whole frame is re-rendered
@@ -820,7 +847,7 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
         const openAiPrompt = renderPromptTemplate(await getGenerationPrompt(supabase, 'interior_targeted_edit'), { instruction: instruction });
 
         const result = await editImageWithOpenAI(openAiPrompt, sourceBuffer, { userId: resolvedUserId, workspaceId: body.workspace_id });
-        imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
+        imageUrl = await persistMeasured(result.base64, result.mimeType);
       } else if (body.style_reference_url) {
         // A reference image on a TARGETED EDIT means "use THIS one" — this tile, this finish,
         // this fabric. So its PIXELS go to the model, next to the room, in the order
@@ -848,7 +875,7 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
           { text: editWithRefText, images: [styleBuffer, sourceBuffer] },
           { model, aspectRatio: editAspectRatio },
         );
-        imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
+        imageUrl = await persistMeasured(result.base64, result.mimeType);
       } else {
         // Gemini direct edit
         const editText = renderPromptTemplate(await getGenerationPrompt(supabase, 'interior_reference_redesign'), { instruction: instruction });
@@ -857,7 +884,7 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
           { text: editText, images: [sourceBuffer] },
           { model, aspectRatio: editAspectRatio },
         );
-        imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
+        imageUrl = await persistMeasured(result.base64, result.mimeType);
       }
     }
 
@@ -878,6 +905,7 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
       // The caller's own carve-outs ("leave the built-in wardrobe", "keep the curtains").
       // Rendered into the template rather than concatenated, so an empty value is a stated
       // "none" instead of a dangling placeholder the model has to interpret.
+      sourceSize = readImageSize(sourceBuffer);
       const keepInstruction = (body.edit_instruction ?? '').trim();
       const unstagePrompt = renderPromptTemplate(
         await getGenerationPrompt(supabase, 'interior_unstage'),
@@ -888,7 +916,7 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
         { text: unstagePrompt, images: [sourceBuffer] },
         { model, aspectRatio: aspectRatioForSource(sourceBuffer) },
       );
-      imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
+      imageUrl = await persistMeasured(result.base64, result.mimeType);
     }
 
     // ── Mode 3: redesign — Flux Depth Pro, single image ───────────────────
@@ -1215,6 +1243,12 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
       model,
       image_url: imageUrl,
       credits_used: credits,
+      // What ran, so the caller can SAY what ran instead of guessing at it. Null on the modes
+      // that invent an image from words — there is no source, which is itself the fact.
+      source_image_url: body.reference_image_url ?? null,
+      material_reference_url: body.style_reference_url ?? null,
+      source_size: sourceSize,
+      output_size: outputSize,
     });
 
   } catch (err) {
