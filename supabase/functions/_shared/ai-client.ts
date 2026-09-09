@@ -1110,15 +1110,16 @@ async function generateMultiImageWithGemini(
   );
 
   let response = await post(true);
-  if (!response.ok && config.aspectRatio) {
-    // `generationConfig.imageConfig` is model-dependent and Google rejects unknown fields with a
-    // 400, so a model that does not take it would fail EVERY generation. Retry once without it:
-    // a free-shaped image is a defect, a dead image pipeline is an outage.
+  if (response.status === 400 && config.aspectRatio) {
+    // `generationConfig.imageConfig` is model-dependent and Google rejects an unknown field with
+    // 400 INVALID_ARGUMENT, so a model that does not take it would fail EVERY generation. Retry
+    // once without it: a free-shaped image is a defect, a dead image pipeline is an outage.
+    //
+    // ONLY on a 400, and only when we sent the field. A 429 or a 503 is the upstream having a
+    // bad minute — retrying those without the pin would quietly re-create the wrong-crop bug
+    // this argument exists to fix, and double the upload doing it.
     const firstErr = await response.text().catch(() => '');
-    console.warn(
-      `[ai-client] gemini multi-image rejected imageConfig (${response.status}), retrying without it:`,
-      firstErr.slice(0, 300),
-    );
+    console.warn('[ai-client] gemini multi-image rejected imageConfig, retrying without it:', firstErr.slice(0, 300));
     response = await post(false);
   }
 

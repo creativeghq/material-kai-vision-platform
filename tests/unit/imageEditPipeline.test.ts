@@ -66,9 +66,14 @@ describe('which attachment is the room — one convention', () => {
   it('the model can pin either slot, 1-based, and the other one follows', () => {
     // "here is a tile, put it in this room" with the ROOM attached first.
     expect(resolveImageSlots(2, { baseImageIndex: 1 })).toEqual({ baseIndex: 0, referenceIndex: 1 });
-    expect(resolveImageSlots(2, { referenceImageIndex: 2 })).toEqual({ baseIndex: 1, referenceIndex: -1 });
     expect(resolveImageSlots(3, { baseImageIndex: 3, referenceImageIndex: 2 }))
       .toEqual({ baseIndex: 2, referenceIndex: 1 });
+  });
+
+  it('pinning ONE slot moves the other — or the override recreates the bug it fixes', () => {
+    // "the tile is image 2" must not leave the base sitting on image 2 as well, editing the tile.
+    expect(resolveImageSlots(2, { referenceImageIndex: 2 })).toEqual({ baseIndex: 0, referenceIndex: 1 });
+    expect(resolveImageSlots(2, { referenceImageIndex: 1 })).toEqual({ baseIndex: 1, referenceIndex: 0 });
   });
 
   it('an out-of-range pin falls back to the convention instead of editing a different image', () => {
@@ -157,6 +162,18 @@ describe('a reference image on an edit is a MATERIAL, and its pixels are sent', 
   it('a targeted edit is not silently promoted to a whole-room restyle', () => {
     const tools = read(GENERATION_TOOLS);
     expect(tools).toMatch(/detectEditIntent\(prompt\) && \(hasRecentGeneration \|\| hasUploadedImage\)/);
+    // ...and the floor-plan modes are still reached: "can you change this floor plan into a
+    // render" matches the generic edit verb, so the specific test has to come first.
+    const detect = tools.slice(tools.indexOf('let resolvedMode ='), tools.indexOf('materials-selection-board: requires'));
+    expect(detect.indexOf("resolvedMode = 'floor-plan-render'"))
+      .toBeLessThan(detect.indexOf("resolvedMode = 'image-edit'"));
+  });
+
+  it('a two-image edit runs on the only provider that takes two images', () => {
+    const fn = read(GEMINI_FN);
+    // Grok and gpt-image-1 edit ONE image: left on those tiers the material reference is gated,
+    // charged for, and then dropped on the floor.
+    expect(fn).toMatch(/multiReference:[^;]*mode === 'image-edit' && !!body\.style_reference_url/s);
   });
 });
 
@@ -236,13 +253,17 @@ describe('an edit comes back the shape it went in', () => {
     const fn = read(GEMINI_FN);
     expect(fn).toContain('const aspectRatioForSource = (source: Uint8Array): ImageAspectRatio =>');
     for (const marker of [
-      'const editAspectRatio = aspectRatioForSource(sourceBuffer)',       // image-edit
-      'aspectRatio: aspectRatioForSource(sourceBuffer) }',                // unstage
-      'const roomAspectRatio = aspectRatioForSource(roomBuffer)',         // copy-style
-      'fluxPrompt, aspectRatioForSource(roomBuffer))',                    // redesign
+      'const editAspectRatio = aspectRatioForSource(sourceBuffer)',        // image-edit
+      'aspectRatio: aspectRatioForSource(sourceBuffer) }',                 // unstage
+      'const measured = await measureSource(body.reference_image_url)',    // redesign
+      'const measuredRoom = await measureSource(body.reference_image_url)', // copy-style
     ]) {
       expect(fn).toContain(marker);
     }
+    // The measuring download must not be able to fail a generation that never needed the bytes.
+    const measure = fn.slice(fn.indexOf('const measureSource ='), fn.indexOf('// ── What may be edited'));
+    expect(measure).toContain('catch (err)');
+    expect(measure).toContain('using the default ratio');
   });
 });
 
@@ -268,11 +289,13 @@ describe('the images stay reachable on the next turn', () => {
 
   it('a finished turn is recorded even when the client is gone', () => {
     const src = read(AGENT_CHAT);
-    // The claim is the turn id, checked before the write — not a blind insert.
+    // The claim is checked before the write — not a blind insert. And the check is the WINDOW,
+    // not the stamp: an edge deploy and a frontend deploy are not one transaction, so a tab still
+    // running the old bundle stamps nothing and must not be given a duplicate of every reply.
     expect(src).toContain('async function recoverAssistantMessage(');
-    expect(src).toMatch(/\.contains\('metadata', \{ turn_id: turnId \}\)/);
     const fn = src.slice(src.indexOf('async function recoverAssistantMessage('), src.indexOf('async function executeAgent('));
-    expect(fn.indexOf(".contains('metadata', { turn_id: turnId })"))
+    expect(fn).toMatch(/\.gte\('created_at', turnStartedAt\)/);
+    expect(fn.indexOf(".gte('created_at', turnStartedAt)"))
       .toBeLessThan(fn.indexOf("await supabase.from('agent_chat_messages').insert("));
     // A read failure must not produce a duplicate.
     expect(fn).toContain('Fail CLOSED on a read error');

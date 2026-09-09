@@ -1528,6 +1528,7 @@ async function recoverAssistantMessage(
   supabase: any,
   conversationId: string,
   turnId: string,
+  turnStartedAt: string,
   content: string,
   metadata: Record<string, unknown>,
 ): Promise<void> {
@@ -1535,12 +1536,21 @@ async function recoverAssistantMessage(
   // final chunk), short enough that the isolate is not held open for nothing on every turn.
   await new Promise((resolve) => setTimeout(resolve, 10_000));
 
+  // "Did ANYTHING get written for this turn" — not "was my stamp written".
+  //
+  // The stamp is the exact signal and it is what a current client sends back. But an edge deploy
+  // and a frontend deploy are not one transaction, and a tab left open across the release is
+  // still running the old bundle, which stamps nothing: keying only on the stamp would give
+  // every one of those turns a duplicate reply. So the window is the guard and the stamp is the
+  // precision — either one present means the turn is recorded. A card message saved mid-stream
+  // counts, which is the conservative call on purpose: a duplicate is visible to the user and a
+  // miss leaves exactly today's behaviour.
   const { data: existing, error: readErr } = await supabase
     .from('agent_chat_messages')
     .select('id')
     .eq('conversation_id', conversationId)
     .eq('role', 'assistant')
-    .contains('metadata', { turn_id: turnId })
+    .gte('created_at', turnStartedAt)
     .limit(1);
 
   // Fail CLOSED on a read error: writing a message we cannot prove is missing is how a
@@ -4437,6 +4447,8 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
      * second copy. Same shape as `pos_issue_receipt`'s client token (CLAUDE.md anti-regression 4).
      */
     const turnId = crypto.randomUUID();
+    /** When this turn started, so the recovery can ask "did anything get written since?". */
+    const turnStartedAtIso = new Date().toISOString();
     /** The last image this turn produced, so a recovered message can still carry it. */
     let lastGeminiImage: Record<string, unknown> | null = null;
     // Tracks whether the agent has produced any real output beyond status/heartbeat.
@@ -4851,7 +4863,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
           // isolate is otherwise torn down the moment this handler returns.
           if (conversation_id && finalResult?.text && !forCustomerTurn && !isEvalRun) {
             void runInBackground(
-              recoverAssistantMessage(supabase, conversation_id, turnId, finalResult.text, {
+              recoverAssistantMessage(supabase, conversation_id, turnId, turnStartedAtIso, finalResult.text, {
                 agentId: ranAsAgentId,
                 requestedAgentId: agentId,
                 routed: wasRouted,

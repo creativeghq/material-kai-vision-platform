@@ -303,22 +303,28 @@ export const createGeminiGenerationTool = (
           const hasRecentGeneration = conversationImages.length > 0;
           const hasUploadedImage = images.length > 0;
 
+          // Floor plan modes come FIRST. They are keyed on explicit "floor plan" language, which
+          // is more specific than any edit verb — and "can you change this floor plan into a
+          // render" matches the generic `can you (change|update|...)` edit pattern, so an
+          // edit-intent test placed above these would swallow it and quietly return a photo edit
+          // of the plan drawing.
+
+          // Text-based floor plan generation (no image, mentions floor plan or has sqm)
+          if (!referenceImageUrl && !hasUploadedImage && (/floor\s*plan|2d\s*plan|floor\s*map|room\s*layout.*diagram|draw.*layout|create.*plan|generate.*plan/i.test(prompt || '') || sqm)) {
+            resolvedMode = 'floor-plan-text';
+
+          // Floor plan image → perspective render (explicit floor plan keyword)
+          } else if ((referenceImageUrl || hasUploadedImage) && /floor\s*plan|render.*layout|convert.*plan/i.test(prompt || '')) {
+            resolvedMode = 'floor-plan-render';
+
           // Edit intent on an image we have (e.g. "change the floor", "replace the tile").
           //
           // `hasUploadedImage` belongs in this test as much as `hasRecentGeneration` does: without
           // it, "replace the floor tile with the one attached" plus a tile and a room photo fell
           // through to the `images.length >= 2` branch below and became copy-style — a WHOLE-ROOM
           // aesthetic transfer — when the user asked for one surface to change.
-          if (detectEditIntent(prompt) && (hasRecentGeneration || hasUploadedImage)) {
+          } else if (detectEditIntent(prompt) && (hasRecentGeneration || hasUploadedImage)) {
             resolvedMode = 'image-edit';
-
-          // Text-based floor plan generation (no image, mentions floor plan or has sqm)
-          } else if (!referenceImageUrl && !hasUploadedImage && (/floor\s*plan|2d\s*plan|floor\s*map|room\s*layout.*diagram|draw.*layout|create.*plan|generate.*plan/i.test(prompt || '') || sqm)) {
-            resolvedMode = 'floor-plan-text';
-
-          // Floor plan image → perspective render (explicit floor plan keyword)
-          } else if ((referenceImageUrl || hasUploadedImage) && /floor\s*plan|render.*layout|convert.*plan/i.test(prompt || '')) {
-            resolvedMode = 'floor-plan-render';
 
           // Copy style: 2 images uploaded (inspiration + room) — use Flux Depth Pro
           } else if (hasUploadedImage && images.length >= 2) {

@@ -69,14 +69,15 @@ export function resolveImageSlots(imageCount: number, overrides: SlotOverrides =
     return { baseIndex: 0, referenceIndex: -1 };
   }
 
-  const baseIndex = pinnedBase ?? SLOT_BASE;
-  // Default: the reference is slot 0, unless the caller pinned slot 0 as the base — then it is
-  // the other one. With exactly two images that reads as "the one that isn't the room".
-  const defaultReference = baseIndex === SLOT_REFERENCE ? SLOT_BASE : SLOT_REFERENCE;
-  const referenceIndex = pinnedReference ?? defaultReference;
+  // Each default gives way to the other side's pin. Pinning ONE slot has to move the other, or
+  // the override reintroduces the bug it exists to fix: "the tile is image 2" with the default
+  // base also at 2 would edit the tile — exactly what went wrong in the first place, reached
+  // through the fix.
+  const baseIndex = pinnedBase ?? (pinnedReference === SLOT_BASE ? SLOT_REFERENCE : SLOT_BASE);
+  const referenceIndex = pinnedReference ?? (baseIndex === SLOT_REFERENCE ? SLOT_BASE : SLOT_REFERENCE);
 
-  // An image cannot be both. The base wins; the reference is dropped rather than duplicated,
-  // because passing the same photo twice tells the model to copy a style off itself.
+  // Both pinned to the same image is a contradiction, and only the caller can mean it. The base
+  // wins: passing one photo twice tells the model to copy a style off itself.
   return {
     baseIndex,
     referenceIndex: referenceIndex === baseIndex ? -1 : referenceIndex,

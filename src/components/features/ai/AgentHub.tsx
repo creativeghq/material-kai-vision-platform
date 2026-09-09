@@ -4080,9 +4080,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             requestedAgentId: data.requested_agent_id ?? undefined,
             routed: data.routed ?? undefined,
             model: data.model || selectedModel,
-            // The server's id for this turn. It writes the message itself if this stamp has not
-            // appeared within ~15s — which is what happens when the tab is closed mid-turn — so
-            // dropping it here would produce a duplicate of every reply, not a missing one.
+            // The server's id for this turn. It writes the reply itself when nothing has been
+            // saved for the turn within ~10s — which is what happens when the tab is closed
+            // mid-turn — and this stamp is how it tells its own write from ours.
             turn_id: data.turn_id ?? streamTurnId ?? undefined,
             responseTimeMs, // Time taken to respond
             productsCount: materialData?.products?.length || 0,

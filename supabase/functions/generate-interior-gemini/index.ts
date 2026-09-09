@@ -548,6 +548,23 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
   const aspectRatioForSource = (source: Uint8Array): ImageAspectRatio =>
     body.aspect_ratio ?? aspectRatioOfImage(source, IMAGE_ASPECT_RATIOS) ?? aspectRatio;
 
+  /**
+   * The same thing for a mode that never had the bytes in hand (redesign and copy-style hand a
+   * URL straight to Flux). The download is for MEASUREMENT, so it must not be able to fail the
+   * generation: `fetchImageGuarded` throws above its size cap, and turning a working redesign
+   * into a post-debit 500 to get a nicer crop is a bad trade. Returns the buffer too, so the
+   * paths that need it later do not fetch twice.
+   */
+  const measureSource = async (url: string): Promise<{ buffer: Uint8Array | null; aspectRatio: ImageAspectRatio }> => {
+    try {
+      const buffer = await fetchImageBuffer(url);
+      return { buffer, aspectRatio: aspectRatioForSource(buffer) };
+    } catch (err) {
+      console.warn('[generate-interior-gemini] could not measure the source image, using the default ratio:', String(err));
+      return { buffer: null, aspectRatio };
+    }
+  };
+
   // ── What may be edited (see _shared/image-edit-gate.ts) ──────────────────────────────
   // This function is the chokepoint for every image the platform alters: the agent's
   // generate_gemini tool, AgentHub's edit modal, projectsService, productMaterialMapsService
@@ -604,7 +621,15 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
   // Pinned catalog materials make this a multi-image prompt, which only Gemini takes —
   // the routing collapses the tier to Gemini so the price collapses with it.
   const routing = resolveGenerationRouting(mode, body.model_tier, {
-    multiReference: (body.material_images?.length ?? 0) > 0,
+    // A material reference on an EDIT makes it a two-image brief, and Grok's and gpt-image-1's
+    // edit endpoints take exactly one image. Left on those tiers the reference is accepted, gated
+    // (and charged for), and then silently dropped — the user's tile never reaches the model at
+    // all, which is the whole defect this file was just fixed for. `multiReference` is the
+    // existing mechanism for that: it collapses the tier to Gemini and prices it as Gemini.
+    // copy-style is exempt — it CARRIES two images by definition and its Grok path is written
+    // for exactly that, one-step, in the Aurora template.
+    multiReference: (body.material_images?.length ?? 0) > 0
+      || (mode === 'image-edit' && !!body.style_reference_url),
   });
   const useGrok = routing.provider === 'grok';
   // ChatGPT (gpt-image-1): the same single-image generate-or-edit shape as Grok, so it
@@ -877,8 +902,8 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
       const fluxPrompt = buildFluxRedesignPrompt(body.style, body.room_type, body.edit_instruction ?? body.prompt);
       // Flux takes its own aspect ratio, so the crop is decided here too: a portrait room
       // redesigned at the 16:9 default came back with its top and bottom cut off.
-      const roomBuffer = await fetchImageBuffer(body.reference_image_url);
-      const replicateUrl = await callFluxDepthPro(body.reference_image_url, fluxPrompt, aspectRatioForSource(roomBuffer));
+      const measured = await measureSource(body.reference_image_url);
+      const replicateUrl = await callFluxDepthPro(body.reference_image_url, fluxPrompt, measured.aspectRatio);
 
       // Download from Replicate (temp URL) and persist to Supabase Storage
       const imgBuffer = await fetchImageBuffer(replicateUrl);
@@ -915,10 +940,12 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
       } else {
         // Gemini + Flux 2-step pipeline (primary for non-grok)
         const inspirationBuffer = await fetchImageBuffer(body.style_reference_url);
-        // Fetched up front rather than inside the failure path: it is what pins the OUTPUT SHAPE
-        // to the user's room, and it is reused by both fallbacks below.
-        const roomBuffer = await fetchImageBuffer(body.reference_image_url);
-        const roomAspectRatio = aspectRatioForSource(roomBuffer);
+        // Measured up front rather than inside the failure path: it is what pins the OUTPUT SHAPE
+        // to the user's room, and the buffer is reused by both fallbacks below. Tolerant — a room
+        // photo too large to download for measurement must not fail a Flux run that never needed
+        // the bytes.
+        const measuredRoom = await measureSource(body.reference_image_url);
+        const roomAspectRatio = measuredRoom.aspectRatio;
         let fluxPrompt: string;
         let designSpec: string | null = null;
         try {
@@ -936,6 +963,9 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
           imageUrl = await uploadToStorage(supabase, toBase64(imgBuffer), 'image/webp', jobId, uploadCtx);
         } catch (fluxErr) {
           console.warn('[copy-style] Flux failed, falling back to Gemini:', String(fluxErr));
+          // Only the Gemini fallbacks genuinely need the pixels — if the measuring fetch failed,
+          // this is where it is allowed to throw, exactly as it did before.
+          const roomBuffer = measuredRoom.buffer ?? await fetchImageBuffer(body.reference_image_url);
           if (designSpec) {
             const applyPrompt = await buildCopyStyleApplyPrompt(supabase, designSpec, body.prompt);
             const result = await generateImageWithGemini(
