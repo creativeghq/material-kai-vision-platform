@@ -50,6 +50,7 @@ import {
   type RevolutConfigRow,
 } from '../_shared/revolut/client.ts';
 import { syncWorkspaceRevolut } from '../_shared/revolut/sync-core.ts';
+import { executePayout, PayoutError } from '../_shared/payments/payout.ts';
 
 /** Webhooks v2 lives under /api/2.0 on the same host family. */
 function webhooksV2Base(cfg: RevolutConfigRow): string {
@@ -565,9 +566,19 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
     }
 
     case 'send-payment': {
-      // Money OUT: mode 'draft' prepares it for human approval in the Revolut app;
-      // mode 'payment' moves money immediately. Both are audited in revolut_payouts
-      // with an idempotency request_id before Revolut is called.
+      /**
+       * Money OUT from a Revolut pocket.
+       *
+       * The implementation moved to `_shared/payments/payout.ts` when Viva gained the same ability
+       * (`finance-send-payment` is the other entry). Everything that made this safe — the caller's
+       * idempotency key, the audit row written before Revolut is called, the tenancy check on
+       * `supplier_bill_id`, the refusal to send to an account whose holder name was never verified
+       * — lives there now, once, rather than here and again in the new screen.
+       *
+       * This entry keeps its own signature: it names a Revolut POCKET directly, because the screens
+       * that call it (Payables → Send, the treasury card) picked one from Revolut's own account
+       * list rather than from `finance_bank_accounts`.
+       */
       const crmBankId = String(body?.crm_bank_account_id ?? '');
       const sourceAccountId = String(body?.source_revolut_account_id ?? '');
       const amount = Number(body?.amount ?? 0);
@@ -595,94 +606,30 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
         ? body.request_id
         : null;
 
-      const cfg = await requireConfig(service, workspaceId);
-      const issuer = issuerDomainFrom(cfg.oauth_redirect_uri ?? '');
-      const { data: bank } = await service
-        .from('crm_bank_accounts')
-        .select('id, account_holder, revolut_counterparty_id, company:crm_companies!company_id(name), contact:crm_contacts!contact_id(name)')
-        .eq('id', crmBankId)
-        .eq('workspace_id', workspaceId)
-        .maybeSingle();
-      if (!bank) throw new HttpError(404, 'not found');
-      if (!bank.revolut_counterparty_id) throw new HttpError(400, 'create the Revolut counterparty for this bank first (VoP-gated)');
-
-      // Tenancy-checked before it is stored: an id from the request body that lands in a foreign
-      // key is invariant 1's exact shape, and a payout pointing at another workspace's bill would
-      // settle it from the feed.
-      if (supplierBillId) {
-        const { data: billRow } = await service
-          .from('supplier_bills')
-          .select('id')
-          .eq('id', supplierBillId)
-          .eq('workspace_id', workspaceId)
-          .maybeSingle();
-        if (!billRow) throw new HttpError(404, 'not found');
-      }
-
-      const requestId = clientRequestId ?? crypto.randomUUID();
-
-      // A repeat of the SAME instruction is not a second payment. The audit row is keyed on the
-      // request id, so an existing one means Revolut has already been told — answer with what
-      // happened rather than telling it again.
-      const { data: priorPayout } = await service
-        .from('revolut_payouts')
-        .select('id, provider_id, state, kind')
-        .eq('workspace_id', workspaceId)
-        .eq('request_id', requestId)
-        .maybeSingle();
-      if (priorPayout) {
+      try {
+        const outcome = await executePayout(service, {
+          workspaceId,
+          userId: auth.userId,
+          requestId: clientRequestId ?? crypto.randomUUID(),
+          source: { bankAccountId: null, provider: 'revolut', ref: sourceAccountId },
+          crmBankAccountId: crmBankId,
+          amount,
+          currency,
+          reference,
+          mode,
+          supplierBillId,
+        });
         return jsonResponse({
           ok: true,
-          mode: priorPayout.kind,
-          duplicate: true,
-          ...(priorPayout.kind === 'draft' ? { draft_id: priorPayout.provider_id } : { payment_id: priorPayout.provider_id }),
-          note: 'This payment instruction was already sent — nothing was sent twice.',
+          mode: outcome.mode,
+          ...(outcome.duplicate ? { duplicate: true } : {}),
+          ...(outcome.mode === 'draft'
+            ? { draft_id: outcome.providerId }
+            : { payment_id: outcome.providerId, state: outcome.state }),
+          ...(outcome.note ? { note: outcome.note } : {}),
         });
-      }
-
-      const bankAny = bank as any;
-      const cpName = String(bankAny.account_holder || bankAny.company?.name || bankAny.contact?.name || '');
-      const { data: audit, error: auditErr } = await service.from('revolut_payouts').insert({
-        workspace_id: workspaceId,
-        request_id: requestId,
-        kind: mode,
-        amount, currency,
-        source_revolut_account_id: sourceAccountId,
-        crm_bank_account_id: crmBankId,
-        counterparty_name: cpName,
-        reference,
-        // The LINK (#359 CM-19). The reference text is a convenience for whoever reads the bank
-        // statement; the bill this pays is a foreign key, set by the screen that already knew it.
-        supplier_bill_id: supplierBillId,
-        created_by: auth.userId,
-      }).select('id').single();
-      if (auditErr || !audit) throw new HttpError(500, `audit insert failed: ${auditErr?.message}`);
-
-      try {
-        if (mode === 'draft') {
-          const draft = await createPaymentDraft(service, cfg, issuer, {
-            title: reference || `Payment to ${cpName}`,
-            payments: [{
-              account_id: sourceAccountId,
-              receiver: { counterparty_id: bank.revolut_counterparty_id },
-              amount, currency,
-              reference: reference || undefined,
-            }],
-          });
-          await service.from('revolut_payouts').update({ provider_id: draft.id, state: 'pending_approval', updated_at: new Date().toISOString() }).eq('id', audit.id);
-          return jsonResponse({ ok: true, mode, draft_id: draft.id, note: 'Approve the draft in the Revolut app to execute it.' });
-        }
-        const pay = await createPayment(service, cfg, issuer, {
-          request_id: requestId,
-          account_id: sourceAccountId,
-          receiver: { counterparty_id: bank.revolut_counterparty_id },
-          amount, currency,
-          reference: reference || undefined,
-        });
-        await service.from('revolut_payouts').update({ provider_id: pay.id, state: pay.state ?? 'pending', updated_at: new Date().toISOString() }).eq('id', audit.id);
-        return jsonResponse({ ok: true, mode, payment_id: pay.id, state: pay.state });
       } catch (err) {
-        await service.from('revolut_payouts').update({ state: 'failed', updated_at: new Date().toISOString() }).eq('id', audit.id);
+        if (err instanceof PayoutError) throw new HttpError(err.status, err.message);
         throw err;
       }
     }
@@ -729,7 +676,7 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
        */
       const DEAD_PAYOUT_STATES = ['failed', 'cancelled', 'declined', 'expired', 'reverted'];
       const { data: livePayouts, error: livePayoutErr } = await service
-        .from('revolut_payouts')
+        .from('payout_instructions')
         .select('supplier_bill_id, state')
         .eq('workspace_id', workspaceId)
         .in('supplier_bill_id', (bills as any[]).map((b) => b.id));
@@ -785,7 +732,7 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
           supplier_bill_id: bill.id,
           amount: Number(bill.amount_due),
           currency: String(bill.currency ?? 'EUR').toUpperCase(),
-          source_revolut_account_id: sourceAccountId,
+          source_account_ref: sourceAccountId,
           crm_bank_account_id: bank.id,
           counterparty_name: bill.supplier_name ?? bank.account_holder ?? null,
           reference: `Bill ${bill.supplier_bill_number ?? bill.id}`,
@@ -794,13 +741,13 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
       }
       if (payments.length === 0) return jsonResponse({ ok: true, drafted: 0, skipped });
 
-      const { error: auditErr } = await service.from('revolut_payouts').insert(auditRows);
+      const { error: auditErr } = await service.from('payout_instructions').insert(auditRows);
       if (auditErr) throw new HttpError(500, `audit insert failed: ${auditErr.message}`);
       const draft = await createPaymentDraft(service, cfg, issuer, {
         title: `Supplier bill run — ${payments.length} payment(s)`,
         payments,
       });
-      await service.from('revolut_payouts')
+      await service.from('payout_instructions')
         .update({ provider_id: draft.id, state: 'pending_approval', updated_at: new Date().toISOString() })
         .like('request_id', `${requestId}:%`);
       return jsonResponse({ ok: true, drafted: payments.length, draft_id: draft.id, skipped, note: 'Approve the draft in the Revolut app to pay the whole run.' });
@@ -855,9 +802,9 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
       const issuer = issuerDomainFrom(cfg.oauth_redirect_uri ?? '');
 
       const requestId = crypto.randomUUID();
-      const { data: audit, error: auditErr } = await service.from('revolut_payouts').insert({
+      const { data: audit, error: auditErr } = await service.from('payout_instructions').insert({
         workspace_id: workspaceId, request_id: requestId, kind: 'payout_link',
-        amount, currency, source_revolut_account_id: sourceAccountId,
+        amount, currency, source_account_ref: sourceAccountId,
         counterparty_name: name, reference, created_by: auth.userId,
       }).select('id').single();
       if (auditErr || !audit) throw new HttpError(500, `audit insert failed: ${auditErr?.message}`);
@@ -868,13 +815,13 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
           account_id: sourceAccountId, amount, currency,
           reference: reference || undefined,
         });
-        await service.from('revolut_payouts').update({
+        await service.from('payout_instructions').update({
           provider_id: link.id, provider_url: link.url ?? null,
           state: link.state ?? 'created', updated_at: new Date().toISOString(),
         }).eq('id', audit.id);
         return jsonResponse({ ok: true, link_id: link.id, url: link.url ?? null });
       } catch (err) {
-        await service.from('revolut_payouts').update({ state: 'failed', updated_at: new Date().toISOString() }).eq('id', audit.id);
+        await service.from('payout_instructions').update({ state: 'failed', updated_at: new Date().toISOString() }).eq('id', audit.id);
         throw err;
       }
     }
@@ -905,9 +852,9 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
       const issuer = issuerDomainFrom(cfg.oauth_redirect_uri ?? '');
 
       const requestId = crypto.randomUUID();
-      const { data: audit, error: auditErr } = await service.from('revolut_payouts').insert({
+      const { data: audit, error: auditErr } = await service.from('payout_instructions').insert({
         workspace_id: workspaceId, request_id: requestId, kind: 'exchange',
-        amount, currency: fromCurrency, source_revolut_account_id: fromAccountId,
+        amount, currency: fromCurrency, source_account_ref: fromAccountId,
         counterparty_name: null, reference: `FX ${fromCurrency}→${toCurrency}`, created_by: auth.userId,
       }).select('id').single();
       if (auditErr || !audit) throw new HttpError(500, `audit insert failed: ${auditErr?.message}`);
@@ -918,12 +865,12 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
           from: { account_id: fromAccountId, currency: fromCurrency, amount },
           to: { account_id: toAccountId, currency: toCurrency },
         });
-        await service.from('revolut_payouts').update({
+        await service.from('payout_instructions').update({
           provider_id: fx.id ?? null, state: fx.state ?? 'completed', updated_at: new Date().toISOString(),
         }).eq('id', audit.id);
         return jsonResponse({ ok: true, exchange_id: fx.id ?? null, state: fx.state ?? null });
       } catch (err) {
-        await service.from('revolut_payouts').update({ state: 'failed', updated_at: new Date().toISOString() }).eq('id', audit.id);
+        await service.from('payout_instructions').update({ state: 'failed', updated_at: new Date().toISOString() }).eq('id', audit.id);
         throw err;
       }
     }

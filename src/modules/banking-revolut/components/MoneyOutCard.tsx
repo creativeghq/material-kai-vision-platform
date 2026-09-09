@@ -57,7 +57,7 @@ export const MoneyOutCard: React.FC<{ workspaceId: string }> = ({ workspaceId })
       const [acc, hist] = await Promise.all([
         callRevolutApi<{ accounts: RevolutAccountInfo[] }>('accounts', workspaceId).catch(() => ({ accounts: [] as RevolutAccountInfo[] })),
         supabase
-          .from('revolut_payouts')
+          .from('payout_instructions')
           .select('id, created_at, kind, state, amount, currency, counterparty_name, reference, provider_url')
           .eq('workspace_id', workspaceId)
           .order('created_at', { ascending: false })

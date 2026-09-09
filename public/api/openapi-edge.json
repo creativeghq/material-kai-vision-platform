@@ -3454,6 +3454,73 @@
         }
       }
     },
+    "/finance-send-payment": {
+      "post": {
+        "tags": [
+          "Finance"
+        ],
+        "summary": "Instruct a real bank transfer from a workspace account to a counterparty",
+        "operationId": "post_finance_send_payment",
+        "description": "Money OUT, on whichever rail the chosen account sits on. The source is one of the workspace's own `finance_bank_accounts` rows; its mapping decides the provider (Revolut pocket or Viva wallet), and an account mapped to neither is refused rather than silently recorded. Writes an instruction to `payout_instructions` BEFORE calling the provider and never writes a `payments` row — the bank feed records the money when the transfer lands, and settles the bill the instruction names. `request_id` is a required idempotency key minted once per payment attempt: a repeat replays the stored outcome instead of sending a second irreversible transfer. Caller must be a finance manager of the workspace; a mismatch answers 404.\n\n**Response:** (`application/json`)",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/finance-send-statement": {
       "post": {
         "tags": [

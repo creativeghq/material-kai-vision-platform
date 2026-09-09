@@ -20,7 +20,8 @@
  * inside ExpensePaymentsDialog): same form, same controls, the target simply starts selected and
  * still changeable. This is the ONLY money-out-against-a-bill form.
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle , DialogDescription } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -33,6 +34,10 @@ import { useToast } from '@/hooks/use-toast';
 import { financeService, formatMoney, type Invoice, type PaymentMethod, type BankAccountBalance, type PayableExpense } from '@/modules/finance/services/financeService';
 import { ordersService, type OrderBalance, type OrderListRow } from '@/modules/finance/services/ordersService';
 import { PaidFromSelect } from '@/modules/finance/components/PaidFromSelect';
+import {
+  SendOrRecordChoice, emptySendState, type SendOrRecordState,
+} from '@/modules/finance/components/SendOrRecordChoice';
+import { sendPayment } from '@/modules/finance/services/payoutService';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { salesDocumentKindLabel, type SalesDocumentKind } from '@/modules/finance/utils/salesDocumentKind';
 import { invoiceGenerationErrorMessage } from '@/modules/finance/utils/invoiceGateMessage';
@@ -358,6 +363,62 @@ export const RecordPaymentDialog: React.FC<{
     () => expenseOptions.find((o) => o.value === expenseId) ?? null,
     [expenseOptions, expenseId]);
 
+  /**
+   * RECORD it, or actually SEND it (#315).
+   *
+   * The dialog has always written the books. Sending was a different button on a different screen
+   * that only a supplier bill could reach, so "pay this" and "note that it was paid" were never
+   * offered as the choice they are. `SendOrRecordChoice` is that choice; everything it needs to
+   * decide what is possible — the rail, the counterparty, whether the name was verified — it
+   * derives rather than being told.
+   */
+  const [sendState, setSendState] = useState<SendOrRecordState>(emptySendState);
+  /**
+   * ONE idempotency key per dialog opening, resent with every attempt.
+   *
+   * A `useRef` latch closes the double-click and cannot close the dropped connection — the case
+   * where the operator holds an error for a transfer that already happened. This is what makes a
+   * retry replay instead of paying twice, so it must NOT be re-minted per attempt.
+   */
+  const sendRequestId = useRef<string>(crypto.randomUUID());
+
+  /** Money OUT to a party we could actually pay — the only shape where sending makes sense. */
+  const isMoneyOut = kind === 'expense' || kind === 'supplier' || kind === 'refund';
+  const sourceAccount = useMemo(
+    () => bankAccounts.find((b) => b.bank_account_id === bankAccountId) ?? null,
+    [bankAccounts, bankAccountId]);
+  const sendParty = useMemo(() => {
+    if (kind === 'expense' && selectedOption) {
+      return {
+        companyId: selectedOption.expense.supplier_company_id,
+        contactId: selectedOption.expense.supplier_contact_id,
+        name: selectedOption.expense.party_name ?? selectedOption.expense.supplier_name,
+      };
+    }
+    if (kind === 'refund' && selectedInvoice) {
+      return {
+        companyId: selectedInvoice.customer_company_id ?? null,
+        contactId: selectedInvoice.customer_contact_id ?? null,
+        name: null,
+      };
+    }
+    // 'supplier' comes from a purchase order whose bills the caller passed in; the party is the
+    // one the dialog was opened for.
+    return {
+      companyId: initialCounterparty?.companyId ?? null,
+      contactId: initialCounterparty?.contactId ?? null,
+      name: null,
+    };
+  }, [kind, selectedOption, selectedInvoice, initialCounterparty]);
+
+  // A fresh opening is a fresh payment: a carried-over "send" intent, counterparty account or
+  // idempotency key would attach this payment to the last one.
+  useEffect(() => {
+    if (!open) return;
+    setSendState(emptySendState());
+    sendRequestId.current = crypto.randomUUID();
+  }, [open]);
+
   // Preset selection prefills the amount once its row has loaded — same value `pickExpense`
   // would set, without duplicating the rule or overwriting anything already typed.
   useEffect(() => {
@@ -421,6 +482,58 @@ export const RecordPaymentDialog: React.FC<{
       });
       return;
     }
+    /**
+     * SENDING is a different act from recording, and it returns here (#315).
+     *
+     * It deliberately writes NO payment row. The money has been instructed, not observed: the bank
+     * feed records it — and settles whatever it pays — when the transfer actually lands. Writing
+     * one here as well is how a single cost gets paid twice on the books, once optimistically and
+     * once by the feed.
+     *
+     * Placed ABOVE every recording branch so there is no path on which both happen.
+     */
+    if (sendState.intent === 'send') {
+      if (!bankAccountId) {
+        toast({ title: 'Pick the account the money comes from', variant: 'destructive' });
+        return;
+      }
+      if (!sendState.crmBankAccountId) {
+        toast({ title: 'Pick the account to send to', variant: 'destructive' });
+        return;
+      }
+      setBusy(true);
+      try {
+        const out = await sendPayment({
+          workspaceId,
+          sourceBankAccountId: bankAccountId,
+          crmBankAccountId: sendState.crmBankAccountId,
+          amount: amt,
+          currency,
+          reference: reference || notes || '',
+          mode: sendState.sendMode,
+          requestId: sendRequestId.current,
+          // The bill this pays is a foreign key, set here because this screen already knows the
+          // answer the feed would otherwise have to guess from reference text a human can edit.
+          supplierBillId: kind === 'expense' ? (selectedOption?.expense.id ?? null) : (billId || null),
+        });
+        toast({
+          title: out.duplicate
+            ? 'Already sent'
+            : out.mode === 'draft' ? 'Draft created' : 'Payment sent',
+          description: out.note
+            ?? (out.mode === 'draft'
+              ? 'Approve it in the Revolut app to execute it. The bank feed will record it once it does.'
+              : 'The bank feed will record it — and settle what it pays — once the transfer lands.'),
+        });
+        onSaved(); onOpenChange(false);
+      } catch (e) {
+        toast({ title: 'Could not send', description: (e as Error).message, variant: 'destructive' });
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+
     setBusy(true);
     try {
       // Settling an expense goes through the one money-out path, so the allocation and the
@@ -755,11 +868,22 @@ export const RecordPaymentDialog: React.FC<{
                       })}
                     </SelectGroup>
                   )}
-                  {pickableInvoices.length === 0 && !(showOrderPicker && orders.length > 0) && (
-                    <div className="px-2 py-1 text-xs text-muted-foreground">{orderId ? 'No invoice on this order yet' : 'No open invoices or orders'}</div>
-                  )}
                 </SelectContent>
               </Select>
+              {/* "There is nothing to pick" belongs BELOW the picker, not as an unselectable row
+                  inside it — the dropdown still offers "None", so it is not empty, and a message
+                  the operator has to open a menu to read is a message most of them never read.
+                  Having nothing open is a legitimate state (the money is held as credit); having
+                  no way to check WHY is the shape this codebase keeps finding. */}
+              {pickableInvoices.length === 0 && !(showOrderPicker && orders.length > 0) && (
+                <p className="text-[11px] text-muted-foreground">
+                  {orderId ? 'This order has no invoice yet' : 'Nothing open to settle'} — the money
+                  will be held as credit.{' '}
+                  <Link to="/finance?tab=invoices" className="underline underline-offset-2 hover:text-foreground">
+                    Check the invoices
+                  </Link>{' '}if you expected one here.
+                </p>
+              )}
               <p className="text-[11px] text-muted-foreground">
                 {selectedTarget
                   ? 'Settling this invoice will mark it paid when fully covered.'
@@ -845,7 +969,25 @@ export const RecordPaymentDialog: React.FC<{
 
           />
           {bankAccounts.length === 0 && (
-            <p className="text-[11px] text-muted-foreground">No accounts yet — add bank/cash accounts in Settings → Accounts to track where money sits.</p>
+            // Naming the place is linking to it: this sentence is the one moment somebody needs
+            // Finance → Settings, and it used to make them go and find it.
+            <p className="text-[11px] text-muted-foreground">
+              No accounts yet — money has to land somewhere before it can be tracked.{' '}
+              <Link to="/finance?tab=settings" className="underline underline-offset-2 hover:text-foreground">
+                Add a bank or cash account
+              </Link>.
+            </p>
+          )}
+
+          {isMoneyOut && (
+            <SendOrRecordChoice
+              workspaceId={workspaceId}
+              sourceAccount={sourceAccount}
+              party={sendParty}
+              value={sendState}
+              onChange={setSendState}
+              disabled={busy}
+            />
           )}
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -878,7 +1020,14 @@ export const RecordPaymentDialog: React.FC<{
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-          <Button onClick={save} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null} Save</Button>
+          {/* The button says which of the two acts it performs — "Save" over a transfer that is
+              about to leave the account is the least honest label available. */}
+          <Button onClick={save} disabled={busy}>
+            {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+            {sendState.intent === 'send'
+              ? (sendState.sendMode === 'draft' ? 'Create draft' : 'Send payment')
+              : 'Save'}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

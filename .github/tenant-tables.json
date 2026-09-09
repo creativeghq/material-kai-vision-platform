@@ -1,6 +1,6 @@
 {
   "_comment": [
-    "Every public table/view carrying a workspace_id column \u2014 i.e. every relation whose rows",
+    "Every public table/view carrying a workspace_id column — i.e. every relation whose rows",
     "belong to one tenant. Consumed by scripts/check-tenancy-parity.mjs.",
     "",
     "Regenerate with:",
@@ -131,6 +131,7 @@
     "orders",
     "payment_audit_log",
     "payments",
+    "payout_instructions",
     "planned_payments",
     "pos_cash_movements",
     "pos_sessions",
@@ -188,7 +189,6 @@
     "reseller_applications",
     "revolut_bank_transactions",
     "revolut_expenses",
-    "revolut_payouts",
     "room_layout_items",
     "room_layout_items_resolved",
     "room_layouts",

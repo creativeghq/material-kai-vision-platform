@@ -1503,6 +1503,103 @@
     "response": "{ok, sent_to}"
   },
   {
+    "name": "finance-send-payment",
+    "tag": "Finance",
+    "summary": "Instruct a real bank transfer from a workspace account to a counterparty",
+    "description": "Money OUT, on whichever rail the chosen account sits on. The source is one of the workspace's own `finance_bank_accounts` rows; its mapping decides the provider (Revolut pocket or Viva wallet), and an account mapped to neither is refused rather than silently recorded. Writes an instruction to `payout_instructions` BEFORE calling the provider and never writes a `payments` row — the bank feed records the money when the transfer lands, and settles the bill the instruction names. `request_id` is a required idempotency key minted once per payment attempt: a repeat replays the stored outcome instead of sending a second irreversible transfer. Caller must be a finance manager of the workspace; a mismatch answers 404.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "methods": [
+      "POST"
+    ],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "workspace_id": {
+          "type": "string",
+          "required": true
+        },
+        "source_bank_account_id": {
+          "type": "string",
+          "required": true,
+          "description": "finance_bank_accounts.id — the account of ours the money leaves."
+        },
+        "crm_bank_account_id": {
+          "type": "string",
+          "required": true,
+          "description": "crm_bank_accounts.id — the counterparty account being paid."
+        },
+        "amount": {
+          "type": "number",
+          "required": true
+        },
+        "currency": {
+          "type": "string",
+          "default": "EUR"
+        },
+        "reference": {
+          "type": "string",
+          "description": "Shown on the bank statement; max 140 chars."
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "draft",
+            "payment"
+          ],
+          "default": "payment",
+          "description": "'draft' prepares it for approval in the provider's app (Revolut only — Viva has no approval step and refuses it)."
+        },
+        "request_id": {
+          "type": "string",
+          "required": true,
+          "description": "UUID idempotency key, minted once per attempt and resent on retry."
+        },
+        "supplier_bill_id": {
+          "type": "string",
+          "description": "The bill this settles. Tenancy-checked before it is stored."
+        }
+      }
+    },
+    "response": {
+      "content_type": "application/json",
+      "fields": {
+        "ok": {
+          "type": "boolean"
+        },
+        "provider": {
+          "type": "string",
+          "enum": [
+            "revolut",
+            "viva"
+          ]
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "draft",
+            "payment"
+          ]
+        },
+        "duplicate": {
+          "type": "boolean",
+          "description": "True when this request_id was already instructed."
+        },
+        "providerId": {
+          "type": "string",
+          "description": "The provider's id for the draft, payment or transfer command."
+        },
+        "state": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
     "name": "finance-send-statement",
     "tag": "Finance",
     "summary": "Render and email a party account-statement PDF (ledger / Καρτέλα)",

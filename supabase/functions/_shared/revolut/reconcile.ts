@@ -290,7 +290,7 @@ export async function reconcileOutgoingRevolut(service: any, workspaceId: string
      * is the same id the feed carries as `transaction_id`.
      */
     const { data: payout } = await service
-      .from('revolut_payouts')
+      .from('payout_instructions')
       .select('supplier_bill_id')
       .eq('workspace_id', workspaceId)
       .eq('provider_id', String(tx.transaction_id ?? ''))

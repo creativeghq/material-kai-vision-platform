@@ -58,8 +58,6 @@ const EXEMPT: Record<string, string> = {
     'assertEmployee() filters hr_employees on ctx.workspaceId — the same check under a local name.',
   'zernio-api/handlers/publish.ts':
     'Compares account.workspace_id !== post.workspace_id explicitly, then userCanAccessWorkspace.',
-  'revolut-api/index.ts':
-    "The update itself carries .eq('workspace_id', workspaceId), so a foreign id matches no row.",
   'gsc-api/index.ts':
     'websiteId arrives inside an HMAC state string this server signed and verifies (verifyState).',
   'project-plan-engine/index.ts':

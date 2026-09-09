@@ -11,7 +11,7 @@
  * The bill number is now composed IN rather than replaced. The operator's note is still theirs —
  * it just cannot displace the one part of the string the bank feed reads.
  *
- * The real binding is `revolut_payouts.supplier_bill_id`, a foreign key set at instruction time.
+ * The real binding is `payout_instructions.supplier_bill_id`, a foreign key set at instruction time.
  * This string is for whoever reads the bank statement.
  *
  * Import-free so a test can load it directly.

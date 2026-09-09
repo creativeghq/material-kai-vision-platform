@@ -4054,6 +4054,7 @@ export type Database = {
           updated_at: string
           vop_checked_at: string | null
           vop_result: string | null
+          viva_bank_account_id: string | null
           workspace_id: string
         }
         Insert: {
@@ -4072,6 +4073,7 @@ export type Database = {
           updated_at?: string
           vop_checked_at?: string | null
           vop_result?: string | null
+          viva_bank_account_id?: string | null
           workspace_id: string
         }
         Update: {
@@ -4090,6 +4092,7 @@ export type Database = {
           updated_at?: string
           vop_checked_at?: string | null
           vop_result?: string | null
+          viva_bank_account_id?: string | null
           workspace_id?: string
         }
         Relationships: [
@@ -8126,6 +8129,7 @@ export type Database = {
           show_on_invoice: boolean
           sort_order: number
           updated_at: string
+          viva_wallet_id: number | null
           workspace_id: string
         }
         Insert: {
@@ -8145,6 +8149,7 @@ export type Database = {
           show_on_invoice?: boolean
           sort_order?: number
           updated_at?: string
+          viva_wallet_id?: number | null
           workspace_id: string
         }
         Update: {
@@ -8164,6 +8169,7 @@ export type Database = {
           show_on_invoice?: boolean
           sort_order?: number
           updated_at?: string
+          viva_wallet_id?: number | null
           workspace_id?: string
         }
         Relationships: [
@@ -17435,6 +17441,91 @@ export type Database = {
           },
         ]
       }
+      payout_instructions: {
+        Row: {
+          amount: number
+          counterparty_name: string | null
+          created_at: string
+          created_by: string | null
+          crm_bank_account_id: string | null
+          currency: string
+          id: string
+          kind: string
+          provider: string
+          provider_id: string | null
+          provider_url: string | null
+          reference: string | null
+          request_id: string
+          source_account_ref: string | null
+          source_bank_account_id: string | null
+          state: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          amount: number
+          counterparty_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          crm_bank_account_id?: string | null
+          currency: string
+          id?: string
+          kind: string
+          provider?: string
+          provider_id?: string | null
+          provider_url?: string | null
+          reference?: string | null
+          request_id: string
+          source_account_ref?: string | null
+          source_bank_account_id?: string | null
+          state?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          amount?: number
+          counterparty_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          crm_bank_account_id?: string | null
+          currency?: string
+          id?: string
+          kind?: string
+          provider?: string
+          provider_id?: string | null
+          provider_url?: string | null
+          reference?: string | null
+          request_id?: string
+          source_account_ref?: string | null
+          source_bank_account_id?: string | null
+          state?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payout_instructions_crm_bank_account_id_fkey"
+            columns: ["crm_bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "crm_bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payout_instructions_source_bank_account_id_fkey"
+            columns: ["source_bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "finance_bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payout_instructions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pdf_processing_results: {
         Row: {
           azure_confidence_score: number | null
@@ -26580,78 +26671,6 @@ export type Database = {
           },
         ]
       }
-      revolut_payouts: {
-        Row: {
-          amount: number
-          counterparty_name: string | null
-          created_at: string
-          created_by: string | null
-          crm_bank_account_id: string | null
-          currency: string
-          id: string
-          kind: string
-          provider_id: string | null
-          provider_url: string | null
-          reference: string | null
-          request_id: string
-          source_revolut_account_id: string | null
-          state: string
-          updated_at: string
-          workspace_id: string
-        }
-        Insert: {
-          amount: number
-          counterparty_name?: string | null
-          created_at?: string
-          created_by?: string | null
-          crm_bank_account_id?: string | null
-          currency: string
-          id?: string
-          kind: string
-          provider_id?: string | null
-          provider_url?: string | null
-          reference?: string | null
-          request_id: string
-          source_revolut_account_id?: string | null
-          state?: string
-          updated_at?: string
-          workspace_id: string
-        }
-        Update: {
-          amount?: number
-          counterparty_name?: string | null
-          created_at?: string
-          created_by?: string | null
-          crm_bank_account_id?: string | null
-          currency?: string
-          id?: string
-          kind?: string
-          provider_id?: string | null
-          provider_url?: string | null
-          reference?: string | null
-          request_id?: string
-          source_revolut_account_id?: string | null
-          state?: string
-          updated_at?: string
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "revolut_payouts_crm_bank_account_id_fkey"
-            columns: ["crm_bank_account_id"]
-            isOneToOne: false
-            referencedRelation: "crm_bank_accounts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "revolut_payouts_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       role_upgrade_requests: {
         Row: {
           admin_note: string | null
@@ -33328,6 +33347,8 @@ export type Database = {
           merchant_id: string | null
           methods: Json
           source_code: string
+          transfer_client_id: string | null
+          transfer_client_secret: string | null
           updated_at: string
           webhook_verified_at: string | null
           workspace_id: string
@@ -33342,6 +33363,8 @@ export type Database = {
           merchant_id?: string | null
           methods?: Json
           source_code?: string
+          transfer_client_id?: string | null
+          transfer_client_secret?: string | null
           updated_at?: string
           webhook_verified_at?: string | null
           workspace_id: string
@@ -33356,6 +33379,8 @@ export type Database = {
           merchant_id?: string | null
           methods?: Json
           source_code?: string
+          transfer_client_id?: string | null
+          transfer_client_secret?: string | null
           updated_at?: string
           webhook_verified_at?: string | null
           workspace_id?: string
@@ -34339,6 +34364,7 @@ export type Database = {
           name: string | null
           opening_balance: number | null
           payment_count: number | null
+          payout_provider: string | null
           show_on_invoice: boolean | null
           sort_order: number | null
           total_in: number | null

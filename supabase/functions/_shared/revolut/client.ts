@@ -391,7 +391,8 @@ export function getTransaction(supabase: any, cfg: RevolutConfigRow, issuerDomai
 }
 
 // ---------------------------------------------------------------------------
-// Money-out (PAY/WRITE scopes) — thin wrappers; auditing lives in revolut_payouts.
+// Money-out (PAY/WRITE scopes) — thin wrappers; auditing lives in payout_instructions,
+// which Viva writes to as well (see _shared/payments/payout.ts).
 // ---------------------------------------------------------------------------
 
 export interface RevolutCounterparty {

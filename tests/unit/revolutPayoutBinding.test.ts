@@ -32,6 +32,13 @@ const read = (p: string) => stripComments(readFileSync(join(ROOT, p), 'utf8').re
 const dialog = read('src/modules/banking-revolut/components/PayViaRevolutDialog.tsx');
 const api = read('supabase/functions/revolut-api/index.ts');
 const reconcile = read('supabase/functions/_shared/revolut/reconcile.ts');
+/**
+ * The single-payment logic MOVED here when Viva gained the ability to send too (#315): one
+ * executor, two entry points (`revolut-api?action=send-payment` and `finance-send-payment`).
+ * These invariants are unchanged — they are simply asserted where the code now lives, which is
+ * the point of following the guard to the code rather than deleting the case that went red.
+ */
+const payout = read('supabase/functions/_shared/payments/payout.ts');
 
 describe('#359 CM-19 — the bill number cannot be typed away', () => {
   it('a note is added to the number, never substituted for it', () => {
@@ -80,15 +87,18 @@ describe('#359 CM-19 — the payout is bound to the bill, not to a string', () =
   it('the server tenancy-checks that id before storing it', () => {
     // An id out of a request body landing in a foreign key is invariant 1's exact shape: a payout
     // pointing at another workspace's bill would settle it from the feed. 404, not 403.
-    // Anchored FORWARD: `case 'create-counterparty'` sits BEFORE this one in the file, so slicing
-    // to its first occurrence produced an empty string — a slice that silently asserts nothing.
-    const start = api.indexOf("case 'send-payment'");
-    expect(start).toBeGreaterThan(-1);
-    const send = api.slice(start, api.indexOf("case '", start + 20));
-    expect(send.length).toBeGreaterThan(500);
-    expect(send).toMatch(/from\('supplier_bills'\)[\s\S]{0,300}\.eq\('workspace_id', workspaceId\)/);
-    expect(send).toMatch(/throw new HttpError\(404, 'not found'\)/);
-    expect(send).toMatch(/supplier_bill_id: supplierBillId/);
+    expect(payout).toMatch(/from\('supplier_bills'\)[\s\S]{0,300}\.eq\('workspace_id', workspaceId\)/);
+    expect(payout).toMatch(/throw new PayoutError\(404, 'not found'\)/);
+    expect(payout).toMatch(/supplier_bill_id: supplierBillId/);
+    // Checked BEFORE it is stored, not when it is used.
+    const check = payout.indexOf("from('supplier_bills')");
+    const store = payout.indexOf("from('payout_instructions').insert");
+    expect(check).toBeGreaterThan(-1);
+    expect(store).toBeGreaterThan(-1);
+    expect(check < store, 'the bill is stored before its ownership is checked').toBe(true);
+    // Both entry points reach it, so neither can quietly skip the check.
+    expect(api).toContain('executePayout(service, {');
+    expect(read('supabase/functions/finance-send-payment/index.ts')).toContain('executePayout(service, {');
   });
 
   it('reconciliation prefers the link over the text', () => {
@@ -98,7 +108,7 @@ describe('#359 CM-19 — the payout is bound to the bill, not to a string', () =
       reconcile.indexOf('export async function reconcileOutgoingRevolut'),
       reconcile.indexOf('export async function reconcileWorkspaceRevolut'),
     );
-    expect(outgoing).toMatch(/from\('revolut_payouts'\)/);
+    expect(outgoing).toMatch(/from\('payout_instructions'\)/);
     expect(outgoing).toMatch(/\.eq\('provider_id', String\(tx\.transaction_id/);
     const linked = outgoing.indexOf('linkedBillId');
     // `referenceQuotes` since #359 CM-16 — the bare `refText.includes` substring match is gone.
@@ -137,16 +147,20 @@ describe('#359 CM-19 — one click is one transfer', () => {
   it('the server reuses the caller key instead of minting a fresh one', () => {
     // `request_id = crypto.randomUUID()` per call is the opposite of an idempotency key: two
     // clicks produced two ids and Revolut executed both.
-    expect(api).toMatch(/const requestId = clientRequestId \?\? crypto\.randomUUID\(\)/);
+    expect(api).toMatch(/requestId: clientRequestId \?\? crypto\.randomUUID\(\)/);
     expect(api).toMatch(/\[0-9a-f\]\{8\}-/);   // validated as a uuid before it reaches the provider
+    // The newer entry does not mint one at all: a caller with no key is refused, because an id
+    // generated per call is the opposite of an idempotency key.
+    const sendFn = read('supabase/functions/finance-send-payment/index.ts');
+    expect(sendFn).toMatch(/UUID_RE\.test\(requestId\)[\s\S]{0,120}throw new HttpError\(400/);
+    expect(sendFn).not.toMatch(/requestId = [^;]*crypto\.randomUUID/);
   });
 
   it('a repeat of the same instruction answers instead of paying again', () => {
-    const send = api.slice(api.indexOf("case 'send-payment'"));
-    expect(send).toMatch(/\.eq\('request_id', requestId\)/);
-    expect(send).toMatch(/duplicate: true/);
-    const dupCheck = send.indexOf('duplicate: true');
-    const insert = send.indexOf("from('revolut_payouts').insert");
+    expect(payout).toMatch(/\.eq\('request_id', requestId\)/);
+    expect(payout).toMatch(/duplicate: true/);
+    const dupCheck = payout.indexOf('duplicate: true');
+    const insert = payout.indexOf("from('payout_instructions').insert");
     expect(dupCheck).toBeGreaterThan(-1);
     expect(insert).toBeGreaterThan(-1);
     expect(dupCheck < insert, 'the audit row is written before the duplicate check').toBe(true);
@@ -212,7 +226,7 @@ describe('#359 CM-19 — the bulk bill run binds and does not double-draft', () 
 
   it('is pointed at the real handler', () => {
     expect(run, 'the bill-run handler is gone').not.toBe('');
-    expect(run).toContain('revolut_payouts');
+    expect(run).toContain('payout_instructions');
     expect(run, 'the handler slice does not reach the draft call').toContain('createPaymentDraft');
   });
 

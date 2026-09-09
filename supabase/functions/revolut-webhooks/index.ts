@@ -140,9 +140,10 @@ Deno.serve(withApiLogging('revolut-webhooks', async (req) => {
       const newState = String(data?.new_state ?? data?.state ?? '');
       if (!linkId || !newState) return json({ ok: true, ignored: true });
       const { error } = await service
-        .from('revolut_payouts')
+        .from('payout_instructions')
         .update({ state: newState, updated_at: new Date().toISOString() })
         .eq('workspace_id', cfg.workspace_id)
+        .eq('provider', 'revolut')
         .eq('kind', 'payout_link')
         .eq('provider_id', linkId);
       if (error) return json({ error: 'payout state update failed' }, 500);

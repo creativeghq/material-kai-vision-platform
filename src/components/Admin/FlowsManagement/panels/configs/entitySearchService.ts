@@ -72,6 +72,10 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'finance-mydata-book', label: 'finance-mydata-book', sublabel: 'Mirror the AADE myDATA aggregate book (Συνοπτικό Βιβλίο) for configured workspaces' },
   { id: 'finance-issue-invoice', label: 'finance-issue-invoice', sublabel: 'Issue, transmit, or POS-complete a fiscal invoice/credit note/delivery note' },
   { id: 'finance-pay-invoice', label: 'finance-pay-invoice', sublabel: 'Create a Stripe Checkout session or pay-link for an invoice' },
+  // Listed for parity with the catalogue, but it needs a signed-in finance manager: called from a
+  // flow it answers 401/404 rather than moving money on nobody's authority. That is the intended
+  // outcome — an irreversible transfer is not a thing an automation should fire unattended.
+  { id: 'finance-send-payment', label: 'finance-send-payment', sublabel: 'Instruct a real bank transfer (Revolut/Viva) — requires a signed-in finance manager' },
   { id: 'finance-send-invoice-email', label: 'finance-send-invoice-email', sublabel: 'Email an invoice to its customer with optional PDF attachment' },
   { id: 'finance-send-statement', label: 'finance-send-statement', sublabel: 'Render and email a party account-statement PDF (ledger / Καρτέλα)' },
   { id: 'finance-storefront', label: 'finance-storefront', sublabel: 'Public online storefront: browse products and submit cart checkout' },

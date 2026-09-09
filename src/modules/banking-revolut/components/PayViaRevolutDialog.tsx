@@ -10,7 +10,7 @@
  * That intent used to be defeated by the screen stating it: the reference was a free-text input
  * and `reference || bill.supplier_bill_number` let anything typed in it REPLACE the number
  * (#359 CM-19). The number is composed in now, and the real binding is a foreign key —
- * `revolut_payouts.supplier_bill_id`, set here because this screen already knows the answer the
+ * `payout_instructions.supplier_bill_id`, set here because this screen already knows the answer the
  * feed would otherwise have to guess.
  */
 import React, { useRef } from 'react';

@@ -110,11 +110,27 @@ Failure is always explicit: `last_sync_error` on the config row, never an empty 
 
 ## Money-out
 
-`revolut_payouts` is the audit ledger, and the idempotent `request_id` is written **before** any
-call. Payment **drafts** are the default — the ERP prepares, a human approves in the Revolut app.
-Direct payments, payout links (refund without knowing an IBAN) and FX exist behind explicit
-confirmation. Every IBAN entering the system is VoP/CoP-validated (`validate-account-name`), and a
-`not_matched` verdict blocks counterparty creation unless forced.
+`payout_instructions` is the audit ledger — renamed from `revolut_payouts` when Viva gained the
+same ability, because a table named for one provider holding two rails is how the next reader
+learns the wrong thing. The idempotent `request_id` is written **before** any call. Payment
+**drafts** are the default — the ERP prepares, a human approves in the Revolut app. Direct
+payments, payout links (refund without knowing an IBAN) and FX exist behind explicit confirmation.
+Every IBAN entering the system is VoP/CoP-validated (`validate-account-name`), and a `not_matched`
+verdict blocks counterparty creation unless forced.
+
+**Paying a counterparty is implemented once**, in `_shared/payments/payout.ts`, and reached by two
+entry points: `revolut-api?action=send-payment` (which names a Revolut pocket directly, for the
+screens that picked one from Revolut's own account list) and `finance-send-payment` (which names a
+`finance_bank_accounts` row and derives the rail from it). Three instruments deliberately stay in
+`revolut-api` because none of them is "pay a counterparty": the bulk `pay-due-bills` run is ONE
+draft covering N bills, a payout link has no counterparty, and an exchange moves money between our
+own pockets.
+
+**Instructing a transfer never writes a `payments` row.** The bank feed does that when the money
+actually appears, and settles the bill the instruction named through `supplier_bill_id`. Recording
+it optimistically as well is how one cost gets paid twice on the books. Finance → Record payment
+offers the choice — *just record it* vs *send it now* — and the send branch returns before every
+recording path, asserted by [tests/unit/payoutExecution.test.ts](../tests/unit/payoutExecution.test.ts).
 
 ## Cards & expenses
 

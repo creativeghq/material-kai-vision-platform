@@ -261,6 +261,12 @@ export interface BankAccountBalance {
   total_out: number;
   current_balance: number;
   payment_count: number;
+  /**
+   * The rail this account can SEND money on, derived by `vw_bank_account_balances` — never
+   * re-decided here from provider columns, or a picker starts offering accounts the server
+   * refuses. NULL means the account can record a payment but cannot instruct one.
+   */
+  payout_provider: 'revolut' | 'viva' | null;
 }
 
 export interface PaymentAllocation {
