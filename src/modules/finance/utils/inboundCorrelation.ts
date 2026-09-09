@@ -1,10 +1,18 @@
 /**
  * A ΔΑ and the ΤΙΜ that bills it, told apart and shown together.
  *
- * myDATA is REQUIRED to file one delivery as two documents, because they are two different legal
- * instruments: a delivery note is not a tax document, so it carries the items at zero money, and
- * the invoice carries the money with its itemisation collapsed to one value-only line — the detail
- * already reached AADE on the delivery note, so repeating it would be filing it twice.
+ * myDATA has TWO kinds of delivery note, and only one of them needs any of this:
+ *
+ *   ΤΔΑ  `1.1` with `isDeliveryNote` — a delivery note that IS the invoice. Full per-item prices,
+ *        total = the sum of its lines, self-contained. 522 held here, every one priced.
+ *   ΔΑ   `9.3` — issued when the invoice follows SEPARATELY, so it prices nothing: the items and
+ *        quantities are there and every value is zero. 104 held here, 205 lines, 35 issuers, not
+ *        one non-zero value. Its ΤΙΜ then collapses the itemisation to a single value-only line,
+ *        because the detail already reached AADE on the ΔΑ and repeating it would file it twice.
+ *
+ * So it is the ΔΑ/ΤΙΜ pair that arrives as two halves of one purchase. Saying "a delivery note
+ * carries no money" is false and was this feature's first mistake — it is true of a ΔΑ only, and
+ * only because the invoice is coming.
  *
  * Held apart, the Expenses inbox shows 104 deliveries worth nothing next to 701 invoices of
  * nothing, and neither row is wrong. This module is the wording that joins them.
@@ -182,9 +190,10 @@ export function correlationCellLabel(link: InboundLinkSummary | undefined): {
       return {
         text: `Invoiced by ${name}`,
         title:
-          `${INBOUND_LINK_SOURCE_LABEL[link.link_source]}. This delivery note is worth zero because ` +
-          `a delivery note carries no money by law; ${name}${amount} is the invoice for it, and ` +
-          'that is where the amount is counted.',
+          `${INBOUND_LINK_SOURCE_LABEL[link.link_source]}. A plain ΔΑ prices nothing — unlike a ` +
+          'ΤΔΑ, which is itself the invoice — so this one is worth zero and stays worth zero. ' +
+          `${name}${amount} is the invoice that bills the goods, and that is where the amount is ` +
+          'counted.',
         actionable: false,
         // The delivery note already names its own items; the invoice supplies money, not detail.
         suppliesDetail: false,
@@ -245,9 +254,10 @@ export const INBOUND_LINE_COST_NOTE: Record<InboundLineCostStatus, string | null
     'This delivery note carries a single item, so the invoice total is that line in full — ' +
     'nothing here is apportioned.',
   unallocated:
-    'Per-item cost is not stated — these lines come from a delivery note, which carries no money, ' +
-    'and one invoice total cannot be split between them without inventing the split. The VAT rate ' +
-    'and the document total below are real; the per-item figures are not known.',
+    'Per-item cost is not stated — these lines come from a plain ΔΑ, which prices nothing because ' +
+    'the invoice bills them separately, and one invoice total cannot be split between several ' +
+    'lines without inventing the split. The VAT rate and the document total below are real; the ' +
+    'per-item figures are not known.',
   none: null,
 };
 

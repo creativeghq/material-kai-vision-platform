@@ -283,3 +283,46 @@ describe('the preview never prints a cost nobody stated', () => {
     expect(src).toMatch(/detail\.status === 'none'/);
   });
 });
+
+describe('a ΤΔΑ is a delivery note that DOES carry prices', () => {
+  /**
+   * "A delivery note carries no money" was the first version of this feature's central claim and
+   * it is FALSE. myDATA has two kinds:
+   *
+   *   ΤΔΑ  `1.1` with `isDeliveryNote` — a delivery note that IS the invoice. Full per-item
+   *        prices, and the total is the sum of its lines. 522 held here, every one priced.
+   *   ΔΑ   `9.3` — issued when the invoice follows separately, so it prices nothing.
+   *        104 held here: 205 lines, 35 issuers, not one non-zero value.
+   *
+   * The distinction matters because the fix for the second must not touch the first, and because
+   * myDATA does not FORBID values on a 9.3 — so keying on the type code would silently null out a
+   * real price the day a supplier sends one. Destroying a stated figure to avoid inventing one is
+   * the same class of error, pointed the other way.
+   */
+  it('decides from the values, not from the document type', () => {
+    const src = read('supabase/functions/finance-inbound-sync/index.ts');
+    // The guard reads the document's own lines...
+    expect(src).toMatch(/const pricesNothing = !all\.some\(/);
+    // ...and never re-introduces the type-code shortcut.
+    expect(src).not.toMatch(/carriesNoMoney\s*=\s*family\(/);
+  });
+
+  it('is a whole-DOCUMENT test, so a zero line beside priced ones stays a real zero', () => {
+    const src = read('supabase/functions/finance-inbound-sync/index.ts');
+    // `!all.some(...)` — no line anywhere on the document carries a value. A per-line test would
+    // erase a genuine free sample or warranty replacement sitting among priced lines.
+    expect(src).toMatch(/!all\.some\(\(x: any\) => Number\(x\?\.net_value \?\? 0\) !== 0\)/);
+  });
+
+  it('never tells the operator that delivery notes carry no money', () => {
+    for (const file of [
+      'src/modules/finance/utils/inboundCorrelation.ts',
+      'src/modules/finance/components/InboundDetailCell.tsx',
+      'src/modules/finance/components/InboundDocPreviewDialog.tsx',
+    ]) {
+      const src = read(file);
+      expect(src).not.toMatch(/delivery note (?:carries|carry) no money/i);
+      expect(src).not.toMatch(/carries no money by law/i);
+    }
+  });
+});

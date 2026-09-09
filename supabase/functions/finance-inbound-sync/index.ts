@@ -642,19 +642,25 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
           const pendingRows = usable.map((l: any, i: number) => {
             const s = byIdx.get(i);
             const qty = l.quantity != null && Number(l.quantity) > 0 ? Number(l.quantity) : 1;
-            // A DELIVERY NOTE STATES ZERO AND MEANS "NOT MY JOB", AND ZERO IS NOT NULL.
+            // A DOCUMENT THAT PRICES NOTHING STATES ZERO, AND ZERO IS NOT NULL.
             //
-            // A ΔΑ carries no money by law — every line is `netValue 0`, and the money arrives
-            // later on the ΤΙΜ that bills it. The `!= null` test below reads that as a stated
-            // price of nothing, so all 205 warehouse items ever received from a delivery note
-            // sat at `unit_cost = 0`: a valid number, on its way to stock valuation and margin,
-            // indistinguishable from goods somebody genuinely got for free.
+            // "A delivery note carries no money" is FALSE and was the first version of this
+            // comment. A ΤΔΑ (Τιμολόγιο–Δελτίο Αποστολής, `1.1` with `isDeliveryNote`) is a
+            // delivery note that IS the invoice: it states full per-item prices and its total is
+            // the sum of its lines. 522 of them here, every one priced. A plain ΔΑ (`9.3`) is
+            // the one issued when the invoice follows separately, and only THAT one prices
+            // nothing — 104 here, 205 lines, 35 issuers, not a single non-zero value.
             //
-            // The discriminator is the DOCUMENT, not the line. A zero line on a real invoice is
-            // a real zero — a free sample, a replacement under warranty — and must stay one. A
-            // zero line on a document that carries no money at all says nothing about price.
-            const carriesNoMoney = family(d.doc_type) === '9';
-            const netValue = !carriesNoMoney && l.net_value != null ? Number(l.net_value) : null;
+            // So the test is the DATA, not the type code. myDATA does not forbid values on a 9.3,
+            // and keying on the family alone would silently null out a real price the day a
+            // supplier sends one — destroying a stated figure to avoid inventing one.
+            //
+            // Read wrongly, that zero becomes `unit_cost = 0`: a valid number, on its way to
+            // stock valuation and margin, indistinguishable from goods somebody got for free.
+            // It has to be the whole DOCUMENT, though, not the line: a zero line on a document
+            // that prices its other lines is a real zero — a free sample, a warranty replacement.
+            const pricesNothing = !all.some((x: any) => Number(x?.net_value ?? 0) !== 0);
+            const netValue = !pricesNothing && l.net_value != null ? Number(l.net_value) : null;
             const unitCost = netValue != null ? r2(netValue / qty) : null;
             // A myDATA line is not just a description. It states the unit, the supplier's own
             // article code and the VAT category, and those are FACTS about the document — read

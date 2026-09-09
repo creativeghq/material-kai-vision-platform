@@ -1,12 +1,13 @@
 /**
  * The Detail column of the Expenses inbox, which answers for BOTH halves of one purchase.
  *
- * A ΔΑ and the ΤΙΜ that bills it are two rows because myDATA is REQUIRED to file them as two
- * documents — a delivery note is not a tax document, so it carries the items at zero money, and
- * the invoice carries the money with its itemisation collapsed to one value-only line. Each row
- * was individually correct and jointly useless: the invoice said "Needs detail" forever, because
- * a value-only line is all it will ever carry, and the delivery note sat at €0.00 looking like
- * nothing had happened.
+ * A plain ΔΑ (`9.3`) and the ΤΙΜ that bills it arrive as two rows, because a ΔΑ is issued when
+ * the invoice follows SEPARATELY: the items and quantities are there and every value is zero,
+ * and the ΤΙΜ then carries the money with its itemisation collapsed to one value-only line.
+ * (A ΤΔΑ — `1.1` with `isDeliveryNote` — is the other kind, which IS the invoice and prices
+ * everything itself; it needs none of this.) Each row was individually correct and jointly
+ * useless: the invoice said "Needs detail" forever, because a value-only line is all it will
+ * ever carry, and the delivery note sat at €0.00 looking like nothing had happened.
  *
  * Four states, and the distinction between the middle two is the point of the whole feature:
  *

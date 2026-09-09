@@ -368,7 +368,7 @@ export const InboundDocPreviewDialog: React.FC<{
                 NAME for the money, not the money. */}
             {detail && detail.money.billed_on && Number(doc.total_gross ?? 0) === 0 && detail.money.billed_gross != null && (
               <Row label="Billed on">
-                <span title="A delivery note carries no money. This is the invoice that bills these goods.">
+                <span title="A plain ΔΑ prices nothing — the invoice bills the goods separately. This is that invoice.">
                   {detail.money.billed_on} — {formatMoney(Number(detail.money.billed_gross), doc.currency)}
                 </span>
               </Row>
