@@ -54,6 +54,16 @@ describe('image-edit source gate', () => {
     }
   });
 
+  it('covers EVERY supplied image, not just the base one', () => {
+    const src = stripComments(read(GEMINI));
+    // A two-image edit sends the style/material reference to the image model as pixels too, so
+    // an identity document dropped into the "Inspiration" slot must be refused the same way one
+    // dropped into "Your Room" is. Gating only `reference_image_url` would have left it open.
+    expect(src).toMatch(/\[body\.reference_image_url, body\.style_reference_url\]/);
+    expect(src).toMatch(/for \(const gatedSource of gatedSources\)/);
+    expect(src).toMatch(/assertEditableSource\(\s*supabase,\s*gatedSource,/);
+  });
+
   it('runs BEFORE credits are debited', () => {
     const src = stripComments(read(GEMINI));
     const gateAt = src.indexOf('assertEditableSource');

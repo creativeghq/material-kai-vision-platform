@@ -34,9 +34,11 @@ import {
   editImageWithGrok,
   generateImageWithOpenAI,
   editImageWithOpenAI,
+  IMAGE_ASPECT_RATIOS,
   type GeminiImageModel,
   type ImageAspectRatio,
 } from '../_shared/ai-client.ts';
+import { aspectRatioOfImage } from '../_shared/image-dimensions.ts';
 import {
   buildNarrativePrompt,
   buildFloorPlanRenderPrompt,
@@ -532,6 +534,20 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
   const aspectRatio: ImageAspectRatio = body.aspect_ratio ?? '16:9';
   const mode: GenerationMode = body.mode ?? detectMode(body);
 
+  /**
+   * The shape a TRANSFORMED photo comes back in.
+   *
+   * '16:9' is a fine default for a room invented from words and a bug for a photo the user
+   * supplied: it re-frames and re-crops the picture, so "change only the floor" cannot be true
+   * however the prompt is written. A 1280x1600 kitchen came back 1408x768 (conversation
+   * b520cc11) — and nothing raised, because a landscape image is a valid image.
+   *
+   * An explicit `aspect_ratio` from the caller still wins; the source is only consulted when
+   * nobody asked. Unreadable bytes fall back to the default rather than to a guess.
+   */
+  const aspectRatioForSource = (source: Uint8Array): ImageAspectRatio =>
+    body.aspect_ratio ?? aspectRatioOfImage(source, IMAGE_ASPECT_RATIOS) ?? aspectRatio;
+
   // ── What may be edited (see _shared/image-edit-gate.ts) ──────────────────────────────
   // This function is the chokepoint for every image the platform alters: the agent's
   // generate_gemini tool, AgentHub's edit modal, projectsService, productMaterialMapsService
@@ -547,8 +563,17 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
   // changes nothing — the gate is on the SOURCE ARTEFACT, never on the instruction
   // (invariant 9b), and "empty this room" is a perfectly ordinary way to ask for the
   // contents of a document to be wiped out.
+  //
+  // BOTH supplied images, not just the base. The style/material reference is a user-supplied
+  // artefact that this function now sends to the image model as PIXELS (see the image-edit
+  // branch), so leaving it ungated would mean an identity document dropped into the
+  // "Inspiration" slot reaches the generator untouched — and before the slots were corrected
+  // that image WAS the gated one, so gating only the base would have narrowed the check.
   const EDIT_MODES: GenerationMode[] = ['image-edit', 'redesign', 'copy-style', 'floor-plan-render', 'unstage'];
-  if (EDIT_MODES.includes(mode) && body.reference_image_url) {
+  const gatedSources = EDIT_MODES.includes(mode)
+    ? [body.reference_image_url, body.style_reference_url].filter((u): u is string => typeof u === 'string' && !!u)
+    : [];
+  for (const gatedSource of gatedSources) {
     // An image this platform generated is exempt — we made it, and re-classifying every
     // "warmer lighting" on our own render would tax the normal design loop for nothing.
     // Recognised by its storage path, not by the caller's word for it.
@@ -560,10 +585,10 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
     // and refused outright whenever the classifier could not run. The rule now lives in
     // storage-paths.ts next to the builder that creates these paths, as an allowlist that
     // deliberately excludes `reference-images/` (same bucket, user-supplied).
-    const isOurs = isPlatformGeneratedImage(body.reference_image_url);
+    const isOurs = isPlatformGeneratedImage(gatedSource);
     const gate = await assertEditableSource(
       supabase,
-      body.reference_image_url,
+      gatedSource,
       body.edit_instruction ?? body.prompt ?? '',
       isOurs,
       resolvedUserId,
@@ -755,6 +780,7 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
 
       const sourceBuffer = await fetchImageBuffer(body.reference_image_url);
       const instruction = body.edit_instruction ?? body.prompt ?? 'Redesign this room with updated materials and finishes';
+      const editAspectRatio = aspectRatioForSource(sourceBuffer);
 
       if (useGrok) {
         // Grok Aurora edit — sends image directly, superior spatial accuracy
@@ -771,24 +797,31 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
         const result = await editImageWithOpenAI(openAiPrompt, sourceBuffer, { userId: resolvedUserId, workspaceId: body.workspace_id });
         imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
       } else if (body.style_reference_url) {
-        // Two-step style-transfer (Gemini):
-        //   Step 1 — Vision: send inspiration to Gemini text model → extract design spec
-        //   Step 2 — Edit: send room image + text spec → cosmetic renovation, zero spatial bleed
+        // A reference image on a TARGETED EDIT means "use THIS one" — this tile, this finish,
+        // this fabric. So its PIXELS go to the model, next to the room, in the order
+        // `IMAGE_LABELS` names them (reference first, room second).
+        //
+        // What was here before: a two-step style transfer. Step 1 described the reference in
+        // words with the `interior_aesthetic_analyst` prompt — which asks a photo for its
+        // FIXTURES, basin, vanity, taps, shower and toilet, because it was written to read a
+        // bathroom inspiration shot, not a 355x355 swatch. Step 2 fed that description, minus the
+        // reference image ("the inspiration image is NOT passed here — only text + room photo"),
+        // into `interior_apply_spec`, which opens "you are performing a cosmetic renovation of
+        // the room" and says "apply every item below" — so the caller's floor-only instruction
+        // arrived UNDER a whole-room restyle order and lost to it. A user asking to swap one
+        // floor tile got a different kitchen (conversation b520cc11, 2026-09-09). The tile they
+        // attached never reached an image model in any form.
+        //
+        // Two-step spec extraction still owns `copy-style`, where the reference IS a room and
+        // paraphrasing it is the point.
         const styleBuffer = await fetchImageBuffer(body.style_reference_url);
-        let applyPrompt: string;
-        try {
-          const designSpec = await extractDesignSpec(supabase, styleBuffer, body.style);
-          applyPrompt = await buildApplySpecPrompt(supabase, designSpec, body.prompt);
-        } catch (specErr) {
-          console.warn('[generate-interior-gemini] Spec extraction failed, using fallback:', specErr);
-          applyPrompt = await buildApplySpecPrompt(supabase, 
-            `Apply a complete visual transformation matching the style of the provided inspiration: ${body.style ?? 'high-end contemporary'}. Copy all surface materials, colors, tile patterns, fixture finishes, and hardware from the inspiration image.`,
-            body.prompt,
-          );
-        }
+        const editWithRefText = renderPromptTemplate(
+          await getGenerationPrompt(supabase, 'interior_targeted_edit_with_reference'),
+          { instruction: instruction },
+        );
         const result = await generateImageWithGemini(
-          { text: applyPrompt, images: [sourceBuffer] },
-          { model, aspectRatio },
+          { text: editWithRefText, images: [styleBuffer, sourceBuffer] },
+          { model, aspectRatio: editAspectRatio },
         );
         imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
       } else {
@@ -797,7 +830,7 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
 
         const result = await generateImageWithGemini(
           { text: editText, images: [sourceBuffer] },
-          { model, aspectRatio },
+          { model, aspectRatio: editAspectRatio },
         );
         imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
       }
@@ -828,7 +861,7 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
 
       const result = await generateImageWithGemini(
         { text: unstagePrompt, images: [sourceBuffer] },
-        { model, aspectRatio },
+        { model, aspectRatio: aspectRatioForSource(sourceBuffer) },
       );
       imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
     }
@@ -842,7 +875,10 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
       }
 
       const fluxPrompt = buildFluxRedesignPrompt(body.style, body.room_type, body.edit_instruction ?? body.prompt);
-      const replicateUrl = await callFluxDepthPro(body.reference_image_url, fluxPrompt, aspectRatio);
+      // Flux takes its own aspect ratio, so the crop is decided here too: a portrait room
+      // redesigned at the 16:9 default came back with its top and bottom cut off.
+      const roomBuffer = await fetchImageBuffer(body.reference_image_url);
+      const replicateUrl = await callFluxDepthPro(body.reference_image_url, fluxPrompt, aspectRatioForSource(roomBuffer));
 
       // Download from Replicate (temp URL) and persist to Supabase Storage
       const imgBuffer = await fetchImageBuffer(replicateUrl);
@@ -879,6 +915,10 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
       } else {
         // Gemini + Flux 2-step pipeline (primary for non-grok)
         const inspirationBuffer = await fetchImageBuffer(body.style_reference_url);
+        // Fetched up front rather than inside the failure path: it is what pins the OUTPUT SHAPE
+        // to the user's room, and it is reused by both fallbacks below.
+        const roomBuffer = await fetchImageBuffer(body.reference_image_url);
+        const roomAspectRatio = aspectRatioForSource(roomBuffer);
         let fluxPrompt: string;
         let designSpec: string | null = null;
         try {
@@ -890,25 +930,24 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
         }
 
         try {
-          const replicateUrl = await callFluxDepthPro(body.reference_image_url, fluxPrompt, aspectRatio);
+          const replicateUrl = await callFluxDepthPro(body.reference_image_url, fluxPrompt, roomAspectRatio);
           if (!replicateUrl) throw new Error('Flux returned empty output URL');
           const imgBuffer = await fetchImageBuffer(replicateUrl);
           imageUrl = await uploadToStorage(supabase, toBase64(imgBuffer), 'image/webp', jobId, uploadCtx);
         } catch (fluxErr) {
           console.warn('[copy-style] Flux failed, falling back to Gemini:', String(fluxErr));
-          const roomBuffer = await fetchImageBuffer(body.reference_image_url);
           if (designSpec) {
             const applyPrompt = await buildCopyStyleApplyPrompt(supabase, designSpec, body.prompt);
             const result = await generateImageWithGemini(
               { text: applyPrompt, images: [roomBuffer] },
-              { model, aspectRatio },
+              { model, aspectRatio: roomAspectRatio },
             );
             imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
           } else {
             const dualPrompt = await buildDualReferenceStylePrompt(supabase, body.style, body.prompt);
             const result = await generateImageWithGemini(
               { text: dualPrompt, images: [inspirationBuffer, roomBuffer] },
-              { model, aspectRatio },
+              { model, aspectRatio: roomAspectRatio },
             );
             imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
           }
@@ -1113,6 +1152,13 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
       generation_status: 'completed',
       progress_percentage: 100,
       request_type: requestType,
+      // The output URL, in the column every reader actually looks at. It was written ONLY into
+      // `models_results[<label>].image_url`, so `image_urls` was `[]` on every row this function
+      // has ever written: ProgressiveImageGrid's restore reads `image_urls`, the admin image
+      // tally counts `image_urls`, and when the chat message that carried the URL fails to save
+      // (client navigates away mid-turn — which happened, twice, in b520cc11) a paid render was
+      // reachable from nothing at all.
+      image_urls: [imageUrl],
       models_queue: (mode === 'redesign' || mode === 'copy-style')
         ? [{ id: 'flux-depth-pro', name: 'Flux Depth Pro', provider: 'replicate' }]
         : [{ id: model, name: `Gemini ${model}`, provider: 'google' }],

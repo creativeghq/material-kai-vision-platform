@@ -4,6 +4,8 @@
  * Also exports: EDIT_INTENT_PATTERNS, detectEditIntent
  */
 
+import { resolveImageSlots } from './image-slots.ts';
+
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what
 // makes agent-chat exceed 12 GB and drop out of the edge typecheck gate entirely (inbox-api is a
@@ -254,7 +256,7 @@ export const createGeminiGenerationTool = (
   conversationId?: string, // Per-session storage folder key
 ) => {
   return tool(
-    async ({ prompt: rawPrompt, roomType, style, mode, referenceImageUrl, modelTier: agentModelTier, materialImages, sqm, boardMode, productName }) => {
+    async ({ prompt: rawPrompt, roomType, style, mode, referenceImageUrl, baseImageIndex, referenceImageIndex, modelTier: agentModelTier, materialImages, sqm, boardMode, productName }) => {
       try {
         // Strip [model:grok] or [model:pro] prefix injected by the edit modal for auto-submit
         // The prefix encodes the model tier chosen by the user without going through the agent.
@@ -301,8 +303,13 @@ export const createGeminiGenerationTool = (
           const hasRecentGeneration = conversationImages.length > 0;
           const hasUploadedImage = images.length > 0;
 
-          // Edit intent on a previously generated image (e.g. "change the floor")
-          if (detectEditIntent(prompt) && hasRecentGeneration) {
+          // Edit intent on an image we have (e.g. "change the floor", "replace the tile").
+          //
+          // `hasUploadedImage` belongs in this test as much as `hasRecentGeneration` does: without
+          // it, "replace the floor tile with the one attached" plus a tile and a room photo fell
+          // through to the `images.length >= 2` branch below and became copy-style — a WHOLE-ROOM
+          // aesthetic transfer — when the user asked for one surface to change.
+          if (detectEditIntent(prompt) && (hasRecentGeneration || hasUploadedImage)) {
             resolvedMode = 'image-edit';
 
           // Text-based floor plan generation (no image, mentions floor plan or has sqm)
@@ -348,39 +355,46 @@ export const createGeminiGenerationTool = (
           return candidate;
         };
 
-        // image-edit / unstage: images[0] = the image to edit (Gemini, single source photo).
-        // Both take one supplied photo and return an altered version of that same photo, so
-        // they resolve their source identically; only the prompt differs downstream.
+        // Which attachment is the photo and which is the material — ONE answer, for every mode.
+        //
+        // `resolveImageSlots` (see _shared/tools/image-slots.ts for what this cost) reads the two
+        // slots the composer labels: slot 0 "Inspiration", slot 1 "Your Room". `image-edit` and
+        // `floor-plan-render` used to read them BACKWARDS, so the same two attachments meant
+        // opposite things depending on a mode the user never picked. The model can pin either
+        // one by index when the user attached them the other way round.
+        const slots = resolveImageSlots(images.length, { baseImageIndex, referenceImageIndex });
+        const slotBaseImage: string | undefined = slots.baseIndex >= 0 ? images[slots.baseIndex] : undefined;
+        const slotReferenceImage: string | undefined = slots.referenceIndex >= 0 ? images[slots.referenceIndex] : undefined;
+
+        // image-edit / unstage: one supplied photo in, an altered version of that same photo out,
+        // so they resolve their source identically; only the prompt differs downstream.
         const SINGLE_SOURCE_MODES = ['image-edit', 'unstage'];
         let resolvedReferenceUrl: string | undefined = referenceImageUrl;
         if (!resolvedReferenceUrl && SINGLE_SOURCE_MODES.includes(resolvedMode)) {
-          const candidate = images[0] ?? conversationImages[conversationImages.length - 1];
+          const candidate = slotBaseImage ?? conversationImages[conversationImages.length - 1];
           if (candidate) resolvedReferenceUrl = await ensurePublicUrl(candidate);
         }
         if (SINGLE_SOURCE_MODES.includes(resolvedMode) && !resolvedReferenceUrl) {
           return JSON.stringify({ success: false, error: 'No reference image available for editing. Please attach an image or generate one first.' });
         }
 
-        // redesign: images[0] = room to redesign (Flux Depth Pro)
+        // redesign: the room to redesign (Flux Depth Pro)
         let redesignReferenceUrl: string | undefined;
         if (resolvedMode === 'redesign') {
-          const candidate = referenceImageUrl || images[0] || conversationImages[conversationImages.length - 1];
+          const candidate = referenceImageUrl || slotBaseImage || conversationImages[conversationImages.length - 1];
           if (candidate) redesignReferenceUrl = await ensurePublicUrl(candidate);
           if (!redesignReferenceUrl) {
             return JSON.stringify({ success: false, error: 'No room image available for redesign. Please attach an image.' });
           }
         }
 
-        // copy-style: images[0] = Inspiration (style donor), images[1] = Your Room (layout donor)
-        // This matches the drag-and-drop slot order in AgentHub (Slot 0 = Inspiration, Slot 1 = Your Room)
+        // copy-style: the inspiration is the style donor, the base is the layout donor
         let copyStyleRoomUrl: string | undefined;
         let copyStyleInspirationUrl: string | undefined;
         if (resolvedMode === 'copy-style') {
-          if (images.length >= 2) {
-            copyStyleInspirationUrl = await ensurePublicUrl(images[0]); // Slot 0 = Inspiration
-            copyStyleRoomUrl = await ensurePublicUrl(images[1]);        // Slot 1 = Your Room
-          } else if (images.length === 1) {
-            copyStyleRoomUrl = await ensurePublicUrl(images[0]);
+          if (slotBaseImage) {
+            copyStyleRoomUrl = await ensurePublicUrl(slotBaseImage);
+            if (slotReferenceImage) copyStyleInspirationUrl = await ensurePublicUrl(slotReferenceImage);
           } else if (referenceImageUrl) {
             copyStyleRoomUrl = referenceImageUrl;
           }
@@ -389,10 +403,10 @@ export const createGeminiGenerationTool = (
           }
         }
 
-        // floor-plan-render: use attached image
+        // floor-plan-render: the plan being rendered is the base, same as every other mode
         let floorPlanImageUrl: string | undefined;
         if (resolvedMode === 'floor-plan-render') {
-          const candidateUrl = resolvedReferenceUrl || (images.length > 0 ? images[0] : undefined);
+          const candidateUrl = resolvedReferenceUrl || slotBaseImage;
           if (candidateUrl?.startsWith('data:')) {
             floorPlanImageUrl = await uploadDataUrl(candidateUrl) ?? candidateUrl;
           } else {
@@ -405,7 +419,7 @@ export const createGeminiGenerationTool = (
         // materials-selection-board: resolve reference from conversationImages or uploaded image
         let materialsBoardRefUrl = floorPlanImageUrl;
         if (resolvedMode === 'materials-selection-board' && !materialsBoardRefUrl) {
-          const candidate = referenceImageUrl || conversationImages[conversationImages.length - 1] || images[0];
+          const candidate = referenceImageUrl || conversationImages[conversationImages.length - 1] || slotBaseImage;
           if (candidate?.startsWith('data:')) {
             materialsBoardRefUrl = await uploadDataUrl(candidate) ?? candidate;
           } else {
@@ -413,11 +427,14 @@ export const createGeminiGenerationTool = (
           }
         }
 
-        // Legacy: second image as style reference for floor-plan-render + image-edit
+        // The material / style reference that rides ALONGSIDE the base photo. On an edit it is
+        // the tile or finish the user wants applied, and the edge function sends its PIXELS to
+        // the model with the room — it is not a mood board to be paraphrased.
         let styleReferenceUrl: string | undefined;
-        if (images.length >= 2 && (resolvedMode === 'floor-plan-render' || resolvedMode === 'image-edit')) {
-          const second = images[1];
-          styleReferenceUrl = second.startsWith('data:') ? await uploadDataUrl(second) : second;
+        if (slotReferenceImage && (resolvedMode === 'floor-plan-render' || resolvedMode === 'image-edit')) {
+          styleReferenceUrl = slotReferenceImage.startsWith('data:')
+            ? await uploadDataUrl(slotReferenceImage)
+            : slotReferenceImage;
         }
 
         const resolvedBoardMode = boardMode || 'selection-board';
@@ -615,6 +632,8 @@ a call that will be refused.`,
         style: z.string().optional().describe('ALWAYS extract from user message when present. Design style: modern, minimalist, scandinavian, industrial, luxury, bohemian, traditional, mediterranean, japandi, art_deco, rustic, coastal'),
         mode: z.enum(['text-to-image', 'image-edit', 'redesign', 'copy-style', 'floor-plan-render', 'floor-plan-text', 'materials-selection-board', 'product-shot', 'product-lifestyle', 'material-texture', 'unstage']).optional().describe('Generation mode. redesign=Flux Depth Pro full redesign (1 image). copy-style=Flux Depth Pro copy aesthetic from inspiration (2 images). image-edit=Gemini targeted change. unstage=REMOVE all furniture and decor, returning the same room empty (use before staging or redesigning a furnished photo). product-shot=one product on seamless white. product-lifestyle=product staged in a room. material-texture=seamless tileable swatch. Omit to auto-detect.'),
         referenceImageUrl: z.string().optional().describe('URL of image to edit, floor plan to render, or the product/swatch photo for the product modes. Leave empty when user has uploaded an image — it is used automatically.'),
+        baseImageIndex: z.number().int().optional().describe('1-based index of the attached image that is the PHOTO TO EDIT — the room whose pixels must survive. Default with two attachments is image 2 ("Your Room" in the composer). Pass it when the user attached them the other way round, e.g. "here is a tile, put it in this room" with the tile first: baseImageIndex=2.'),
+        referenceImageIndex: z.number().int().optional().describe('1-based index of the attached image that is the MATERIAL or STYLE reference — a tile, a swatch, an inspiration photo. Default with two attachments is image 1. Its pixels are sent to the model alongside the room, so a specific tile is applied as that tile, not as a description of one.'),
         productName: z.string().optional().describe('Name of the single item being rendered, for product-shot / product-lifestyle / material-texture (e.g. "Fenwick lounge chair", "olive green boucle").'),
         modelTier: z.enum(['fast', 'pro', 'grok', 'chatgpt']).optional().describe('fast=Gemini Flash (6 credits), pro=Gemini Pro (15 credits), grok=Aurora best spatial accuracy (15 credits), chatgpt=OpenAI gpt-image-1 strong prompt adherence (10 credits). Use pro or grok when user requests maximum quality. materials-selection-board always uses pro. If the user names a model ("use Grok", "try Gemini Pro", "use ChatGPT"), honour it; if they ask to compare, call once per tier so they can pick.'),
         materialImages: z.array(z.string()).optional().describe('URLs of catalog material images to incorporate into the design (up to 14)'),

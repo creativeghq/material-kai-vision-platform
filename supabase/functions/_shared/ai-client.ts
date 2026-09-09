@@ -943,7 +943,15 @@ export async function callClaudeMessages(
 // GA image models (Nano Banana 2 / Pro). The `-preview` aliases were deprecated
 // and shut down; the GA ids use the identical generateContent API.
 export type GeminiImageModel = 'gemini-3.1-flash-image' | 'gemini-3-pro-image';
-export type ImageAspectRatio = '1:1' | '16:9' | '3:2' | '4:3' | '9:16' | '3:4' | '4:5' | '5:4' | '21:9' | '2:3';
+/**
+ * The output shapes the image models accept. Declared ONCE as values: `nearestAspectRatio`
+ * (_shared/image-dimensions.ts) is handed this list to match a source photo against, rather than
+ * restating the set and drifting from it.
+ */
+export const IMAGE_ASPECT_RATIOS = [
+  '1:1', '16:9', '3:2', '4:3', '9:16', '3:4', '4:5', '5:4', '21:9', '2:3',
+] as const;
+export type ImageAspectRatio = typeof IMAGE_ASPECT_RATIOS[number];
 
 export interface GeminiImageResult {
   base64: string;
@@ -1024,7 +1032,7 @@ export async function generateImageWithGemini(
  */
 async function generateMultiImageWithGemini(
   prompt: { text: string; images: (Uint8Array | string)[] },
-  config: UnitBillingConfig & { model: GeminiImageModel },
+  config: UnitBillingConfig & { model: GeminiImageModel; aspectRatio?: ImageAspectRatio },
 ): Promise<GeminiImageResult> {
   if (!GOOGLE_API_KEY()) throw new Error('GOOGLE_GENERATIVE_AI_API_KEY not set');
   const _start = Date.now();
@@ -1082,17 +1090,37 @@ async function generateMultiImageWithGemini(
   // Instruction comes last so Gemini processes both images before reading the task
   parts.push({ text: prompt.text });
 
-  const response = await fetch(
+  // The requested aspect ratio has to actually be SENT. This function accepted `config` from
+  // every caller, was typed for it, and never forwarded the ratio to Google — so the shape of an
+  // EDIT was whatever the model felt like, and a 4:5 room photo came back 16:9, re-cropped. The
+  // text-to-image path above has always passed it; the image path (i.e. every edit) had not.
+  const post = (withImageConfig: boolean) => fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${GOOGLE_API_KEY()}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ role: 'user', parts }],
-        generationConfig: { responseModalities: ['IMAGE', 'TEXT'] },
+        generationConfig: {
+          responseModalities: ['IMAGE', 'TEXT'],
+          ...(withImageConfig && config.aspectRatio ? { imageConfig: { aspectRatio: config.aspectRatio } } : {}),
+        },
       }),
     },
   );
+
+  let response = await post(true);
+  if (!response.ok && config.aspectRatio) {
+    // `generationConfig.imageConfig` is model-dependent and Google rejects unknown fields with a
+    // 400, so a model that does not take it would fail EVERY generation. Retry once without it:
+    // a free-shaped image is a defect, a dead image pipeline is an outage.
+    const firstErr = await response.text().catch(() => '');
+    console.warn(
+      `[ai-client] gemini multi-image rejected imageConfig (${response.status}), retrying without it:`,
+      firstErr.slice(0, 300),
+    );
+    response = await post(false);
+  }
 
   if (!response.ok) {
     const err = await response.text();

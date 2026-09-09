@@ -2622,6 +2622,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       // was actually fixed. Do not reintroduce full-response caching for KAI.
       let data: any = null;
       let pendingGeminiData: Message['geminiImageData'] | null = null;
+      // The server's id for this turn, carried on every chunk. Several card paths below build
+      // their own `final_result` object locally, so reading it off `data` alone would miss it —
+      // and an unstamped save is one the server cannot tell from no save at all.
+      let streamTurnId: string | undefined;
       let pendingSearchSpec: Message['searchSpec'] | null = null;
 
       // Always call the agent (no response cache).
@@ -2741,6 +2745,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
               // The run sees every chunk, before any branch below claims one.
               feedRunChunk(chunk);
+
+              if (typeof chunk.turn_id === 'string') streamTurnId = chunk.turn_id;
 
               // Capture reasoning steps for Jarvis-style display
               if (chunk.type === 'agent_routed') {
@@ -4074,6 +4080,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             requestedAgentId: data.requested_agent_id ?? undefined,
             routed: data.routed ?? undefined,
             model: data.model || selectedModel,
+            // The server's id for this turn. It writes the message itself if this stamp has not
+            // appeared within ~15s — which is what happens when the tab is closed mid-turn — so
+            // dropping it here would produce a duplicate of every reply, not a missing one.
+            turn_id: data.turn_id ?? streamTurnId ?? undefined,
             responseTimeMs, // Time taken to respond
             productsCount: materialData?.products?.length || 0,
             cachedResponse: false,

@@ -1510,6 +1510,77 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
  * and toolResults contains all tool execution results
  * onChunk callback receives real-time progress updates
  */
+/**
+ * Write the turn's reply if — and only if — the client did not.
+ *
+ * Chat history has exactly one writer today, and it is the browser. That is fine until the
+ * browser leaves: the server finishes the turn, bills it, and the reply exists nowhere. In
+ * conversation b520cc11 that lost an assistant message AND the only reachable pointer to a
+ * 15-credit render, and the conversation still reads as a question nobody answered.
+ *
+ * The dedupe is the `turn_id` the client stamps on the message it saves (never on the mid-stream
+ * card messages — those are a different message, and a turn that produced a card AND a reply must
+ * still get its reply). So this is a claim, not a race: look for the stamp, write only if it is
+ * absent. The delay is what makes it a safety net rather than a competitor — a live client saves
+ * within a second or two of the final chunk.
+ */
+async function recoverAssistantMessage(
+  supabase: any,
+  conversationId: string,
+  turnId: string,
+  content: string,
+  metadata: Record<string, unknown>,
+): Promise<void> {
+  // Long enough that a live client always wins the race (it saves within a second or two of the
+  // final chunk), short enough that the isolate is not held open for nothing on every turn.
+  await new Promise((resolve) => setTimeout(resolve, 10_000));
+
+  const { data: existing, error: readErr } = await supabase
+    .from('agent_chat_messages')
+    .select('id')
+    .eq('conversation_id', conversationId)
+    .eq('role', 'assistant')
+    .contains('metadata', { turn_id: turnId })
+    .limit(1);
+
+  // Fail CLOSED on a read error: writing a message we cannot prove is missing is how a
+  // conversation ends up saying everything twice.
+  if (readErr) {
+    console.warn('[agent-chat] message recovery: could not check for the client write:', readErr.message);
+    return;
+  }
+  if (existing && existing.length > 0) return;
+
+  const { error: insertErr } = await supabase.from('agent_chat_messages').insert({
+    conversation_id: conversationId,
+    role: 'assistant',
+    content,
+    attachment_ids: [],
+    metadata,
+  });
+  if (insertErr) {
+    console.error('[agent-chat] message recovery: insert failed:', insertErr.message);
+    return;
+  }
+
+  // Same counters the client maintains, or the sidebar shows a conversation one message short.
+  const { data: convo } = await supabase
+    .from('agent_chat_conversations')
+    .select('message_count')
+    .eq('id', conversationId)
+    .single();
+  await supabase
+    .from('agent_chat_conversations')
+    .update({
+      message_count: (convo?.message_count ?? 0) + 1,
+      last_message_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', conversationId);
+
+  console.log(`[agent-chat] recovered an unsaved assistant message for conversation ${conversationId}`);
+}
+
 async function executeAgent(
   agentId: string,
   workspaceId: string,
@@ -2029,6 +2100,19 @@ async function executeAgent(
       + `(mode=image-edit for a targeted change, redesign/copy-style for a room) with no `
       + `referenceImageUrl and the attached image is used automatically. If the user's instruction `
       + `describes changing something, the thing they mean is the attached image, not a database record.`;
+    if (images.length >= 2) {
+      // WHICH one is the room is a real question with a real answer, and the model is the only
+      // thing in the loop that can see both. It used to have no way to say so: it wrote "Image 2
+      // is the base photograph and must be preserved exactly" into the PROMPT, where nothing
+      // reads it, while the tool took image 1 — a tile swatch — as the photo to edit.
+      systemPrompt += `\n\n[CONTEXT] With two attachments the default is: image 1 = the MATERIAL or `
+        + `STYLE reference (a tile, a swatch, an inspiration photo), image 2 = the user's own PHOTO, `
+        + `the one being edited and the one whose pixels must survive. That is what the composer `
+        + `labels them ("Inspiration" / "Your Room"). If the user attached them the other way round `
+        + `— and "here is a tile, put it in this room" often does — pass baseImageIndex and `
+        + `referenceImageIndex on generate_gemini instead of describing the order in the prompt text. `
+        + `Nothing reads the prompt text for this.`;
+    }
   } else if (priorUploadedImages.length > 0) {
     systemPrompt += `\n\n[CONTEXT] The user attached an image EARLIER in this conversation and has not `
       + `attached a new one on this turn. It is still available to the image tools as the default `
@@ -4285,10 +4369,28 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
     const lastMessage = messages[messages.length - 1];
     let userInput = lastMessage?.content || '';
 
-    // Convert messages to Anthropic API format
+    // Convert messages to Anthropic API format.
+    //
+    // The image fields are CARRIED, not dropped. This map used to project every message down to
+    // `{role, content}` — and this array is what `executeAgent` receives as its history, so the
+    // two recovery paths inside it read fields that had been erased 2,000 lines earlier:
+    // `priorUploadedImages` (an image the user attached on an EARLIER turn) and
+    // `conversationImages` (an image WE generated earlier). Both were therefore empty in every
+    // conversation that has ever run, which means: the "do not ask them to re-upload" context
+    // line has never once been added, "change the floor" on a generated image could never find
+    // that image, and `generate_gemini(mode:'image-edit')` answered `No reference image
+    // available for editing` in 2ms on any turn without a fresh attachment. It looks like a
+    // working feature from every angle except the DB.
+    //
+    // Kept as an explicit list rather than a `...msg` spread so the contract is visible: these
+    // four are read by name in executeAgent, and a fifth one added there needs a line here.
     let anthropicMessages = messages.map((msg: any) => ({
       role: msg.role,
       content: msg.content,
+      ...(msg.images ? { images: msg.images } : {}),
+      ...(msg.metadata ? { metadata: msg.metadata } : {}),
+      ...(msg.geminiImageData ? { geminiImageData: msg.geminiImageData } : {}),
+      ...(msg.tool_results ? { tool_results: msg.tool_results } : {}),
     }));
 
     // ── DATA fence (security invariant 9) ─────────────────────────────────
@@ -4323,6 +4425,20 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
     // Execute agent with STREAMING
 
     const encoder = new TextEncoder();
+    /**
+     * Identity for THIS turn's assistant message, minted server-side and streamed to the client.
+     *
+     * The client is the only writer of chat history, so a turn whose stream nobody is left to
+     * read is a turn that never happened: conversation b520cc11 completed at 12:08:05, having
+     * spent 15 credits on an image and ~64 on the model, and the conversation still ends on the
+     * user's question — the reply, and the only pointer to the render, were never saved. The
+     * client stamps this id on the message it writes and `recoverAssistantMessage` below looks
+     * for that stamp before writing anything, so whoever gets there first wins and there is no
+     * second copy. Same shape as `pos_issue_receipt`'s client token (CLAUDE.md anti-regression 4).
+     */
+    const turnId = crypto.randomUUID();
+    /** The last image this turn produced, so a recovered message can still carry it. */
+    let lastGeminiImage: Record<string, unknown> | null = null;
     // Tracks whether the agent has produced any real output beyond status/heartbeat.
     // Used for partner-mode refunds: if executeAgent crashes before the first
     // tool_call / text_chunk / final_result, the underlying Anthropic + tool spend
@@ -4378,7 +4494,14 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
             return false;
           }
           try {
-            const chunk = encoder.encode(JSON.stringify(data) + '\n');
+            // Every chunk but the keepalive carries the turn id, so the client can stamp the
+            // message it saves whichever chunk it ended up treating as the final one — several
+            // card paths synthesize their own `final_result` locally, and a message saved
+            // without the stamp would be recovered a second time by the server.
+            const stamped = data?.type && data.type !== 'heartbeat' && !data.turn_id
+              ? { ...data, turn_id: turnId }
+              : data;
+            const chunk = encoder.encode(JSON.stringify(stamped) + '\n');
             controller.enqueue(chunk);
             // Mark partner-refund eligibility off once the agent has produced anything
             // spendworthy. NON_SPEND_CHUNK_TYPES are orchestration noise emitted BEFORE the
@@ -4451,6 +4574,18 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
               role as string, // User's workspace role for RBAC tool gating
               // Streaming callback with safe enqueue
               (chunk: any) => {
+                // Remembered for the recovery write below — an image is the half of a turn that
+                // cost real money, so a message written without the client's help must still
+                // carry it.
+                if (chunk?.type === 'gemini_image_ready' && chunk.image_url) {
+                  lastGeminiImage = {
+                    job_id: chunk.job_id,
+                    image_url: chunk.image_url,
+                    mode: chunk.mode,
+                    model: chunk.model,
+                    credits_used: chunk.credits_used,
+                  };
+                }
                 if (!streamClosed) {
                   safeEnqueue(chunk);
                 }
@@ -4679,6 +4814,9 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
             tool_results: finalResult.toolResults,
             generation_job: finalResult.generationJob,
             next_steps: nextSteps,
+            // Stamped onto the message the client saves, so the server can tell "already
+            // recorded" from "lost with the tab" without writing a second copy.
+            turn_id: turnId,
           };
 
           // Send final result - use safeEnqueue to check if stream is still open
@@ -4705,6 +4843,27 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
             controller.close();
           } catch (closeError) {
             console.warn('⚠️ Stream already closed:', closeError);
+          }
+
+          // The turn is finished and paid for. If the client is still there it writes the
+          // message within a second or two; if it is not — tab closed, connection dropped, the
+          // 150s idle timeout — nothing else ever will. Runs under `runInBackground` because the
+          // isolate is otherwise torn down the moment this handler returns.
+          if (conversation_id && finalResult?.text && !forCustomerTurn && !isEvalRun) {
+            void runInBackground(
+              recoverAssistantMessage(supabase, conversation_id, turnId, finalResult.text, {
+                agentId: ranAsAgentId,
+                requestedAgentId: agentId,
+                routed: wasRouted,
+                model: modelUsed,
+                turn_id: turnId,
+                recovered_by_server: true,
+                nextSteps: nextSteps.length > 0 ? nextSteps : undefined,
+                generation_job: finalResult.generationJob ?? undefined,
+                geminiImageData: lastGeminiImage ?? undefined,
+              }),
+              'agent-chat-message-recovery',
+            );
           }
         } catch (error) {
           // A cancelled turn is not a crash (#352 A16). The client is gone, so there is nobody
