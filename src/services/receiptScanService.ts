@@ -37,6 +37,23 @@ export interface ReceiptFields {
    * gets booked with nothing to notice it.
    */
   foots: boolean | null;
+  /**
+   * Where the document says to pay it — the ISSUER's own account. Null when it printed none,
+   * which is most receipts.
+   *
+   * Returned, never stored by the scan. `crm_bank_accounts` is what the payout path sends money
+   * to, so this becomes a payment destination only after a person confirms it — the expense form
+   * files it as a SUGGESTION against the supplier they pick, and the party page is where it is
+   * reviewed. `checksum_ok` is the mod-97 verdict as read: false means a character was misread or
+   * the document itself carries a typo, and either way it is worth showing rather than dropping.
+   */
+  bank: {
+    iban: string | null;
+    account_ref: string | null;
+    bank_name: string | null;
+    account_holder: string | null;
+    checksum_ok: boolean;
+  } | null;
 }
 
 export interface ScanResult {

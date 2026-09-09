@@ -1,5 +1,5 @@
 import React from 'react';
-import { Landmark, Plus, Trash2, Pencil, Loader2, Star, X, Check } from 'lucide-react';
+import { Landmark, Plus, Trash2, Pencil, Loader2, Star, X, Check, FileText, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -7,7 +7,10 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { HubEmptyState } from '@/components/core/hub';
 import { useToast } from '@/hooks/use-toast';
-import { crmBankAccountsAPI, type CrmBankAccount, type CrmBankAccountInput } from '@/services/crm.service';
+import {
+  crmBankAccountsAPI, crmBankAccountSuggestionsAPI,
+  type CrmBankAccount, type CrmBankAccountInput, type CrmBankAccountSuggestion,
+} from '@/services/crm.service';
 import { isValidIban, normalizeIban } from '@/utils/iban';
 import { callRevolutApi, getRevolutStatus } from '@/modules/banking-revolut/services/revolutConfigService';
 
@@ -20,6 +23,9 @@ interface Props {
 
 const EMPTY: CrmBankAccountInput = { bank_name: '', account_holder: '', iban: '', account_ref: '', currency: 'EUR', is_primary: false };
 
+/** The suggestions read, as a VALUE or a stated reason there is no value — never a bare `[]`. */
+interface SuggestionsRead { rows: CrmBankAccountSuggestion[]; error: string | null }
+
 /**
  * Manages the bank accounts that belong to a CRM company / contact (their OWN banks — e.g. a
  * supplier IBAN you pay to). These are selectable on a Bank Payment involving this counterparty.
@@ -30,8 +36,15 @@ export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, c
   const [rows, setRows] = React.useState<CrmBankAccount[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
-  const [editingId, setEditingId] = React.useState<string | null>(null); // 'new' = add form
+  const [editingId, setEditingId] = React.useState<string | null>(null); // 'new' = add form, 'suggestion' = reviewing one
   const [form, setForm] = React.useState<CrmBankAccountInput>(EMPTY);
+  // Bank details our readers found on this party's own documents. They are PROPOSALS: this table
+  // is what payouts are sent to, so nothing here becomes payable without the operator confirming
+  // it in the same editor they would have typed it into.
+  const [suggestions, setSuggestions] = React.useState<CrmBankAccountSuggestion[]>([]);
+  const [reviewing, setReviewing] = React.useState<CrmBankAccountSuggestion | null>(null);
+  const [dismissing, setDismissing] = React.useState<string | null>(null);
+  const [suggestionsError, setSuggestionsError] = React.useState<string | null>(null);
   // Confirmation of Payee via the workspace's Revolut connection (#315). Offered only
   // when Revolut is actually connected; verdict is per-edit-session, not persisted.
   const [vopAvailable, setVopAvailable] = React.useState(false);
@@ -47,7 +60,20 @@ export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, c
     if (!companyId && !contactId) { setLoading(false); return; }
     try {
       setLoading(true);
-      setRows(await crmBankAccountsAPI.list(parent));
+      // Both, together: a suggestion only makes sense next to what is already on file, and the
+      // conflict warning is about exactly that pairing.
+      const [accounts, pending] = await Promise.all([
+        crmBankAccountsAPI.list(parent),
+        // Settled, not caught-to-empty: a failed read must not render as "no suggestions". That
+        // is the shape that hid a collector which had never once succeeded.
+        crmBankAccountSuggestionsAPI.listPending(parent).then<SuggestionsRead, SuggestionsRead>(
+          (r) => ({ rows: r, error: null }),
+          (e: any) => ({ rows: [], error: e?.message ?? 'could not be loaded' }),
+        ),
+      ]);
+      setRows(accounts);
+      setSuggestions(pending.rows);
+      setSuggestionsError(pending.error);
     } catch (e: any) {
       toast({ title: 'Failed to load bank accounts', description: e?.message, variant: 'destructive' });
     } finally { setLoading(false); }
@@ -102,13 +128,42 @@ export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, c
           : <span className="text-xs text-muted-foreground">Could not be checked for this bank</span>
   );
 
-  const startAdd = () => { setForm(EMPTY); setVopVerdict(null); setEditingId('new'); };
+  const startAdd = () => { setForm(EMPTY); setVopVerdict(null); setReviewing(null); setEditingId('new'); };
+
+  /**
+   * Review one sighting in the SAME editor an operator would have typed it into.
+   *
+   * Deliberately not a one-click "accept": this is a payment destination, the number came off a
+   * document anyone can send us, and the fields the reader could not find (a bank name is often
+   * absent) have to be filled in anyway. `is_primary` stays off — promoting a just-read account
+   * over the one you have been paying is the exact move an invoice-fraud attempt is after.
+   */
+  const startReview = (s: CrmBankAccountSuggestion) => {
+    setForm({
+      bank_name: s.bank_name ?? '', account_holder: s.account_holder ?? '', iban: s.iban ?? '',
+      account_ref: s.account_ref ?? '', currency: s.currency || 'EUR', is_primary: false,
+    });
+    setVopVerdict(null);
+    setReviewing(s);
+    setEditingId('suggestion');
+  };
+
+  const dismiss = async (s: CrmBankAccountSuggestion) => {
+    setDismissing(s.id);
+    try {
+      await crmBankAccountSuggestionsAPI.dismiss(s.id, 'dismissed on the party page');
+      await load();
+    } catch (e: any) {
+      toast({ title: 'Failed to dismiss', description: e?.message, variant: 'destructive' });
+    } finally { setDismissing(null); }
+  };
   const startEdit = (r: CrmBankAccount) => {
     setForm({ bank_name: r.bank_name, account_holder: r.account_holder ?? '', iban: r.iban ?? '', account_ref: r.account_ref ?? '', currency: r.currency, is_primary: r.is_primary, notes: r.notes ?? '' });
     setVopVerdict(null);
+    setReviewing(null);
     setEditingId(r.id);
   };
-  const cancel = () => { setEditingId(null); setForm(EMPTY); setVopVerdict(null); };
+  const cancel = () => { setEditingId(null); setForm(EMPTY); setVopVerdict(null); setReviewing(null); };
 
   const save = async () => {
     if (!(form.bank_name ?? '').trim()) { toast({ title: 'Bank name is required', variant: 'destructive' }); return; }
@@ -121,7 +176,17 @@ export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, c
     }
     setSaving(true);
     try {
-      if (editingId === 'new') {
+      if (editingId === 'suggestion' && reviewing) {
+        // Claim + insert are ONE transaction in the RPC, so a double-click cannot add the account
+        // twice, and the values saved are the operator's rather than the document's.
+        await crmBankAccountSuggestionsAPI.accept(reviewing.id, {
+          bankName: (form.bank_name ?? '').trim(),
+          accountHolder: form.account_holder,
+          iban: form.iban,
+          accountRef: form.account_ref,
+          currency: form.currency,
+        });
+      } else if (editingId === 'new') {
         await crmBankAccountsAPI.create({ workspaceId, ...parent }, form);
       } else if (editingId) {
         await crmBankAccountsAPI.update(editingId, form);
@@ -160,6 +225,27 @@ export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, c
 
   const editor = (
     <div className="rounded-md border border-border/60 p-3 space-y-3 bg-muted/20">
+      {reviewing && (
+        <div className="space-y-1 text-xs">
+          <div className="font-medium">Read off {reviewing.document_label || 'a document they sent'}</div>
+          <p className="text-muted-foreground">
+            Check every character against the document before saving. Once saved this account can be paid to.
+          </p>
+          {reviewing.conflicts_with?.iban && (
+            <p className="text-destructive">
+              This is not the account you have on file ({reviewing.conflicts_with.iban.slice(-6)}). A changed IBAN on a
+              supplier invoice is the commonest invoice fraud — confirm it on a phone number you already had for them,
+              not one printed on the document.
+            </p>
+          )}
+          {!reviewing.checksum_ok && (
+            <p className="text-warning">
+              The IBAN as read fails its checksum — a character was misread, or the document itself has a typo. Retype
+              it from the document.
+            </p>
+          )}
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label className="text-xs" htmlFor="crmb-name">Bank name *</Label>
@@ -240,13 +326,74 @@ export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, c
               </div>
             ))}
             {editingId === 'new' && editor}
-            {rows.length === 0 && editingId === null && (
+            {editingId === 'suggestion' && editor}
+            {rows.length === 0 && suggestions.length === 0 && editingId === null && (
               <HubEmptyState
                 icon={Landmark}
                 title="No bank accounts yet"
                 description="This party's own accounts — the ones offered when you record a Bank Payment involving them. Separate from your own accounts in Finance → Settings."
                 action={<Button size="sm" onClick={startAdd}><Plus className="h-3.5 w-3.5 mr-1" />Add bank</Button>}
               />
+            )}
+
+            {/* A read that FAILED must not look like a party with nothing to review. */}
+            {suggestionsError && (
+              <p className="text-xs text-warning">
+                Bank details found on their documents could not be loaded ({suggestionsError}) — this list may be
+                incomplete.
+              </p>
+            )}
+
+            {suggestions.length > 0 && editingId === null && (
+              <div className="space-y-2 pt-1">
+                <div className="text-[11px] font-semibold text-muted-foreground">Seen on their documents</div>
+                {suggestions.map((s) => (
+                  <div key={s.id} className="rounded-md border border-border/60 border-dashed p-3 space-y-1">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium truncate">{s.bank_name || 'Bank not printed'}</span>
+                          {s.conflicts_with_account_id && (
+                            <Badge variant="warning" className="text-[9px] py-0">
+                              <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />Differs from the one on file
+                            </Badge>
+                          )}
+                          {!s.checksum_ok && (
+                            <Badge variant="error" className="text-[9px] py-0">Fails its checksum</Badge>
+                          )}
+                        </div>
+                        {s.iban && <div className="text-xs font-mono text-muted-foreground truncate">{s.iban}</div>}
+                        {s.account_ref && <div className="text-[11px] text-muted-foreground">SWIFT/Acct: {s.account_ref}</div>}
+                        {s.account_holder && <div className="text-xs text-muted-foreground truncate">{s.account_holder}</div>}
+                        <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                          <FileText className="h-3 w-3 shrink-0" />
+                          <span className="truncate">
+                            {s.document_label || (s.source === 'inbox_attachment' ? 'an Inbox attachment' : 'a scanned invoice')}
+                            {s.seen_count > 1 ? ` · on ${s.seen_count} documents` : ''}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button size="sm" variant="outline" className="h-7 px-2 text-[11px]" onClick={() => startReview(s)}>
+                          <Check className="h-3 w-3 mr-1" />Review
+                        </Button>
+                        <Button
+                          size="sm" variant="ghost" className="h-7 px-2 text-[11px]"
+                          disabled={dismissing === s.id} onClick={() => void dismiss(s)}
+                        >
+                          {dismissing === s.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Dismiss'}
+                        </Button>
+                      </div>
+                    </div>
+                    {s.conflicts_with?.iban && (
+                      <p className="text-[11px] text-destructive">
+                        You already pay them on {s.conflicts_with.iban}. Confirm the change by phone before using this
+                        one.
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
             )}
           </>
         )}

@@ -2929,6 +2929,12 @@ const AttachmentDocumentTag: React.FC<{
     const money = typeof d.total === 'number' ? formatMoney(d.total, d.currency ?? 'EUR') : null;
     const facts = [d.issuer, d.document_number ? `no. ${d.document_number}` : null, d.document_date, money]
       .filter((x): x is string => !!x).join(' · ');
+    // Named, never asserted as ours: it is a number on somebody's PDF until a person confirms it
+    // against the supplier. Shown here so the operator knows the expense form will carry it, and
+    // masked because this line sits in a conversation view.
+    const bankWord = d.bank?.iban
+      ? `bank details printed · IBAN ending ${d.bank.iban.slice(-4)}`
+      : d.bank?.account_ref ? 'bank details printed' : null;
     const description = `${label}${d.document_number ? ` ${d.document_number}` : ''}`
       + `${d.issuer ? ` from ${d.issuer}` : ''}${d.document_date ? ` dated ${d.document_date}` : ''}`
       + `${money ? ` — total on document ${money} (gross, VAT not split)` : ''}`
@@ -2939,6 +2945,7 @@ const AttachmentDocumentTag: React.FC<{
           {label}{pct !== null ? ` · ${pct}%` : ''}{unsure ? ' · unsure' : ''}
         </Badge>
         {facts && <span className="max-w-[280px] truncate text-muted-foreground" title={facts}>{facts}</span>}
+        {bankWord && <Badge variant="neutral" className="text-[10px] py-0">{bankWord}</Badge>}
         {bookable && workspaceId && (
           <>
             <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" onClick={() => setExpenseOpen(true)}>
@@ -2949,7 +2956,21 @@ const AttachmentDocumentTag: React.FC<{
               open={expenseOpen}
               onOpenChange={setExpenseOpen}
               onCreated={() => { setExpenseOpen(false); toast({ title: 'Expense recorded' }); }}
-              prefill={{ description, supplier: d.issuer ? { name: d.issuer } : undefined }}
+              prefill={{
+                description,
+                supplier: d.issuer ? { name: d.issuer } : undefined,
+                // The account this document says to pay into, carried to the one screen that
+                // knows WHOSE it is. Filed as a suggestion on that party, not as a destination.
+                bankDetails: d.bank ? {
+                  bank: d.bank,
+                  source: 'inbox_attachment',
+                  sourceRef: { message_id: messageId, thread_id: threadId, attachment_name: att.name },
+                  documentLabel: `${label}${d.document_number ? ` ${d.document_number}` : ''}`
+                    + `${d.document_date ? ` dated ${d.document_date}` : ''} · from an Inbox attachment`,
+                  issuerName: d.issuer,
+                  confidence: d.confidence,
+                } : undefined,
+              }}
             />
           </>
         )}

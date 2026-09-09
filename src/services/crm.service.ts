@@ -893,6 +893,157 @@ export const crmBankAccountsAPI = {
   },
 };
 
+// -------- Bank details READ off a counterparty's own documents, awaiting review --------
+
+/** Where a sighting came from. Closed set — `crm_bank_account_suggestions_source_check`. */
+export type CrmBankSuggestionSource = 'supplier_bill_scan' | 'inbox_attachment';
+
+export interface CrmBankAccountSuggestion {
+  id: string;
+  workspace_id: string;
+  company_id: string | null;
+  contact_id: string | null;
+  iban: string | null;
+  account_ref: string | null;
+  bank_name: string | null;
+  account_holder: string | null;
+  currency: string;
+  /** mod-97 verdict at the time it was read. False = a typo on the paper, or a misread character. */
+  checksum_ok: boolean;
+  source: CrmBankSuggestionSource;
+  source_ref: Record<string, unknown>;
+  document_label: string | null;
+  issuer_name: string | null;
+  confidence: number | null;
+  status: 'pending' | 'accepted' | 'dismissed';
+  conflicts_with_account_id: string | null;
+  resolved_bank_account_id: string | null;
+  seen_count: number;
+  first_seen_at: string;
+  last_seen_at: string;
+  /** The account on file this one disagrees with, embedded for the review card. */
+  conflicts_with?: Pick<CrmBankAccount, 'id' | 'iban' | 'bank_name' | 'is_primary'> | null;
+}
+
+/** What a document said about where to pay it. Mirrors the edge reader's `DocumentBankDetails`. */
+export interface DocumentBankDetailsInput {
+  iban?: string | null;
+  account_ref?: string | null;
+  bank_name?: string | null;
+  account_holder?: string | null;
+}
+
+export interface RecordBankSuggestionResult {
+  /** `already_on_file` = nothing to review. `seen_again` = corroboration, not a new decision. */
+  outcome: 'new' | 'seen_again' | 'already_on_file';
+  suggestion_id?: string;
+  status?: 'pending' | 'accepted' | 'dismissed';
+  /** True when this party already has a DIFFERENT account on file — the one to look at twice. */
+  conflict?: boolean;
+  checksum_ok?: boolean;
+  seen_count?: number;
+  bank_account_id?: string;
+}
+
+/**
+ * The bank details our document readers found on a counterparty's own invoice, held for review.
+ *
+ * WHY THIS IS NOT JUST A WRITE. `crm_bank_accounts` is a payment DESTINATION — the payout path
+ * loads a row from it and sends real money on Revolut/Viva. Anyone can email us a PDF, so an IBAN
+ * a model read off one becomes payable only after a person has looked at it. Everything here is a
+ * proposal; `accept` is the only door into that table from this path, and it takes the operator's
+ * confirmed values rather than the document's.
+ *
+ * Writes go through SECURITY DEFINER RPCs (the table has a SELECT policy and nothing else), so
+ * there is exactly one code path and it re-checks workspace membership itself.
+ */
+export const crmBankAccountSuggestionsAPI = {
+  /** Pending sightings for one party, newest first. Accepted/dismissed ones are not offered again. */
+  async listPending(parent: { companyId?: string; contactId?: string }): Promise<CrmBankAccountSuggestion[]> {
+    let query = (supabase as any)
+      .from('crm_bank_account_suggestions')
+      .select('*, conflicts_with:crm_bank_accounts!conflicts_with_account_id(id, iban, bank_name, is_primary)')
+      .eq('status', 'pending');
+    if (parent.companyId) query = query.eq('company_id', parent.companyId);
+    else if (parent.contactId) query = query.eq('contact_id', parent.contactId);
+    else return [];
+    const { data, error } = await query.order('last_seen_at', { ascending: false });
+    if (error) throw new Error(error.message || 'Failed to load suggested bank accounts');
+    return (data ?? []) as CrmBankAccountSuggestion[];
+  },
+
+  /**
+   * File one sighting against a party. Called at the moment the party is known — when a scanned
+   * supplier invoice is booked as an expense, or when an operator saves the details off an inbox
+   * attachment. An unbound sighting is deliberately NOT recorded: it would be a row nobody ever
+   * looks at, which is worse than not having read it.
+   */
+  async record(args: {
+    workspaceId: string;
+    companyId?: string | null;
+    contactId?: string | null;
+    bank: DocumentBankDetailsInput;
+    currency?: string | null;
+    source: CrmBankSuggestionSource;
+    sourceRef?: Record<string, unknown>;
+    documentLabel?: string | null;
+    issuerName?: string | null;
+    confidence?: number | null;
+  }): Promise<RecordBankSuggestionResult> {
+    const { data, error } = await (supabase as any).rpc('crm_record_bank_account_suggestion', {
+      p_workspace_id: args.workspaceId,
+      p_company_id: args.companyId ?? null,
+      p_contact_id: args.companyId ? null : (args.contactId ?? null),
+      p_iban: args.bank.iban ?? null,
+      p_account_ref: args.bank.account_ref ?? null,
+      p_bank_name: args.bank.bank_name ?? null,
+      p_account_holder: args.bank.account_holder ?? null,
+      p_currency: args.currency ?? 'EUR',
+      p_source: args.source,
+      p_source_ref: args.sourceRef ?? {},
+      p_document_label: args.documentLabel ?? null,
+      p_issuer_name: args.issuerName ?? null,
+      p_confidence: args.confidence ?? null,
+    });
+    if (error) throw new Error(error.message || 'Failed to record the bank details found on the document');
+    return (data ?? { outcome: 'new' }) as RecordBankSuggestionResult;
+  },
+
+  /**
+   * Confirm one, creating the payment destination. The values passed are the OPERATOR's — the
+   * suggestion only prefilled the form. Claim + insert are one transaction in the RPC, so a
+   * double-click cannot add the account twice.
+   */
+  async accept(id: string, confirmed: {
+    bankName: string;
+    accountHolder?: string | null;
+    iban?: string | null;
+    accountRef?: string | null;
+    currency?: string | null;
+    isPrimary?: boolean;
+  }): Promise<string> {
+    const { data, error } = await (supabase as any).rpc('crm_accept_bank_account_suggestion', {
+      p_suggestion_id: id,
+      p_bank_name: confirmed.bankName,
+      p_account_holder: confirmed.accountHolder ?? null,
+      p_iban: confirmed.iban ?? null,
+      p_account_ref: confirmed.accountRef ?? null,
+      p_currency: confirmed.currency ?? null,
+      p_is_primary: confirmed.isPrimary ?? false,
+    });
+    if (error) throw new Error(error.message || 'Failed to add the bank account');
+    return data as string;
+  },
+
+  /** Rule against one. The row stays — a rejected account that keeps arriving is worth knowing. */
+  async dismiss(id: string, reason?: string): Promise<void> {
+    const { error } = await (supabase as any).rpc('crm_dismiss_bank_account_suggestion', {
+      p_suggestion_id: id, p_reason: reason ?? null,
+    });
+    if (error) throw new Error(error.message || 'Failed to dismiss');
+  },
+};
+
 // -------- CRM phone numbers (additional named numbers for a party) --------
 
 export type CrmPhoneType = 'mobile' | 'landline' | 'work' | 'home' | 'fax' | 'whatsapp' | 'other';

@@ -24,7 +24,10 @@ import { ordersService, type OrderLinkTarget } from '@/modules/finance/services/
 import { OrderLinkPicker } from '@/modules/finance/components/OrderLinkPicker';
 import { PaidFromSelect } from '@/modules/finance/components/PaidFromSelect';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
-import { crmBankAccountsAPI, type CrmBankAccount } from '@/services/crm.service';
+import {
+  crmBankAccountsAPI, crmBankAccountSuggestionsAPI,
+  type CrmBankAccount, type CrmBankSuggestionSource, type DocumentBankDetailsInput,
+} from '@/services/crm.service';
 import { QuickAddCompanyDialog } from '@/components/business/crm/QuickAddCompanyDialog';
 import { useSessionDraft } from '@/hooks/useSessionDraft';
 import { useEntitlements } from '@/hooks/useEntitlements';
@@ -64,7 +67,23 @@ interface Props {
     categoryId?: string;
     /** Pre-select the payee: a CRM supplier company OR contact (+ display name), or a one-off name. */
     supplier?: { companyId?: string | null; contactId?: string | null; name?: string | null };
+    /**
+     * The payment block already read off the document this expense comes from (an Inbox
+     * attachment). Filed against whichever supplier the operator actually picks, as a SUGGESTION —
+     * never as a payment destination. See `crmBankAccountSuggestionsAPI`.
+     */
+    bankDetails?: ScannedBank;
   };
+}
+
+/** A payment block read off a document, plus enough provenance for a person to recognise it. */
+interface ScannedBank {
+  bank: DocumentBankDetailsInput & { checksum_ok?: boolean };
+  source: CrmBankSuggestionSource;
+  sourceRef?: Record<string, unknown>;
+  documentLabel?: string | null;
+  issuerName?: string | null;
+  confidence?: number | null;
 }
 
 export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenChange, onCreated, orderId, prefill }) => {
@@ -82,6 +101,14 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [receipt, setReceipt] = useState<File | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanNote, setScanNote] = useState<string | null>(null);
+  /**
+   * The bank block the reader found on the document, held until the party is known.
+   *
+   * This is the whole reason it can be filed at all: the document states an account, and the FORM
+   * is where a person says whose account it is. Nothing is written until Save, and what is written
+   * is a suggestion on the party's card — never a payable destination.
+   */
+  const [scannedBank, setScannedBank] = useState<ScannedBank | null>(null);
   const receiptInput = useRef<HTMLInputElement | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -200,6 +227,10 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     // EVERY open belongs here. The create-business dialog is a child overlay, never part of the
     // draft: it should never be showing when this form opens.
     setCompanyDialogOpen(false);
+    // The dialog is persistent, so a bank block read on the LAST document would otherwise still be
+    // in state and get filed against this expense's supplier. It comes from the prefill or from a
+    // scan in this session, never from the one before.
+    setScannedBank(prefill?.bankDetails ?? null);
     if (orderId) {
       setSubtotalNet(prefill?.amount != null ? String(prefill.amount) : '0');
       setVatAmount(prefill?.vatAmount != null ? String(prefill.vatAmount) : '0');
@@ -231,7 +262,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       setParty({ type: 'adhoc', id: null, label: prefill.supplier.name });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, orderId, prefill?.amount, prefill?.vatAmount, prefill?.description, prefill?.categoryId, prefill?.supplier?.companyId, prefill?.supplier?.contactId, prefill?.supplier?.name]);
+  }, [open, orderId, prefill?.amount, prefill?.vatAmount, prefill?.description, prefill?.categoryId, prefill?.supplier?.companyId, prefill?.supplier?.contactId, prefill?.supplier?.name, prefill?.bankDetails?.bank?.iban, prefill?.bankDetails?.bank?.account_ref]);
 
   // Load the picked payee's own bank accounts (for the Bank Payment "paid to their bank" selector).
   useEffect(() => {
@@ -527,6 +558,48 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           });
         }
       }
+      // The bank account the document printed, filed against the supplier that was just chosen.
+      //
+      // This is the only moment both halves are known: the reader had the IBAN and no party, the
+      // operator has just named the party. A one-off `adhoc` payee is skipped — there is no CRM
+      // record to hang it on, and creating one from a petrol-station receipt is the same mistake
+      // the payee prefill deliberately avoids.
+      //
+      // It is a SUGGESTION on the party's card, not a payment destination: `crm_bank_accounts` is
+      // what the payout path sends money to, and this number came off a document. Best-effort and
+      // REPORTED for the same reason as the receipt upload above — the expense is committed, so a
+      // failure here must not read as "nothing happened", and it must not read as "nothing found".
+      if (scannedBank && (cpCompanyId || cpContactId)) {
+        try {
+          const res = await crmBankAccountSuggestionsAPI.record({
+            workspaceId,
+            companyId: cpCompanyId ?? null,
+            contactId: cpContactId ?? null,
+            bank: scannedBank.bank,
+            currency,
+            source: scannedBank.source,
+            sourceRef: { ...(scannedBank.sourceRef ?? {}), bill_id: created.billId },
+            documentLabel: scannedBank.documentLabel,
+            issuerName: scannedBank.issuerName,
+            confidence: scannedBank.confidence,
+          });
+          if (res.outcome === 'new') {
+            toast({
+              title: res.conflict ? 'Bank details on this document DIFFER from the ones on file' : 'Bank details found on the document',
+              description: res.conflict
+                ? `${party.label} is on file with a different IBAN. Review it on their page before paying — a changed IBAN on an invoice is the commonest invoice fraud.`
+                : `Waiting for review on ${party.label}'s page — nothing can be paid to it until you confirm it.`,
+              variant: res.conflict ? 'destructive' : undefined,
+            });
+          }
+        } catch (err: any) {
+          toast({
+            title: 'Expense saved, bank details not filed',
+            description: `${err?.message ?? 'Failed'} — the IBAN on this document was not recorded against ${party.label}. Add it on their page if you need it.`,
+            variant: 'destructive',
+          });
+        }
+      }
       clearDraft();
       // Cash actually moved only when a payment was booked — `paidNow` alone is the intent, not
       // the outcome (a zero-total bill books no payment).
@@ -584,6 +657,16 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         const hit = expenseCats.find((c) => c.name.toLowerCase() === f.category_hint!.toLowerCase());
         if (hit) setCategoryId(hit.id);
       }
+      // Where the document says to pay it. Held, not written: it is filed against the supplier
+      // the operator picks, when they Save, as a suggestion on that party's card.
+      setScannedBank(f.bank ? {
+        bank: f.bank,
+        source: 'supplier_bill_scan',
+        documentLabel: [f.document_number ? `Invoice ${f.document_number}` : 'A scanned invoice', f.doc_date ? `dated ${f.doc_date}` : null]
+          .filter(Boolean).join(' '),
+        issuerName: f.vendor,
+        confidence: f.confidence,
+      } : null);
       const notes: string[] = [];
       if (!f.total_gross) notes.push('no total found');
       if (f.vat_amount === null) notes.push('no VAT line on the receipt — entered as 0');
@@ -638,7 +721,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 <Paperclip className="h-3 w-3 shrink-0" />
                 <span className="truncate">{receipt.name}</span>
                 <Button type="button" size="sm" variant="ghost" className="h-5 w-5 p-0"
-                  title="Remove the receipt" onClick={() => { setReceipt(null); setScanNote(null); }}>
+                  title="Remove the receipt" onClick={() => { setReceipt(null); setScanNote(null); setScannedBank(null); }}>
                   <X className="h-3 w-3" />
                 </Button>
               </span>
@@ -648,6 +731,15 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             {/* What the reader could NOT do is worth more than what it could. A silent partial
                 prefill is how a missing VAT line becomes a cost booked gross. */}
             {scanNote && <span className="w-full text-[11px] text-amber-600 dark:text-amber-400">{scanNote}</span>}
+            {/* Said before Save, not after: the operator is about to name the party this account
+                gets filed against, and that is the decision worth informing. */}
+            {scannedBank && (
+              <span className="w-full text-[11px] text-muted-foreground">
+                Bank details on this document
+                {scannedBank.bank.iban ? ` (IBAN ending ${scannedBank.bank.iban.slice(-4)})` : ''} — filed for review on
+                the payee&rsquo;s page when you save. Not payable until you confirm it there.
+              </span>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">

@@ -146,6 +146,21 @@ export interface InboxAttachmentDocument {
   document_date?: string;
   total?: number;
   currency?: string;
+  /**
+   * Where the document says to pay it — the ISSUER's own account, absent when none is printed.
+   *
+   * On the document's row, deliberately not on the counterparty: `crm_bank_accounts` is what the
+   * payout path sends money to, and anyone can email us a PDF. Booking the attachment as an
+   * expense files this as a SUGGESTION against the supplier the operator picks, reviewed on that
+   * party's page. `checksum_ok` false = a misread character or a typo on the paper.
+   */
+  bank?: {
+    iban: string | null;
+    account_ref: string | null;
+    bank_name: string | null;
+    account_holder: string | null;
+    checksum_ok: boolean;
+  };
   model?: string;
   classified_at?: string;
   error?: string;

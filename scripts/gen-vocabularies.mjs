@@ -229,6 +229,15 @@ export const VOCABULARIES = [
     'src/lib/calculators/heatingCostComparison.ts',
     'supabase/functions/_shared/calculators/heatingCostComparison.generated.ts',
   ],
+  [
+    // The IBAN normaliser + mod-97 check. NOT a value-set, and mirrored for the reason the
+    // escapeHtml twins exist: this rule already lives twice (here and `public.iban_is_valid`,
+    // which backs the CHECK on `crm_bank_accounts`), and the document readers now need it in
+    // Deno too. A hand-written third copy is how the first two would start disagreeing about
+    // which IBAN is a typo — on a payment destination.
+    'src/utils/iban.ts',
+    'supabase/functions/_shared/iban.generated.ts',
+  ],
 ];
 
 const banner = (source) => [

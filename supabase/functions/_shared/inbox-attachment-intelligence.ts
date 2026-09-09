@@ -19,7 +19,10 @@
  *                  an audio part) → `attachments[i].transcript`
  *   pdf / image  → classified by a FORCED Claude tool call (invariant 9: the verdict lands on a
  *                  row, so no free-form JSON and no salvage parser) → `attachments[i].document`
- *                  = {kind, confidence, reason} plus the header facts ONLY when printed
+ *                  = {kind, confidence, reason} plus the header facts ONLY when printed, and the
+ *                  PAYMENT BLOCK (bank, IBAN, holder) when the document prints one — read here
+ *                  because the file is already open, reviewed elsewhere because
+ *                  `crm_bank_accounts` is what payouts are sent to
  *
  * Every element gets a STATUS — ok | failed | skipped — with the reason on it. A silent skip is
  * exactly the failure this replaces: a value, or a stated reason there is no value, never a
@@ -43,6 +46,10 @@ import { reserveCredits, refundCredits, settleCredits } from './credit-reserve.t
 import { resolveTokenPrice } from './ai-logger.ts';
 import { callClaudeMessages, transcribeAudioWithGemini } from './ai-client.ts';
 import { INBOX_DOCUMENT_KINDS, type InboxDocumentKind } from './inboxDocumentKinds.generated.ts';
+import {
+  describeDocumentBankDetails, documentBankToolProperties, readDocumentBankDetails,
+  type DocumentBankDetails,
+} from './finance/document-bank-details.ts';
 
 // deno-lint-ignore no-explicit-any
 type Db = any;
@@ -98,6 +105,13 @@ export interface AttachmentDocument {
   document_date?: string;
   total?: number;
   currency?: string;
+  /**
+   * Where the document says to pay it. Absent when it prints no account — which is most photos
+   * and plenty of receipts. Held here, on the document's own row, and NOT written to
+   * `crm_bank_accounts`: that table is what `payout.ts` sends money to, and anyone can email us
+   * a PDF.
+   */
+  bank?: DocumentBankDetails;
   model?: string;
   classified_at: string;
   error?: string;
@@ -295,6 +309,11 @@ const CLASSIFY_TOOL = {
       document_date: { type: 'string', description: 'YYYY-MM-DD. Omit if not printed.' },
       total: { type: 'number', description: 'The grand total as printed. Omit if not printed.' },
       currency: { type: 'string', description: 'ISO 4217 code of the total, e.g. EUR. Omit if not printed.' },
+      // The payment block, from the same source `scan-receipt` declares it from. A supplier
+      // invoice states where to pay it, and that is the fact we otherwise re-key by hand onto
+      // the party. Recorded on the attachment; it becomes a payment destination only through
+      // the review path (see _shared/finance/document-bank-details.ts).
+      ...documentBankToolProperties(),
     },
     required: ['kind', 'confidence', 'reason'],
   },
@@ -404,6 +423,8 @@ async function classifyOne(
   if (typeof input.total === 'number' && Number.isFinite(total)) out.total = total;
   const currency = cleanString(input.currency, 3);
   if (currency && /^[A-Za-z]{3}$/.test(currency)) out.currency = currency.toUpperCase();
+  const bank = readDocumentBankDetails(input);
+  if (bank) out.bank = bank;
   return out;
 }
 
@@ -522,6 +543,10 @@ export function describeAttachmentForAssistant(att: InboxAttachmentRecord | null
     if (d.document_number) facts.push(`no. ${d.document_number}`);
     if (d.document_date) facts.push(`dated ${d.document_date}`);
     if (typeof d.total === 'number') facts.push(`total ${d.total}${d.currency ? ` ${d.currency}` : ''}`);
+    // MASKED on purpose — see describeDocumentBankDetails. The assistant should know a payment
+    // block was read (so it can point at the review), never be able to recite the account.
+    const bankWord = describeDocumentBankDetails(d.bank);
+    if (bankWord) facts.push(bankWord);
     const sure = typeof d.confidence === 'number' ? ` (confidence ${Math.round(d.confidence * 100)}%)` : '';
     return `[attached ${name ? `"${name}"` : 'a file'}, which our reader identified as a ${documentKindLabel(d.kind)}${sure}`
       + `${facts.length ? `, ${facts.join(', ')}` : ''}. You cannot open the file yourself.]`;

@@ -12,6 +12,11 @@
  *                   supplier_bill, private bucket, + a signed URL.
  *   - sign_bill   : { bill_id } → a fresh signed URL for one already attached.
  *
+ * `scan` also returns the PAYMENT BLOCK the document prints — bank, IBAN, holder — because the
+ * file is already open in front of a model and reading it costs nothing more. It is returned, not
+ * stored: `crm_bank_accounts` is what `payout.ts` sends money to, so a supplier's IBAN becomes a
+ * destination only after a person reviews it (`crm_accept_bank_account_suggestion`).
+ *
  * `scan` deliberately does NOT write. The trip flow scans, creates the line from the result, then
  * uploads through `trip-expense-ops.upload_receipt`, which already owns that permission model;
  * the Finance flow scans, the operator confirms, and the bill is created by the normal path. A
@@ -42,6 +47,7 @@ import { userCanAccessWorkspace } from '../_shared/auth.ts';
 import { loadPrompt } from '../_shared/prompt-utils.ts';
 import { callClaudeMessages } from '../_shared/ai-client.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
+import { documentBankToolProperties, readDocumentBankDetails } from '../_shared/finance/document-bank-details.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -96,6 +102,11 @@ const RECEIPT_TOOL = {
       category_hint: { type: 'string', description: 'One short word for what was bought' },
       confidence: { type: 'number', description: '0..1, how legible the document was overall' },
       unreadable: { type: 'boolean', description: 'true when the essential figures cannot be read at all' },
+      // Where the document says to pay it. Same four properties the Inbox reader declares, from
+      // one source, so the two cannot disagree about what "the IBAN on the document" means.
+      // Read-only here: `scan` stores nothing, and an IBAN becomes a payment destination only
+      // through the review path (see _shared/finance/document-bank-details.ts).
+      ...documentBankToolProperties(),
     },
     required: ['confidence', 'unreadable'],
   },
@@ -267,6 +278,10 @@ async function scan(body: Body, admin: any, uid: string): Promise<Response> {
     category_hint: typeof raw.category_hint === 'string' ? raw.category_hint.trim() || null : null,
     confidence: typeof raw.confidence === 'number' ? Math.max(0, Math.min(1, raw.confidence)) : 0,
     foots,
+    // Where the document says to pay it, or null when it says nothing. Returned to the caller and
+    // stored NOWHERE by this function: the expense form records it against the supplier the
+    // operator actually picks, which is the first moment the party is known.
+    bank: readDocumentBankDetails(raw),
   };
 
   return json({
