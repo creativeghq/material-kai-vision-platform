@@ -366,6 +366,24 @@ UX; the tool reaches the same tables without passing it. 10 of 19 files did not 
 including the operator, permanently. Guarded by [tests/unit/adminOnlyParity.test.ts](tests/unit/adminOnlyParity.test.ts)
 and [tests/unit/toolModuleGates.test.ts](tests/unit/toolModuleGates.test.ts).
 
+**An attachment SLOT means one thing, and an EDIT edits the user's own photo.** With two images
+attached the composer labels them *Inspiration* (slot 0) and *Your Room* (slot 1); `copy-style` and
+`ai-client`'s `IMAGE_LABELS` read that order, and `image-edit`/`floor-plan-render` read it
+BACKWARDS — so a 355×355 tile swatch was sent to Gemini as the room, with the user's kitchen
+paraphrased into text as the "inspiration", and it invented a kitchen. Twice, 15 credits each
+(conversation b520cc11, 2026-09-09). Every mode now resolves its slots through `resolveImageSlots`
+(`_shared/tools/image-slots.ts`) — **never a raw `images[0]`/`images[1]`** — and the model, the only
+party that can see both pictures, says which is which with `baseImageIndex`/`referenceImageIndex`
+rather than in prose the tool cannot read. Three corollaries, each its own silent failure: a
+material reference on an edit is sent as **pixels** alongside the room (paraphrasing it into a
+whole-room "design spec" is `copy-style`'s job, and that prompt orders a full renovation, which
+beats any floor-only instruction placed under it); an edit's **aspect ratio comes from the source
+photo**, because a re-cropped picture is not the same room however good the edit is; and
+`agent-chat` must **carry `images`/`metadata`/`geminiImageData`/`tool_results` through its history
+map** — projecting to `{role, content}` made `priorUploadedImages` and `conversationImages` empty in
+every conversation ever run, so "change the floor" a turn later answered `No reference image
+available` in 2ms. Guarded by [tests/unit/imageEditPipeline.test.ts](tests/unit/imageEditPipeline.test.ts).
+
 **A run is DERIVED from the stream — never a hand-written pipeline per toolkit.** The canvas shows the
 work while it happens (`runs/RunCanvas.tsx`), and it does that for all 48 toolkits because
 `runs/runDerivation.ts` folds the `tool_call` / `tool_progress` / `tool_result` / `tool_error` chunks

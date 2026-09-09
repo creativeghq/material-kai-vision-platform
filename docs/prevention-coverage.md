@@ -713,6 +713,43 @@ looked different at 20 rows and at 900.
   swallowing its error two months after AD-29 removed that shape from the other ten blocks.
 
 
+### 22. Two readers of the same ordered input, disagreeing about which is which
+
+Conversation b520cc11 (2026-09-09): a user attached a 355x355 terrazzo swatch and a 1280x1600
+photo of their kitchen, asked to swap the floor tile, and got a kitchen that does not exist.
+Twice, 15 credits a render, ~223 credits for the session, and every layer reported success.
+
+The composer labels the two attachment slots **Inspiration** and **Your Room**. `copy-style` read
+them that way; `ai-client`'s `IMAGE_LABELS` tells Gemini the same thing; `image-edit` and
+`floor-plan-render` read them the other way round. So the same two files meant opposite things
+depending on a mode the user never chose, and the swatch was sent as the room.
+
+This is shape 15 (two files, one policy) applied to an ORDERED INPUT rather than to a rule, and
+it is worse in one specific way: there is no contradiction to find. Each site's line is locally
+correct — `images[0]` genuinely is the thing to edit *in that mode's own vocabulary*. The
+disagreement only exists across files, and the artefact it produces is a plausible image.
+
+- **The tell:** a positional index into a user-supplied list (`images[0]`, `rows[1]`,
+  `parts.at(-1)`) appearing in more than one module, with the meaning of the position written only
+  in a comment. Every such index is a vocabulary with no declaration.
+- **The fix is a resolver, not a convention:** `_shared/tools/image-slots.ts` answers "which one is
+  the room" once, for every mode. A rule in a comment is what already existed, three times, in
+  three wordings.
+- **Give the only party who can see both a way to say so.** The agent had described the correct
+  order in its own prompt text — *"Image 2 is the base photograph and must be preserved exactly"* —
+  where nothing reads it. `baseImageIndex` / `referenceImageIndex` on `generate_gemini` make that
+  sentence a parameter. An override must move the OTHER slot too, or pinning one recreates the bug.
+- **Downstream of the same defect, three more:** a second image switched `image-edit` into a
+  style transfer that paraphrases the reference and never sends it; the output shape was requested
+  at a 16:9 default that the multi-image call then dropped anyway, so a 4:5 photo came back
+  re-cropped; and `agent-chat` projected its history to `{role, content}` before the two image
+  recovery paths read it, so "the image you attached a minute ago" was unreachable **in every
+  conversation the platform has ever run** and the retry answered `No reference image available
+  for editing` in 2ms.
+- **Guarded** by [tests/unit/imageEditPipeline.test.ts](../tests/unit/imageEditPipeline.test.ts),
+  and verified live on the failing conversation's own two images before and after.
+
+
 ## Mechanism inventory
 
 | Mechanism | Runs | Enforces | Self-proving? |
@@ -758,6 +795,7 @@ looked different at 20 rows and at 900.
 | [tests/unit/workspaceRoles.test.ts](../tests/unit/workspaceRoles.test.ts) — the tier cross-product | `npm test`, blocking | #358 PQ-1 — the workspace role beats EVERY account tier, for every role, and no scoped role can reach `platform.admin`/`network.manage`/`pricing.manage`/`catalog.import` through one | **yes** — mutation-tested 2026-08-17 by moving the account-tier switch back above `TEAM_ROLE_PERSONA`; 3 assertions failed. The pre-existing per-role test passed `accountRole: null`, which is exactly why it never fired on the real bug — the cross-product is the whole point |
 | `lint_plpgsql_errors()` via `db.plpgsql-lint` | smoke monitor, 2-hourly | every `public` plpgsql function still compiles against the live schema | yes — baseline is a strict **zero**, so any new breakage fails instead of blending into a known-broken list |
 | [tests/unit/companyIdentity.test.ts](../tests/unit/companyIdentity.test.ts) | `npm test`, blocking | shape 8 — one identity lookup for every create-a-business surface, `crm_companies` direct-insert ratchet | **yes** — asserts its own scan matched >500 files before trusting the verdict, so an inert glob fails instead of reporting clean |
+| [tests/unit/imageEditPipeline.test.ts](../tests/unit/imageEditPipeline.test.ts) | `npm test`, blocking | shape 22 — the composer, the tool and the model prompt agree which attachment is the room; a material reference reaches the model as PIXELS; an edit keeps the source's aspect ratio; and agent-chat carries the image fields into the history its own recovery paths read | **yes** — mutation-tested 2026-09-09 by restoring `images[0]` as the edit source and by re-flattening the history map; each failed naming its own case. Also verified END TO END against the deployed function on the failing conversation's own two images: 1408x768 diptych of an invented kitchen before, the user's kitchen at 4:5 with the attached terrazzo after |
 | [tests/unit/profileBusinessIdentity.test.ts](../tests/unit/profileBusinessIdentity.test.ts) | `npm test`, blocking | "am I a business?" has ONE derivation (`public.user_business_identity()`) and no TypeScript twin — the card calls the RPC, no client file touches the `business_*_en` columns, and the role gate reads the derivation instead of `entity_type` | partly — the parser half is behavioural (including the half-identity case, which must fall back to solo rather than render a company card with a blank VAT number); the SQL half cannot run here (it lives only in `pg_proc`) and was verified live against the MATERIALS BANK ΕΕ row when it shipped. What this test actually guards is the copy growing back |
 | [tests/unit/productRelationDerivation.test.ts](../tests/unit/productRelationDerivation.test.ts) | `npm test`, blocking | shape 1 off the money path — a second client-side derivation of "what relates to this product" (#267) | **yes** — asserts its scan matched >100 files, and was watched to fail on a planted violation before shipping |
 | `product_edges` composite FKs | every write | invariant 1 — an edge's two products must both sit in the edge's workspace | n/a — declarative; unlike a trigger it cannot be disabled |
