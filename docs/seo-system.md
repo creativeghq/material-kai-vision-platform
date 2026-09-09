@@ -83,11 +83,23 @@ value or a stated reason there is no value" rule from CLAUDE.md:
 - **A failed check is unknown, not lost.** A check that could not run stores `error`, is excluded from every figure and counted separately. Announcing "you left the top 10" off a timed-out request is worse than saying nothing.
 - **Up is good.** Position 3 beats position 30, so the RPC inverts the raw delta **once** and no consumer has to remember which way round it is.
 
-**Cost is the real constraint** — one SERP call per keyword per run, the only cron here whose bill
-scales with what a user types. Both paths cap at **60 keywords per invocation**, ordered
-oldest-checked-first, so a large set becomes a slower rotation rather than a larger bill.
+**Cost scales with what a user types** — one SERP call per keyword per run, $0.0006 measured, the
+only cron here whose bill grows that way. Both paths cap at **60 keywords per invocation**.
 `last_checked_at` is stamped **even on failure**, or one broken keyword sits at the head of the
 queue forever and starves everything behind it.
+
+**The cap is per RUN, not per day, and the sweep is scheduled in legs.** `20 5,7,9,11 * * *` — four
+legs, each taking what the earlier ones did not reach, so a 129-keyword set is covered every day
+instead of rotating over two. Adding legs is nearly free: `seo_keywords_due(p_only_stale => true)`
+returns nothing once the day's work is done and the leg makes no upstream call at all. Before this
+the sweep was one leg of 60 against 129 keywords — the panel said "followed daily" over figures that
+blended three capture dates, and a failed check waited a full day for its retry.
+
+**`seo_keywords_due` is the one derivation of what to check next** (service_role only): latest check
+failed first, then never-checked, then least-recently-checked; `p_only_stale` skips what today's
+earlier legs covered; `p_website_id` NULL orders the whole platform at once, so a big site cannot
+starve a small one by sorting first every leg. It replaced `seo_keywords_to_recheck` plus two
+PostgREST reads in the edge function — two places deciding one thing.
 
 **Time is the other constraint, and it was the binding one.** One keyword takes ~19 s end to
 end (a 7–15 s live SERP call per `ai_usage_logs.metadata.latency_ms`, plus two writes), so
@@ -96,8 +108,11 @@ checking 60 one after another needs ~19 minutes — and the edge gateway cuts th
 129-keyword set: the sweep checked **10**, so each keyword came round every ~13 days under a
 panel that said "checked daily". The shape is the silent-rotation one: every keyword that WAS
 checked was checked correctly, so nothing raised. The loop is now a pool of **12 in flight**
-(`CONCURRENCY`), which puts the 60-cap at ~5 rounds, ~100 s. With 129 keywords the set still
-rotates over ~2 days; that is the cap doing its job, not a defect.
+(`CONCURRENCY`), which puts the 60-cap at ~5 rounds, ~100 s. Two guards keep it there: every SERP
+call carries a **45 s** `AbortSignal.timeout` (a hung call otherwise holds one of the twelve workers
+until the platform kills the whole request), and the pool stops **starting** keywords at 120 s
+(`RUN_DEADLINE_MS`) so the run ends with a report instead of dying at the 504 — which also skipped
+the drop alerts and the retention delete, while `api_usage_logs` recorded the 200 it never sent.
 
 **A capped run means the newest capture DATE covers part of the set, so every reader uses each
 keyword's OWN latest capture.** `get_website_rank_summary` joined every keyword to the site's
@@ -115,10 +130,14 @@ rest.
 "partial results"); one retry left 5–8% of a sweep as unknown, and because `last_checked_at`
 is stamped on failure too (correctly — a broken keyword must not starve the rest) those
 keywords went to the BACK of a two-day rotation, so "8 of 129 latest checks failed" sat on the
-panel for days. `serpWithRetry` now makes three attempts with backoff, and `trackWebsite`
-takes `seo_keywords_to_recheck` (latest capture has an error; service_role only) ahead of the
-oldest-checked fill. The summary carries `last_checked_at` (a timestamp — the capture DATE
-read "checked 10h ago" at ten in the morning) and the note names the source's error text.
+panel for days. `serpWithRetry` now makes three attempts with backoff, `seo_keywords_due` puts a
+failed check at the head of the next leg — hours later, not tomorrow — and after those three
+attempts the collector reads the **top 50 once** before recording unknown: what DataForSEO fails on
+is the deep pages (40106 says so, and the 40101s land on the same depth-100 Greek tasks), so the
+shallower ask usually answers, and "not in top 50" with `depth_checked = 50` is a real answer where
+unknown is none. Residual after all that, measured 09-06→09-09: **1–2 keywords per 60-keyword leg**,
+all transient upstream task errors. The summary carries `last_checked_at` (a timestamp — the capture
+DATE read "checked 10h ago" at ten in the morning) and the note names the source's error text.
 **A partial page set is used when we are IN it.** 40106 returns the result pages DataForSEO did
 fetch; MIVAA's `_call` passes those items through with `ok=False`, and the tracker accepts them
 on its LAST attempt only: a position found in the fetched pages is real, "not found in a partial

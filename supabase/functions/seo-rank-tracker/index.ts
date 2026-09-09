@@ -7,18 +7,25 @@
  * answer the only question it exists for.
  *
  * Actions (user JWT): run — check one website's keywords now.
- * Action (x-cron-secret): cron-run — the daily sweep.
+ * Action (x-cron-secret): cron-run — one leg of the daily sweep.
  *
- * COST. One SERP call per keyword per run, so this is the most expensive cron in the
- * SEO module by a wide margin and the only one whose cost scales with what the user
- * types in. Both paths are capped, and the cron takes the oldest-checked keywords
- * first so a large set degrades into a slower rotation rather than a large bill.
+ * COST. One SERP call per keyword per run ($0.0006 measured), so this is the most
+ * expensive cron in the SEO module by a wide margin and the only one whose cost scales
+ * with what the user types in. Every run is capped and time-bounded.
+ *
+ * COVERAGE. The cap is per RUN, not per day: the sweep is scheduled several times a
+ * day and `seo_keywords_due(p_only_stale => true)` hands each leg the keywords the
+ * earlier legs did not reach, so a set larger than the cap is still covered daily
+ * instead of rotating over two. It was one leg of 60 against a 129-keyword set — the
+ * panel said "followed daily" over figures that blended three capture dates, and a
+ * failed check waited a full day for its retry. Adding legs is free where the work is
+ * already done: a leg with nothing due makes no upstream call at all.
  */
 
 import { createClient } from '@supabase/supabase-js';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { authenticate, userCanAccessWorkspace, isCronAuthorized } from '../_shared/auth.ts';
-import { assertEntitled } from '../_shared/entitlement.ts';
+import { assertEntitled, isWorkspaceEntitled } from '../_shared/entitlement.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 import { describeUpstreamError } from '../_shared/tool-result-shape.ts';
@@ -43,6 +50,38 @@ const MAX_PER_RUN = 60;
  * endpoint has no concurrency limit at this scale and MIVAA's dispatcher adds none.
  */
 const CONCURRENCY = 12;
+
+/**
+ * A live SERP answers in 7–15 s (measured). One that has not answered in 45 s is hung,
+ * and with no timeout it holds one of the twelve workers until the PLATFORM kills the
+ * whole request — so a single stuck upstream call costs the run rather than the keyword.
+ */
+const SERP_TIMEOUT_MS = 45_000;
+
+/**
+ * Stop STARTING keywords at 120 s. The gateway cuts the request off at 150 s with a 504,
+ * and a run that dies there loses its drop alerts, its retention sweep and its report to
+ * the caller — while `api_usage_logs` records the 200 it never sent. Ending early costs
+ * nothing: what is left is by definition the stalest, which is what the next leg takes
+ * first.
+ */
+const RUN_DEADLINE_MS = 120_000;
+
+/** One row of `seo_keywords_due` — the queue, derived in SQL. */
+type DueKeyword = {
+  id: string;
+  website_id: string;
+  workspace_id: string;
+  url: string;
+  keyword: string;
+  country_code: string;
+  language_code: string;
+  device: string;
+  last_checked_at: string | null;
+  /** Last ANSWERED position, or null. A shallow read cannot contradict it. */
+  last_position: number | null;
+  retry: boolean;
+};
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -70,6 +109,7 @@ async function serp(keyword: string, country: string, language: string, userId: 
   const resp = await fetch(`${MIVAA_GATEWAY_URL()}/api/v1/seo-agent/dataforseo/serp_google_organic`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET() },
+    signal: AbortSignal.timeout(SERP_TIMEOUT_MS),
     // `country_code`, NOT `location_code` — the client maps the former to the latter
     // itself, and passing the mapped name is a hard 400 on an unexpected kwarg.
     body: JSON.stringify({
@@ -91,7 +131,10 @@ async function serp(keyword: string, country: string, language: string, userId: 
     const err = String(parsed?.data?.error || 'upstream returned no result');
     const partialItems = Array.isArray(parsed?.data?.items) ? parsed.data.items : [];
     if (acceptPartial && /40106/.test(err) && partialItems.length > 0) {
-      return { ...parsed.data, partial: true, partial_error: err };
+      // `depth` travels with the result or the row claims the depth it did not read:
+      // the caller stores `depth_checked` from it, and the panel prints that number
+      // as "not in top N".
+      return { ...parsed.data, partial: true, partial_error: err, depth };
     }
     throw new Error(err);
   }
@@ -108,8 +151,9 @@ async function serp(keyword: string, country: string, language: string, userId: 
  * retrieved after several retry attempts" and 40101 "internal SE server error",
  * both transient by their own description. One retry still left 5–8% of a sweep as
  * unknown (measured 2026-09-05: 15 failures in 128 calls, 8 keywords left failed).
- * A keyword that fails all three is recorded as unknown with the message, never as
- * unranked, and the next run takes it first (`seo_keywords_to_recheck`).
+ * A keyword that fails all three gets one shallower read (see `trackWebsite`) and, if
+ * that fails too, is recorded as unknown with the message — never as unranked. The next
+ * leg of the sweep takes it first (`seo_keywords_due`), hours later rather than tomorrow.
  */
 const SERP_ATTEMPTS = 3;
 const SERP_BACKOFF_MS = [1500, 4000];
@@ -193,103 +237,119 @@ function ownedFeatures(items: any[], host: string): string[] {
   return OWNABLE_FEATURES.filter((f) => owned.has(f));
 }
 
-/** Check one website's tracked keywords and store today's positions. */
+/**
+ * Check the keywords handed to us and store today's positions.
+ *
+ * WHICH keywords is not decided here — `seo_keywords_due` derives that in SQL, once,
+ * for both entry points. This function's only job is asking, reading and writing.
+ */
 async function trackWebsite(
   supabase: any,
   website: { id: string; workspace_id: string; url: string },
+  keywords: DueKeyword[],
   userId: string | null,
-  limit: number,
-): Promise<{ checked: number; ranking: number; failed: number }> {
+  deadline: number,
+): Promise<{ checked: number; ranking: number; failed: number; done: string[] }> {
   const host = hostOf(website.url);
   const today = new Date().toISOString().slice(0, 10);
 
-  // Keywords whose LATEST check failed go first: `last_checked_at` is stamped on
-  // failure too (or a broken keyword starves the rest), which put them at the back
-  // of a two-day rotation, so "8 of 129 failed" sat on the panel for days. Then
-  // oldest-checked first, so a set larger than the cap rotates through rather than
-  // always re-checking the same head of the list.
-  const { data: recheckIds, error: recheckErr } = await supabase.rpc('seo_keywords_to_recheck', { p_website_id: website.id });
-  if (recheckErr) console.warn('[seo-rank-tracker] recheck read failed:', recheckErr.message);
-  const first = new Set<string>(((recheckIds as string[] | null) || []).slice(0, limit));
-  const { data: oldest } = await supabase
-    .from('seo_tracked_keywords')
-    .select('id, keyword, country_code, language_code, device, last_checked_at')
-    .eq('website_id', website.id).eq('is_active', true)
-    .order('last_checked_at', { ascending: true, nullsFirst: true })
-    .limit(limit + first.size);
-  let failedFirst: any[] = [];
-  if (first.size > 0) {
-    const { data } = await supabase
-      .from('seo_tracked_keywords')
-      .select('id, keyword, country_code, language_code, device, last_checked_at')
-      .in('id', [...first]);
-    failedFirst = data || [];
-  }
-  const keywords = [
-    ...failedFirst,
-    ...(oldest || []).filter((k: any) => !first.has(k.id)),
-  ].slice(0, limit);
-
   let checked = 0, ranking = 0, failed = 0;
-  const checkOne = async (kw: any): Promise<void> => {
+  const done: string[] = [];
+
+  /**
+   * One answered SERP → one row. `depth` comes off the result, never assumed.
+   *
+   * THROWS when the read was too shallow to contradict what we already know: a keyword
+   * last answered at #60, read only to depth 50 because the deep pages failed, is not
+   * "not ranking" — it is unknown, and storing the shallow miss as a fact is the same
+   * defect as storing a failed check as unranked. Finding us is never ambiguous, and a
+   * keyword with no answered position yet has nothing to contradict.
+   */
+  const rowFrom = (kw: DueKeyword, r: any, items: any[]): Record<string, unknown> => {
+    const { position, url } = findPosition(items, host);
+    const depth = Number(r.depth) || 100;
+    if (position == null && kw.last_position != null && kw.last_position > depth) {
+      throw new Error(`read to depth ${depth} only; last answered at #${kw.last_position}, deeper pages unavailable`);
+    }
+    // Every distinct block type on the page, so "we lost the featured snippet"
+    // is answerable later without re-fetching.
+    const features = [...new Set(items.map((i: any) => i?.type).filter(Boolean))] as string[];
+    if (position != null) ranking++;
+    return {
+      tracked_keyword_id: kw.id, website_id: website.id, workspace_id: website.workspace_id,
+      captured_at: today,
+      position, found: position != null, url,
+      serp_features: features, owned_features: ownedFeatures(items, host), error: null,
+      depth_checked: depth,
+    };
+  };
+
+  const checkOne = async (kw: DueKeyword): Promise<void> => {
     let row: Record<string, unknown>;
+    let triedShallow = false;
     try {
       let r = await serpWithRetry(kw.keyword, kw.country_code, kw.language_code, userId);
       let items: any[] = r.items || [];
-      let { position, url } = findPosition(items, host);
       // A partial page set that does not contain us says nothing about the pages that
       // did not load. Before giving up as unknown, read the top 50 — half the pages,
       // which DataForSEO fetches reliably where the deep Greek pages fail — and record
       // the depth so the panel says "not in top 50", not "not in top 100".
-      if (r.partial && position == null) {
+      if (r.partial && findPosition(items, host).position == null) {
+        triedShallow = true;
         try {
           r = await serp(kw.keyword, kw.country_code, kw.language_code, userId, false, 50);
           items = r.items || [];
-          ({ position, url } = findPosition(items, host));
         } catch (fallbackErr) {
           throw new Error(String(r.partial_error || (fallbackErr instanceof Error ? fallbackErr.message : 'partial results')));
         }
       }
-      // Every distinct block type on the page, so "we lost the featured snippet"
-      // is answerable later without re-fetching.
-      const features = [...new Set(items.map((i: any) => i?.type).filter(Boolean))] as string[];
-      row = {
-        tracked_keyword_id: kw.id, website_id: website.id, workspace_id: website.workspace_id,
-        captured_at: today,
-        position, found: position != null, url,
-        serp_features: features, owned_features: ownedFeatures(items, host), error: null,
-        depth_checked: Number(r.depth) || 100,
-      };
-      if (position != null) ranking++;
+      row = rowFrom(kw, r, items);
     } catch (e) {
-      // UNKNOWN, not unranked. `found:false` with an error set is a different fact
-      // from `found:false` with none, and the report separates them.
-      failed++;
-      row = {
-        tracked_keyword_id: kw.id, website_id: website.id, workspace_id: website.workspace_id,
-        captured_at: today, position: null, found: false, url: null,
-        error: String(e instanceof Error ? e.message : e).slice(0, 300),
-      };
+      // The last thing to try before recording UNKNOWN: one read of the top 50. What
+      // DataForSEO fails on is the DEEP pages — 40106 says exactly that, and the 40101s
+      // land on the same Greek depth-100 tasks — so the shallower ask often answers
+      // where three deep ones did not. "Not in the top 50" is a real answer and the row
+      // carries the depth that produced it; unknown is not an answer at all.
+      try {
+        if (triedShallow) throw e;
+        const r = await serp(kw.keyword, kw.country_code, kw.language_code, userId, false, 50);
+        row = rowFrom(kw, r, r.items || []);
+      } catch {
+        // UNKNOWN, not unranked. `found:false` with an error set is a different fact
+        // from `found:false` with none, and the report separates them.
+        failed++;
+        row = {
+          tracked_keyword_id: kw.id, website_id: website.id, workspace_id: website.workspace_id,
+          captured_at: today, position: null, found: false, url: null,
+          error: String(e instanceof Error ? e.message : e).slice(0, 300),
+        };
+      }
     }
     checked++;
+    done.push(kw.keyword);
     const { error: upErr } = await supabase
       .from('seo_keyword_positions')
       .upsert(row, { onConflict: 'tracked_keyword_id,captured_at' });
     if (upErr) console.warn('[seo-rank-tracker] position write failed:', upErr.message);
     // Stamped even when the check FAILED, or a keyword whose SERP call errors would
-    // stay first in the rotation forever and starve every keyword behind it.
+    // stay first in the rotation forever and starve every keyword behind it. Being
+    // taken first on the next leg is `seo_keywords_due`'s job, and it reads the row.
     await supabase.from('seo_tracked_keywords')
       .update({ last_checked_at: new Date().toISOString() }).eq('id', kw.id);
   };
 
   // A pool, not batches: a slow SERP holds up one slot, not the eleven beside it.
-  // Each worker pulls the next keyword off the shared queue until it is empty.
-  const queue: any[] = [...(keywords || [])];
+  // Each worker pulls the next keyword off the shared queue until it is empty or the
+  // run is out of time.
+  const queue: DueKeyword[] = [...keywords];
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, async () => {
-    for (let kw = queue.shift(); kw; kw = queue.shift()) await checkOne(kw);
+    for (let kw = queue.shift(); kw; kw = queue.shift()) {
+      if (Date.now() > deadline) break;
+      await checkOne(kw);
+    }
   }));
 
-  return { checked, ranking, failed };
+  return { checked, ranking, failed, done };
 }
 
 /**
@@ -297,12 +357,22 @@ async function trackWebsite(
  * costs traffic. Deliberately NOT every position change: a tracker that alerts on
  * noise gets muted, and then it cannot alert on anything.
  */
-async function alertOnDrops(supabase: any, website: { id: string; workspace_id: string }, today: string): Promise<void> {
+async function alertOnDrops(
+  supabase: any,
+  website: { id: string; workspace_id: string },
+  today: string,
+  checkedInThisRun: string[],
+): Promise<void> {
   try {
-    const { data: dropped } = await supabase.rpc('seo_keywords_dropped_out_of_top10' as any, {
+    const { data: all } = await supabase.rpc('seo_keywords_dropped_out_of_top10' as any, {
       p_website_id: website.id, p_captured_at: today,
     });
-    if (!dropped?.length) return;
+    // The sweep runs in several legs and every leg sees the SAME day's captures, so an
+    // unfiltered alert would re-announce leg one's drops at every later leg. A keyword
+    // can only have dropped in the run that actually re-checked it.
+    const inThisRun = new Set(checkedInThisRun);
+    const dropped = ((all as any[] | null) || []).filter((d: any) => inThisRun.has(d.keyword));
+    if (!dropped.length) return;
     const names = dropped.slice(0, 5).map((d: any) => d.keyword).join(', ');
     // `seo.ranking_movement`, not a new `seo.rank_drop`. The trigger already exists,
     // is already in the tenant vocabulary, and already means "your rankings moved" —
@@ -333,21 +403,42 @@ Deno.serve(withApiLogging('seo-rank-tracker', async (req: Request) => {
   const action = String(body?.action || '');
   const today = new Date().toISOString().slice(0, 10);
 
-  // ── Daily sweep ──
+  // ── One leg of the daily sweep ──
   if (action === 'cron-run') {
     if (!isCronAuthorized(req)) return json({ error: 'Unauthorized' }, 401);
-    const { data: sites } = await supabase
-      .from('user_websites').select('id, workspace_id, url').eq('is_active', true);
-    let checked = 0, failed = 0;
-    for (const s of sites || []) {
-      const r = await trackWebsite(supabase, s, null, MAX_PER_RUN);
+    const deadline = Date.now() + RUN_DEADLINE_MS;
+    // One list for the whole platform, ordered failed-first then stalest-first, so the
+    // cap falls on the freshest work rather than on whichever site sorts last. Reading
+    // it per site with a per-site cap is how one large site starves a small one every
+    // single leg — the site order never changes.
+    const { data: due, error: dueErr } = await supabase.rpc('seo_keywords_due', {
+      p_website_id: null, p_limit: MAX_PER_RUN, p_only_stale: true,
+    });
+    if (dueErr) return json({ error: dueErr.message }, 500);
+    const bySite = new Map<string, { site: { id: string; workspace_id: string; url: string }; keywords: DueKeyword[] }>();
+    for (const k of ((due as DueKeyword[] | null) || [])) {
+      const entry = bySite.get(k.website_id)
+        ?? { site: { id: k.website_id, workspace_id: k.workspace_id, url: k.url }, keywords: [] };
+      entry.keywords.push(k);
+      bySite.set(k.website_id, entry);
+    }
+    let checked = 0, failed = 0, skipped = 0;
+    for (const { site, keywords } of bySite.values()) {
+      if (Date.now() > deadline) break;
+      // The SERP calls ARE the spend, so the module gate is asked before them (invariant
+      // 10) — a workspace that no longer holds the SEO module is not swept for free.
+      if (!(await isWorkspaceEntitled(supabase, site.workspace_id, 'seo-toolkit'))) {
+        skipped += keywords.length;
+        continue;
+      }
+      const r = await trackWebsite(supabase, site, keywords, null, deadline);
       checked += r.checked; failed += r.failed;
-      if (r.checked > 0) await alertOnDrops(supabase, s, today);
+      if (r.checked > 0) await alertOnDrops(supabase, site, today, r.done);
     }
     // 730 days of history is the RPC's ceiling; keep a little past it and no more.
     await supabase.from('seo_keyword_positions')
       .delete().lt('captured_at', new Date(Date.now() - 760 * 86400000).toISOString().slice(0, 10));
-    return json({ ok: true, checked, failed });
+    return json({ ok: true, due: ((due as DueKeyword[] | null) || []).length, checked, failed, skipped });
   }
 
   // ── User: check one website now ──
@@ -366,7 +457,17 @@ Deno.serve(withApiLogging('seo-rank-tracker', async (req: Request) => {
   const ent = await assertEntitled(supabase, website.workspace_id, 'seo-toolkit');
   if (!ent.ok) return ent.response;
 
-  const r = await trackWebsite(supabase, website, auth.userId, MAX_PER_RUN);
-  if (r.checked > 0) await alertOnDrops(supabase, website, today);
-  return json({ ok: true, ...r });
+  // `p_only_stale: false` — a person pressing Check now gets work done whatever the
+  // sweep already covered today. The order is the same, so the keywords they have been
+  // waiting on are still the ones that go first.
+  const { data: due, error: dueErr } = await supabase.rpc('seo_keywords_due', {
+    p_website_id: website.id, p_limit: MAX_PER_RUN, p_only_stale: false,
+  });
+  if (dueErr) return json({ error: dueErr.message }, 500);
+
+  const r = await trackWebsite(
+    supabase, website, ((due as DueKeyword[] | null) || []), auth.userId, Date.now() + RUN_DEADLINE_MS,
+  );
+  if (r.checked > 0) await alertOnDrops(supabase, website, today, r.done);
+  return json({ ok: true, checked: r.checked, ranking: r.ranking, failed: r.failed });
 }));
