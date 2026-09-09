@@ -583,13 +583,19 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             issuerName: scannedBank.issuerName,
             confidence: scannedBank.confidence,
           });
-          if (res.outcome === 'new') {
+          // A conflict is announced on EVERY sighting that is still open, not only the first.
+          // The second invoice carrying a changed IBAN is precisely the one worth reacting to,
+          // and by then the row is `seen_again` — gating on `new` would silence it.
+          if (res.conflict && res.status === 'pending') {
             toast({
-              title: res.conflict ? 'Bank details on this document DIFFER from the ones on file' : 'Bank details found on the document',
-              description: res.conflict
-                ? `${party.label} is on file with a different IBAN. Review it on their page before paying — a changed IBAN on an invoice is the commonest invoice fraud.`
-                : `Waiting for review on ${party.label}'s page — nothing can be paid to it until you confirm it.`,
-              variant: res.conflict ? 'destructive' : undefined,
+              title: 'Bank details on this document DIFFER from the ones on file',
+              description: `${party.label} is on file with a different IBAN. Review it on their page before paying — a changed IBAN on an invoice is the commonest invoice fraud.`,
+              variant: 'destructive',
+            });
+          } else if (res.outcome === 'new') {
+            toast({
+              title: 'Bank details found on the document',
+              description: `Waiting for review on ${party.label}'s page — nothing can be paid to it until you confirm it.`,
             });
           }
         } catch (err: any) {
@@ -599,6 +605,15 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             variant: 'destructive',
           });
         }
+      } else if (scannedBank) {
+        // A one-off payee has no CRM record to file it against — and this is the DEFAULT for a
+        // scanned invoice and for the Inbox's "Add as expense", both of which prefill the issuer's
+        // name as an ad-hoc payee. Said out loud: the strip above promised this would be filed,
+        // and silently dropping it is how a feature looks like it works and never has.
+        toast({
+          title: 'Bank details not filed — the payee is a one-off',
+          description: `The document states an account to pay ${party.label}, but a one-off payee has no record to keep it on. Pick or create them in CRM and save again, or add it on their page.`,
+        });
       }
       clearDraft();
       // Cash actually moved only when a payment was booked — `paidNow` alone is the intent, not
@@ -629,6 +644,11 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const scanReceipt = async (file: File) => {
     setScanning(true);
     setScanNote(null);
+    // Cleared before the call, not after a successful read. Every other exit from this function —
+    // an unreadable image, a thrown request — returns early, and the bank block left in state
+    // would be the PREVIOUS document's: supplier A's IBAN filed against supplier B, off an
+    // attachment that says nothing of the sort.
+    setScannedBank(null);
     try {
       const res = await receiptScanService.scan(workspaceId, file);
       const f = res.fields;
@@ -733,11 +753,17 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             {scanNote && <span className="w-full text-[11px] text-amber-600 dark:text-amber-400">{scanNote}</span>}
             {/* Said before Save, not after: the operator is about to name the party this account
                 gets filed against, and that is the decision worth informing. */}
+            {/* Accurate about the case it is actually in: a one-off payee has no record to keep
+                this on, and that is the DEFAULT here — a scan and the Inbox both prefill the
+                issuer's name as an ad-hoc payee. Promising a filing the save cannot perform is
+                how a feature looks like it works. */}
             {scannedBank && (
               <span className="w-full text-[11px] text-muted-foreground">
                 Bank details on this document
-                {scannedBank.bank.iban ? ` (IBAN ending ${scannedBank.bank.iban.slice(-4)})` : ''} — filed for review on
-                the payee&rsquo;s page when you save. Not payable until you confirm it there.
+                {scannedBank.bank.iban ? ` (IBAN ending ${scannedBank.bank.iban.slice(-4)})` : ''}
+                {party && party.type !== 'adhoc'
+                  ? ` — filed for review on ${party.label}'s page when you save. Not payable until you confirm it there.`
+                  : ' — pick the supplier in CRM to keep it on their record. A one-off payee cannot hold bank details.'}
               </span>
             )}
           </div>

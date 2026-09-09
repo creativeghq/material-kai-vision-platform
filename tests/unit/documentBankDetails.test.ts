@@ -198,6 +198,31 @@ describe('a sighting is filed only where the party is actually known', () => {
     expect(EXPENSE_DIALOG).toContain('setScannedBank(prefill?.bankDetails ?? null)');
   });
 
+  it('a scan clears the previous reading BEFORE the call, not after a successful one', () => {
+    // Every other exit from scanReceipt returns early (unreadable image, thrown request). Clearing
+    // on success only would file document A's IBAN against the supplier on document B.
+    const scan = EXPENSE_DIALOG.slice(EXPENSE_DIALOG.indexOf('const scanReceipt'));
+    const cleared = scan.indexOf('setScannedBank(null)');
+    const call = scan.indexOf('await receiptScanService.scan');
+    expect(cleared).toBeGreaterThan(-1);
+    expect(cleared).toBeLessThan(call);
+  });
+
+  it('an ad-hoc payee is TOLD the reading was not filed — it is the default case, not an edge one', () => {
+    // A scan and the Inbox both prefill the issuer as an ad-hoc payee, so the commonest path is
+    // the one with no CRM record to file against. Silence there is a feature that never runs.
+    const save = EXPENSE_DIALOG.slice(EXPENSE_DIALOG.indexOf('crmBankAccountSuggestionsAPI.record'));
+    expect(save).toContain('Bank details not filed — the payee is a one-off');
+  });
+
+  it('a conflict is announced on every open sighting, not only the first', () => {
+    // The SECOND invoice carrying a changed IBAN is the one worth reacting to, and by then the
+    // row is `seen_again`.
+    const save = EXPENSE_DIALOG.slice(EXPENSE_DIALOG.indexOf('crmBankAccountSuggestionsAPI.record'));
+    expect(save).toContain("if (res.conflict && res.status === 'pending')");
+    expect(save).not.toMatch(/outcome === 'new'[\s\S]{0,80}res\.conflict \?/);
+  });
+
   it('the Inbox carries what it read into the form rather than filing it itself', () => {
     const page = read('src/pages/Inbox/InboxPage.tsx');
     expect(page).toContain("source: 'inbox_attachment'");
