@@ -127,6 +127,23 @@ until the platform kills the whole request), and the pool stops **starting** key
 (`RUN_DEADLINE_MS`) so the run ends with a report instead of dying at the 504 — which also skipped
 the drop alerts and the retention delete, while `api_usage_logs` recorded the 200 it never sent.
 
+**Out of time is not a failed check.** A call is not dispatched with less than `MIN_CALL_BUDGET_MS`
+(6 s) left — a live SERP needs 7–15 s, so sending one is a guaranteed abort that still pays for the
+upstream task — and when nothing was observed the collector writes NOTHING (`OutOfTime`): an `error`
+row claims we asked and were refused, and it would stamp `last_checked_at` and hide the keyword from
+the rest of the day's legs. Unstamped and stale IS the front of the next queue. A failure we DID
+observe is still stored with its message. The abort itself is renamed on the way out — `AbortSignal`
+says `Signal timed out.`, which the note would print as what "the source said".
+
+**Two writing rules that come from the same place:** an error row clears `serp_features` /
+`owned_features` (the upsert can land on a row an earlier leg wrote today, and the badges would
+otherwise survive next to a position we say we could not read), and `last_checked_at` is stamped
+only when the position row was actually written — a stamp after a failed write hides the keyword
+for the rest of the day with neither a position nor an error to show for the call we paid for.
+Write failures are counted and reported; a leg that bought work and stored none of it returns 500
+rather than `ok`, because re-buying the same calls every leg forever while reporting success is the
+`ops.silent_zero` shape.
+
 **A capped run means the newest capture DATE covers part of the set, so every reader uses each
 keyword's OWN latest capture.** `get_website_rank_summary` joined every keyword to the site's
 newest date; the morning after a 60-of-129 run that rendered "materialshub", #1 for a week, as
