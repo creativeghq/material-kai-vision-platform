@@ -466,6 +466,13 @@ interface ArtifactCardProps {
  */
 export const ArtifactCard: React.FC<ArtifactCardProps> = ({ artifact, active, onOpen }) => {
   const Icon = KIND_ICON[artifact.kind];
+  // A preview that fails to load falls back to the kind icon. In REACT state, not by writing
+  // `style.display = 'none'` from the error handler: React never resets an imperative style, so
+  // one transient failure left an empty slot on that card for good — including after `preview`
+  // changed to a URL that works.
+  const [previewFailed, setPreviewFailed] = React.useState(false);
+  React.useEffect(() => { setPreviewFailed(false); }, [artifact.preview]);
+  const showPreview = Boolean(artifact.preview) && !previewFailed;
   return (
     <button
       onClick={onOpen}
@@ -476,7 +483,7 @@ export const ArtifactCard: React.FC<ArtifactCardProps> = ({ artifact, active, on
         active ? 'border-primary' : 'border-hairline',
       )}
     >
-      {artifact.preview ? (
+      {showPreview ? (
         // A picture of the result reads faster than its name, and it is the thing most of these
         // turns were asked for. `object-cover` on a fixed square so a panorama and a swatch
         // occupy the same slot and the row height never jumps.
@@ -485,7 +492,7 @@ export const ArtifactCard: React.FC<ArtifactCardProps> = ({ artifact, active, on
           alt=""
           loading="lazy"
           className="h-12 w-12 shrink-0 rounded-sm border border-hairline object-cover"
-          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+          onError={() => setPreviewFailed(true)}
         />
       ) : (
         <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-sm bg-surface-sunken text-primary">

@@ -87,11 +87,46 @@ describe('an artifact is named once', () => {
      */
     const calls = hub.split('renderArtifactCard(message)').length - 1;
     expect(calls, 'the artifact card must have exactly one placement in the stream').toBe(1);
-    const bubble = hub.indexOf('msg-assistant');
-    const call = hub.indexOf('renderArtifactCard(message)', bubble);
-    expect(bubble, 'the assistant bubble is gone — re-point this guard').toBeGreaterThan(-1);
-    expect(call, 'the card renders inside the bubble again, where it cannot be seen')
-      .toBeGreaterThan(hub.indexOf('</div>', bubble));
+
+    // The bubble's ACTUAL closing tag, by matching `<div>` depth from its opening tag. Anchoring
+    // on the first `</div>` after `msg-assistant` looked equivalent and was not: that one closes
+    // the routed-by-JARVIS label a few lines in, so the assertion held for a card put back
+    // anywhere in the bubble below it. A guard that cannot fail for the regression it names is
+    // worse than no guard, because it reports green while the thing walks back in.
+    const bubbleClass = hub.indexOf('msg-assistant');
+    expect(bubbleClass, 'the assistant bubble is gone — re-point this guard').toBeGreaterThan(-1);
+    const bubbleOpen = hub.lastIndexOf('<div', bubbleClass);
+    let depth = 0;
+    let bubbleClose = -1;
+    for (let i = bubbleOpen; i < hub.length; i++) {
+      if (hub.startsWith('</div>', i)) {
+        if (--depth === 0) { bubbleClose = i; break; }
+      } else if (hub.startsWith('<div', i)) {
+        // A self-closing `<div … />` opens nothing.
+        const tagEnd = hub.indexOf('>', i);
+        if (tagEnd > 0 && hub[tagEnd - 1] !== '/') depth++;
+      }
+    }
+    expect(bubbleClose, 'could not match the bubble’s closing tag — re-point this guard')
+      .toBeGreaterThan(bubbleOpen);
+    expect(
+      hub.indexOf('renderArtifactCard(message)'),
+      'the card renders inside the message bubble again, where it cannot be seen',
+    ).toBeGreaterThan(bubbleClose);
+  });
+
+  it('a bubble that would only repeat its card is not drawn', () => {
+    // A pending question, an approval gate and a plain result carry their heading as `content`
+    // AND as the artifact title, so once the card moved outside the bubble the turn said the
+    // same sentence twice. Derived by comparing the two — naming the payloads would be the
+    // per-payload branching the stream just lost twenty-one copies of.
+    expect(hub).toContain('const bubbleRepeatsTheCard');
+    expect(hub).toMatch(/\{!bubbleRepeatsTheCard\(message\) && \(/);
+    const predicate = between(hub, 'const bubbleRepeatsTheCard', 'const renderArtifactCard');
+    expect(predicate, 'the predicate must compare the prose against the title, not list payloads')
+      .toMatch(/prose === artifact\.title\.trim\(\)/);
+    expect(predicate, 'a hardcoded payload list here is the branching this file removed')
+      .not.toMatch(/inputRequestData|actionConfirmationData|agentResultData/);
   });
 
   it('the card is a panel that is itself the click target', () => {
@@ -104,7 +139,14 @@ describe('an artifact is named once', () => {
     // For an image, a render or a board, the picture IS most of what was asked for; a line of
     // text naming it is a worse answer than the thing.
     expect(canvas).toMatch(/preview\?:\s*string/);
-    expect(canvas).toMatch(/artifact\.preview \?/);
+    expect(canvas).toMatch(/\{showPreview \?/);
+    // A preview that fails to load falls back to the kind icon, in REACT state. Hiding the <img>
+    // by writing `style.display` from the error handler is not a fallback: React never resets an
+    // imperative style, so one transient failure left that card with an empty slot for good,
+    // including after `preview` changed to a URL that works.
+    expect(canvas, 'a failed preview must fall back, not leave a hole')
+      .toMatch(/onError=\{\(\) => setPreviewFailed\(true\)\}/);
+    expect(canvas).toMatch(/setPreviewFailed\(false\); \}, \[artifact\.preview\]\)/);
     const artifact = between(hub, 'const getCanvasArtifact', 'const visibleMessages');
     expect(
       artifact.split('preview:').length - 1,

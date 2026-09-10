@@ -4636,7 +4636,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     // that pairing explicitly; the derivation has to.
     if (m.geminiImageData && !m.videoData) return { id: m.id, kind: 'image', title: 'Generated image', preview: m.geminiImageData.image_url };
     if (m.videoData) return { id: m.id, kind: 'video', title: 'Generated video' };
-    if (m.geminiImageData) return { id: m.id, kind: 'image', title: 'Generated image', preview: m.geminiImageData.image_url };
     if (m.inspirationData) return { id: m.id, kind: 'inspiration', title: m.inspirationData.page_title || 'Inspiration board', preview: m.inspirationData.hero_image };
     if (m.techRadarData) return { id: m.id, kind: 'radar', title: 'Tech radar' };
     if (m.agentResultData) return { id: m.id, kind: 'result', title: m.agentResultData.title || 'Result' };
@@ -5471,6 +5470,25 @@ export const AgentHub: React.FC<AgentHubProps> = ({
    * One derivation names it, one renderer draws it, and this is the only thing the stream says
    * about an artifact.
    */
+  /**
+   * True when the message bubble would say exactly what the card under it already says.
+   *
+   * A pending question, an approval gate and a plain agent result all carry their heading as
+   * `content` AND as the artifact title, so once the card moved out of the bubble the turn
+   * rendered the same sentence twice — once as prose, once as the thing you press.
+   *
+   * Compared rather than listed. Naming the three payloads here would be the per-payload
+   * branching the stream just lost twenty-one copies of, and it would go stale the next time a
+   * card-only result is added; this stays right for any payload whose prose is its title, and
+   * harmlessly shows the bubble for any whose prose says something more.
+   */
+  const bubbleRepeatsTheCard = (message: Message): boolean => {
+    const artifact = getCanvasArtifact(message);
+    if (!artifact) return false;
+    const prose = normalizeContent(message.content).trim();
+    return prose === '' || prose === artifact.title.trim();
+  };
+
   const renderArtifactCard = (message: Message): React.ReactNode => {
     const artifact = getCanvasArtifact(message);
     if (!artifact) return null;
@@ -6291,6 +6309,14 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     </div>
                   );
                 })()}
+                {/* A bubble that would only repeat the card under it is not drawn.
+                    Three payloads carry no prose of their own — a pending question, an approval
+                    gate and a plain result — their `content` IS the string the card takes its
+                    title from, so the turn said "Delete 12 contacts?" twice, once as prose and
+                    once as the thing you press. Derived by comparing the two rather than by
+                    listing the payloads: a list is the per-payload branching this file just
+                    lost twenty-one copies of. */}
+                {!bubbleRepeatsTheCard(message) && (
                 <div
                   className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
@@ -6438,6 +6464,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     </div>
                   )}
                 </div>
+                )}
                 {/* The turn's artifact, OUTSIDE the bubble.
                     It used to sit inside, which is why it could not be seen: `.msg-assistant` is
                     `--primary` on the dark themes and `--card` on the light ones, so a card drawn
