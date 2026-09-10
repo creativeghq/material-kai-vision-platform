@@ -93,6 +93,20 @@
   <h2>How to tell it worked — the “mD” column</h2>
   <p>Back on the <strong>Invoices</strong> list, the <strong>mD</strong> column shows each document's myDATA transmission status, so you can see at a glance which invoices have been reported and which haven't.</p>
 
+  <h2>The transmissions log — every attempt, and what to do when one fails</h2>
+  <p>The <strong>mD</strong> column tells you a document's <em>current</em> myDATA state; the <strong>myDATA transmissions</strong> tab (<span class="badge route">/finance?tab=mydata_transmissions</span>, beside the myDATA Book in the Finance rail) is the full audit — <em>“every attempt to file a document with AADE, newest first — one row per attempt, so a document that took three tries shows all three.”</em> A banner counts what hasn't landed (<em>“N attempts have not landed”</em>).</p>
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/mydata-transmissions.png" alt="The myDATA transmissions tab">
+    <figcaption>The <strong>myDATA transmissions</strong> tab — one row per filing attempt, newest first, with a status filter (All attempts / Accepted / Queued / Rejected / Errored / Cancelled). Shown here before any document has been transmitted.</figcaption>
+  </figure>
+  <ul class="feat">
+    <li><strong>One row per attempt</strong>, with columns <strong>When</strong>, <strong>Document</strong> (links to the invoice, credit note or delivery note), <strong>Type</strong>, <strong>Series / AA</strong>, <strong>Status</strong>, <strong>MARK</strong>, <strong>Credits</strong> and <strong>Actions</strong>.</li>
+    <li><strong>Filter by outcome</strong> — All attempts / Accepted / Queued (AADE offline) / Rejected / Errored / Cancelled — with a refresh button.</li>
+    <li><strong>The status distinguishes “refused” from “unknown”.</strong> <em>Accepted</em> = registered at AADE with a MARK; <em>Rejected</em> = AADE refused it (no MARK — fix it and send again), and the row shows AADE's <strong>error code and message</strong>; <em>Errored</em> = the provider couldn't be reached, so it's genuinely unknown whether it was filed — <em>“check before re-sending”</em> rather than assume it failed.</li>
+    <li><strong>Send again</strong> appears only on a failed attempt that isn't a dropped-connection case and still has a document to resend. An <em>accepted</em> row gets no retry button, because AADE refuses a duplicate of a document it already registered.</li>
+  </ul>
+  <div class="callout"><p><strong>What the customer's copy now carries.</strong> Three things AADE requires on the printed/emailed document — which were being transmitted but left off the customer's copy — now print on both the PDF and the on-screen preview: <strong>“Transmitted via”</strong> (the e-invoicing provider's name/website, beside the MARK), the <strong>issue date <em>and time</em> in your own timezone</strong> (not the server's UTC), and, for a document settled at a terminal, a <strong>CARD / IRIS PAYMENT</strong> block (payment identity, amount, terminal and the provider signature).</p></div>
+
   <h2>VAT validation (why it matters)</h2>
   <p>Before a document is issued, the customer's VAT number is checked — Greek numbers against the <strong>ΑΑΔΕ registry</strong>, EU numbers against <strong>VIES</strong>. You can make this stricter in <a href="finance-settings-general.html">Settings → General</a> (block issuance to an inactive or never-validated VAT). Fixing a wrong VAT before issuing is far cheaper than correcting a rejected myDATA submission afterwards.</p>
 

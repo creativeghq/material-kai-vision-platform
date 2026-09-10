@@ -18,8 +18,17 @@
 
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/projects/projects.png" alt="Projects list">
-    <figcaption>The Projects list — create your first project to get started.</figcaption>
+    <figcaption>The Projects grid — each project wears a cover (here a library kitchen scene picked from the name “Kitchen renovation”), with its status, and a toolbar carrying search, filters, sort and the grid/list toggle.</figcaption>
   </figure>
+
+  <h2>The projects grid — covers, sorting &amp; a list view</h2>
+  <p>The list is a <strong>grid of cover cards</strong> with a toolbar (search and filters on the left, sort and a view toggle on the right) and a count band at the foot (<em>“N projects”</em>, and a <em>“show them”</em> toggle for archived ones).</p>
+  <ul class="feat">
+    <li><strong>Every project wears a cover.</strong> The picture is chosen down a ladder: the project's <strong>own cover image</strong> if you set one, else its newest <a href="moodboards.html">moodboard</a> image, else a <strong>library scene picked from the project's name</strong> (a kitchen job gets a kitchen, a bathroom a bathroom). You set or change it from <strong>ProjectCover</strong> at the top of a project's Overview — pick a moodboard image, a library scene, an upload, or an AI render; <em>“Use automatic”</em> hands it back to the ladder.</li>
+    <li><strong>Card anatomy.</strong> A 16:9 cover with the <strong>status</strong> top-left (and a <em>Shared</em> badge when a project isn't yours), then the category, the <strong>name</strong>, and the client. Below, a <strong>budget bar</strong> — spent against budget, turning red when over (or <em>“No budget set”</em>) — and a footer with the moodboard count, accepted-quote count and the <strong>deadline</strong> (a warning when overdue, or last activity when there's no deadline). The whole card is a link into the project.</li>
+    <li><strong>Sort</strong> — <em>Recently active</em> (default), <em>Deadline, soonest first</em>, <em>Name A–Z</em>, <em>Most budget used</em>, or <em>Newest first</em>; projects missing that value sort last. Your choice is remembered.</li>
+    <li><strong>Grid or list.</strong> A toggle switches the covers for a dense <strong>table</strong> (sortable by any column — name, client, status, budget, deadline, boards, quotes, activity), and back. That choice is remembered too.</li>
+  </ul>
 
   <h2>Inside a project</h2>
   <div class="cards">

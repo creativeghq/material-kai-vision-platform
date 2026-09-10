@@ -44,6 +44,7 @@
     <li><strong>Specialists</strong> — <strong>Vision</strong> (design/3D), <strong>Pepper</strong> (catalogs &amp; research), <strong>Edith</strong> (SEO &amp; visibility), <strong>Trinity</strong> (finance &amp; quotes), <strong>Hermes</strong> (social), and <strong>Demo</strong> (showcase). Pick one to stay in a single lane.</li>
   </ul>
   <p>You can start different conversations with different agents. For a full breakdown of each agent and exactly when to use it, see <a href="agent-agents.html">AI Agents</a>.</p>
+  <p><strong>An agent opens with what it can do.</strong> On a fresh thread the empty state is headed <em>“What {agent} can do”</em> with <strong>quick-start actions grouped into tabs</strong> — one tab per toolkit (with a count badge), each holding a handful of one-click starters — so you scan by area instead of scrolling one long list. The offer is tuned to the agent: Edith (SEO) opens on research and article starters, not HVAC calculators. Enabling a new toolkit adds its tab (<em>“{toolkit} loaded — what do you want to do?”</em>).</p>
   <div class="callout tip"><p><strong>Tip:</strong> not sure which to pick? Leave it on <strong>JARVIS</strong> and let it route. Switch to <strong>Vision</strong> for a full design session or <strong>Trinity</strong> for a quoting session when you want a focused thread.</p></div>
 
   <!-- 3 -->
@@ -88,6 +89,16 @@
     <li>Switch between a conversation's artifacts with the <strong>chips</strong>; collapse the chat or hide the canvas as needed.</li>
     <li>Chain follow-ups in the same thread to refine — the assistant keeps the conversation's context, and new results land on the canvas.</li>
   </ol>
+
+  <h3>Watching the work happen — the run canvas</h3>
+  <p><strong>What it is —</strong> while a request is being worked, the <strong>run itself</strong> fills the canvas — a live view of the steps the assistant is taking, for <em>every</em> toolkit, not just the ones that end in a picture. <strong>Why it matters —</strong> you can see what it's doing and how each step turned out, instead of waiting at a spinner and hoping.</p>
+  <ul class="feat">
+    <li><strong>A header</strong> with your request as the title, the toolkit and workflow name, a live elapsed clock, and a status — <strong>Working / Finished / Failed / Stopped</strong>.</li>
+    <li><strong>Progress</strong> — a known workflow counts <em>“Step 2 of 4”</em>; an open-ended run counts <em>“N of M steps complete”</em> without inventing a total. A live activity line shows the current sub-action.</li>
+    <li><strong>A step list</strong>, each step marked <strong>Waiting / Running / Needs you / Done / Failed / Skipped</strong> — and, honestly, <strong>No verdict</strong> when a step started and the turn ended without saying how it went (a failure reads <em>“Failed”</em>, never a misleading <em>“0 results”</em>). A step that needs input shows its form right there; where allowed, a step offers <strong>Re-run</strong>, <strong>Edit input</strong> or <strong>Skip</strong>.</li>
+    <li><strong>“What it produced”</strong> lists the run's artifacts to open on the canvas; a turn that produced nothing says so and offers <strong>Try again</strong>, rather than pretending it was done.</li>
+    <li>When you dock the chat back to the rail, a one-line <strong>run chip</strong> keeps the run's status to hand.</li>
+  </ul>
 
   <!-- 5 -->
   <h2>5. Turning results into real artefacts</h2>

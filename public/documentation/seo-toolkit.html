@@ -40,14 +40,42 @@
   <div class="callout warn"><p><strong>These tools debit credits.</strong> The research and audit tools call paid data providers, so each run draws on your workspace <a href="account-credits.html">credit pool</a>. Reading the saved results later is free.</p></div>
 
   <h2>Writing an SEO article</h2>
-  <p>The headline capability is the <strong>article pipeline</strong>. Ask Edith to write an article (from the studio, or the launcher's <em>“Write an article”</em> entry) and it runs an end-to-end job:</p>
+  <p>The headline capability is the <strong>article pipeline</strong>. Ask Edith to write an article (from the studio, or the launcher's <em>“Write an article”</em> entry) and it runs an end-to-end job whose <strong>progress you watch live on the canvas</strong> — a stage strip walks <strong>Research → Planning → Writing → Analyzing → Done</strong>, each with a caption of what it's doing (<em>“Researching keywords with DataForSEO…”</em>, <em>“Writing article with Claude Opus…”</em>):</p>
   <ol>
     <li><strong>Research</strong> — pulls the SERP, related searches and competitor angles for your target keyword.</li>
     <li><strong>Plan</strong> — builds an outline / brief from that research.</li>
     <li><strong>Write</strong> — drafts the full article (on Claude Opus).</li>
-    <li><strong>Analyze</strong> — scores the draft for SEO and readability, and can auto-fix weak spots.</li>
+    <li><strong>Analyze</strong> — scores the draft for SEO and readability, and locates the fixes you can apply.</li>
   </ol>
-  <p>The article is <strong>filed under your connected website</strong> and appears on the site dashboard's <strong>Articles</strong> tab. Opening it launches the article viewer, organised into tabs — <strong>Optimize</strong>, <strong>Brief</strong>, <strong>Gaps/Gains</strong>, <strong>Research</strong> and <strong>Inter-linking</strong>.</p>
+  <p>The pipeline <strong>outlives the tool call</strong>: you can leave the run going and the article keeps building, then opens on the canvas as a first-class artifact (with a <em>“SEO article”</em> chip in the chat rail) when it's ready. It's <strong>filed under your connected website</strong> and also appears on the site dashboard's <strong>Articles</strong> tab.</p>
+
+  <h2>The article editor — six tabs</h2>
+  <p>Opening an article launches the editor. It's organised into six tabs:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Tab</th><th>What's on it</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Content</strong></td><td>The <strong>Search appearance</strong> block (below) on top of the rendered article — a Markdown / Rendered toggle, <strong>Copy Markdown</strong>, and the editorial body with callouts and an FAQ accordion.</td></tr>
+      <tr><td><strong>Optimize</strong></td><td>The <strong>score gauges</strong> and the <strong>“Fixes you can apply here”</strong> card (both below).</td></tr>
+      <tr><td><strong>Brief</strong></td><td>The writer's brief — target word count and headings, the content outline, key terms, and the FAQ questions with an <strong>Add a question</strong> control.</td></tr>
+      <tr><td><strong>Gaps/Gains</strong></td><td>Topics competitors cover that you don't (gaps) and ones you already do (gains), each with its search volume and an <strong>Add section</strong> button.</td></tr>
+      <tr><td><strong>Research</strong></td><td>The SERP behind the article — features present (AI Overview, Featured Snippet, People Also Ask), plus Key Terms / Competition / Questions / Statistics, each addable to the draft.</td></tr>
+      <tr><td><strong>Inter-Linking</strong></td><td>Internal-link suggestions to your own pages (below).</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Search appearance — the meta title &amp; description</h3>
+  <p>At the top of the <strong>Content</strong> tab, the <strong>Search appearance</strong> block shows how the page will look in results: the <strong>meta title</strong> (with a live <em>length / 60</em> counter that warns when it'll be truncated) and the <strong>meta description</strong> (up to ~155 characters). A <strong>missing one is stated, not silently blank</strong> — <em>“No meta title — search engines will invent one from the page”</em>, or <em>“No meta description — search engines will pull an arbitrary sentence from the body instead”</em> — so you always know when there's one to write.</p>
+
+  <h3>The scores — what they actually measure</h3>
+  <p>The <strong>Optimize</strong> tab leads with gauges: an <strong>SEO Score</strong> out of 100 and, for AI-answer readiness, a <strong>GEO Score</strong>, shown next to the competitors' average and top scores. The SEO score measures <em>the article</em> — it's 100 minus weighted penalties for the issues found, and each distinct problem is <strong>counted once</strong> however many paragraphs it touches, so splitting one issue across rows no longer double-docks you. Readability (Flesch reading ease) is computed too, and it deliberately reads <strong>no score</strong> for a Greek (non-Latin) article rather than print a confident but meaningless number.</p>
+
+  <h3>Fixes you can apply — one paragraph at a time, and undo</h3>
+  <p><strong>What it is —</strong> the analyzer doesn't just grade; where a fix belongs to a single paragraph it offers to make it. The <strong>“Fixes you can apply here”</strong> card (top of Optimize) lists each such recommendation with the suggestion, the section it's under, and a two-line quote of <em>the exact words at stake</em>, plus an <strong>Apply</strong> button. <strong>Why it matters —</strong> you improve the draft in place, surgically, instead of rewriting by hand or re-generating the whole thing. (Document-wide findings like a missing meta tag still show, but without an Apply button — there's no single paragraph to rewrite.)</p>
+  <ul class="feat">
+    <li><strong>Apply</strong> rewrites <em>only that paragraph</em> (on Claude, in the article's own brand voice) and splices it back — everything else stays byte-for-byte identical. The score updates and the toast confirms <em>“Score is now X/100. You can revert this.”</em> Each apply costs a small credit charge (refunded if it fails).</li>
+    <li><strong>Revert last</strong> puts the previous wording back — and the revert is itself undoable (it swaps rather than discards), so you can toggle a change in and out. Reverting is free.</li>
+    <li><strong>Re-analyse</strong> (free) re-scores the current draft and refreshes which fixes apply — so the card always tells you where you stand, even when there's nothing left to apply.</li>
+  </ul>
 
   <h3>Inter-linking — internal links inserted into the draft</h3>
   <p><strong>What it is —</strong> the reason connecting your site matters. On the <strong>Inter-linking</strong> tab, the article viewer shows <em>“Suggested Internal Links from Your Site”</em> — pages from your <a href="seo-websites.html">connected site's index</a> that semantically match the article, each with a <strong>% match</strong> and a suggested anchor phrase. <strong>Why it matters —</strong> internal links are core SEO, and here they're <em>real</em> links to <em>your</em> pages, not invented ones.</p>

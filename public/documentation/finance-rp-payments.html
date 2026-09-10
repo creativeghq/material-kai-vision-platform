@@ -38,6 +38,22 @@
   <h2>How allocation works — and what it updates</h2>
   <p>The <strong>Allocated</strong> figure is the heart of this tab. When you tie a payment to a document, that document's <em>Paid</em> rises by the allocated amount and its <em>Due</em> falls by the same. Because allocation is per-document, one payment can be split — partially clearing one receivable, or covering several at once. A fully-allocated <em>in</em> payment against an overdue invoice drops that row's <em>Due</em> to zero, which is what lets it fall out of its aging bucket on the <a href="finance-receivables-payables.html">Receivables</a> tab. The same mechanics, in reverse, clear a supplier bill on <a href="finance-receivables-payables.html">Payables</a> when you record an <em>out</em> payment.</p>
 
+  <h2>Paying money out — just record it, or actually send it</h2>
+  <p>When the payment is <strong>money out</strong> (a supplier bill, a supplier payment or a refund), the <strong>Record Payment</strong> dialog offers a choice — <em>two rails</em> behind the same button:</p>
+  <ul class="feat">
+    <li><strong>Just record it — the money moved elsewhere</strong> (the default). You already paid the supplier in your bank app, in cash or by card; this only writes it to the books, so the bill's <em>Due</em> drops. Nothing leaves any account from here.</li>
+    <li><strong>Send it now via Revolut</strong> / <strong>Send it now via Viva</strong>. The platform actually makes the transfer — out of the account you chose under <em>Paid from</em>, to the counterparty's own bank account.</li>
+  </ul>
+  <p>Which one you're offered is <strong>derived from the account you're paying from</strong>: an account linked to a <a href="banking.html">Revolut</a> pocket or a <a href="payments-viva.html">Viva</a> wallet can send, so its provider's name appears on the button; an account that isn't linked shows <em>Send</em> disabled with the reason — <em>“… can record payments but cannot send them — it is not linked to a Revolut pocket or a Viva wallet. Link it in Finance → Settings.”</em></p>
+
+  <h3>Sending it for real</h3>
+  <p>Choose <strong>Send it now</strong> and a <strong>Send to</strong> picker appears — the counterparty's own <a href="crm-companies.html">bank accounts</a>, defaulting to their primary IBAN. From there the two providers differ:</p>
+  <ul class="feat">
+    <li><strong>Revolut</strong> — money is never sent to an unverified account, so it runs a <strong>Verify the holder name</strong> check (Confirmation of Payee) first; if the name doesn't match the IBAN you must tick a <em>“the holder name does NOT match this IBAN — proceed anyway”</em> box. By default it prepares a <strong>draft</strong> you approve in the Revolut app (the button reads <strong>Create draft</strong>); tick <strong>Send immediately</strong> to skip that approval. The full flow — Verification of Payee, bill runs, payout links — is on <a href="banking-money-out.html">Money-out &amp; payouts</a>.</li>
+    <li><strong>Viva</strong> — <strong>executes the transfer immediately</strong>; there's no approval step and no holder-name check (the button reads <strong>Send payment</strong>).</li>
+  </ul>
+  <div class="callout"><p><strong>Sending writes nothing to the books yet — and that's the point.</strong> A sent payment isn't logged as a payment on this tab; the dialog says so: <em>“No payment is written to the books yet. The bank feed records it — and settles what it pays — once the transfer actually lands.”</em> That's what keeps the count honest: whether you <em>record</em> a payment you made in the bank app or <em>send</em> one from here, it ends up as <strong>one</strong> payment. When the matching line arrives on the <a href="banking-reconciliation.html">bank feed</a>, the platform recognises the payment it already has (same account, direction and amount, within a few days) and ties the feed line to it instead of booking a second one.</p></div>
+
   <h2>How to read each row</h2>
   <p>The list is your settlement history; search by reference or counterparty to find a specific transaction:</p>
   <div class="table-wrap">
