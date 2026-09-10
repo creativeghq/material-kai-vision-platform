@@ -54,13 +54,15 @@ Deno.serve(withApiLogging('profile-review-summary', async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
-  // A signed-in user (the reviewer, right after saving) OR an internal service-role caller —
-  // this is offered as a flow action, and a flow node authenticates as the service role, for
-  // which authenticate() returns level 'secret' with a null userId. Nothing here is forgeable:
-  // the subject is public data and every input is re-read server-side from `user_id`.
-  const auth = await authenticate(req, { requireUser: false });
-  if (!auth.success) return json({ error: auth.error || 'Unauthorized' }, 401);
-  if (!auth.userId && auth.level !== 'secret') return json({ error: 'Unauthorized' }, 401);
+  // Any signed-in caller may ask for a refresh: the subject is public data and every input is
+  // re-read server-side from `user_id`, so there is nothing here to forge.
+  //
+  // Deliberately NOT service-role callable. It appears in the flows Edge Function picker only
+  // because that picker is generated from the endpoint catalogue; flow-engine's own
+  // RUN_EDGE_FUNCTION_ALLOWED is three names, and adding a fourth widens a
+  // privilege-escalation surface for a caller that does not exist yet.
+  const auth = await authenticate(req, { requireUser: true });
+  if (!auth.success || !auth.userId) return json({ error: auth.error || 'Unauthorized' }, 401);
 
   let body: any;
   try { body = await req.json(); } catch { return json({ error: 'invalid JSON' }, 400); }
