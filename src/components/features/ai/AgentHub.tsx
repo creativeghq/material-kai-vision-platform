@@ -58,7 +58,7 @@ import { agentChatHistoryService, ChatConversation, SaveMessageOptions } from '@
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { useToast } from '@/hooks/use-toast';
 import { DemoAgentResults } from './DemoAgentResults';
-import { AgentResultCard } from './AgentResultCard';
+import { AgentResultCard, primaryListCount } from './AgentResultCard';
 import { useRecordLinkAccess } from '@/hooks/useRecordLinkAccess';
 import { ConversationManagerModal } from './ConversationManagerModal';
 import {
@@ -4504,7 +4504,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   // Which messages carry a canvas-eligible artifact (the P2 pilot set).
   const getCanvasArtifact = useCallback((m: Message): CanvasArtifact | null => {
     if (m.role !== 'assistant') return null;
-    if (m.demoData) return { id: m.id, kind: 'demo', title: 'Demo results' };
+    // What the card says it HOLDS, before it is opened. Counts only — anything needing a
+    // sentence belongs inside the artifact.
+    const count = (n: number | undefined, one: string, many = `${one}s`) =>
+      (typeof n === 'number' ? [`${n} ${n === 1 ? one : many}`] : undefined);
+    if (m.demoData) return { id: m.id, kind: 'demo', title: 'Demo results', meta: count(Array.isArray(m.demoData.data) ? m.demoData.data.length : undefined, 'item') };
     if (m.heatPumpData) return { id: m.id, kind: 'calc', title: 'Heat-pump sizing' };
     if (m.heatingCostData) return { id: m.id, kind: 'calc', title: 'Heating cost comparison' };
     // The third calculator. `renderCanvasArtifact` has drawn a KitchenCostResultCard since the day
@@ -4519,7 +4523,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     if (m.materialData?.products && m.materialData.products.length > 0) {
       const lead = m.materialData.products[0];
       const leadImage = lead?.images?.find((img: { isPrimary?: boolean }) => img.isPrimary) || lead?.images?.[0];
-      return { id: m.id, kind: 'products', title: m.materialData.title || `${m.materialData.products.length} products`, preview: leadImage?.url };
+      return {
+        id: m.id, kind: 'products', preview: leadImage?.url,
+        title: m.materialData.title || `${m.materialData.products.length} products`,
+        meta: count(m.materialData.products.length, 'product'),
+      };
     }
     if (m.generation_job) return { id: m.id, kind: 'render', title: m.generation_job.room_type ? `Room · ${m.generation_job.room_type}` : 'Room generation' };
     if (m.worldData) return { id: m.id, kind: 'world', title: m.worldData.caption || m.worldData.prompt || 'VR world' };
@@ -4532,8 +4540,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     if (m.videoData) return { id: m.id, kind: 'video', title: 'Generated video' };
     if (m.inspirationData) return { id: m.id, kind: 'inspiration', title: m.inspirationData.page_title || 'Inspiration board', preview: m.inspirationData.hero_image };
     if (m.techRadarData) return { id: m.id, kind: 'radar', title: 'Tech radar' };
-    if (m.agentResultData) return { id: m.id, kind: 'result', title: m.agentResultData.title || 'Result' };
-    if (m.jobFindingsData) return { id: m.id, kind: 'jobs', title: m.jobFindingsData.tracked_job_label ? `Jobs · ${m.jobFindingsData.tracked_job_label}` : 'Job findings' };
+    if (m.agentResultData) {
+      // `primaryListCount` is AgentResultCard's own answer to "which list is this result
+      // about" — imported so the card and the table cannot disagree on the number.
+      const rows = primaryListCount(m.agentResultData.data);
+      return { id: m.id, kind: 'result', title: m.agentResultData.title || 'Result', meta: count(rows, 'row') };
+    }
+    if (m.jobFindingsData) return { id: m.id, kind: 'jobs', title: m.jobFindingsData.tracked_job_label ? `Jobs · ${m.jobFindingsData.tracked_job_label}` : 'Job findings', meta: count(m.jobFindingsData.listings?.length, 'match', 'matches') };
     if (m.sourcingOptionsData) return { id: m.id, kind: 'sourcing', title: 'Supply options' };
     if (m.purchaseOrderCreatedData) return { id: m.id, kind: 'order', title: 'Purchase orders created' };
     if (m.purchaseOrderSentData) return { id: m.id, kind: 'order', title: m.purchaseOrderSentData.order_number ? `PO ${m.purchaseOrderSentData.order_number}` : 'Purchase order sent' };
@@ -4543,11 +4556,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     if (m.seoResearchData) return { id: m.id, kind: 'seo', title: 'SEO research' };
     if (m.seoGenericData) return { id: m.id, kind: 'seo', title: 'SEO' };
     if (m.articleData) return { id: m.id, kind: 'seo', title: 'SEO article' };
-    if (m.catalogExtractionData) return { id: m.id, kind: 'catalog', title: 'Catalog candidates' };
-    if (m.catalogImageCandidatesData) return { id: m.id, kind: 'catalog', title: m.catalogImageCandidatesData.material_name ? `Images · ${m.catalogImageCandidatesData.material_name}` : 'Catalog images' };
+    if (m.catalogExtractionData) return { id: m.id, kind: 'catalog', title: 'Catalog candidates', meta: count(m.catalogExtractionData.candidates?.length, 'candidate') };
+    if (m.catalogImageCandidatesData) return { id: m.id, kind: 'catalog', title: m.catalogImageCandidatesData.material_name ? `Images · ${m.catalogImageCandidatesData.material_name}` : 'Catalog images', meta: count(m.catalogImageCandidatesData.candidates?.length, 'image') };
     // A pending question is an artifact. Every branch above is a FINISHED result, which is why a
     // follow-up had nowhere to go but the chat stream (#370, Class D).
-    if (m.inputRequestData) return { id: m.id, kind: 'clarify', title: m.inputRequestData.title || 'Needs your input' };
+    if (m.inputRequestData) return { id: m.id, kind: 'clarify', title: m.inputRequestData.title || 'Needs your input', meta: count(m.inputRequestData.fields?.length, 'question') };
     // …and so is a pending APPROVAL. This one blocks the turn until it is answered, so leaving it
     // in the chat stream alone meant that on a phone — where `canvasPaneVisible` unmounts the chat
     // — the gate the user has to act on was the one thing they could not see.
@@ -5331,6 +5344,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         artifact={artifact}
         active={activeCanvasId === artifact.id}
         onOpen={() => focusCanvas(artifact.id)}
+        onCloseArtifact={handleCloseArtifact}
+        onDeleteArtifact={handleDeleteArtifact}
       />
     );
   };
@@ -5930,7 +5945,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           </div>
         )}
         {/* Messages Area */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 space-y-4 custom-scrollbar">
+        <div className="custom-scrollbar flex-1 min-h-0 space-y-5 overflow-y-auto px-3 pb-6 pt-4 sm:px-5 sm:pb-8 sm:pt-5">
           {/* Active workflow wizards — render whenever any are active, regardless
               of message count. This is what makes the "click Build my first
               catalog → wizard appears instantly on an empty chat" path work.
@@ -6371,7 +6386,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         </div>
 
         {/* Input Area */}
-        <div className="px-2.5 pb-3 pt-2 sm:px-4 sm:pb-4">
+        <div className="px-3 pb-4 pt-2 sm:px-5 sm:pb-5">
           {/* Voice Recording Indicator */}
           {isRecording && interimTranscript && (
             <div className="pb-2">

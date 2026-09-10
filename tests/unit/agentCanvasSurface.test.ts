@@ -130,6 +130,35 @@ describe('an artifact is named once', () => {
       .toMatch(/pending\s*\?\s*'bg-primary text-primary-foreground'/);
   });
 
+  it('the card says what it holds, and can be acted on without opening it', () => {
+    // Counts only, derived where the artifact is derived. `primaryListCount` is AgentResultCard's
+    // own "which list is this about", imported so the card's row count and the table's cannot
+    // disagree.
+    expect(canvas).toMatch(/meta\?:\s*string\[\]/);
+    const artifact = between(hub, 'const getCanvasArtifact', 'const visibleMessages');
+    expect(artifact).toContain('primaryListCount(');
+    expect(
+      artifact.split('meta:').length - 1,
+      'no artifact carries meta — the card is back to a title and a kind',
+    ).toBeGreaterThanOrEqual(5);
+    // The kebab is a sibling of the open button, never nested inside it: a button inside a
+    // button is invalid markup and unclickable.
+    expect(canvas).toMatch(/onCloseArtifact\?: \(id: string\) => void;/);
+    expect(hub).toMatch(/onCloseArtifact=\{handleCloseArtifact\}[\s\S]{0,120}onDeleteArtifact=\{handleDeleteArtifact\}/);
+  });
+
+  it('a table opened in the modal is a preview, not a dump', () => {
+    // The modal body scrolls the whole artifact, so a table that scrolled with it took its own
+    // column names off screen by row twenty, and a 500-row result rendered 500 rows.
+    const card = stripComments(read('src/components/features/ai/AgentResultCard.tsx'));
+    expect(card, 'the table needs its own bounded scroll region').toMatch(/max-h-\[26rem\]/);
+    expect(card, 'the header must stay put while the rows scroll').toMatch(/sticky top-0 z-10/);
+    expect(card, 'a wide table still scrolls horizontally').toContain('overflow-x-auto');
+    expect(card).toContain('ROW_PREVIEW_CAP');
+    expect(card, 'the capped rows must be what renders').toMatch(/\{visible\.map\(/);
+    expect(card, 'the reader must be told how many there are').toMatch(/rows\.length === 1 \? 'row' : 'rows'/);
+  });
+
   it('the card is a panel that is itself the click target', () => {
     // The design system's own answer for a panel you click through on: the border goes to the
     // accent and the ground warms a step, with no translation. Not a bespoke hover here.

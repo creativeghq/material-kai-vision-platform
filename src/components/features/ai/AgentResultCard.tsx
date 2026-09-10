@@ -34,6 +34,8 @@ const labelize = (k: string) => k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.t
 // of payload shape/cycles.
 const MAX_DEPTH = 4;
 const ARRAY_INLINE_CAP = 8;
+// Rows drawn before the table offers "show all". A preview, not a dump.
+const ROW_PREVIEW_CAP = 50;
 
 const URL_RE = /^https?:\/\//i;
 const IMG_URL_RE = /^https?:\/\/\S+\.(png|jpe?g|webp|gif)(\?\S*)?$/i;
@@ -174,6 +176,20 @@ const isNumericCol = (rows: any[], k: string) =>
   rows.every((r) => r?.[k] == null || typeof r?.[k] === 'number');
 
 /** An array worth tabulating: 2+ objects that actually share a shape. */
+/**
+ * How many rows the result is a list OF, or undefined when it is not list-shaped.
+ *
+ * The same "first array wins" rule the card renders by, exported so the chat card's "12 rows" and
+ * the table below it cannot disagree.
+ */
+export function primaryListCount(data: unknown): number | undefined {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return undefined;
+  const inner = (data as Record<string, unknown>).data;
+  const obj = (inner && typeof inner === 'object' && !Array.isArray(inner) ? inner : data) as Record<string, unknown>;
+  const list = Object.entries(obj).find(([k, v]) => Array.isArray(v) && !isPlumbing(k, v));
+  return list ? (list[1] as unknown[]).length : undefined;
+}
+
 function tabularColumns(rows: any[]): string[] | null {
   if (!Array.isArray(rows) || rows.length < 2) return null;
   if (!rows.every((r) => r && typeof r === 'object' && !Array.isArray(r))) return null;
@@ -291,16 +307,30 @@ function RecordTable({ rows, columns, listKey }: { rows: any[]; columns: string[
     () => shown.find((c) => !isNumericCol(rows, c) && !STATUS_KEYS.has(c)) ?? shown[0],
     [shown, rows],
   );
+  const [showAll, setShowAll] = useState(false);
+  const visible = showAll ? rows : rows.slice(0, ROW_PREVIEW_CAP);
+  const hidden = rows.length - visible.length;
 
   return (
-    <div className="-mx-1 overflow-x-auto custom-scrollbar">
+    <div className="space-y-1.5">
+      <div className="flex items-baseline justify-between gap-2 text-[11px] text-muted-foreground">
+        <span className="tabular-nums">
+          {rows.length} {rows.length === 1 ? 'row' : 'rows'}
+          {hidden > 0 && <> · showing {visible.length}</>}
+        </span>
+        <span className="tabular-nums">{shown.length} {shown.length === 1 ? 'column' : 'columns'}</span>
+      </div>
+      {/* Its own scroll region, so the header can stay put. A result opened in the modal is a data
+          preview: the body scrolls the page, and a table that scrolled with it took its own column
+          names off the screen by row twenty. */}
+      <div className="custom-scrollbar max-h-[26rem] overflow-x-auto overflow-y-auto rounded-sm border border-hairline">
       <table className="w-full border-collapse text-xs">
         <thead>
-          <tr className="bg-surface-sunken">
+          <tr>
             {shown.map((c) => (
               <th
                 key={c}
-                className={`whitespace-nowrap px-2 py-1.5 text-[11px] font-semibold text-muted-foreground ${
+                className={`sticky top-0 z-10 whitespace-nowrap border-b border-hairline bg-surface-sunken px-2.5 py-2 text-[11px] font-semibold text-muted-foreground ${
                   isNumericCol(rows, c) ? 'text-right' : 'text-left'
                 }`}
               >
@@ -310,7 +340,7 @@ function RecordTable({ rows, columns, listKey }: { rows: any[]; columns: string[
           </tr>
         </thead>
         <tbody>
-          {rows.map((r, i) => {
+          {visible.map((r, i) => {
             const self = ctx ? rowRecordRef(r, ctx.listKey, ctx.resultType) : null;
             const openable = self && canOpenRecordKind(self.kind, ctx!.access.gate) ? self : null;
             // A kind `get_record_peek` does not model has nothing to show in a dialog — opening
@@ -327,7 +357,7 @@ function RecordTable({ rows, columns, listKey }: { rows: any[]; columns: string[
                   return (
                     <td
                       key={c}
-                      className={`px-2 py-1.5 ${numeric ? 'text-right tabular-nums' : 'text-left'}`}
+                      className={`px-2.5 py-2 ${numeric ? 'text-right tabular-nums' : 'text-left'}`}
                     >
                       {openable && isName && isScalar(r?.[c]) && r?.[c] != null && r?.[c] !== '' ? (
                         selfHref ? (
@@ -363,6 +393,16 @@ function RecordTable({ rows, columns, listKey }: { rows: any[]; columns: string[
           })}
         </tbody>
       </table>
+      </div>
+      {hidden > 0 && (
+        <button
+          type="button"
+          onClick={() => setShowAll(true)}
+          className="text-[11px] font-medium text-primary hover:underline"
+        >
+          Show all {rows.length} rows
+        </button>
+      )}
     </div>
   );
 }

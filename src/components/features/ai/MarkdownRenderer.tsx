@@ -35,25 +35,27 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
         remarkPlugins={[remarkGfm]}
         components={{
           // Headings — inherit color from parent bubble
+          // A heading opens a SECTION, so the space belongs above it — and never above the
+          // first one, where it is a gap between the bubble's edge and its own first line.
           h1: ({ children }) => (
-            <h1 className="text-xl font-bold mt-4 mb-2">{children}</h1>
+            <h1 className="mb-2 mt-6 text-xl font-bold leading-snug first:mt-0">{children}</h1>
           ),
           h2: ({ children }) => (
-            <h2 className="text-lg font-semibold mt-3 mb-2">{children}</h2>
+            <h2 className="mb-2 mt-5 text-lg font-semibold leading-snug first:mt-0">{children}</h2>
           ),
           h3: ({ children }) => (
-            <h3 className="text-base font-semibold mt-2 mb-1">{children}</h3>
+            <h3 className="mb-1.5 mt-4 text-base font-semibold leading-snug first:mt-0">{children}</h3>
           ),
           // Paragraphs
           p: ({ children }) => (
-            <p className="mb-2 text-sm leading-relaxed">{children}</p>
+            <p className="mb-3 text-sm leading-relaxed last:mb-0">{children}</p>
           ),
           // Lists
           ul: ({ children }) => (
-            <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>
+            <ul className="mb-3 list-disc space-y-1 pl-5 last:mb-0">{children}</ul>
           ),
           ol: ({ children }) => (
-            <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>
+            <ol className="mb-3 list-decimal space-y-1 pl-5 last:mb-0">{children}</ol>
           ),
           li: ({ children }) => (
             <li className="text-sm">{children}</li>

@@ -41,6 +41,11 @@ export interface CanvasArtifact {
    * render or a board is most of what you wanted to see.
    */
   preview?: string;
+  /**
+   * Short facts about the result — "12 rows", "8 products". Rendered on the card so it says what
+   * it holds before it is opened. Counts only; a fact that needs a sentence belongs inside.
+   */
+  meta?: string[];
 }
 
 /**
@@ -292,7 +297,7 @@ export const ArtifactModal: React.FC<ArtifactModalProps> = ({
         hideClose
       >
         {/* Header — what this is, and the ways out of it */}
-        <div className="flex h-14 shrink-0 items-center gap-3 border-b border-hairline px-4 sm:px-5">
+        <div className="flex h-16 shrink-0 items-center gap-3 border-b border-hairline px-4 sm:px-6">
           {/* Accent-tinted, matching the card in the chat this was opened from — `surface-sunken`
               on `card` is two barely-different creams on the light themes, so the tile read as an
               empty square. */}
@@ -300,10 +305,10 @@ export const ArtifactModal: React.FC<ArtifactModalProps> = ({
             <Icon className="h-[18px] w-[18px]" />
           </span>
           <div className="min-w-0 flex-1">
-            <DialogTitle className="truncate text-sm font-semibold leading-snug">
+            <DialogTitle className="truncate text-[15px] font-semibold leading-snug">
               {active?.title ?? 'Canvas'}
             </DialogTitle>
-            <DialogDescription className="truncate text-[11px] leading-snug">
+            <DialogDescription className="mt-0.5 truncate text-[11px] leading-snug">
               {active ? KIND_LABEL[active.kind] : 'Nothing open'}
             </DialogDescription>
           </div>
@@ -402,7 +407,7 @@ export const ArtifactModal: React.FC<ArtifactModalProps> = ({
               artifact IS the page, so it was a same-colour box with a hairline sitting inside a
               same-colour panel — a card in a card, which is one surface more than the ladder
               has. One rule rather than a prop on fifteen renderers. */}
-          <div className="artifact-page min-h-0 flex-1 overflow-auto p-4 sm:p-6 custom-scrollbar">
+          <div className="artifact-page custom-scrollbar min-h-0 flex-1 overflow-auto p-4 sm:p-6">
             {children}
           </div>
           {inspector && (
@@ -455,86 +460,104 @@ interface ArtifactCardProps {
   /** True while this artifact is the one open in the modal. */
   active: boolean;
   onOpen: () => void;
+  /** Close-in-chat / delete, offered on the card itself rather than only inside the modal. */
+  onCloseArtifact?: (id: string) => void;
+  onDeleteArtifact?: (id: string) => void;
 }
 
-/** The artifact, as it appears in the conversation: a card you click to open it. */
-export const ArtifactCard: React.FC<ArtifactCardProps> = ({ artifact, active, onOpen }) => {
+/**
+ * The artifact, as it appears in the conversation: a card you click to open it.
+ *
+ * It lives OUTSIDE the message bubble. `.msg-assistant` is `--primary` on the dark themes and
+ * `--card` on the light ones, so a card drawn in `bg-card` was invisible in one of them; out here
+ * the ordinary three-surface ladder applies and one treatment is right in all four.
+ */
+export const ArtifactCard: React.FC<ArtifactCardProps> = ({
+  artifact, active, onOpen, onCloseArtifact, onDeleteArtifact,
+}) => {
   const Icon = KIND_ICON[artifact.kind];
-  // A preview that fails to load falls back to the kind icon. In REACT state, not by writing
-  // `style.display = 'none'` from the error handler: React never resets an imperative style, so
-  // one transient failure left an empty slot on that card for good — including after `preview`
-  // changed to a URL that works.
+  // React state, not `style.display` from the error handler: React never resets an imperative
+  // style, so one transient failure left an empty slot on that card for good.
   const [previewFailed, setPreviewFailed] = React.useState(false);
   React.useEffect(() => { setPreviewFailed(false); }, [artifact.preview]);
   const showPreview = Boolean(artifact.preview) && !previewFailed;
   const pending = PENDING_KINDS.has(artifact.kind);
+  const meta = artifact.meta?.filter(Boolean) ?? [];
+
   return (
-    <button
-      onClick={onOpen}
-      aria-label={`Open ${artifact.title}`}
+    // A container, not a button: the kebab is a second control, and a button inside a button is
+    // invalid markup and unclickable.
+    <div
       className={cn(
-        'panel-interactive group flex items-center gap-3 rounded-md border bg-card p-2.5 text-left transition-colors',
-        /**
-         * SIZED TO ITS CONTENT, not to the conversation.
-         *
-         * This was `w-full` inside a `max-w-[75%]` wrapper, which on a full-width chat is about
-         * 1400px — so a 48px tile and two short lines were stretched into an empty bar with the
-         * action pinned a whole viewport away from the title. A bubble can fill that width
-         * because it is full of text; a card has nothing to fill it with. The preview variant
-         * gets a little more room because it is carrying a picture.
-         */
+        'panel-interactive group flex items-stretch rounded-md border bg-card transition-colors',
         showPreview ? 'w-full max-w-lg' : 'w-full max-w-md',
-        active
-          ? 'border-primary'
-          : pending
-            ? 'border-primary/40'
-            : 'border-hairline',
+        active ? 'border-primary' : pending ? 'border-primary/40' : 'border-hairline',
       )}
     >
-      {showPreview ? (
-        // A picture of the result reads faster than its name, and it is the thing most of these
-        // turns were asked for. `object-cover` on a fixed square so a panorama and a swatch
-        // occupy the same slot and the row height never jumps.
-        <img
-          src={artifact.preview}
-          alt=""
-          loading="lazy"
-          className="h-12 w-12 shrink-0 rounded-sm border border-hairline object-cover"
-          onError={() => setPreviewFailed(true)}
-        />
-      ) : (
-        // Accent-tinted, not `surface-sunken`: on the light themes a sunken square on a card is
-        // two barely-different creams, so the tile read as a blank box rather than as an icon.
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-sm bg-primary/10 text-primary">
-          <Icon className="h-5 w-5" />
+      <button
+        onClick={onOpen}
+        aria-label={`Open ${artifact.title}`}
+        className="flex min-w-0 flex-1 items-center gap-3 rounded-md p-3 text-left"
+      >
+        {showPreview ? (
+          <img
+            src={artifact.preview}
+            alt=""
+            loading="lazy"
+            className="h-12 w-12 shrink-0 rounded-sm border border-hairline object-cover"
+            onError={() => setPreviewFailed(true)}
+          />
+        ) : (
+          // Accent-tinted: `surface-sunken` on `card` is two barely-different creams on the light
+          // themes, so the tile read as an empty square.
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-sm bg-primary/10 text-primary">
+            <Icon className="h-5 w-5" />
+          </span>
+        )}
+        <span className="min-w-0 flex-1 space-y-1">
+          <span className="block truncate text-sm font-medium leading-snug text-foreground">
+            {artifact.title}
+          </span>
+          <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] leading-snug">
+            <span className={pending ? 'font-medium text-primary' : 'text-muted-foreground'}>
+              {KIND_LABEL[artifact.kind]}
+            </span>
+            {meta.map((m) => (
+              <React.Fragment key={m}>
+                <span aria-hidden className="text-muted-foreground/50">&middot;</span>
+                <span className="tabular-nums text-muted-foreground">{m}</span>
+              </React.Fragment>
+            ))}
+          </span>
+        </span>
+        <span
+          className={cn(
+            'flex shrink-0 items-center gap-1 rounded-sm px-2 py-1 text-[11px] font-medium transition-colors',
+            pending
+              ? 'bg-primary text-primary-foreground'
+              : active
+                ? 'bg-primary/10 text-primary'
+                : 'bg-surface-sunken text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary',
+          )}
+        >
+          {CTA_LABEL[artifact.kind] ?? (active ? 'Open' : 'View')}
+          <ArrowUpRight className="h-3.5 w-3.5" />
+        </span>
+      </button>
+      {/* Close / delete without opening it first. Hidden until hover on a pointer device; always
+          present where there is no hover. */}
+      {artifact.kind !== 'run' && (onCloseArtifact || onDeleteArtifact) && (
+        <span className="hidden shrink-0 items-start p-1.5 sm:flex">
+          <ArtifactMenu
+            id={artifact.id}
+            title={artifact.title}
+            onCloseArtifact={onCloseArtifact}
+            onDeleteArtifact={onDeleteArtifact}
+            className="opacity-100 lg:opacity-0 lg:group-focus-within:opacity-100 lg:group-hover:opacity-100"
+          />
         </span>
       )}
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium text-foreground">{artifact.title}</span>
-        {/* No second copy of the icon here — the tile beside it is already the icon, and at this
-            width the pair read as two bullets on one card. */}
-        <span className={cn('block truncate text-[11px]', pending ? 'text-primary' : 'text-muted-foreground')}>
-          {KIND_LABEL[artifact.kind]}
-        </span>
-      </span>
-      {/* A named action, not a bare chevron: the card is the only way into the modal now that the
-          tab strip is gone, so it should say what pressing it does. A PENDING kind gets the solid
-          fill — the turn is waiting on it, and it had been rendering as the quietest thing on the
-          screen next to results nobody has to act on. */}
-      <span
-        className={cn(
-          'flex shrink-0 items-center gap-1 rounded-sm px-2 py-1 text-[11px] font-medium transition-colors',
-          pending
-            ? 'bg-primary text-primary-foreground'
-            : active
-              ? 'bg-primary/10 text-primary'
-              : 'bg-surface-sunken text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary',
-        )}
-      >
-        {CTA_LABEL[artifact.kind] ?? (active ? 'Open' : 'View')}
-        <ArrowUpRight className="h-3.5 w-3.5" />
-      </span>
-    </button>
+    </div>
   );
 };
 

@@ -20,7 +20,9 @@ describe('AgentResultCard renders a record list as a table', () => {
 
   it('produces a real table, not a stack of chips', () => {
     expect(html).toContain('<table');
-    expect((html.match(/<tr /g) || []).length).toBe(4); // header + 3 rows
+    // `<tr[ >]`, not `<tr `: the header row carries no class now. Sticky positioning does not
+    // work on a <tr>, so the sunken background moved onto the <th> cells.
+    expect((html.match(/<tr[ >]/g) || []).length).toBe(4); // header + 3 rows
   });
 
   it('derives its columns from the rows and drops the join key', () => {
@@ -32,7 +34,9 @@ describe('AgentResultCard renders a record list as a table', () => {
   it('right-aligns the numeric column with tabular figures', () => {
     expect(html).toContain('text-right tabular-nums');
     // …and only the numeric one: a text column aligned right reads as a broken table.
-    expect((html.match(/tabular-nums/g) || []).length).toBe(3); // one per row, the `runs` cell
+    // The right-aligned CELLS, not every `tabular-nums` on the surface — the row/column count
+    // above the table is tabular too, and it is not a cell.
+    expect((html.match(/text-right tabular-nums/g) || []).length).toBe(3); // one per row, `runs`
   });
 
   it('renders status as a tinted badge, mapped to meaning', () => {
