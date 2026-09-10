@@ -12,7 +12,7 @@
  *
  * 1. STARTING a turn opens nothing; PRODUCING something opens it. (agentRunProgress.test.ts pins
  *    the run half; this file pins the surface.)
- * 2. An artifact is named ONCE. The stream used to hand-write thirty `<ArtifactChip kind="…"
+ * 2. An artifact is named ONCE. The stream used to hand-write thirty `<ArtifactCard kind="…"
  *    title="…">` calls — a second copy of the mapping `getCanvasArtifact` makes — so a result
  *    could be called one thing on its chip and another on its tab, and a new kind needed four
  *    edits to appear everywhere.
@@ -53,24 +53,63 @@ function payloadKeys(text: string): Set<string> {
 
 describe('an artifact is named once', () => {
   it('the stream derives its chip instead of typing one out', () => {
-    expect(hub).toContain('const renderArtifactChip');
-    const chipHelper = between(hub, 'const renderArtifactChip', 'const renderCanvasArtifact');
+    expect(hub).toContain('const renderArtifactCard');
+    const chipHelper = between(hub, 'const renderArtifactCard', 'const renderCanvasArtifact');
     expect(chipHelper, 'the chip must come from the same derivation the modal opens on')
       .toContain('getCanvasArtifact(message)');
   });
 
   it('nobody hand-writes a chip’s kind or title again', () => {
-    // The exact shape that shipped thirty times. `ArtifactChip` takes the artifact now, so a
+    // The exact shape that shipped thirty times. `ArtifactCard` takes the artifact now, so a
     // `kind=` on it cannot even typecheck — this is here to say why, and to catch a new prop
     // being added back for the convenience of one call site.
-    expect(hub, 'a hand-written ArtifactChip kind= is a second copy of getCanvasArtifact')
-      .not.toMatch(/<ArtifactChip[^>]*\skind=/);
-    expect(canvas, 'ArtifactChip must take the derived artifact, not a kind and a title')
+    expect(hub, 'a hand-written ArtifactCard kind= is a second copy of getCanvasArtifact')
+      .not.toMatch(/<ArtifactCard[^>]*\skind=/);
+    expect(canvas, 'ArtifactCard must take the derived artifact, not a kind and a title')
       .toMatch(/artifact:\s*CanvasArtifact/);
   });
 
   it('the chip renders the kind’s own label rather than restating it', () => {
     expect(canvas).toMatch(/KIND_LABEL\[artifact\.kind\]/);
+  });
+
+  it('the card is rendered ONCE, and outside the message bubble', () => {
+    /**
+     * Inside the bubble it could not be seen, and that is a property of the bubble rather than
+     * of the card: `.msg-assistant` is `--primary` on the dark themes and `--card` on the light
+     * ones, so a card drawn in `bg-card` was a dark box on magenta in one and EXACTLY the
+     * bubble's own colour in the other. The bubble also re-themes its children by attribute
+     * selector (`html.light .msg-assistant [class*="bg-white"]`, …), so anything in there is
+     * styled by where it sits instead of by what it is.
+     *
+     * Outside, it is an ordinary panel on the page ground and the three-surface ladder applies.
+     * Once, because a per-payload copy is how the thirty hand-written chips happened.
+     */
+    const calls = hub.split('renderArtifactCard(message)').length - 1;
+    expect(calls, 'the artifact card must have exactly one placement in the stream').toBe(1);
+    const bubble = hub.indexOf('msg-assistant');
+    const call = hub.indexOf('renderArtifactCard(message)', bubble);
+    expect(bubble, 'the assistant bubble is gone — re-point this guard').toBeGreaterThan(-1);
+    expect(call, 'the card renders inside the bubble again, where it cannot be seen')
+      .toBeGreaterThan(hub.indexOf('</div>', bubble));
+  });
+
+  it('the card is a panel that is itself the click target', () => {
+    // The design system's own answer for a panel you click through on: the border goes to the
+    // accent and the ground warms a step, with no translation. Not a bespoke hover here.
+    expect(canvas).toContain('panel-interactive');
+  });
+
+  it('a result you can recognise before you open it', () => {
+    // For an image, a render or a board, the picture IS most of what was asked for; a line of
+    // text naming it is a worse answer than the thing.
+    expect(canvas).toMatch(/preview\?:\s*string/);
+    expect(canvas).toMatch(/artifact\.preview \?/);
+    const artifact = between(hub, 'const getCanvasArtifact', 'const visibleMessages');
+    expect(
+      artifact.split('preview:').length - 1,
+      'no artifact carries a preview — the card is back to being a line of text',
+    ).toBeGreaterThanOrEqual(5);
   });
 });
 
@@ -81,7 +120,7 @@ describe('anything that gets a chip can be drawn', () => {
     // so the same markup serves both surfaces, so it counts as coverage.
     const drawable = new Set([
       ...payloadKeys(between(hub, 'const renderCanvasArtifact', 'const renderCanvasInspector')),
-      ...payloadKeys(between(hub, 'const renderDataCardBody', 'const renderArtifactChip')),
+      ...payloadKeys(between(hub, 'const renderDataCardBody', 'const renderArtifactCard')),
     ]);
 
     expect(artifactKeys.size, 'no artifact payloads found — re-point this guard').toBeGreaterThan(20);

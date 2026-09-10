@@ -53,6 +53,12 @@ export interface CanvasArtifact {
   id: string;
   kind: CanvasArtifactKind;
   title: string;
+  /**
+   * A picture of the thing, when the thing has one. Turns the card in the chat from a line of
+   * text into a result you can recognise before you open it — which for a generated image, a
+   * render or a board is most of what you wanted to see.
+   */
+  preview?: string;
 }
 
 /**
@@ -431,7 +437,7 @@ export const ArtifactModal: React.FC<ArtifactModalProps> = ({
   );
 };
 
-interface ArtifactChipProps {
+interface ArtifactCardProps {
   artifact: CanvasArtifact;
   /** True while this artifact is the one open in the modal. */
   active: boolean;
@@ -439,35 +445,70 @@ interface ArtifactChipProps {
 }
 
 /**
- * The artifact, as it appears in the chat: a line you can click.
+ * The artifact, as it appears in the conversation: a card you click to open it.
  *
- * Takes the ARTIFACT, not a kind and a title typed out at the call site. The stream used to
- * hand-write thirty of these with their own `kind=` and `title=` strings — a second copy of the
- * mapping `getCanvasArtifact` already makes, with nothing holding the two together, so a result
- * could be called one thing on its chip and another on its tab.
+ * IT LIVES OUTSIDE THE MESSAGE BUBBLE, and that is the whole reason it is legible. Inside, it
+ * could not be: `.msg-assistant` is `--primary` on the dark themes (an accent-filled slab) and
+ * `--card` on the light ones, so a card drawn in `bg-card` was a dark box on magenta in one and
+ * EXACTLY THE BUBBLE'S OWN COLOUR in the other — a hairline apart from its background, which is
+ * what "not so visible" was. The bubble also re-themes its own children by attribute selector
+ * (`html.light .msg-assistant [class*="bg-white"]`, …), so anything in there is styled by where
+ * it sits rather than by what it is.
  *
- * Tokens, not raw palette: this used to be `bg-black/20` / `text-white` / `border-white/10`,
- * which reads on the dark themes' plum-black and turns into a grey smudge on the light themes'
- * cream. It is the same defect class as the Inbox source tag.
+ * Out here it is an ordinary panel on the page ground and the normal three-surface ladder
+ * applies — `bg-card` + `border-hairline`, border to the accent on hover, the design system's
+ * `panel-interactive` behaviour for a panel that is itself the click target. One treatment,
+ * correct in all four theme combinations.
+ *
+ * It takes the ARTIFACT, not a kind and a title typed out at the call site: the stream used to
+ * hand-write thirty of these with their own strings, a second copy of the mapping
+ * `getCanvasArtifact` already makes.
  */
-export const ArtifactChip: React.FC<ArtifactChipProps> = ({ artifact, active, onOpen }) => {
+export const ArtifactCard: React.FC<ArtifactCardProps> = ({ artifact, active, onOpen }) => {
   const Icon = KIND_ICON[artifact.kind];
   return (
     <button
       onClick={onOpen}
+      aria-label={`Open ${artifact.title}`}
       className={cn(
-        'group flex w-full items-center gap-3 rounded-sm border bg-card px-3 py-2.5 text-left transition-colors',
-        active ? 'border-primary' : 'border-hairline hover:bg-surface-sunken',
+        'panel-interactive group flex w-full items-center gap-3 rounded-md border bg-card p-2.5 text-left',
+        'transition-colors',
+        active ? 'border-primary' : 'border-hairline',
       )}
     >
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-surface-sunken text-primary">
-        <Icon className="h-4 w-4" />
-      </span>
+      {artifact.preview ? (
+        // A picture of the result reads faster than its name, and it is the thing most of these
+        // turns were asked for. `object-cover` on a fixed square so a panorama and a swatch
+        // occupy the same slot and the row height never jumps.
+        <img
+          src={artifact.preview}
+          alt=""
+          loading="lazy"
+          className="h-12 w-12 shrink-0 rounded-sm border border-hairline object-cover"
+          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+        />
+      ) : (
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-sm bg-surface-sunken text-primary">
+          <Icon className="h-5 w-5" />
+        </span>
+      )}
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium text-foreground">{artifact.title}</span>
-        <span className="block text-[11px] text-muted-foreground">{KIND_LABEL[artifact.kind]}</span>
+        <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          <Icon className="h-3 w-3 shrink-0" />
+          {KIND_LABEL[artifact.kind]}
+        </span>
       </span>
-      <span className="flex shrink-0 items-center gap-1 text-[11px] font-medium text-muted-foreground group-hover:text-foreground">
+      {/* A named action, not a bare chevron: the card is the only way into the modal now that
+          the tab strip is gone, so it should say what pressing it does. */}
+      <span
+        className={cn(
+          'flex shrink-0 items-center gap-1 rounded-sm px-2 py-1 text-[11px] font-medium transition-colors',
+          active
+            ? 'bg-primary/10 text-primary'
+            : 'bg-surface-sunken text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary',
+        )}
+      >
         {active ? 'Open' : 'View'}
         <ArrowUpRight className="h-3.5 w-3.5" />
       </span>

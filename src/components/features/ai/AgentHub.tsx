@@ -62,7 +62,7 @@ import { AgentResultCard } from './AgentResultCard';
 import { useRecordLinkAccess } from '@/hooks/useRecordLinkAccess';
 import { ConversationManagerModal } from './ConversationManagerModal';
 import {
-  ArtifactModal, ArtifactChip, artifactKindIcon, artifactKindLabel,
+  ArtifactModal, ArtifactCard, artifactKindIcon, artifactKindLabel,
   type CanvasArtifact, type CanvasArtifactGroup,
 } from './CanvasPanel';
 import {
@@ -4621,21 +4621,23 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     if (m.sheetPdfData) return { id: m.id, kind: 'sheet', title: m.sheetPdfData.title || 'Presentation sheet' };
     if (m.sheetCanvasData) return { id: m.id, kind: 'sheet', title: m.sheetCanvasData.title || 'Presentation sheet' };
     if (m.quoteData) return { id: m.id, kind: 'quote', title: m.quoteData.quote_number ? `Quote ${m.quoteData.quote_number}` : (m.quoteData.name || 'Quote') };
-    if (m.virtualStagingData) return { id: m.id, kind: 'staging', title: 'Virtual staging' };
+    if (m.virtualStagingData) return { id: m.id, kind: 'staging', title: 'Virtual staging', preview: m.virtualStagingData.image_url };
     if (m.materialData?.products && m.materialData.products.length > 0) {
-      return { id: m.id, kind: 'products', title: m.materialData.title || `${m.materialData.products.length} products` };
+      const lead = m.materialData.products[0];
+      const leadImage = lead?.images?.find((img: { isPrimary?: boolean }) => img.isPrimary) || lead?.images?.[0];
+      return { id: m.id, kind: 'products', title: m.materialData.title || `${m.materialData.products.length} products`, preview: leadImage?.url };
     }
     if (m.generation_job) return { id: m.id, kind: 'render', title: m.generation_job.room_type ? `Room · ${m.generation_job.room_type}` : 'Room generation' };
     if (m.worldData) return { id: m.id, kind: 'world', title: m.worldData.caption || m.worldData.prompt || 'VR world' };
-    if (m.materialsBoardData) return { id: m.id, kind: 'board', title: 'Materials board' };
+    if (m.materialsBoardData) return { id: m.id, kind: 'board', title: 'Materials board', preview: m.materialsBoardData.image_url };
     // Video WINS when a message carries both. `renderCanvasArtifact` draws a `<video>` for a
     // gemini message that also has `videoData` — the image was animated — so naming it
     // "Generated image" put a still-image chip on a clip. The deleted inline branch handled
     // that pairing explicitly; the derivation has to.
-    if (m.geminiImageData && !m.videoData) return { id: m.id, kind: 'image', title: 'Generated image' };
+    if (m.geminiImageData && !m.videoData) return { id: m.id, kind: 'image', title: 'Generated image', preview: m.geminiImageData.image_url };
     if (m.videoData) return { id: m.id, kind: 'video', title: 'Generated video' };
-    if (m.geminiImageData) return { id: m.id, kind: 'image', title: 'Generated image' };
-    if (m.inspirationData) return { id: m.id, kind: 'inspiration', title: m.inspirationData.page_title || 'Inspiration board' };
+    if (m.geminiImageData) return { id: m.id, kind: 'image', title: 'Generated image', preview: m.geminiImageData.image_url };
+    if (m.inspirationData) return { id: m.id, kind: 'inspiration', title: m.inspirationData.page_title || 'Inspiration board', preview: m.inspirationData.hero_image };
     if (m.techRadarData) return { id: m.id, kind: 'radar', title: 'Tech radar' };
     if (m.agentResultData) return { id: m.id, kind: 'result', title: m.agentResultData.title || 'Result' };
     if (m.jobFindingsData) return { id: m.id, kind: 'jobs', title: m.jobFindingsData.tracked_job_label ? `Jobs · ${m.jobFindingsData.tracked_job_label}` : 'Job findings' };
@@ -5459,7 +5461,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   /**
    * The artifact's line in the chat — derived, never typed out.
    *
-   * The stream used to carry THIRTY hand-written `<ArtifactChip kind="…" title="…">` calls, each
+   * The stream used to carry THIRTY hand-written `<ArtifactCard kind="…" title="…">` calls, each
    * a second copy of the mapping `getCanvasArtifact` already makes, sitting inside a
    * `canvasShown ? chip : fullCard` ternary that also duplicated `renderCanvasArtifact`'s whole
    * body. Two registries of the same fact and two renderers of the same card, held together by
@@ -5469,11 +5471,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
    * One derivation names it, one renderer draws it, and this is the only thing the stream says
    * about an artifact.
    */
-  const renderArtifactChip = (message: Message): React.ReactNode => {
+  const renderArtifactCard = (message: Message): React.ReactNode => {
     const artifact = getCanvasArtifact(message);
     if (!artifact) return null;
     return (
-      <ArtifactChip
+      <ArtifactCard
         artifact={artifact}
         active={activeCanvasId === artifact.id}
         onOpen={() => focusCanvas(artifact.id)}
@@ -6297,11 +6299,18 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     return <AgentAvatar agentId={ma?.id} className={cn('w-8 h-8', ma?.color)} />;
                   })()}
                   <div
-                    className={`${message.demoData || message.materialData || message.worldData || message.videoData || message.virtualStagingData || message.materialsBoardData || message.inspirationData || message.sheetCanvasData || message.actionConfirmationData || message.sheetPdfData || message.mentionSummaryData || message.llmVisibilityData || message.mentionFeedData || message.seoResearchData || message.seoGenericData || message.catalogExtractionData || message.catalogImageCandidatesData || message.sourcingOptionsData || message.purchaseOrderCreatedData || message.purchaseOrderSentData || message.agentResultData || message.techRadarData || message.jobFindingsData || message.articleData ? 'max-w-full' : 'max-w-[88%] sm:max-w-[75%]'} min-w-0 overflow-x-auto rounded-2xl p-3.5 sm:p-5 ${
+                    className={cn(
+                      // One width for every message. The old class here listed twenty-three
+                      // payloads and went `max-w-full` for any of them, because the artifact was
+                      // rendered INSIDE the bubble and a product table or a render grid needed the
+                      // room. The artifact is its own card below the bubble now, so a bubble only
+                      // ever holds prose — and prose at full width is a worse read, not a better
+                      // one.
+                      'min-w-0 max-w-[88%] overflow-x-auto rounded-2xl p-3.5 sm:max-w-[75%] sm:p-5',
                       message.role === 'user'
                         ? 'bg-[#1f2937] text-white shadow-md'
-                        : 'msg-assistant text-white shadow-sm'
-                    }`}
+                        : 'msg-assistant text-white shadow-sm',
+                    )}
                   >
                     {wasRoutedMessage(message) && (
                       // Says the handoff happened, in words. The avatar alone is easy to miss, and
@@ -6311,94 +6320,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                         <span>· routed by JARVIS</span>
                       </div>
                     )}
-                    {message.demoData ? (
-                      <div className="space-y-4">
-                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        {renderArtifactChip(message)}
-                      </div>
-                    ) : message.inspirationData ? (
-                      <div className="space-y-3">
-                        {renderArtifactChip(message)}
-                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                      </div>
-                    ) : message.heatPumpData ? (
-                      <div className="space-y-3">
-                        {renderArtifactChip(message)}
-                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                      </div>
-                    ) : message.heatingCostData ? (
-                      <div className="space-y-3">
-                        {renderArtifactChip(message)}
-                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                      </div>
-                    ) : message.kitchenCostData ? (
-                      <div className="space-y-3">
-                        <KitchenCostResultCard result={message.kitchenCostData.result} />
-                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                      </div>
-                    ) : message.techRadarData ? (
-                      <div className="space-y-3">
-                        {renderArtifactChip(message)}
-                        {message.content && <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />}
-                      </div>
-                    ) : message.jobFindingsData ? (
-                      <div className="space-y-3">
-                        {renderArtifactChip(message)}
-                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                      </div>
-                    ) : message.inputRequestData ? (
-                      // Canvas-first, like every other artifact: when the canvas pane is up the
-                      // question lives THERE and the chat keeps a one-line chip, which is the
-                      // behaviour the user asked for — a follow-up should not be a wall of prose.
-                      renderArtifactChip(message)) : message.actionConfirmationData ? (
-                      // Same rule as the question above: one card, in one place. With the canvas
-                      // up it lives THERE and the stream keeps a chip, so the gate is never drawn
-                      // twice and never drawn only where the viewport is not.
-                      renderArtifactChip(message)) : message.agentResultData ? (
-                      <div className="space-y-3">
-                        {renderArtifactChip(message)}
-                      </div>
-                    ) : message.sourcingOptionsData ? (
-                      <div className="space-y-3">
-                        {renderArtifactChip(message)}
-                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                      </div>
-                    ) : message.purchaseOrderCreatedData ? (
-                      <div className="space-y-3">
-                        {renderArtifactChip(message)}
-                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                      </div>
-                    ) : message.purchaseOrderSentData ? (
-                      <div className="space-y-3">
-                        {renderArtifactChip(message)}
-                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                      </div>
-                    ) : message.mentionSummaryData ? (
-                      <div className="space-y-3">
-                        {renderArtifactChip(message)}
-                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                      </div>
-                    ) : message.llmVisibilityData ? (
-                      <div className="space-y-3">
-                        {renderArtifactChip(message)}
-                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                      </div>
-                    ) : message.mentionFeedData ? (
-                      <div className="space-y-3">
-                        {renderArtifactChip(message)}
-                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                      </div>
-                    ) : message.seoResearchData ? (
-                      <div className="space-y-3">
-                        {renderArtifactChip(message)}
-                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                      </div>
-                    ) : message.seoGenericData ? (
-                      <div className="space-y-3">
-                        {renderArtifactChip(message)}
-                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                      </div>
-                    ) : message.materialData ? (
+                    {message.materialData ? (
                       <div className="space-y-4">
                         {/* Explainable search spec — how KAI interpreted the query. When there
                             are products it rides with them inside the artifact
@@ -6409,59 +6331,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           <SearchSpecCard spec={message.searchSpec} query={message.searchSpec.query || ''} />
                         )}
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        {/* Products open in the modal; the chip is how the chat names them */}
-                        {message.materialData.products && message.materialData.products.length > 0 && (
-                          renderArtifactChip(message))}
                       </div>
                     ) : message.geminiImageData ? (
                       <div className="space-y-3">
                         <MarkdownRenderer content={normalizeContent(message.content).replace(/!\[.*?\]\(https?:\/\/[^)]+\)/g, '').trim()} className="text-sm" />
-                        {renderArtifactChip(message)}
-                      </div>
-                    ) : message.materialsBoardData ? (
-                      <div className="space-y-3">
-                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        {renderArtifactChip(message)}
-                      </div>
-                    ) : message.sheetCanvasData ? (
-                      <div className="space-y-3">
-                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        {renderArtifactChip(message)}
-                      </div>
-                    ) : message.sheetPdfData ? (
-                      <div className="space-y-3">
-                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        {renderArtifactChip(message)}
-                      </div>
-                    ) : message.quoteData ? (
-                      <div className="space-y-3">
-                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        {renderArtifactChip(message)}
-                      </div>
-                    ) : message.catalogExtractionData ? (
-                      <div className="space-y-3">
-                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        {renderArtifactChip(message)}
-                      </div>
-                    ) : message.catalogImageCandidatesData ? (
-                      <div className="space-y-3">
-                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        {renderArtifactChip(message)}
-                      </div>
-                    ) : message.virtualStagingData ? (
-                      <div className="space-y-3">
-                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        {renderArtifactChip(message)}
-                      </div>
-                    ) : message.videoData ? (
-                      <div className="space-y-3">
-                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        {renderArtifactChip(message)}
-                      </div>
-                    ) : message.worldData ? (
-                      <div className="space-y-4">
-                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        {renderArtifactChip(message)}
                       </div>
                     ) : (
                       <div className="space-y-2">
@@ -6515,17 +6388,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           </div>
                         )}
 
-                        {/* materialData is handled by its own ternary branch above (with the
-                            SearchSpec + products chip); it never reaches this regular-message block. */}
-
-                        {/* Async 3D room-generation grid — full grid opens in the canvas (chip in chat) */}
-                        {message.role === 'assistant' && message.generation_job && (
-                          renderArtifactChip(message))}
-
-                        {/* SEO article pipeline — opens in the modal; the chip is how the chat names it */}
-                        {message.role === 'assistant' && message.articleData && (
-                          renderArtifactChip(message))}
-
                       </div>
                     )}
                     {message.role === 'assistant' && renderFollowUps(message)}
@@ -6576,6 +6438,25 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     </div>
                   )}
                 </div>
+                {/* The turn's artifact, OUTSIDE the bubble.
+                    It used to sit inside, which is why it could not be seen: `.msg-assistant` is
+                    `--primary` on the dark themes and `--card` on the light ones, so a card drawn
+                    in `bg-card` was a dark box on magenta in one and the bubble's own colour in
+                    the other. Out here it is an ordinary panel on the page ground, and the
+                    three-surface ladder works the way it does everywhere else.
+
+                    It is also the reason twenty-one branches of the bubble's ternary chain are
+                    gone: they were all "render the markdown, then the card", differing only in
+                    which came first. */}
+                {(() => {
+                  const card = renderArtifactCard(message);
+                  if (!card) return null;
+                  return (
+                    <div className="flex justify-start">
+                      <div className="w-full max-w-[88%] sm:max-w-[75%]">{card}</div>
+                    </div>
+                  );
+                })()}
                 </React.Fragment>
               ))}
 
