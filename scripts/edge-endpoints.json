@@ -15092,5 +15092,30 @@
       }
     ],
     "response": "{ ok, run_id, case_key, passed, failures[], conversation_id, routed_agent, model, tools_called[], tools_zero[], tools_failed[], credits, latency_ms, reply }"
+  },
+  {
+    "name": "profile-review-summary",
+    "tag": "Profiles",
+    "summary": "Regenerates the AI summary printed above a professional's public reviews.",
+    "description": "Reads the non-hidden reviews written about user_id, and when at least three carry written comments and the stored summary is stale, asks Claude for a 2-3 sentence summary and stores it in review_summaries.summary_text. Every gate runs before the model call, so a fresh summary costs nothing. Review text is fenced as data, not instructions. Not credit-metered: the summary is a marketplace surface the operator owns, and neither the reviewer nor the professional asked for it. Records summary_status (ok / not_enough_reviews / generation_failed) so an empty summary can say which it is.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "user_id": {
+          "type": "string",
+          "description": "The reviewed professional's user id.",
+          "required": true
+        }
+      }
+    },
+    "response": "{status: 'ok'|'fresh'|'not_enough_reviews'|'cooling_down', summary_text?: string, reviews_summarised?: number}"
   }
 ]

@@ -110,6 +110,13 @@ export const ReviewModal: React.FC<{
 
     toast({ title: existingReview ? 'Review updated' : 'Review submitted' });
 
+    // The public profile's review summary is now stale. Fire and forget: the review is already
+    // saved, so a failed refresh must not read as a failed submission, and every gate that
+    // decides whether a model runs at all lives in the function.
+    void supabase.functions
+      .invoke('profile-review-summary', { body: { user_id: toUserId } })
+      .catch((e) => console.warn('[reviews] summary refresh failed:', e));
+
     // The review_submitted Flow event is now emitted by the fn_notify_review DB trigger (covers every
     // insert path — client, agent, API — and is admin-pausable). No client-side emit needed here.
 

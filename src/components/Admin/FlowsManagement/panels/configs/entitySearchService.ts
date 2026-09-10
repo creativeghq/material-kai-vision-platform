@@ -122,6 +122,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'project-assessment', label: 'project-assessment', sublabel: "Derive a project's health signals, and optionally write the AI assessment of them" },
   { id: 'real-estate-assessment', label: 'real-estate-assessment', sublabel: "Derive one property listing's health signals, and optionally write the AI assessment of them" },
   { id: 'project-plan-engine', label: 'project-plan-engine', sublabel: 'Authoritative compute for the Blueprint estimating engine (plans, pricing, versions, quotes)' },
+  { id: 'profile-review-summary', label: 'profile-review-summary', sublabel: "Regenerates the AI summary printed above a professional's public reviews" },
   { id: 'public-project-plan', label: 'public-project-plan', sublabel: 'Public lead-gen Blueprint estimator (/tools/project-plan)' },
   { id: 'quote-public-share', label: 'quote-public-share', sublabel: 'Public token-based quote share lookup (anonymous-friendly)' },
   { id: 'quotes-api', label: 'quotes-api', sublabel: 'REST API for quote requests (customer-facing)' },

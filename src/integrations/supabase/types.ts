@@ -26420,6 +26420,8 @@ export type Database = {
           avg_rating: number | null
           last_computed_at: string
           review_count: number
+          summary_error: string | null
+          summary_status: string
           summary_text: string
           user_id: string
         }
@@ -26427,6 +26429,8 @@ export type Database = {
           avg_rating?: number | null
           last_computed_at?: string
           review_count?: number
+          summary_error?: string | null
+          summary_status?: string
           summary_text?: string
           user_id: string
         }
@@ -26434,6 +26438,8 @@ export type Database = {
           avg_rating?: number | null
           last_computed_at?: string
           review_count?: number
+          summary_error?: string | null
+          summary_status?: string
           summary_text?: string
           user_id?: string
         }

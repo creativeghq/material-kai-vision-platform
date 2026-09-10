@@ -17,7 +17,7 @@ import { ReviewModal } from './ReviewModal';
 export interface ProfileReview {
   id: string;
   from_user_id: string;
-  from_name: string;
+  from_name: string | null;
   overall_rating: number;
   dimension_ratings: Record<string, number>;
   comment: string | null;
@@ -397,7 +397,8 @@ function ReviewCard({
   const [saving, setSaving] = useState(false);
   const [replyError, setReplyError] = useState<string | null>(null);
 
-  const initials = review.from_name
+  // A null from_name here is a render crash that takes the whole tab, not a blank name.
+  const initials = (review.from_name ?? '')
     .split(' ')
     .filter(Boolean)
     .slice(0, 2)
