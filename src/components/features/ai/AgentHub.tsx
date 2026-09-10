@@ -153,7 +153,13 @@ import { looksInsufficientCredits, balanceFromCreditsError, humanEdgeRefusal } f
 // What one turn may carry. agent-chat REFUSES a turn over these with 413 before any model call,
 // so the composer has to clamp on the same numbers — offering an attachment the server will not
 // accept is silent until the user has already read and uploaded it.
-import { AGENT_MAX_IMAGES, AGENT_MAX_DOCUMENTS, attachmentRoom } from '@/config/agentAttachmentLimits';
+import {
+  AGENT_MAX_IMAGES,
+  AGENT_MAX_DOCUMENTS,
+  AGENT_MAX_MULTIMODAL_CHARS,
+  attachmentRoom,
+  attachmentsWithinBytes,
+} from '@/config/agentAttachmentLimits';
 import { CreditTopUpDialog, type CreditTopUpRequest } from '@/components/core/CreditTopUpDialog';
 import { safeHref } from '@/utils/safeUrl';
 import { GENERATION_MODELS } from '@/config/generationModels.generated';
@@ -4136,7 +4142,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       // previous answer under the next turn's working panel.
       setStreamingText('');
     }
-  }, [input, selectedAgent, selectedModel, attachedImages, attachedCatalogPdfs, userId, currentConversationId, messages]);
+    // `attachedDocuments` belongs here for the same reason `attachedCatalogPdfs` does — it was
+    // simply missed when the readable-document path was added. Without it the closure holds the
+    // array from the last render that changed one of the others, so attaching a PDF and pressing
+    // send WITHOUT typing hits the empty-composer guard above with a stale empty array: the button
+    // is enabled, the click does nothing, and nothing is reported. Typing anything first hid it,
+    // because `input` is in this list.
+  }, [input, selectedAgent, selectedModel, attachedImages, attachedCatalogPdfs, attachedDocuments, userId, currentConversationId, messages]);
 
   // Keep ref in sync so effects can call the latest handleSendMessage without stale closures
   useEffect(() => {
@@ -4302,7 +4314,20 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             reader.readAsDataURL(file);
           }),
       ),
-    ).then((docs) => {
+    ).then((allDocs) => {
+      // The byte ceiling can only be measured once the files are READ — six legal-count PDFs are
+      // ~40MB of base64 — so it is applied here rather than above. Still before the send, which is
+      // the whole point: without it the turn is refused after the upload.
+      const fit = attachmentsWithinBytes(attachedDocuments.map((d) => d.dataUrl), allDocs.map((d) => d.dataUrl));
+      const docs = allDocs.slice(0, fit.accepted);
+      if (fit.rejected > 0) {
+        toast({
+          title: 'Too large to attach',
+          description: `${allDocs.slice(fit.accepted).map((d) => d.name).join(', ')} — one turn carries about ${Math.round(AGENT_MAX_MULTIMODAL_CHARS / 1024 / 1024)}MB of attachments in total.`,
+          variant: 'destructive',
+        });
+      }
+      if (docs.length === 0) return;
       // `.slice` holds the invariant even if two picks land in one render — the clamp above is
       // what TELLS the user, this is what makes it true.
       setAttachedDocuments((prev) => [...prev, ...docs].slice(0, AGENT_MAX_DOCUMENTS));
@@ -4310,7 +4335,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     }).catch(() => {
       toast({ title: 'Attach failed', description: 'The PDF could not be read. Please try again.', variant: 'destructive' });
     });
-  }, [attachedDocuments.length, toast]);
+    // The whole array, not just its length: the byte check reads every attached data URL.
+  }, [attachedDocuments, toast]);
 
   const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;

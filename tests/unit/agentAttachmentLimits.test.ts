@@ -35,6 +35,7 @@ import {
   AGENT_MAX_MULTIMODAL_CHARS,
   checkAgentAttachments,
   attachmentRoom,
+  attachmentsWithinBytes,
 } from '../../src/config/agentAttachmentLimits';
 import { humanEdgeRefusal, looksInsufficientCredits } from '../../src/utils/edgeError';
 
@@ -125,6 +126,32 @@ describe('the one predicate', () => {
     expect(AGENT_MAX_DOCUMENTS * fat.length).toBeGreaterThan(AGENT_MAX_MULTIMODAL_CHARS);
   });
 
+  it('never prints a size that equals the limit it is over', () => {
+    // Rounding both operands said `~32MB, max 32MB per turn` — self-contradictory, and nothing the
+    // reader can act on. A turn is only ever refused for being OVER.
+    // A kilobyte over is the hard case: one decimal alone rounds it back to the limit.
+    for (const excess of [1024, 1024 * 1024, 40 * 1024 * 1024]) {
+      const message = checkAgentAttachments({
+        documents: ['x'.repeat(AGENT_MAX_MULTIMODAL_CHARS + excess)],
+      })?.message ?? '';
+      const [actual, limit] = [...message.matchAll(/([\d.]+)MB/g)].map((m) => Number(m[1]));
+      expect(message).toContain('too large');
+      expect(actual, `${message} — a refused turn must not print its own limit as its size`)
+        .toBeGreaterThan(limit);
+    }
+  });
+
+  it('fits attachments under the byte ceiling in order, and refuses one that never could', () => {
+    const half = 'x'.repeat(AGENT_MAX_MULTIMODAL_CHARS / 2);
+    expect(attachmentsWithinBytes([], [half, half])).toEqual({ accepted: 2, rejected: 0 });
+    expect(attachmentsWithinBytes([half], [half, half])).toEqual({ accepted: 1, rejected: 1 });
+    // A single item over the whole ceiling takes nothing with it, rather than being accepted here
+    // and refused at send.
+    const enormous = 'x'.repeat(AGENT_MAX_MULTIMODAL_CHARS + 1);
+    expect(attachmentsWithinBytes([], [enormous])).toEqual({ accepted: 0, rejected: 1 });
+    expect(attachmentsWithinBytes([], [])).toEqual({ accepted: 0, rejected: 0 });
+  });
+
   it('survives a caller that passes nothing, or garbage', () => {
     expect(checkAgentAttachments({})).toBeNull();
     expect(checkAgentAttachments({ images: undefined, documents: undefined })).toBeNull();
@@ -194,6 +221,25 @@ describe('the composer clamps before the read, not after the send', () => {
     expect(src).toMatch(/\$\{AGENT_MAX_DOCUMENTS\} documents is the limit/);
     expect(src).toMatch(/\$\{AGENT_MAX_IMAGES\} images is the limit/);
   });
+
+  it('checks BYTES at attach time too, not only counts', () => {
+    // The count clamp alone leaves the byte ceiling discoverable only after the upload — the exact
+    // shape the counts were clamped to close.
+    expect(src).toContain('attachmentsWithinBytes(');
+  });
+
+  it('sends what is attached: the send handler sees the documents array', () => {
+    // `attachedDocuments` was missing from handleSendMessage's dependency list while
+    // `attachedCatalogPdfs` was present, so the closure held a stale array. Attaching a PDF and
+    // pressing send WITHOUT typing hit the empty-composer guard and did nothing at all, with the
+    // button enabled and no error — typing first hid it, because `input` is in that list.
+    const deps = src.match(/\}, \[input, selectedAgent, selectedModel,[^\]]*\]\);/);
+    expect(deps, 'handleSendMessage dependency list not found — re-point this guard').toBeTruthy();
+    for (const state of ['attachedImages', 'attachedCatalogPdfs', 'attachedDocuments']) {
+      expect(deps![0], `handleSendMessage closes over ${state} but does not depend on it`)
+        .toContain(state);
+    }
+  });
 });
 
 describe('a refusal reads like a sentence', () => {
@@ -213,6 +259,19 @@ describe('a refusal reads like a sentence', () => {
     expect(humanEdgeRefusal('Agent execution failed: 500 - ')).toBeNull();
     expect(humanEdgeRefusal(undefined)).toBeNull();
     expect(humanEdgeRefusal('Agent execution failed: 502 - <html>bad gateway</html>')).toBeNull();
+  });
+
+  it('leaves a CRASH looking like a crash', () => {
+    // A 5xx body carries whatever the exception said. Rendering that as clean prose strips the
+    // status and puts an internal error on screen as an ordinary assistant reply — a failure the
+    // reader cannot tell from an answer. Only a 4xx is a decision someone wrote a sentence for.
+    expect(humanEdgeRefusal(
+      'Agent execution failed: 500 - {"error":"Cannot read properties of undefined (reading \'id\')"}',
+    )).toBeNull();
+    expect(humanEdgeRefusal('Agent execution failed: 503 - {"error":"Model provider unavailable"}')).toBeNull();
+    // …and every 4xx our own functions answer with still comes through.
+    expect(humanEdgeRefusal('Agent execution failed: 400 - {"error":"Attach a PDF, not a folder."}'))
+      .toBe('Attach a PDF, not a folder.');
   });
 
   it('is what AgentHub actually renders on a non-credit failure', () => {

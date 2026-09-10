@@ -99,7 +99,7 @@ export function looksInsufficientCredits(text: unknown): boolean {
 }
 
 /**
- * The human sentence inside a refusal that reached us as raw TEXT — a streamed agent turn, which
+ * The human sentence inside a REFUSAL that reached us as raw TEXT — a streamed agent turn, which
  * reads the body with `response.text()` and has no `functions.invoke` error to unwrap.
  *
  * Returns `null` when there is nothing better than what the caller already has, so the call site
@@ -111,12 +111,22 @@ export function looksInsufficientCredits(text: unknown): boolean {
  * `Error: Agent execution failed: 413 - {"error":"Too many documents attached: 19 (max 6 per turn)."}`
  * when the function had written a perfectly good sentence and put it in the body.
  *
+ * ONLY 4xx. A refusal is a decision the function made and wrote a sentence for; a 5xx is a crash,
+ * and its body carries whatever the exception said. Presenting that as clean prose would strip the
+ * status and render an internal error as an ordinary assistant reply — a failure the reader cannot
+ * tell from an answer, which is worse than the raw text it replaced. Same line `withApiLogging`
+ * draws when it reports 5xx to Sentry and deliberately never reports 4xx.
+ *
  * Slug-shaped bodies (`insufficient_credits`, `not_entitled`) are deliberately NOT humanised — the
  * slug is worse to read than the raw text, and the credit path keys off the raw string.
  */
 export function humanEdgeRefusal(text: unknown): string | null {
   if (!text) return null;
   const s = text instanceof Error ? text.message : String(text);
+  // The status immediately in front of the body, as AgentHub formats it. No status means we cannot
+  // tell a refusal from a crash, so leave the text alone.
+  const status = s.match(/\b(\d{3})\s*-\s*(?=\{)/);
+  if (!status || Number(status[1]) < 400 || Number(status[1]) > 499) return null;
   const start = s.indexOf('{');
   const end = s.lastIndexOf('}');
   if (start < 0 || end <= start) return null;

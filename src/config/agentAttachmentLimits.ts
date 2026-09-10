@@ -50,8 +50,19 @@ export interface AgentAttachmentRefusal {
   message: string;
 }
 
-/** Base64 chars → the megabytes a human recognises, for the message. */
-function approxMegabytes(chars: number): number {
+/**
+ * Base64 chars → the megabytes a human recognises.
+ *
+ * One decimal on the ACTUAL, whole on the LIMIT, and the actual rounds UP: rounding both to whole
+ * megabytes produced `~32MB, max 32MB per turn`, which contradicts itself and tells the reader
+ * nothing they can act on — and one decimal alone is not enough, because a turn a kilobyte over
+ * still reads `32.0MB, max 32MB`. A turn is only ever refused for being OVER, so the number shown
+ * must be over. Ceiling at one decimal guarantees it for any whole-megabyte limit.
+ */
+function actualMegabytes(chars: number): string {
+  return (Math.ceil((chars / 1024 / 1024) * 10) / 10).toFixed(1);
+}
+function limitMegabytes(chars: number): number {
   return Math.round(chars / 1024 / 1024);
 }
 
@@ -87,7 +98,7 @@ export function checkAgentAttachments(turn: {
   if (chars > AGENT_MAX_MULTIMODAL_CHARS) {
     return {
       code: 'attachments_too_large',
-      message: `Attached media too large (~${approxMegabytes(chars)}MB, max ${approxMegabytes(AGENT_MAX_MULTIMODAL_CHARS)}MB per turn).`,
+      message: `Attached media too large (~${actualMegabytes(chars)}MB, max ${limitMegabytes(AGENT_MAX_MULTIMODAL_CHARS)}MB per turn).`,
     };
   }
   return null;
@@ -105,4 +116,31 @@ export function attachmentRoom(current: number, incoming: number, limit: number)
 } {
   const accepted = Math.max(0, Math.min(incoming, limit - current));
   return { accepted, rejected: incoming - accepted };
+}
+
+/**
+ * How many of `incoming` fit under the byte ceiling, in order, given what is already attached.
+ *
+ * The count clamp alone leaves the BYTE limit discoverable only at send — six legal-count PDFs are
+ * ~40MB of base64 — which is the same "find out after the upload" shape the counts were clamped to
+ * close. Measured on documents only: images are uploaded to storage first and reach the turn as
+ * short URLs, so counting the composer's own data URLs against them would refuse turns the server
+ * would happily take.
+ *
+ * A single item over the whole ceiling accepts nothing, rather than accepting it and refusing at
+ * send — an item that can never fit is not a queueing problem.
+ */
+export function attachmentsWithinBytes(
+  existing: readonly string[],
+  incoming: readonly string[],
+): { accepted: number; rejected: number } {
+  let used = existing.reduce((n, s) => n + (typeof s === 'string' ? s.length : 0), 0);
+  let accepted = 0;
+  for (const item of incoming) {
+    const size = typeof item === 'string' ? item.length : 0;
+    if (used + size > AGENT_MAX_MULTIMODAL_CHARS) break;
+    used += size;
+    accepted++;
+  }
+  return { accepted, rejected: incoming.length - accepted };
 }
