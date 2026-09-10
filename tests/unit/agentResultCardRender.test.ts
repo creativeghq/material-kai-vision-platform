@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { AgentResultCard } from '@/components/features/ai/AgentResultCard';
+import { AgentResultCard, primaryListCount } from '@/components/features/ai/AgentResultCard';
 
 const FLOWS = {
   flows: [
@@ -286,5 +286,39 @@ describe('AgentResultCard sends a record where its detail actually lives', () =>
       }),
     );
     expect(html).toContain('href="/inbox?thread=aaaaaaaa-1111-2222-3333-444444444444"');
+  });
+});
+
+/**
+ * The chat card says "12 rows" above a table the modal draws. Both must be counting the SAME
+ * list, so `primaryListCount` is asserted against what the component actually renders rather
+ * than against a second reading of the rule.
+ */
+describe('the count on the chat card is the count in the table', () => {
+  const rowsIn = (html: string) => (html.match(/<tr[ >]/g) || []).length - 1; // less the header
+
+  const CASES: Array<[string, Record<string, unknown>]> = [
+    ['a plain list', FLOWS],
+    // Half the tools wrap their whole answer in one key; the card peels it, so the count must too.
+    ['wrapped in `data`', { data: FLOWS }],
+    ['wrapped in `result`', { result: FLOWS }],
+    ['wrapped twice', { data: { result: FLOWS } }],
+    // NOT a sole-key wrapper: `data` sits beside a peer, so nothing is peeled and the first
+    // array still wins. Peeling here would count a different list from the one on screen.
+    ['a `data` key that is not a wrapper', { flows: FLOWS.flows, data: { other: [1, 2, 3, 4, 5] } }],
+  ];
+
+  for (const [name, payload] of CASES) {
+    it(`agrees on ${name}`, () => {
+      const html = render(payload);
+      expect(rowsIn(html)).toBe(3);
+      expect(primaryListCount(payload)).toBe(3);
+    });
+  }
+
+  it('says nothing when the result is not list-shaped', () => {
+    expect(primaryListCount({ count: 0, query: 'CREATIVEG', records: null })).toBeUndefined();
+    expect(primaryListCount(undefined)).toBeUndefined();
+    expect(primaryListCount([1, 2, 3])).toBeUndefined();
   });
 });

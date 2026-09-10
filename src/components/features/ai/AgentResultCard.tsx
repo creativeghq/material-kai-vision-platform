@@ -177,16 +177,33 @@ const isNumericCol = (rows: any[], k: string) =>
 
 /** An array worth tabulating: 2+ objects that actually share a shape. */
 /**
+ * Peel a chunk that wraps its whole answer in ONE `data` or `result` key, up to two levels.
+ *
+ * Half the tools emit `{data: {count: 6, expenses: […]}}`, which would otherwise render as a
+ * field labelled "Data" with the real answer nested inside it.
+ */
+export function unwrapResultData(raw: any): any {
+  let d = raw;
+  for (let i = 0; i < 2; i++) {
+    const keys = d && typeof d === 'object' && !Array.isArray(d) ? Object.keys(d) : [];
+    const inner = keys.length === 1 && (keys[0] === 'data' || keys[0] === 'result') ? (d as any)[keys[0]] : null;
+    if (!inner || typeof inner !== 'object' || Array.isArray(inner)) break;
+    d = inner;
+  }
+  return d;
+}
+
+/**
  * How many rows the result is a list OF, or undefined when it is not list-shaped.
  *
- * The same "first array wins" rule the card renders by, exported so the chat card's "12 rows" and
- * the table below it cannot disagree.
+ * The card's own rule, exported: unwrap the same way, then the first non-plumbing array wins. A
+ * second approximation of it made the chat card count a different list from the table under it.
  */
-export function primaryListCount(data: unknown): number | undefined {
+export function primaryListCount(raw: unknown): number | undefined {
+  const data = unwrapResultData(raw);
   if (!data || typeof data !== 'object' || Array.isArray(data)) return undefined;
-  const inner = (data as Record<string, unknown>).data;
-  const obj = (inner && typeof inner === 'object' && !Array.isArray(inner) ? inner : data) as Record<string, unknown>;
-  const list = Object.entries(obj).find(([k, v]) => Array.isArray(v) && !isPlumbing(k, v));
+  const list = Object.entries(data as Record<string, unknown>)
+    .find(([k, v]) => Array.isArray(v) && !isPlumbing(k, v));
   return list ? (list[1] as unknown[]).length : undefined;
 }
 
@@ -330,7 +347,7 @@ function RecordTable({ rows, columns, listKey }: { rows: any[]; columns: string[
             {shown.map((c) => (
               <th
                 key={c}
-                className={`sticky top-0 z-10 whitespace-nowrap border-b border-hairline bg-surface-sunken px-2.5 py-2 text-[11px] font-semibold text-muted-foreground ${
+                className={`sticky top-0 z-10 whitespace-nowrap bg-surface-sunken px-2.5 py-2 text-[11px] font-semibold text-muted-foreground shadow-[inset_0_-1px_0_hsl(var(--hairline))] ${
                   isNumericCol(rows, c) ? 'text-right' : 'text-left'
                 }`}
               >
@@ -513,16 +530,7 @@ export const AgentResultCard: React.FC<{
   // answer nested inside it: the shape of the JSON showing through as a heading, exactly the leak
   // the list-unwrapping below already exists to stop. On the canvas that is the whole artifact, so
   // the same six expenses read as a debug dump there and as a clean table in the chat.
-  const data = useMemo(() => {
-    let d = rawData;
-    for (let i = 0; i < 2; i++) {
-      const keys = d && typeof d === 'object' && !Array.isArray(d) ? Object.keys(d) : [];
-      const inner = keys.length === 1 && (keys[0] === 'data' || keys[0] === 'result') ? (d as any)[keys[0]] : null;
-      if (!inner || typeof inner !== 'object' || Array.isArray(inner)) break;
-      d = inner;
-    }
-    return d;
-  }, [rawData]);
+  const data = useMemo(() => unwrapResultData(rawData), [rawData]);
 
   // Rail-3 reverse handoff: resolve the owning capability's page + Hub label.
   const capId = resultType ? RESULT_TYPE_CAPABILITY[resultType] : undefined;

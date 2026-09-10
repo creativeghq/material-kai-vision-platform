@@ -544,16 +544,19 @@ export const ArtifactCard: React.FC<ArtifactCardProps> = ({
           <ArrowUpRight className="h-3.5 w-3.5" />
         </span>
       </button>
-      {/* Close / delete without opening it first. Hidden until hover on a pointer device; always
-          present where there is no hover. */}
+      {/* Close / delete without opening it first, hover-revealed on a pointer device and hidden
+          below `sm` where the modal carries it. `cursor-default` because `panel-interactive` puts
+          a pointer on the whole card and these ~40px open nothing. */}
       {artifact.kind !== 'run' && (onCloseArtifact || onDeleteArtifact) && (
-        <span className="hidden shrink-0 items-start p-1.5 sm:flex">
+        <span className="hidden shrink-0 cursor-default items-start p-1.5 sm:flex">
           <ArtifactMenu
             id={artifact.id}
             title={artifact.title}
             onCloseArtifact={onCloseArtifact}
             onDeleteArtifact={onDeleteArtifact}
-            className="opacity-100 lg:opacity-0 lg:group-focus-within:opacity-100 lg:group-hover:opacity-100"
+            // Radix portals the menu OUT of the group, so hover is lost the moment it opens and the
+            // trigger would fade under its own dropdown.
+            className="opacity-100 data-[state=open]:opacity-100 lg:opacity-0 lg:group-focus-within:opacity-100 lg:group-hover:opacity-100"
           />
         </span>
       )}
