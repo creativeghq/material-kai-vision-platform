@@ -461,7 +461,10 @@ function KeyValues({ obj, depth = 0, inline = false }: { obj: any; depth?: numbe
           key={k}
           className={inline
             ? 'text-xs'
-            : 'grid grid-cols-[minmax(96px,180px)_1fr] items-start gap-x-4 py-1.5 text-xs first:pt-0 last:pb-0'}
+            // STACKED below `sm`. Two columns on a phone leave the value about 130px once the
+            // label has taken its minimum and the row is nested one level — and these nest. A
+            // label above its value reads; a label beside a 130px value does not.
+            : 'grid grid-cols-1 items-start gap-x-4 py-1.5 text-xs first:pt-0 last:pb-0 sm:grid-cols-[minmax(96px,180px)_1fr]'}
         >
           <span className="text-muted-foreground">{labelize(k)}{inline ? ': ' : ''}</span>
           <div className="min-w-0 text-foreground"><Value v={v} depth={depth} listKey={k} /></div>

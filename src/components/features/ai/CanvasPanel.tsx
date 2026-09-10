@@ -309,8 +309,23 @@ export const ArtifactModal: React.FC<ArtifactModalProps> = ({
            * scrolling — but a small one is now the size of the thing in it.
            */
           'flex max-h-[92dvh] w-[96vw] max-w-5xl flex-col gap-0 overflow-hidden p-0',
-          // Full-bleed on a phone: an artifact wants the screen.
-          'max-sm:max-h-[100dvh] max-sm:w-full max-sm:max-w-none max-sm:rounded-none',
+          /**
+           * Full-bleed SHEET on a phone — a FIXED height, unlike the desktop cap above, and
+           * `max-h` lifted to match it.
+           *
+           * `DialogContent` centres itself (`top-1/2` + `-translate-y-1/2`), so content-sized
+           * + full-width + square-cornered made a small result a band floating across the
+           * middle of the screen with its corners bleeding off both edges. Commit to the
+           * sheet or keep the inset rounded dialog; the mix is what looks broken.
+           *
+           * `max-h` and `h` are DIFFERENT PROPERTIES, so the 92dvh cap above went on
+           * clamping the phone sheet after the height was fixed — measured at 776 of 844,
+           * a full-width square-cornered panel with a 34px gap above and below it. Measured,
+           * not reasoned: it looks right in the class list either way.
+           *
+           * The mobile bottom nav is z-40 and this is z-50, so the sheet covers it.
+           */
+          'max-sm:h-[100dvh] max-sm:max-h-[100dvh] max-sm:w-full max-sm:max-w-none max-sm:rounded-none',
         )}
         // The header carries its own controls on one line; the primitive's floating X would
         // land on top of them.
