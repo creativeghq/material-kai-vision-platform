@@ -21,6 +21,10 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 // Cluster → tool_ids, GENERATED from agentToolsCatalog.TOOLKITS (the picker's own
 // source). Boot-safe: a plain data module with no npm deps and no env reads.
 import { TOOLKIT_CLUSTERS } from '../_shared/toolkitClusters.generated.ts';
+// What one turn may carry, GENERATED from src/config/agentAttachmentLimits.ts so the composer
+// clamps on the same predicate this function refuses on. Same boot profile: pure data + a pure
+// function, no npm deps, no env reads.
+import { checkAgentAttachments } from '../_shared/agentAttachmentLimits.generated.ts';
 // Type-only — erased at compile time, so it costs nothing at boot. The implementation is
 // loaded inside initRuntime() alongside the other lazy modules.
 import type { AgentMemory as AgentMemoryType } from '../_shared/agent-memory.ts';
@@ -4117,25 +4121,18 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
     // metered only post-hoc (internal). An unbounded multimodal payload could drive tens of
     // dollars of vision/document tokens per turn for a fixed/near-zero charge. Bound count + bytes
     // BEFORE any model call — reject oversized attachments with 413.
-    const MAX_IMAGES = 12;
-    const MAX_DOCUMENTS = 6;
-    const MAX_MULTIMODAL_CHARS = 32 * 1024 * 1024; // base64 chars ≈ ~24MB raw across all attachments
-    const reject413 = (msg: string) => new Response(
-      JSON.stringify({ error: msg }),
-      { status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-    );
-    if (Array.isArray(images) && images.length > MAX_IMAGES) {
-      return reject413(`Too many images attached: ${images.length} (max ${MAX_IMAGES} per turn).`);
-    }
-    if (Array.isArray(documents) && documents.length > MAX_DOCUMENTS) {
-      return reject413(`Too many documents attached: ${documents.length} (max ${MAX_DOCUMENTS} per turn).`);
-    }
-    const multimodalChars = [
-      ...(Array.isArray(images) ? images : []),
-      ...(Array.isArray(documents) ? documents : []),
-    ].reduce((n: number, s: unknown) => n + (typeof s === 'string' ? s.length : 0), 0);
-    if (multimodalChars > MAX_MULTIMODAL_CHARS) {
-      return reject413(`Attached media too large (~${Math.round(multimodalChars / 1024 / 1024)}MB, max ${Math.round(MAX_MULTIMODAL_CHARS / 1024 / 1024)}MB per turn).`);
+    //
+    // The limits and this predicate live in `agentAttachmentLimits` because the COMPOSER has to
+    // clamp on exactly what is enforced here. They used to be three `const`s in this handler, so
+    // AgentHub appended attachments with no ceiling and a user could read, upload and send 19 PDFs
+    // before learning six was the number. `code` is on the body so a caller can tell WHICH limit
+    // it hit without parsing English.
+    const attachmentRefusal = checkAgentAttachments({ images, documents });
+    if (attachmentRefusal) {
+      return new Response(
+        JSON.stringify({ error: attachmentRefusal.message, code: attachmentRefusal.code }),
+        { status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
     }
     // user_id: string | null — only honored when the caller authenticates with
     // the platform sb_secret_* admin key (server-to-server "act on behalf of"

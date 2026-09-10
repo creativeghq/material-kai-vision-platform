@@ -340,6 +340,19 @@ with a perfect `if (config.tools.includes('x')) tools.push(...)` line that no ag
 anyone. `price_my_spec` and `generate_video` were both live in that state; `generate_video`'s own earlier fix
 stopped at the push site. Guarded by the "listed by at least one agent" case in `toolkitCoverage.test.ts`.
 
+**What the composer may ATTACH is what agent-chat ACCEPTS, and the numbers live in one file.**
+`src/config/agentAttachmentLimits.ts` (mirrored to Deno by `vocab:mirror`) holds the per-turn ceiling — 12
+images, 6 documents, ~32MB — and `checkAgentAttachments` is the ONE predicate: the edge refuses on it with
+413 before any model call, and AgentHub clamps on it at attach time. They were three `const`s inside
+agent-chat's handler, so the only party that knew them was the one refusing: the composer appended with no
+ceiling of any kind, and 19 PDFs were read to base64, uploaded, and answered with the raw JSON of the
+refusal. A clamp must sit on **every** write that can grow those arrays — the paperclip, the clipboard, the
+deep-link seed and the toolkit form all fill them. And the refusal itself must READ like one: AgentHub's
+catch translated only the 402 credits shape and printed `Error: Agent execution failed: <status> - <body>`
+for everything else, so prefer the body's own sentence via `humanEdgeRefusal` (`src/utils/edgeError.ts`),
+which deliberately leaves slug-shaped bodies alone so the credits path keeps working. Guarded by
+[tests/unit/agentAttachmentLimits.test.ts](tests/unit/agentAttachmentLimits.test.ts).
+
 **Skills: `agents:` holds agent IDS, not display names** — JARVIS is `kai`, Trinity is `erp`. `getSkillsForAgent`
 matches on the id, so a skill listing `trinity` is offered to nobody, silently. A skill also has to be imported
 into `SKILL_FILES` (`skills-loader.ts`), and its `SKILL.md`/`skill.ts` twins must match — the `.md` is what gets

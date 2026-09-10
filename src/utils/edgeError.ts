@@ -98,6 +98,40 @@ export function looksInsufficientCredits(text: unknown): boolean {
   return /insufficient[_\s]credits|not enough credits/i.test(s);
 }
 
+/**
+ * The human sentence inside a refusal that reached us as raw TEXT — a streamed agent turn, which
+ * reads the body with `response.text()` and has no `functions.invoke` error to unwrap.
+ *
+ * Returns `null` when there is nothing better than what the caller already has, so the call site
+ * reads `humanEdgeRefusal(text) ?? \`Error: ${text}\`` and never loses a message it cannot improve.
+ *
+ * WHY. AgentHub throws `Agent execution failed: ${status} - ${body}` and its catch translated
+ * exactly ONE shape — the 402 credits refusal. Everything else printed the status and the raw JSON
+ * at the user: a 413 for attaching too many PDFs rendered as
+ * `Error: Agent execution failed: 413 - {"error":"Too many documents attached: 19 (max 6 per turn)."}`
+ * when the function had written a perfectly good sentence and put it in the body.
+ *
+ * Slug-shaped bodies (`insufficient_credits`, `not_entitled`) are deliberately NOT humanised — the
+ * slug is worse to read than the raw text, and the credit path keys off the raw string.
+ */
+export function humanEdgeRefusal(text: unknown): string | null {
+  if (!text) return null;
+  const s = text instanceof Error ? text.message : String(text);
+  const start = s.indexOf('{');
+  const end = s.lastIndexOf('}');
+  if (start < 0 || end <= start) return null;
+  try {
+    const body = JSON.parse(s.slice(start, end + 1));
+    const slugShaped = typeof body?.error === 'string' && /^[a-z][a-z0-9_]*$/.test(body.error);
+    const message = typeof body?.message === 'string' && body.message
+      ? body.message
+      : (!slugShaped && typeof body?.error === 'string' && body.error ? body.error : null);
+    return message && /\s/.test(message) ? message : null;
+  } catch {
+    return null;
+  }
+}
+
 /** The balance the refusal reported, when it carried one — for "you have X, this needs Y". */
 export function balanceFromCreditsError(text: unknown): number | null {
   if (!text) return null;

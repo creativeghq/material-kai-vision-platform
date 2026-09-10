@@ -149,7 +149,11 @@ import { onEnterOrSpace } from '@/utils/a11y';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
 import { formatDate, formatTime } from '@/utils/datetime';
 import { formatNumber } from '@/utils/decimal';
-import { looksInsufficientCredits, balanceFromCreditsError } from '@/utils/edgeError';
+import { looksInsufficientCredits, balanceFromCreditsError, humanEdgeRefusal } from '@/utils/edgeError';
+// What one turn may carry. agent-chat REFUSES a turn over these with 413 before any model call,
+// so the composer has to clamp on the same numbers — offering an attachment the server will not
+// accept is silent until the user has already read and uploaded it.
+import { AGENT_MAX_IMAGES, AGENT_MAX_DOCUMENTS, attachmentRoom } from '@/config/agentAttachmentLimits';
 import { CreditTopUpDialog, type CreditTopUpRequest } from '@/components/core/CreditTopUpDialog';
 import { safeHref } from '@/utils/safeUrl';
 import { GENERATION_MODELS } from '@/config/generationModels.generated';
@@ -4105,13 +4109,19 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       // matched once and the top-up card below has never rendered in its life. What the user got
       // instead was `Error: Agent execution failed: 402 - {"error":"insufficient_credits",...}`.
       const isCreditsError = looksInsufficientCredits(errText);
-      endRun('failed', isCreditsError ? 'The turn did not run: no credits left.' : errText);
+      // Every OTHER refusal used to print the status and the raw JSON at the user — a 413 for too
+      // many attachments read as `Error: Agent execution failed: 413 - {"error":"Too many documents
+      // attached: 19 (max 6 per turn)."}` while the function had written that sentence and put it
+      // in the body. Prefer the body's own sentence whenever there is one; `null` when there isn't,
+      // so nothing is ever lost. NOT a second credits branch: a slug-shaped body is left alone.
+      const humanRefusal = isCreditsError ? null : humanEdgeRefusal(errText);
+      endRun('failed', isCreditsError ? 'The turn did not run: no credits left.' : (humanRefusal ?? errText));
       const errorMessage: Message = {
         id: `msg-${Date.now()}-error`,
         role: 'assistant',
         content: isCreditsError
           ? 'You have run out of credits, so this turn did not run. Top up and I will pick up where we left off.'
-          : `Error: ${errText}`,
+          : (humanRefusal ?? `Error: ${errText}`),
         timestamp: new Date(),
         agentId: selectedAgent,
         insufficientCredits: isCreditsError,
@@ -4148,7 +4158,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const deepLinkSeeded = useRef(false);
   useEffect(() => {
     if (deepLinkSeeded.current || !userId) return;
-    if (initialImages?.length) setAttachedImages(initialImages);
+    if (initialImages?.length) setAttachedImages(initialImages.slice(0, AGENT_MAX_IMAGES));
     if (initialGenerationMode) setSelectedGenerationMode(initialGenerationMode);
     deepLinkSeeded.current = true;
   }, [userId, initialImages, initialGenerationMode]);
@@ -4184,8 +4194,24 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
   // Shared image-attach path: read a set of image File objects to data URLs and
   // append them to the composer. Used by the file picker AND clipboard paste.
+  //
+  // Clamped to AGENT_MAX_IMAGES here, at ATTACH time, because agent-chat refuses the whole turn
+  // over that number — telling the user now costs them one toast, telling them at send costs them
+  // the read, the upload and a 413.
   const attachImageFiles = useCallback((files: File[]) => {
-    const imageFiles = files.filter((f) => f.type.startsWith('image/'));
+    const allImages = files.filter((f) => f.type.startsWith('image/'));
+    if (allImages.length === 0) return;
+    const { accepted, rejected } = attachmentRoom(attachedImages.length, allImages.length, AGENT_MAX_IMAGES);
+    if (rejected > 0) {
+      toast({
+        title: `${AGENT_MAX_IMAGES} images is the limit`,
+        description: accepted > 0
+          ? `Attaching ${accepted}; ${rejected} left out. Send these first, then attach the rest.`
+          : 'Send the ones you have attached first, then attach the rest.',
+        variant: accepted > 0 ? 'default' : 'destructive',
+      });
+    }
+    const imageFiles = allImages.slice(0, accepted);
     if (imageFiles.length === 0) return;
 
     Promise.all(
@@ -4202,7 +4228,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           }),
       ),
     ).then((urls) => {
-      setAttachedImages((prev) => [...prev, ...urls]);
+      // `.slice` holds the invariant even if two picks land in one render — the clamp above is
+      // what TELLS the user, this is what makes it true.
+      setAttachedImages((prev) => [...prev, ...urls].slice(0, AGENT_MAX_IMAGES));
     }).catch((err) => {
       console.error('[AgentHub] Failed to read image(s):', err);
       toast({
@@ -4211,7 +4239,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         variant: 'destructive',
       });
     });
-  }, []);
+  }, [attachedImages.length, toast]);
 
   // Core catalog-PDF ingest — uploads the source PDF, binds the catalog toolkit, and
   // prefills the ask so the agent extracts products. Shared by the dedicated PDF button
@@ -4244,9 +4272,25 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   // Attach a PDF as a *readable document* — base64 data URL sent to agent-chat as a
   // `document` block so Opus reads it natively (quotes, invoices, specs). This is the
   // "read this and rebuild/summarize it" path, distinct from catalog product-extraction.
+  //
+  // Clamped to AGENT_MAX_DOCUMENTS, for the reason the catalog branch below has always clamped to
+  // one: agent-chat refuses the turn over that number with a 413. Unclamped, 19 PDFs were read to
+  // base64, uploaded, and answered with the raw JSON of the refusal.
   const attachDocumentFiles = useCallback((files: File[]) => {
+    const { accepted, rejected } = attachmentRoom(attachedDocuments.length, files.length, AGENT_MAX_DOCUMENTS);
+    if (rejected > 0) {
+      toast({
+        title: `${AGENT_MAX_DOCUMENTS} documents is the limit`,
+        description: accepted > 0
+          ? `Attaching ${accepted}; ${rejected} left out. Ask about these first, then attach the rest.`
+          : 'Ask about the ones you have attached first, then attach the rest.',
+        variant: accepted > 0 ? 'default' : 'destructive',
+      });
+    }
+    const takenFiles = files.slice(0, accepted);
+    if (takenFiles.length === 0) return;
     Promise.all(
-      files.map(
+      takenFiles.map(
         (file) =>
           new Promise<{ name: string; dataUrl: string }>((resolve, reject) => {
             const reader = new FileReader();
@@ -4259,12 +4303,14 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           }),
       ),
     ).then((docs) => {
-      setAttachedDocuments((prev) => [...prev, ...docs]);
+      // `.slice` holds the invariant even if two picks land in one render — the clamp above is
+      // what TELLS the user, this is what makes it true.
+      setAttachedDocuments((prev) => [...prev, ...docs].slice(0, AGENT_MAX_DOCUMENTS));
       toast({ title: docs.length > 1 ? `${docs.length} documents attached` : 'Document attached', description: docs.map((d) => d.name).join(', ') });
     }).catch(() => {
       toast({ title: 'Attach failed', description: 'The PDF could not be read. Please try again.', variant: 'destructive' });
     });
-  }, [toast]);
+  }, [attachedDocuments.length, toast]);
 
   const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -7894,7 +7940,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           // with it (staging wizard / gemini-edit canvas) or force the generation
           // pipeline + auto-send the rendered prompt as ONE complete message.
           setToolkitFormState(null);
-          if (images.length > 0) setAttachedImages(images);
+          if (images.length > 0) setAttachedImages(images.slice(0, AGENT_MAX_IMAGES));
           if (opensModal === 'virtual-staging') {
             if (images[0]) setVirtualStagingImageUrl(images[0]);
             return;

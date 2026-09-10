@@ -238,6 +238,15 @@ export const VOCABULARIES = [
     'src/utils/iban.ts',
     'supabase/functions/_shared/iban.generated.ts',
   ],
+  [
+    // What one agent turn may carry. The numbers lived as `const`s inside agent-chat's request
+    // handler, so the only party that knew them was the one refusing: the composer appended
+    // attachments with no ceiling at all, and 19 PDFs were read, uploaded and then answered with
+    // a raw `413 - {"error":"Too many documents attached: 19 (max 6 per turn)."}`. Mirrored, not
+    // re-typed, because the composer must clamp on the SAME predicate the edge enforces on.
+    'src/config/agentAttachmentLimits.ts',
+    'supabase/functions/_shared/agentAttachmentLimits.generated.ts',
+  ],
 ];
 
 const banner = (source) => [
