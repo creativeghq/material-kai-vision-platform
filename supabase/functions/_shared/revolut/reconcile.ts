@@ -178,6 +178,111 @@ export function legShapeIsComplete(shape: LegShape | undefined): boolean {
   return shape.inLegs + shape.outLegs >= shape.legsTotal;
 }
 
+/**
+ * How far apart the operator's stated payment date and the bank's booking date may be.
+ *
+ * They are two different facts about one event: `paid_at` is when the person says the money moved,
+ * `booked_at` is when the bank says it did. Instant transfers agree; a SEPA transfer books a day or
+ * two later; somebody writing up last week's payments backdates them, or does not. Ten days either
+ * way is wide enough to cover all of that — the guard against a wrong bind is not the window, it is
+ * the demand that the amount, the currency and the account all agree and that exactly ONE candidate
+ * survives.
+ */
+const RECORDED_PAYMENT_WINDOW_DAYS = 10;
+
+/**
+ * Is this feed line a payment somebody already wrote down by hand?
+ *
+ * The case: an operator pays a supplier in the Revolut app, comes here, and records it against the
+ * bill so the books are right. Days later the sync pulls the same transfer. Nothing in the ladder
+ * below knows that payment exists — it reasons about open documents, not about money already
+ * booked — so the line either sits unmatched forever or, worse, allocates a second time against
+ * whatever the first payment left open.
+ *
+ * Returns the payment id to BIND to, or null. Deliberately conservative, because the failure it
+ * prevents (double-booking) and the failure it could cause (marking a real second transfer as
+ * already-recorded, so a genuine payment never reaches the books) are both silent:
+ *
+ *   - the feed row must name one of OUR accounts, and the payment must name the SAME one. A line
+ *     with no `bank_account_id` is unknown, not a match — fail closed;
+ *   - same direction, same currency, cent-equal amount;
+ *   - dated within the window above;
+ *   - the payment must not already be bound to another line;
+ *   - and exactly ONE payment may survive all of that. Two candidates is a person's decision, not
+ *     a guess we are entitled to make.
+ */
+export async function findAlreadyRecordedPayment(
+  service: any,
+  workspaceId: string,
+  tx: any,
+): Promise<string | null> {
+  const bankAccountId = tx.bank_account_id ?? null;
+  // No account on the line means we cannot tell which balance it moved, and "probably that one"
+  // is not a standard to double-book money against.
+  if (!bankAccountId) return null;
+
+  const bookedAt = tx.booked_at ? new Date(tx.booked_at) : null;
+  if (!bookedAt || Number.isNaN(bookedAt.getTime())) return null;
+  const windowMs = RECORDED_PAYMENT_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+  const from = new Date(bookedAt.getTime() - windowMs).toISOString();
+  const to = new Date(bookedAt.getTime() + windowMs).toISOString();
+
+  const amount = Number(tx.amount ?? 0);
+  if (!(amount > 0)) return null;
+
+  const { data, error } = await service
+    .from('payments')
+    .select('id, amount')
+    .eq('workspace_id', workspaceId)
+    .eq('direction', String(tx.direction))
+    .eq('bank_account_id', bankAccountId)
+    .eq('currency', String(tx.currency ?? 'EUR').toUpperCase())
+    .gte('paid_at', from)
+    .lte('paid_at', to)
+    .limit(50);
+  // An error is not "no match" — treating a failed read as an absence would quietly re-enable the
+  // double-allocation this exists to stop, on exactly the days the database is unhappy.
+  if (error) throw new Error(`recorded-payment lookup failed: ${error.message}`);
+
+  const sameAmount = (data ?? []).filter((p: any) => centsEqual(Number(p.amount), amount));
+  if (sameAmount.length !== 1) return null;
+  const candidate = sameAmount[0] as { id: string };
+
+  // Already spoken for by another line — binding it twice would report two transfers settled by
+  // one payment. The partial unique index enforces this too; asking first keeps the error path
+  // for genuine races rather than for the ordinary case.
+  const { data: taken, error: takenErr } = await service
+    .from('revolut_bank_transactions')
+    .select('id')
+    .eq('workspace_id', workspaceId)
+    .eq('reconciled_payment_id', candidate.id)
+    .limit(1)
+    .maybeSingle();
+  if (takenErr) throw new Error(`recorded-payment binding check failed: ${takenErr.message}`);
+  if (taken) return null;
+
+  return candidate.id;
+}
+
+/**
+ * Stamp a line as money that was already on the books. Writes NO payment and NO allocation —
+ * that is the entire point.
+ */
+async function stampAlreadyRecorded(service: any, tx: any, paymentId: string): Promise<void> {
+  const { error } = await service
+    .from('revolut_bank_transactions')
+    .update({
+      match_status: 'matched',
+      match_method: 'already_recorded',
+      matched_at: new Date().toISOString(),
+      reconciled_payment_id: paymentId,
+      suggested_invoice_ids: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', tx.id);
+  if (error) throw new Error(`already-recorded stamp failed: ${error.message}`);
+}
+
 /** Settle one line against one invoice and stamp the row. Shared by auto + manual. */
 export async function settleTransaction(
   service: any,
@@ -270,6 +375,29 @@ export async function reconcileOutgoingRevolut(service: any, workspaceId: string
         .from('revolut_bank_transactions')
         .update({ match_status: 'ignored', updated_at: new Date().toISOString() })
         .eq('id', tx.id);
+      continue;
+    }
+
+    /**
+     * BEFORE the ladder: is this money already on our books?
+     *
+     * It has to come first. The ladder below reasons about what a bill still OWES, so a payment
+     * the operator recorded by hand is invisible to it — and a partly-recorded bill leaves a
+     * remainder that is cent-equal to this very line, which the amount rule then allocates a
+     * second time. Asking first turns both the double-allocation and the permanently unmatched
+     * row into one honest verdict.
+     */
+    try {
+      const recordedPaymentId = await findAlreadyRecordedPayment(service, workspaceId, tx);
+      if (recordedPaymentId) {
+        await stampAlreadyRecorded(service, tx, recordedPaymentId);
+        continue;
+      }
+    } catch (err) {
+      // Per-line, like every other failure in this loop. Letting it escape would abort the whole
+      // outgoing pass and report the remaining lines as if they had been examined.
+      out.errors.push(`${tx.provider_ref}: ${err instanceof Error ? err.message : String(err)}`);
+      out.unmatched++;
       continue;
     }
 
@@ -470,6 +598,29 @@ export async function reconcileWorkspaceRevolut(service: any, workspaceId: strin
         .eq('id', tx.id);
       if (error) result.errors.push(`${tx.provider_ref}: internal stamp failed: ${error.message}`);
       else result.internal++;
+      continue;
+    }
+
+    /**
+     * Already on the books? Then bind, do not settle again.
+     *
+     * The mirror of the outgoing case: a customer transfer entered by hand — because somebody saw
+     * it in the bank before the sync ran — leaves an invoice partly or fully paid. Fully paid, it
+     * drops out of `loadOpenInvoices` and this line would sit unmatched forever; partly paid, the
+     * remainder can be cent-equal to this line and rule 2 would settle it a second time.
+     */
+    try {
+      const recordedPaymentId = await findAlreadyRecordedPayment(service, workspaceId, tx);
+      if (recordedPaymentId) {
+        await stampAlreadyRecorded(service, tx, recordedPaymentId);
+        result.autoMatched++;
+        continue;
+      }
+    } catch (err) {
+      // Reported, not swallowed: the fallback is the ladder below, which is exactly the path that
+      // can double-book, so a silent failure here would be the defect wearing the fix's clothes.
+      result.errors.push(`${tx.provider_ref}: ${err instanceof Error ? err.message : String(err)}`);
+      result.unmatched++;
       continue;
     }
 
