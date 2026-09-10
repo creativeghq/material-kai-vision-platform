@@ -28,20 +28,31 @@ const PAYMENT_METHOD: Record<number, string> = {
   5: 'On credit', 6: 'Web banking', 7: 'POS / e-POS', 8: 'IRIS',
 };
 
+/** A street number AADE actually sent, or null. `0`, `-` and `—` are the placeholders it fills
+ *  the field with when the issuer left it blank; printed verbatim they read as an address that
+ *  is missing something ("ΙΑΣΩΝΙΔΟΥ 15 -, 56334 …") rather than one that is simply complete. */
+const streetNumber = (n: string | null | undefined): string | null => {
+  const v = n?.trim();
+  return v && v !== '0' && /\d/.test(v) ? v : null;
+};
+
 const fmtAddress = (a: InboundAddress | null | undefined): string | null => {
   if (!a) return null;
-  const line = [a.street, a.number && a.number !== '0' ? a.number : null].filter(Boolean).join(' ');
+  const line = [a.street, streetNumber(a.number)].filter(Boolean).join(' ');
   const town = [a.postal_code, a.city].filter(Boolean).join(' ');
   return [line, town].filter(Boolean).join(', ') || null;
 };
 
 /** One `Label value` pair in the issuer strip. Renders nothing when there's no value, so the
- *  strip shows what we actually know instead of a row of em-dashes. */
+ *  strip shows what we actually know instead of a row of em-dashes.
+ *
+ *  `leading-5` on both halves so every chip is exactly one 20px line tall whatever mix of 10px
+ *  label and 12px value it holds — that is what lets a strip line them up as one row. */
 const Fact: React.FC<{ label: string; value?: React.ReactNode }> = ({ label, value }) =>
   value ? (
-    <span className="inline-flex items-baseline gap-1">
-      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</span>
-      <span className="text-xs">{value}</span>
+    <span className="inline-flex items-baseline gap-1 leading-5">
+      <span className="text-[10px] uppercase leading-5 tracking-wide text-muted-foreground">{label}</span>
+      <span className="text-xs leading-5">{value}</span>
     </span>
   ) : null;
 
@@ -125,7 +136,7 @@ export const InboundDocPreviewDialog: React.FC<{
   const issuerAddress = fmtAddress(doc.issuer_address)
     // AADE omits the issuer address on ~2/3 of documents; the registry has it when CRM does.
     ?? (issuer && (issuer.street || issuer.city)
-      ? [[issuer.street, issuer.street_number].filter(Boolean).join(' '),
+      ? [[issuer.street, streetNumber(issuer.street_number)].filter(Boolean).join(' '),
          [issuer.postal_code, issuer.city].filter(Boolean).join(' ')].filter(Boolean).join(', ')
       : null);
   const activity = issuer?.kad_primary_description ?? issuer?.profession ?? null;
@@ -179,11 +190,15 @@ export const InboundDocPreviewDialog: React.FC<{
           )}
         </div>
 
-        {/* Dispatch — a ΤΔΑ's whole point. Shown only when the document carries it. */}
+        {/* Dispatch — a ΤΔΑ's whole point. Shown only when the document carries it.
+            The row is items-CENTER, not items-baseline: the truck icon makes the label an
+            inline-flex with no baseline-aligned child, so a baseline row synthesizes its baseline
+            from that label's bottom EDGE and lifts the whole "Dispatch" chunk a few px above the
+            facts sitting beside it. */}
         {hasDispatch && (
-          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 rounded-md border border-border/60 px-3 py-2">
-            <span className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
-              <Truck className="h-3.5 w-3.5" /> Dispatch
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md border border-border/60 px-3 py-2">
+            <span className="inline-flex items-center gap-1.5 text-[11px] uppercase leading-5 tracking-wide text-muted-foreground">
+              <Truck className="h-3.5 w-3.5 shrink-0" /> Dispatch
             </span>
             <Fact label="Date" value={doc.dispatch_date ? formatDate(doc.dispatch_date) : null} />
             <Fact label="Vehicle" value={doc.vehicle_number ? <span className="font-mono">{doc.vehicle_number}</span> : null} />
