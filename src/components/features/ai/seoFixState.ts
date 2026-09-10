@@ -1,18 +1,4 @@
-/**
- * What the Apply card should say — one answer, and one that can be tested as a VALUE.
- *
- * Import-free on purpose. It lived inside `SEOArticleViewer.tsx`, which imports the Supabase
- * client at module load, so importing it from a test threw before a single case ran; the verdict
- * could only be checked by rendering the whole viewer, which is why it never was.
- *
- * The state that matters is `stale`, and it is invisible from the types. A fix produced before
- * the analyzer learned to anchor carries no `scope` and no `anchor` — a perfectly valid
- * `ContentFix` — so it fails the applicable test like any other document-wide finding. Every
- * article in the database was in that state, and the card answered by rendering `null`: an
- * Apply/Revert feature that was written, deployed, verified against the edge handler, and absent
- * from the screen. Telling the two apart is the whole job here, because they need different
- * sentences and only one of them has a button that fixes it.
- */
+/** What the Apply card should say — one answer, and one that can be tested as a VALUE. */
 
 /** A fix the analyzer located in ONE paragraph — the only kind that can be applied surgically. */
 export interface ApplicableFix {

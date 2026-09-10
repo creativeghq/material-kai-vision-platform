@@ -1,20 +1,4 @@
-/**
- * Intrinsic size of an image, read from its header bytes.
- *
- * Exists so an EDIT can come back the shape it went in. `generate-interior-gemini` asked for
- * `body.aspect_ratio ?? '16:9'` on every mode including the ones that alter a photo the user
- * supplied, and `generateMultiImageWithGemini` did not forward the value at all — so the output
- * shape was whatever the model felt like. A 1280x1600 (4:5) kitchen photo came back 1408x768 in
- * conversation b520cc11: re-framed, re-cropped, and therefore not the same room however good the
- * edit prompt was. An edit that changes the crop cannot preserve anything.
- *
- * No decoding, no dependency: the size of a PNG/JPEG/WebP/GIF is in the first few dozen bytes.
- * Returns null for anything unrecognised — the caller then keeps its own default rather than
- * guessing, because a wrong aspect ratio is a valid aspect ratio.
- *
- * Import-free on purpose: the guard test (tests/unit/imageEditPipeline.test.ts) imports it
- * directly, and it must read the same way under Deno and vitest.
- */
+/** Intrinsic size of an image, read from its header bytes. */
 
 export interface ImageSize {
   width: number;

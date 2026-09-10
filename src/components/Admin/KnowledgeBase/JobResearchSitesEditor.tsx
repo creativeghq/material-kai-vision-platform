@@ -1,15 +1,4 @@
-/**
- * Inline editor for the "Job Research Sites" KB doc.
- *
- * Mounted as a 3rd tab ("Manage") inside the standard DocumentEditor when
- * the document's metadata.doc_kind === 'job_research_sites'. Lets the operator
- * add as many resources as they want from inside the KB — no separate /admin/
- * route, no fragmented surface.
- *
- * Reads/writes the typed `job_research_sites` table (not the doc body); the
- * doc body auto-syncs on the backend after every CRUD so the Preview tab on
- * the same dialog reflects the latest state on next refresh.
- */
+/** Inline editor for the "Job Research Sites" KB doc. */
 
 import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';

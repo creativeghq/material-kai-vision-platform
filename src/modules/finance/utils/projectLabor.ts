@@ -1,14 +1,4 @@
-/**
- * A project's labour roll-up, and the parse of it — PURE, so a test can CALL it (#378 N1).
- *
- * Separated from `timeTrackingService` for the reason `billLink.ts` was: importing the service
- * pulls in the Supabase client, which needs environment a unit test does not have, so the only
- * check left would be a source-text one — and this module's whole job is a distinction source
- * text cannot see. `actual_cost` and `variance` are NULL when nothing could be costed against
- * payroll, and the single likeliest way to break that is a `num()` where a `maybeNum()` belongs.
- * Turning an unknown into 0 makes a job look more profitable the more unpayrolled labour it
- * consumed.
- */
+/** A project's labour roll-up, and the parse of it — PURE, so a test can CALL it (#378 N1). */
 /** Per-user slice of a project's labor roll-up. Derived in SQL by `get_project_labor`. */
 export interface ProjectLaborByUser {
   user_id: string | null;

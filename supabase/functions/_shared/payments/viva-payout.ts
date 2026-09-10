@@ -1,36 +1,4 @@
-/**
- * Viva.com money OUT — the Bank transfer API.
- *
- * Viva is not only a card rail. A merchant account holds wallets with real balances, and
- * `/banktransfers/v1` sends from one of them to an external IBAN. That makes Viva the second
- * provider that can MOVE money, which is why the audit ledger it writes into is
- * `payout_instructions` and not a Viva-shaped table of its own.
- *
- * Three things about this API decide the shape of everything below.
- *
- *  1. **Different credentials from the ones that charge cards.** The transfer scope
- *     (`urn:viva:payments:core:api:banktransfers`) belongs to Viva's "Account Transactions
- *     Credentials", a separate client pair in Settings → API Access — NOT the Smart Checkout
- *     client in `client_id`/`client_secret`. They live in `transfer_client_id` /
- *     `transfer_client_secret`, and their absence is the switch: no transfer credentials means
- *     this workspace cannot send, and the UI must not offer it.
- *
- *  2. **The recipient is LINKED first, then paid.** You cannot send to a bare IBAN. Linking
- *     mints a `bankAccountId` and validates the IBAN in the same call, so it is the exact twin
- *     of creating a Revolut counterparty — stored beside it on `crm_bank_accounts` and reused,
- *     never re-minted per payment.
- *
- *  3. **Amounts are MINOR units**, like every other Viva amount (`amountMinor` in
- *     viva-provider.ts). An integer euro figure sent here is a hundredfold underpayment that
- *     Viva will happily execute.
- *
- * Docs: https://developer.viva.com/apis-for-payments/bank-transfer-api/
- * Spec: https://developer.viva.com/downloads/payment-api.yaml (paths /banktransfers/v1/…)
- *
- * NOT YET EXERCISED against the live API — every shape here is read off that spec, the same
- * position the Revolut money-out leg is in. Expect first-contact corrections, and make the first
- * real transfer a small one.
- */
+/** Viva.com money OUT — the Bank transfer API. */
 import { vivaHosts } from './viva-provider.ts';
 
 /** What a workspace needs before it can send money through Viva. Absence = cannot send. */

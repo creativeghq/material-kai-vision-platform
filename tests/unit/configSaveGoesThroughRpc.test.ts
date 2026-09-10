@@ -1,27 +1,4 @@
-/**
- * A per-workspace credential table is written through a DEFINER RPC, never by upsert.
- *
- * THE DEFECT THIS EXISTS FOR
- * --------------------------
- * `workspace_revolut_config` and `workspace_viva_config` carry three policies — insert, update,
- * delete — and deliberately NO select policy, so a stored private key or client secret can never
- * come back down to the browser. Both save paths then used `supabase.upsert()`.
- *
- * Postgres cannot run `INSERT ... ON CONFLICT DO UPDATE` without reading the conflicting row. With
- * no SELECT policy it therefore fails with `42501 new row violates row-level security policy`,
- * while a plain UPDATE of that same row and a plain INSERT of a new one both succeed — which is
- * why it never looked like a policy problem, and why the panel simply said "Save failed".
- *
- * The rows are created by the edge functions under the service role, so the browser's FIRST save
- * already took the conflict path. The Revolut `client_id` was never once stored: the connection
- * was set up, the certificate registered, and the one field needed to finish it silently refused
- * to save for five weeks.
- *
- * The RPC closes a second hole at the same time. An RLS policy authorises the ROW, not the
- * columns, so a finance manager could PATCH `private_key`, `refresh_token` or
- * `webhook_signing_secret` straight through PostgREST. The RPCs take one explicit parameter per
- * field the UI legitimately owns (security invariant 8 — never hand the client a whole row).
- */
+/** A per-workspace credential table is written through a DEFINER RPC, never by upsert. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';

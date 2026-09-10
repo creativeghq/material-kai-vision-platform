@@ -723,15 +723,7 @@ export function formatAddressLine(a: AddressLike): string {
 }
 
 export const addressUnitsAPI = {
-  /**
-   * List the sub-units of a company OR contact (pass exactly one id).
-   * Read goes through the supabase client (table RLS = is_workspace_member), NOT the
-   * crm-api edge function: that function gates address-units to admin/factory, which is
-   * correct for writes but too strict for this read — the sub-unit picker is mounted in
-   * the project/quote client flows used by non-admin workspace members, where the strict
-   * gate produced a benign-but-noisy "Access denied" and hid the picker. RLS keeps it
-   * tenant-safe; writes (create/update/remove) stay on the admin-gated edge function.
-   */
+  /** List the sub-units of a company OR contact (pass exactly one id). */
   async list(parent: { companyId?: string; contactId?: string }): Promise<AddressUnit[]> {
     let query = (supabase as any).from('crm_address_units').select('*');
     if (parent.companyId) query = query.eq('company_id', parent.companyId);
@@ -1064,18 +1056,7 @@ export interface RecordBankSuggestionResult {
   bank_account_id?: string;
 }
 
-/**
- * The bank details our document readers found on a counterparty's own invoice, held for review.
- *
- * WHY THIS IS NOT JUST A WRITE. `crm_bank_accounts` is a payment DESTINATION — the payout path
- * loads a row from it and sends real money on Revolut/Viva. Anyone can email us a PDF, so an IBAN
- * a model read off one becomes payable only after a person has looked at it. Everything here is a
- * proposal; `accept` is the only door into that table from this path, and it takes the operator's
- * confirmed values rather than the document's.
- *
- * Writes go through SECURITY DEFINER RPCs (the table has a SELECT policy and nothing else), so
- * there is exactly one code path and it re-checks workspace membership itself.
- */
+/** The bank details our document readers found on a counterparty's own invoice, held for review. */
 export const crmBankAccountSuggestionsAPI = {
   /** Pending sightings for one party, newest first. Accepted/dismissed ones are not offered again. */
   async listPending(parent: { companyId?: string; contactId?: string }): Promise<CrmBankAccountSuggestion[]> {

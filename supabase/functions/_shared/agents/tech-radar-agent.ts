@@ -1,21 +1,4 @@
-/**
- * Background Agent: Tech Radar
- *
- * The "background brain" behind Pepper. One background_agents row per watched
- * subject (config.subject_id), fired on a cron cadence by agent-scheduler-cron.
- * On each tick it re-researches the subject's tech landscape and surfaces only
- * the NEW improvement ideas (cross-run dedupe lives in persistFindings).
- *
- * Sibling to model-health-check: that one answers "is our model still UP?";
- * this one answers "is there something BETTER we should move to?". When a new
- * finding is in the `models` category, the chain trigger can fan out to
- * model-health-check to confirm the candidate is actually live before we trust
- * an 'adopt'.
- *
- * Config (background_agents.config):
- *   subject_id   string   The tech_radar_subjects row this monitor watches (required)
- *   force        boolean  Ignore next_review_at and review now (default false)
- */
+/** Background Agent: Tech Radar */
 
 import type { AgentRunner, AgentRunContext, AgentRunResult } from './types.ts';
 import { svcClient, runRadarForSubject } from '../tools/tech-radar-tools.ts';

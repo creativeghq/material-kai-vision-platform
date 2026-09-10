@@ -1,23 +1,6 @@
 /**
  * An EDIT must edit the user's own photo, come back the same shape, and still be findable on the
  * next turn.
- *
- * All three failed at once in conversation b520cc11 (2026-09-09). The user attached a 355x355
- * terrazzo swatch and a 1280x1600 photo of their kitchen and asked to swap the floor tile:
- *
- *   1. `image-edit` read the two composer slots BACKWARDS — `images[0]` was "the photo to edit"
- *      there and "the inspiration" everywhere else — so the SWATCH was sent as the room.
- *   2. A second image on an edit switched the mode into a two-step style transfer whose first
- *      step describes the reference in words and whose second step never sends it at all, under
- *      a prompt that says "apply every item below" to the whole room.
- *   3. The output was requested at the 16:9 default and the multi-image call did not forward
- *      even that, so a 4:5 photo came back 16:9 — re-cropped, i.e. not the same room.
- *   4. On the retry, `agent-chat` had flattened the history to `{role, content}` before the
- *      recovery paths read it, so the earlier attachments were unreachable and the tool
- *      answered "No reference image available for editing" in 2ms.
- *
- * Nothing failed anywhere: a wrong room is a valid image, a landscape crop is a valid crop, and
- * an empty array is a valid array. These are source-level assertions for that reason.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';

@@ -7,9 +7,6 @@ import path from 'path';
 //                            same philosophy as scripts/smoke. `npm run test:integration`.
 //                            They self-SKIP when SUPABASE_SERVICE_ROLE_KEY is absent so a
 //                            local `npm test` never drags them in.
-//
-// Kept separate from vite.config.ts on purpose: the app build config (manualChunks, spark
-// dedupe, define-injected env) is irrelevant to — and would only slow — the test runner.
 export default defineConfig({
   resolve: { alias: { '@': path.resolve(__dirname, './src') } },
   test: {
@@ -31,11 +28,6 @@ export default defineConfig({
     // job gates on this suite, one blip blocks EVERY deploy. That happened on 2026-07-28:
     // `hr-careers-public` died on `read ECONNRESET` with 67 of 68 passing, and it held back an
     // email-guard fix for half an hour while the bug it fixed kept firing.
-    //
-    // This does not paper over real failures: a genuine bug fails all three attempts. Hermetic
-    // unit tests are deterministic, so a retry never changes their verdict — only the wall-clock
-    // of an already-failing run, by milliseconds. If a test only passes on retry, that is a
-    // signal worth chasing, not a green light.
     retry: 2,
   },
 });

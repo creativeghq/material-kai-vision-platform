@@ -1,13 +1,4 @@
-/**
- * Issue #377 Phase 1b — the rule that makes complete-the-document safe.
- *
- * `total_net` is transmitted, carries a MARK and is not editable. The lines are ours. If they do
- * not add up to it, the document states two different amounts for one purchase — and both are
- * valid numbers, so nothing downstream can tell which is real: warehouse intake would derive unit
- * costs from the typed side while payables reads the AADE side, and the two would part company
- * silently. `inbound_doc_set_lines` is the authority; this is the half the dialog uses, and it has
- * to agree with the server or the save button lights up on something that will be refused.
- */
+/** Issue #377 Phase 1b — the rule that makes complete-the-document safe. */
 import { describe, it, expect } from 'vitest';
 import { FOOTING_TOLERANCE, footLines, isBlankLine, type DraftLine } from '@/modules/finance/utils/lineFooting';
 

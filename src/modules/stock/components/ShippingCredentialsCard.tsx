@@ -3,10 +3,6 @@
  * ShipsGo (or compatible) API key; the platform NEVER provides one. Opt-in — inbound container/BL
  * tracking only works once a key is saved + enabled. Finance-manager-gated via RLS; the key is stored
  * in workspace_shipping_credentials and never returned to the browser (only a masked tail).
- *
- * Why BYOK-only: container-milestone tracking has no free production API (AIS/vessel-position free
- * tiers give only vessel location, not container events), and each provider bills per container — so
- * the tenant runs it on their own account + their own bill, not ours.
  */
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';

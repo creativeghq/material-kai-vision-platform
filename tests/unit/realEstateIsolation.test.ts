@@ -1,18 +1,4 @@
-/**
- * Guards for the real-estate half of audit #356 (`RE-1` … `RE-13`).
- *
- * The module's ENTRY gate is the reference implementation of invariant 1 in this codebase —
- * body `workspace_id` verified with `userCanAccessWorkspace`, 404 not 403, module and
- * entitlement checks before RBAC. Every finding here is downstream of a correctly authenticated
- * workspace, and that is what made them easy to miss: nothing was wrong with the tenancy
- * boundary, so the *agent* boundary inside it went unexamined.
- *
- * Two ideas account for most of them:
- *   • `open_for_all` is a VIEW grant. It was read as an edit grant by the importer (`RE-3`) and
- *     as a share of the lead book by `get-property` (`RE-2`).
- *   • Authorise the object you are about to MUTATE. `upsert-tenancy` authorised a property from
- *     the body and then updated a tenancy named separately (`RE-1`).
- */
+/** Guards for the real-estate half of audit #356 (`RE-1` … `RE-13`). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

@@ -1,14 +1,4 @@
-/**
- * Who this is for, said in the words the reader would use about themselves.
- *
- * The homepage said "for design, construction and materials businesses", which is three audiences
- * in one breath and therefore none: a contractor reads it and cannot tell whether the thing knows
- * what a retention release is. Naming the job each one actually does — and the spreadsheet it
- * replaces — is the difference between a category claim and a reason to sign up.
- *
- * Every capability listed here is one that SHIPPED. Nothing aspirational, because the first thing
- * a visitor does after signing up is look for the thing that made them sign up.
- */
+/** Who this is for, said in the words the reader would use about themselves. */
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { HardHat, Palette, PackageSearch, ArrowRight } from 'lucide-react';

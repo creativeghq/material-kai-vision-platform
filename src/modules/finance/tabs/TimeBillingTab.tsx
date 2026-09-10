@@ -44,18 +44,7 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
   const [desc, setDesc] = useState('');
   const [saving, setSaving] = useState(false);
   const [projectId, setProjectId] = useState('');
-  /**
-   * Whose hours these are (#378 N1).
-   *
-   * Blank = mine, the signed-in user. Otherwise an `hr_employees` row — a fitter or a
-   * subcontractor with no platform login, who N2 already made assignable to a task. Until this
-   * existed, `time_entries.user_id` FKs `auth.users`, so the schedule could name somebody whose
-   * hours could never be recorded and who could therefore never appear on that job's labour cost.
-   *
-   * The roster comes from `listTaskAssignees`, which is the SAME deduped member+employee list the
-   * task picker uses — somebody who is both a member and an employee appears once, as the
-   * employee, so the two surfaces cannot disagree about who exists.
-   */
+  /** Whose hours these are (#378 N1). */
   const [workerEmployeeId, setWorkerEmployeeId] = useState('');
   const [roster, setRoster] = useState<Array<{ kind: 'employee' | 'member'; id: string; name: string }>>([]);
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);

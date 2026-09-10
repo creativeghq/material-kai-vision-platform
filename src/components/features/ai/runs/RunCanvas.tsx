@@ -1,16 +1,4 @@
-/**
- * RunCanvas — what the canvas shows while the agent is working.
- *
- * The canvas used to be empty until a finished artifact landed: for the length of the turn
- * the biggest surface on screen said "Your canvas. When the agent produces something…"
- * while the agent was, in fact, producing something. Every signal that work was happening
- * lived in a 400px rail — and for the 21 direct-run quick-starts that emit no artifact at
- * all, the canvas stayed on that sentence forever while the chat said "done".
- *
- * So the run itself is a canvas citizen: a plan when we have one, the tools as they execute
- * when we don't, a verdict per step, and the results at the end. Same card for all 48
- * toolkits, because it is derived from the stream rather than authored per toolkit.
- */
+/** RunCanvas — what the canvas shows while the agent is working. */
 import React, { useEffect, useState } from 'react';
 import {
   Check, X, SkipForward, Loader2, PencilLine, AlertTriangle, CircleDashed,

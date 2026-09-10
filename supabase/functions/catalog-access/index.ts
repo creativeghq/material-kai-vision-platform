@@ -1,30 +1,4 @@
-/**
- * catalog-access
- *
- * Public-facing email gate for /c/:slug. Three actions, one endpoint:
- *
- *   POST { action: 'request', slug, email }
- *     → Looks up the catalog by slug. Matches email against:
- *       1. auth.users (platform user)
- *       2. crm_contacts (private CRM contact)
- *       3. crm_companies (B2B contact)
- *       4. catalog_email_grants (admin-managed allowlist for this catalog)
- *       Logs the attempt to catalog_access_log. If matched, mints a 30-day
- *       cookie token and returns it in the response (frontend sets the
- *       cookie itself since this is cross-origin from the API). On mismatch,
- *       returns granted_access:false (no leak about whether catalog exists).
- *
- *   POST { action: 'verify', slug, token }
- *     → Looks up the cookie token in catalog_access_log. Returns the catalog
- *       payload (cover/body/back) if the token is fresh and matches the slug.
- *
- *   POST { action: 'public_meta', slug }
- *     → Returns minimal info (title, subtitle, owner branding) for the
- *       email-gate landing page itself. Does NOT include body materials.
- *
- * No auth header required — this is the only endpoint reachable by anonymous
- * visitors. Edge function uses the service role internally.
- */
+/** catalog-access */
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -103,19 +77,7 @@ async function resolveTemplateArt(supabase: any, workspaceId: string | null): Pr
   }
 }
 
-/**
- * What an email-gated VIEWER may see of a catalog (#364 EX-4).
- *
- * The grant is row-level — "this email may read this catalog" — but the row is not what the
- * page renders. `verify` used to return `cover_data`, `body_data` and `back_cover_data` as the
- * raw jsonb the builder wrote, so every material also carried `provenance` (the source PDF id
- * and page it was lifted from), `price_source` / `price_source_ref`, `image_source_ref` (a
- * product id or the supplier URL an image was scraped from) and `specs_raw`. None of that is on
- * the page; all of it is internal, and jsonb accepts whatever a future writer adds.
- *
- * So this is an ALLOWLIST, keyed to what PublicCatalogPage actually renders, not a denylist of
- * the internal keys we happen to know about today.
- */
+/** What an email-gated VIEWER may see of a catalog (#364 EX-4). */
 function projectCatalogForViewer(catalog: Record<string, any>, pdfUrl: string | null, art: TemplateArt) {
   const sections = Array.isArray(catalog.body_data?.sections) ? catalog.body_data.sections : [];
   const specTables = Array.isArray(catalog.body_data?.spec_tables) ? catalog.body_data.spec_tables : [];
@@ -233,26 +195,7 @@ Deno.serve(withApiLogging('catalog-access', async (req) => {
       // to be the owner's EARLIEST active membership: for a multi-workspace owner it decided
       // who may read a catalog using a different tenant's contact list entirely — the same
       // first-workspace mistake as `CM-22` in #359, except here it is the access decision.
-      /**
-       * THROTTLE THE ORACLE.
-       *
-       * `request` is public, unauthenticated, and answers "is this address in your CRM, or granted
-       * this catalog?" for any address asked. Nothing capped it, so anyone holding a catalog slug
-       * could walk a list and read back the workspace's customer base one `granted_access: false`
-       * at a time. The catalog contents were never the exposure here; the AUDIENCE was.
-       *
-       * Counted on FAILURES only, which is what separates the two populations. A mailshot lands
-       * many people on this endpoint at once and they nearly all succeed; an enumerator produces
-       * almost nothing but failures. Counting every attempt would throttle the mailshot — the one
-       * time this endpoint is supposed to be busy.
-       *
-       * Two dimensions, for the reason `hr-careers` carries two: the per-IP cap is only as good as
-       * the IP, so the per-CATALOG ceiling bounds what a distributed sweep can learn about one
-       * audience however many addresses it claims to come from. Set far above human mistyping.
-       *
-       * Keyed on `catalog_access_log`, which already records every attempt with its address,
-       * outcome and time — the throttle reads the record the endpoint was already writing.
-       */
+      /** THROTTLE THE ORACLE. */
       const RL_WINDOW_MS = 10 * 60_000;
       const RL_MAX_FAILED_PER_IP = 10;
       const RL_MAX_FAILED_PER_CATALOG = 60;

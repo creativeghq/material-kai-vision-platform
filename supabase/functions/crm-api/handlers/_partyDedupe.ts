@@ -1,30 +1,4 @@
-/**
- * "Is this party already in this workspace?" — one implementation, both kinds (#378 F2).
- *
- * WHY THIS EXISTS
- * ---------------
- * The rule is the platform's oldest CRM rule: a party is SEARCHED FOR before it is created,
- * because the same customer entered twice — once in Greek script, once in Latin — is the failure a
- * CRM never recovers from. `crm_companies` enforced it server-side (#366 BU-3) and returned the
- * row it matched, so the client could offer "use the existing one" instead of a dead end.
- *
- * `crm_contacts` never asked. It has the same generated `name_xscript` column, the same fold, the
- * same alphabet problem and two create paths — `POST /contacts` and the create-and-attach branch
- * of `POST /companies/:id/contacts` — and neither checked anything. The client-side convention
- * (reach create only THROUGH a search that came back empty) held on the screens that opted into
- * it and nowhere else, which is a convention, not a guarantee.
- *
- * One function rather than a third copy of the query: the escape hatch, the fail-closed rule on a
- * failed lookup, and the choice of key are the parts with judgement in them, and a copy is where
- * they drift.
- *
- * THE KEY
- * -------
- * `name_xscript` = `crm_translit(crm_fold(name))`, not `name_fold`. The old key folded case and
- * accents but could not see across ALPHABETS: `Παπαδόπουλος` and `Papadopoulos` fold to different
- * strings, so the same party could be created twice, once per script, and the check said yes to
- * both (#353 CRM-1). The probe transliterates the same way the stored column does.
- */
+/** "Is this party already in this workspace?" — one implementation, both kinds (#378 F2). */
 import { foldForSearch } from '../../_shared/searchFold.ts';
 // Generated mirror of src/services/crm/greekTransliteration.ts (#353 CRM-1).
 import { transliterateGreek } from '../../_shared/crm/greekTransliteration.generated.ts';

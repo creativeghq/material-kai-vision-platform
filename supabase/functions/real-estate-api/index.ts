@@ -265,14 +265,6 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
 
   // Sub-module entitlement gates: Property Management + Investments are add-ons on top of
   // Real Estate. A workspace without the add-on gets 402 on those actions (root workspace is entitled).
-  //
-  // The membership test is the TABLE the handler touches, not the tab it happens to be drawn on:
-  // `property_tenancies` / `property_rent_charges` / `property_maintenance` /
-  // `property_tenancy_inspections` are Property Management, `property_investments` is Investments.
-  // Seven actions reaching those tables were missing from these sets — the lifecycle/portal-token
-  // writes and the inspection pair the Lettings tab itself calls, plus all three deletes. The tab
-  // was hidden the whole time, which is exactly why nothing looked wrong: the page guard is UX and
-  // this is the boundary (`_shared/entitlement.ts`), and `real-estate-api` is reachable directly.
   const PM_ACTIONS = new Set([
     'list-tenancies', 'upsert-tenancy', 'list-rent-charges', 'generate-rent-schedule', 'mark-rent-paid',
     'list-maintenance', 'upsert-maintenance', 'landlord-statement', 'invoice-rent-charge', 'renew-tenancy',
@@ -450,8 +442,6 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
           // broker could enable syndication, copy the feed URL, hand it to Kyero or an OpenImmo
           // portal — and the portal pulled an empty document, permanently, with no error anywhere.
           // `unpublish-property` already clears it, so setting it here makes the pair symmetric.
-          // Defaults true because publishing IS the act of making a listing publicly
-          // discoverable; pass `in_discovery: false` to publish to the agency's own site only.
           in_discovery: body.in_discovery === undefined ? true : body.in_discovery === true,
         };
         if (!property.listing_date) patch.listing_date = new Date().toISOString().slice(0, 10);
@@ -1569,7 +1559,6 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         // in the agent's calendar and never fires the 60-minute reminder, so the agent misses the
         // appointment. `update-viewing`'s sync block is gated on `data?.meeting_id`, so the
         // mismatch stayed invisible forever. Note the sibling insert two statements down has
-        // always checked its error — the omission was inconsistent within one block.
         const { data: meeting, error: meetingErr } = await supabase.from('crm_meetings').insert({
           workspace_id: workspaceId, owner_user_id: agentId,
           target_kind: contactId ? 'contact' : null, target_id: contactId,

@@ -1,15 +1,4 @@
-/**
- * The Balance tile must say something the tiles beside it do not.
- *
- * Reported from a real screen: a party holding €1,373 of unallocated credit and nothing else
- * rendered "On account €1,373" next to "Balance · we owe them €1,373". Both were correct. Balance
- * is a NET of three terms, and when only one of them is non-zero it nets nothing — it reprints
- * that one term with a direction word.
- *
- * Nothing in the stack could catch that: the number was right, the layout was valid, and the two
- * tiles agreeing is exactly what you would expect them to do. Only the rule "a net of one term is
- * not a net" makes it visible, so that rule gets a test.
- */
+/** The Balance tile must say something the tiles beside it do not. */
 import { describe, it, expect } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -124,19 +113,7 @@ describe('the balance direction reads neutrally', () => {
   });
 });
 
-/**
- * …and neither may the two surfaces that hand-roll their own closing line.
- *
- * `netPositionDirection` being neutral protected the tiles and nothing else: the printed Καρτέλα
- * and the emailed statement PDF each wrote their own label and both still read "Χρεωστικό υπόλοιπο
- * (οφείλει) / owes us". Those are the artefacts that leave the building — printed, emailed, or
- * opened on the public /statement/{token} page — so they are precisely the ones that must not
- * accuse. The statement runs on Deno and cannot import the helper, so the wording is held in step
- * here rather than by convention.
- *
- * Matched on the rendered LABEL STRINGS, not on prose: these files legitimately discuss owing in
- * comments, and a test that fails on a comment gets deleted rather than obeyed.
- */
+/** …and neither may the two surfaces that hand-roll their own closing line. */
 describe('the closing balance on artefacts that leave the building', () => {
   const OWING = /\bowes?\b|\bowe\s+(us|them)\b|οφείλ/i;
 

@@ -1,21 +1,10 @@
-/** Canonical VAT country list — keyed on the **VAT prefix letters**, not the
+/**
+ * Canonical VAT country list — keyed on the **VAT prefix letters**, not the
  * ISO-3166 country code. The two diverge for Greece: its ISO code is `GR` but
  * its VAT/VIES/ΑΑΔΕ prefix is `EL`. We store the VAT prefix so the value here
  * can be concatenated with the VAT number and used directly against VIES / ΑΑΔΕ
  * (e.g. `EL` + `123456789` → `EL123456789`).
- *
- * Covers EU + EEA + UK + CH + the handful of non-EU countries we see on the
- * platform. Shared by every Tax & VAT surface (Business profile, CRM contact,
- * CRM company) so the option set + the Greece `EL≠GR` rule live in one place.
- *
- * This list is the DROPDOWN source. The country-name → code DERIVATION lives in
- * SQL (`public.country_ref()`, applied by the `crm_normalize_country` BEFORE-write
- * trigger on crm_companies / crm_contacts / crm_address_units) so that the
- * XML importer, ΑΑΔΕ / VIES writers and the agent tools — which never load this
- * file — get the same answer. Deliberately not duplicated here: a second copy of
- * the mapping is a drift surface, and `crm.country_code_mismatch` in the
- * data-integrity registry watches for country/code disagreement.
- * **Adding a country means editing BOTH this list and `public.country_ref()`.** */
+ */
 export interface VatCountryOption {
   /** VAT prefix letters (alpha-2, but `EL` for Greece). */
   code: string;
@@ -61,18 +50,7 @@ export const VAT_COUNTRY_OPTIONS: VatCountryOption[] = [
   { code: 'JP', name: 'Japan',           eu: false },
 ];
 
-/**
- * ISO-3166 country code → the VAT prefix letters that belong on a VAT number.
- * The two agree everywhere except Greece: `GR` in an address, `EL` on the VAT
- * number. A value that is already a VAT prefix passes through unchanged, so
- * this is safe to apply to a field whose convention you are not sure of —
- * which is the whole point, because `finance_settings.business_country_code`
- * stores the ISO code while `crm_companies.country_code` stores the prefix,
- * and a `GR` fed to VIES validates nothing and reports no error either.
- *
- * SQL keeps its own twin, `public._vat_prefix(text)`, because the invoicing-identity
- * projection runs there and cannot call this. One rule, two runtimes — change both.
- */
+/** ISO-3166 country code → the VAT prefix letters that belong on a VAT number. */
 export const toVatPrefix = (code: string | null | undefined): string => {
   const u = (code ?? '').trim().toUpperCase();
   return u === 'GR' ? 'EL' : u;

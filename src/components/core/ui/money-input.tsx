@@ -14,21 +14,7 @@ type MoneyInputProps = Omit<
   displayDecimals?: number | null;
 };
 
-/**
- * Locale-tolerant money / amount input for number-backed state.
- *
- * Plain `<Input type="number">` rejects European-format numbers like
- * `2.249,86` (the browser hands back an empty string), and a controlled
- * `value={someNumber}` would also wipe the comma mid-typing. This component
- * keeps a free-text draft while focused so the user can type any common
- * format (`2.249,86`, `2,249.86`, `2249,86`, `12.999`, …) and emits the
- * parsed number via {@link parseDecimal}. When blurred it shows the canonical
- * value formatted to `displayDecimals`.
- *
- * Use this for inputs whose parent stores a `number`. For inputs that already
- * keep the raw typed string in state, just use `<Input type="text" inputMode="decimal">`
- * + `parseDecimal`/`parseDecimalOr` at the compute site instead.
- */
+/** Locale-tolerant money / amount input for number-backed state. */
 export function MoneyInput({
   value,
   onValueChange,

@@ -1,16 +1,4 @@
-/**
- * Turntable placement math for an arbitrary product model (#321).
- *
- * Deliberately free of React, drei and R3F. It was originally exported from `ProductModelViewer.tsx`,
- * which is fine for the in-app viewer but not for the #258 embed bundle: that ships to a customer's
- * own website as a plain web component, and importing this from a `.tsx` would drag React and drei
- * into a bundle that has no use for either.
- *
- * Same split, and the same reason, as `src/utils/embedOrigins.ts`. The in-app viewer re-exports
- * these so its own call sites are unchanged, and
- * [tests/unit/productModelNormalization.test.ts](../../../../tests/unit/productModelNormalization.test.ts)
- * drives THIS module against a real `.glb` — the guard follows the code rather than a copy of it.
- */
+/** Turntable placement math for an arbitrary product model (#321). */
 import { Box3, Vector3, type Object3D } from 'three';
 
 /** Scene units the model's largest dimension is normalized to. */

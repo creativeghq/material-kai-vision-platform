@@ -1,22 +1,4 @@
-/**
- * A half-finished money flow says so, and a retry does not repeat it (#351 A1/S4/C3/C1/C4 + B4/C2/D5).
- *
- * One shape produced six of this audit's findings: a create-then-stamp pair with no transaction
- * and a retryable button. The first write commits, the second fails, the UI says "Failed", and the
- * operator does the only thing the screen offers — presses it again. That bills the same hours
- * twice, cuts a second delivery note, books the cost twice, or re-issues a transmitted credit note.
- *
- * The fixes are of three kinds and this file checks the first two:
- *   - moved into ONE SQL transaction (S4 — `bill_time_entries_to_invoice` /
- *     `bill_trip_expenses_to_invoice`), or made idempotent by a token (C1);
- *   - made resumable and honest where a transaction is not the right instrument (A1, C3, C4):
- *     each leg records that it happened, the toast names the half that did not, and the retry
- *     starts where it stopped.
- *
- * The SQL half — the cumulative credit cap, the POS token, the claim-before-work stamps — lives in
- * `pg_proc`, which no repo-file test can see (the trap recorded in `docs/prevention-coverage.md`).
- * Those are asserted in `tests/integration/fiscal-derivations.test.ts`, against a real database.
- */
+/** A half-finished money flow says so, and a retry does not repeat it (#351 A1/S4/C3/C1/C4 + B4/C2/D5). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -38,24 +20,7 @@ const creditDialog = read('src/modules/finance/components/NewCreditNoteDialog.ts
 const planning = read('src/modules/finance/tabs/PlanningTab.tsx');
 const parties = read('src/modules/finance/tabs/PartiesTab.tsx');
 
-/**
- * Rewriting a project plan is ONE transaction.
- *
- * `writePlanItems` rewrote a plan as two statements over the wire — `delete().eq('plan_id', …)`
- * then `insert(rows)`. The delete commits on its own, so a failing insert left the plan with ZERO
- * items and an error message. The retry could not undo it either: reprice rebuilds the composition
- * lines from `project_plans.composition`, but the MANUAL lines it preserves come from
- * `loadPlanItems` — which by then returns nothing. A hand-built section and every task under it
- * was gone for good, reported as a write error rather than as the data loss it was.
- *
- * `public.replace_plan_items(uuid, jsonb)` does both in one transaction. Watched 2026-08-30 on a
- * seeded plan: a write whose second row violates the parent FK leaves the ORIGINAL two rows intact
- * (`[Hand-added task, Kitchen]`), where the two-statement version left zero; a good write still
- * replaces wholesale.
- *
- * The RPC is SECURITY INVOKER on purpose — RLS on `project_plan_items` is the boundary, and the
- * engine calls it with the caller's client for a JWT request.
- */
+/** Rewriting a project plan is ONE transaction. */
 describe('#285 — rewriting a project plan is one transaction', () => {
   const engine = read('supabase/functions/project-plan-engine/index.ts');
 

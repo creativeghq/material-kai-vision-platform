@@ -38,20 +38,7 @@ interface PageHeaderProps {
   children?: React.ReactNode;
 }
 
-/**
- * PAGE HEADER — the identity band at the top of every page.
- *
- * This is the ONE surface that still uses the display serif and still gets to
- * be a little larger than the UI around it, because it answers "where am I".
- * Everything else in the header is chrome: 20px title, 12px subtitle, actions
- * right-aligned, one hairline underneath. The icon sits in a small tinted
- * square rather than a coloured circle — a circle at this size reads as an
- * avatar, and this is not a person.
- *
- * It deliberately does NOT carry the brand gradient any more. A gradient band
- * across the top of every screen makes each page announce the product instead
- * of announcing itself, and it collided with the page's own content colours.
- */
+/** PAGE HEADER — the identity band at the top of every page. */
 export function PageHeader({
   icon: Icon,
   thumbnailUrl,

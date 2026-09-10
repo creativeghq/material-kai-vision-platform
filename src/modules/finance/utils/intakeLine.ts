@@ -1,31 +1,4 @@
-/**
- * One reading of a supplier invoice line, shared by every surface that receives one.
- *
- * Two screens turn a myDATA line into stock — `ReceiveToWarehouseDialog` (the modal on an
- * expense document) and `PendingProductsCard` (the intake queue) — and they had independently
- * answered the same six questions. Where they disagreed, the modal was right and the queue was
- * wrong, in ways nothing could see:
- *
- *   • the unit — the modal read `measurement_unit` off the line (AADE states it, so it IS the
- *     unit); the queue asked Haiku to infer it from the description and filed 4.1 metres of
- *     worktop as 4.1 pieces.
- *   • the supplier's article code — the modal used `item_code`; the queue used a regex over the
- *     description, so `11-3331-60-1` was stored as `H3331`, and that fabricated string is what
- *     the "supplier item code matches existing stock" auto-approve branch was keyed on.
- *   • the VAT category — the modal seeded it from the line; the queue left it blank.
- *   • unit cost — both divide the net by the quantity, and both had their own copy of it.
- *   • markup ↔ sale price — the same "two views of one number" pair, written twice.
- *   • netting a VAT-inclusive price before storing it as `list_price` — written twice, and both
- *     copies silently skipped the netting when no VAT category was set. In the modal that is
- *     nearly unreachable (the category is seeded from the line); in the queue it was the
- *     DEFAULT path, so a gross figure was stored as an ex-VAT list price and every quote built
- *     on it was 24% wrong. `netListPrice` cannot be called wrongly now: it returns a refusal
- *     rather than an unnetted number.
- *
- * Only the *reading* lives here. What each screen then WRITES stays with the screen — the modal
- * mints a full catalog product through the ingest core, the queue records a stock and cost
- * event — because that difference is deliberate.
- */
+/** One reading of a supplier invoice line, shared by every surface that receives one. */
 import { normalizeUnit, unitFromMydataCode, unitDef } from '@/lib/units';
 import { round2 } from '@/utils/decimal';
 

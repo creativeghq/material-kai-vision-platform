@@ -1,21 +1,4 @@
-/**
- * Turn a myDATA inbound document's lines into stock.
- *
- * A supplier line is one free-text string plus a quantity and a net value. Everything a
- * stock item needs is in there — "AMALFI GRIS 80X80 A' -3 -1", qty 17.92, net €295.86 is an
- * 80×80 cm tile, sold by the square metre, costing €16.51/m² ex-VAT — so the form parses it
- * (`parseSupplierLine`) and presents the result as editable fields rather than making the
- * operator retype what the document already said.
- *
- * What each line writes on submit:
- *   catalog product  — name, sku, cost, and the parsed size/maker into products.metadata
- *   sale price       — product_prices.list_price, from cost × (1 + markup)
- *   stock item       — physical fields + intake photos, linked to the product
- *   stock movement   — one 'in' movement per line, via inbound_doc_receive_to_warehouse
- *
- * Money deliberately does NOT live on warehouse_items: cost is products.cost and the sale
- * price is product_prices.list_price, which is where the rest of the platform reads them.
- */
+/** Turn a myDATA inbound document's lines into stock. */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, Plus, Search, X, ImagePlus, Ruler, Check, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
@@ -455,15 +438,6 @@ export const ReceiveToWarehouseDialog: React.FC<{
     /**
      * What this run has already written, for the failure path. Declared OUTSIDE the try so the
      * catch can read it.
-     *
-     * The stock RECEIPT is atomic — inbound_doc_receive_to_warehouse takes every mapping in one
-     * RPC and runs last — so a mid-loop failure never half-receives stock. What it DOES leave
-     * behind is the preparation: catalog products (each with a real embedding cost), their fiscal
-     * fields, list prices and empty warehouse_items rows. Those cannot be folded into the same
-     * transaction because product creation goes through the ingest service for embeddings.
-     *
-     * So they are tracked and REPORTED instead. Without this the operator sees only 'Failed', has
-     * no idea N products now exist, and pressing Receive again silently creates them twice.
      */
     const createdNames: string[] = [];
 

@@ -5,18 +5,6 @@ import * as React from 'react';
  * vertical form never did, and it needs them wherever that collapse happens —
  * a Radix `TabsList` (Finance, HR, Stock) and a `HubSideNav` (Profile, Social,
  * Party work) both become the same object below `lg`, so they share this.
- *
- *  1. **Keep the ACTIVE item in view.** A deep link into section 14 of 19 that
- *     scrolls to rest showing sections 1–4 tells the reader they are on a page
- *     whose selected tab does not exist.
- *  2. **Say that there is more.** `data-overflow` reports which edge still has
- *     items off-screen; `index.css` fades that edge. Without it a strip is
- *     indistinguishable from a short list that happens to end at the viewport,
- *     which is the whole reason the wrapped version got reported as broken.
- *
- * A no-op when the element is not actually scrollable, so it is safe to attach
- * unconditionally — on desktop the rail is vertical and `scrollWidth` equals
- * `clientWidth`.
  */
 export function useStripAffordance(
   elRef: React.RefObject<HTMLElement | null>,

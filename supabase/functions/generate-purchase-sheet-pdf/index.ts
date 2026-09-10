@@ -1,23 +1,4 @@
-/**
- * generate-purchase-sheet-pdf
- *
- * Renders a project's purchase items (internal doors, windows, etc.) into a
- * polished purchase specification PDF. Output modes, combinable:
- *   - 'schedule'  → A3-landscape architectural elevation schedule ("SCHEDULE OF
- *                   DOORS / WINDOWS") — dimensioned CAD elevation line-drawings in
- *                   a grid, each with a tag (D-1/W-1), set count + location, type,
- *                   material and glass. Deterministic line-art, no AI.
- *   - 'per_item'  → one A4-portrait spec page per item (image/render + spec table +
- *                   door swing symbol + finish swatches + PUR-00N block)
- *   - 'both'      → the elevation schedule, then a detail page per item
- *
- * Data source: `project_purchase_items` (fetched under RLS via the caller's JWT),
- * or inline `items` when called with the service-role key (smoke tests / server).
- *
- * Output: uploaded to the private `pdf-documents` bucket at
- *   project-purchase/{project_id}/purchase-{ts}.pdf
- * and returned as a 7-day signed URL.
- */
+/** generate-purchase-sheet-pdf */
 import { createClient } from '@supabase/supabase-js';
 import { formatMoney } from '../_shared/money.ts';
 import { PDFDocument, rgb, degrees } from 'pdf-lib';
@@ -809,7 +790,6 @@ async function handlePurchaseOrder(body: Body, admin: any, reader: any): Promise
     // money quantity, in the renderer, which is the one place forbidden to derive. After a
     // discount, currency or tax edit that produced a document whose lines did not add up to its
     // own total, with no error anywhere (#361 `EG-20`). A missing line total is a data defect:
-    // fail, rather than print a plausible number onto a document sent to a supplier.
     lines: items.map((it: any) => {
       if (it.line_total === null || it.line_total === undefined) {
         throw new HttpError(

@@ -1,12 +1,6 @@
 /**
  * Guard: one comment stripper for the guard tests, and it is correct on the two cases the
  * hand-rolled copies were not.
- *
- * This one guards the guards, which is why it is worth having. Thirty test files stripped BLOCK
- * comments before LINE comments; a `//` comment containing `/*` (this repo writes `/api/rag/*`
- * and `image/*` in prose constantly) therefore opened a block that closed hundreds of lines
- * later, and the assertions then ran against source with the middle removed. Nothing failed —
- * the tests passed by having nothing left to object to.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';

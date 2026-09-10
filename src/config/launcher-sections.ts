@@ -4,16 +4,6 @@
 // Only ALWAYS-available tabs are listed; role-, module- and BYOK-gated tabs are omitted so a link
 // never lands on a blank tab or an upsell. Sales and Inbox have no URL-backed tabs and no nested
 // surface → the center shows an "Open" card only.
-//
-// A ?tab= key here that names NO pane is caught — tests/unit/deepLinkTargets.test.ts resolves every
-// one against the target page. Two failure modes it cannot see, because both produce a link that
-// resolves perfectly:
-//   • a tab that EXISTS but is listed nowhere here — a gap, not a break. Finance's bank feed and HR's
-//     schedules/overtime/onboarding each shipped a month before anything in the launcher named them.
-//   • a link to a tab that renders behind a padlock. It resolves, so the guard passes; the click
-//     just lands the user on an upsell (see the real-estate and CRM notes below).
-// Neither is machine-checkable cheaply, so re-read the target page's TabsTrigger list by hand
-// whenever you touch its tabs.
 import {
   Users, Contact, Building2, Tags, ArrowUpCircle, ShoppingCart,
   FileText, Banknote, BarChart3, Plane, CalendarDays, Clock, Briefcase, Wallet,
@@ -81,12 +71,6 @@ export interface LauncherSection {
 /**
  * Center-pane sections, keyed by SidebarNavItem.id (=== LauncherApp.id).
  * Tab values are the exact `<TabsTrigger value>` strings on each module's landing page:
- *   CRM      (src/modules/crm/pages/CRMPage.tsx)            → users | contacts | companies | categories
- *   Finance  (src/pages/Admin/FinancePage.tsx)             → ar | ap | doc_orders | doc_invoices |
- *                                                            doc_payments | reports | parties | trip_cards
- *   HR       (src/modules/hr/pages/HRPage.tsx)             → employees | timeoff | attendance |
- *                                                            recruitment | payroll | documents
- *   Email    (src/modules/email-marketing/pages/…Page.tsx) → campaigns | templates | contacts | setup
  */
 export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
   // Property Mgmt and Investments carry their own add-on slug — shown to a workspace that owns
@@ -169,8 +153,6 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
   // opens the studio primed on the presentation-sheets toolkit (its picker offers all 9 sheet types,
   // incl. the "design breakdown" board) instead of hunting for the per-board Sheets tab.
   // (sheets are an agent capability, not a page tab.) Deliberately a single entry:
-  // "Design breakdown" pointed at the same URL (a sheet TYPE, not a separate action), and
-  // "Interior studio" duplicated the top-level Interior Design app — both removed as redundant.
   moodboard: [
     { label: 'Presentation sheets', to: '/agent-hub?capability=presentation-sheet', icon: LayoutTemplate },
   ],
@@ -212,21 +194,6 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
   // clusters that existed in the picker and were reachable from no menu at all. `?capability=`
   // primes the toolkit and shows its quick-starts without firing one, which is what makes a chip
   // an entry point rather than a spend.
-  // Both gates are real, and they are different questions. `seo-toolkit` is the PURCHASE: seo-api
-  // refuses a workspace that doesn't own it, so an ungated chip would be a live link to a 402.
-  // `agent.use` is the PERSON: these all land in the AI studio.
-  // The FIRST chip is deliberately ungated, and that is what gives this tile a card at all.
-  // Every other chip needs `seo-toolkit`, so on a workspace without it the launcher found zero
-  // links, judged the app "nothing to expand", and promoted it out of the centre column into the
-  // Jump-to rail — correct by its own rule, and misleading here, because the surface behind the
-  // tile is a seven-tab dashboard that is free. A paid bench should not make a free surface look
-  // like a bare link.
-  //
-  // Keyword research and Write an article ARE repeated from the Marketing 'seo' tile on purpose.
-  // The earlier note called that duplication; it is not the kind the rail rule guards against
-  // (two CARDS for one app). These are two entry points to one capability from two different
-  // starting questions — "market my content" and "manage this website" — and a person in the SEO
-  // Module should not have to know the Marketing hub exists to write an article about their site.
   'seo-websites': [
     { label: 'Connected websites', to: '/profile?tab=websites', icon: Globe },
     { label: 'Keyword research', to: '/agent-hub?capability=seo-research', icon: Search, moduleSlug: 'seo-toolkit', requireAnyCapability: ['agent.use'] },
@@ -286,20 +253,10 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
   // see LAUNCHER_ACTIONS below. Categories are free text typed per doc, not a fixed vocabulary, so
   // there is nothing stable to list here: a chip per category would be a different menu per
   // workspace and would break the moment someone renamed one.
-  // Sales/Inbox have no URL tabs → Open-only. My HR is Open-only too: EmployeeSelfServicePage uses
-  // Tabs `defaultValue` and never reads ?tab=, so a tab deep-link would be inert.
 };
 
 // Right-column context-aware quick-CREATE triggers, keyed by SidebarNavItem.id. Each `to` carries a
 // ?new= param that the target PAGE reads to open its real create modal/route:
-//   /crm?new=contact → contacts/new · /crm?new=company → AddCompanyModal
-//   /finance?new=invoice → New Invoice modal · /finance?tab=doc_orders&new=order → New (sales) order
-//   /quotes?new=quote → Create Quote · /projects?new=project → New Project
-//   /sales?new=order → New Order dialog · /inbox?new=conversation → New internal thread
-//   /hr?tab=employees&new=employee → Add-employee dialog
-//   /marketing/email?new=campaign → Create Campaign · ...?tab=templates&new=template → New Template
-// Add a row ONLY after wiring the matching ?new= handler on the page — an unwired trigger is inert.
-// (Automations/Flows deliberately omitted: create is a window.prompt + the agent, not a modal.)
 export const LAUNCHER_ACTIONS: Record<string, LauncherSection[]> = {
   crm: [
     { label: 'New Contact', to: '/crm?new=contact', icon: UserPlus },
@@ -345,17 +302,6 @@ export const LAUNCHER_ACTIONS: Record<string, LauncherSection[]> = {
 /**
  * Right-column "Jump to", PER HUB. The rail follows the Hub selected on the left, so the menu
  * changes as you move through it instead of showing the same three links under every hub.
- *
- * What belongs here is decided by ONE rule: **the middle column must not already offer it.** The
- * centre pane renders every app in the selected hub with all of its sections and create actions, so
- * a rail entry that repeats one of those is pure duplication — the same trap the promoted-apps note
- * in AppLauncher describes, and the reason the rail exists at all. Each entry is therefore a
- * cross-cutting surface the hub's own cards cannot reach: a Profile tab, a public calculator, a
- * template type, a billing page.
- *
- * Guarded by tests/unit/launcherHubShortcuts.test.ts (every hub covered; nothing repeated from that
- * hub's cards), and every `?tab=` value is resolved against its page by tests/unit/deepLinkTargets.
- * Both are cheap; neither can tell you an entry is USEFUL, so pick real destinations by hand.
  */
 export const LAUNCHER_HUB_SHORTCUTS: Record<HubId, LauncherSection[]> = {
   // The channels marketing actually has to keep connected, plus the one-off scan that needs no

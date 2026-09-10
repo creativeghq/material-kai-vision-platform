@@ -1,24 +1,6 @@
 /**
  * Guards the agent result cards' one interactive claim: a row that IS a record can be opened, and
  * a name that belongs to another record goes to that record.
- *
- * Three failure modes, none of which anything else can see:
- *
- *  1. **A second route table.** The ⌘K palette already declares where every kind opens and which
- *     gates match the guard on that route. Writing those again here would compile, render, and be
- *     wrong the first time a route moves — so the shared kinds must be DERIVED from
- *     `GLOBAL_SEARCH_KINDS`, and this file proves they still are by comparing the two answers.
- *
- *  2. **A link built from a key that is not a record.** `recordKindForIdKey` decides by suffix,
- *     which is what makes it work for tools nobody has written yet — and is exactly why it must
- *     refuse `workspace_id`, `category_id`, `template_id` and friends. A wrong link goes somewhere
- *     REAL and wrong, which is harder to notice than no link at all.
- *
- *  3. **A payload with nothing to link.** The card can only link an id the tool actually selected.
- *     `list_recent_expenses` returned six expenses whose supplier existed only inside a `notes`
- *     sentence, so the canvas showed a Notes column where the chat's prose answer had a Supplier
- *     column — the same data reading as two different answers on the two halves of one screen.
- *     A source scan is the only thing that can see a missing column in a `select` string.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -289,19 +271,7 @@ describe('the card renders the record layer', () => {
   });
 });
 
-/**
- * The myDATA expenses feed has a route of its own.
- *
- * Asked "only the expenses from myAADE, not the ones added manually", the agent had one expense
- * tool — `list_recent_expenses` over `supplier_bills` — so it answered from the six BOOKED expenses
- * and worked out the origin by reading the `notes` prose. It said two. The inbox held 1,866
- * documents. Nothing failed: a wrong count is a valid number, the tool ran clean, and the sentence
- * read like an answer.
- *
- * Two halves have to hold, and each is silent alone. The tool must exist and be reachable; and its
- * DESCRIPTION must carry the words a person uses for it, because tool selection is the step that
- * actually failed — a perfect tool the router never considers is the same screen as no tool.
- */
+/** The myDATA expenses feed has a route of its own. */
 describe('the myDATA expenses feed is reachable and findable', () => {
   const tools = read('supabase/functions/_shared/tools/expense-tools.ts');
   const chat = read('supabase/functions/agent-chat/index.ts');

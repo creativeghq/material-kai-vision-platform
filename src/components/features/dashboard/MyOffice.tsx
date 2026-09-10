@@ -141,14 +141,6 @@ const MyOfficeImpl: React.FC = () => {
   }, [user, activeWorkspaceId, workspaceLoading]);
 
   // ── stats ──
-  //
-  // Receivables and payables come from `loadAgingLedger` — the SAME assembly the Finance page
-  // reads, so the figure on this tile and the tab it links to cannot disagree. This used to sum
-  // `invoices.amount_due` for three statuses with `.limit(1000)`, which was wrong three ways at
-  // once: a silent cap past 1,000 open invoices, a total summed across currencies and then
-  // labelled with whichever one the last row carried, and — the reason it was noticed — no
-  // knowledge of confirmed-but-uninvoiced orders. In this workspace that is every receivable
-  // there is, so the tile said "All Settled" and the Receivables tab it opened listed the money.
   useEffect(() => {
     if (!activeWorkspaceId) {
       // Only leave the loading state once we KNOW there is no workspace. While the
@@ -213,13 +205,6 @@ const MyOfficeImpl: React.FC = () => {
   }, [activeWorkspaceId, workspaceLoading]);
 
   // The Finance headline, and the one thing it must never say by accident.
-  //
-  // `overlayFailed` means the uninvoiced-orders half of the ledger did not load, so `outstanding`
-  // is an UNDER-report — and an under-report of money owed reads as good news. "All Settled" is
-  // therefore only ever shown when we actually know the ledger is complete AND empty; a failed
-  // load says so instead. `mixed` gets the same treatment: a sum across currencies is not a
-  // number a symbol can fix, so the caption says the total cannot be taken at face value rather
-  // than quietly stamping it with the largest bucket's currency.
   const financeIncomplete = stats.overlayFailed;
   const financeHeadline = financeIncomplete
     ? '—'
@@ -241,9 +226,6 @@ const MyOfficeImpl: React.FC = () => {
   // is ALSO null for the first beat of every load, while the workspace resolves.
   // Returning null there rendered the dashboard's top row hero-only and then grew it
   // by this panel's height a moment later, shoving the widgets below down the page:
-  // the "grid starts smaller and then expands" blink. Render the panel through the
-  // resolving phase — its stat/insight skeletons above already hold the full height —
-  // and only drop out once we actually know there is no workspace.
   if (!activeWorkspaceId && !workspaceLoading) return null;
 
   return (

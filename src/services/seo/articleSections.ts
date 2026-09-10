@@ -1,39 +1,6 @@
 /**
  * How an article names its two structural sections — the FAQ and the closing — in the language
  * it is written in, and how every reader finds them again afterwards.
- *
- * WHY THIS EXISTS. The writer prompt said the FAQ heading was "exactly: Frequently Asked
- * Questions". That instruction is more specific than "write every word in Greek", so the model
- * obeyed it: two live articles came out with every heading in Greek except `## Frequently Asked
- * Questions` and `## Conclusion`, sitting in the middle of a Greek document for a Greek reader.
- * The PLANNER had already got it right — its outline said `Συχνές Ερωτήσεις (FAQ) για πλακάκια
- * μπάνιου Θεσσαλονίκη` — and the writer overrode the plan, because the structure rules outranked
- * both the plan and the language block.
- *
- * Fixing the prompt alone would have broken four things at once, which is why this module comes
- * with it. Every reader of that section keyed off the English string:
- *
- *   • the viewer's `FAQ_HEADING_REGEX` — a Greek heading renders as plain markdown, so the FAQ
- *     accordion silently disappears;
- *   • `analyze`'s `content.includes('frequently asked')` — twice: the article scores as HAVING NO
- *     FAQ, which raises a high-severity "FAQ section not found but planned" fix against an article
- *     that has one, and permanently docks the AEO score;
- *   • the PAA fix's `affectedSection`, which then names a heading the article does not contain;
- *   • `insertFaqEntry`'s fallback heading, which would write a fresh ENGLISH heading into a Greek
- *     article — reintroducing the defect from the other end.
- *
- * None of those raise. They are the silent-zero shape: a valid regex that matches nothing, a
- * `false` that is a plausible answer, a score that is merely lower than it should be.
- *
- * THE CONTRACT. `SECTION_LABELS` is the one table — the label to WRITE and the aliases to
- * RECOGNISE come from the same entry, so a language cannot be readable but unwritable. Recognition
- * is CONTAINS, not equals, because a good FAQ heading carries the keyword too (the planner's does).
- * When no label matches at all — a language not in the table — `findFaqSection` falls back to the
- * STRUCTURE: an H2 whose children are question-shaped headings. That degrades to something rather
- * than to nothing, which is the whole point.
- *
- * IMPORT-FREE on purpose: mirrored to Deno by `npm run vocab:mirror` (Vite resolves `@/`, Deno
- * resolves by URL, so a single import makes the copy unbuildable in the other runtime).
  */
 
 /**
@@ -260,16 +227,7 @@ function sectionEnd(lines: string[], headingLine: number): number {
   return lines.length;
 }
 
-/**
- * Find the article's FAQ section.
- *
- * Two passes, and the order matters. The LABEL pass is precise, so it runs alone whenever it
- * finds anything — that keeps a body section that merely discusses questions from being promoted
- * into an accordion. The STRUCTURE pass runs only when no heading in the document names an FAQ at
- * all, which is the case this exists for: an article written in a language the table does not
- * list. An H2 with two or more question-shaped sub-headings under it is an FAQ section in any
- * language, and finding it beats rendering the questions as flat prose.
- */
+/** Find the article's FAQ section. */
 export function findFaqSection(markdown: string): FaqSectionLocation | null {
   const lines = markdown.split('\n');
 

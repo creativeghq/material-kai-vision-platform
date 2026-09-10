@@ -1,29 +1,4 @@
-/**
- * `<materialkai-configurator>` — the tenant's own blueprint, on the tenant's own website (#382).
- *
- *   <materialkai-configurator api-key="mk_embed_…" blueprint="…"></materialkai-configurator>
- *
- * WHAT MAKES THIS DIFFERENT FROM THE OTHER TWO TAGS. `<materialkai-product>` shows a thing that
- * exists. `<materialkai-builder>` asks for adjectives and matches them against a catalogue. This
- * one lets a visitor BUILD something that does not exist yet — zones, module widths and counts,
- * finishes, appliances — and watch a real price move as they do.
- *
- * THE PRICE IS THE PLATFORM'S OWN DERIVATION, NOT A SECOND ONE. `deriveComposition` /
- * `composeEstimate` are imported from `@/utils/blueprintComposition` + `blueprintCompute`, which
- * are the GENERATED mirror of the edge copy that records plan money. That mirror exists, in its
- * own words, "only so an anonymous visitor sees the number the edge copy will record" — this is
- * the surface it was written for, and it took until #382 to be wired to one. A local pricer here
- * would be the shown price and the recorded price drifting apart, which is the money rule arriving
- * as a UI bug instead of a SQL one.
- *
- * WHAT THE SERVER SENDS AND DOES NOT. `products-3d-api?action=blueprint` folds every line's cost
- * basis to a single price before it leaves the server (`foldItemPricingForAnon`), so the material
- * cost, labour rate and margin behind each number never reach the page. The arithmetic below runs
- * on the folded figures and lands on the same total.
- *
- * The same guest rules as its siblings: shadow DOM, no React, never throws into the host page,
- * nothing loads until the widget is near the viewport.
- */
+/** `<materialkai-configurator>` — the tenant's own blueprint, on the tenant's own website (#382). */
 import type { Composition, RateItemLike, ZoneDef, ZoneConfig, ZoneGlobalDef } from '@/utils/blueprintComposition';
 import { defaultComposition, hasComposition, rateChoices } from '@/utils/blueprintComposition';
 // The pricing SEQUENCE lives in its own module — it is order-sensitive in a way that is invisible
@@ -492,18 +467,7 @@ export class MaterialKaiConfigurator extends HTMLElement {
     this.root.replaceChildren(style, wrap);
   }
 
-  /**
-   * Hand the merchant the whole configuration.
-   *
-   * The COMPOSITION travels, not just the total — it is what an operator needs to open this as a
-   * real plan rather than reading a number and re-typing the kitchen. Turning that into a
-   * `project_plans` row server-side is #382 Phase 4; emitting it now means a merchant who wants to
-   * wire their own form is not blocked on that, and the payload shape does not change when it
-   * lands.
-   *
-   * Both channels, same reason as the product widget's add-to-cart: the tag may be mounted inline
-   * or in an iframe and the merchant should not have to care.
-   */
+  /** Hand the merchant the whole configuration. */
   /**
    * The quote form — name, email, a note, and the bot challenge.
    *

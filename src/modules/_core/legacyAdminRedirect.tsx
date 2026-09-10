@@ -1,18 +1,4 @@
-/**
- * A module route that only forwards an old `/admin/...` address to its real one.
- *
- * Seven tenant surfaces were mounted under `/admin` behind `AdminGuard` — which is not "an admin"
- * but the PLATFORM OPERATOR (owner/admin of the root workspace). The pages configure things that
- * belong to a workspace: its messaging channels, its email domain, its catalogs, its connected
- * social accounts, its automations. So a customer who bought one of those modules could not open
- * the page that sets it up, and every in-app link to it read `/admin/...` as though the tenant
- * were browsing our operator console.
- *
- * The redirects exist because links outlive routes: stored `action_url`s on notifications sent
- * months ago, bookmarks, anything pasted into a chat. They carry the route params and the query
- * string across, and they are deliberately UNGATED — the whole point is that the person the old
- * address bounced now arrives.
- */
+/** A module route that only forwards an old `/admin/...` address to its real one. */
 import React from 'react';
 import { Navigate, useLocation, useParams } from 'react-router-dom';
 import type { ComponentType, LazyExoticComponent } from 'react';

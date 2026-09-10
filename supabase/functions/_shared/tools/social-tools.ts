@@ -2,10 +2,6 @@
 // publish or schedule a post, and read analytics from chat — over the workspace's
 // already-connected accounts (via the zernio-api edge function).
 // DESIGN: read/list uses the service-role client scoped to the caller's workspace;
-// publish/schedule/analytics call zernio-api over HTTP with the CALLER'S JWT, so
-// zernio-api authenticates AS the user and applies its own workspace-membership
-// checks. workspace_id / user_id are server-derived (never model-supplied). It
-// CANNOT connect new accounts — that's the app UI's OAuth flow.
 
 // deno-lint-ignore-file no-explicit-any
 
@@ -147,15 +143,6 @@ export const createManageSocialTool = (
         // SECURITY INVARIANT 9 (#352 A3). Publishing had NO gate of any kind — no `confirm` in
         // the schema, no `action_confirmation` chunk. The only "confirm" in this file was the
         // word in the tool description, which is a request to the model rather than a gate.
-        //
-        // The caption is frequently model-written from material this agent scraped
-        // (`generate_content`, tech-radar results, SERP snippets), so a poisoned page could
-        // supply the copy AND trigger the call, and the post was live on the workspace's real
-        // account before any human saw it. A published post cannot be recalled — the platform
-        // has already fanned it out — which is why this is gated like a WhatsApp send rather
-        // than like a draft.
-        //
-        // Placed AFTER account resolution so the card can name the real handle: "post to
         // @materialshub" is a decision someone can make, "post to platform instagram" is not.
         // It is still before the draft row and before any call to Zernio.
         if (confirm !== true) {

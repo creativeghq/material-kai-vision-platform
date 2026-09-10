@@ -1,32 +1,4 @@
-/**
- * The one way an edge function gets the Replicate credential.
- *
- * ── Why this exists at all ────────────────────────────────────────────────────────────────────
- * Six functions read the token, and until 2026-08-30 every one of them called `Deno.env.get()`
- * directly. Per `_shared/secrets.ts` and the platform-secrets design, that is the one lookup an
- * admin cannot fix: `Deno.env.set` throws on Supabase edge, so `secrets-bootstrap` is a no-op and
- * a `platform_secrets` row is simply unreachable to a `Deno.env.get` caller. The row existed, was
- * empty, and could not have helped even if it were full.
- *
- * ── Why it resolves TWO names ─────────────────────────────────────────────────────────────────
- * Three callers read `REPLICATE_API_TOKEN` (generate-interior-gemini, generate-virtual-staging,
- * model-health-check-agent) and three read `REPLICATE_API_KEY` (generate-social-image,
- * generate-social-video, generate-interior-video-v2). Same account, same value, two spellings —
- * the `platform_secrets` description on `REPLICATE_API_KEY` even says "Same value as
- * REPLICATE_API_TOKEN". So setting one name fixed half the platform and left the other half
- * emitting the identical "not configured" error, which is the worst shape of half-fix: the
- * symptom does not change, so the obvious conclusion is that setting the key did not work.
- * One resolver reading both means ONE row, or ONE project secret, is enough.
- *
- * ── Fail closed, and say which thing failed ───────────────────────────────────────────────────
- * `resolve()` returns the SOURCE alongside the value. A caller that cannot find a credential must
- * report "no Replicate credential is configured" and never "Replicate rejected us" — those send a
- * reader to completely different fixes, and conflating them is exactly what happened here: 18 of
- * 19 registry rows sat at `last_probe_status='auth_failed'` carrying our OWN
- * "REPLICATE_API_TOKEN not configured in this environment" string, while the account was funded
- * and the token worked. Replicate was never called. Same distinction the repo already draws
- * between `collector_failed` and `not_collected` (CLAUDE.md anti-regression 3).
- */
+/** The one way an edge function gets the Replicate credential. */
 import { createClient } from '@supabase/supabase-js';
 import { resolveSecret } from './secrets.ts';
 

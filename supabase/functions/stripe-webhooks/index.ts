@@ -74,11 +74,6 @@ Deno.serve(withApiLogging('stripe-webhooks', async (req) => {
   // fault is a server error (5xx, must be retried AND reported to Sentry). The
   // two used to share one catch that returned 400 for both, which made a real
   // failure indistinguishable from a bad signature and hid the cause for weeks.
-  // The same webhook URL receives events from BOTH the default account (tenant
-  // payments) and, when configured, the dedicated platform-billing account. Verify against
-  // the default secret first; on failure try the billing secret. Whichever verifies decides
-  // which Stripe client downstream API calls use (subscriptions.retrieve, etc.) and which
-  // customer-id column we persist.
   let event: Stripe.Event;
   eventIsBilling = false;
   stripe = _stripe;
@@ -163,17 +158,10 @@ Deno.serve(withApiLogging('stripe-webhooks', async (req) => {
         await handleInvoicePaymentFailed(event.data.object as Stripe.Invoice);
         break;
 
-      // ============================================
       // Reversals
-      // ============================================
       // These were entirely absent — `grep "refund\|dispute"` over this 715-line file
       // returned ZERO matches — so they fell into `default:` and were logged as
       // "Unhandled event type". A refunded or charged-back invoice therefore read `paid`
-      // forever: AR, revenue and the payment_allocations ledger all over-counted by the
-      // reversed amount.
-      // Because it is a MISSING branch rather than a failing one, no error rate, no Sentry
-      // event and no silent-zero probe could ever have surfaced it. That is what makes this
-      // class worth handling explicitly rather than relying on monitoring.
       case 'charge.refunded':
         await handleChargeReversed(event.data.object as Stripe.Charge, 'refund');
         break;
@@ -675,18 +663,7 @@ async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
   }).catch(() => {});
 }
 
-/**
- * A charge was refunded (fully or partially).
- *
- * Deliberately does NOT reverse the ledger automatically. Reversing money is a finance
- * decision with a legal artefact attached — in this platform a refund is settled by a CREDIT
- * NOTE, which carries its own numbering and myDATA obligations. Silently deleting
- * payment_allocations rows would leave the books internally consistent and legally wrong.
- *
- * So this raises it to a human, loudly and with the numbers, and leaves the credit-note flow
- * to do the reversal properly. That is the same conclusion viva-webhooks reached — the
- * difference is that this makes the alarm reach someone instead of stopping at console.error.
- */
+/** A charge was refunded (fully or partially). */
 async function handleChargeReversed(charge: Stripe.Charge, kind: 'refund' | 'dispute') {
   const amount = (charge.amount_refunded ?? 0) / 100;
   const currency = (charge.currency ?? 'eur').toUpperCase();

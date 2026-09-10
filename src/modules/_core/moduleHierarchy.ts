@@ -4,8 +4,6 @@
 // renders it under its parent instead of as a loose sibling card. Both the operator catalog
 // (/admin/modules) and the tenant storefront (Profile → Modules) group through this file — do not
 // re-walk `manifest.parent` anywhere else.
-// Resolution is by SLUG, never by registered module: a parent may exist only as a `modules` row with
-// no `src/modules/<slug>/` folder (e.g. `price-monitoring`).
 import { registeredModules } from './registry';
 
 const PARENT_BY_SLUG: ReadonlyMap<string, string> = new Map(

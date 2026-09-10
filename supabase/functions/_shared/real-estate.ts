@@ -46,9 +46,6 @@ export function estimateFromMedianPerSqm(median: number | null, area: number, ba
  * `realestate_rent_charge_settlement_derivation`). TypeScript formats, SQL derives: never re-compute
  * rent received from `status`/`paid_amount` in a consumer, because an invoiced charge is settled by
  * the Finance ledger and the stored flag on the row does not move when the tenant pays.
- *
- * Falls back to the stored flag ONLY if the RPC itself fails — a landlord statement that renders
- * slightly stale beats one that renders nothing, and the drift check reports the disagreement either way.
  */
 export async function withRentSettlements(supabase: any, charges: any[]): Promise<any[]> {
   if (!charges.length) return [];
@@ -133,10 +130,6 @@ export async function buildVendorReport(supabase: any, property: any): Promise<a
     // +30…, max budget 350k" is a realistic note — so quoting it verbatim hands one client's
     // contact details and negotiating position to another. HTML-escaping it, which this path
     // already did correctly, is not the same as being allowed to say it.
-    //
-    // Sharing is therefore explicit and per viewing: nothing is quoted unless somebody ticked
-    // `share_with_vendor` on that row. Default false, so the safe state is the one you get by
-    // doing nothing.
     supabase.from('property_viewings')
       .select('scheduled_at, status, feedback')
       .eq('property_id', property.id).eq('status', 'completed').not('feedback', 'is', null)
@@ -279,10 +272,6 @@ export async function createRentInvoiceForCharge(supabase: any, args: {
   // both see the same charge as uninvoiced and both get this far. This link used to be
   // unconditional and its result discarded: the last write won and the loser's invoice stayed
   // behind — orphaned, unreferenced by any charge, and still a payable draft.
-  //
-  // The claim is therefore conditional on the charge still being unlinked, and the result is
-  // checked. Losing the race is not an error; it means somebody else already invoiced this
-  // charge, so the invoice this call just built is withdrawn and the winner's id is returned.
   const { data: claimed, error: claimErr } = await supabase
     .from('property_rent_charges')
     .update({ invoice_id: invoiceId })

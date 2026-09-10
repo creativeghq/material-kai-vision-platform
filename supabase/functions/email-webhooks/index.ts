@@ -1,15 +1,4 @@
-/**
- * Email Webhooks Handler — two inbound directions, one function (merge rule).
- *
- * 1. **Resend delivery events** (the original surface): bounces, complaints, deliveries, opens,
- *    clicks. Svix-signed; verification is HMAC-SHA256 with RESEND_WEBHOOK_SECRET.
- * 2. **Inbound mail** (#342 §1): the Cloudflare Email Worker calls `inbound_begin` then
- *    `inbound_stored`, authenticated by INBOUND_WEBHOOK_SECRET. Everything tenancy-related —
- *    recipient resolution, the auth/loop/dupe gates, and the workspace/thread/customer
- *    correlation — happens HERE, never in the Worker.
- *
- * Both branches fail closed when their secret is unset.
- */
+/** Email Webhooks Handler — two inbound directions, one function (merge rule). */
 
 import { createClient } from '@supabase/supabase-js';
 import type { DbClient } from '../_shared/supabase-client.ts';
@@ -42,16 +31,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, svix-id, svix-timestamp, svix-signature, x-inbound-secret',
 };
 
-/**
- * Resend event → delivery-trail event (`document_events.event_type`).
- *
- * Deliberately NOT the same map as RESEND_EVENT_MAP: that one feeds
- * `email_events`, whose vocabulary is the provider's ('delivery', 'open'). The
- * trail's vocabulary is past-tense and shared with the page channel
- * ('delivered', 'opened'), so one <DeliveryTrail> renders both. `delivery_delayed`
- * is intentionally absent — a delay is not an outcome and must not displace the
- * real one on the status ladder.
- */
+/** Resend event → delivery-trail event (`document_events.event_type`). */
 const DOCUMENT_EVENT_BY_RESEND: Record<string, EmailEventType> = {
   'email.sent': 'sent',
   'email.delivered': 'delivered',
@@ -147,18 +127,7 @@ const inboundJson = (body: Record<string, unknown>, status = 200): Response =>
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 
-/**
- * Inbound branch (#342 §1). Two actions, called in order by the Cloudflare Email Worker:
- *
- *   `inbound_begin`  — does this recipient exist? If so, hand back a signed upload URL scoped to
- *                      one object path. This is what lets the Worker `setReject()` an unknown
- *                      address at SMTP time WITHOUT knowing which addresses exist: it asks, we
- *                      decide, it relays a boolean.
- *   `inbound_stored` — the raw `.eml` is in storage; parse it, run the gates, correlate, deliver.
- *
- * The Worker never receives a database credential, so the worst a leaked shared secret buys is
- * "upload an email and ask whether an address exists" — not database access.
- */
+/** Inbound branch (#342 §1). Two actions, called in order by the Cloudflare Email Worker: */
 async function handleInbound(
   req: Request,
   suppliedSecret: string,
@@ -275,15 +244,6 @@ async function handleInbound(
   /**
    * Spoofing gate. DMARC fail means the sender is not who they claim, so the message is stored
    * and visible but never auto-replied to.
-   *
-   * DKIM rescues a DMARC fail — forwarding breaks SPF and "use my own address" is a forwarding
-   * flow by design — but ONLY WHEN IT IS ALIGNED WITH THE FROM DOMAIN (#357 AE-5).
-   *
-   * This read `auth.dkim !== 'pass'`, i.e. a pass for ANY domain. An attacker signs a message
-   * with a domain they own, sets `From: someone@yourcustomer.test`, and DMARC fails while
-   * `dkim=pass` — so the gate opened and the agent could auto-reply as though the claimed sender
-   * were verified. Every header on an inbound message is attacker-chosen; the signature domain
-   * is the one thing that is not.
    */
   const dkimVouchesForSender = dkimAlignedWith(fromAddress, auth);
   const dmarcFailed = auth.dmarc === 'fail' && !dkimVouchesForSender;
@@ -453,9 +413,6 @@ Deno.serve(withApiLogging('email-webhooks', async (req) => {
       // evidence disagreed with the action taken on it: a Transient bounce was written down as
       // Permanent and (rightly) not suppressed, leaving the row unable to explain the behaviour.
       // Anything reading this column for a deliverability report counts every soft bounce as hard.
-      //
-      // Resend sends Permanent | Transient | Undetermined. An absent type is 'Undetermined' — the
-      // honest answer — never the most severe one.
       const reported = String((event.data as { bounce?: { type?: string } }).bounce?.type ?? '').trim();
       eventRecord.bounce_type = reported || 'Undetermined';
       eventRecord.diagnostic_code = event.data.bounce.message;
@@ -549,11 +506,6 @@ Deno.serve(withApiLogging('email-webhooks', async (req) => {
           // check for the same reason, so nothing stops the next one either. That combination is
           // how an address that hard-bounced keeps being mailed, which is the fastest way to lose
           // a sending domain.
-          //
-          // The attribution gap that caused this was closed in mid-August (every log since carries
-          // a workspace), so this branch should now be unreachable. Saying so loudly is what makes
-          // its return visible instead of silent, and `email.hard_bounce_unsuppressed` reports any
-          // address left in that state.
           console.error(
             `[email-webhooks] ${event.type} for ${toEmail ?? 'an unknown address'} could NOT be `
             + `suppressed: the email_log carries ${wsId ? 'no recipient' : 'no workspace_id'}. `

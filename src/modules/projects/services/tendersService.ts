@@ -1,18 +1,4 @@
-/**
- * Package tendering — send a trade package to several subcontractors, compare, award.
- *
- * AWARDING IS ONE RPC, not a sequence of writes from here. `award_tender_package` creates the
- * purchase order, its lines, recomputes the order totals, stamps the package and withdraws the
- * losing bids inside one transaction — and the stamp is the CLAIM, guarded on `awarded_bid_id is
- * null`. Doing it client-side would be the create-then-stamp pair anti-regression rule 4 exists to
- * forbid: the order commits, the stamp fails, the screen says Failed, and the operator presses the
- * only button offered, letting the same package twice.
- *
- * A SUBCONTRACT IS A PURCHASE ORDER. Nothing new was invented for it: `orders` already carries the
- * project, the supplier, lines with cost codes and supplier bills that settle against it, and
- * `get_project_cvr` already reads open purchase orders as committed cost. So an award appears in
- * the cost report with no new derivation.
- */
+/** Package tendering — send a trade package to several subcontractors, compare, award. */
 import { supabase } from '@/integrations/supabase/client';
 
 export {
@@ -326,17 +312,7 @@ export const tendersService = {
     return data as string;
   },
 
-  /**
-   * Issue the enquiry to one subcontractor: mints their private link, emails it, returns it.
-   *
-   * The link is PER BID. It resolves to that subcontractor's own lines and nothing else, so a
-   * forwarded link cannot show anybody what a competitor quoted — which is the one thing a tender
-   * must never do. Re-sending keeps the same token, so somebody part-way through pricing does not
-   * lose their link because the buyer pressed send twice.
-   *
-   * The link comes back whether or not the email went out: a company with no email on file is
-   * ordinary, and the buyer can paste it into their own message.
-   */
+  /** Issue the enquiry to one subcontractor: mints their private link, emails it, returns it. */
   async sendEnquiry(bidId: string): Promise<{ link: string; emailed: boolean; has_email: boolean }> {
     const { data, error } = await supabase.functions.invoke('tender-bid-portal', {
       body: { action: 'send', bid_id: bidId },

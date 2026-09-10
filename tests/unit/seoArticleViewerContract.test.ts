@@ -4,28 +4,7 @@ import { join } from 'node:path';
 import { SEO_ARTICLE_DEMO_DATA } from '../../src/data/demo/seo-article';
 import { fixListState } from '../../src/components/features/ai/seoFixState';
 
-/**
- * The demo article is the EXECUTABLE CONTRACT between the pipeline and the viewer.
- *
- * `DemoAgentResults` renders `<SEOArticleViewer initialArticle={SEO_ARTICLE_DEMO_DATA.data} />`
- * — the same component the real path uses. So the demo is not a mock of the viewer, it is a
- * finished article handed to the real thing, and it is the only place in the repo where the
- * complete shape of a completed article is written down. That makes it the reference: if the
- * demo renders every tab and a real article does not, the difference is the DATA.
- *
- * This matters because the two halves cannot see each other. The pipeline is Deno under
- * `supabase/functions`, the viewer is React under `src/`, and the field names that join them
- * (`optimize_data`, `brief_data`, `gaps_gains_data`, `research_tab_data`, `interlinking_data`)
- * are strings on both sides with nothing holding them equal. Renaming one is a silent
- * regression that shows up only when an article completes — which, at the time this file was
- * written, had never once happened.
- *
- * Three properties, each of which has already broken here at least once:
- *   1. viewer ↔ pipeline ↔ demo agree on the tab dataset names;
- *   2. every section score the analyzer emits has a human label, and no label is dead;
- *   3. everything the pipeline writes survives the write — as a real column, or folded into
- *      `stages_data.extra` and pulled back up by `hydrateArticle`.
- */
+/** The demo article is the EXECUTABLE CONTRACT between the pipeline and the viewer. */
 
 const ROOT = process.cwd();
 const HANDLERS = join(ROOT, 'supabase/functions/seo-api/handlers');
@@ -119,10 +98,6 @@ describe('what the pipeline writes actually survives the write', () => {
    * non-column in an update payload lands NOTHING and takes the real columns down with it.
    * That is why finished articles used to have `title = NULL`, no markdown and a status
    * stuck mid-pipeline while the endpoint returned `{success: true}`.
-   *
-   * `updateArticle` splits the payload against `ARTICLE_COLUMNS` and folds the remainder into
-   * `stages_data.extra`; the viewer's `hydrateArticle` folds it back up. Both halves of that
-   * arrangement have to exist, or the fields go nowhere.
    */
   it('routes every final field through the column allowlist, not straight at the table', () => {
     const finalWrite = pipelineSrc.slice(pipelineSrc.indexOf("status: 'completed',") - 2000);
@@ -149,19 +124,7 @@ describe('what the pipeline writes actually survives the write', () => {
   });
 });
 
-/**
- * The Apply card must say why it is empty.
- *
- * The card rendered `null` whenever no fix was applicable, and every fix in the database was
- * inapplicable — analyses produced before the analyzer learned to anchor carry no `scope` and no
- * `anchor`, so the filter matched nothing. The result: an Apply/Revert feature that was built,
- * tested against the handler, deployed, and did not exist on screen. Nothing could see it. The
- * handler tests passed (they call the edge function directly), the types were satisfied (a fix
- * with no `scope` is a valid fix), and the UI has no assertion that says "be visible".
- *
- * `fixListState` is the whole verdict, exported so it can be tested as a value rather than
- * inferred from a render.
- */
+/** The Apply card must say why it is empty. */
 describe('the Apply card explains itself rather than disappearing', () => {
   const fix = (over: Record<string, unknown> = {}) => ({
     category: 'readability',

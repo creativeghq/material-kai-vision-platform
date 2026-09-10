@@ -2,17 +2,6 @@
  * Workflow types — the shared contract between the agent (which emits chunks)
  * and the chat surface (which renders the WorkflowTracker + step cards +
  * inline forms).
- *
- * The agent emits these four chunk types during a multi-step run:
- *
- *   1. workflow_plan              — boots a tracker. Sent ONCE at the start.
- *   2. workflow_step_progress     — emitted whenever a step changes status.
- *   3. workflow_step_input_request— a step needs user input. Frontend renders an
- *                                    inline form. User submits → resumes flow.
- *   4. workflow_finished          — the workflow ended (done | aborted | failed).
- *
- * The frontend keeps a single source of truth: the `workflows` map on a
- * Message. Chunks mutate that map in place; the WorkflowTracker re-renders.
  */
 
 export type WorkflowStepStatus =

@@ -1,14 +1,4 @@
-/**
- * real-estate-vendor-reports — the weekly "how your property is doing" send to the instructing vendor.
- *
- * A service communication under the agency agreement, not marketing: it goes to the vendor of a
- * property we are actively marketing, about that property, and it is switched off per listing with
- * `properties.vendor_reports_enabled` rather than by a marketing-consent flag that would be the
- * wrong legal basis for it.
- *
- * Weekly via pg_cron (x-cron-secret). Every listing is stamped only on a SUCCESSFUL send, so a bad
- * week retries next run instead of being silently skipped.
- */
+/** real-estate-vendor-reports — the weekly "how your property is doing" send to the instructing vendor. */
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';

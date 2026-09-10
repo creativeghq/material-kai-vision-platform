@@ -1,21 +1,6 @@
 /**
  * An unsubscribe is a compliance control, and it was wired two ways that both let mail through
  * (#366 BU-2).
- *
- * (a) The suppression lookup lived INSIDE `if (body.emailType === 'marketing')`. `emailType` is
- *     client-supplied and defaults to 'transactional' at three call sites, so omitting the field
- *     skipped the check — and so did setting it. The code comment claimed the marketing branch
- *     "closes the freeform / multi-`to` bypass"; the freeform composer is precisely the path that
- *     declares itself transactional. `SendEmailDialog` sends operator-typed free text to a CRM
- *     contact as 'transactional', and the meeting-invite sender and the real-estate buyer digest
- *     did the same.
- *
- * (b) The lookup destructured `{ data: supp }` and dropped `{ error }`. A failed query left `supp`
- *     undefined, `if (supp)` false, and the send proceeded — a control that switches itself off
- *     exactly when it cannot do its job.
- *
- * Both are source-shape defects with no runtime signal: nothing throws, nothing logs, and the
- * mail arrives. So they are pinned here, at the shape.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -91,32 +76,7 @@ describe('the senders that were bypassing', () => {
   });
 });
 
-/**
- * ── The webhook side, 2026-08-30 ────────────────────────────────────────────────────────────
- *
- * A hard bounce and a spam complaint are mandatory opt-outs — the mailbox is gone, or the
- * recipient has told a provider we are spam. `email-webhooks` is the only thing that records
- * either. Two defects there, both silent:
- *
- * (a) `bounce_type` was written as the literal `'Permanent'` while the suppression decision
- *     forty lines below correctly read `bounce.type` from the payload. So the stored evidence
- *     disagreed with the action taken on it: a Transient bounce was recorded as Permanent and
- *     (rightly) not suppressed, leaving the row unable to explain the behaviour — and any
- *     deliverability report reading that column counts every soft bounce as hard.
- *
- * (b) `email_unsubscribes` is keyed on `(workspace_id, email)`, so a send whose log carries no
- *     workspace could not be suppressed at all — and the `if (wsId && toEmail)` guard skipped
- *     it in silence. The SEND path skips its own check for the same reason, so nothing stopped
- *     the next message either.
- *
- * MEASURED on this platform 2026-08-30: both hard bounces ever recorded
- * (2026-07-31, 2026-08-03) landed on logs with a NULL `workspace_id`, and `email_unsubscribes`
- * is empty. Two addresses that hard-bounced are still mailable. The CAUSE is already fixed —
- * workspace attribution on `email_logs` closed in mid-August and all 82 logs since carry one —
- * so what was missing is the part that would have told anyone. The integrity probe
- * `email_hard_bounce_unsuppressed` (in `dic_detect__ops_silent_zero`, rostered in
- * `ops.silent_zero_probe_missing`) is that part; it reports the two historical addresses.
- */
+/** ── The webhook side, 2026-08-30 ──────────────────────────────────────────────────────────── */
 const HOOK = readFileSync(resolve(process.cwd(), 'supabase/functions/email-webhooks/index.ts'), 'utf8');
 
 describe('a recorded bounce says what the provider said', () => {

@@ -368,22 +368,7 @@ export interface OpportunitiesResponse {
 // Which subject are we looking at?
 // ─────────────────────────────────────────────────────────────────────────
 
-/**
- * A tracked subject, addressed either way the backend addresses one.
- *
- * `tracked_mentions` has always held two kinds of row: a PRODUCT enrolment
- * (`product_id` set, reached at `/products/{id}/…`) and a free SUBJECT — a brand or
- * keyword with no product behind it, reached at `/track/{id}/…`. MIVAA has served both
- * families since the feature shipped.
- *
- * The client only ever spoke the first one. Every reader below existed exactly once, in
- * its product form, so the subject half of the product was reachable by curl and by
- * nothing else — and on this platform **all 17 tracked subjects are the subject kind**,
- * so in practice the screens could not open a single real row. A typed wrapper is not a
- * surface; neither is a route.
- *
- * One ref, one set of functions, so a reader cannot exist for one kind and not the other.
- */
+/** A tracked subject, addressed either way the backend addresses one. */
 export type MentionSubjectRef =
   | { kind: 'product'; productId: string }
   | { kind: 'subject'; trackedMentionId: string };
@@ -514,17 +499,7 @@ export async function untrackProduct(productId: string): Promise<void> {
   await api(`/api/v1/mention-monitoring/products/${productId}/track`, { method: 'DELETE' });
 }
 
-/**
- * Content + outreach opportunities for one subject.
- *
- * Both arms existed and neither had a caller. This is the read side of a ~2,000-line
- * service that scores AI Overview presence, People-Also-Ask gaps, featured snippets,
- * competitor rankings, video/news carousels, knowledge panels and outlet pitches — the
- * entire "how do we get cited more" half of the product, reachable by curl only.
- *
- * `use_llm_summary` costs credits (it polishes each rationale through Haiku); everything
- * else is one SERP call the subject has already paid for.
- */
+/** Content + outreach opportunities for one subject. */
 export async function getSubjectOpportunities(
   ref: MentionSubjectRef,
   options?: {

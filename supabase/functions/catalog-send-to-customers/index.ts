@@ -1,21 +1,4 @@
-/**
- * catalog-send-to-customers
- *
- * Admin sends a published (or ready) catalog to recipients resolved from a
- * set of CRM categories. For every unique email:
- *   1. (Optional) ensure a catalog_email_grants row exists so first-time
- *      visitors who match neither auth.users nor crm_contacts/companies
- *      still get through the gate.
- *   2. Dispatch the email via the platform's email-api edge function using
- *      the catalog_send.recipient template.
- *   3. Log one catalog_email_sends row per recipient (sent_by, batch_id,
- *      source_category_ids, status, resend_message_id).
- *
- * Two actions:
- *   - "preview"  → returns the resolved recipient list without sending.
- *                  Used by the SendToCustomersModal to confirm the count.
- *   - "send"     → actually dispatches.
- */
+/** catalog-send-to-customers */
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';

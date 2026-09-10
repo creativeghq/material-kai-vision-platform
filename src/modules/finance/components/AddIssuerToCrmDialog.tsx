@@ -1,21 +1,4 @@
-/**
- * Add a myDATA issuer to the platform as a CRM supplier.
- *
- * Extracted out of `InboundDocActionsMenu` so the document row and the Expenses-by-Supplier list
- * offer the SAME act rather than two spellings of it. Two things make this a dialog and not a
- * button that writes:
- *
- *  1. It DEDUPES first, on the normalised VAT key (#353 CRM-4) — not on the raw string, because a
- *     row stored as `GR 800 370 260` matches none of the spellings a caller would think to try,
- *     and the workspace ends up with the same business twice.
- *  2. It RESEARCHES: ΑΑΔΕ → ΓΕΜΗ → web/Apollo via the shared [[researchCompany]] chain, so an
- *     issuer added here lands with the same identity an operator would get from Add Company. That
- *     costs an ΑΑΔΕ call that writes an audit entry into the issuer's own TAXISnet inbox, which is
- *     the operator's decision to make — hence the checkbox, and hence no silent create anywhere.
- *
- * Never navigates on success: the caller says what happens next, because one caller is mid-triage
- * in a 241-row filing queue and the other is looking at a single document.
- */
+/** Add a myDATA issuer to the platform as a CRM supplier. */
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Building2, Loader2, ExternalLink, Sparkles } from 'lucide-react';

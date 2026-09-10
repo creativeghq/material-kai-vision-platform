@@ -1,23 +1,6 @@
 /**
  * Document Health Panel — shown inside the AsyncJobQueueMonitor job detail
  * modal as a third tab once a job has finished.
- *
- * Calls the MIVAA observability endpoint:
- *   GET /api/internal/document-extraction-status/{document_id}
- *
- * Displays:
- *   - Layer 1 (catalog layout) + Layer 2 (catalog legends) run state
- *   - Legend types detected on the document
- *   - Global certifications propagated catalog-wide
- *   - Per-product coverage buckets (how many products in each % bucket)
- *   - Average coverage across the whole document
- *   - A sample of products with missing critical fields + source breakdown
- *     (which tier populated each field: chunk_regex / vision_rollup /
- *     pymupdf_text_dict / claude_opus_vision / catalog_legend / ...)
- *   - A list of detected issues with suggested remediation
- *
- * This is a reusable admin tool — it works for any document processed by
- * the reusable Layer 1/2/3 pipeline, not just the one catalog under review.
  */
 
 import React, { useEffect, useState } from 'react';

@@ -1,20 +1,6 @@
 import { lazy, type ComponentType, type LazyExoticComponent } from 'react';
 
-/**
- * Drop-in replacement for React.lazy that survives stale-deploy chunk failures.
- *
- * After a frontend deploy, a client still running the previous build holds an
- * `index.html` that references old chunk filenames. When it navigates to a lazy
- * route, the dynamic `import()` either rejects (chunk 404 — "Failed to fetch
- * dynamically imported module") or resolves to `undefined`, and the
- * `.then(m => ({ default: m.X }))` mapper throws `Cannot read properties of
- * undefined (reading 'X')`. Either way the route white-screens.
- *
- * This wrapper catches that failure and forces a SINGLE full reload to pull the
- * fresh `index.html` (and therefore the new chunk URLs). A sessionStorage guard
- * prevents reload loops — if the import still fails after one reload (a genuinely
- * broken chunk, not a stale one), we rethrow so the error boundary can show.
- */
+/** Drop-in replacement for React.lazy that survives stale-deploy chunk failures. */
 const RELOAD_GUARD_KEY = 'lazyWithRetry:reloaded';
 
 export function lazyWithRetry<T extends ComponentType<any>>(

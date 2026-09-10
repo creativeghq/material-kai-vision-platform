@@ -1,23 +1,5 @@
 // Where the platform's own places ARE — one registry, so naming a place and linking to it are
 // the same act.
-//
-// Two dead ends this exists to close, both seen on the Social quick-start:
-//
-//   1. A reply that ends "connect one in Profile → Social Accounts" names a destination and then
-//      leaves the reader to go find it. Mentioning a place without linking to it is the text
-//      equivalent of an empty state with no way out of being empty.
-//   2. A result card that offers "Add account" under a list of connected accounts hands the
-//      intent back to the model — and the model cannot connect an account, because that is an
-//      OAuth handshake that only exists in the app UI. What comes back is prose about where to
-//      go, which is dead end #1 again, one turn later.
-//
-// Both are fixed by the same fact: this is where that place lives. Read by
-// `linkifyDestinations()` (agent replies), `AgentResultCard` (the setup action on a result card)
-// and `RESULT_SETUP_DESTINATION` in `capabilities.ts`.
-//
-// A route here is a promise the app keeps — `tests/unit/agentReplyDestinations.test.ts` fails the
-// build when one points at a route or a tab that does not exist, because a link to nowhere is
-// worse than the mention it replaced.
 
 import { FINANCE_BASE, FINANCE_TAB } from '@/modules/finance/routes';
 

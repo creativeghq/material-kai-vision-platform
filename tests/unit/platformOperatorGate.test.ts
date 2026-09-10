@@ -1,23 +1,6 @@
 /**
  * Guards the #362 fix: `reset-platform` deletes every tenant's data, and its authorization
  * gate accepted a WORKSPACE admin from ANY workspace.
- *
- * The root error is a vocabulary one, and it is worth restating because the same two words
- * mean different things one line apart:
- *
- *   workspace_members.role = 'admin'   per-workspace business role. Every tenant's own
- *                                      administrator holds it. `authenticate({allowedRoles})`
- *                                      matches it in ANY workspace, with no workspace bound.
- *   roles.name = 'admin'               the GLOBAL account tier, via user_profiles.role_id.
- *                                      True in every workspace. This is "operates the platform".
- *
- * `reset-platform` gated on the first and meant the second, so any customer admin could wipe
- * all tenants. Live at the time: 5 workspaces, 1 workspace-admin membership, 1 global operator.
- *
- * These are static assertions over source text — there is no Deno runtime in this suite, and a
- * behavioural test would need a live JWT plus a platform this test is allowed to destroy.
- *
- * Every case was watched to FAIL against the pre-fix tree.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';

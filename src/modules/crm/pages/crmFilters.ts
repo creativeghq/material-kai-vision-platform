@@ -1,19 +1,4 @@
-/**
- * Filter definitions for the three CRM list tabs.
- *
- * The CRM lists are HYBRID and the field defs encode which half each dimension belongs to:
- *
- *  - Users are client-side (one edge-function payload), so every field carries an
- *    `accessor` and `applyFilters` does the matching.
- *  - Contacts / companies are SERVER-paged through crm-api, which takes its own
- *    `CrmListFilters` shape (and an `ids[]` allowlist for membership dimensions the client
- *    resolves itself). Those fields therefore carry NEITHER `accessor` NOR `column`:
- *    `applyFilters` passes them through untouched and the page reads them out of `values`
- *    to build the request. Giving them a `column` would be wrong — there is no supabase
- *    query builder on that path at all.
- *
- * The old `ANY = '__any__'` sentinel is gone: an unset value is "no filter".
- */
+/** Filter definitions for the three CRM list tabs. */
 import { Building2, Tags, User } from 'lucide-react';
 import type { FilterGroupDef, FilterOption } from '@/components/core/filters';
 import type { CrmCategoryKind } from '@/services/crmCategoriesService';
@@ -45,24 +30,7 @@ const FACET_COUNT: Record<CategoryFacetEntity, (c: CategoryFacetRow) => number> 
   user: (c) => c.user_count,
 };
 
-/**
- * Category options for one list, as a FACET rather than a catalogue.
- *
- * A category is offered only when it currently holds a member of that entity kind — only when
- * ticking it can actually narrow this list — and the count rides along on the option so an
- * empty result is visible before the click.
- *
- * This is what the companies tab was getting wrong: it offered every non-industry category,
- * and most of them can never contain a company at all. `crm_resync_auto_category_members`
- * fills `role` categories with platform USERS and `employment` categories with CONTACTS, and
- * the lead_status / lead_source vocabulary only ever tags contacts. The handful that did match
- * were the "Suppliers" professional-type category — the same word as the Relationship filter
- * one group up, holding 3 of the 35 companies flagged `is_supplier`.
- *
- * `keep` is the value currently applied: an active filter must stay visible in the modal even
- * if its last member just left the category, or it goes on filtering the table with no
- * checkbox left to untick.
- */
+/** Category options for one list, as a FACET rather than a catalogue. */
 export function categoryFacetOptions(
   categories: CategoryFacetRow[],
   entity: CategoryFacetEntity,
@@ -161,13 +129,6 @@ export function buildContactFilters(ctx: {
 
 // No `status` filter: crm_companies has no status column, so it could only ever match zero
 // rows (or 400 server-side). Deliberately absent rather than shipped inert.
-//
-// And no `professionOptions` — the shared five-value enum — for the same reason one step
-// further in: on a COMPANY, `profession` does NOT hold that vocabulary. The ΑΑΔΕ enrichment
-// writes the primary ΚΑΔ activity description into it ("ΧΟΝΔΡΙΚΟ ΕΜΠΟΡΙΟ ΠΛΑΚΑΚΙΩΝ…"), and
-// the server matches the column with `.eq`, so every option the enum offered matched zero
-// rows, every time. The field below filters the same column on the values it actually holds,
-// derived by the page from the company lookup.
 export function buildCompanyFilters(ctx: {
   categoryOptions: FilterOption[];
   industryOptions: FilterOption[];

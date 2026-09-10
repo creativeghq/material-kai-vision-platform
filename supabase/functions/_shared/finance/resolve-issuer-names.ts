@@ -1,31 +1,4 @@
-/**
- * Fills in the supplier name AADE never sends.
- *
- * myDATA's `RequestDocs` feed identifies the issuer by ΑΦΜ only — the `<issuer>` block
- * carries `vatNumber`/`country`/`branch` and nothing else. (Measured on live data: of 1,146
- * inbound documents with no issuer name, ZERO contained a `<name>` tag — it is never a parse
- * miss.) So the name has to be resolved from the ΑΦΜ on our side.
- *
- * Resolution order, cheapest first:
- *   1. `greek_registry_companies` — platform-wide ΑΦΜ→name cache (public registry data).
- *   2. `crm_companies` for this workspace — the operator may already know the supplier.
- *   3. ΓΕΜΗ OpenData (`GEMI_API_KEY`) — public registry, one platform key, no per-tenant
- *      quota and no notification to the looked-up business.
- *   4. ΑΑΔΕ RgWsPublic2 — LAST, opt-in per workspace, and only for the ΑΦΜ ΓΕΜΗ has
- *      definitively answered "no such company" about.
- *
- * ΓΕΜΗ first and ΑΑΔΕ last on purpose: every RgWsPublic2 lookup writes an audit entry into the
- * looked-up ΑΦΜ's TAXISnet inbox under the caller's identity and burns their monthly quota.
- * That is fine for "verify my own business" and completely wrong as the way to resolve 166
- * suppliers, so ΓΕΜΗ answers the overwhelming majority for free and in silence.
- *
- * But ΓΕΜΗ only carries ΓΕΜΗ-REGISTERED companies. A sole trader who invoices you is not in it
- * (measured: 3 issuers, 8 documents, 404 on every run forever), and no free source will ever
- * name them — ΑΑΔΕ is the only registry that can. So step 4 exists, bounded hard: opt-in per
- * workspace, capped per run, only about a business that filed a document against THIS workspace,
- * only after ΓΕΜΗ has said no, and never asked twice (an ΑΑΔΕ miss is cached as `source='aade'`
- * so a second run cannot re-notify the same business).
- */
+/** Fills in the supplier name AADE never sends. */
 // deno-lint-ignore-file no-explicit-any
 import { resolveAadeCredentials, buildSoapEnvelope, postSoap, summarizeAadeError } from '../aade/soap.ts';
 import {
@@ -85,17 +58,7 @@ function pickBest(results: any[], afm: string): any | null {
     ?? null;
 }
 
-/**
- * One registry lookup.
- *
- * Returns the best hit, `null` for a genuine "no such company", or `'error'` for anything
- * transient. The distinction matters: only a genuine miss may be cached as `not_found`.
- *
- * ΓΕΜΗ signals throttling as **HTTP 200** with `{"message":"API rate limit exceeded"}` and no
- * `searchResults` key — so status alone is not enough to tell a miss from a throttle. Reading
- * an absent `searchResults` as "no results" would permanently record live companies as
- * not-found; measured on a real backfill, that was 152 of 166 ΑΦΜ.
- */
+/** One registry lookup. */
 interface GemiResult {
   hit: any | null | 'error';
   /** Requests left in the current minute, from ΓΕΜΗ's own headers. null when absent. */
@@ -215,8 +178,6 @@ export async function resolveInboundIssuerNames(
     // throttled rather than retrying. Retrying inside a run cannot help — the budget is
     // per-minute and already spent — it just burns the function's wall clock. The backlog
     // drains across runs instead, which is what the cache exists for.
-    // Measured the hard way: an unpaced backfill of 166 ΑΦΜ needed ~600 requests to resolve
-    // 162 because ~75% came back throttled.
     const PACE_MS = 8000;
     for (let i = 0; i < toLookUp.length; i++) {
       const afm = toLookUp[i];

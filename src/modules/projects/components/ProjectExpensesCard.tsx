@@ -1,16 +1,4 @@
-/**
- * Expenses booked against this project (#285).
- *
- * Two ways in, both from inside the job:
- *   · Add — books a new claim straight onto this project.
- *   · Link — pulls an existing unattributed claim onto it. That list is where imported card
- *     spend shows up (the Revolut feed materialises into trip_expense_items), so a fetched
- *     charge gets attached here rather than being re-keyed.
- *
- * The claim itself still lives in Expenses and still goes through the normal approval — this
- * panel never approves anything. Only APPROVED claims count towards job cost; pending ones are
- * shown so they are visible without moving the margin.
- */
+/** Expenses booked against this project (#285). */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, Plus, Link2, Link2Off, Receipt } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';

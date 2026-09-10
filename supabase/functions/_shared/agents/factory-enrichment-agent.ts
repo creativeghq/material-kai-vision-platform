@@ -1,22 +1,4 @@
-/**
- * Background Agent: Factory Enrichment
- *
- * Enriches incomplete factory metadata on products using a cascade of B2B data
- * sources — Apollo.io → Firecrawl website scrape → Hunter.io contacts.
- *
- * All three API calls fit within the Deno 90 s edge-function limit, so this
- * agent NEVER throws DelegateToMivaaError.
- *
- * Config params (background_agents.config):
- *   batch_size       number   Products per run (default 20, max 50)
- *   min_name_length  number   Skip factory_name shorter than this (default 3)
- *
- * Input data (agent_runs.input_data — set by trigger-factory-enrichment):
- *   product_ids   string[]   Specific product IDs to check
- *   workspace_id  string     Workspace to operate on
- *   scope_column  string     (optional) 'source_document_id' | 'scrape_session_id'
- *   scope_value   string     (optional) value for scope_column
- */
+/** Background Agent: Factory Enrichment */
 
 import type { AgentRunner, AgentRunContext, AgentRunResult } from './types.ts';
 import {

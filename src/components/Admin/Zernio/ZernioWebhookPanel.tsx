@@ -1,16 +1,4 @@
-/**
- * Zernio delivery + plan headroom — the operator half of the social/WhatsApp integration.
- *
- * Mounted as a settings panel on BOTH the Social Media and Messaging modules, because one Zernio
- * account serves both and the webhook is registered once for the whole account. It lives here,
- * next to the Keys tab, because that is where an operator already is when they paste
- * ZERNIO_WEBHOOK_SECRET — the register button used to exist only inside the WhatsApp management
- * page, which is a tenant surface and is not reachable from the app menu at all.
- *
- * The secret is not something to copy out of Zernio: `ensureZernioWebhook` SENDS it as the signing
- * key when it registers. So the order is paste-then-register, and registering first would leave the
- * handler (which fails closed) rejecting every delivery until Zernio auto-disables the hook.
- */
+/** Zernio delivery + plan headroom — the operator half of the social/WhatsApp integration. */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Loader2, RefreshCw, Webhook, Layers, AlertTriangle, CheckCircle2, Copy } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';

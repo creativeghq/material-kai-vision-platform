@@ -1,25 +1,4 @@
-/**
- * Money-derivation guard for the configurator (#321 M2, #260 Phase 1).
- *
- * The sibling of [moneyDerivation.test.ts](./moneyDerivation.test.ts), applied to a NEW money
- * quantity, which CLAUDE.md requires whenever one is added: derive it in SQL, return it derived,
- * and stop anything else from re-deriving it.
- *
- * "What does this configuration cost" is base price + the deltas of the chosen options. That is
- * trivial arithmetic, which is exactly why it gets rewritten: once in the configurator panel, once
- * in the quote builder when a configuration is turned into a line, once again in the embed widget
- * because it cannot import the service. Then one of them forgets that an unpriced product has a
- * null base, or sums an option belonging to a different product, and quotes a confident wrong
- * number. A wrong total is a valid `number` — no typecheck sees it, and no integrity probe sees it
- * either, because nothing stored is inconsistent.
- *
- * `get_configured_product_price` returns `configured_price` already derived. TypeScript formats it.
- *
- * SCOPE — the same limitation the finance guard carries, restated because it matters:
- * this scans REPO FILES, so it sees the TypeScript half only. SQL in this project is applied
- * through the Supabase MCP and never committed, so a second derivation written into another SQL
- * function is invisible here. A green run does not prove the invariant holds in the database.
- */
+/** Money-derivation guard for the configurator (#321 M2, #260 Phase 1). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';

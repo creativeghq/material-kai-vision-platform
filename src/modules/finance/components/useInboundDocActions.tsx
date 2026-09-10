@@ -1,34 +1,4 @@
-/**
- * Everything a received (myDATA) document can HAVE DONE TO IT, in one place.
- *
- * THE DEFECT THIS EXISTS FOR
- * --------------------------
- * `InboundDocActionsMenu` is one file and always was. What was duplicated is the WIRING around
- * it: two tables — the Expenses inbox and the supplier document table — each held their own copy
- * of the same five state hooks (`busy`, `receiveDoc`, `detailDoc`, `orderDoc`, `ordered`), their
- * own `dismiss`, their own `docsWithOrders` effect, and their own list of props to pass down.
- *
- * That copy is not cosmetic, because several menu entries are GATED ON THE HANDLER EXISTING:
- *
- *     const canAddDetail = … && !!onAddLineDetail && …
- *
- * So a host that forgets one does not get a disabled entry — the entry is deleted, silently. One
- * host passed `onAddLineDetail` and the other did not, and "say what was actually on this
- * document" was unreachable from the CRM company card and the supplier modal. On two thirds of
- * this workspace's received documents (1,161 of 1,769 carry value-only lines) that was the only
- * thing standing between them and warehouse receive, product extraction and the catalog.
- *
- * With one wiring site there is nothing to forget. `tests/unit/inboundDocActionsParity.test.ts`
- * still guards the symptom; this removes the cause.
- *
- * WHAT STAYS PER-TABLE
- * --------------------
- * The COLUMNS, and where the rows come from. Those differ for real reasons: the inbox lists many
- * issuers (so it has an Issuer column and a per-row category picker) and is handed its rows;
- * the supplier table is scoped to one ΑΦΜ, fetches its own, and adds a date window and totals.
- * Merging those would mean one component with a mode flag, which is two components wearing a
- * trench coat.
- */
+/** Everything a received (myDATA) document can HAVE DONE TO IT, in one place. */
 import React, { useCallback, useEffect, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { inboundService, type InboundDocument } from '@/modules/finance/services/inboundService';

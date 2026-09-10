@@ -1,18 +1,6 @@
 /**
  * A thread you cannot read does not exist, and an id in a request body is checked against you
  * (#359 CM-9 / CM-11).
- *
- * CM-11: handlers answered `403 You are not a participant of this thread`, which confirms the id
- * is real and a conversation exists behind it. Invariant 1 is explicit — *"Return 404 (not 403) on
- * ownership mismatch to avoid id enumeration."* One handler (`loadThreadIntake`) already did the
- * right thing; the rest did not, and the capability refusals sat in front of the visibility check
- * so a non-participant got the capability message.
- *
- * CM-9: `open_marketplace_inquiry` stored `demand_id` straight from the body, and `accept` then
- * wrote a `stock_allocations` row keyed on it. The `order_items` read carried a workspace filter;
- * the `quote_items` read did not, and could not have had a simple one — `quote_items` has no
- * workspace column, so tenancy lives on the parent quote. Fifth confirmed instance of two ids each
- * individually valid, never checked against each other (CRM-5 #353, RE-4 #356, PQ-4 #358).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -160,13 +148,6 @@ describe('#359 CM-10 — a customer sees the customer projection', () => {
   it('the thread row is projected too', () => {
     // It carries the routing metadata the relay reads — the mailbox we send FROM, the provider
     // conversation id — plus assignment and internal counters.
-    //
-    // Asserted as the customer branch's KEY SET rather than as `isMember ? thread : {`, which is
-    // what this used to pin. That shape was a proxy for the rule and it broke the moment the
-    // MEMBER half was legitimately enriched (`counterparty_participant_id`) — a change that
-    // cannot widen what a customer receives, but failed the anchor anyway. A proxy that fires on
-    // safe edits gets relaxed by whoever hits it next, and the relaxation is where the real leak
-    // walks in. So: name the seven columns. Adding an eighth to the customer's copy fails here.
     const get = sliceCase("case 'get_thread'");
     expect(get).toMatch(/const threadForCaller = isMember \?/);
     const decl = get.slice(get.indexOf('const threadForCaller = isMember ?'));

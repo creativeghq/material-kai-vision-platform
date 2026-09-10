@@ -1,25 +1,4 @@
-/**
- * Generation provider health — the Operations-page answer to "why is nothing generating?".
- *
- * THE BUG THIS PANEL EXISTS FOR (issue #4). Replicate returned 402 Insufficient credit on every
- * model from 2026-06-26, and Operations reported it HEALTHY for two months. `get_provider_health`
- * derives failure from ai_usage_logs, where the row is written BEFORE the upstream call and never
- * corrected — 0 of 22 generation rows carry a `success` key, so a 100% failure rate computed as
- * 0.000 and rendered green. Nothing on this page could have told you the account was empty.
- *
- * So this panel reads generation_models.last_probe_*, written by the model-health-check background
- * agent, which actually asks the provider on a schedule rather than inferring from traffic. The
- * distinction it exists to make visible:
- *
- *   credit_exhausted (402)  the ACCOUNT is empty  → add funds; the models are fine
- *   auth_failed (401/403)   the TOKEN is wrong    → funding changes nothing
- *   not_found (404)         the model is DELETED  → no amount of money brings it back
- *   not_configured          we NEVER CALLED them  → the secret is not deployed here
- *
- * Those three are indistinguishable from the user's side — every one is just "generation failed" —
- * and they have three different remedies. Collapsing them is how a four-model deletion and a
- * billing outage looked like the same event for two months.
- */
+/** Generation provider health — the Operations-page answer to "why is nothing generating?". */
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/core/ui/button';

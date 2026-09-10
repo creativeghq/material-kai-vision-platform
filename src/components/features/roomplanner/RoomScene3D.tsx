@@ -1,14 +1,4 @@
-/**
- * 3D room view (#321 M3, #259 Phase 2) — the same layout rows the 2D plan draws, at true scale.
- *
- * Consumes `room_layout_items_resolved` unchanged: Phase 2 adds a second RENDERER, not a second
- * data model. If the two views ever disagree about where or how big something is, exactly one of
- * them is wrong and it is a rendering bug, not a sync problem.
- *
- * Items without a 3D model are drawn as a labelled box at their planned footprint rather than
- * omitted. A room that silently loses half its furniture in 3D looks emptier than it is, and the
- * missing pieces are precisely the ones a tenant needs prompting to upload.
- */
+/** 3D room view (#321 M3, #259 Phase 2) — the same layout rows the 2D plan draws, at true scale. */
 import React, { Suspense, useMemo } from 'react';
 import { useGLTF, OrbitControls, Grid } from '@react-three/drei';
 import { PresetLighting, DEFAULT_PRESET } from '@/components/features/lighting/PresetLighting';

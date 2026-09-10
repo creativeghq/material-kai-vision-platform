@@ -2,12 +2,6 @@
  * Label formatting utilities.
  * Converts snake_case / camelCase database keys into human-readable labels
  * with zero cost and zero loading — pure string transformation.
- *
- * Usage:
- *   formatLabel('wall_tile')        → 'Wall Tile'
- *   formatLabel('material_type')    → 'Material Type'
- *   formatLabel('voc_content')      → 'VOC Content'
- *   formatLabel('productId')        → 'Product ID'
  */
 
 /**

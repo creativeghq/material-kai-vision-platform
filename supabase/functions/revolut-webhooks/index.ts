@@ -1,23 +1,4 @@
-/**
- * Revolut Business webhooks v2 receiver (#315).
- *
- * Registered per-workspace by `revolut-api?action=register-webhook` with the URL
- * `.../revolut-webhooks?ws=<workspace_id>` — the query param picks the config row whose
- * `webhook_signing_secret` verifies this delivery. Signature scheme (webhooks v2):
- *
- *   signed payload = "v1." + Revolut-Request-Timestamp + "." + raw body
- *   Revolut-Signature: v1=<hex HMAC-SHA256(signing_secret, signed payload)>
- *
- * Doctrine (mirrors stripe-webhooks, CLAUDE.md invariant 6):
- *   - missing signature/timestamp header → 400
- *   - workspace has no stored signing secret → 503 FAIL CLOSED, never process unsigned
- *   - bad signature or stale timestamp (>5 min) → 400
- *   - unknown ws → 200 {ignored} so the endpoint can't be probed for live workspaces
- *   - handler faults → 5xx so Revolut retries; non-actionable events → 200
- *
- * The webhook is a TRIGGER for silver-layer upserts only — reconciliation into the money
- * tables stays in its own explicit step. No CORS on purpose: browsers never call this.
- */
+/** Revolut Business webhooks v2 receiver (#315). */
 
 // deno-lint-ignore-file no-explicit-any
 

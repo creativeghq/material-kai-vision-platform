@@ -39,28 +39,10 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const CREDIT_COST = 2;
 
 
-/**
- * Article plan structure budget.
- *
- * Gemini counts THINKING tokens against `maxOutputTokens`, and this call runs at
- * `thinkingLevel: 'high'`. At the old 4096 the split was 3,929 reasoning + 151 text: the
- * model wrote a good title, metaTitle, metaDescription and slug in Greek and was cut off
- * mid-key at `"primaryKeyword":`, `finishReason: MAX_TOKENS`. The AI SDK reports that as
- * `No object generated: could not parse the response.` — which reads like a model that
- * answered badly rather than a budget that was never large enough, and is why this sat
- * broken. A full plan is ~1.5–2.5k tokens of JSON, so the cap has to clear reasoning
- * plus that, not just that.
- */
+/** Article plan structure budget. */
 const PLAN_MAX_OUTPUT_TOKENS = 16384;
 
 // Zod schema for structured Gemini output.
-//
-// Two levels, not `z.lazy` recursion. The AI SDK cannot express a self-referencing schema
-// to Google — it logged `Recursive reference detected at
-// #/properties/sections/items/properties/subsections/items! Defaulting to any` on every
-// call, so `subsections` reached the model with NO schema at all and its contents were
-// whatever the model felt like. Two levels is also what an article outline actually is,
-// and what `plan.sections.reduce((s, sec) => s + sec.subsections.length, 0)` counts.
 const ArticleSubsectionSchema = z.object({
   heading: z.string(),
   headingLevel: z.enum(['h1', 'h2', 'h3', 'h4']),
@@ -135,7 +117,6 @@ export async function handlePlan(req: Request, body: any): Promise<Response> {
     // `keyword_research` that is a string (the tool's zod schema is `z.any()`, so anything the
     // model sends arrives intact) threw `Cannot read properties of undefined (reading 'slice')`
     // and surfaced as a 500 on a request that was merely malformed — AFTER the credits were
-    // debited, so a bad request was billed for.
     const research = body.keyword_research;
     if (typeof research !== 'object' || research === null || Array.isArray(research)) {
       return jsonResponse(

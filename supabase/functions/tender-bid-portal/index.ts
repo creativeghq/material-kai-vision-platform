@@ -1,26 +1,4 @@
-/**
- * tender-bid-portal — issue a trade package to a subcontractor, and take their price back.
- *
- * Until this existed a package could be assembled and compared but never SENT: somebody had to
- * type the subcontractor's rates in themselves, so the tender lived entirely inside our office.
- *
- * THE SUBCONTRACTOR IS NOT A PLATFORM USER and must never need to be. This follows the rail the
- * platform already uses for a quote, a contract and a buyer: a long random token, a public page
- * that resolves it, and an edge function where THE TOKEN IS THE BOUNDARY.
- *
- * THE TOKEN IS PER BID, and that is the security model. It resolves to exactly one
- * subcontractor's own lines, so a forwarded link cannot show anybody what a competitor quoted. A
- * package-level token would hand every bidder the competition's prices, which is the one thing a
- * tender must never do.
- *
- * INVARIANTS:
- *   1  `send` is authenticated and the workspace is derived from the PACKAGE, never the body.
- *      The public actions trust nothing except the token: no id from the request is ever used to
- *      look a row up, and the reply carries only this bid's own package and lines.
- *   8  `submit` never spreads the request body into a write. Rates are matched to bid lines this
- *      token owns, and anything else in the payload is discarded.
- *   11 Every value interpolated into the invitation email goes through `escapeHtml`.
- */
+/** tender-bid-portal — issue a trade package to a subcontractor, and take their price back. */
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';

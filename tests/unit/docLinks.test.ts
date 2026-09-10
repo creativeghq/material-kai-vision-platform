@@ -1,30 +1,4 @@
-/**
- * Documentation link integrity guard.
- *
- * Every relative `](*.md)` link in /docs must resolve to a real file.
- *
- * Why this exists: two cleanup commits — 51ff18b6 (dead web-scrape path) and
- * 75e9e843 (3 dead edge functions) — deleted docs + functions but left the
- * references behind. 30 dangling links accumulated, including 4 to
- * web-scraping-integration.md (deleted by 51ff18b6, yet still advertised as
- * "✨ NEW" in docs/README.md).
- *
- * Deleting is as much a wiring operation as adding; this makes the delete half
- * fail loudly. Added at ZERO — keep it there. If a doc is intentionally removed,
- * remove or repoint its inbound links in the same commit.
- *
- * Scope: only relative links to .md files. External URLs, anchors, and links to
- * non-.md files (source, .sql) are out of scope — they need a different check.
- *
- * IMPORTANT — resolve against GIT-TRACKED files, not the local filesystem.
- * existsSync() answers "is this on MY disk", which is not the question. A dev box
- * has gitignored dirs (.claude/) and populated submodule working copies
- * (mivaa-pdf-extractor/ is a separate repo) that a fresh clone and CI do not.
- * Using existsSync made this test pass locally and fail in CI — and it was CI
- * that was right: both of those links are genuinely broken for anyone cloning.
- * git ls-files is what a reader actually gets, so it is the honest oracle and it
- * makes the check environment-independent.
- */
+/** Documentation link integrity guard. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';

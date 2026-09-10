@@ -1,14 +1,4 @@
-/**
- * Splitting a money figure into the net + VAT pair a supplier bill actually stores.
- *
- * `supplier_bills` keeps `subtotal_net` and `vat_amount` separately because they go to different
- * places: net is the P&L cost, VAT is recoverable input tax. Anything that pre-fills the expense
- * form therefore has to hand over BOTH, and the two entry points on an order used to hand over
- * neither consistently — one passed a net figure and one passed a VAT-inclusive one, into the
- * same field, with VAT hardcoded to 0. A 24% line came out as "net 2,249.86 / VAT 0".
- *
- * These two functions are the only place that arithmetic lives.
- */
+/** Splitting a money figure into the net + VAT pair a supplier bill actually stores. */
 
 import { round2 as r2 } from '@/utils/decimal';
 import { vatOf } from '@/modules/finance/lib/vatMath';

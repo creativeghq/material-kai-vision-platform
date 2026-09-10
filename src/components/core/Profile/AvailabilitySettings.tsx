@@ -1,18 +1,4 @@
-/**
- * Profile → Schedule → Availability: the days and hours a client may book you for.
- *
- * It used to be an eleventh card three quarters of the way down the Profile tab, between the
- * supplier-verification form and the featured moodboard — while the bookings it produces lived
- * two tabs away under Appointments, and the meetings you keep lived a third tab away under
- * Calendar. Three surfaces, one subject: your time. They are one rail now (`SchedulePanel`), and
- * this is the section that decides whether the other two ever have anything in them.
- *
- * The saved-but-not-saved hazard is why every write here is checked: supabase-js RESOLVES on an
- * RLS denial rather than throwing, so the four writes below once ran under an unconditional
- * "Availability saved" toast. A rejected write left the user believing their calendar was
- * published while clients either could not book at all or could still book slots that had been
- * removed (#347 audit).
- */
+/** Profile → Schedule → Availability: the days and hours a client may book you for. */
 import React, { useEffect, useState } from 'react';
 import { CalendarDays, ChevronLeft, ChevronRight, Loader2, Plus, Trash2, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';

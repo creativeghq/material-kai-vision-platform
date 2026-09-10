@@ -1,22 +1,4 @@
-/**
- * "Is the model we are about to call actually able to run?" — asked BEFORE the credit debit.
- *
- * `generation_models` is the platform's declared source for which generation models exist and
- * are usable, and the health check writes `status` back to it. MIVAA's interior roster consults
- * it, so a down model is never queued into the grid. The edge functions did not, so the two
- * Replicate models that are reached ONLY from the edge — `flux-depth-pro` (redesign / copy-style)
- * and `runway-gen4-turbo` (video) — went debit → call → fail → refund on every attempt.
- *
- * Measured 2026-08-22: a `mode:'redesign'` call debited 20 credits, got
- * `500 REPLICATE_API_TOKEN not set`, and refunded 20. The ledger nets to zero, so nothing looks
- * wrong in billing — the user just waits, sees a generic failure, and the reason (no Replicate
- * credential in the EDGE environment, distinct from the MIVAA droplet where the token is set and
- * valid) appears nowhere they can see it.
- *
- * FAILS OPEN. An unreadable registry must not stop generation: the check exists to turn a
- * known-down model into a clear message, not to become a new single point of failure. Unknown
- * model id is also open — the registry is a health signal, not a whitelist.
- */
+/** "Is the model we are about to call actually able to run?" — asked BEFORE the credit debit. */
 
 export interface GenerationHealth {
   /** False only when the registry positively says this model cannot run. */

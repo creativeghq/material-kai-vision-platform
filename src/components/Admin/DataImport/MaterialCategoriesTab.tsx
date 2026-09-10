@@ -1,19 +1,4 @@
-/**
- * Material Categories Tab
- *
- * Admin CRUD for the `material_categories` table — the dropdown shared by
- * PDF upload, XML import, and (future) web-scraping flows. Lives under
- * Data Import Hub because that's where every code path that consumes
- * these categories starts.
- *
- * Writes are gated by `is_admin_user()` RLS. Non-admins get a 403 from
- * Supabase and the toast surfaces the error.
- *
- * Disable (is_active=false) is preferred over delete: the slug
- * (`category_key`) is referenced as a string by every existing product /
- * job row, so a hard delete would orphan historical data. Delete is
- * still offered but warns first.
- */
+/** Material Categories Tab */
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, Pencil, Trash2, ArrowUp, ArrowDown, Loader2, CornerDownRight } from 'lucide-react';

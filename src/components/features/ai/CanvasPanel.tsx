@@ -1,24 +1,6 @@
 /**
  * The Agent Studio artifact canvas — the VOCABULARY of what an artifact is, the chip that
  * stands for one in the chat, and the modal that opens one full size.
- *
- * WHAT THIS REPLACED, AND WHY. The canvas used to be a permanent left-docked PANE, which made
- * the chat a 400px right rail for the whole conversation. Every turn opened a page on it —
- * `handleSendMessage` selected the turn's run before a single tool had reported — so a turn that
- * only ever produced PROSE, which is most of them, put a tab on the strip, took the screen away
- * from the answer, and left the reader a checklist of nothing beside a column of text a third of
- * the window wide. Conversation d3ec683e is four of those in a row.
- *
- * So the canvas is no longer a place you live beside. It is a thing you OPEN: the chat is the
- * whole window, an artifact is a chip in the stream, and clicking one — or producing one — opens
- * it in a modal over the conversation. Nothing is lost, because the pane never showed the chat and
- * an artifact at once either; what goes is the rail, the collapse handle, the mobile
- * single-pane fork, and a tab strip that described work rather than results.
- *
- * The modal deliberately speaks the app's existing overlay language (`SocialPostEditorDialog`,
- * `DocumentEditor`): the shared Radix `Dialog`, `bg-card` on a flat `bg-black/80` scrim, a
- * hairline border, `shadow-overlay`, the primitive's own close affordance. A second overlay
- * idiom invented here would be one more thing to keep in step with the rest of the app.
  */
 import React from 'react';
 import {
@@ -249,18 +231,7 @@ interface ArtifactModalProps {
   onAsk?: (text: string) => void;
 }
 
-/**
- * One artifact, full size, over the conversation.
- *
- * Sized like `DocumentEditor` — the app's existing full-workspace dialog — because an artifact
- * here is a 3D world, a page of products or an article, not a form. Full-bleed below `sm`: an
- * artifact on a phone wants the whole screen, and the 16px gutter a form dialog keeps would just
- * be 16px less of it.
- *
- * The PANEL does not scroll; the body does. `DialogContent` puts `overflow-y-auto` on itself as a
- * mobile-safety floor for content-sized dialogs, which for a fixed-height workspace would scroll
- * the header and the sub-tabs off the top along with the content.
- */
+/** One artifact, full size, over the conversation. */
 export const ArtifactModal: React.FC<ArtifactModalProps> = ({
   group, activeId, onSelect, onClose, onCloseArtifact, onDeleteArtifact, children, inspector, onAsk,
 }) => {
@@ -309,22 +280,11 @@ export const ArtifactModal: React.FC<ArtifactModalProps> = ({
            * scrolling — but a small one is now the size of the thing in it.
            */
           'flex max-h-[92dvh] w-[96vw] max-w-5xl flex-col gap-0 overflow-hidden p-0',
-          /**
-           * Full-bleed SHEET on a phone — a FIXED height, unlike the desktop cap above, and
-           * `max-h` lifted to match it.
-           *
-           * `DialogContent` centres itself (`top-1/2` + `-translate-y-1/2`), so content-sized
-           * + full-width + square-cornered made a small result a band floating across the
-           * middle of the screen with its corners bleeding off both edges. Commit to the
-           * sheet or keep the inset rounded dialog; the mix is what looks broken.
-           *
-           * `max-h` and `h` are DIFFERENT PROPERTIES, so the 92dvh cap above went on
-           * clamping the phone sheet after the height was fixed — measured at 776 of 844,
-           * a full-width square-cornered panel with a 34px gap above and below it. Measured,
-           * not reasoned: it looks right in the class list either way.
-           *
-           * The mobile bottom nav is z-40 and this is z-50, so the sheet covers it.
-           */
+          // Full-bleed SHEET on a phone — a FIXED height here, unlike the desktop cap above.
+          // DialogContent centres itself (`top-1/2` + `-translate-y-1/2`), so content-sized +
+          // full-width + square corners made a small result a band floating across the middle of
+          // the screen with its corners bleeding off both edges. Commit to the sheet or keep the
+          // inset rounded dialog; the mix is what looks broken. Bottom nav is z-40, this is z-50.
           'max-sm:h-[100dvh] max-sm:max-h-[100dvh] max-sm:w-full max-sm:max-w-none max-sm:rounded-none',
         )}
         // The header carries its own controls on one line; the primitive's floating X would
@@ -497,26 +457,7 @@ interface ArtifactCardProps {
   onOpen: () => void;
 }
 
-/**
- * The artifact, as it appears in the conversation: a card you click to open it.
- *
- * IT LIVES OUTSIDE THE MESSAGE BUBBLE, and that is the whole reason it is legible. Inside, it
- * could not be: `.msg-assistant` is `--primary` on the dark themes (an accent-filled slab) and
- * `--card` on the light ones, so a card drawn in `bg-card` was a dark box on magenta in one and
- * EXACTLY THE BUBBLE'S OWN COLOUR in the other — a hairline apart from its background, which is
- * what "not so visible" was. The bubble also re-themes its own children by attribute selector
- * (`html.light .msg-assistant [class*="bg-white"]`, …), so anything in there is styled by where
- * it sits rather than by what it is.
- *
- * Out here it is an ordinary panel on the page ground and the normal three-surface ladder
- * applies — `bg-card` + `border-hairline`, border to the accent on hover, the design system's
- * `panel-interactive` behaviour for a panel that is itself the click target. One treatment,
- * correct in all four theme combinations.
- *
- * It takes the ARTIFACT, not a kind and a title typed out at the call site: the stream used to
- * hand-write thirty of these with their own strings, a second copy of the mapping
- * `getCanvasArtifact` already makes.
- */
+/** The artifact, as it appears in the conversation: a card you click to open it. */
 export const ArtifactCard: React.FC<ArtifactCardProps> = ({ artifact, active, onOpen }) => {
   const Icon = KIND_ICON[artifact.kind];
   // A preview that fails to load falls back to the kind icon. In REACT state, not by writing

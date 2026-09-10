@@ -1,33 +1,4 @@
-/**
- * A brake that cannot read its own gauge must ENGAGE, not disengage.
- *
- * Every rate limit in this codebase is the same two steps: count what this caller has already
- * done, compare it to a ceiling. The count is the ENFORCEMENT DECISION — and
- * `const { count } = await supabase…` followed by `(count ?? 0) >= LIMIT` silently turns "I could
- * not answer that" into "this caller has done nothing", which lifts the limit for everybody at the
- * exact moment it is needed. The load that breaks the count query is usually the abuse the limit
- * exists to stop, so the failure is self-reinforcing rather than random.
- *
- * `real-estate-public.enforceLeadRateLimit` already carries this reasoning at length and splits the
- * two halves properly: the COUNT fails closed, the bookkeeping INSERT never blocks a legitimate
- * caller. MEASURED 2026-08-30: seven other limiters across five functions had not adopted it —
- *
- *   • `public-project-plan` — the anonymous estimator's daily quota AND its lead cap;
- *   • `flow-engine` — the per-flow and cross-flow LOOP BREAKERS, where failing open means unbounded
- *     execution and spend, triggered by the very load that breaks the query;
- *   • `hr-kiosk` — the per-IP throttle, and the PIN LOCKOUT, whose own comment says it exists to
- *     blunt distributed brute force against a 4-digit PIN;
- *   • `hr-careers` — both public application caps;
- *   • `inbox-api` — the public-profile contact form, per sender and per recipient.
- *
- * Nothing was failing at the time. That is the point: this defect is invisible until the day the
- * query breaks, and on that day it produces no error of its own.
- *
- * SCOPE. Only a count compared against a NAMED CEILING (`*_MAX_*`, `*_CAP`, `*_QUOTA`, `*_LIMIT`,
- * `*_THRESHOLD`) is flagged. An informational count — "does a row already exist", "how many did we
- * import" — is not an enforcement decision and is deliberately left alone, because a guard that
- * flags those gets suppressed, and a suppressed guard protects nothing.
- */
+/** A brake that cannot read its own gauge must ENGAGE, not disengage. */
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -74,16 +45,7 @@ const LOOKBACK = 30;
 
 interface Site { file: string; line: number; variable: string; ceiling: string; reason: string }
 
-/**
- * Did the statement that produced `name` also bind its query error?
- *
- * Deliberately index-based rather than a regex over the window. Both binding forms occur —
- * `const { count: x, error: e } = await …` and the array form
- * `const [{ count: a, error: ea }, { count: b, error: eb }] = await Promise.all([…])`, which is how
- * the inbox contact form is written — and a pattern general enough to span both across newlines
- * backtracks badly enough to hang the suite. Slicing from the last `const` is linear and, pinned
- * by the cases below, precise enough for a shape guard.
- */
+/** Did the statement that produced `name` also bind its query error? */
 function bindingChecksError(window: string, name: string): boolean | null {
   // Every `const … ;` statement in the window. The one we want is the latest that AWAITS a query
   // and mentions this count — not simply the last `const`, because the comparison is often itself

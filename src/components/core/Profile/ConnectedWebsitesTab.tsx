@@ -228,9 +228,6 @@ export const ConnectedWebsitesTab: React.FC<{ onOpen?: (w: UserWebsite) => void 
    * was nothing to scan down. It is a list of records with a status and two numbers, which is
    * what `HubDataTable` is: one accent entry point per row, right-aligned figures, an em dash
    * where a value genuinely does not exist yet.
-   *
-   * `page_count` is `—` until the site has actually been crawled. A crawl that ran and found
-   * nothing renders `0`, which is a finding; a crawl that never ran must not.
    */
   const columns: HubColumn<UserWebsite>[] = [
     {

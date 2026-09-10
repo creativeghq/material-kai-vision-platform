@@ -12,17 +12,7 @@ export const APPLICATION_STATUSES: ApplicationStatus[] = [
   'draft', 'submitted', 'certified', 'paid', 'disputed',
 ];
 
-/**
- * Applications that still represent money the project is waiting on.
- *
- * `certified` is IN this list, which is the part worth stating: a certified application has been
- * agreed and NOT paid, and that gap is exactly what a contractor chases. Treating certified as
- * settled would make the outstanding figure read as zero on a job that is owed everything it has
- * ever claimed.
- *
- * `disputed` is also open — a disagreement is not a settlement, and dropping it would quietly
- * remove the applications most in need of attention.
- */
+/** Applications that still represent money the project is waiting on. */
 export const APPLICATION_OPEN_STATUSES: ApplicationStatus[] = [
   'draft', 'submitted', 'certified', 'disputed',
 ];

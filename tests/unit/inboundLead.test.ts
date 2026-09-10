@@ -1,14 +1,4 @@
-/**
- * Portal lead-email parsing guard.
- *
- * Portal notification formats change without notice, and the failure mode is silent: the parser
- * keeps returning a lead, just without the phone number, or with the portal's own no-reply address
- * where the buyer's should be. Nobody notices until an agent tries to call someone back.
- *
- * The case that matters most is the no-reply one. A portal notification almost always contains the
- * portal's own address somewhere in the body — taking the first email match would create a stream of
- * leads that cannot be answered, and it would look like it was working.
- */
+/** Portal lead-email parsing guard. */
 import { describe, it, expect } from 'vitest';
 import { parsePortalLead, detectPortal } from '../../supabase/functions/_shared/real-estate-inbound';
 

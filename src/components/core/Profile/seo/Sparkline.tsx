@@ -3,16 +3,6 @@ import React from 'react';
 /**
  * Minimal inline SVG sparkline — no chart dependency, theme-token stroke so it
  * reads on all four theme combinations.
- *
- * Two behaviours that matter more than they look:
- *
- *  - **A flat line is drawn flat.** When every point is equal (this platform's
- *    domain snapshots sat at exactly 2 organic keywords for five straight weeks)
- *    a min/max-normalised chart divides by a zero range and either blows up or
- *    draws a misleading full-height sweep. Here it renders as a real flat line
- *    through the middle, which is the truth.
- *  - **It refuses to draw a trend from one point.** A single capture is not a
- *    trend; the caller gets nothing rather than a decorative stub.
  */
 export const Sparkline: React.FC<{
   points: number[];

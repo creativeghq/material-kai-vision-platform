@@ -1,16 +1,4 @@
-/**
- * AI Assessment — the client side, for all three subjects (#397).
- *
- * THIS FILE FORMATS. It does not derive anything. Every number, every status and the verdict
- * itself come from `get_assessment_snapshot`, and the dimension scores from `score_assessment` —
- * one derivation, in SQL, where it can be tested. The rule that matters: if you find yourself
- * computing a percentage, a total or a verdict here, it belongs in the RPC instead. A wrong
- * number is a valid number, and nothing on this side of the wire would catch it.
- *
- * Both the preview and the run go through an edge function rather than straight to the RPC,
- * because that is where `assertEntitled` lives. PostgREST is reachable directly, so a
- * client-side check would be a filter, not a boundary.
- */
+/** AI Assessment — the client side, for all three subjects (#397). */
 import { supabase } from '@/integrations/supabase/client';
 import { todayLocalISO } from '@/utils/datetime';
 import type {

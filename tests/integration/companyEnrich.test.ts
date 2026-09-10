@@ -4,7 +4,6 @@
 // grants a credit balance (the function reserves credits per invariant #10), then
 // calls company-enrich AS that user with a real business name and asserts the web
 // search half actually filled something. Tears the fixture down afterwards.
-// Run:  SUPABASE_SERVICE_ROLE_KEY=… SUPABASE_ANON_KEY=… npx vitest run tests/integration/companyEnrich.test.ts
 import { describe, it, expect, afterAll } from 'vitest';
 import { hasCreds, serviceClient, createUser, createWorkspace, addMember, teardown, runId, SUPABASE_URL } from './_harness';
 

@@ -1,19 +1,4 @@
-/**
- * Agent data coverage — the baseline is held to the source.
- *
- * THE DEFECT THIS EXISTS TO CATCH (2026-09-05, conversation 9225f61f): the platform derived the
- * answer to "which keywords does our site rank for" in SQL — `get_website_rank_summary`, 129
- * keywords checked 35 minutes earlier — and no agent tool read it, so the agent answered from a
- * third-party index seven weeks stale. `agent_data_coverage()` then listed 16 website RPCs with
- * 4 exposed, and ~50 more across finance, deals, projects, stock and real estate.
- *
- * The full check needs the database (`scripts/audit-agent-data-coverage.mjs`), which CI cannot
- * reach. What CI CAN hold is the committed baseline against the tool sources:
- *   - the `exposed` list equals what the tools read today (a stale baseline is a lie about coverage);
- *   - a gap that a tool now reads has left the gap list (shrink-only — closed gaps do not linger);
- *   - every remaining gap carries a decision, not "unreviewed";
- *   - the family that started this is exposed and stays exposed.
- */
+/** Agent data coverage — the baseline is held to the source. */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

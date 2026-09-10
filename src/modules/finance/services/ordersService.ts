@@ -345,16 +345,6 @@ export { propertyLabel } from '@/utils/propertyLabel';
 /**
  * What a cost is FOR. One field in the UI, five resolutions — every one of which writes a column
  * that already existed; this adds vocabulary, not schema.
- *
- * The distinction that matters is `merge_order` vs `sales_order` vs `cost_of_order`. All three read
- * as "add it to an order I already have", and they write three different things:
- *   • `merge_order` — the same party and the same direction, so the LINES join that order.
- *   • `sales_order` — settles on money IN. Appending our costs there would bill the customer what
- *     we paid, so it is LINKED (`covers_order_id`) and never written into.
- *   • `cost_of_order` — this cost RIDES ALONG with a purchase already recorded (freight, customs,
- *     an installer, often from a different supplier entirely). It becomes an EXPENSE on that order
- *     (`supplier_bills.order_id`); no order is created and no line is appended, because the cost is
- *     not part of what that order bought. An order holds as many expenses as the job needed.
  */
 export type OrderLinkTarget =
   | { kind: 'none' }
@@ -380,20 +370,7 @@ export type OrderLinkTarget =
    * project, and routing it through one would invent a job nobody raised.
    */
   | { kind: 'property'; propertyId: string; label: string }
-  /**
-   * FILE this against an order that already exists — e.g. `trip_expense_items.order_id` (#378 D5).
-   *
-   * Distinct from the three order kinds above, and the distinction is the whole reason it exists:
-   *   • `sales_order` sets `covers_order_id` — "who this purchase was bought FOR";
-   *   • `merge_order` APPENDS lines, so it needs the same type and party;
-   *   • `cost_of_order` books a supplier bill ON a purchase order.
-   * None of them can say "this cost belongs to that commitment", which is why the trip line kept
-   * two bare `<Select>`s and why swapping them for the picker would have deleted a capability.
-   *
-   * A filing target, never a merge target: appending a rep's hotel bill to an order would change
-   * what the order says it is for. Either order type — a rep's taxi to a supplier's factory is a
-   * cost of that purchase order even though the rep is not the supplier.
-   */
+  /** FILE this against an order that already exists — e.g. `trip_expense_items.order_id` (#378 D5). */
   | { kind: 'order'; orderId: string; projectId: string | null; label: string };
 
 import { round2 as r2 } from '@/utils/decimal';
@@ -598,12 +575,6 @@ export const ordersService = {
   /**
    * What we have SOLD one customer, line by line — the menu behind "which order did this unit come
    * off?" in the installed base (#343).
-   *
-   * Sales only, and drafts excluded: a unit the customer owns came off an order that actually
-   * happened, and offering a draft would let a warranty be attached to a sale still being typed.
-   * Party matching is deliberately narrow — `customer_*` only, never the `or(customer,supplier)`
-   * of `listPage` — because a company we also buy from would otherwise offer its own purchase
-   * orders as the origin of the customer's equipment.
    */
   async listCustomerSaleLines(opts: {
     workspaceId: string;
@@ -642,18 +613,6 @@ export const ordersService = {
    * Confirmed orders that carry real money owed but are NOT yet an invoice/supplier bill —
    * i.e. un-invoiced receivables (sales) / payables (purchase). Single source of truth used by
    * BOTH the CRM party Account tab and the global Finance AR/AP tabs so the two stay identical.
-   *
-   * An order is included when: status is not draft/cancelled, it has no invoice AND no supplier
-   * bill yet, and its outstanding (total − settled payments) is > 0. Once invoiced, the invoice/
-   * bill becomes the AR/AP row and the order drops out here — no double counting.
-   *
-   * Each row also carries the DERIVED due date the money ages against (`due_date`): the operator's
-   * `expected_payment_date` when set, otherwise the order date + the workspace's default payment
-   * terms — the same fallback `mark_invoice_issued` applies to an invoice with no explicit due
-   * date. Without it, an un-invoiced order could never age: real overdue money sat in the
-   * "no due date" bucket forever and every aging card read €0 (the silent-zero shape).
-   * `due_from_terms` flags the derived case so callers can label it and keep the operator-set
-   * field itself empty (editing a due date must never persist one nobody typed).
    */
   async listUninvoicedOutstanding(opts: {
     workspaceId: string;
@@ -746,16 +705,6 @@ export const ordersService = {
   /**
    * Settlement position per order, straight from `get_order_settlements` — the SINGLE definition
    * of how much an order is settled and how much is still owed.
-   *
-   * Do NOT re-derive `outstanding` from these numbers. The rule — a sales order settles on money
-   * IN; a purchase order on money OUT; the opposite direction is the other side of the trade and
-   * must never reduce what the counterparty owes — lives in ONE place. Net the two directions and
-   * a fully-paid sales order with a paid supplier bill reports as still owing exactly the
-   * supplier's amount, while the payment badge on the same row says "Paid".
-   *
-   * The RPC returns `settled` / `outstanding` / `payment_status` already derived, and the same
-   * function backs `recompute_order_payment_status` and the `finance.order_payment_status_drift`
-   * integrity check, so the three cannot disagree.
    */
   async orderBalances(orderIds: string[]): Promise<Map<string, OrderBalance>> {
     const out = new Map<string, OrderBalance>();
@@ -766,13 +715,6 @@ export const ordersService = {
      * `settled: 0` / `outstanding: total` / the cached `payment_status`, which is not "unknown",
      * it is a wrong number: a fully-paid €1,000 sales order renders as unpaid and still owing
      * €1,000, and `hasCash()` returns false so drafts with real cash vanish from AR/AP entirely.
-     *
-     * Three call sites already wrote `.catch(() => new Map())` — the authors expected this to
-     * throw. Swallowing the error inside made that catch dead code, which is why nobody noticed.
-     *
-     * The trigger is not permission (the function is SECURITY INVOKER, granted to `authenticated`):
-     * it is a transport failure, a statement timeout on a large `p_order_ids`, or a rename
-     * returning PGRST202.
      */
     const { data, error } = await supabase.rpc('get_order_settlements', { p_order_ids: orderIds });
     if (error) throw new Error(`Could not read order settlements: ${error.message}`);
@@ -811,22 +753,6 @@ export const ordersService = {
   /**
    * A party's whole ORDER position — the rows and the roll-up — in one call, so the CRM Account
    * tab and the Finance → Parties drill-down cannot disagree about it.
-   *
-   * Why this exists: an order is not a financial document, so it is (correctly) absent from the
-   * party ledger and from `vw_finance_parties`. A customer who ordered €3,000, paid €3,000 and was
-   * never invoiced therefore read as "Invoiced €0 · Paid €0 · Outstanding €0" with a lone €3,000
-   * credit in the ledger — the money had moved and no tile could say what for.
-   *
-   * Every number here is DERIVED elsewhere and only assembled here:
-   *  • `settled` / `outstanding` / payment status ← `get_order_settlements` (`orderBalances`)
-   *  • `invoiced` ← `invoicedOrderIds`
-   *  • `owedNet` ← `listUninvoicedOutstanding`, signed by direction (a sales order they still owe
-   *    on is due to us; a purchase order we still owe on is due to them). Never sum those raw.
-   *
-   * `settledUninvoiced` is the number the invoice tiles structurally CANNOT show: cash that moved
-   * on orders which never became an invoice or a bill. Orders that HAVE been invoiced are excluded
-   * on purpose — `get_order_settlements` counts allocations made against the order's invoice too,
-   * so including them would print the same euro twice, once here and once as "Paid".
    */
   async partyOrderPosition(opts: {
     workspaceId: string;
@@ -1142,26 +1068,7 @@ export const ordersService = {
     return (data ?? { ok: false }) as any;
   },
 
-  /**
-   * Re-price purchase lines as what the CUSTOMER pays, for the mirrored sales order.
-   *
-   * Every catalog line goes back through `resolveLinePricing` — the pricing pyramid, the same
-   * resolver a hand-picked line uses — so the customer's pricing level and discount apply. It does
-   * NOT mark cost up by a house percentage; there is no such number, and inventing one here would
-   * be a second pricing rule competing with the resolver.
-   *
-   * Ad-hoc lines (no `product_id`) have nothing to look up. They are carried at cost and reported in
-   * `unpriced` so the operator is told which lines still need a price, rather than a zero-margin
-   * line quietly reaching the customer.
-   *
-   * `supplierCompanyId` is the purchase's own supplier, and every mirrored line keeps it. On a SALES
-   * line `supplier_company_id` answers "who do we buy this from" — it is what `getOrderSupplierExposure`
-   * groups our payable by and what the line's "Mark paid" pays. This used to be nulled on the way
-   * across on the reasoning that a supplier stamp belongs to the purchase side, which had it exactly
-   * backwards: the mirror is created FROM the purchase, so the one moment the answer is known for
-   * certain is this one. Nulling it meant a sale raised from a purchase showed "+ supplier" on every
-   * line and an empty Suppliers tab, with the operator re-picking by hand what the purchase already said.
-   */
+  /** Re-price purchase lines as what the CUSTOMER pays, for the mirrored sales order. */
   async mirrorLinesForSale(opts: {
     workspaceId: string;
     items: NewOrderItem[];
@@ -1209,24 +1116,7 @@ export const ordersService = {
    * can repeat business without re-entering everything. Delivered/paid state is NOT carried (a fresh
    * order starts undelivered, unpaid); reservation re-pins on confirm. Returns the new order id.
    */
-  /**
-   * Re-order: the same items, bought/sold AGAIN, at TODAY's prices and against today's stock.
-   *
-   * Distinct from `duplicate`, which is an exact copy of a past order — frozen unit prices, frozen
-   * costs, straight into `draft`. That is right for "I typed this wrong, give me another go at the
-   * same paperwork" and wrong for "order this again": a copy re-books last year's price as if it
-   * were current, and silently mis-states margin from the first line.
-   *
-   * So this returns a PREFILL rather than a row. It re-resolves each product line through
-   * `resolveLinePricing` — the same customer-aware resolver a hand-picked line uses — and hands the
-   * result to the ordinary New order form, where the operator sees today's numbers and availability
-   * before committing. Saving then runs the normal create path, so order numbering, stock
-   * reservation, three-way match and notifications all fire exactly as for any other order. A copy
-   * inserted behind the scenes fires none of them.
-   *
-   * `changes` reports what moved since the original, so a re-order at a new price is a visible
-   * decision instead of a silent one.
-   */
+  /** Re-order: the same items, bought/sold AGAIN, at TODAY's prices and against today's stock. */
   /**
    * Raise the purchase order(s) this confirmed sales order needs but stock cannot cover.
    *
@@ -1434,17 +1324,7 @@ export const ordersService = {
         .select('id, payment_id, payment:payments(amount, currency, paid_at, counterparty_company_id, counterparty_contact_id)')
         .eq('order_id', orderId),
     ]);
-    /**
-     * EVERY read here is checked (#351 S1).
-     *
-     * All six destructured `.data` only, so a failure on any one of them produced an empty array
-     * and this function returned a confident, wrong money position: invoices missing means the
-     * order looks uninvoiced, payments missing means it looks unpaid, and the settlement RPC
-     * missing means `settled: 0` / `outstanding: total`.
-     *
-     * None of those is "unknown" — they are numbers a person acts on. Throwing hands the caller a
-     * failure it can show, which is the only honest answer.
-     */
+    /** EVERY read here is checked (#351 S1). */
     for (const [what, res] of [
       ['invoices', inv], ['supplier bills', bills], ['payments', pay],
       ['allocations', alloc], ['settlement', settlement], ['credit blocks', blocks],
@@ -1859,18 +1739,7 @@ export const ordersService = {
     companyId?: string | null; contactId?: string | null;
     /** The line's chosen identity, so a variant-specific price can win (#347 phase 7.1). */
     selectedAttributes?: Record<string, string> | null;
-    /**
-     * The line's quantity and unit, so `product_price_breaks` can fire (#347 defect 16).
-     *
-     * These were never passed, so a configured break — "from 5 pallets, 15% off" — could not
-     * apply to a human-entered order line, while the agent path (`quote-tools.ts`) passed them
-     * and got the discount. Same product, same customer, two prices.
-     *
-     * Pass them TOGETHER or not at all. `get_product_price_break` does
-     * `coalesce(convert_to_base_unit(product, qty, unit), qty)`, so a quantity with the wrong
-     * or missing unit is silently treated as already being in base units and can match the
-     * wrong threshold — the exact 1:1 assumption the UoM ladder exists to prevent.
-     */
+    /** The line's quantity and unit, so `product_price_breaks` can fire (#347 defect 16). */
     quantity?: number | null; unit?: string | null;
     /**
      * The configurator choices on this line (#375).
@@ -2007,18 +1876,7 @@ export const ordersService = {
     }
   },
 
-  /**
-   * Free stock per (product, variant) — derived by `get_variant_availability` (#374 Phase 3).
-   *
-   * This used to sum `qty_on_hand - qty_reserved` per product_id in TypeScript, so the figure
-   * beside a line that had chosen Nero 60x60 was every colour and every size added together.
-   * The rule for "which rows can ship this line" belongs to the warehouse resolver, and
-   * restating it here would be a second derivation of the same answer.
-   *
-   * Three numbers, not one, because stock on an UNVARIANTED row is genuinely of unknown variant:
-   * the resolver will ship it for any line, so it is real availability, but folding it into every
-   * variant's figure would report the same units once per variant.
-   */
+  /** Free stock per (product, variant) — derived by `get_variant_availability` (#374 Phase 3). */
   async availabilityFor(
     pairs: Array<{ productId: string; variantKey?: string | null }>,
   ): Promise<Map<string, VariantAvailability>> {
@@ -2109,13 +1967,6 @@ export const ordersService = {
   /**
    * The two facts that decide whether a line can reach the warehouse: WHICH catalog product it
    * is, and whether it belongs in stock at all.
-   *
-   * Deliberately NOT part of `updateItems`. Neither field is a figure — they change nothing about
-   * what was ordered, billed or owed — so they must stay editable after a supplier bill or invoice
-   * has been derived from the lines, which is exactly when `updateItems` locks. Without this a
-   * free-text line was a dead end: `receive_order_into_warehouse` skips it forever, the order sits
-   * at "partially delivered", and the toast telling you to link a product pointed at a UI that
-   * refused to open.
    */
   async setOrderItemStock(itemId: string, patch: { productId?: string | null; updateWarehouse?: boolean }): Promise<void> {
     const upd: Record<string, unknown> = {};
@@ -2126,29 +1977,8 @@ export const ordersService = {
     if (error) throw error;
   },
 
-  /**
-   * The customs identity of a line: its commodity code and its net mass.
-   *
-   * Like `setOrderItemStock`, and for the same reason, this is deliberately NOT part of
-   * `updateItems`. Neither field is a figure — they change nothing about what was ordered, billed
-   * or owed — so they must stay editable after a supplier bill has been derived from the lines,
-   * which is precisely when a clearance turns out to need them and `updateItems` refuses.
-   *
-   * `order_items.taric_code` is a SNAPSHOT, not a lookup: the nomenclature is republished monthly
-   * and a past order must keep the code it was cleared under. That is why this writes the line and
-   * not the product — and why the Customs card reads the line rather than re-reading the catalog.
-   */
-  /**
-   * WHY a sales line is 0% VAT — the myDATA exemption cause (ΑΑΔΕ 1–31).
-   *
-   * An order may sit at 0% indefinitely: it is a commercial document and declares nothing. The
-   * cause is required only at the moment that rate becomes a fiscal claim, which is why
-   * `generate_invoice_from_order` raises `vat_exemption_required` rather than this write refusing.
-   * A line that leaves it null falls back to the customer's standing `vat_exemption_reason`.
-   *
-   * Not part of `updateItems` — same reasoning as the stock and customs fields: it is not a
-   * figure, so it must stay settable on an order whose numbers are already locked by a document.
-   */
+  /** The customs identity of a line: its commodity code and its net mass. */
+  /** WHY a sales line is 0% VAT — the myDATA exemption cause (ΑΑΔΕ 1–31). */
   async setOrderItemVatExemption(itemId: string, exemptionCategory: number | null): Promise<void> {
     const { error } = await supabase.from('order_items')
       .update({ vat_exemption_category: exemptionCategory })
@@ -2233,12 +2063,6 @@ export const ordersService = {
     if (bySup.size === 0) return [];
     // What has been PAID comes from the allocation ledger, not from payments that happen to carry
     // this order_id.
-    // The old query subtracted only payments tagged with BOTH order_id and a matching
-    // counterparty_company_id, so a bill settled from Payables, from the Expenses Inbox, or by
-    // on-account credit was invisible: "you still owe X" and a live Pay button persisted after the
-    // debt was already paid, inviting a second payment. payment_allocations is the settlement
-    // ledger (the same one get_order_settlements reads); supplier_bills.order_id ties a bill to
-    // this order.
     const supplierIds = [...bySup.keys()];
     const paid = new Map<string, number>();
 
@@ -2291,23 +2115,7 @@ export const ordersService = {
     });
   },
 
-  /**
-   * Purchase orders that look like they were placed to fulfil THIS sale, but say nothing about it.
-   *
-   * `covers_order_id` is the link, and it is only ever written when the purchase is raised FROM the
-   * sale. Buy the goods first — the ordinary way round when a supplier has stock — and the two
-   * halves of one trade sit on separate screens with nothing connecting them: the sale reports that
-   * no cost is booked against it while the money sits, paid, on the purchase order. Nothing is
-   * wrong with either record, which is why it stays that way indefinitely.
-   *
-   * A candidate is deliberately narrow: same workspace, same currency, not cancelled, covering
-   * nothing yet, and bought from a supplier this sale's own lines name. That last condition is what
-   * keeps it a suggestion rather than a list of every purchase order you have ever placed.
-   *
-   * Returns what the operator needs to judge it — the PO's total against what this sale's lines say
-   * that supplier's goods cost — and never links anything by itself. Two orders from one supplier
-   * in the same week are not necessarily the same trade, and only a person knows.
-   */
+  /** Purchase orders that look like they were placed to fulfil THIS sale, but say nothing about it. */
   async suggestCoveringOrders(salesOrderId: string): Promise<Array<{
     id: string; order_number: string | null; status: string; total: number; currency: string;
     supplier_company_id: string; supplier_name: string;
@@ -2394,23 +2202,6 @@ export const ordersService = {
    * Set per-line delivered quantities and auto-advance the order's fulfilment status:
    *   nothing delivered → confirmed · some → partially_fulfilled · all → fulfilled.
    * (Stays out of 'draft'/'cancelled'.)
-   *
-   * ONE call, ONE transaction. This used to loop over the lines calling `deliver_order_line`
-   * and `throw` on the first error. Each call was atomic, but the LOOP was not: a failure on
-   * line 3 left lines 1 and 2 already delivered — stock moved out of the warehouse,
-   * `quantity_delivered` written, allocations dispatched — and the operator was told only that
-   * the save failed, with no way to know how far it got. That is pipeline convention #3, "no
-   * two-call patterns that can crash mid-way".
-   *
-   * `deliver_order_lines` runs the same per-line function inside a single transaction, so an
-   * exception on any line rolls the whole delivery back.
-   *
-   * #320: this writes a PICKING marker and nothing else — no warehouse stock moves from here.
-   * Goods may only leave against a fiscal accompanying document, so stock is moved by
-   * `issue_delivery_note` (Δελτίο Αποστολής, myDATA 9.3), by `mark_invoice_issued` on an
-   * order-linked invoice (τιμολόγιο–δελτίο αποστολής), or by `receive_order_into_warehouse` on
-   * the purchase side. All three go through `_deliver_order_line_core(..., true)`, which the
-   * public RPC cannot reach — the gate is the absence of a parameter, not a default.
    */
   async setDelivery(orderId: string, deliveries: Array<{ itemId: string; quantityDelivered: number }>): Promise<OrderStatus> {
     const { data, error } = await supabase.rpc('deliver_order_lines', {

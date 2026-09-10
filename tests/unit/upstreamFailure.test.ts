@@ -7,27 +7,7 @@ import {
 } from '../../supabase/functions/_shared/upstream-failure.ts';
 import { callerRoleFromAuthHeader } from '../../supabase/functions/_shared/caller-role.ts';
 
-/**
- * "The database is down" must not be reported as "your request was bad".
- *
- * THE OUTAGE (2026-08-22, four hours). Every edge function reads the database like this:
- *
- *     if (error) throw new HttpError(400, error.message);     // 207 sites, 16 functions
- *
- * During the outage `error` was a Cloudflare **522 Connection timed out** page. Callers got
- * `400 Bad Request` with 2,916 bytes of HTML as the message, `api-logger` skipped Sentry
- * because 4xx are client errors by policy, and the `api_usage_logs` insert failed too because
- * it needs the same dead database. A total outage that looked like user error and paged nobody.
- *
- * The fix is a classifier applied once in the wrapper. What this file protects is its two
- * failure modes, which are NOT symmetric:
- *
- *   - reading a client error as an outage → a wrong status and a spurious Sentry event.
- *   - reading an outage as a client error → what happened above.
- *
- * So the client-error cases below are the real messages this platform produces, and the outage
- * cases are the real payloads it received.
- */
+/** "The database is down" must not be reported as "your request was bad". */
 
 const API_LOGGER = join(process.cwd(), 'supabase/functions/_shared/api-logger.ts');
 

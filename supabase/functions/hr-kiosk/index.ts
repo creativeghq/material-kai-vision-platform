@@ -36,17 +36,7 @@ async function findEmployeeByVat(supabase: any, workspaceId: string, vat: string
   return { id: emp.id, name: contact.name ?? '', work_start_time: emp.work_start_time ?? null, clock_pin_hash: emp.clock_pin_hash ?? null };
 }
 
-/**
- * Is the employee clocked in — as of their LAST punch, whenever it was (#354 HR-9).
- *
- * This used to look only at punches whose `reference_date` is today in workspace time. Clock in at
- * 23:30 and at 00:10 the kiosk searched a different day, found nothing, showed "clocked out" and
- * accepted a second arrival while the first shift stayed open. Night shifts are ordinary in
- * several of the industries this serves. A shift is a span, not a calendar day, so the state comes
- * from the last punch full stop — which is also exactly what the table's sequence guard enforces.
- *
- * `tz` is no longer needed and the parameter is gone; the two callers passed the same value.
- */
+/** Is the employee clocked in — as of their LAST punch, whenever it was (#354 HR-9). */
 async function currentlyIn(supabase: any, workspaceId: string, employeeId: string): Promise<boolean> {
   const { data } = await supabase
     .from('hr_time_punches').select('punch_type').eq('workspace_id', workspaceId).eq('employee_id', employeeId)
@@ -76,19 +66,7 @@ Deno.serve(withApiLogging('hr-kiosk', async (req) => {
   const { data: settings } = await supabase
     .from('hr_settings').select('kiosk_enabled, kiosk_require_pin').eq('workspace_id', ws.id).maybeSingle();
   const kioskEnabled = !!settings?.kiosk_enabled;
-  /**
-   * A PIN is ALWAYS required (#354 HR-6).
-   *
-   * This endpoint is `verify_jwt = false` and identified the employee by ΑΦΜ alone whenever
-   * `kiosk_require_pin` was off. An ΑΦΜ is not a secret — it is on every payslip and contract and
-   * known to colleagues — so slug + ΑΦΜ was enough to punch someone else's attendance, which is
-   * buddy-punching: the precise fraud a kiosk exists to prevent. The QR scanner does not help
-   * either: it reads the ΑΦΜ out of clear text, so the code is an encoding, not an authenticator.
-   *
-   * `hr_settings.kiosk_require_pin` stays in the schema and the admin screen still shows it, but
-   * an anonymous endpoint that writes a statutory attendance record does not get a switch that
-   * turns its only authenticator off.
-   */
+  /** A PIN is ALWAYS required (#354 HR-6). */
   const requirePin = true;
 
   // Public metadata — lets the page render the workspace name + whether a PIN is needed.
@@ -97,24 +75,7 @@ Deno.serve(withApiLogging('hr-kiosk', async (req) => {
   }
   if (!kioskEnabled) return json({ error: 'kiosk_disabled', message: 'Clock-in kiosk is not enabled for this workspace.' }, 403);
 
-  /**
-   * Rate limit: cap lookups + clocks per IP per minute (blunts VAT/PIN probing + punch spam).
-   *
-   * The IP is the TRUSTED hop. This function carried its own `clientIp` returning the LEFTMOST
-   * `x-forwarded-for` entry — which the caller sends — under a comment calling it "trusted-ish
-   * from the proxy hop". Rotating that header minted a fresh bucket per request, so the throttle
-   * below counted to twenty against an attacker who never reached two. `hr-careers` next door had
-   * exactly this defect and was fixed in the same #354 sweep; the kiosk kept a local copy and was
-   * missed, which is the argument for the shared helper rather than a fifth implementation.
-   *
-   * What this does NOT change: the per-(workspace, VAT) PIN lockout is keyed on a subject hash,
-   * not on the IP, so PIN brute force was always capped at 8 per 15 minutes however many addresses
-   * the attacker claimed. What was uncapped is VAT enumeration and punch spam.
-   *
-   * And NO workspace-wide ceiling here, unlike `hr-careers`. A board takes a few applications an
-   * hour; a factory has every employee clocking in within the same five minutes at shift change,
-   * so a per-workspace cap would deny the primary use case at exactly the moment it is used.
-   */
+  /** Rate limit: cap lookups + clocks per IP per minute (blunts VAT/PIN probing + punch spam). */
   const ip = getTrustedClientIp(req);
   const since = new Date(Date.now() - 60_000).toISOString();
   const { count, error: rateErr } = await supabase.from('hr_kiosk_attempts')

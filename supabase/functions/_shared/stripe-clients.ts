@@ -2,35 +2,6 @@
  * Shared lazy Stripe + Supabase client factories for every edge function that
  * touches Stripe (stripe-webhooks, stripe-api handlers, stripe-connect,
  * finance-pay-invoice, the bank feed, the payments provider registry).
- *
- * Why this exists:
- *   Stripe credentials may live in either Deno.env (a real deploy secret) OR the
- *   platform_secrets DB table (admin-saved at /admin/modules/payments-stripe/
- *   settings → Keys). Both have to work, and env has to win, because env is an
- *   explicit deployer choice and the DB store is self-service.
- *
- *   This file used to read the keys with `Deno.env.get()` and lean on
- *   `_shared/secrets-bootstrap.ts` having copied the DB rows into env first.
- *   That bootstrap CANNOT work on the Supabase edge runtime: `Deno.env.set`
- *   throws "The operation is not supported" there, which secrets-bootstrap.ts
- *   documents at its own catch site. So the DB half was dead — a key saved on
- *   the Keys tab was invisible to every Stripe function, for ever, and the 503
- *   those functions return tells the operator to go set it on exactly that tab.
- *   Only a real deploy secret ever worked.
- *
- *   The keys are therefore resolved through `_shared/secrets.ts → resolveSecret`,
- *   which reads env first and queries platform_secrets itself (30s row cache).
- *   That is the canonical path for every admin-editable secret in the platform.
- *
- * Pattern at call site — the getters are ASYNC, because resolving may hit the DB:
- *
- *   import { getStripe, getSupabase, noPaymentProviderResponse } from '../_shared/stripe-clients.ts';
- *
- *   Deno.serve(async (req) => {
- *     const stripe = await getStripe();
- *     if (!stripe) return noPaymentProviderResponse();
- *     // … use stripe normally
- *   });
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';

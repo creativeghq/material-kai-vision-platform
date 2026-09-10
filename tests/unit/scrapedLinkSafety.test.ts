@@ -1,16 +1,4 @@
-/**
- * A link built from content we did not write goes through `safeHref` (#360 CB-11).
- *
- * Price monitoring, mention monitoring, the SEO surfaces and the agent result cards render
- * competitor titles, SERP snippets, tech-radar entries and source names — content authored by
- * anyone who can rank for a watched query, and (#352 A17) content that also reaches the model.
- * #358 established that React 18 still renders a `javascript:` href, so this is live rather than
- * theoretical.
- *
- * `safeHref` has existed since #357 AE-6 and was used in exactly ONE file. A rule written once and
- * applied nowhere is the shape this platform keeps meeting; the sweep guarded 38 sites across 13
- * files, and this test is what stops the 39th arriving unguarded.
- */
+/** A link built from content we did not write goes through `safeHref` (#360 CB-11). */
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';

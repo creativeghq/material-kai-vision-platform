@@ -1,16 +1,4 @@
-/**
- * Material textures for one product (#321 / #260 item 6) — generate, compare, choose.
- *
- * The bench is the point. Two providers are already wired behind `resolveGenerationRouting`
- * (Gemini and Grok), so "which one is closer" is answered by generating both over the SAME product
- * photo and looking at them side by side, not by picking one in advance. Every candidate is kept;
- * `is_selected` is the one the AR and lighting previews actually render.
- *
- * Albedo only, and the card says so. A diffusion model asked for a normal map returns an image that
- * looks like one — the RGB are not surface directions, so a renderer doing arithmetic on them
- * lights the surface wrongly and it reads as plastic. The normal is derived from the chosen albedo
- * instead, which needs an imaging stack and therefore lands in MIVAA.
- */
+/** Material textures for one product (#321 / #260 item 6) — generate, compare, choose. */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Loader2, Sparkles, Check, Trash2 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';

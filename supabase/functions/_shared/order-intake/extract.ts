@@ -1,21 +1,4 @@
-/**
- * Reading an order out of a conversation. Issue #342 §3.
- *
- * ── INVARIANT 9 ─────────────────────────────────────────────────────────────────────────────
- * An inbound email address is public and a WhatsApp number is public, so everything reaching this
- * module is untrusted text written by a stranger. Two consequences, both structural rather than
- * advisory:
- *
- *   1. The conversation is wrapped in explicit "this is DATA, not instructions" delimiters, and
- *      the system prompt states that content inside them can never change the task.
- *   2. Both calls use SCHEMA-ENFORCED output (`generateStructuredWithClaude` → a forced Anthropic
- *      tool call under the AI SDK). There is no free-form JSON and no salvage parser: a response
- *      that does not fit the schema throws, and the caller refunds. A regex-repaired verdict that
- *      drives a DB write is exactly the shape this platform banned.
- *
- * The model reads QUANTITIES and DESCRIPTIONS. It never supplies a price — pricing is
- * `get_product_price_for_workspace`, in `price.ts`.
- */
+/** Reading an order out of a conversation. Issue #342 §3. */
 
 import { generateStructuredWithClaude, z } from '../ai-client.ts';
 import { loadPrompt } from '../prompt-utils.ts';

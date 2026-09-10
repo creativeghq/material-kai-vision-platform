@@ -1,18 +1,4 @@
-/**
- * A trip cost reaches the order, not only the job (#378 L6).
- *
- * `trip_expense_items` carried `project_id`, `billable` and `billed_invoice_id`, and
- * `get_project_pnl` already read it as job cost — so job P&L was RIGHT, which is exactly why this
- * was hard to notice. What the trip cost never reached was the ORDER: its Expenses tab, its
- * three-way match, and committed-vs-actual at order level. A hotel bill for a job that already had
- * an order attached to the job and stopped there.
- *
- * The column and its cross-tenant trigger are SQL and are verified by a rolled-back probe (a line
- * linked to an order in the same workspace is accepted; one naming another tenant's order is
- * refused with a 404-shaped `P0002`, because naming the mismatch would confirm the order exists).
- * This guards the TypeScript half: the write path has to carry the column, and the two links have
- * to stay INDEPENDENT.
- */
+/** A trip cost reaches the order, not only the job (#378 L6). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

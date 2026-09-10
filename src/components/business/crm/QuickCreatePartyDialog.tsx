@@ -26,27 +26,7 @@ interface Props {
   onCreated: (id: string, name: string) => void;
 }
 
-/**
- * QUICK CREATE — the smallest party a deal can be attached to, made without leaving the deal.
- *
- * Why this exists: a deal must be linked to a contact or a company (the DB enforces it via
- * `crm_deals_party_check`), so a salesperson taking a call about a company that is not in the CRM
- * yet had to abandon the half-filled deal, go to CRM, create the party, come back and start over.
- * In practice that means the deal does not get logged.
- *
- * Why it is reachable ONLY from a search that returned nothing (see `allowCreate` on the
- * contact/company dropdowns), and never as a bare "add" button:
- *
- *   A CRM's value collapses when the same customer exists three times. This platform's rule is
- *   that a party is searched for before it is created — including in Greek script, where
- *   "Παπαδόπουλος" and "Papadopoulos" are the same person and a naive create makes two of them.
- *   Routing every quick-create through the dropdown means the duplicate search has already run,
- *   against the folded `search_fold` column, and the user has already seen the misses.
- *
- * The company endpoint enforces this a second time server-side: `crm-api` refuses a create whose
- * folded name already exists and returns the row it found, which is surfaced here as "use the
- * existing one" rather than an error the user has to work around.
- */
+/** QUICK CREATE — the smallest party a deal can be attached to, made without leaving the deal. */
 export const QuickCreatePartyDialog: React.FC<Props> = ({ kind, initialName = '', onClose, onCreated }) => {
   const { toast } = useToast();
   const [name, setName] = React.useState(initialName);

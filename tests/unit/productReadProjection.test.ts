@@ -1,31 +1,4 @@
-/**
- * Nothing asks the browser's Postgres for a whole `products` row (#368 follow-up).
- *
- * WHAT THIS IS ABOUT. `products` is not an ordinary catalogue table. Alongside name and
- * metadata it carries `cost`, `cost_currency`, `cost_source`, `cost_updated_at`,
- * `markup_percent`, `supplier_company_id`, `attributes_raw` (the raw supplier feed),
- * `quality_metrics` and `import_batch_id`. Its only SELECT policy is
- * `is_workspace_member(workspace_id)` — and membership includes `end_user` project clients,
- * `employee`, `warehouse_staff` and everyone else in the workspace. So `select('*')` is not a
- * convenience: it is a decision to hand every one of those columns to whoever is on the page.
- *
- * WHY RENDER-SIDE SCRUBBING IS NOT THE ANSWER, and why this test exists rather than a review
- * note. Every site fixed here scrubbed properly before rendering — `convertToDisplayProduct`
- * sets `wholesale: 0` under a comment naming the previous leak, and the admin modal wrapper
- * rebuilds an explicit object. The page looked correct in all of them. The row had already
- * crossed the wire and was sitting in React state, which no amount of reading the JSX reveals.
- *
- * The four that were live when this was written:
- *   QuotesService.getQuote / getQuoteRequests   `product:products(*)` — the CUSTOMER quote page
- *   ProductsTab                                 `select('*')`, 20 rows a page
- *   UnifiedProcessingMonitor ×2                 `select('*', {count})` with no `head`, unbounded,
- *                                               to collect `id` and nothing else
- *   PDFDocumentDetails                          `select('*')` to render four fields
- *
- * SCOPE. Source text only. It cannot see a wide read built at runtime from a variable, and it
- * says nothing about the server — `get_product_detail()` is the gated single-product read and
- * lives in `pg_proc`, not in this repo.
- */
+/** Nothing asks the browser's Postgres for a whole `products` row (#368 follow-up). */
 import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
@@ -67,12 +40,6 @@ describe('reads of the products table are projected', () => {
     const offenders: string[] = [];
     for (const { rel, src } of FILES) {
       // `[^;]` — not `[\s\S]` — so the gap cannot run past the end of the query it belongs to.
-      // A PostgREST chain contains no semicolon, so this costs nothing and closes a false
-      // positive that depended on LINE ENDINGS: in `PDFDocumentDetails.tsx` a correctly
-      // projected products read sits 198 characters before an unrelated `document_chunks`
-      // `.select('*')`, so the old span matched under LF and missed under CRLF. It passed on
-      // every Windows checkout and failed in CI, where it blocked the deploy from #368 onward
-      // while three commits' worth of `deploy-functions` jobs were quietly skipped.
       const re = /\.from\(\s*['"]products['"]\s*\)[^;]{0,200}?\.select\(\s*['"]\*['"]([^)]*)\)/g;
       for (const m of src.matchAll(re)) {
         if (/head\s*:\s*true/.test(m[1])) continue;

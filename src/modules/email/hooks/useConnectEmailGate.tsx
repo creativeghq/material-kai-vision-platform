@@ -7,18 +7,6 @@ import {
 /**
  * Reusable gate for any surface that sends tenant business email (quotes, invoices, statements,
  * catalog, POs). Drop it into a component:
- *
- *   const { handleEmailSendError, connectEmailGate } = useConnectEmailGate();
- *   ...
- *   catch (err) {
- *     if (await handleEmailSendError(err, { workspaceId, feature: 'quote' })) return; // modal shown
- *     toast({ description: (err as Error).message, variant: 'destructive' });         // other error
- *   }
- *   ...
- *   return (<>{yourUI}{connectEmailGate}</>);
- *
- * When the send was blocked because the workspace has no BYOK sender, it opens the Connect-email
- * modal, raises the admin bell, and returns true so the caller skips its raw error toast.
  */
 export function useConnectEmailGate() {
   const [open, setOpen] = useState(false);

@@ -1,45 +1,4 @@
-/**
- * Inbox attachment intelligence — a voice note is HEARD and a document is READ.
- *
- * WHAT WAS WRONG
- * --------------
- * A WhatsApp voice note landed in the inbox as an <audio> player and the assistant was told the
- * customer "sent something with no text". An emailed supplier invoice landed as a paperclip, the
- * assistant was told it "CANNOT open it", and the document reached Expenses only if a person
- * opened the thread, recognised the invoice and re-keyed it. Measured 2026-09-05: 96 messages
- * carried attachments, 77 of them documents or photos, and nothing had read any of them.
- *
- * WHAT THIS DOES
- * --------------
- * Runs once per inbound message with attachments, BEFORE the member notification and the agent
- * hand-off, so the transcript is on the row when the assistant reads the thread and the
- * notification can say what arrived:
- *
- *   audio/*      → transcribed by Gemini (the one text model behind the shared client that takes
- *                  an audio part) → `attachments[i].transcript`
- *   pdf / image  → classified by a FORCED Claude tool call (invariant 9: the verdict lands on a
- *                  row, so no free-form JSON and no salvage parser) → `attachments[i].document`
- *                  = {kind, confidence, reason} plus the header facts ONLY when printed, and the
- *                  PAYMENT BLOCK (bank, IBAN, holder) when the document prints one — read here
- *                  because the file is already open, reviewed elsewhere because
- *                  `crm_bank_accounts` is what payouts are sent to
- *
- * Every element gets a STATUS — ok | failed | skipped — with the reason on it. A silent skip is
- * exactly the failure this replaces: a value, or a stated reason there is no value, never a
- * hidden row. The patch is one SQL call on one array element (`inbox_message_patch_attachment`)
- * because messaging-api's repair path writes the same column.
- *
- * MONEY. Credits are RESERVED against the paying user before the upstream call and SETTLED
- * against the tokens it used (invariant 10). An unpriced model releases the reservation rather
- * than charging a guess. The `ai_usage_logs` row is written by the shared client; nothing here
- * writes a second one, so the two ledgers cannot disagree about which feature ran.
- *
- * PROMPTS come from `prompts` (prompt_type='tool'). There is no fallback string in this file, so
- * an admin edit in /admin/ai-configs is the prompt. The attachment is DATA: the classification
- * prompt says so, and a forced tool call cannot return prose to argue with.
- *
- * Guarded by tests/unit/inboxAttachmentIntelligence.test.ts.
- */
+/** Inbox attachment intelligence — a voice note is HEARD and a document is READ. */
 
 import { getToolPrompt } from './prompt-utils.ts';
 import { reserveCredits, refundCredits, settleCredits } from './credit-reserve.ts';

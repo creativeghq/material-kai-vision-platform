@@ -19,19 +19,7 @@ import {
   type UserWebsite,
 } from '@/services/userWebsitesService';
 
-/**
- * Websites → Reports.
- *
- * A report is a SELECTION and a SCHEDULE, not a second copy of the numbers. Every
- * section is one of the derivations the dashboard already reads, so a figure in the
- * report and the same figure on screen cannot disagree — and they would, quickly, if
- * the report re-implemented any of them. The report is the copy that goes to a
- * client, so it is the worse of the two to have drift.
- *
- * Each run is a frozen snapshot: opening last month's report shows what was true
- * last month. That is the whole point of a report, and re-deriving on open would
- * quietly destroy it.
- */
+/** Websites → Reports. */
 
 /** Section keys must match `build_website_seo_report`'s CASE arms verbatim. */
 const SECTIONS: { key: string; label: string; note: string }[] = [

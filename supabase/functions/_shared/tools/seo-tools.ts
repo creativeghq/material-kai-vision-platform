@@ -2,13 +2,6 @@
  * SEO Article Pipeline Tools: callSEOFunction helper,
  * createSEOKeywordResearchTool, createSEOArticlePlannerTool,
  * createSEOArticleWriterTool, createSEOContentAnalyzerTool, createSEOPipelineTool
- *
- * Workflow chunks: each tool emits workflow_plan (research only — first step)
- * and workflow_step_progress chunks so the WorkflowWizardCard / Tracker
- * advance step-by-step. Run_id stability comes from the agent passing
- * `_workflow_run_id` (extracted from `[workflow:seo-article/<step>:<run_id>]`
- * prefix in the user message) to every tool. Falls back to the research_id
- * generated on the first call when `_workflow_run_id` is absent.
  */
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic

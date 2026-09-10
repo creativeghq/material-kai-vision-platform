@@ -1,15 +1,4 @@
-/**
- * Shared branded-document renderer — the ONE design every generated PDF uses.
- *
- * Renders a normalized `BrandedDoc` (quote, catalog, proforma, …) as:
- *   cover → optional client/company page → items (list-table OR grid) → optional
- *   totals → optional back cover, under the workspace's branded template images.
- *
- * PAGE SIZE + ORIENTATION FOLLOW THE TEMPLATE COVER IMAGE: the page is sized to the
- * cover image's aspect ratio (portrait vs landscape), so a full-page template renders
- * with no distortion and the whole layout adapts. Falls back to A4 portrait when no
- * cover dimensions are known.
- */
+/** Shared branded-document renderer — the ONE design every generated PDF uses. */
 import { PDFDocument, PDFFont, PDFImage, PDFPage, rgb, RGB } from 'pdf-lib';
 import { embedOpenSans } from '../fonts/open-sans.ts';
 import { round2 } from '../money.ts';
@@ -463,10 +452,6 @@ function drawTotals(page: PDFPage, g: Geom, totals: BrandedTotals, y: number, fo
     // customer. CLAUDE.md's rule is one derivation per money quantity: SQL derives, TypeScript
     // formats. A percentage applied here cannot see line-level rounding, per-line discounts, or
     // anything the invoice itself did, so the PDF could print a discount the ledger disagrees
-    // with — and it would look completely plausible. (#365 AD-19)
-    //
-    // The branch above prints a discount when the DERIVED fields are present. When they are not,
-    // there is no discount to print: showing nothing is correct, showing a computed one is not.
     line('Price', formatCurrency(totals.subtotal, cur));
   }
   line(`VAT (${totals.vat_rate}%)`, formatCurrency(totals.vat_amount, cur), false, true);
@@ -666,18 +651,7 @@ async function embedImage(pdfDoc: PDFDocument, bytes: Uint8Array | null): Promis
 function drawRightAligned(page: PDFPage, text: string, rightX: number, y: number, size: number, font: PDFFont, color: RGB): void {
   page.drawText(text, { x: rightX - font.widthOfTextAtSize(text, size), y, size, font, color });
 }
-/**
- * Paint the workspace's content-page artwork behind a page.
- *
- * NO veil. The grid and spec paths used to follow the image with a full-page white
- * rectangle at 0.92 opacity, which washed the artwork out to almost nothing — the
- * template a workspace had uploaded arrived on the page as a faint ghost of itself.
- * The list path never did it, so the same document could veil one page and not the
- * next. One helper now, so a layout cannot reintroduce it on its own.
- *
- * Legibility belongs to the elements that need it — table row bands, the back-cover
- * scrim — not to a sheet thrown over the whole design.
- */
+/** Paint the workspace's content-page artwork behind a page. */
 function drawPageBackground(page: PDFPage, g: Geom, bgImage: PDFImage | null): void {
   if (!bgImage) return;
   page.drawImage(bgImage, { x: 0, y: 0, width: g.PAGE_W, height: g.PAGE_H });
@@ -692,14 +666,6 @@ const HEADING_RULE_GAP = 4;
 /**
  * Accent rule ABOVE a section heading. `y` is the TOP of the block; returns the
  * heading's baseline so the caller keeps its own spacing below.
- *
- * drawText positions the BASELINE, not the top of the text. Both call sites used to
- * put the rule a flat 14pt above that baseline — but Open Sans caps reach ~15.8pt at
- * 22pt, so the 3pt bar was drawn straight THROUGH the top of the first letters. It
- * read as a strikethrough on "Monoblock Air Conditioner" and "Technical specification".
- *
- * Measured off the font's own ascender rather than a cap-height guess, because a Greek
- * capital carrying a tonos climbs above cap height and would clip the rule again.
  */
 function drawHeadingWithRule(page: PDFPage, g: Geom, title: string, y: number, fontBold: PDFFont): number {
   const ruleY = y - HEADING_RULE_H;

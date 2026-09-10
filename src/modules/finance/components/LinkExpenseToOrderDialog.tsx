@@ -1,18 +1,4 @@
-/**
- * Attach an EXISTING expense to an order.
- *
- * An order holds many expenses — `supplier_bills.order_id` has no uniqueness — but until now the
- * link could only ever be written at the moment an expense was born: the Inbox's "Add to Expenses"
- * created the order and the bill together, and the general expense form offered a purchase-order
- * picker only while the form was still open. Anything already booked (a transport invoice that
- * landed a week after the goods, customs, an installer, a second supplier on the same job) had no
- * route onto the order it belonged to. This is that route, from the order side.
- *
- * Only UNLINKED expenses are offered (`unlinkedOnly`), so a cost can never be counted onto two
- * orders. To move one, unlink it on the order that holds it first — the Supplier bills list has
- * the action. Settled expenses are included: a cost being paid already says nothing about which
- * order it belongs to.
- */
+/** Attach an EXISTING expense to an order. */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, Search, Link2, Inbox } from 'lucide-react';
 import {

@@ -1,29 +1,4 @@
-/**
- * `?section=` deep links — the half of the navigation contract `deepLinkTargets.test.ts` cannot see.
- *
- * That file checks `?tab=<key>` names a pane that renders. It stops there, and four surfaces in
- * this app have since grown a SECOND level: a tab whose body is a side rail, addressed by
- * `?tab=<tab>&section=<id>`.
- *
- *   /profile?tab=schedule&section=calendar          SchedulePanel
- *   /profile?tab=social-accounts&section=whatsapp   SocialHubPanel
- *   /profile?tab=keys&section=email                 WorkspaceKeysTab
- *   /finance?tab=settings&section=banks             finance SettingsTab
- *
- * A wrong `?section=` fails in the worst available way: every rail here validates the id and
- * falls back to its default, so the route resolves, the tab opens, a perfectly good pane renders
- * — and it is the wrong one. Nothing throws, nothing is blank, and the reader has no way to tell
- * they were sent somewhere else. That is not hypothetical: `/finance?tab=settings&section=banks`
- * is what the Revolut reconciler and the bank sync put on their notifications, and `SettingsTab`
- * did not read `?section=` at all until this guard was written, so every one of those landed on
- * **General**.
- *
- * TypeScript cannot see any of it — these are string literals in config files, edge functions and
- * notification rows written months earlier, addressing a component in another module.
- *
- * The rails below are listed EXPLICITLY, and a `?section=` link for a tab that is not listed FAILS
- * rather than passing quietly: an unresolvable destination is a hole in the check, not a pass.
- */
+/** `?section=` deep links — the half of the navigation contract `deepLinkTargets.test.ts` cannot see. */
 import { describe, it, expect } from 'vitest';
 import { readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';

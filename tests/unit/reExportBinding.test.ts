@@ -2,30 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-/**
- * Guards one ES-module footgun that typechecks clean and explodes at runtime.
- *
- *     export { round2 } from '../money.ts';   // re-export ONLY
- *     ...
- *     const amt = round2(x);                  // ReferenceError: round2 is not defined
- *
- * `export … from` forwards a binding to CONSUMERS without creating one in the local scope.
- * TypeScript only verifies the re-export is valid, so `tsc` and `deno check` both pass; the module
- * then throws the first time it calls the symbol it appears to have imported.
- *
- * This shipped twice in one refactor — `_shared/blueprint/formula.ts` and
- * `_shared/finance/expense-math.ts`, both for `round2`, both in money-critical code. The blueprint
- * one broke `computeLinePricing` outright (14 failing tests). It was caught only because an
- * existing test happened to exercise that module; nothing structural stopped it, and the
- * expense-math copy had nothing pointing at it at all.
- *
- * The fix is always the same shape:
- *     import { round2 } from '../money.ts';
- *     export { round2 };
- *
- * Barrel files (`index.ts` forwarding components) are unaffected — they never CALL what they
- * forward, which is why this checks for a call rather than for the re-export alone.
- */
+/** Guards one ES-module footgun that typechecks clean and explodes at runtime. */
 const ROOTS = ['src', 'supabase/functions'];
 
 function walk(dir: string): string[] {

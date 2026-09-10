@@ -1,14 +1,4 @@
-/**
- * Shared accessors for product metadata.
- *
- * Different ingestion paths (PDF extraction, manual entry, MIVAA, web import)
- * store the same conceptual fields under different keys. These helpers check
- * every known key so consumers don't have to hard-code one source of truth
- * and silently miss data.
- *
- * Add a new key to the relevant helper as soon as you find another source
- * using a different name — never branch on metadata keys at the call site.
- */
+/** Shared accessors for product metadata. */
 
 export interface ProductLike {
   id: string;
@@ -34,9 +24,6 @@ export const PRODUCT_IMAGE_SELECT = `image_product_associations(
  * before write. The legacy aliases below are kept as a defensive fallback for
  * any older rows that haven't been backfilled yet — they can be removed once
  * the backfill is run platform-wide.
- *
- * IMPORTANT: this is the function to use anywhere you group, filter, or
- * display "who makes this product". Do NOT read a single key directly.
  */
 export function getManufacturer(metadata?: Record<string, any> | null): string | null {
   if (!metadata) return null;
@@ -113,20 +100,7 @@ export function getMaterialCategory(metadata?: Record<string, unknown> | null): 
   return String(raw);
 }
 
-/**
- * Formats a material category slug as Title Case for display.
- *
- *   "ceramic_tile"    → "Ceramic Tile"
- *   "wood_flooring"   → "Wood Flooring"
- *   "natural_stone"   → "Natural Stone"
- *   "wall_tile"       → "Wall Tile"
- *   "bathroom_tile"   → "Bathroom Tile"
- *   "3d_wall_panel"   → "3D Wall Panel"
- *   null / empty      → "—"
- *
- * Also handles free-text values like "ceramic tile" (returns "Ceramic Tile"),
- * controlled vocabulary slugs, and the handful of acronyms we know about.
- */
+/** Formats a material category slug as Title Case for display. */
 const KNOWN_ACRONYMS = new Set(['3D', '2D', 'LED', 'LVT', 'PVC', 'EPDM', 'SBR', 'PEI', 'SGN']);
 
 export function formatMaterialCategory(

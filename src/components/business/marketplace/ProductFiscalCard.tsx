@@ -1,16 +1,4 @@
-/**
- * The one editor for a product's fiscal, catalog and customs identity.
- *
- * Every one of these columns was already being WRITTEN — the warehouse intake form
- * (`ReceiveToWarehouseDialog`) collects the full set, `WarehousePanel` collects a subset — but
- * the product modal only ever rendered three of them, so an operator could set a TARIC code or
- * an invoicing unit on intake and then had nowhere to see or correct it. That is what this
- * replaces: the write-only path, and the four hand-maintained copies of "which columns are the
- * fiscal ones" that came with it. `FISCAL_KEYS` in `warehouseService` stays the single
- * definition; this is the single editor over it.
- *
- * Supersedes `ProductMydataCard`, which covered VAT category + wholesale classification only.
- */
+/** The one editor for a product's fiscal, catalog and customs identity. */
 import React, { useEffect, useState } from 'react';
 import { Loader2, Save, Receipt, Ship, Tag, Sparkles, Check, X, AlertTriangle, Info } from 'lucide-react';
 import { Label } from '@/components/core/ui/label';

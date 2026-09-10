@@ -46,19 +46,7 @@ interface ProductCardProps {
    *  Supplied by the parent grid via the bulk catalog-price RPC to avoid an N+1.
    *  `kind` ('your_price' | 'retail' | 'seller') drives the label authoritatively. */
   viewerPrice?: { price: number | null; discount_pct: number; currency: string; kind?: string } | null;
-  /**
-   * Render `product.pricing.retail` when no `viewerPrice` was resolved (#368 PD-4).
-   *
-   * OFF by default, and it must stay that way on any surface backed by real catalog rows.
-   * The embedded retail is the shelf price for everyone; a reseller entitled to a discount
-   * who lands on a grid that forgot to pass `viewerPrice` was silently shown retail instead
-   * of their own price. The label was honest ("Retail") — the number was not the one they
-   * would be charged, which is the same divergence as FP-2 in #367 and is invisible because
-   * a wrong price is still a valid price.
-   *
-   * The one legitimate caller is the demo grid: `src/data/demo/*.json` products have made-up
-   * ids that no pricing RPC can resolve, so their embedded retail is all there is.
-   */
+  /** Render `product.pricing.retail` when no `viewerPrice` was resolved (#368 PD-4). */
   allowEmbeddedRetail?: boolean;
 }
 

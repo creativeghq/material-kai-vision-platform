@@ -1,16 +1,4 @@
-/**
- * The provider's copy of a document is never shown — to a customer or to an operator.
- *
- * We render and serve our own PDF, so the provider's rendering is not an alternative view of the
- * same thing: it is a second document, with their letterhead, that we do not control. Novus's
- * REST v2.3 made `invoiceUrl` and `qrUrl` IDENTICAL — both open their copy — and added
- * `aadeQrUrl`, which is the tax authority's own validation page.
- *
- * We were printing THEIR url as the QR on our invoice, linking it in the customer's email under
- * the words "Verify on myDATA (government)", and opening it from a button labelled "View on
- * AADE". Three surfaces, all pointing at the provider, two of them saying otherwise in so many
- * words. Nothing could catch it: a QR is a valid QR whatever it encodes.
- */
+/** The provider's copy of a document is never shown — to a customer or to an operator. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

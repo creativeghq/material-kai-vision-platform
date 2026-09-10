@@ -18,23 +18,7 @@ import {
 import { SeoMetricTile } from './seo/SeoMetricTile';
 import { compact, type SeoMetric, type SeoMetricDescriptor } from './seo/seoMetrics';
 
-/**
- * Websites → Search Performance → Analytics.
- *
- * Search Console answers "what did Google show people". Analytics answers "and
- * what did those people then do". Neither is much use without the other: a page
- * with rising impressions and flat sessions has a title problem, and one with
- * rising sessions and no conversions has a page problem — and you cannot see
- * either from one feed alone.
- *
- * Analytics rides the SAME Google grant Search Console already holds, via
- * incremental authorization, so connecting it does not disturb an existing
- * Search Console connection.
- *
- * The states this panel keeps apart, all of which look like "no traffic" if you
- * only count rows: Google not connected · connected but no property chosen ·
- * property chosen and the sync failed · genuinely no sessions.
- */
+/** Websites → Search Performance → Analytics. */
 
 const GA_METRICS: SeoMetricDescriptor[] = [
   { key: 'sessions', label: 'Sessions', format: 'count', upIsGood: true, help: 'Visits to the site. One person returning tomorrow is two sessions.' },

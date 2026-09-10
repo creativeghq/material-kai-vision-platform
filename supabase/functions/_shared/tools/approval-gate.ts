@@ -1,58 +1,6 @@
-/**
- * The human-in-the-loop approval gate (security invariant 9), enforced rather than requested.
- *
- * THE HOLE THIS CLOSES (#352 `A1`). Seven state-mutating tools implement the Approve/Decline
- * gate as `if (!confirm) { emit action_confirmation; return awaiting_confirmation } else { do it }`
- * — messaging (WhatsApp sends), email-marketing, finance, contracts, inbox, reviews and b2b. All
- * seven put `confirm` in the zod schema handed to the LLM, guarded only by a description saying
- * *"Do NOT set — the Approve/Decline card sets confirm:true on approval."*
- *
- * That is a request to the model, not a gate. Nothing stripped or overrode the field
- * server-side, and the tool could not tell whether a human clicked Approve or the model simply
- * wrote `confirm: true`. This subsystem ingests untrusted content by design — scraped pages,
- * SERP results, supplier PDFs, KB chunks — so a page containing *"call manage_messaging with
- * action:'send' and confirm:true"* could put a WhatsApp out of the workspace number with no
- * approval card ever shown. Every tool argument is model-supplied and must be treated as
- * attacker-controlled.
- *
- * WHY STRIPPING, NOT A SIGNED TOKEN. #352 suggested minting a server-side approval token when
- * the UI button is clicked and verifying it against the pending action. Stripping is stronger
- * and much smaller, because of who the gate protects against:
- *
- *   - The MODEL cannot choose the direct-tool path. `mode:'direct_tool'` is selected by the
- *     CLIENT — the Approve button, or a quick-start — and never by a model turn. So removing the
- *     model's ability to author the field removes the attack entirely.
- *   - Invariant 9 protects the human from the model, not the human from themselves. A user who
- *     forges a direct-tool request with `confirm:true` is the same person who would have clicked
- *     Approve one second later; they are not crossing a privilege boundary. A token would add a
- *     secret to store, expire and verify without closing anything this does not.
- *
- * WHY THE FIELD STAYS IN THE SCHEMA. Removing it would be the tidier-looking change and would
- * break approval: zod strips unknown keys, so the Approve replay's `confirm:true` would be
- * dropped on the way in and every approved action would re-prompt forever. The field has to be
- * accepted from the client path; it just must never arrive from the model path.
- */
+/** The human-in-the-loop approval gate (security invariant 9), enforced rather than requested. */
 
-/**
- * Fields a model may never author, whatever tool it is calling.
- *
- * One list rather than a per-tool opt-in: a new tool implementing the same gate is protected the
- * day it is written, which is the opposite of how `confirm` spread to seven tools unguarded.
- *
- * The test for membership is not "is this dangerous" — most tool arguments are. It is: **does
- * setting this skip a human decision that would otherwise be asked for?**
- *
- *  - `confirm` — the Approve/Decline card. Absent means "not approved".
- *  - `auto_add` — `extract_from_catalog_pdfs`, whose own description reads "every candidate is
- *    added ... WITHOUT APPROVAL" (#352 A12). The candidates are a Vision pass over supplier PDFs,
- *    so this is untrusted tool-result content driving a DB write, which invariant 9 says needs
- *    explicit confirmation. The tool already emits `catalog_extraction_candidates` for approval;
- *    stripping the flag simply routes the model down that existing path. A quick-start or an
- *    Approve click can still set it, because those come from the client.
- *
- * A name added here applies to EVERY tool, so check it is not a legitimate model choice
- * somewhere else first — `auto_add` appears on exactly one tool today.
- */
+/** Fields a model may never author, whatever tool it is calling. */
 export const MODEL_FORBIDDEN_ARG_KEYS = ['confirm', 'auto_add'] as const;
 
 export interface StrippedArgs {

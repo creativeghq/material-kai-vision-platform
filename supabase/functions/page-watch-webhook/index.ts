@@ -1,28 +1,4 @@
-/**
- * Firecrawl Monitoring → page watch ingestion (issue #331).
- *
- * Firecrawl calls this when a watched page changes. Two event types:
- *   monitor.page              — one entry per page, per check
- *   monitor.check.completed   — reconciliation summary after the whole check
- *
- * SECURITY NOTE — read before changing the auth block.
- * Firecrawl does NOT sign its webhooks. There is no HMAC, no signature header,
- * no timestamp to check for replay. The only authentication the provider offers
- * is `webhook.headers` — arbitrary headers we hand them at monitor-creation time
- * and they echo back on every delivery. So the shared secret below IS the whole
- * authentication story, which makes two things non-negotiable:
- *
- *   1. It fails CLOSED. Secret unset → 503, never "process it anyway". An
- *      unauthenticated caller can otherwise write arbitrary diffs into a
- *      tenant's change log and fire notifications off them.
- *   2. It is compared in constant time, because a bearer-style secret compared
- *      with `===` leaks its prefix to a patient attacker, and unlike an HMAC
- *      there is no second factor behind it.
- *
- * A replay is possible in principle (no nonce is available to us). It is made
- * harmless by the `page_watch_changes_idem` unique index: replaying a delivery
- * conflicts on (page_watch_id, firecrawl_check_id, url) and writes nothing.
- */
+/** Firecrawl Monitoring → page watch ingestion (issue #331). */
 
 import { serviceClient, type DbClient } from '../_shared/supabase-client.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
@@ -62,15 +38,6 @@ function secretsMatch(provided: string, expected: string): boolean {
 /**
  * The `monitor.page` entry, as Firecrawl actually sends it (captured from a live
  * delivery 2026-08-16, not read off the docs):
- *
- *   { checkId, monitorId, url, status, previousScrapeId, currentScrapeId,
- *     error, isMeaningful, judgment, diff }
- *
- * Two things that are NOT in it and shape the code below:
- *   • no `statusCode` — a page that 404s or 503s arrives as an ordinary `new`
- *     then `same`, with `error: null`. See probeWatchedPageHealth().
- *   • no `diff.json` in git-diff mode; the structured half of the change lives in
- *     `judgment.meaningfulChanges`.
  */
 interface MeaningfulChange {
   type?: string;
@@ -257,23 +224,7 @@ async function handleMonitorPage(
   return written;
 }
 
-/**
- * Ask Firecrawl what HTTP status the watched page actually returned.
- *
- * THIS IS THE SILENT-ZERO GUARD FOR THIS FEATURE. A watched URL that 404s or
- * 503s does not arrive as an error: Firecrawl scrapes the error page, compares
- * it to the previous error page, and reports `status: "same", error: null`
- * forever. The operator sees "up to date" on a watch that has been pointed at a
- * "Page Not Found" since the supplier redesigned their site. Verified against a
- * live 404 and a live 503 on 2026-08-16 — neither carried any signal in the
- * webhook payload at all.
- *
- * `statusCode` is only available on the check-detail endpoint, so this costs one
- * extra API call per completed check (no Firecrawl credits). It is best-effort:
- * the monitor API allows roughly three calls a minute, so a burst of watches
- * finishing together will see some of these rate-limited. A lookup we could not
- * make leaves the previous health verdict alone rather than inventing one.
- */
+/** Ask Firecrawl what HTTP status the watched page actually returned. */
 async function probeWatchedPageHealth(
   supabase: DbClient,
   monitorId: string,
@@ -322,11 +273,6 @@ async function handleCheckCompleted(
     // cache_status distinguishes "ran clean, nothing changed" from "the check
     // itself broke and must be retried" — the difference the price pipeline
     // learned to record the hard way.
-    //
-    // Three different things can be wrong and only the first one is obvious:
-    //   1. the check failed outright             → e.status === 'failed'
-    //   2. a page inside it errored              → summary.error > 0
-    //   3. the page is fine but it is a 404/503  → probeWatchedPageHealth()
     const checkFailed = e.status === 'failed';
     const pagesErrored = Number(e.summary?.error ?? 0) > 0;
     const health = (!checkFailed && e.monitorId && e.checkId)

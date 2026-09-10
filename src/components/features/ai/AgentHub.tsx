@@ -294,22 +294,7 @@ const AGENTS: AgentDefinition[] = [
   },
 ];
 
-/**
- * Tone for each kind of reasoning step, as light/dark PAIRS.
- *
- * The first version was one set of classes per kind — `text-amber-600 dark:text-amber-400`,
- * `text-green-600 dark:text-green-400`, `text-blue-600 dark:text-blue-400` — chosen while
- * looking at the dark theme, where they measure 7-11:1. The trace does not sit on a card: it
- * sits on `bg-primary/5` over the page, and on the light themes' cream that ground is
- * rgb(232,234,225). Against it the italic thinking line measured **2.63:1** — the orange
- * smudge the user reported — the tool results 2.72:1 and the tool calls 4.27:1, all under AA.
- * A wrong colour is a valid class, so nothing failed: it emits CSS perfectly well.
- *
- * The `-600` shades are pale by design. Light needs one to two steps further down the ramp
- * (amber and green need -800 where blue clears at -700), and `iteration` dropped its `/80`
- * because muted-foreground is already the dimmest AA-safe token there is — thinning it to 80%
- * took it to 3.27:1. Measured, not eyeballed; guarded by tests/unit/inboxChipContrast.test.ts.
- */
+/** Tone for each kind of reasoning step, as light/dark PAIRS. */
 const REASONING_STEP_TONE: Record<'thinking' | 'tool_call' | 'tool_result' | 'iteration', string> = {
   thinking: 'text-amber-800 dark:text-amber-400 italic',
   tool_call: 'text-blue-700 dark:text-blue-400',
@@ -492,9 +477,6 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   // "Which job boards?", "Browse the radar"). A direct run has NO model turn, so the
   // "the agent's prose summarizes it" assumption these used to rely on is false: they were
   // logged to console.debug and the user got a bare "Done!" with the data thrown away.
-  // Their MUTATION siblings (flow_created/updated/removed, job_sites_updated) are deliberately
-  // NOT here — every quick-start that could reach those pins `action:'list'`, so they only ever
-  // run through the agent, which does narrate them; a card beside that prose would be noise.
   job_sites_list: 'Job boards searched',
   flows_list: 'Workspace flows',
   tech_radar_list: 'Tech radar',
@@ -894,12 +876,6 @@ interface AgentHubProps {
  * The image modal (ProgressiveImageGrid) cannot reach the generation pipeline itself, so a
  * one-click action there is handed back through `onEditImage` as a sentinel-encoded URL and
  * auto-submitted here instead of opening the edit builder.
- *
- * Decoded in ONE place on purpose. There are TWO identical `onEditImage` handlers — the
- * in-message grid and the single-image modal — and the sentinel branch was already copied
- * into both. A third action added the same way is a coin flip on whether it works from the
- * surface the user happens to be on, with no error either way: the un-updated site falls
- * through to "open the edit modal", which looks like a deliberate design.
  */
 const DIRECT_EDIT_ACTIONS = [
   { sentinel: '|LIGHTING|', mode: 'image-edit' },
@@ -1216,8 +1192,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
    *      (computed dynamically from agentToolsCatalog).
    *   2. Auto-enabling the toolkit in activeToolkits so the agent-chat backend
    *      binds the tools on the next message.
-   * Without this, clicking any quick-start while on the wrong agent or with
-   * the toolkit disabled gave the dreaded "I don't have those tools" reply.
    */
   const ensureAgentAndToolkit = useCallback((toolkit: ToolkitDefinition) => {
     // resolveToolkitAgent keeps the agent the user picked when it owns the toolkit,
@@ -1353,9 +1327,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
    *   1. switch agent if the quick-start belongs to a different one
    *   2. `form`         → open ToolkitFormModal to collect fields, then auto-send
    *   3. `run`          → fire the target tool deterministically (no prompt)
-   *   4. `opensModal`   → open the guided design canvas (new-design / staging)
-   *   5. fallback       → inject `prompt` + auto-send (also the graceful path
-   *                       when a modal can't open yet, e.g. no image attached)
    */
   const handleQuickStart = useCallback((qs: ToolkitQuickStart, tk: ToolkitDefinition, agentId?: string) => {
     // `getToolkitOwnerAgents(tk)[0]` is ALWAYS the generalist (kai owns every toolkit),
@@ -1493,16 +1464,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
    * first step's form, no agent latency. Subsequent step advances DO call
    * the agent (the agent runs the step's tool + emits step_progress chunks),
    * but the user sees the wizard the moment they click.
-   *
-   * Side effects to make the wizard always work:
-   *   1. Auto-switch the active agent to def.agent_id (defaults to 'kai') so
-   *      the agent that owns the workflow's tools is the one receiving the
-   *      Next-click messages. Without this, clicking a Catalogs wizard while
-   *      on Interior Designer would send messages to an agent that doesn't
-   *      have catalog tools.
-   *   2. Auto-enable the workflow's moduleSlug toolkit (catalogs / mentions /
-   *      etc.) so the tools are bound on the next message. Persists to the
-   *      current conversation if loaded.
    */
   const bootWorkflowLocally = useCallback((workflowId: string): string | null => {
     const def = getWorkflowDefinition(workflowId);
@@ -1597,10 +1558,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     //     the step with form values, no LLM ambiguity.
     //   • Free-form prose — when the user used the "in your own words" override,
     //     the agent reads it normally and runs the step using its own judgment.
-    // The prefix includes the run_id so the agent can preserve it across the
-    // remaining steps. Agent prompt addendum instructs: extract run_id from
-    // the prefix, pass it to every tool as `_workflow_run_id`, and emit all
-    // workflow_step_progress chunks with that exact run_id.
     const wf = workflows[args.runId];
     // The send this triggers is a step of THIS workflow, not a run of its own. Without the
     // binding the canvas would draw two cards for one turn: the pipeline and the tools that
@@ -1961,19 +1918,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
    * Transform raw reasoning data into Jarvis-style witty messages
    * Personality: Dry wit, subtle humor, calm, measured, professional
    */
-  /**
-   * The working-panel line for one agent event.
-   *
-   * Every line here must be TRUE. This used to pick at random from canned flavour text —
-   * "Results acquired. Rather satisfying, actually." read identically whether a search returned
-   * forty products or none, `tool_result` never looked at the result at all, and only eight of
-   * the platform's 171 tools had a line, so everything else said "Executing AI tools. One
-   * moment." A progress feed that does not track progress is decoration.
-   *
-   * The edge function now sends the shape of each result (count, zero, failed, duration) on the
-   * `tool_result` chunk, derived by the same `shapeToolResult` the tool-call log uses, so these
-   * lines and the audit log cannot disagree.
-   */
+  /** The working-panel line for one agent event. */
   const toJarvisStyle = (
     type: 'thinking' | 'tool_call' | 'tool_result' | 'iteration',
     data: {
@@ -2626,7 +2571,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       // fresh KB / live data, and short-circuited the agent entirely (even in a new
       // conversation). A live-data agent MUST run every time. This directly caused the
       // repeated "the KB has no Materials Hub content" replies that persisted after the KB
-      // was actually fixed. Do not reintroduce full-response caching for KAI.
       let data: any = null;
       let pendingGeminiData: Message['geminiImageData'] | null = null;
       // The server's id for this turn, carried on every chunk. Several card paths below build
@@ -2771,12 +2715,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 ]);
               } else if (chunk.type === 'status') {
                 // A status chunk carries its OWN message and there is more than one emitter:
-                // agent-chat opens the turn with "Initializing agent...", knowledge-grounding
-                // sends "Consulting the knowledge base…" partway through. This branch used to
-                // throw `chunk.message` away and push one hardcoded line for all of them, so two
-                // different things happening rendered as the same sentence twice in a row and
-                // read as a duplicate. Say what actually happened, and never repeat the line
-                // already at the bottom of the list.
                 const raw = typeof chunk.message === 'string' ? chunk.message.trim() : '';
                 const message = STATUS_STEP_COPY[raw] ?? (raw || 'Systems online. Beginning analysis.');
                 setReasoningSteps((prev) => (
@@ -3112,14 +3050,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 setMessages((prev) => [...prev, articleMessage]);
 
                 // Open it on the canvas straight away.
-                //
-                // The article was already ELIGIBLE for the canvas (`canvasArtifactFor` returns
-                // kind 'seo', `renderCanvasArtifact` mounts the viewer) — it was just never
-                // SELECTED, so the run appeared only as a chip in the chat and the operator had
-                // to find it and click it to watch their own article being written. Every other
-                // long-running result on this screen opens where the work is shown; this one
-                // is the only thing on the canvas worth looking at while it runs, and the
-                // pipeline now takes minutes with a live progress bar.
                 focusCanvas(articleMessage.id);
 
                 if (conversationId) {
@@ -3696,11 +3626,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 // run_id is a UUID generated on the frontend. The server-side
                 // tools emit chunks using their natural primary entity ID
                 // (catalog_id, sheet_id, tracked_mention_id, etc.). When the
-                // first workflow_plan chunk arrives with a NEW run_id but
-                // matches a locally-booted run of the same definition_id, we
-                // MIGRATE the state: transfer step_order + step states +
-                // collapsed flag, then drop the local entry. From this point
-                // forward the server's run_id is canonical.
                 const def = getWorkflowDefinition(chunk.definition_id);
                 if (def) {
                   const stepOrder = (chunk.step_overrides || def.steps).map((s: any) => s.id);
@@ -3829,19 +3754,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 } else if (event === 'unpublished') {
                   line = 'Catalog archived (no longer publicly accessible).';
                 }
-                /**
-                 * A catalog chunk with no branch renders an EMPTY assistant bubble (#395).
-                 *
-                 * `line` starts as '' and every arm above is an `else if`, so a chunk type added
-                 * to a catalog tool — or one renamed on the tool side and not here — produces a
-                 * message with no content at all. That is the same defect the `run:` quick-starts
-                 * had: the work happened, the screen said nothing. The sibling `seo_*_card` router
-                 * twenty lines up cannot do this, because it derives its line FROM the type.
-                 *
-                 * The fallback does the same, so the worst case is a plain sentence rather than a
-                 * blank turn. `tests/unit/agentChunkRendering.test.ts` fails the build if a branch
-                 * is actually missing — this is the floor under that, not a substitute for it.
-                 */
+                /** A catalog chunk with no branch renders an EMPTY assistant bubble (#395). */
                 if (!line) line = `Catalog updated — ${event.replace(/_/g, ' ')}.`;
                 const m: Message = {
                   id: `msg-catalog-${event}-${Date.now()}`,
@@ -3988,8 +3901,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       // through to a placeholder and the chat said "Done — ran manage_appointments."
       // — an internal tool id, shown to a customer. The quick-start's own `done`
       // copy replaces it. A tool that wrote its OWN message (the mutating ones:
-      // "Invoice INV-2026-014 created") keeps it; the placeholder is recognised by
-      // the one thing a tool's own message never does — naming the tool.
       if (directRun) {
         const toolResult = Array.isArray(data.tool_results) ? data.tool_results[0]?.result : undefined;
         const failed = toolResult && toolResult.success === false;
@@ -4409,19 +4320,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         const merged = new Set<string>([...convo.toolkits, ...ALWAYS_ON_TOOLKIT_IDS]);
         setActiveToolkits([...merged]);
       }
-      /**
-       * A conversation BELONGS to an agent, so opening one selects that agent.
-       *
-       * Nothing did this, and the picker kept whatever was last active — so the daily
-       * job digest's bell notification (`/agent-hub?conversation=…`, a `kai` thread)
-       * opened its findings under Vision: the header, the avatar and the model were
-       * the wrong agent's, and the first follow-up about a job listing was sent to the
-       * interior designer. The stored `agent_id` is the answer; it does not need to be
-       * restated on the link.
-       *
-       * An id no agent claims any more leaves the picker alone rather than pointing it
-       * at an agent that no longer exists.
-       */
+      /** A conversation BELONGS to an agent, so opening one selects that agent. */
       const ownerAgent = convo?.agentId && AGENTS.some((a) => a.id === convo.agentId) ? convo.agentId : null;
       if (ownerAgent) {
         adoptedConversationAgentRef.current = ownerAgent;
@@ -4495,16 +4394,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     [],
   );
 
-  /**
-   * Load a specific conversation when navigated with `?conversation=`.
-   *
-   * Which id has been honoured, NOT a "have we loaded one yet" flag: the flag went true on
-   * the first deep link and stayed true, so a second notification click — a different
-   * conversation, same mounted Hub — changed the URL and nothing else. The bell said one
-   * thing and the screen showed the previous thread. Recording the id honours each new one
-   * while still ignoring the id the Hub itself just put in the URL, which is what the flag
-   * was protecting: re-fetching mid-turn races the save and wipes the user's own bubble.
-   */
+  /** Load a specific conversation when navigated with `?conversation=`. */
   useEffect(() => {
     if (!initialConversationId) return;
     if (loadedConversationParamRef.current === initialConversationId) return;
@@ -4705,18 +4595,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     return map;
   }, [displayRuns]);
 
-  /**
-   * The canvas tab strip, one entry per TURN rather than per message.
-   *
-   * A user message opens a new turn; every artifact-bearing assistant message after it belongs
-   * to that turn. One request that produces several artifacts is one piece of work and gets one
-   * page with sub-tabs — "generate an SEO article" ran research, a keyword card and a volume
-   * card and opened three separate canvas pages, so the strip described the steps and never the
-   * result.
-   *
-   * The turn is titled by, and opens on, its LAST artifact: that is its outcome, and the steps
-   * that produced it sit behind it.
-   */
+  /** The canvas tab strip, one entry per TURN rather than per message. */
   const canvasGroups = useMemo(() => {
     const groups: CanvasArtifactGroup[] = [];
     let members: CanvasArtifact[] | null = null;
@@ -4836,23 +4715,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     yieldedRunsRef.current = new Set();
   }, [currentConversationId]);
 
-  /**
-   * PRODUCING something opens it. Starting a turn does not.
-   *
-   * This is the whole difference between the canvas as a pane and the canvas as a thing you
-   * open. The pane version selected the turn's run at the SEND site, before a single tool had
-   * reported, so every turn took the screen — and most turns produce prose, which meant the
-   * answer got a 400px rail and the canvas got a checklist of nothing. Conversation d3ec683e is
-   * four of those in a row.
-   *
-   * Keyed on the RUNS of this session, never on `canvasGroups` alone: loading a conversation
-   * rebuilds every past artifact into a group, and an effect that opened "the newest" would pop
-   * a modal over a thread you had only just opened. Runs are cleared per conversation, so a
-   * historical artifact has none and can never trigger this.
-   *
-   * Once per run, because a user who closes the modal must be able to keep it closed — an
-   * effect that re-opens every render is a modal you cannot dismiss.
-   */
+  /** PRODUCING something opens it. Starting a turn does not. */
   const yieldedRunsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     for (const run of displayRuns) {
@@ -4897,17 +4760,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
   const currentAgent = AGENTS.find((a) => a.id === selectedAgent);
 
-  /**
-   * Which agent actually produced a message.
-   *
-   * JARVIS routes a turn to a specialist and the turn runs AS that specialist, but every avatar in
-   * the thread rendered `currentAgent` — i.e. whatever is selected in the picker — so Pepper's
-   * replies wore JARVIS's face and nothing on screen ever said the handoff had happened. The
-   * message has carried the right id since the routing fix; this is the half that reads it.
-   *
-   * Note `kai` and `orchestrator` are BOTH named JARVIS, so a generalist turn resolves to JARVIS
-   * either way and correctly shows no handoff.
-   */
+  /** Which agent actually produced a message. */
   const agentForMessage = useCallback(
     (m: Message) => AGENTS.find((a) => a.id === m.agentId) ?? currentAgent,
     [currentAgent],
@@ -5457,31 +5310,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     return null;
   };
 
-  /**
-   * The artifact's line in the chat — derived, never typed out.
-   *
-   * The stream used to carry THIRTY hand-written `<ArtifactCard kind="…" title="…">` calls, each
-   * a second copy of the mapping `getCanvasArtifact` already makes, sitting inside a
-   * `canvasShown ? chip : fullCard` ternary that also duplicated `renderCanvasArtifact`'s whole
-   * body. Two registries of the same fact and two renderers of the same card, held together by
-   * nothing: a result could be called one thing on its chip and another on its tab, and a new
-   * artifact kind needed four edits to appear everywhere.
-   *
-   * One derivation names it, one renderer draws it, and this is the only thing the stream says
-   * about an artifact.
-   */
-  /**
-   * True when the message bubble would say exactly what the card under it already says.
-   *
-   * A pending question, an approval gate and a plain agent result all carry their heading as
-   * `content` AND as the artifact title, so once the card moved out of the bubble the turn
-   * rendered the same sentence twice — once as prose, once as the thing you press.
-   *
-   * Compared rather than listed. Naming the three payloads here would be the per-payload
-   * branching the stream just lost twenty-one copies of, and it would go stale the next time a
-   * card-only result is added; this stays right for any payload whose prose is its title, and
-   * harmlessly shows the bubble for any whose prose says something more.
-   */
+  /** The artifact's line in the chat — derived, never typed out. */
+  /** True when the message bubble would say exactly what the card under it already says. */
   const bubbleRepeatsTheCard = (message: Message): boolean => {
     const artifact = getCanvasArtifact(message);
     if (!artifact) return false;
@@ -5797,19 +5627,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   /**
    * The starters the canvas empty state offers — the SELECTED agent's own clusters first,
    * then whatever is actually loaded.
-   *
-   * This used to read `activeToolkits` alone, and the agent-switch effect below only ever
-   * PRUNES that list — nothing seeds the new agent's. So on a default set (Core + Web
-   * Research + Calculators, the three always-on) picking Vision, Trinity, Edith or Hermes
-   * from the dropdown produced the identical nine starters every time: the hero above it
-   * changed name, avatar and description, and the menu under it did not move. The menu was
-   * describing the toolbox, and the user had just answered a question about the agent.
-   *
-   * Signature toolkits are OFFERED, not enabled: a click runs `ensureAgentAndToolkit`, which
-   * turns on the one that was launched. Seeding all of them on switch would bind Edith's ~60
-   * SEO tools the moment she is picked — the ~15k-token default the toolkit picker exists to
-   * undo. `getAgentSignatureToolkits` returns [] for JARVIS/kai, who own all 45 clusters, so
-   * the router keeps offering the loaded set.
    */
   const starterToolkits = useMemo(() => {
     const active = activeToolkits
@@ -5860,16 +5677,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     );
   };
 
-  /**
-   * "…and now?" — the next steps offered under the reply to a deterministic run.
-   *
-   * A direct run ends the turn cold: no model, so nothing proposes what to do with
-   * what just landed. The toolkit's OTHER quick-starts are already exactly that
-   * list — declared, labelled, and launchable through the same dispatcher the rest
-   * of the UI uses — so they are offered here rather than a hand-written "next
-   * steps" table that would need an entry per tool and rot the day one is added.
-   * The one that just ran is excluded; three is the cap so the reply stays a reply.
-   */
+  /** "…and now?" — the next steps offered under the reply to a deterministic run. */
   const renderFollowUps = (message: Message): React.ReactNode => {
     const chipRow = (children: React.ReactNode) => (
       <div className="mt-3 border-t border-white/10 pt-3">
@@ -6949,26 +6757,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                         <AgentAvatar agentId={currentAgent?.id} className={cn('h-4 w-4', currentAgent?.color)} />
                         <span>{currentAgent?.name || 'JARVIS'}</span>
                         {selectedAgent === 'orchestrator' && (() => {
-                          /*
-                           * WHILE a routed turn is running, say who is running it.
-                           *
-                           * `routingTo` existed and was rendered in exactly one place — the pulsing
-                           * avatar beside the reasoning block — which disappears the moment the turn
-                           * ends. Beside it the composer went on reading "JARVIS · Auto-assign", so
-                           * the operator watching Vision generate an image had nothing anywhere near
-                           * the input saying Vision was doing it. Reported from that exact screen.
-                           *
-                           * The picker itself still says JARVIS, and still SENDS as JARVIS: routing
-                           * is per turn, and repointing `selectedAgent` would pin the conversation
-                           * to this specialist so the follow-up could no longer be routed. That is
-                           * what the badge is for — it states the handoff without making it sticky.
-                           *
-                           * Gated on `isLoading` for the same reason. The composer describes what
-                           * the NEXT message will do, and the next message is auto-assigned again;
-                           * leaving "→ Vision" up after the turn would promise otherwise. Once the
-                           * answer lands, the MESSAGE carries the specialist's face and the "routed
-                           * by JARVIS" label, which is where that fact belongs afterwards.
-                           */
+                          /* WHILE a routed turn is running, say who is running it. */
                           const live = isLoading && routingTo
                             ? (AGENTS.find((a) => a.id === routingTo.id) ?? { id: routingTo.id, name: routingTo.name, color: undefined })
                             : null;

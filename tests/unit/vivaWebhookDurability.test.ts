@@ -1,17 +1,4 @@
-/**
- * Money Viva tells us about is recorded before it is acknowledged (#360 CB-5 … CB-9).
- *
- * Viva retries a webhook 24 times, hourly, until it gets a 2xx — so a 200 is a promise that the
- * delivery was handled, and anything lost behind one is lost permanently. Five findings, all the
- * same sentence from different angles: *money received and unbooked, with no retry and no record.*
- *
- *   CB-5 a verified, captured card payment whose intent row was missing returned 200 `ignored`
- *   CB-6 the RF sweep `continue`d past every failure into an unconditional 200
- *   CB-7 a reversal was announced (a console.error and a `.catch(() => {})` flow event) and
- *        never written down
- *   CB-8 the paid amount was never compared to the amount we asked for
- *   CB-9 no delivery dedupe outside the card path's accidental one
- */
+/** Money Viva tells us about is recorded before it is acknowledged (#360 CB-5 … CB-9). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

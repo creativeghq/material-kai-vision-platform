@@ -1,20 +1,4 @@
-/**
- * A button that goes somewhere names the place by its TITLE.
- *
- * MEASURED 2026-09-04: BillingTab's empty state said "Go to quotes" and opened a tab titled
- * "Quotes"; the Quotes tab beside it said "Go to Quotes". One page, one place, two spellings — and
- * the lowercase one reads as a verb phrase ("go to quotes") rather than as a destination. Nothing
- * catches it: both are valid strings and both buttons work. Three more sat elsewhere ("Go to
- * sources", "Go to listings", "Go to platform"), each under a tab or nav item that is title-cased.
- *
- * Two rules, in order of strength:
- *
- *   1. A link to a PROJECT SECTION takes its label from `goToSectionLabel` — the same registry the
- *      page's strip renders from, so renaming a section renames every button that points at it.
- *      A hand-typed "Go to …" in a file that links to a section is exactly the drift this is for.
- *   2. Everywhere else, "Go to <Name>" is title-cased. Prose that says "Go to the Campaigns tab"
- *      is a sentence, not a label, and is left alone.
- */
+/** A button that goes somewhere names the place by its TITLE. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';

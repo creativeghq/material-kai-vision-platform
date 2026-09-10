@@ -1,28 +1,4 @@
-/**
- * Revolut bank-feed guard (#315).
- *
- * The integration shipped with zero tests over the code that decides where real money is
- * attributed. Two bug shapes it is here to stop, both of which were live:
- *
- * 1. **The feed is per-LEG, and it carries every kind of money movement.** The incoming
- *    matcher selected `direction=in AND state=completed` with NO type filter, so top-ups,
- *    pocket exchanges, refunds and fee legs all queued up asking to be matched to a
- *    customer invoice — one "unmatched bank payment" alert each. Worse, an internal
- *    pocket→pocket transfer produces an `in` leg that is indistinguishable from an
- *    incoming customer payment unless you look at its SIBLING legs.
- *
- * 2. **Settlement re-derived somewhere other than the one money path.** Every match must
- *    go through `recordInvoicePayment` / `payment_allocations`; a local `total - paid`
- *    here would be the sixth copy of the derivation CLAUDE.md exists to prevent.
- *
- * Plus the buyer-facing provider ORDER, which has already broken once: the registry
- * sorted alphabetically, so adding 'revolut' silently demoted 'stripe' to second and
- * flipped the pay page's preselected default for every existing Stripe seller.
- *
- * SCOPE: these read repo files. They pin the shape of the edge code (which vitest cannot
- * import — it is Deno source with .ts specifiers and Deno globals). Behaviour against the
- * live Revolut API is only ever proven by the sandbox checklist in the issue.
- */
+/** Revolut bank-feed guard (#315). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

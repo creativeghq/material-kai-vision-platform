@@ -2,27 +2,7 @@ import * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
-/**
- * DATA TABLE primitives.
- *
- * The table is the most-used surface in this platform, so it carries the
- * density rules for everything else:
- *
- *  - **Rows are separated by a hairline, not by a fill.** Zebra striping and
- *    tinted rows both consume the one visual channel a table needs to keep
- *    free — the row's own status colour.
- *  - **The header is a sunken strip with a hard bottom rule**, and it sticks.
- *    A scrolled table whose header has left the viewport is an unreadable grid
- *    of numbers; this is the single most valuable 3 lines in the file.
- *  - **Header labels are 11px semibold, not uppercase.** Uppercase kills word
- *    shape, which is exactly the cue you use to find a column at a glance.
- *  - **Cell padding is 12px/10px.** The old 16px/16px row was ~56px tall, so a
- *    laptop viewport showed nine rows of a hundred-row list.
- *
- * `Table` renders its own horizontal scroll container. Never wrap it in
- * `overflow-hidden` — see tests/unit/responsiveTableOverflow.test.ts for what
- * that costs on a phone.
- */
+/** DATA TABLE primitives. */
 const Table = React.forwardRef<
   HTMLTableElement,
   React.HTMLAttributes<HTMLTableElement>

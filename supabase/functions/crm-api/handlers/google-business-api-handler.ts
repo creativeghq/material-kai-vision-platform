@@ -11,40 +11,9 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '',
 );
 
-/**
- * Google Business Profile mirror for a CRM party.
- *
- *   GET  /crm-api/google-business?company_id= | ?contact_id=   → the stored snapshot (or null)
- *   POST /crm-api/google-business  {company_id|contact_id, query?}  → look it up + store it
- *
- * The GET is free and reads what we already have. The POST spends: it reaches DataForSEO's
- * Business Data endpoint on the OPERATOR's credential, so it goes through the shared dispatcher,
- * which reserves the caller's credits BEFORE the upstream call (invariant 10).
- *
- * What comes back is a mirror, not an update. Nothing here writes to crm_companies /
- * crm_contacts: Google's address for a business and ours are two independent claims, and the
- * whole value of having both is being able to see that they disagree. Merging them destroys
- * exactly the information the operator opened the panel to get.
- */
+/** Google Business Profile mirror for a CRM party. */
 
-/**
- * WHERE we search matters as much as what we search for, and getting it wrong is silent.
- *
- * DataForSEO's `country_to_location` does not reject a code it does not know — it falls through
- * to its default, the United States. So both of these produced a billed lookup on the wrong
- * continent, stored as `no_match` and shown to the operator as "Google has no listing":
- *
- *   - `EL`, the VAT code every Greek party row carries, which ISO calls `GR` (fixed in the
- *     shared `countryCodes` table, mirrored to both runtimes);
- *   - NOTHING AT ALL, which is the commoner case by far — 9 of 10 live `crm_contacts` rows have
- *     no country on them.
- *
- * So the country is resolved, never defaulted: the caller's explicit choice, else the party's
- * own, else the workspace's registered country (a workspace's counterparties are overwhelmingly
- * in its own country, and it beats Michigan by any measure). If none of the three answers, the
- * lookup is REFUSED rather than aimed at a continent nobody chose — and the resolved code is
- * stored on the row, so the panel can say where it looked.
- */
+/** WHERE we search matters as much as what we search for, and getting it wrong is silent. */
 async function workspaceCountry(workspaceId: string): Promise<string | null> {
   const { data } = await supabase
     .from('finance_settings')

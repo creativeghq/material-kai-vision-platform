@@ -1,12 +1,6 @@
 /**
  * Where a workflow wizard IS — the three questions the card and its host both have to answer,
  * in one place and with no React in scope.
- *
- * They lived inside WorkflowWizardCard, which imports WorkflowInlineForm, which imports the
- * Supabase client: asking "does the wizard have an ask right now?" from the canvas meant
- * pulling a live DB client into the answer. Here it is a pure function of the runtime, so the
- * host can gate its form slot on the same verdict the card renders from rather than deriving a
- * second one that comes to disagree.
  */
 import type { WorkflowRuntimeState } from './types';
 import { getWorkflow } from './workflowRegistry';

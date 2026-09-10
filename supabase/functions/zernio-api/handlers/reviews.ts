@@ -1,16 +1,4 @@
-/**
- * Reviews on connected platform profiles (Google Business).
- *
- * Reviews PUSH: `review.new` and `review.updated` land on zernio-webhook-handler and upsert into
- * `external_reviews`. This handler is the two things a webhook cannot do —
- *
- *   sync_reviews  → back-fill everything that arrived before the webhook was subscribed, and
- *                   reconcile if a delivery was ever missed. Idempotent on (platform, external_id).
- *   reply_review  → answer one, which is the only WRITE this feature has.
- *
- * Reading is a plain RLS-scoped select from the client; there is no action for it here, because a
- * pass-through read would be a second, weaker copy of the policy on the table.
- */
+/** Reviews on connected platform profiles (Google Business). */
 
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../../_shared/http.ts';

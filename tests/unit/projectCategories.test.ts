@@ -1,32 +1,4 @@
-/**
- * Project categories — guard.
- *
- * THE DEFECTS THIS EXISTS FOR
- * ---------------------------
- * 1. **A field with no writer.** The commit right before this one was "the column I added had no
- *    writer either — a service parameter is not a form". That is the shape this feature is most
- *    exposed to: `category_id` exists on the table, `CreateProjectInput` accepts it, the modal
- *    renders a select — and if any one link is missing, the user picks "Renovation", presses
- *    Create, and gets an uncategorised project. Nothing raises. The insert succeeds, the types
- *    are fine, and the only evidence is a badge that never appears.
- *
- * 2. **A read that forgets the join.** `category_id` is a uuid; the label lives in
- *    `project_categories`. A select that fetches the id and not the label renders nothing, which
- *    is pixel-identical to "this project has no category" (rule 3: a metric is a value or a
- *    stated reason there is no value, never a hidden row).
- *
- * 3. **A client-invented key.** `key` is derived by a DB trigger precisely so a Greek or emoji
- *    label still gets a usable slug. A client that starts sending its own `key` reintroduces the
- *    empty-string and collision cases the trigger exists to absorb.
- *
- * 4. **A dropped category on the agent path.** `create_project` takes the category by NAME
- *    because the vocabulary is per workspace and cannot be a `z.enum`. An unknown name must be
- *    REFUSED with the real options — dropping it silently creates a project without the kind the
- *    user asked for, and the model has no way to notice (the silent-zero shape).
- *
- * None of the four is a type error and none of them makes anything fail loudly, so they are
- * pinned here against the source rather than trusted to review.
- */
+/** Project categories — guard. */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

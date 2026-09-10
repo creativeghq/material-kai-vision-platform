@@ -27,17 +27,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-/**
- * Which image a media tool acts on — and, just as important, a NAME for it.
- *
- * `virtual_staging`, `apply_lighting_preset` and `generate_vr_world` each resolved their own
- * source as `sourceImageUrl || conversationImages.at(-1)`, and each was handed only
- * `conversationImages` — images WE generated. So a photo the user had just attached was
- * unreachable by all three, and the tools refused with "no image available" while the user was
- * looking at their room in the composer. They also returned nothing about which image they used,
- * so the model narrated an outcome it had no evidence for (see the `edited` block on
- * generate_gemini for the same fix).
- */
+/** Which image a media tool acts on — and, just as important, a NAME for it. */
 type MediaSourceChoice = 'auto' | 'my_upload' | 'last_generated';
 
 interface ResolvedMediaSource {
@@ -108,12 +98,6 @@ export const create3DGenerationTool = (
         // 3. If edit intent detected and no other image, use most recent generated image
         // 4. If it's a data URL, upload to Supabase storage to get a public URL
         //    (Replicate models require a public HTTP URL, not a base64 data URL)
-        //
-        // Step 2 used to be `userImages[0]`, which is the slot the composer labels
-        // "Inspiration" — so a user attaching a tile swatch and their room sent the SWATCH to
-        // MIVAA as the img2img control, and this tool fans that across every model in the grid
-        // at once. Same defect as generate_gemini's (see _shared/tools/image-slots.ts); it was
-        // fixed there and left here, in the file the resolver already lives next to.
         const slots = resolveImageSlots(userImages.length, { baseImageIndex });
         const slotBaseImage = slots.baseIndex >= 0 ? userImages[slots.baseIndex] : undefined;
         let resolvedImageUrl = referenceImageUrl || undefined;
@@ -313,16 +297,7 @@ export function detectEditIntent(message: string): boolean {
   return EDIT_INTENT_PATTERNS.some((pattern) => pattern.test(message));
 }
 
-/**
- * LangChain Tool: Gemini Interior Design Generation
- *
- * Uses Gemini 3.1 Flash Image / Pro for:
- * - Fast text-to-image generation
- * - Multi-turn conversational image editing
- * - Floor plan → photorealistic render
- * - Two-step floor plan from text
- * - Multi-reference material generation
- */
+/** LangChain Tool: Gemini Interior Design Generation */
 export const createGeminiGenerationTool = (
   userId: string,
   workspaceId: string,
@@ -888,19 +863,7 @@ The source room must be EMPTY — this model furnishes bare space and will fight
   );
 };
 
-/**
- * LangChain Tool: Check Generation Status
- *
- * Allows agent to query the status of ongoing 3D generation jobs
- * Returns progress, completed/failed counts, and elapsed time
- *
- * TENANCY (#395). This factory took NO identity — not a user, not a workspace — and read
- * `generation_3d` by a model-supplied `jobId` with a service-role client, returning the job's
- * status AND `models_results`, which holds the generated model URLs. Any uuid returned any
- * tenant's generation. It is the purest form of #352's pattern 2: a service-role client and an
- * argument, with nothing in between. Scoped now to the caller's workspace, 404-style so an id
- * cannot be probed for existence.
- */
+/** LangChain Tool: Check Generation Status */
 export const createGenerationStatusTool = (workspaceId: string | null) => {
   return tool(
     async ({ jobId }) => {

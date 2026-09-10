@@ -1,16 +1,4 @@
-/**
- * Channels cost & margin, per workspace — the operator view for the social/WhatsApp add-on.
- *
- * It exists because the biggest cost line in this integration is invisible per tenant: Zernio
- * bills one monthly total for every connected account on the platform, so no invoice ever says
- * which workspace caused it. Ten tenants averaging three accounts is ~$108/month arriving as a
- * single number with no attribution.
- *
- * Revenue here values credits at the SALE price ($0.085), not the $0.01 the debit engine accounts
- * them at. The Third Party Services table further down this page shows the 1.5× markup only,
- * which understates every margin by roughly 8.5× — that discrepancy is why messaging looked
- * unprofitable until someone checked what a credit actually sells for.
- */
+/** Channels cost & margin, per workspace — the operator view for the social/WhatsApp add-on. */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Radio, RefreshCw, Loader2, AlertTriangle, Receipt } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';

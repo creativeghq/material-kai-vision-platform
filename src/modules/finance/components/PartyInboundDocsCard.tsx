@@ -1,15 +1,4 @@
-/**
- * A supplier's myDATA received documents, on their CRM record.
- *
- * These are documents the supplier filed with AADE naming us as the counterparty. They arrive in
- * Finance → Documents → Expenses (the Inbox) and, until one is turned into an expense, they are
- * NOT in the books — so they show here with their state spelled out rather than silently missing.
- *
- * Matched live by ΑΦΜ (see `inboundService.listForIssuerVat`), so this needs no link column and
- * no backfill. The rows themselves are [[SupplierInboundDocs]] — the same table, the same menu and
- * the same dialogs Finance → Expenses by Supplier expands to, because "a received document" should
- * behave identically wherever it is shown. This file is the card that frames them.
- */
+/** A supplier's myDATA received documents, on their CRM record. */
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';

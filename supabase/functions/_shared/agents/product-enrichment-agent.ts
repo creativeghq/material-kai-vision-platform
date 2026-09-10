@@ -1,16 +1,4 @@
-/**
- * Background Agent: Product Enrichment
- *
- * Uses Claude to enrich products with AI-generated descriptions,
- * search keywords, and material category tags.
- *
- * Config params (background_agents.config):
- *   batch_size       number  Products to process per run (default 10, max 20)
- *   category_filter  string  Optional: only enrich products in this category
- *   force_rewrite    boolean Re-enrich products that already have descriptions
- *
- * Delegation: throws DelegateToMivaaError when batch_size > 20
- */
+/** Background Agent: Product Enrichment */
 
 import { loadPrompt } from '../prompt-utils.ts';
 import { runLangGraphAgent, logAgentAiUsage } from './base-agent.ts';

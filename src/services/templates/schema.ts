@@ -222,13 +222,6 @@ export const TEMPLATE_SCHEMAS: Record<LiveTemplateEntityType, TemplateSchema> = 
     // `vat_amount` straight off the bill — both FORBIDDEN_CAPTURE_FIELDS — and an expense
     // template applies as a `prefill`, so the operator is looking at the actual bill when they
     // type the figure. Last quarter's electricity is not this quarter's.
-    //
-    // The payee is absent because NO adapter captures a party: an invoice template does not
-    // remember the customer either. A template is a SHAPE you apply to whichever party you pick,
-    // which is also why `crm_company` sits in the CHECK unbuilt (a party goes through duplicate
-    // search, never a silent create). So what this actually saves is the category, the currency
-    // and the description — the stable half of a rent/retainer/subscription bill.
-    // `notes` is the description shown on the bill.
     captureFields: ['currency', 'notes', 'category_id'],
     editableFields: [
       { key: 'notes', label: 'Description', kind: 'textarea' },
@@ -342,8 +335,4 @@ export const SYNTHETIC_PAYLOAD_FIELDS: Partial<Record<LiveTemplateEntityType, re
   // (#385 FN-4). Their columns — `subtotal_net` and `vat_amount` — are BOTH on
   // FORBIDDEN_CAPTURE_FIELDS, and the synthetic names are what let them through: the
   // guard read the declared `captureFields` array, where neither key ever appeared.
-  //
-  // The guard now also reads what the adapters actually SELECT, so a synthetic key can
-  // no longer be a way around the allowlist. That is the general lesson; the two fields
-  // are just where it showed up.
 };

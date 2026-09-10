@@ -3,10 +3,6 @@
  * user input. Schema-driven so every step's form looks the same; specialised
  * field types (pdf_picker, category_picker, ...) call out to the right
  * Supabase tables to populate options.
- *
- * On submit, calls onSubmit(values). The parent (AgentHub) is responsible for
- * either: (a) sending those values into the chat as a message the agent
- * picks up, or (b) calling the relevant tool directly.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, Send, ArrowDownToLine, X } from 'lucide-react';

@@ -1,24 +1,4 @@
 // inbox-follow-up-cron — the half of "Follow-up" that made it a queue instead of a shelf.
-//
-// The Inbox has had three statuses for a long time, and the middle one never worked: "Snoozed"
-// carried no date and nothing ever brought it back, so it was a bucket you had to remember to
-// walk past. Measured 2026-09-01, all 56 live threads sat in `open` and neither of the other two
-// had ever been used once.
-//
-// A follow-up is now a moment (`inbox_threads.follow_up_at`) and, optionally, a message to send
-// when it arrives (`follow_up_message`). This runs every five minutes and does two things per
-// due thread: send the chase if there is one, and put the conversation back in front of whoever
-// asked for it.
-//
-// ── The claim comes first, and it is the database's ──────────────────────────────────────────
-// `claim_due_inbox_follow_ups` stamps `follow_up_fired_at` in the SAME statement that selects the
-// row. That ordering is the whole safety property: this function sends a real message to a real
-// customer, that half cannot be rolled back, and a retry after a timeout must not chase somebody
-// twice. A lost race returns zero rows rather than a second message.
-//
-// ── Nothing here writes a notification ───────────────────────────────────────────────────────
-// It emits `inbox.follow_up_due` and the seeded `system-default` flow delivers it, so an operator
-// can retarget or silence it without a deploy.
 
 import { createClient } from '@supabase/supabase-js';
 import type { DbClient } from '../_shared/supabase-client.ts';
@@ -39,18 +19,7 @@ interface ClaimedRow {
   follow_up_set_by: string | null;
 }
 
-/**
- * Send the chase through inbox-api rather than by writing a row.
- *
- * `internal_send_follow_up` runs the ordinary send path — the 24-hour window check, the channel
- * relay, attachment signing, the notification. A cron that inserted into `inbox_messages` itself
- * would produce a message the operator can see and the customer never got, which is the exact
- * failure this whole feature exists to prevent, wearing the opposite face.
- *
- * A dedicated action, not `send_message` with a borrowed identity: `send_message` requires a real
- * JWT, and making it accept a body-supplied `user_id` would be invariant 1 in reverse. The
- * impersonation is one narrow thing a cron does, behind the service-role bearer.
- */
+/** Send the chase through inbox-api rather than by writing a row. */
 async function sendChase(
   threadId: string,
   body: string,
@@ -129,17 +98,7 @@ Deno.serve(withApiLogging('inbox-follow-up-cron', async (req: Request) => {
       remindedOnly++;
     }
 
-    /*
-     * Back to Open, whether or not the message went.
-     *
-     * That is the point of a follow-up: it puts the conversation in front of somebody again. A
-     * chase that Meta refused needs the operator MORE than one that went out, not less — so a
-     * failure must not leave the thread parked where nobody looks at it.
-     *
-     * Written unconditionally rather than only on success, because `follow_up_fired_at` is
-     * already stamped: leaving the status alone here would produce a thread that has fired, is
-     * still in Follow-up, and will never fire again.
-     */
+    /* Back to Open, whether or not the message went. */
     await db.from('inbox_threads').update({
       status: 'open',
       follow_up_error: sendError,

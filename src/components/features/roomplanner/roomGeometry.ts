@@ -1,14 +1,4 @@
-/**
- * Room planner geometry (#321 M3, #259 Phase 1).
- *
- * Pure, React-free, metres in and metres out. Every number the planner stores is a real-world
- * measurement — there is no pixel unit anywhere in the model, because a layout that only means
- * something at one zoom level is not a plan. Pixels exist solely in `metresToPx`, at the edge.
- *
- * Separated from the canvas component because this is the part that can be *wrong* in ways nobody
- * sees: an item that clamps to the wrong edge, a rotated sofa whose footprint is computed
- * unrotated and so overlaps a wall it visually clears. Those all render happily.
- */
+/** Room planner geometry (#321 M3, #259 Phase 1). */
 
 export interface Footprint {
   widthM: number;
@@ -88,17 +78,7 @@ export function boundsOf(p: Placement): { left: number; right: number; top: numb
   };
 }
 
-/**
- * Do two placements overlap on the floor?
- *
- * Axis-aligned approximation of the rotated extents — deliberately conservative: it can report an
- * overlap for two diagonally-rotated pieces that would just miss. For a planner that is the right
- * error, because the warning is advisory and a false "these touch" costs a glance, while a missed
- * one costs a delivery.
- *
- * Touching edges do not count as overlapping; furniture pushed flush against furniture is a normal
- * arrangement, not a mistake.
- */
+/** Do two placements overlap on the floor? */
 export function overlaps(a: Placement, b: Placement): boolean {
   const A = boundsOf(a);
   const B = boundsOf(b);

@@ -1,19 +1,4 @@
-/**
- * The CVR — what this job is worth against what it costs, per cost code.
- *
- * Every number comes from `get_project_cvr`; this component formats and does not derive. That
- * matters more here than anywhere else in the project: a cost-value reconciliation is the number
- * an operator decides whether to keep going on, and the platform has already shipped one money
- * quantity implemented five different ways.
- *
- * So the footer total is the sum of the SQL's own per-row totals, never a re-computation from the
- * components beside them, and the margin percentage is not recalculated in TypeScript — a null
- * `margin_pct` means "there is no value to take a percentage of yet", which is a different fact
- * from 0% and reads differently to anybody deciding anything.
- *
- * It supersedes the plain cost-by-code card: that showed the cost half alone, and a cost with no
- * value beside it cannot tell you whether the job is making money.
- */
+/** The CVR — what this job is worth against what it costs, per cost code. */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Loader2, Scale } from 'lucide-react';
 

@@ -1,29 +1,4 @@
-/**
- * The guard that was missing, and whose absence put seven tenant surfaces behind the operator.
- *
- * There were exactly three real gates: `AdminGuard` (`isPlatformOperator` — owner/admin of the
- * ROOT workspace, i.e. us and nobody else), `CapabilityGuard` (a persona capability) and
- * `EntitlementGuard` (this workspace owns the module). Configuration pages for a workspace's OWN
- * modules — its messaging channels, its email domains, its catalogs, its social accounts, its
- * automations — fit none of them:
- *
- *   • `EntitlementGuard` alone is too wide: it asks "does this workspace own the module?", so
- *     every member gets in, and a warehouse user could rewire the company's WhatsApp sender.
- *   • `AdminGuard` is too narrow, and it is the one they were all using. It does not mean "an
- *     admin"; it means the platform operator. A customer workspace that BUYS the messaging module
- *     therefore cannot open the page that configures it — not the owner, not anyone. The module is
- *     sold and unusable. Nothing reports this, because the route resolves and the guard is doing
- *     exactly what it says.
- *
- * This is the middle rung: owner/admin OF THE ACTIVE WORKSPACE. Pair it with `EntitlementGuard`
- * (the module route builder does) so the question asked is the right one — "does this workspace
- * own the module, and are you the one who runs this workspace?"
- *
- * It is deliberately NOT a capability. Capabilities describe what a PERSONA does (sell, invoice,
- * run HR); this is about standing in one workspace, which is `workspace_members.role` — the same
- * fact `is_workspace_admin()` enforces server-side. Adding a capability per module would mean a
- * new capability every time a module ships.
- */
+/** The guard that was missing, and whose absence put seven tenant surfaces behind the operator. */
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, ArrowLeft } from 'lucide-react';

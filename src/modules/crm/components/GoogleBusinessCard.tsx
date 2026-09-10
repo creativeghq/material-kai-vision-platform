@@ -60,25 +60,7 @@ const Row: React.FC<{ icon: React.ElementType; children: React.ReactNode }> = ({
   </div>
 );
 
-/**
- * The counterparty as GOOGLE has them — their Business Profile listing.
- *
- * Why it is a mirror and not an import: Google's record and ours are two independent claims
- * about the same business, and the useful thing is seeing where they differ. A supplier who
- * moved warehouse updates Google long before they update anyone's CRM, and a phone number
- * customers actually reach is worth more than the one on a three-year-old quote. Merging
- * Google's answer into our fields would destroy the comparison and quietly hand an external
- * source write access to our invoicing address — the same rule the AADE and bank mirrors follow.
- *
- * The lookup COSTS CREDITS (DataForSEO Business Data), so it never runs on mount. The panel
- * loads what we already stored and waits to be asked.
- *
- * Four states, kept distinct on purpose (rule 3 — a value or a stated reason there is none):
- *   no row     → nobody has looked
- *   no_match   → Google answered and has no listing under that name
- *   failed     → we never got an answer; this is UNKNOWN, not "no listing"
- *   ok         → the listing
- */
+/** The counterparty as GOOGLE has them — their Business Profile listing. */
 export const GoogleBusinessCard: React.FC<Props> = ({
   companyId, contactId, partyName, address,
 }) => {

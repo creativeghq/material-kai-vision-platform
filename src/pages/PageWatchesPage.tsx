@@ -44,24 +44,7 @@ import {
   type PageWatchChangeStatus,
 } from '@/services/pageWatchService';
 
-/**
- * Page monitoring (#331) — watch a page you do NOT control and read what changed.
- *
- * Deliberately separate from the two surfaces it keeps being confused with, and the
- * page now says so out loud rather than leaving an operator to guess:
- *
- *   • **Price monitoring** tracks what retailers charge for OUR products. It has a
- *     product identity to resolve and a structured price to compare.
- *   • **Websites** (Profile → Websites) crawls domains we OWN, whole, for SEO.
- *
- * This has neither: no discovery, no identity, no schema. Somebody names one URL and
- * we report the diff. The whole value IS the diff, so the diff is what the UI puts on
- * screen — coloured per line, not summarised into a status word.
- *
- * The explainer panel is not decoration. Every question it answers — what a check
- * costs, who hears about a change, why this is not under Websites — was previously
- * answerable only by reading this file.
- */
+/** Page monitoring (#331) — watch a page you do NOT control and read what changed. */
 
 const MODULE_SLUG = 'page-monitoring';
 
@@ -81,16 +64,7 @@ function writeExplainerPref(open: boolean): void {
 
 type Tone = 'success' | 'warning' | 'error' | 'info' | 'neutral';
 
-/**
- * What a WATCH is currently doing.
- *
- * Six answers, not four. The two that were missing are the two that matter most: a
- * watch that has never been checked used to render as "up to date" (it is not — nothing
- * has looked at it yet), and a row saved locally whose Firecrawl monitor was never
- * created rendered the same way (nothing is watching it at all). Both are the silent-zero
- * shape: a plausible absence of news standing in for "we do not know". `rank` floats
- * trouble to the top when the State column is sorted.
- */
+/** What a WATCH is currently doing. */
 function watchState(w: PageWatch): { label: string; tone: Tone; hint?: string; rank: number } {
   if (!w.is_active) {
     return { label: 'Paused', tone: 'neutral', rank: -1, hint: 'Not being checked at all. Resume to start again.' };

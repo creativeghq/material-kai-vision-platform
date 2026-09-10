@@ -69,19 +69,6 @@ export default defineConfig(({ mode }) => {
             if (!id.includes('node_modules')) return undefined;
 
             // Extract "pkg" or "@scope/pkg" from the resolved path.
-            //
-            // Split on the LAST `node_modules/`, not the first. Nested package stores put a second
-            // one in the path — Deno vendors as
-            //   .../node_modules/.deno/react@18.3.1/node_modules/react/index.js
-            // and pnpm as  .../node_modules/.pnpm/.../node_modules/react/... — so matching the
-            // FIRST segment yields `.deno` (or `.pnpm`) for every package, CHUNK[pkg] is undefined
-            // for all of them, and manualChunks silently assigns nothing.
-            //
-            // That failure is invisible: the build still succeeds and emits a working bundle, just
-            // with a completely different chunk shape from CI. It is what produced the retracted
-            // "every visitor downloads 1.37 MB of three.js" claim in audit #308 — a conclusion
-            // drawn from a local artifact that is not the one we ship. Taking the last segment is
-            // correct for a flat tree too, so this is strictly more robust, not a special case.
             const norm = id.replace(/\\/g, '/'); // normalise Windows separators
             const tail = norm.split('node_modules/').pop();
             const m = tail?.match(/^(@[^/]+\/[^/]+|[^/]+)/);
@@ -111,42 +98,9 @@ export default defineConfig(({ mode }) => {
               // Charts
               // 'recharts' is deliberately NOT mapped here — same footgun as @sentry/react below,
               // and the third instance of it in this config.
-              //
-              // Forcing recharts into a named `vendor-charts` chunk made that chunk a STATIC
-              // import of the entry, so index.html emitted a <link rel="modulepreload"> for it and
-              // every visitor downloaded 362,395 bytes of charting library on first paint —
-              // including anonymous landing pages, which have no charts at all. All seven recharts
-              // importers are inside lazy admin/analytics routes; nothing on the eager path uses it.
-              //
-              // Unmapped, Rollup splits it by actual use: CartesianChart / BarChart / LineChart /
-              // PieChart / PriceHistoryChart, 334,590 bytes total (101,970 gzip), fetched only when
-              // a chart actually renders. Eager payload drops to 1,207,814 raw / 359,093 gzip.
-              //
-              // The rule: a manualChunks entry does not "organise" a dependency, it PINS it. Only
-              // map a package you want every visitor to download.
-              //
-              // Re-added and re-removed 2026-08-10. The pin came back under a comment about
-              // forwardRef safety — which was true and beside the point: the question is never
-              // "is this chunk safe", it is "does every visitor need it". The rebuilt artifact
-              // carried vendor-charts-*.js at exactly 362,395 bytes, the same number written
-              // above, modulepreloaded from index.html on every anonymous page load. If you are
-              // about to add this line a third time, the answer is still no.
-              // Supabase
               '@supabase/supabase-js': 'vendor-supabase',
               // Sentry
               // '@sentry/react' is deliberately NOT mapped here.
-              //
-              // Forcing it into one manual chunk defeats the whole point of deferring its heavy
-              // integrations: main.tsx dynamically imports browserTracingIntegration and
-              // replayIntegration after first paint, but a manual assignment pulls every module of
-              // the package into the same chunk regardless, so the dynamic import resolved to
-              // bytes that were already downloaded. Measured: the chunk was byte-identical
-              // (413,748 both before and after the defer).
-              //
-              // Left to Rollup, the eagerly-reachable core lands with the entry and the
-              // lazily-reached tracing/replay code becomes its own chunk. See audit #308 finding 2.
-              // Data layer
-              // Flow builder — Rollup import ordering guarantees React loads first
               '@xyflow/react': 'vendor-flow',
               '@xyflow/system': 'vendor-flow',
               // Email template builder (lazy-loaded page, ~1.1 MB)

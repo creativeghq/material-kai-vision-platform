@@ -1,28 +1,4 @@
-/**
- * A job's labour, at the rate somebody TYPED against what payroll says it actually cost (#378 N1).
- *
- * THE DEFECT THIS EXISTS FOR
- * --------------------------
- * `get_project_labor` costs a job at `minutes / 60 * time_entries.hourly_rate`. The real cost of
- * that hour is `hr_payroll_items.employer_cost` — gross plus employer contributions — which reaches
- * Finance through `post-payroll-to-finance` and never reached the job. Nothing compared them, so
- * every job's margin was built on a guess that nothing anywhere labelled as one.
- *
- * The roll-up itself had no reader at all in `src/`: it was derived, typed, and consumed only by
- * `get_project_pnl` inside SQL. This is its surface.
- *
- * WHAT IT REFUSES TO DO
- * ---------------------
- * Show a number it does not have. `actual_cost` and `variance` come back NULL when no worker on
- * the job could be costed, and this renders that as "Not comparable" with the reason — never as
- * €0.00, which would make a job look more profitable the more unpayrolled labour it consumed.
- * When only some workers are costed it says so, because a variance computed over two thirds of the
- * hours is not a variance over the job.
- *
- * The estimate is never replaced by the actual: payroll is monthly and a job is not, so the actual
- * is an ALLOCATION. Both are shown, which is also why this card does not feed the P&L — that still
- * reads the one derivation.
- */
+/** A job's labour, at the rate somebody TYPED against what payroll says it actually cost (#378 N1). */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Loader2, Clock, TrendingUp, TrendingDown } from 'lucide-react';
 

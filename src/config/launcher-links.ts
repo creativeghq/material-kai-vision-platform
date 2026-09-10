@@ -2,22 +2,6 @@
  * The inner links of a launcher app — its sections, its create actions, and (when it has neither)
  * its agent quick-starts — plus the per-hub "Jump to" shortcuts. ONE derivation, read by the desktop
  * Apps popover and the mobile Apps panel through `useLauncherLinks`.
- *
- * This used to be a closure inside AppLauncher.tsx. The mobile menu needed the same answer, and a
- * second copy is how the two surfaces start disagreeing: the desktop applied three gates to a
- * section (module, capability, workspace-admin) and only two to a shortcut, and a phone port
- * written from memory would have picked one of those and been silently wrong on the other. So the
- * gate lives here, and tests/unit/launcherLinksSingleSource.test.ts fails the build if any file
- * under src/ indexes LAUNCHER_SECTIONS / LAUNCHER_ACTIONS / LAUNCHER_HUB_SHORTCUTS except this one.
- *
- * The gate answers three different questions, and every link gets all three:
- *   • `moduleSlug`            — has this WORKSPACE bought the add-on the link lands on?
- *   • `requireAnyCapability`  — may this PERSON open the route (a CapabilityGuard on it)?
- *   • `requireWorkspaceAdmin` — may this person REWIRE it (a WorkspaceAdminGuard on it)?
- * A link that passes two of the three resolves perfectly and lands on a wall, which is the failure
- * every comment in launcher-sections.ts is about.
- *
- * Pure functions, no React: the guard test calls them directly against the real tables.
  */
 import {
   LAUNCHER_SECTIONS, LAUNCHER_ACTIONS, LAUNCHER_HUB_SHORTCUTS, LAUNCHER_SHORTCUTS,

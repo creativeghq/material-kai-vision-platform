@@ -1,29 +1,4 @@
-/**
- * The Detail column of the Expenses inbox, which answers for BOTH halves of one purchase.
- *
- * A plain ΔΑ (`9.3`) and the ΤΙΜ that bills it arrive as two rows, because a ΔΑ is issued when
- * the invoice follows SEPARATELY: the items and quantities are there and every value is zero,
- * and the ΤΙΜ then carries the money with its itemisation collapsed to one value-only line.
- * (A ΤΔΑ — `1.1` with `isDeliveryNote` — is the other kind, which IS the invoice and prices
- * everything itself; it needs none of this.) Each row was individually correct and jointly
- * useless: the invoice said "Needs detail" forever, because a value-only line is all it will
- * ever carry, and the delivery note sat at €0.00 looking like nothing had happened.
- *
- * Four states, and the distinction between the middle two is the point of the whole feature:
- *
- *   Needs detail          nothing names this document and no correlation is known
- *   Detail on ΔΑ 2944     somebody stands behind it — AADE declared it, or an operator accepted it
- *   ΔΑ 2944?              OUR guess, evidence in the tooltip, waiting for a yes or no
- *   Invoiced by ΤΙΜ 2734  the same edge read from the delivery note's side
- *
- * The third must never be written as the second. A 0.95 dispatch-date match and a 0.25 "one of
- * eleven invoices that month" would otherwise render identically, and a coincidence accepted
- * silently becomes the itemisation of a supplier bill.
- *
- * ONE component, used by the inbox table and the supplier's own document list. The two tables
- * already carried byte-identical copies of the "Needs detail" span, which is how the wording for
- * the other three states would have ended up living in two places on the first edit.
- */
+/** The Detail column of the Expenses inbox, which answers for BOTH halves of one purchase. */
 import React from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { inboundService, type InboundDocument, type InboundLinkSummary } from '@/modules/finance/services/inboundService';

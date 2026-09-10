@@ -1,26 +1,4 @@
-/**
- * RecordPeekDialog — the detail behind a row in an agent result card.
- *
- * A tool answers "show me the last five expenses" with a table. Until now that table was where the
- * conversation stopped: the rows were records, and there was nothing to click. The obvious fix —
- * import each module's own detail dialog — does not scale past the first one (PartyDetailDialog
- * alone wants a party row, an aging bag and a finance base) and gives the 127 result types 127
- * different answers to the same question.
- *
- * So the detail is derived ONCE, in SQL: `get_record_peek(kind, id)` returns a title, a badge, the
- * fields worth reading and the records this one points at — for every kind, under the caller's own
- * RLS. This component formats that and nothing more; adding a kind is a migration, not a new
- * component, which is what makes "more interactive" land on every tool rather than on one.
- *
- * Two destinations, and they are not the same thing:
- *   • a kind WITH a page (`company`, `order`, `invoice`, …) offers "Open" — a new tab, so the chat
- *     the reader is mid-way through is still there when they come back.
- *   • a kind WITHOUT one (`expense`, `payment`, `contract`) offers its LIST, labelled as the list.
- *     Calling that "open the record" would be a button whose whole effect is to name a place.
- *
- * Related records push onto a stack rather than replacing, so supplier → their order → the project
- * is one trip with a Back at every step.
- */
+/** RecordPeekDialog — the detail behind a row in an agent result card. */
 import React, { useCallback, useEffect, useState } from 'react';
 import { ExternalLink, ArrowLeft, Loader2, Link2 } from 'lucide-react';
 

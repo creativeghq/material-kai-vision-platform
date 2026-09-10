@@ -4,26 +4,7 @@ import { join } from 'path';
 
 import { stripComments } from '../helpers/stripComments';
 
-/**
- * A marketing send fails CLOSED on both of its compliance controls (#387, #366 BU-2).
- *
- * The subsystem applied one philosophy — "never block the send" — to two controls, and
- * it is right for only one category of mail. For a TRANSACTIONAL email, never blocking
- * is correct: the recipient asked for it. For a MARKETING send the safe failure is
- * inverted — not sending is recoverable, sending bulk mail without a working opt-out is
- * not, and deliverability damage is not something a later fix undoes.
- *
- * WHAT MADE #387 HARD TO SEE
- * The email still contained AN unsubscribe link, because the body fell back to a generic
- * `${appBase}/unsubscribe`. So it looked compliant. What actually vanished was the
- * `List-Unsubscribe` / `List-Unsubscribe-Post` header pair, and the fallback link
- * carried no workspace and no recipient token — so the page could not tell who had
- * clicked and could not honour the request without them re-entering their details. That
- * is precisely the friction one-click exists to remove.
- *
- * RFC 8058 one-click unsubscribe has been a requirement for bulk senders under the Gmail
- * and Yahoo rules since February 2024.
- */
+/** A marketing send fails CLOSED on both of its compliance controls (#387, #366 BU-2). */
 
 const ROOT = join(__dirname, '..', '..');
 const EMAIL_API = join(ROOT, 'supabase/functions/email-api/index.ts');

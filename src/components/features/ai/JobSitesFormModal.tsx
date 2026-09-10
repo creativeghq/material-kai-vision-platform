@@ -3,11 +3,6 @@
  * chunk. Lets the user fill site details without learning the schema, then
  * submits as a follow-up agent message that re-invokes the `manage_job_sites`
  * tool with structured fields.
- *
- * Why this exists: a chat-only flow is fine for one-off additions ("add
- * kariera.gr to perplexity filter") but tedious for full entries with country
- * codes, categories, and notes. The modal trades a single chunk-emit for a
- * proper form, then collapses back into chat-tool flow on submit.
  */
 
 import { useEffect, useState } from 'react';

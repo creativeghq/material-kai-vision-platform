@@ -1,15 +1,4 @@
-/**
- * Semgrep ruleset validity guard.
- *
- * `.github/semgrep-security.yml` is the code-level half of the invariants (the DB
- * half is check_security_invariants(), run by the data-integrity cron). It was INVALID YAML from
- * the day it was added — an unquoted pattern containing `": F"` parsed as a nested mapping — so
- * semgrep loaded zero rules and exited non-zero on every run. The workflow ran it with
- * `|| true`, so the job went green and the gate silently enforced nothing.
- *
- * The workflow is blocking now, but a malformed ruleset is exactly the failure that hid before,
- * so assert it parses HERE too: the unit tier fails in seconds, without pulling a container.
- */
+/** Semgrep ruleset validity guard. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -86,15 +75,6 @@ describe('semgrep security ruleset', () => {
    * Patterns that semgrep REJECTS. A rule whose pattern fails to parse is not skipped quietly at
    * the rule level — semgrep reports a "Rule parse error" and the rule matches nothing, which on
    * a clean-looking scan is indistinguishable from a codebase with no violations.
-   *
-   * The entry below cost a real debugging cycle while writing the rules: `catch (...)` gives
-   * "Invalid pattern for JavaScript/TypeScript: Stdlib.Parsing.Parse_error". The binding form
-   * `catch ($E)` is correct AND also matches a bare `catch {`, so it is strictly better anyway.
-   *
-   * Only syntax CONFIRMED against semgrep belongs in this list. A trailing `...` in an object
-   * pattern (`{ ..., allowed: true, ... }`) was nearly added here on the assumption it shared the
-   * blame; probing it showed it parses fine in both typescript and python. A guard built on a
-   * guess would have blocked valid patterns forever.
    */
   const FORBIDDEN_PATTERN_SYNTAX: Array<{ re: RegExp; why: string }> = [
     { re: /catch\s*\(\s*\.\.\.\s*\)/, why: '`catch (...)` is a parse error — use `catch ($E)`, which also matches a bare `catch {`' },

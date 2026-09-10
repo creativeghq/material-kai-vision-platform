@@ -1,26 +1,4 @@
-/**
- * Deal-pipeline guard (#311).
- *
- * The pipeline was Real Estate's, with its seven stages written as a TypeScript union and a
- * `STAGES` array in the board:
- *
- *   lead → viewing → offer → under_offer → conveyancing → exchanged → completed
- *
- * "Conveyancing" and "exchanged" are property-transfer terms. The moment a second kind of deal
- * exists — a project, a construction job, whatever a tenant invents — a single shared stage list
- * puts that deal in a column that is nonsense for it, and a hardcoded `stage === 'completed'`
- * marks the wrong thing won. Neither is visible to a typecheck: both are valid strings.
- *
- * So stages are DATA (`crm_deal_stages`, one set per `crm_deal_types` row), the database enforces
- * the pairing through a composite FK on `(deal_type_id, stage)`, and this file fails the build if
- * a stage list, or the old table, comes back into the frontend.
- *
- * SCOPE — a green run here does NOT prove the invariant holds. This scans REPO FILES, so it sees
- * the TypeScript half only. The composite FK, the `subject_kind` CHECK and the RLS visibility rule
- * live in `pg_proc`/`pg_constraint` and are invisible here (this project's SQL is applied via the
- * Supabase MCP and never committed — CLAUDE.md). The DB half is guarded by the constraints
- * themselves, which reject the bad write rather than reporting it.
- */
+/** Deal-pipeline guard (#311). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -362,10 +340,6 @@ describe('the deal pipeline has one object and data-driven stages', () => {
     // company's CRM page. The wrong way to do that is a deal-notes table plus a copy onto the
     // party: two rows saying the same thing, which disagree the moment one is edited, and then a
     // permanent question about which is true.
-    //
-    // So there is ONE row, targeted at the contact/company — which is what crm_record_timeline
-    // already reads, so the CRM page needed no change — with `deal_id` recording where it was
-    // typed so the deal can show its own subset.
     const drawer = SOURCES.get('src/components/business/crm/DealDrawer.tsx');
     expect(drawer, 'the deal drawer is gone').toBeTruthy();
     expect(

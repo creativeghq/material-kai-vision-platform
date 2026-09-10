@@ -190,16 +190,7 @@ const PATH_PARAM_KEYS = [
   'factory_name', 'task_type', 'model_name',
 ] as const;
 
-/**
- * Resolve an endpoint template against the payload, URL-encoding every value.
- *
- * Only `factory_name` was encoded; the other twelve were interpolated raw. That let a
- * non-admin call `rag_get_job` with `job_id = "../../../admin/system/metrics?x="`: the
- * template `/api/rag/documents/job/{job_id}` does not start with `/api/admin`, so the admin
- * guard passed, and the resolved path then normalised to `/api/admin/system/metrics` and was
- * sent to MIVAA under the gateway's privileged credential (#361 `EG-1`). Encoding turns the
- * `../` into `..%2F`, which is a path SEGMENT rather than a traversal.
- */
+/** Resolve an endpoint template against the payload, URL-encoding every value. */
 function substitutePathParams(template: string, payload: Record<string, unknown> | null): string {
   let out = template;
   for (const key of PATH_PARAM_KEYS) {
@@ -231,19 +222,7 @@ function normalizePath(path: string): string {
   return '/' + out.join('/');
 }
 
-/**
- * Actions that are privileged even though their PATH is not under `/api/admin`.
- *
- * The gate below derives "is this admin" from the resolved path, which works only while every
- * privileged route lives under that prefix. These two do not: MIVAA's admin router is mounted at
- * `prefix="/api"` and declares `/system/health` + `/system/metrics`, so the real paths are
- * `/api/system/...`. The action map here said `/api/admin/system/...`, which 404'd — broken, but
- * safely broken, since the wrong path also happened to satisfy the admin check.
- *
- * Correcting the path alone would therefore have un-gated host CPU, memory and disk figures for
- * any authenticated user. The gate is explicit for these two instead, so the path can be right
- * and the privilege can stay.
- */
+/** Actions that are privileged even though their PATH is not under `/api/admin`. */
 const ADMIN_ONLY_ACTIONS = new Set([
   'admin_system_health',
   'admin_system_metrics',
@@ -758,11 +737,6 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
     // trusted `service=mivaa` identity and trust the client-supplied workspace_id / skip ownership
     // → cross-tenant reads. Admin-secret + cron/no-JWT callers keep the MIVAA service key. Mirrors
     // the upload path's forwarding.
-    // Scope JWT-forwarding to /api/rag/* — those routes are EXCLUDED from MIVAA's JWT middleware
-    // and decode the bearer in-handler via get_optional_workspace_context (same as the upload
-    // path), so a real user JWT resolves the actual user + enforces ownership there. Other
-    // prefixes (/api/search, /api/images, /api/kb) are middleware-validated, so keep sending the
-    // service key to avoid coupling to user-JWT middleware behavior.
     const callerAuthHeader = req.headers.get('authorization');
     const isRagPath = typeof endpoint.path === 'string' && endpoint.path.startsWith('/api/rag');
     const forwardedAuthHeader = (!isAdmin && isRagPath && callerAuthHeader && callerAuthHeader.startsWith('Bearer '))

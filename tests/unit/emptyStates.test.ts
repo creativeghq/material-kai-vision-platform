@@ -1,48 +1,4 @@
-/**
- * An empty surface must offer the way out of being empty.
- *
- * THE DEFECT THIS EXISTS FOR
- * --------------------------
- * `ContractsSection` rendered `<p>No contracts yet.</p>` — and eight lines above it, in the same
- * component, sat `canCreate` and `openCreate` powering a "New contract" button in the card
- * header. So the one screen state where the user most needs the create action showed them a
- * sentence and nothing else, while the button they needed was there the whole time, in scope,
- * unused. That shape repeated 116 times across 74 files.
- *
- * It is invisible to every other check. The text is correct, the component renders, the types are
- * fine, and the screen only looks wrong to somebody who has no data — which is never the person
- * writing the code, and rarely the person reviewing it. It is only ever seen by a new workspace on
- * its first day, which is the worst possible audience for it.
- *
- * WHAT IS FLAGGED, AND WHY IT IS NARROW
- * -------------------------------------
- * Only the intersection of three things:
- *   1. an empty-state SENTENCE ("No X yet", "Nothing here", "There are no X"),
- *   2. inside a branch that is clearly a LIST-EMPTY test (`length === 0` and friends),
- *   3. in a file that already HAS a create affordance — a button reading New/Add/Create/Import/
- *      Upload/Connect/Enable/Invite/Generate.
- *
- * (3) is what keeps this honest. Plenty of empty states have no action and should not have one:
- * "No AI usage logs found" on a telemetry panel, `<CommandEmpty>` inside a combobox, a derived
- * read-only rollup. Flagging those would produce the kind of guard that gets suppressed, and a
- * suppressed guard protects nothing. If a file has no create button, this test says nothing about
- * it.
- *
- * RATCHET, NOT A WALL
- * -------------------
- * 42 files still carry the shape. Failing the build on all of them today would mean either a
- * 42-file commit nobody can review or a disabled test, so the baseline records them and the count
- * may only go DOWN. A new one fails immediately; fixing an old one is a small PR that also edits
- * the baseline downward.
- *
- * To regenerate the baseline after fixing some:
- *
- *     WRITE_EMPTY_STATE_BASELINE=1 npx vitest run tests/unit/emptyStates.test.ts
- *
- * That is deliberately not the path of least resistance. Regenerating is the correct move after
- * you REMOVE offenders and the wrong move in every other case, so it should cost a moment's
- * thought rather than a flag someone reaches for to make a red test green.
- */
+/** An empty surface must offer the way out of being empty. */
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync, statSync, writeFileSync, existsSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
@@ -102,14 +58,6 @@ export function findOffenders(): Record<string, number> {
       if (!EMPTY_TEXT.test(lines[i])) continue;
       // A window either side: far enough to see the conditional and any nearby button, near
       // enough not to pick up an unrelated control elsewhere in the render.
-      //
-      // This window is why the check has FALSE NEGATIVES and no false positives, which is the
-      // right way round. A create button that happens to sit within six lines of the message —
-      // in the card header immediately above it, say — suppresses the finding even though the
-      // empty branch itself still offers nothing. Widening the window fixes those and starts
-      // convicting files where the only nearby button is a row action or a dialog footer, and a
-      // guard that cries wolf gets switched off. Under-reporting is recoverable; being ignored
-      // is not.
       const win = lines.slice(Math.max(0, i - 6), Math.min(lines.length, i + 7)).join('\n');
       if (LIST_EMPTY.test(win) && !HAS_ACTION.test(win)) hits++;
     }

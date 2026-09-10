@@ -1,32 +1,4 @@
-/**
- * vies-validate
- *
- * Server-side VIES VAT validation.
- *
- *   POST /functions/v1/vies-validate
- *     body: { country_code: string, vat_number: string, company_id?: string }
- *
- *   Returns: { valid, name, address, checked_at, source: 'vies', skipped_reason?: string }
- *
- * If company_id is provided AND the caller owns the row (created_by) OR is admin,
- * the result is also cached on crm_companies (vat_validated*, vat_validated_at, …).
- *
- * Why server-side:
- *  - VIES has occasional downtime; we want consistent error handling + a single retry policy
- *  - Caching the result on crm_companies needs service-role to bypass RLS for the admin path
- *  - Avoids CORS friction from calling ec.europa.eu directly from the browser
- *
- * VIES is EU-only — non-EU country codes are skipped with skipped_reason='non_eu'.
- * address_parsed additionally carries `state` (province) for countries whose address
- * convention encodes one (e.g. IT); null elsewhere.
- *
- * Script note: VIES proxies each member state's own register and returns the name/address in that
- * register's script — Cyrillic for BG, Greek for EL/CY. It has NO language parameter (verified
- * 2026-08-03 against the REST and SOAP endpoints and against `Accept-Language` / `lang` / `locale`
- * / `language`, all ignored). So we additionally return `*_latin` fields carrying a deterministic
- * transliteration. Those are a readability aid, NOT a translation and NOT a trading name — the
- * unconverted values stay authoritative and are what belongs on an invoice.
- */
+/** vies-validate */
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
@@ -291,22 +263,7 @@ Deno.serve(withApiLogging('vies-validate', async (req: Request) => {
       console.warn(`[vies-validate] rejected workspace_id ${requestedWs} for user ${user.id} — not a member`);
     }
 
-    /**
-     * RECORD THAT *WE* VERIFIED IT (#353 CRM-7).
-     *
-     * `vat_validated` is a trust assertion on a record that feeds invoicing, and it sat in the
-     * crm-api write allowlist — so any CRM-capable caller could mark a number verified having
-     * done no lookup at all. The fields could not simply be dropped, because the real flow is a
-     * server-side lookup followed by a client save.
-     *
-     * This receipt is the missing link: the server writes it only when a registry actually
-     * answered, and `crm-api` stamps the flag only when a recent one exists. The client is no
-     * longer believed about what it looked up. Keyed on the NORMALISED number so `EL800370260`
-     * and `800 370 260` are one receipt (#353 CRM-4).
-     *
-     * Only on a POSITIVE result: a VIES "not recognised" is a real answer, and recording it
-     * would let a subsequent save stamp `vat_validated` for a number VIES rejected.
-     */
+    /** RECORD THAT *WE* VERIFIED IT (#353 CRM-7). */
     if (workspaceId && result.valid === true) {
       const { error: receiptErr } = await admin.from('vat_validation_receipts').upsert({
         workspace_id: workspaceId,

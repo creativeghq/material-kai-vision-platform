@@ -95,18 +95,6 @@ export interface TaskNetworkNode {
 /**
  * The critical path method: a forward pass for the earliest each task can run, a backward pass for
  * the latest it can run without delaying the project, and the float between them.
- *
- * This replaced a longest-single-chain heuristic. Two things were wrong with that: it reported ONE
- * chain when a real programme routinely has several equally critical ones, and it produced no
- * FLOAT — which is the number a site manager actually uses, because "this has four days of slack"
- * is what decides whether a late delivery matters.
- *
- * Still deliberately NOT a full planning engine: no calendars, no resource levelling, no lag, and
- * only finish-to-start is treated as a real constraint. Those change what a date MEANS, and
- * inventing them here would produce confident dates nobody agreed to.
- *
- * Returns null when the edges contain a cycle — the DB rejects those at write time, so null means
- * the data is already inconsistent and a caller should fall back rather than loop.
  */
 export function computeNetwork(
   tasks: ScheduleTask[],

@@ -1,21 +1,4 @@
-/**
- * A deal and the paper it was won on (#378 C3).
- *
- * `crm_deals` linked to a project and a property; nothing linked a document to a DEAL. The
- * pipeline's weighted forecast and the invoiced revenue were two unrelated numbers, so forecast
- * accuracy was unmeasurable and a won deal had to be re-typed as a quote.
- *
- * Three invariants, each protecting a different way of getting it wrong:
- *
- *   1. The LIST is one SQL derivation. Three client-side selects would be a second answer to
- *      "what did this deal produce", and the two would drift the moment a fourth document type
- *      appeared — the shape `get_party_work` and `get_order_settlements` exist to prevent.
- *   2. Attaching is restricted to the deal's OWN party, and to documents on no deal yet.
- *      Without the party filter a stranger's invoice can be pulled into this pipeline; without
- *      the null filter, one deal silently steals a document from another.
- *   3. This panel attaches; it never CREATES. Raising a quote has its own form, its own pricing
- *      and its own numbering — a "New quote" button here would be a fourth way to make one.
- */
+/** A deal and the paper it was won on (#378 C3). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

@@ -69,17 +69,7 @@ type DocType = keyof typeof DOC_TYPES;
 
 type PayMethod = 'cash' | 'card' | 'iris';
 
-/**
- * The AADE / myDATA payment-method code for a register payment.
- *
- * ONE derivation — never inline a second one at a call site. `method === 'cash' ? 3 : 7`
- * looks right and collapses IRIS to the card code, which declares **every IRIS receipt to
- * AADE as a card payment** and takes the Z-report payment-method breakdown with it.
- *
- * The integers come from `MYDATA_PAYMENT_CODE` (AADE table 8.12) rather than being written
- * out here: the same eight codes were also spelled out, ROTATED BY TWO, in the reference
- * seed behind the manual invoice picker and in the three maps that print them.
- */
+/** The AADE / myDATA payment-method code for a register payment. */
 const AADE_PAYMENT_CODE: Record<PayMethod, number> = {
   cash: MYDATA_PAYMENT_CODE.cash,
   card: MYDATA_PAYMENT_CODE.pos,
@@ -129,19 +119,7 @@ const PosPage: React.FC = () => {
   const [movVehicle, setMovVehicle] = useState('');
   const [movShipTo, setMovShipTo] = useState('');
   const [issuing, setIssuing] = useState(false);
-  /**
-   * A sale is issued ONCE (#351 C1).
-   *
-   * `disabled={issuing}` is React state, so it takes effect a frame later — a touchscreen bounce
-   * or a stuck button lands the second call inside that window, and two calls meant two receipts,
-   * two payments and two stock reductions, each carrying its own legal AADE number.
-   *
-   * The ref closes the window synchronously. It cannot close the OTHER half: a connection dropped
-   * after the transaction committed shows the cashier an error for a receipt that exists, and
-   * pressing the button again is the natural thing to do. So the register also mints a token per
-   * BASKET and `pos_issue_receipt` returns the same receipt for it — a retry of this sale is the
-   * same sale, while the next customer's identical basket is a new one.
-   */
+  /** A sale is issued ONCE (#351 C1). */
   const issuingRef = useRef(false);
   const [saleToken, setSaleToken] = useState(() => crypto.randomUUID());
   const [session, setSession] = useState<PosSession | null>(null);
@@ -233,19 +211,7 @@ const PosPage: React.FC = () => {
   }, [items, search]);
 
   const currency = cart[0]?.currency ?? items[0]?.currency ?? 'EUR';
-  /**
-   * Totals, computed PER LINE at that line's own VAT rate.
-   *
-   * Each cart line already snapshots `line_vat` at the moment it was added, the line-item
-   * table renders it, and the thermal receipt prints it per row — but nothing used it for
-   * arithmetic. Every rate in the basket was taxed at whatever `vatRate` the keypad happened
-   * to be showing at the end. So ringing up a 24% item and then switching to 6% printed
-   * "24%" beside line 1 while the ΑΝΑΛΥΣΗ ΦΠΑ block below declared the whole sale at 6% —
-   * wrong VAT remitted, on a document that contradicts itself in print.
-   *
-   * `byRate` also gives the receipt a real per-rate VAT analysis, which is what a mixed-rate
-   * Greek retail receipt is required to show.
-   */
+  /** Totals, computed PER LINE at that line's own VAT rate. */
   const totals = useMemo(() => {
     const byRate = new Map<number, { net: number; vat: number; gross: number }>();
     for (const l of cart) {
@@ -439,9 +405,6 @@ const PosPage: React.FC = () => {
       // legal series — and a failure after the second left an `issued` invoice, holding a legal
       // number, with zero items. The counter increment is a plain UPDATE, so inside the function it
       // simply rolls back with everything else.
-      //
-      // The header totals come back DERIVED FROM THE STORED LINES, so Σ lines = subtotal_net always
-      // holds. myDATA rejects a document whose lines do not foot. (audit #271 items 4 and 6)
       const { data: issued, error: issErr } = await supabase.rpc('pos_issue_receipt', {
         p_workspace_id: activeWorkspaceId,
         p_session_id: session!.id,

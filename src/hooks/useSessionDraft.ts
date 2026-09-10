@@ -4,24 +4,6 @@ import { useCallback, useEffect } from 'react';
  * Persist an in-progress modal/form to sessionStorage so a half-filled form
  * survives navigating to another screen and reopening — and is gone when the tab
  * closes (no stale drafts lingering forever like localStorage would).
- *
- * Usage:
- *   const clearDraft = useSessionDraft(
- *     `my-form:${workspaceId}`,
- *     open,
- *     { name, amount, notes },          // the fields to persist
- *     (d) => {                          // restore: runs once when the modal opens
- *       setName(d?.name ?? '');
- *       setAmount(d?.amount ?? '');
- *       setNotes(d?.notes ?? '');
- *     },
- *   );
- *   // call clearDraft() on successful Save AND on explicit Cancel.
- *
- * Only persist plain serializable values (and small self-contained objects you can
- * restore without a refetch). Transient/loaded state (search results, fetched lists)
- * should stay out of `values`.
- *
  * @param key     unique storage key for this form instance
  * @param open    whether the modal is open (drafts are only read/written while open)
  * @param values  current form values (a flat object of the fields to persist)

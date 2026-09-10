@@ -1,27 +1,4 @@
-/**
- * The SERP feature inventory.
- *
- * A keyword research run records `serpFeatureTypes` — every block type Google
- * actually returned for the query. One stored run here holds
- * `["ai_overview","organic","people_also_ask","popular_products","local_pack",
- * "images","product_considerations","related_searches"]` and the UI rendered
- * none of it: the keyword-research tab showed the keyword, a count and a date.
- *
- * This file turns that raw list into an INVENTORY rather than a list of hits,
- * and that difference is the whole point. Google gives a keyword a fixed set of
- * possible blocks; which ones are ABSENT is as actionable as which are present:
- *
- *   - no featured snippet on an informational query is an opening, not a blank
- *   - an image pack you are not in is a channel you are ignoring
- *   - a local pack on a commercial query means the buyer wants a nearby seller,
- *     and a national page will not win it however good the copy is
- *
- * So every feature below is always rendered, with a present/absent verdict and a
- * line saying what that verdict means for the person reading it — the same rule
- * the metric tiles follow.
- *
- * Keys are DataForSEO's `item.type` values from `/serp/google/organic/live/advanced`.
- */
+/** The SERP feature inventory. */
 
 export type SerpFeatureGroup = 'answer' | 'visual' | 'commercial' | 'social' | 'navigational';
 

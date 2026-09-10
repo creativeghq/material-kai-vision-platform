@@ -1,14 +1,4 @@
-/**
- * How a conversation's mood LOOKS — one definition, used everywhere it is shown.
- *
- * Three surfaces read this: the ring around the contact's avatar, the mood panel in the drawer,
- * and the urgency flag on the thread row. Written out three times they drift, and a customer
- * shown as "frustrated" in the panel with a calm green ring beside it is worse than no signal at
- * all — the reader believes the one that agrees with what they already assumed.
- *
- * The mood itself comes from `inbox-api analyze_sentiment`, which is also what the assistant is
- * told before it drafts a reply. One verdict, so the screen and the reply cannot disagree.
- */
+/** How a conversation's mood LOOKS — one definition, used everywhere it is shown. */
 import type { ConversationMood, ConversationUrgency } from '@/services/inboxApi';
 
 export interface MoodStyle {

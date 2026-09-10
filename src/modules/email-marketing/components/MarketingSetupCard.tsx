@@ -1,22 +1,4 @@
-/**
- * Email Marketing → Setup. A STATUS surface, not a second editor.
- *
- * The sender config lives in ONE place — Profile → Keys → Email (`/profile?tab=keys&section=email`),
- * the canonical home for every per-workspace BYOK credential. This card used to mount the same
- * `WorkspaceEmailConfigCard` a second time against the same `workspace_email_config` row, and the
- * duplication is what made it lie:
- *
- *   • It passed `requireOwnSender` unconditionally — in the activation gate AND in this settings
- *     tab — so "This is required to unlock Templates and Campaigns" kept showing after they were
- *     unlocked, as permanent copy rather than a one-time prompt.
- *   • `requireOwnSender` also SUPPRESSED the "platform default sender is active" box, which is the
- *     only thing on the page that says which address mail actually goes out from. On the operator's
- *     root workspace — exempt from BYOK, sending from the platform sender — that left a green
- *     "your Resend sender is configured" banner above a form with every field empty, and no
- *     explanation anywhere.
- *
- * So this states what a send resolves to RIGHT NOW, and links to the one place that changes it.
- */
+/** Email Marketing → Setup. A STATUS surface, not a second editor. */
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, CheckCircle2, ExternalLink, Loader2, Mail, Send, ShieldCheck } from 'lucide-react';

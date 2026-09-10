@@ -1,25 +1,4 @@
-/**
- * A WhatsApp send checks the opt-out list and the 24-hour window (#359 CM-1 / CM-2 / CM-5).
- *
- * `messaging-api` contained zero occurrences of `optout`, `opt_out`, `opted`, `suppress` or
- * `unsubscrib`. The module ships a 330-line opt-outs tab to collect them and
- * `zernio-webhook-handler` records every STOP keyword the customer sends — and the direct send
- * path never looked at either. Only the campaign cron did, and it compared raw strings.
- *
- * WhatsApp opt-out is stricter than email: it is a legal requirement AND a Meta platform-policy
- * one, and repeated violations degrade the number's quality rating up to a ban.
- *
- * Underneath it was a shape problem. FOUR phone normalizers with three behaviours:
- *
- *   • `messaging-api` prefixed a bare `+`, so `0030691…` became `+0030691…`
- *   • the two frontend copies defaulted to country code **+1**, so a Greek mobile typed as
- *     `6912345678` became `+16912345678` — a real US number, billed, in violation, and it looks
- *     exactly like a clean send
- *   • the webhook stored whatever the provider sent
- *
- * An opt-out written in one shape and checked in another is a guard that cannot see. It never
- * matches, nothing raises, and the message goes out.
- */
+/** A WhatsApp send checks the opt-out list and the 24-hour window (#359 CM-1 / CM-2 / CM-5). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

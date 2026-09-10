@@ -2,14 +2,6 @@
 // Mirrors the Python app/utils/ssrf_guard.py contract.
 // A user-controlled URL fetched by OUR runtime can be pointed at cloud metadata
 // (169.254.169.254), loopback, or RFC1918 internal services. This guard:
-//   1. requires an http/https scheme,
-//   2. blocks IP-literal hosts in private/loopback/link-local/reserved ranges,
-//   3. blocks known-internal hostnames (localhost, *.internal, metadata hosts),
-//   4. resolves the hostname (A/AAAA) and blocks if ANY resolved address is
-//      private — closing DNS-rebinding-to-internal.
-// Callers MUST additionally pass `redirect: "error"` (or "manual") to fetch(),
-// because a public URL can 302 to a blocked address AFTER this check. Re-guard
-// each hop if you follow redirects yourself.
 
 export class SSRFError extends Error {
   constructor(message: string) {

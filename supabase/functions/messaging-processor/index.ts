@@ -1,14 +1,5 @@
 /**
  * Messaging Campaign Processor — WhatsApp via Zernio.
- *
- * Cron-invoked (every minute). Sends scheduled WhatsApp campaigns per-recipient
- * through Zernio's inbox conversation-create path with an approved template
- * (WhatsApp blocks cold freeform sends). SMS / Twilio removed.
- *
- * Outbound sends are logged to messaging_logs only — they deliberately do NOT
- * create an inbox conversation. A thread is surfaced + assigned only when the
- * recipient replies (handled in zernio-webhook-handler on message.received).
- *
  * @see https://docs.zernio.com — /v1/inbox/conversations
  */
 
@@ -138,9 +129,6 @@ serve(withApiLogging('messaging-processor', async (req) => {
       // two frontend copies defaulted to country code +1 — so a stored opt-out and a campaign
       // recipient were routinely different strings for the same person, and the Set never matched.
       // A guard that cannot see is worse than no guard: it reads as coverage.
-      //
-      // The verdict is now `messaging_number_is_opted_out`, which normalizes both sides. Called per
-      // recipient rather than prefetched: a STOP that arrives mid-campaign must stop the rest of it.
 
       // Enforce the channel's CUMULATIVE daily send cap (was only a per-request size guard in
       // send-bulk; the cron blew past it unchecked). Count today's sends for this channel and cap this
@@ -261,8 +249,6 @@ serve(withApiLogging('messaging-processor', async (req) => {
           // messaging_logs_analytics trigger never fires so messaging_analytics under-counts;
           // and the cumulative daily cap counts messaging_logs rows, so the channel's
           // daily_quota is silently exceeded. The receipt webhook cannot find the row either.
-          // The WhatsApp send already SUCCEEDED here, so this throws into the per-recipient
-          // catch below, which records the recipient as failed rather than silently 'sent'.
           const { data: messageLog, error: logErr } = await supabase.from('messaging_logs').insert({
             channel_type: 'whatsapp',
             workspace_id: channel.workspace_id, // Tenant scope

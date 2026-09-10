@@ -1,14 +1,6 @@
 // The measurements + section/task tree of a blueprint. ONE renderer, used by the editor page
 // (editable) and by the library's starter preview (read-only) — the preview is the same screen with
 // the inputs disabled, not a second, thinner rendering of the same data.
-//
-// It was briefly the latter: the library drew its own summary of section names and quantities, which
-// silently dropped the formula, the labor and material rates, the margin, the allowance flag and the
-// option/tier — i.e. everything you would actually want to read BEFORE copying a starter into your
-// library. A preview that hides the fields cannot answer the question it exists to answer.
-//
-// Read-only is enforced by a `<fieldset disabled>` wrapper rather than a `disabled` prop on each
-// control: it cannot be forgotten on a field added later, and it covers the native <select> too.
 import React from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { HubEmptyState } from '@/components/core/hub';

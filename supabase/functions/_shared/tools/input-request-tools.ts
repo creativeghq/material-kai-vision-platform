@@ -1,32 +1,4 @@
-/**
- * `request_input` — the agent's structured way to ask for something (issue #370, Class D).
- *
- * WHY THIS EXISTS. The mechanism for an interactive follow-up was half-built. The b2b-research
- * workflow already declares `awaits_user_input: true` with an `input_schema`; AgentHub already
- * HANDLES a `workflow_step_input_request` chunk and already RENDERS a form from it. Nothing in
- * `supabase/functions/` has ever emitted that chunk — `createWorkflowEmitter` has `plan()`,
- * `step()` and `finished()` and no input request — so the form only ever appeared via the
- * frontend-local path when the picker launched a workflow. An agent answering a free-form message
- * had no structured channel at all, so every follow-up degraded to a wall of markdown in the chat.
- * That is what the user saw twice in conversation 96da9fc8, and it was the only thing the agent
- * could do.
- *
- * WHAT IT IS NOT. This is NOT the confirmation gate. Approving a spend, a send, or a fiscal
- * document stays with `action_confirmation` and invariant 9. `request_input` collects SCOPE, and
- * scope is never a gate:
- *
- *   - it is DISMISSIBLE, always. The card renders a "decide for me" control that hands the turn
- *     back with permission to proceed on defaults. A question the user cannot wave away is a gate,
- *     and gates are the failure the operating doctrine exists to prevent.
- *   - it is for parameters that genuinely change the work. The doctrine says a parameter the tool
- *     marks optional is not a question; this tool does not exempt the agent from that. It is for
- *     the case where the answer really does change what gets built — not for collecting a country
- *     the tool would have defaulted for you.
- *
- * The fields reuse the frontend's `ToolkitFormField` shape, so a `country` field renders the real
- * sourcing-market vocabulary and an `enum` renders the real values — the same renderers the
- * quick-start forms use, rather than a second set that can drift from them.
- */
+/** `request_input` — the agent's structured way to ask for something (issue #370, Class D). */
 
 // `tool` is typed non-generically ON PURPOSE — see the note in toolkit-tools.ts. Inferring it
 // pulls @langchain/core's generic graph in and blows the edge typecheck heap.
@@ -141,11 +113,6 @@ export const createRequestInputTool = (onChunk: ChunkSink) => {
           // description, and the model complied about half the time — R3 pre-filled all four
           // fields, T2/V2/W2 sent every field null. A form of empty boxes is an interrogation with
           // extra steps, which is the thing this tool exists to avoid.
-          //
-          // Only `select` is required to carry a default, deliberately. A select always HAS a
-          // most-likely option, so omitting it is laziness. A free-text field often has no
-          // honest guess — forcing one there would make the model invent a website or a client
-          // name and pre-fill it, which is worse than an empty box.
           .superRefine((fields, ctx) => {
             for (const [i, f] of fields.entries()) {
               if (f.kind === 'select' && !f.default) {

@@ -1,26 +1,4 @@
-/**
- * The payable arithmetic of a myDATA document-level tax — AADE Appendix §23, the `taxType` table.
- *
- * | taxType | bucket      | kind         | reducesPayable=true | reducesPayable=false |
- * |---------|-------------|--------------|---------------------|----------------------|
- * | 1       | withheld    | deductive (−)| subtracts           | does not subtract    |
- * | 2       | fees        | additive  (+)| does NOT add        | adds                 |
- * | 3       | other taxes | additive  (+)| does NOT add        | adds                 |
- * | 4       | stamp duty  | additive  (+)| does NOT add        | adds                 |
- * | 5       | deductions  | deductive (−)| subtracts           | does not subtract    |
- *
- * ONE boolean whose effect depends on the tax's inherent sign; either way `true` leaves the
- * payable smaller. ΠΛΗΡΩΤΕΟ = totalNetValue + totalVatAmount, plus the sum of these deltas.
- *
- * **`public.mydata_tax_payable_delta` in SQL is the authority**, and it is what stamps the
- * stored `invoices.tax_payable_delta` that the envelope builder transmits. This copy exists for
- * ONE reason: the invoice dialog has to show a live total before any row has been written, so
- * there is no invoice for the RPC to derive from yet. The two are held equal by the truth-table
- * case in `tests/unit/mydataDocumentTaxes.test.ts` — the same arrangement `escapeHtml` uses
- * across its runtimes, and for the same reason: the last hand-copied rule drifted.
- *
- * Import-free on purpose, so the guard test can load it in any runtime.
- */
+/** The payable arithmetic of a myDATA document-level tax — AADE Appendix §23, the `taxType` table. */
 
 /** AADE `taxType`. */
 export const MYDATA_TAX_TYPE = {

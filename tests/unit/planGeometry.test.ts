@@ -1,16 +1,4 @@
-/**
- * Plan geometry math.
- *
- * This module converts a picture into measurements, and every number it returns
- * feeds something that spends money or gets built — cable lengths, pipe runs,
- * fixture counts. The failure mode that matters is not a crash; it is a
- * plausible-looking wrong number. So the tests below concentrate on:
- *
- *   • degenerate calibration returning null rather than 0 (a 0 scale would make
- *     every derived length "0 mm" and read as a legitimate answer)
- *   • malformed jsonb degrading to empty geometry instead of throwing
- *   • the metres-vs-millimetres slip, which is the classic 1000x error
- */
+/** Plan geometry math. */
 import { describe, it, expect } from 'vitest';
 import {
   PLAN_GEOMETRY_VERSION,

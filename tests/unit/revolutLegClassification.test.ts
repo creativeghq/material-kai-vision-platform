@@ -1,22 +1,6 @@
 /**
  * A pocket move never settles a customer invoice (#359 CM-12), and Revolut amounts are settled
  * as MAJOR units (#359 CM-15).
- *
- * CM-12: one Revolut transaction becomes N feed rows, one per leg. The reconciler groups them back
- * and reads the shape — an `in` leg with no `out` leg is external money (a customer paying); `in`
- * AND `out` legs are both ours, so it is a pocket→pocket move and not a payment at all.
- *
- * The default when the shape could not be built was `{ inLegs: 1, outLegs: 0 }` — external. And
- * `loadLegShapes` destructured `{ data }` only, so a failed page contributed nothing and every
- * transaction in it fell to that default. This is the exact hazard CLAUDE.md records about this
- * feed: *"the feed is per-leg: match a row in isolation and an internal pocket move settles a
- * customer invoice."*
- *
- * CM-15: the audit could not tell whether Revolut returns minor or major units, and flagged that
- * one of this code and #351's payment providers had to be wrong by 100×. Neither is: the Revolut
- * BUSINESS API returns decimals (a documented leg reads `amount: -47.8, fee: 0.66`), while the
- * Stripe/Viva MERCHANT APIs take minor units. Two APIs, two conventions. This file pins the
- * settlement so nobody "reconciles" them later.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';

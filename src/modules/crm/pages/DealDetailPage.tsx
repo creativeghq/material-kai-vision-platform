@@ -1,14 +1,4 @@
-/**
- * Deal record page (#311 Phase 2) — `/crm/deals/:id`.
- *
- * The board answers "what is in the pipeline". This answers "what is happening on THIS deal", and
- * it is the reason a deal card can be clicked at all: before it existed, every non-property deal
- * had a title styled as a link that went nowhere.
- *
- * Activity-first, like the contact and company records. The stage control writes through
- * `dealsService.moveToStage`, so a winning stage wins the deal from here exactly as it does on the
- * board — which stage wins is the deal type's data, never a string in this file.
- */
+/** Deal record page (#311 Phase 2) — `/crm/deals/:id`. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Loader2, Trophy, XCircle, Building2, User, Home, FolderKanban, Percent, CalendarClock } from 'lucide-react';

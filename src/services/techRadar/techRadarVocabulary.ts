@@ -1,19 +1,4 @@
-/**
- * The tech-radar value-set, written ONCE (#391).
- *
- * `ring` was written out three times in two files: a union (widened with `| string`, which
- * collapses it back to `string` and made the literals decorative) plus a `RING_ORDER`
- * array in `TechRadarFindingsCard`, and a `RING_VALUES` const plus a second inline
- * `z.enum([...])` in `tech-radar-tools`.
- *
- * THE DATABASE IS THE ENFORCER
- * -----------------------------
- * `tech_radar_ring` is a Postgres ENUM on two columns, so an out-of-set ring cannot be
- * stored at all. Pinned to `pg_enum` by `tests/unit/techRadarVocabulary.test.ts`.
- *
- * THIS FILE IS IMPORT-FREE, ON PURPOSE — byte-mirrored to the edge by
- * `npm run vocab:mirror`.
- */
+/** The tech-radar value-set, written ONCE (#391). */
 
 /**
  * `tech_radar_ring`, in RADAR ORDER — adopt is the innermost ring, hold the outermost.

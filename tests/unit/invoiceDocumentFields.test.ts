@@ -1,16 +1,4 @@
-/**
- * What a fiscal document has to SHOW.
- *
- * Every gap this pins was the same shape: the figure was stored, it was transmitted to myDATA,
- * and it was simply never printed — so the customer's copy was missing information the envelope
- * carried, and nothing could raise. A missing column is not a type error, an unprinted exemption
- * ground is not a failed constraint, and a document addressed to last month's version of a
- * customer is a perfectly valid PDF.
- *
- * These are contract tests on `buildInvoiceRenderData`, which both renderers draw from — the
- * React preview directly, the pdf-lib generator through the same field set. They fail if a
- * field stops reaching the page.
- */
+/** What a fiscal document has to SHOW. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

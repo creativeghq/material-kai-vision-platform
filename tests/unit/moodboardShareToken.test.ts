@@ -1,19 +1,4 @@
-/**
- * A published moodboard is reached by a token that can expire and be rotated (#360 CB-15).
- *
- * The public read was `is_public = true` for role `public`, keyed on the board's own id. Two
- * consequences, and the second is the one that bites: the share never expired, and it could not be
- * ROTATED — the URL was the board's identity, so revoking one recipient's link meant un-publishing
- * for everybody, which is why nobody did it.
- *
- * The pattern already existed twice here: `moodboard_sheets.public_share_token` in this very
- * feature, and `inbox_thread_tokens` with its 30-day TTL. The board was the odd one out.
- *
- * The SQL half is verified by a rolled-back fixture recorded in the commit (anon with a valid
- * token sees 1 row; expired 0; unpublished 0; rotation changes the token). What this file pins is
- * the checkout: that the client reads through the token function and nothing reintroduces the
- * blanket read.
- */
+/** A published moodboard is reached by a token that can expire and be rotated (#360 CB-15). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

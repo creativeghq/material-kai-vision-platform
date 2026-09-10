@@ -1,21 +1,4 @@
-/**
- * A tenant's customer never pays into the operator's Stripe balance (#359 CM-18).
- *
- * The finding asks for per-workspace BYOK. That is the wrong prescription, and worth writing down
- * so nobody implements it later: Stripe CONNECT is already here —
- * `workspace_payment_config.stripe_connect_account_id`, Express onboarding, destination charges —
- * and Connect is strictly better than collecting every tenant's secret key, because the key never
- * leaves Stripe and PCI scope stays where it belongs.
- *
- * The real defect is the FALLBACK. `resolveContext` returned `credentials: {}` for a workspace
- * that had not completed onboarding, and `createCharge` then omitted `transfer_data` — a charge on
- * the PLATFORM account for a tenant's invoice. The tenant's customer pays, the money lands in the
- * operator's balance, and the operator carries the chargeback liability and remits by hand. Which
- * is the mixing CM-18 describes, reached by a different route than the one it names.
- *
- * The verdict lives in SQL so the customer pay page and the admin pay-link cannot disagree about
- * whose balance a payment settles into.
- */
+/** A tenant's customer never pays into the operator's Stripe balance (#359 CM-18). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

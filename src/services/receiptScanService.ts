@@ -1,20 +1,4 @@
-/**
- * Receipt scanning (#379) — a photograph becomes the fields an expense needs.
- *
- * One service for both callers: the rep's expense card in the sales portal, and Finance's
- * "Record an expense". Neither of them owns the extraction, and neither of them should hand-roll
- * the file reading, the size limits or the vocabulary of a failed scan.
- *
- * WHAT THIS DOES NOT DO, on purpose: it never writes. `scan` reads an image and returns fields;
- * the caller creates the record. A scanner that also booked the expense would be an automation
- * quietly writing money rows off a model's reading of a photograph. The design is
- * prefill-then-confirm, and `needs_review` on the row is what carries that through to the screen.
- *
- * THE DATE IS NOT DEFAULTED SERVER-SIDE. `doc_date` comes back null when the receipt's date could
- * not be read, and the caller fills it with `todayLocalISO()`. The edge function runs in UTC, and
- * a UTC "today" between local midnight and 03:00 is YESTERDAY on a record that gets numbered by
- * date (invariant 1b).
- */
+/** Receipt scanning (#379) — a photograph becomes the fields an expense needs. */
 import { supabase } from '@/integrations/supabase/client';
 
 /** What the reader found. Every field is nullable because a receipt need not state it. */
@@ -40,12 +24,6 @@ export interface ReceiptFields {
   /**
    * Where the document says to pay it — the ISSUER's own account. Null when it printed none,
    * which is most receipts.
-   *
-   * Returned, never stored by the scan. `crm_bank_accounts` is what the payout path sends money
-   * to, so this becomes a payment destination only after a person confirms it — the expense form
-   * files it as a SUGGESTION against the supplier they pick, and the party page is where it is
-   * reviewed. `checksum_ok` is the mod-97 verdict as read: false means a character was misread or
-   * the document itself carries a typo, and either way it is worth showing rather than dropping.
    */
   bank: {
     iban: string | null;
@@ -134,18 +112,7 @@ export const receiptScanService = {
   },
 };
 
-/**
- * The net/VAT split to prefill a form with.
- *
- * The form's own fields are NET and VAT; a receipt states the GROSS. Handing the gross straight to
- * a "Subtotal (net)" field books a VAT-bearing cost with its tax folded into the net — the P&L
- * cost is overstated and the recoverable VAT is lost. That exact mistake is called out on
- * `NewExpenseDialog`'s own prefill contract, so this derives the pair once, here.
- *
- * When the document states only a gross, VAT is 0 and the whole sum is net: that is what a receipt
- * with no VAT line actually says, and inventing a rate for it would be a guess wearing the costume
- * of a reading.
- */
+/** The net/VAT split to prefill a form with. */
 export function splitForForm(f: ReceiptFields): { net: number; vat: number } {
   const gross = f.total_gross ?? 0;
   if (f.net !== null && f.vat_amount !== null) return { net: f.net, vat: f.vat_amount };

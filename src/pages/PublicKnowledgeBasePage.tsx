@@ -162,21 +162,7 @@ function BrandSidebar({ slug, name }: { slug: string; name: string }) {
   );
 }
 
-/**
- * The columns a knowledge-base article may show the public — and the ONLY ones anon can now read.
- *
- * `kb_docs_public_read` grants a whole ROW to `anon` for any published+public article, and this
- * page asked for `select('*')`, so publishing an article also published its `workspace_id`,
- * `created_by`/`updated_by`, its embedding vector, the embedding error message, `allowed_agents`,
- * `content_tier`, `price_doc_type` and `is_locked` (#365 `AD-36`). The projection is now enforced
- * by column-level GRANTs rather than by this list being remembered — an anon `select('*')` fails.
- * That means this list is not a preference: widening it needs a matching GRANT, and shrinking the
- * GRANT breaks this page loudly instead of quietly over-sharing.
- *
- * `content_tier` is on the list because the article list ORDERS by it (FEATURED before
- * SECONDARY) — it is presentation metadata, and PostgREST cannot sort on a column the caller
- * may not read.
- */
+/** The columns a knowledge-base article may show the public — and the ONLY ones anon can now read. */
 const PUBLIC_DOC_COLUMNS =
   'id, title, slug, summary, content, content_markdown, category_id, seo_keywords, ' +
   'reading_time_minutes, metadata, status, visibility, content_tier, created_at, updated_at, ' +

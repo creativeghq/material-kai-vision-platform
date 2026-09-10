@@ -1,15 +1,4 @@
-/**
- * Wires `ModuleDefinition.subscribers` into the platform's notification bus.
- *
- * Behaviour:
- *   - On registry init + every enabled-set change: attach subscribers for
- *     every enabled module that hasn't already been attached.
- *   - When a module becomes disabled: detach its subscribers (so disabling
- *     the Email module really stops Email from receiving send events).
- *
- * Lazy-loads the listener function only on first attach to avoid pulling
- * module code into the main bundle at app boot.
- */
+/** Wires `ModuleDefinition.subscribers` into the platform's notification bus. */
 
 import { notificationBus, type NotificationEventName, type NotificationEvents } from '@/_system/events/notification-bus';
 import { registeredModules } from './registry';

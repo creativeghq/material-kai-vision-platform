@@ -1,22 +1,4 @@
-/**
- * A `?tab=` in a link is a promise the page has to keep.
- *
- * MEASURED 2026-08-30: `ProjectDetailPage` held its open tab in `useState('overview')` and never
- * looked at the URL. Seven links in the repo said otherwise:
- *
- *   • `BillingTab`'s own button → `/projects/:id?tab=quotes`
- *   • all four `project_request_*` flow events → `/projects/:id?tab=requests&request=<id>`
- *   • the sheet-share edge function → `/projects/:id?tab=client-view`
- *
- * Every one of them landed the reader on Overview. Nothing fails when this happens: the route
- * matches, the page renders, the query string is simply ignored — so the notification that says
- * "a client raised a request" opens a screen with no request on it, and the reader is left to
- * find the tab. That is the empty-state defect wearing a URL.
- *
- * This guard reads the link sites and the page's own tab list, so a new tab, a renamed tab or a
- * new notification link cannot re-open the gap. It deliberately does NOT restate the tab names:
- * the list comes from the page.
- */
+/** A `?tab=` in a link is a promise the page has to keep. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';

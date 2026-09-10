@@ -1,13 +1,4 @@
-/**
- * Catalog cards on an Inbox message — the in-app rendering of `inbox_messages.metadata.cards`.
- *
- * ONE component for both readers: the member's transcript in `InboxPage` and the customer's
- * `/i/:token` page. The card says what the customer was told: the name, the image, the price
- * line the server derived once for THEM (gross for a consumer, net for a business buyer) and the
- * same link the WhatsApp button or the email button carries. A card with no link is a card with
- * no button, not a button to an app route the customer cannot open — and a link or image that
- * is not http(s) is not rendered at all, because the card is tenant data.
- */
+/** Catalog cards on an Inbox message — the in-app rendering of `inbox_messages.metadata.cards`. */
 
 import React from 'react';
 import { ExternalLink, Package, Wrench } from 'lucide-react';

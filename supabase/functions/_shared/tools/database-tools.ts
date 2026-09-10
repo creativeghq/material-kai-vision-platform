@@ -1,16 +1,4 @@
-/**
- * Database Tools: createQueryDatabaseTool
- *
- * This file also held five PDF-pipeline diagnostics (checkJobStatus, getStageDetails,
- * getRelationshipCounts, getDocumentEntities, getMetadataExtraction). They were
- * exported and never instantiated — unreachable by any agent since the day they were
- * written — so they were deleted rather than wired up (issue #266). Two reasons not to
- * revive them as-is: each takes a caller-supplied document/job id and queries with the
- * SERVICE-ROLE client with no workspace check (security invariant 1), and
- * getRelationshipCounts filtered chunk_product_relationships.chunk_id by a DOCUMENT id
- * while leaving its other three counts unfiltered — one permanent zero next to three
- * workspace-wide totals, reported as "counts for this document".
- */
+/** Database Tools: createQueryDatabaseTool */
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what

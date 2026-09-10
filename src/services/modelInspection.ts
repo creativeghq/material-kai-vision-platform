@@ -1,14 +1,4 @@
-/**
- * Reading a glTF/GLB's own facts out of the file (#321 M0, deferred item).
- *
- * React-free and renderer-free: it parses, measures and reports. Used at upload so the platform
- * stops asking a human for numbers the file already contains.
- *
- * WHY THIS MATTERS MORE THAN IT LOOKS. `width_m` / `depth_m` are what the room planner draws
- * footprints from and what AR uses for true-to-scale placement. Typed by hand they are a guess with
- * a decimal point in it, and a wrong one produces a plan that looks right and a delivery that does
- * not fit. The glTF has known its own bounding box the whole time.
- */
+/** Reading a glTF/GLB's own facts out of the file (#321 M0, deferred item). */
 import { Box3, Vector3, type Mesh, type Object3D } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 

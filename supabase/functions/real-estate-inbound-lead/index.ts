@@ -1,20 +1,4 @@
-/**
- * real-estate-inbound-lead — portal enquiry emails become CRM leads.
- *
- * Syndication pushes listings OUT; the enquiries those portals generate arrive as email and were
- * retyped by hand or lost. The agency points any inbound-email service (Resend, Mailgun routes,
- * SendGrid Inbound Parse, Cloudflare Email Workers) at their tokenised URL and forwards portal mail
- * to it.
- *
- * SECURITY (invariant 6 — inbound webhooks):
- *  • The per-workspace token IS the credential and is checked BEFORE anything is parsed or written.
- *    The From address is trivially spoofable and is never trusted for authentication — only to guess
- *    which portal sent it.
- *  • Fails CLOSED: no token configured, token unknown, or ingestion switched off ⇒ reject. There is
- *    no path where an unauthenticated body reaches a write.
- *  • workspace_id and property_id are derived server-side (token → workspace, reference → listing).
- *    Nothing identifying is taken from the payload.
- */
+/** real-estate-inbound-lead — portal enquiry emails become CRM leads. */
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';

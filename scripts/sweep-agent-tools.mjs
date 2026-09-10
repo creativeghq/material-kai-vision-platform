@@ -1,37 +1,5 @@
 #!/usr/bin/env node
-/**
- * Sweep every agent tool once, to find the ones that are broken before a user does.
- *
- * WHY THIS EXISTS
- * ---------------
- * On 2026-08-25 a single real request exposed five separate tool defects, every one of them
- * silent: a scraper whose analysis pass had thrown on every call it had ever received while still
- * reporting `success: true`; two tools refused by an unpriced credit key; a background agent whose
- * declared `web_search` had no factory behind it; a `material_search` doing GET against a
- * POST-only endpoint. None of them failed loudly, none was visible to a test, and 143 of the
- * platform's 176 tools had never been called even once — so there was no reason to think the
- * remaining ones were healthier. They were simply unobserved.
- *
- * This calls each tool once through `mode: 'direct_tool'`, which runs the tool with NO model turn.
- * That is the whole trick: it costs no Opus tokens, so exercising the entire surface is cheap.
- *
- * SAFETY — the sweep must never damage anything, so it FAILS CLOSED
- * ----------------------------------------------------------------
- * A tool is only called when it can be positively shown to be read-only:
- *   • a tool whose name matches a mutating verb is SKIPPED;
- *   • a dispatcher with an `action` enum is called with a READ action, or skipped when it has
- *     none (`manage_crm` only offers create_contact / log_activity, so it is skipped);
- *   • a tool that spends real money upstream is skipped unless --paid is passed;
- *   • anything that cannot be classified is skipped, not guessed at.
- * `confirm` is never set true — it is the human-in-the-loop approval gate, not a parameter.
- *
- * USAGE
- *   SUPABASE_URL=... SERVICE_ROLE_KEY=... SWEEP_USER_ID=... SWEEP_WORKSPACE_ID=... \
- *     node scripts/sweep-agent-tools.mjs [--paid] [--only=name,name] [--limit=N]
- *
- * Reads the committed manifest, so it always covers exactly what `npm run tools:manifest`
- * knows about.
- */
+/** Sweep every agent tool once, to find the ones that are broken before a user does. */
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -149,17 +117,7 @@ const HINTS = {
   workspace_id: () => WORKSPACE_ID, user_id: () => USER_ID,
 };
 
-/**
- * A REAL uuid, not a word.
- *
- * The first sweep sent `"tile"` for every string param, including ids. Postgres answered
- * `22P02 invalid input syntax for type uuid` and the route turned that into a 500 — so the
- * report read "server error" for what was a malformed request from the sweep itself. A probe
- * that cannot tell those apart manufactures the very ambiguity it exists to remove.
- *
- * The all-zero uuid is deliberate: valid in shape, guaranteed to match nothing, so a tool that
- * reaches its query answers "not found" rather than touching a real record.
- */
+/** A REAL uuid, not a word. */
 const NIL_UUID = '00000000-0000-0000-0000-000000000000';
 const ID_PARAM = /(^|_)(id|ids|uuid)$/i;
 

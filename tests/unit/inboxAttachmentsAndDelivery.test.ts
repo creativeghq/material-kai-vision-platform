@@ -1,24 +1,4 @@
-/**
- * Guard: a file the customer sent must arrive, and a message the customer never got must say so.
- *
- * Two independent silent-zeros found together on 2026-08-24, on the first connected WhatsApp
- * number. Both had the same shape — a number sitting at zero forever while every health signal
- * stayed green.
- *
- *  1. **36 inbound messages, 0 attachments stored.** The insert read `msg.attachments ?? []`,
- *     one guessed field name. Files were definitely arriving — the assistant's own replies in
- *     those threads say "Sorry, I can't open PDFs or attachments here" — and every one was
- *     discarded. Two of the messages had no text either, so they rendered as an empty bubble:
- *     the customer sent a document and the operator saw nothing at all. Zernio addresses
- *     attachments at `/inbox/conversations/{id}/messages/{messageId}/attachments/{index}`, so the
- *     inline shape was never something to assume in the first place.
- *
- *  2. **27 outbound messages, 27 accepted by Meta, 23 reported FAILED, 0 recording why.** The
- *     relay worked perfectly; Meta refused delivery and said why; `apply_inbox_delivery_receipt`
- *     had no parameter to carry the reason, and the UI showed no delivery state at all. So 85% of
- *     replies never reached the customer and the operator saw 27 ordinary sent bubbles. "We are
- *     not sending messages to WhatsApp" was the only conclusion available from the screen.
- */
+/** Guard: a file the customer sent must arrive, and a message the customer never got must say so. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

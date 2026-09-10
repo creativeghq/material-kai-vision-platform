@@ -24,10 +24,6 @@ import { safeHref } from '@/utils/safeUrl';
  * previously emitted but shown as plain text (graph tools, trip-expense,
  * job-research, misc). One card, consistent layout, handles arbitrary JSON
  * payloads so all 19 chunk types become visible without 19 bespoke cards.
- *
- * When the result maps to a page-backed capability, it also
- * renders a reverse "Open in {Hub}" handoff (deep-links to the record when the
- * payload carries its id), so any capability tool's card can jump to its page.
  */
 
 const isScalar = (v: any) => v == null || typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean';
@@ -168,17 +164,6 @@ function Value({ v, depth = 0, listKey }: { v: any; depth?: number; listKey?: st
 
 
 // ── A list of records is a TABLE, not a stack of chips ──────────────────────
-//
-// Every one of the 127 result types in AGENT_RESULT_TITLES renders through this card, and a list
-// payload — `{ flows: [...] }`, `{ manufacturers: [...] }`, `{ deals: [...] }` — used to come out
-// as one grey chip per row with `Name: x  Status: y` runs inside it. Readable for a single row,
-// a wall at twenty, and impossible to scan down a column. That is most of why the Hub reads as a
-// debug view rather than a product: the data was right and the shape was wrong.
-//
-// Design system (docs/design-system.md): sunken sticky header, hairline row separators, NO zebra,
-// 11px semibold headers that are not uppercase, right-aligned tabular-nums for numbers, `—` for an
-// absent value, status as a tinted squared Badge, and the whole thing in its own overflow-x
-// container so a wide table scrolls instead of pushing the page sideways.
 
 // Status tint and enum-to-prose live in `@/utils/recordDisplay` — the record peek dialog opened
 // FROM this table renders the same words, and two copies is how a status ends up amber here and
@@ -233,17 +218,6 @@ function singularize(word: string): string {
 }
 
 // ── The rows are RECORDS, and a record you cannot open is a screenshot ───────
-//
-// Every id in these payloads was hidden as plumbing (`isPlumbing`, above) — correct, a raw uuid is
-// not information, and wrong in one respect: it was the only thing that could make the table
-// interactive. So the ids stay OUT of the columns and go INTO the links. `recordLinks.ts` answers
-// what an id points at, which cell holds its name, and where that kind opens; the ⌘K palette owns
-// the routes and the gates, so a link offered here opens exactly where the palette would send you.
-//
-// Two different gestures, because they are two different intentions:
-//   • the row's own name OPENS THE PEEK — the detail, in place, without losing the conversation.
-//   • a name belonging to some OTHER record (the supplier on an expense) is an anchor to that
-//     record's page with target=_blank, because following it is leaving.
 interface RecordLinkCtx {
   access: RecordLinkAccess;
   onPeek: (ref: RecordRef) => void;
@@ -267,13 +241,6 @@ const MONEY_COL_RE = /(^|_)(total|amount|amount_due|amount_paid|price|value|subt
 /**
  * One cell. Everything the plain `Scalar` did, plus: money reads with the row's own currency, a
  * status reads as a tag, and a name that belongs to a record becomes a way to that record.
- *
- * Money matters more than it looks. The chat's prose answer said `€328.00` and the card said
- * `328` in one column and `EUR` in another — the same six expenses reading as two different
- * answers depending on which half of the screen you looked at.
- *
- * `noLink` is for the cell that sits INSIDE the row's own open button: an anchor nested in a
- * button is invalid markup and gives one gesture two meanings.
  */
 function Cell({ row, col, numeric, noLink }: { row: any; col: string; numeric: boolean; noLink?: boolean }) {
   const v = row?.[col];
@@ -461,9 +428,8 @@ function KeyValues({ obj, depth = 0, inline = false }: { obj: any; depth?: numbe
           key={k}
           className={inline
             ? 'text-xs'
-            // STACKED below `sm`. Two columns on a phone leave the value about 130px once the
-            // label has taken its minimum and the row is nested one level — and these nest. A
-            // label above its value reads; a label beside a 130px value does not.
+            // STACKED below `sm`. Two columns on a phone leaves the value ~130px once the label
+            // has its minimum and the row is nested one level — and these nest.
             : 'grid grid-cols-1 items-start gap-x-4 py-1.5 text-xs first:pt-0 last:pb-0 sm:grid-cols-[minmax(96px,180px)_1fr]'}
         >
           <span className="text-muted-foreground">{labelize(k)}{inline ? ': ' : ''}</span>
@@ -481,12 +447,6 @@ export const AgentResultCard: React.FC<{
   /**
    * Ask the agent something on the user's behalf. This is how a result card offers the next
    * action — "Add contact" — WITHOUT becoming a second create path.
-   *
-   * Deliberately not a deep link to a `/crm/contacts/new` route: a CRM party must go through the
-   * duplicate search before it exists (CLAUDE.md — `crm_company` is deliberately unbuilt as a
-   * template type for exactly this reason), and a button that jumps past that is how duplicates
-   * get made. Handing the intent back to the agent runs the real flow, and since `request_input`
-   * exists the agent answers with a form on the canvas rather than an interrogation.
    */
   onAsk?: (prompt: string) => void;
   /**

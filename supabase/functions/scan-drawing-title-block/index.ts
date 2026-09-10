@@ -1,32 +1,4 @@
-/**
- * scan-drawing-title-block — a drawing sheet becomes the register entry it should have had.
- *
- * The drawing register already stored files, revisions and supersession; what nobody would ever do
- * by hand is type the drawing number, revision, scale, sheet size, discipline, issue date and
- * issue status off every sheet in a set of two hundred. So they get typed for the first one and
- * left blank for the rest, and a register with blank numbers is a file list with extra columns.
- *
- * This reads the title block and hands the fields BACK. It deliberately writes nothing: the
- * operator confirms, and `projectDocumentsService` creates the document by the normal path. A
- * scanner that also created register entries would file two hundred rows off a model's reading,
- * and a wrong drawing number is invisible until somebody builds from the wrong sheet.
- *
- * INVARIANTS, none optional on this path:
- *   1  Tenancy — the workspace comes from the PROJECT row, never the body, and the caller is
- *      checked against it with `userCanAccessWorkspace`. A project in someone else's workspace is
- *      reported as not found rather than forbidden, so this cannot be used to enumerate ids.
- *   9  The sheet is untrusted ingested content. Anyone can print "IGNORE PREVIOUS INSTRUCTIONS"
- *      in a title block. The prompt states the DATA boundary and the call uses real `tools` plus
- *      forced `tool_choice` — no free-form JSON, no salvage parser.
- *   10 Credits are debited BEFORE the model call, through `debitOrRefuse` so the result cannot be
- *      discarded by accident.
- *   1b The issue date is NEVER defaulted. An ambiguous or absent date comes back null; a drawing
- *      stamped with today because nobody could read it is worse than one with no date, because
- *      the register would then show it as issued on time.
- *
- * The prompt lives in the database (`prompts.category = 'drawing_title_block'`) and this RAISES
- * when the row is missing. No code fallback: a fallback is invisible when it fires.
- */
+/** scan-drawing-title-block — a drawing sheet becomes the register entry it should have had. */
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';

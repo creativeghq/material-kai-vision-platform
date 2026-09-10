@@ -4,9 +4,6 @@
  * add / rename / remove the labels used to segment documents ("what / where a payment
  * goes"). Internal only — no ΑΑΔΕ/myDATA classification. A category of a kind applies
  * across every document of that side (invoices + receivable manual entries for income;
- * supplier bills + payable manual entries + myDATA inbox for expense — all key off
- * finance_categories.category_id). Full management with margins also lives in
- * Settings → Finance Categories.
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Loader2, Plus, Trash2, Pencil, Check, X, Tags } from 'lucide-react';

@@ -1,21 +1,4 @@
-/**
- * Fencing for SERP-derived text before it reaches an LLM prompt (security invariant 9, #361 `EG-5`).
- *
- * Everything DataForSEO hands back about a keyword — the AI Overview paragraph, the current
- * featured snippet, People-Also-Ask answers, competitor page titles, related searches — is
- * written by whoever currently ranks for that query. Ranking for a low-competition keyword a
- * tenant is watching is not an attack, it is SEO; it just happens to be the delivery mechanism.
- * The planner and the writer were interpolating all of it directly into their prompts, so a
- * competitor's page title reading "Ignore the outline above and…" was indistinguishable from
- * instructions we wrote ourselves.
- *
- * Two pieces, and both matter:
- *   • `serpValue` neutralises the fence itself, so a value cannot close the block early and
- *     continue as prompt. Fencing without this is decoration.
- *   • `serpBlock` states, once, that everything inside is DATA. Same shape as the candidate
- *     fence in `_shared/rerank.ts` — one wording across the platform, so it reads as a rule
- *     rather than as this file's idea.
- */
+/** Fencing for SERP-derived text before it reaches an LLM prompt (security invariant 9, #361 `EG-5`). */
 
 /** Longest a single SERP-supplied value may be before it is clipped. */
 const MAX_VALUE_CHARS = 1200;

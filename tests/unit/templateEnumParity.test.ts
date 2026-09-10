@@ -1,26 +1,4 @@
-/**
- * Every enum an adapter hardcodes must match the CHECK constraint it is standing in for (#322).
- *
- * This is the bug shape that has now bitten this feature three times, and each time it was a
- * *silent* copy of a database vocabulary drifting from the database:
- *
- *   1. The seeded project starters used `visibility: "client"`. `project_tasks_visibility_check`
- *      accepts only `internal | client_visible`, so applying either starter aborted PARTWAY
- *      through building the task tree and left half a project behind.
- *   2. `contracts_context_check` accepted only `hr | finance | project`, while
- *      `ContractContext`, contracts-api's `CONTEXTS`, `TYPE_OPTIONS`, the context badge and
- *      PropertyWorkbench's Contracts panel all supported `realestate`. Every real-estate contract
- *      creation threw 23514 — a whole feature that looked wired and failed 100% of the time.
- *      (Fixed by widening the constraint, not by narrowing the app.)
- *   3. `properties.furnished` is TEXT ("yes / no / partial"), and the adapter compared it to
- *      `true` — so every template-created listing came out unfurnished.
- *
- * None of these is a type error: every one is a valid string in the wrong vocabulary. The adapters
- * narrow through `oneOf([...])` so a bad payload value cannot reach an insert; this test makes
- * sure the list inside each `oneOf` is the list the database actually accepts.
- *
- * adapters.ts is read as TEXT, not imported — importing it pulls in the Supabase client.
- */
+/** Every enum an adapter hardcodes must match the CHECK constraint it is standing in for (#322). */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -55,18 +33,7 @@ const DB_ENUMS: Record<string, { constraint: string; values: string[] }> = {
   orderKind: { constraint: 'orders.order_type (app-level)', values: ['sales', 'purchase'] },
 };
 
-/**
- * Vocabularies an adapter now takes from a shared source rather than spelling out (#391).
- *
- * `contractContext` was `oneOf(['hr','finance','project','realestate'] as const)` — one of
- * FIVE copies of that list. It is `oneOf(CONTRACT_CONTEXTS)` now, so there is no literal
- * for the regex below to find, and the values are imported here instead.
- *
- * Importing rather than re-typing them matters for this file in particular: finding 2 in
- * the docstring above is `contracts_context_check` drifting from the app's copy of this
- * very vocabulary, so re-typing it here would put a sixth copy inside the test written to
- * catch the problem.
- */
+/** Vocabularies an adapter now takes from a shared source rather than spelling out (#391). */
 const IMPORTED_ONE_OFS: Record<string, readonly string[]> = {
   contractContext: CONTRACT_CONTEXTS,
 };

@@ -189,17 +189,7 @@ describe('#391 — `priority_level` was a false positive, not a missed unificati
 });
 
 
-/**
- * AADE Appendix table 8.12 — the payment method a fiscal envelope transmits.
- *
- * Two DIFFERENT numberings of the same eight entries were live at once. The register, the
- * storefront and the fiscal envelope used AADE's; the `mydata_reference` seed behind the
- * manual invoice picker and the three maps that PRINT the result used it rotated by two, so
- * "3 — On credit" in the dialog transmitted **Cash** and a POS receipt (7) printed as
- * "Domestic account". Both halves were internally consistent and every value involved is a
- * valid integer 1–8, so nothing could raise. Found by reading another vendor's public API
- * docs on 2026-08-29, not by anything we own — hence this.
- */
+/** AADE Appendix table 8.12 — the payment method a fiscal envelope transmits. */
 describe("myDATA payment methods are AADE table 8.12, in AADE's order", () => {
   /** `select code, description from mydata_reference where category='payment_method'`, 2026-08-29. Verbatim. */
   const SEED: [number, string][] = [

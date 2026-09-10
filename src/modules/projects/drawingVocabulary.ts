@@ -1,26 +1,4 @@
-/**
- * The drawing-register value-sets, written ONCE.
- *
- * Both runtimes need these: the register UI offers them, and `scan-drawing-title-block` snaps what
- * it reads off a title block onto them before anything is written. A model asked for "the issue
- * status" will happily answer "Construction Issue", "FOR CONSTRUCTION" or "Issued for Construction"
- * on three drawings from the same set — the whole value of a controlled list is that the register
- * can be filtered, so the snapping has to be against the same list the picker shows.
- *
- * THE DATABASE IS THE ENFORCER for two of the three.
- * -------------------------------------------------
- * `project_documents_kind_check` and `project_document_revisions_purpose_check` admit exactly
- * these values. A copy that drifts wider makes the UI offer something the write rejects with a raw
- * 23514; one that drifts narrower makes a legitimate value vanish from the picker.
- *
- * `discipline` is deliberately NOT constrained in the database. The list below is what the picker
- * offers and what extraction snaps to, but a practice with a discipline nobody anticipated should
- * be able to type it rather than be refused — and because the vocabulary is NARROWER than what the
- * column accepts, there is no drift hazard in that direction.
- *
- * THIS FILE IS IMPORT-FREE, ON PURPOSE — it is byte-mirrored to the edge by
- * `npm run vocab:mirror`.
- */
+/** The drawing-register value-sets, written ONCE. */
 
 /** `project_documents_kind_check`. What sort of document this register entry is. */
 export const DOCUMENT_KINDS = [
@@ -86,17 +64,7 @@ export function isDiscipline(v: unknown): v is Discipline {
   return typeof v === 'string' && (DISCIPLINES as readonly string[]).includes(v);
 }
 
-/**
- * Snap free text onto one of the lists above, or null.
- *
- * Written here rather than in the edge function because the register UI needs the same answer: a
- * document imported with `discipline: "Structural Engineering"` and one extracted from a title
- * block reading "STRUCTURAL" must land on the same value, or the register filters differently
- * depending on how the row arrived.
- *
- * Returns null rather than a guess. An unrecognised discipline is a fact about the drawing, and
- * the alternative — defaulting to `other` — quietly discards what was printed.
- */
+/** Snap free text onto one of the lists above, or null. */
 export function snapToVocabulary<T extends string>(
   value: unknown,
   vocabulary: readonly T[],

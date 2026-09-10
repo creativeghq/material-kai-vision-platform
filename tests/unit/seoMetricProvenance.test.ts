@@ -1,21 +1,4 @@
-/**
- * A figure the collector could not fetch is UNKNOWN, and says so (#395, CLAUDE.md rule 3).
- *
- * `seo-domain-tracker` records a verdict per source — `ok` | `no_data` | `failed` — in
- * `seo_domain_snapshots.source_status`, precisely so a reader can tell "the backlink index has
- * no record of this domain" from "the backlinks call failed". `get_website_domain_intel` returns
- * the whole row, so the verdict reaches the client.
- *
- * `WebsiteDomainIntelPanel` ignored it. Every snapshot for the one connected site has NULL
- * backlinks, and the panel printed `—` for all of them — the same statement as hiding the row,
- * which is the defect this panel was already fixed for once. (The live verdicts say
- * `backlinks: no_data`: a real answer, and one worth showing as "None" rather than as nothing.)
- *
- * The vocabulary is exercised for real — `seoMetrics.ts` is import-free — because the part that
- * matters is behavioural: an unrecognised status must fail CLOSED, and the collector's word
- * `failed` must land on the same presentation a metric's `collector_failed` does. A second
- * translation living in a panel is how these surfaces drifted apart the first time.
- */
+/** A figure the collector could not fetch is UNKNOWN, and says so (#395, CLAUDE.md rule 3). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

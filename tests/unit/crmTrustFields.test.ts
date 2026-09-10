@@ -6,17 +6,7 @@ import { stripComments } from '../helpers/stripComments';
 import { normalizeVat } from '@/services/crm/vatNormalize';
 import { normalizeVat as edgeNormalizeVat } from '../../supabase/functions/_shared/crm/vatNormalize.generated';
 
-/**
- * Trust fields are stamped by the server, and money terms need the right role (#353 CRM-7).
- *
- * `vat_validated` means "this VAT number was verified against a tax authority". It is stamped on
- * records that feed invoicing, and it sat in the crm-api write allowlist — so any CRM-capable
- * caller could mark a number verified having done no lookup at all.
- *
- * It could not simply be removed: the real flow is a SERVER-SIDE registry lookup followed by a
- * client save, so dropping the field breaks genuine verification. The fix is a receipt — the
- * server records that IT verified, and the save reads that instead of believing the request.
- */
+/** Trust fields are stamped by the server, and money terms need the right role (#353 CRM-7). */
 
 const ROOT = join(__dirname, '..', '..');
 const code = (p: string) => stripComments(readFileSync(join(ROOT, p), 'utf8').replace(/\r\n/g, '\n'));

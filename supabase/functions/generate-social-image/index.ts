@@ -1,14 +1,4 @@
-/**
- * Generate Social Image Edge Function
- *
- * Routes to the best AI image model based on content type:
- *   lifestyle / people  → xAI Aurora (grok-2-aurora)   10 credits
- *   product / interior  → Gemini Imagen                  5 credits
- *   artistic / textured → FLUX 2 Pro (Replicate)         6 credits
- *
- * Credits are debited upfront and are non-refundable.
- * Stores result in Supabase Storage and updates social_posts.
- */
+/** Generate Social Image Edge Function */
 
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { jsonResponse } from '../_shared/http.ts';
@@ -255,8 +245,6 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
     // `post_id` pointing at a post in B is where the image actually lands. A pays, B receives.
     // Both ownership checks pass, nothing raises, and the spend appears against a workspace that
     // has nothing to show for it. (#365 AD-30, same shape as EX-1 in #364)
-    //
-    // The POST's workspace wins, because that is where the work is delivered.
     const postWorkspace = (existingPost as { workspace_id: string }).workspace_id;
     if (workspace_id && workspace_id !== postWorkspace) {
       return jsonResponse({

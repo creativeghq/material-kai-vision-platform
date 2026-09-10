@@ -1,21 +1,6 @@
 /**
  * Guard: a foreign key taken from the REQUEST BODY is proved to belong to the caller's
  * workspace before it is stored.
- *
- * The shape, found independently in two modules (#356 `RE-4`, #353 `CRM-5`) and then in five
- * more places by sweeping for it: a route authenticates the workspace correctly — often
- * impeccably — and then accepts a foreign key out of the body and writes it. Both halves are
- * individually valid: the workspace is real and verified, the id is a real row. Nothing checks
- * them against each other. Later a service-role read joins the row and hands back the other
- * tenant's company name, product cost or employee record.
- *
- * It is invariant 1 one level down. Naming your own workspace honestly does not entitle you to
- * name a row inside somebody else's.
- *
- * This test is deliberately NOT a list of known sites — that is what let the class spread to
- * seven places. It pins the two things that keep the sweep possible: the shared helper still
- * does the one thing that makes it a check (filters by workspace), and the sites fixed by the
- * sweep still carry a check of some kind.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';

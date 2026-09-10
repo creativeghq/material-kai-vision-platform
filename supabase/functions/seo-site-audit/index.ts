@@ -1,22 +1,4 @@
-/**
- * seo-site-audit — Site Health for connected websites.
- *
- * TWO audits, deliberately, because they answer different questions:
- *
- *   run          a SYNCHRONOUS homepage audit (instant-page + Lighthouse) → website_health_audits.
- *                Fast, cheap, one URL. Answers "is my front door broken".
- *   crawl-start  an ASYNCHRONOUS multi-page OnPage crawl → website_crawls + website_crawl_issues.
- *                Answers "is my SITE broken" — broken links, redirect chains, duplicate titles,
- *                pages told not to index. None of those are visible one page at a time, which is
- *                why the single-page audit always looked thin.
- *   crawl-sync   poll a running crawl and ingest its issue classes when it finishes.
- *
- * Actions (user JWT): run, crawl-start, crawl-sync.
- * Action (x-cron-secret): cron-run — weekly audit of every active connected website + prune.
- *
- * verify_jwt is disabled at the gateway (see config.toml) so cron works; the user action
- * calls authenticate() + userCanAccessWorkspace() (invariant #1).
- */
+/** seo-site-audit — Site Health for connected websites. */
 
 import { createClient } from '@supabase/supabase-js';
 import { withApiLogging } from '../_shared/api-logger.ts';

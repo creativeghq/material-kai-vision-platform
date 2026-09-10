@@ -7,20 +7,7 @@ import { moodboardSheetsService } from '@/services/moodboardSheetsService';
 import { LivePreviewPanel } from './LivePreviewPanel';
 import { onEnterOrSpace } from '@/utils/a11y';
 
-/**
- * Annotated Render Sheet canvas.
- *
- * Workflow:
- *   1. Receives a backdrop render and an initial set of AI-detected annotations.
- *   2. Each annotation has TWO points: the anchor on the image (red dot) and the
- *      label endpoint (where the leader line terminates and the text sits).
- *      Both are normalized [0..1] over the image area.
- *   3. User can click anywhere on the render to add a new callout (which will
- *      start with anchor=click, endpoint=click+offset, blank label).
- *   4. User can edit any label inline and remove any callout via the side list.
- *   5. "Render PDF" persists the annotations on the sheet row and triggers
- *      generate-moodboard-sheet-pdf.
- */
+/** Annotated Render Sheet canvas. */
 
 export interface CalloutAnnotation {
   x: number;

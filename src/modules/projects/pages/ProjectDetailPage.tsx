@@ -90,11 +90,6 @@ import { projectCoverInput } from '../utils/projectPresentation';
  * so a `?tab=` naming a section this viewer cannot see falls back to Overview instead of rendering
  * a blank panel — the trap `PropertyWorkbench.availableTabs` exists to close, on the page that had
  * no equivalent.
- *
- * Until this existed the page ignored `?tab=` entirely, so `BillingTab`'s own "Go to Quotes"
- * button and all four `project_request_*` notification `action_url`s
- * (`/projects/:id?tab=requests&request=…`) landed the reader on Overview with no hint of where to
- * go next. Guarded by tests/unit/projectTabLinks.test.ts.
  */
 
 /** Tabs only the owner sees. `finance` needs `finance.manage` on top and is handled separately. */
@@ -112,14 +107,6 @@ const OWNER_ONLY_TABS = new Set<ProjectTab>([
  * the second row is a different one at every width. So the strip shows the STAGES of a project —
  * design it, specify it, sell it, build it, hand it over, review it — and the selected stage opens
  * its own sections in a smaller strip beneath.
- *
- * `?tab=` still names the SECTION, never the stage. The stage is derived from the section, so the
- * four `project_request_*` notifications, the sheet-share mail, `BillingTab`'s "see the quotes",
- * the construction tools' `?tab=finance` and every other deep link land exactly where they did.
- * A stage this viewer can see only ONE section of renders AS that section — a collaborator gets a
- * "Quotes" tab, not a "Commercial" tab with one thing under it.
- *
- * Every section belongs to exactly one stage — guarded by tests/unit/projectTabLinks.test.ts.
  */
 type ProjectStage = 'overview' | 'design' | 'specification' | 'commercial' | 'delivery' | 'client' | 'review';
 const TAB_GROUPS: ReadonlyArray<{ id: ProjectStage; label: string; icon: LucideIcon; tabs: readonly ProjectTab[] }> = [

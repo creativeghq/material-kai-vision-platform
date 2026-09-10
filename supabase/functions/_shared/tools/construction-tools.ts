@@ -1,29 +1,4 @@
-/**
- * Construction Tools — agent-chat surface for the contractor money chain.
- *
- * The whole construction build (cost codes, priced schedule, CVR, variations, applications,
- * retention, tendering) shipped with NOTHING the agent could reach. On this platform that is a
- * structural gap rather than a nicety: an operator's habit is to ask, and a feature the agent
- * cannot see does not exist to them.
- *
- * Tools:
- *   - project_cvr             — value against cost per cost code, and the job's margin
- *   - project_applications    — what has been claimed, certified, paid and retained
- *   - list_variations         — changes to scope, and which are not yet agreed
- *   - tender_status           — packages out, bids in, and what is waiting on a decision
- *
- * EVERY FIGURE COMES FROM SQL. These tools call `get_project_cvr`,
- * `get_project_applications` and `get_project_retention` and format the result — they never add
- * anything up. A second implementation of a money quantity inside a tool would be the fifth copy
- * of the defect anti-regression rule 1 exists to stop, and it would be the copy a model quotes to
- * somebody out loud.
- *
- * All four are READ-ONLY. Nothing here raises a variation, certifies an application or awards a
- * package: those move real money and belong behind the human-in-the-loop gate, not behind a
- * sentence a model decided to act on.
- *
- * Cost discipline: all four are plain DB reads — 0 credits. Module-gated on `projects`.
- */
+/** Construction Tools — agent-chat surface for the contractor money chain. */
 
 // `tool` is typed non-generically ON PURPOSE — see the note in project-tools.ts. Inferring it
 // pulls @langchain/core's generic graph into every module that defines a tool, which is what makes
@@ -414,14 +389,6 @@ export const createTenderStatusTool = (
 /**
  * Bid analysis — the numbers a package's bids actually say, so the model can talk about them
  * without ever producing one.
- *
- * Every figure here comes from `get_tender_bid_analysis` / `get_tender_bid_summary`. The model is
- * given the derivation and asked to write about it; the moment it is allowed to add up a column
- * itself, its arithmetic and the ledger's start to disagree and nothing raises.
- *
- * The one thing worth saying out loud to a model: rank on `comparable_total`, never on
- * `submitted_total`. Two bids compare only once they cover the same scope, and the cheapest
- * submitted figure is regularly the one with a hole in it.
  */
 export const createBidAnalysisTool = (
   userId: string,

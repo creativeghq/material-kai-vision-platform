@@ -6,25 +6,7 @@ import { resolveGenerationRouting } from '../../supabase/functions/_shared/gener
 import { TOOL_MANIFEST } from '../../src/components/features/ai/toolManifest.generated.ts';
 import { TOOLKITS } from '../../src/components/features/ai/agentToolsCatalog';
 
-/**
- * `unstage` — remove every movable object from a room photo and reconstruct what was behind it.
- *
- * It is the inverse of everything else in the interior stack, and that is exactly why it is
- * fragile. Every OTHER path here ADDS: the Replicate grid restyles a room, `generate-virtual-
- * staging` furnishes one and says so in its own description ("Stage an EMPTY room"), and
- * `image-edit`'s prompt is built to PRESERVE "every fixed element ... sink, vanity, toilet,
- * shower, bath" plus the furniture. So a mode that deletes has to be wired against the grain at
- * five separate points, and four of the five fail SILENTLY when missed:
- *
- *   - not in the tool's z.enum      → the agent can never ask for it; it answers in prose instead
- *   - not in GEMINI_ONLY_MODES      → the Replicate grid runs too and returns a confidently
- *                                     FURNISHED room beside the one tile that emptied it
- *   - not in EDIT_MODES             → invariant 9b's gate is skipped on a user-supplied image
- *   - not in GROK_UNSUPPORTED_MODES → `tier: 'grok'` bills grok-aurora and runs Gemini anyway,
- *                                     the wrong-but-valid number generation-routing.ts exists for
- *
- * Only the first has a visible symptom, and it looks like the model being unhelpful.
- */
+/** `unstage` — remove every movable object from a room photo and reconstruct what was behind it. */
 
 const root = join(__dirname, '..', '..');
 const read = (p: string) => stripComments(readFileSync(join(root, p), 'utf8'));

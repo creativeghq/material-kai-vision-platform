@@ -1,20 +1,4 @@
-/**
- * Search fold — the Deno twin.
- *
- * The CRM list endpoints match a folded query term against the `search_fold` generated column
- * on `crm_contacts` / `crm_companies`. The column is written by `public.crm_fold()` in SQL; the
- * TERM is folded here. If the two stop agreeing, the sides never meet and search silently
- * returns nothing — no error, no log.
- *
- * Three implementations of one algorithm, and they cannot share a module (Vite alias / Deno URL /
- * plpgsql):
- *   • src/components/core/filters/types.ts     — frontend (option-list search)
- *   • supabase/functions/_shared/searchFold.ts — this file (server-side list search)
- *   • public.crm_fold(text)                    — SQL (writes the stored column)
- *
- * They are held byte-equivalent by tests/unit/searchFoldParity.test.ts, not by convention —
- * convention is how the escapeHtml copies drifted to three different strengths.
- */
+/** Search fold — the Deno twin. */
 
 /**
  * Case- AND diacritic-insensitive fold.
@@ -34,18 +18,7 @@ export function foldForSearch(value: unknown): string {
     .replace(/ς/g, 'σ'); // final sigma ς folds onto the medial σ
 }
 
-/**
- * Escape PostgREST ilike wildcards so a value carrying `%` or `_` cannot broaden the match.
- *
- * Lives HERE, beside `foldForSearch`, because it is never used alone: every folded search is
- * `escapeLike(foldForSearch(term))`, and a caller that reaches for one needs the other. It was
- * previously exported from `crm-api/handlers/contacts-api-handler.ts`, so anything outside
- * crm-api had to import a handler or write a second copy — and a second copy of an escaper is
- * exactly how the three escapeHtml twins drifted to three different strengths.
- *
- * A DIFFERENT contract from `escapeHtml` (invariant 11): PostgREST filter grammar, not HTML.
- * Never substitute one for the other.
- */
+/** Escape PostgREST ilike wildcards so a value carrying `%` or `_` cannot broaden the match. */
 export function escapeLike(value: string): string {
   return value.replace(/[%_\\]/g, '\\$&');
 }

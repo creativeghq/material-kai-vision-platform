@@ -2,9 +2,6 @@
 // A plain signup is a CONSUMER of the operator. To become a reseller a user must
 // supply a business VAT number; the operator verifies it with ΑΑΔΕ and approves,
 // which upgrades their workspace (kind='reseller' + CRM mirror).
-// Backend: reseller_applications table + submit/approve/reject SECURITY DEFINER
-// RPCs, and the myaade-rgwspublic2 `verify-reseller-application` action for the
-// operator's ΑΑΔΕ check. See the "Reseller onboarding" migrations.
 
 import { supabase } from '@/integrations/supabase/client';
 import { edgeError } from '@/utils/edgeError';

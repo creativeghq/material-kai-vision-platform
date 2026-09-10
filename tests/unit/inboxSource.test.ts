@@ -1,26 +1,4 @@
-/**
- * The Inbox's SOURCE tag — "where did this conversation come from".
- *
- * This exists because the platform used to answer that question by keeping messages in different
- * TABLES. A "Hire me" enquiry off a public profile page lived in `profile_contact_requests` with
- * its own screen at `/profile?tab=inbox`; everything else lived in `inbox_threads` at `/inbox`.
- * The split bought nothing and cost the enquiry every feature the real Inbox has — a reply that
- * reaches the sender, assignment, labels, archive, search. So the two merged, and the distinction
- * they encoded became a derived tag on one row.
- *
- * What can go wrong now is quieter and worth pinning:
- *
- *   • A source that never resolves. `metadata.source` is honoured only for keys the derivation
- *     knows, so a producer writing `source: 'contact_form'` with no matching entry silently gets
- *     the channel's generic answer — a thread tagged "Email" that nothing can tell apart from
- *     cold mail. Every filter option must be reachable from some thread shape.
- *   • The reverse: an option in the filter that no thread can ever carry, which returns an empty
- *     list and reads as "you have none".
- *   • A source filter that stops narrowing the server request, so picking "WhatsApp" pulls the
- *     whole mailbox and trims it client-side — correct-looking, and wrong past 200 threads.
- *   • `metadata.source` losing to the transport. A public-profile enquiry replies BY EMAIL, so
- *     `channel === 'email'`; if channel won, the tag would be right back to saying nothing.
- */
+/** The Inbox's SOURCE tag — "where did this conversation come from". */
 import { describe, it, expect } from 'vitest';
 import {
   SOURCE_FILTER_ORDER,

@@ -1,20 +1,4 @@
-/**
- * The AI impression on a lead (#341 join 7) — and the fact that an anonymous caller chooses it.
- *
- * The builder shows a generated impression when the catalogue has nothing to show, then the visitor
- * asks to be quoted. Sending that picture with the request is the point: the operator otherwise
- * reads "fabric: linen, colour: sunset" and imagines what the customer had on screen, while the
- * image they are actually anchored on existed and was thrown away.
- *
- * But `request_quote` is an ANONYMOUS write. Whatever it stores gets rendered later in
- * /admin → Quote Requests, in an operator's browser. An unvalidated URL here means a stranger
- * decides what that browser loads — an off-platform tracker at minimum. So the endpoint keeps the
- * value only when it is one of our own public generation objects, and drops it otherwise WITHOUT
- * refusing the request: losing a lead over a bad image URL is the worse failure of the two.
- *
- * This test pins the shape of that check against the source, because the failure it prevents is
- * invisible to every other gate — a stored string is a valid string.
- */
+/** The AI impression on a lead (#341 join 7) — and the fact that an anonymous caller chooses it. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

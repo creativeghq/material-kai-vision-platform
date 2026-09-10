@@ -1,30 +1,4 @@
-/**
- * canonicalize-attributes
- *
- * Thin proxy invoked by background agents (material-tagger, product-enrichment)
- * to canonicalize a product's raw attributes through MIVAA's
- * POST /api/admin/facets/canonicalize.
- *
- * Why this layer exists at all (vs. agents calling MIVAA directly): keeps the
- * MIVAA service URL + key in one place (env on the edge function), and lets the
- * canonicalization endpoint stay admin-only on MIVAA side without each agent
- * carrying credentials. Same pattern as the existing mivaa-gateway proxy.
- *
- * Request body:
- *   {
- *     product_id?:     string,           // optional — enables diff-before-canonicalize
- *     raw_attributes:  Record<string,unknown>,
- *     source:          string,           // e.g. 'agent_material_tagger'
- *   }
- *
- * Response:
- *   {
- *     attributes:        Record<string,unknown>,
- *     attributes_raw:    Record<string,string[]>,
- *     resolutions_count: number,
- *     actions_by_type:   Record<string,number>,
- *   }
- */
+/** canonicalize-attributes */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsHeaders } from '../_shared/cors.ts';

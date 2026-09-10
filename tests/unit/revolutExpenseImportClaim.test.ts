@@ -2,14 +2,6 @@
  * An imported expense is CLAIMED before the reimbursable line is created (#359 CM-14), a 200
  * carrying a failure is a failure (#359 CM-23), a numbering save leaves the templates alone
  * (#359 CM-24), and one click is one payout link (#359 CM-20).
- *
- * CM-14 is the shape this codebase keeps meeting: mark-after-the-work rather than claim-before-it.
- * The import read a `seen` set at the start of the run, then created a `trip_expense_items` row,
- * uploaded the receipt, and only THEN wrote the ledger row that marks the expense done. A crash,
- * a timeout or a second overlapping run in that window imports the same Revolut expense again as
- * a SECOND reimbursable line — the employee is paid twice. The unique constraint on
- * `(workspace_id, revolut_expense_id)` was there the whole time; it just was not reached until
- * after the side effects.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';

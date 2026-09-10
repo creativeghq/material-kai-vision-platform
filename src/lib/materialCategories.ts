@@ -2,13 +2,6 @@
  * Shared material category utilities.
  * Single source of truth for category detection, colors, and professional type labels.
  * Used across DiscoverPage, LatestWidgets, ProfileModal, PublicProfilePage, ProfileTab, etc.
- *
- * The 10 DB categories (material_categories table):
- * tiles, wood, decor, furniture, general_materials, paint_wall_decor,
- * heating, sanitary, kitchen, lighting
- *
- * Legacy display-only categories (stone, paint, fabric, metal, glass, composite)
- * are kept for backwards compatibility in theme colors and existing UI.
  */
 import { formatLabel } from '@/lib/labelUtils';
 import { UPLOAD_CATEGORIES, resolveUploadCategory, type UploadCategory } from '@/lib/categoryFieldRegistry';

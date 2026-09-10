@@ -1,19 +1,4 @@
-/**
- * Channels, in one place — Profile → Social Accounts.
- *
- * Social publishing and WhatsApp are the same Zernio account and the same mental model ("channels
- * we talk to customers on"), but they were two unrelated surfaces: connect lived on this profile
- * tab, while everything operational — the number, Meta templates, campaigns, the message log, the
- * opt-out register — lived on /messaging, an admin-shaped page the app launcher never linked. And
- * social analytics lived nowhere at all.
- *
- * One side-rail now covers all three, grouped the way an operator asks for them. The rail is
- * HubSideNav (the settings archetype) rather than a third row of tabs: eleven sections in a tab
- * strip wraps to three lines and stops telling you where you are.
- *
- * `?section=` is a real deep-link — nav items and the launcher point straight at a section — and
- * it round-trips through the URL so a reload keeps its place.
- */
+/** Channels, in one place — Profile → Social Accounts. */
 import React, { useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {

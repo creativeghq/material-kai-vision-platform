@@ -1,18 +1,4 @@
-/**
- * Running out of credits is an OFFER, not an error.
- *
- * Two things this pins, both of which have already failed once:
- *
- * 1. The DETECTOR. AgentHub tested `/insufficient credits/i` — with a SPACE — against the body
- *    agent-chat actually returns, `{"error":"insufficient_credits"}` — with an UNDERSCORE. It
- *    never matched, so the top-up card that had been sitting in that file all along could not
- *    render once, and what the user got was the raw JSON of a 402. A wrong regex is a valid
- *    regex: nothing typechecked, nothing linted, no test failed.
- *
- * 2. That nobody hand-rolls a SECOND one. The reason the bug survived is that the test lived at
- *    the call site instead of in a shared helper, so it could drift from the string it was
- *    matching with nothing comparing the two.
- */
+/** Running out of credits is an OFFER, not an error. */
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';

@@ -1,24 +1,4 @@
-/**
- * An agent tool reaches this workspace's records, and only this workspace's (#395).
- *
- * Two files, one shape, found by running #352's pattern 2 — "service-role client plus a
- * model-supplied id" — over the slices #395 lists as unread. Plus the expense tool's half of the
- * create-then-pay pair, which is CLAUDE.md anti-regression rule 4 on the agent surface.
- *
- * ── the original finding ──────────────────────────────────────────────────────────────────────
- * A catalog belongs to a workspace, and the tool that opens it has to know which.
- *
- * `loadCatalog` is the gate for nine catalog tools. `catalog_id` is a model-supplied argument, the
- * client is service-role, and the only check was `owner_user_id === userId` — a USER identity, not
- * a tenancy binding. So a catalog you own in workspace B was readable, editable and publishable
- * from a workspace-A session: one agent turn moves another tenant's catalogue body into this
- * workspace's work. The sibling path in the same file already scoped source PDFs by
- * `catalog.workspace_id` under a comment naming it a BOLA guard; this one was simply never given
- * the workspace.
- *
- * This is #352's pattern 2 — "service-role client plus a model-supplied id" — found for the third
- * and fourth time, in the slice #395 lists as unread.
- */
+/** An agent tool reaches this workspace's records, and only this workspace's (#395). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

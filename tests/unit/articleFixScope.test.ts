@@ -6,18 +6,6 @@ import { readingEase } from '../../supabase/functions/seo-api/handlers/readabili
 /**
  * Three defects found by running the analyzer against the first article this platform ever
  * produced (88779ba1, 2,077 Greek words, 66/100) rather than by reading the code.
- *
- *  1. `affectedSection` was null on all eight fixes. The paragraph-length check had already
- *     ISOLATED the offending paragraphs and then threw them away, so the only way to act on
- *     "3 paragraphs exceed 80 words" was to rewrite the whole article.
- *  2. The auto-fix loop was gated on `reachableScore = overallScore + penalties-of-UNFIXABLE
- *     -fixes`, entered only when that was BELOW 70. That inverts: the more unfixable
- *     problems an article has, the higher its reachable score climbs and the less likely the
- *     fixer is to touch what it CAN fix. Measured: 66/100, five auto-fixable issues,
- *     `auto_fix: true`, `fix_iterations: 0`.
- *  3. `readabilityScore` was a hardcoded `null // Could be enhanced with Flesch-Kincaid`.
- *
- * All three are the same family: the analyzer knew something and did not say it.
  */
 
 const ANALYZE = join(process.cwd(), 'supabase/functions/seo-api/handlers/analyze.ts');

@@ -1,25 +1,4 @@
-/**
- * "Am I a business?" — one derivation, in SQL, and no TypeScript twin of it.
- *
- * The bug this exists to stop: a workspace was issuing real invoices to myDATA as MATERIALS BANK ΕΕ
- * (VAT EL802349569, ΓΕΜΗ 174794504000, ΔΟΥ Δ ΘΕΣΣΑΛΟΝΙΚΗΣ) while Profile → Business showed the same
- * person a badge reading "Solo entity" and copy inviting them to switch "if you operate as a
- * registered company". Nothing was detectably wrong: `user_profiles.entity_type` held a perfectly
- * valid `'solo'` and `finance_settings` held a perfectly valid identity — the fact was recorded
- * twice and only the copy nobody reads had been filled in. The consequence was not cosmetic:
- * `role-upgrade-requests` gated Dealer and Brand applications on `entity_type='business' &&
- * business_id`, so a real company could not apply.
- *
- * The answer is now DERIVED by `public.user_business_identity()`: the explicit profile link if
- * there is one, else the invoicing profile of a workspace the user owns or administers. Setting up
- * invoicing IS the declaration; there is no second step and no button.
- *
- * SCOPE — read this before assuming a clean run means the invariant holds.
- * The derivation itself lives in `pg_proc` and this project never commits SQL as a file (CLAUDE.md),
- * so these tests cannot execute it. What they CAN do is the thing that actually rots: fail the build
- * if a TypeScript copy of the projection grows back. The SQL half was verified live against the row
- * below when it shipped — see the commit and docs/prevention-coverage.md.
- */
+/** "Am I a business?" — one derivation, in SQL, and no TypeScript twin of it. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

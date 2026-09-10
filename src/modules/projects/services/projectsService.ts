@@ -478,28 +478,7 @@ export interface UpdateTaskInput {
 // SERVICE
 // =====================================================
 
-/**
- * Raise a project lifecycle flow event (#378 Phase 4).
- *
- * ONE helper, because every one of these payloads has to carry the same four things and getting
- * any of them wrong fails silently in its own way:
- *
- *   • `workspace_id` — a trigger whose emitter does not stamp it can NEVER be forked by a tenant.
- *     `fork_workspace_flow_default` disables the global in the same transaction, so forking such a
- *     trigger ends with FEWER notifications and nothing raising. `appointment_booked` shipped in
- *     exactly that state.
- *   • `user_id` — `create_notification` reads it straight off the payload, so a missing one is a
- *     flow that runs, records a step, reports success and tells nobody.
- *   • `title` / `body` / `action_url` — the same, and the reason the seeded defaults can be one
- *     shape for all of them.
- *
- * Resolves the workspace and the job's name FROM the project rather than trusting a caller: the
- * callers here hold a task, a snag or an asset, and each looking it up its own way is how four of
- * them end up subtly different.
- *
- * Best-effort and non-blocking. The thing that happened has happened; failing the write because a
- * notification did not go out is the worse outcome.
- */
+/** Raise a project lifecycle flow event (#378 Phase 4). */
 export async function emitProjectLifecycle(
   projectId: string | null | undefined,
   type: 'project_created' | 'project_task_completed' | 'project_milestone_reached'
@@ -540,21 +519,7 @@ export async function emitProjectLifecycle(
 class ProjectsService {
   // ---------- PROJECTS ----------
 
-  /**
-   * Projects the caller can see: their own plus any they are an active collaborator on.
-   *
-   * This deliberately does NOT filter on `user_id`. RLS already scopes the table via
-   * `projects_owner_all` (owner) and `projects_collaborator_read`
-   * (`_user_is_active_project_collaborator`, which honours `revoked_at`/`expires_at`), so an
-   * explicit owner filter here was narrower than the policy and hid every project shared with
-   * you — the collaborator feature existed but nothing shared ever reached this list.
-   *
-   * It DOES scope by the active workspace (#358 PQ-5). RLS bounds this to "mine + shared with
-   * me", which for a user who belongs to several tenants is every one of their workspaces at
-   * once — so switching workspace changed nothing on this screen. The one thing that must not be
-   * dropped is a project shared with you: it lives in the OWNER's workspace, and you can see it
-   * because you were invited, not because of which workspace you are in.
-   */
+  /** Projects the caller can see: their own plus any they are an active collaborator on. */
   async listProjects(opts: { status?: ProjectStatus | 'active' } = {}): Promise<ProjectWithClient[]> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
@@ -756,21 +721,7 @@ class ProjectsService {
 
     const project = data as Project;
 
-    /**
-     * A job moved (#378 Phase 4 — project lifecycle).
-     *
-     * Projects emitted almost nothing: of the whole trigger vocabulary the only project events
-     * were two invitation ones and two request ones, so "the job is now on site" — the thing
-     * everyone downstream waits for — could not start an automation.
-     *
-     * Fired only on a REAL change: an update that resaves the same status is not a move, and a
-     * flow run is metered. `workspace_id` is in the payload because a trigger without it can
-     * never be forked by a tenant — `appointment_booked` shipped in exactly that state, and its
-     * table has no workspace column at all to put there.
-     *
-     * Best-effort: the status IS saved, and failing the update because a notification did not go
-     * out would be the worse outcome.
-     */
+    /** A job moved (#378 Phase 4 — project lifecycle). */
     if (input.status !== undefined && project.status && project.status !== previousStatus) {
       void flowEventService.emit('project_status_changed', {
         workspace_id: project.workspace_id,
@@ -1147,20 +1098,7 @@ class ProjectsService {
 
   // ---------- LINKED ARTIFACTS ----------
 
-  /**
-   * Per-room budget rollup, and — deliberately — what is NOT on a room.
-   *
-   * THIS IS NOT THE PROJECT ACTUAL, AND THE TWO SIT ON THE SAME CARD. `projects.actual_amount` is
-   * `SUM(grand_total)` of accepted quotes, maintained by a trigger. These rows are `SUM(line_total)`
-   * of accepted-quote ITEMS. Per `get_quote_totals`, grand_total is
-   * `(sum(line_total) - cash discount) + accepted upsells + VAT`, so the room rows can never add up
-   * to the project figure — and until `unassigned` existed, quote lines with no `room_id` were
-   * dropped from the breakdown entirely with nothing saying so. Money that is simply absent from a
-   * budget screen reads as money that was not spent.
-   *
-   * One query, one derivation. The caller formats and names the gap; it must not re-derive either
-   * half (CLAUDE.md rule 1).
-   */
+  /** Per-room budget rollup, and — deliberately — what is NOT on a room. */
   async getRoomBudgetSummary(projectId: string): Promise<{
     rooms: Array<{ room: ProjectRoom; actual_amount: number; quote_count: number; item_count: number }>;
     /** Accepted-quote line spend on this project that is not attributed to any room. */
@@ -1173,9 +1111,6 @@ class ProjectsService {
     // The error was discarded here, so a failed read reported every room as zero spent — which
     // on a budget screen reads as good news (#358 PQ-6). It throws now; the caller renders the
     // failure instead of a number nobody measured.
-    //
-    // The `room_id is not null` filter that used to live here is what made the untagged lines
-    // invisible. They are bucketed below instead of dropped.
     const { data: items, error: itemsError } = await (supabase as any)
       .from('quote_items')
       .select('room_id, line_total, quote_id, quote:quotes!inner(project_id, status)')
@@ -1534,17 +1469,6 @@ class ProjectsService {
   /**
    * Finance documents that are NOT yet attached to any project — the candidate list for the
    * "attach" picker.
-   *
-   * Both sides are scoped to the PROJECT's workspace. RLS bounds these to every workspace the
-   * caller belongs to, so for a multi-workspace user the picker was offering another tenant's
-   * documents and attaching one would have moved it across the boundary.
-   *
-   * Receivables are scoped to the project's client. Payables cannot be — a project buys from
-   * whoever supplies it — but "every unattached supplier bill in the workspace" is not a
-   * candidate list either (#358 PQ-13). Each row is flagged `related`: its supplier already
-   * appears on this project's purchase orders or purchase items. The picker leads with those and
-   * keeps the rest behind a labelled divider, so a genuinely new supplier is still attachable
-   * without the list pretending everything is a candidate.
    */
   async listAttachableFinance(projectId: string): Promise<{ receivables: any[]; payables: any[] }> {
     const project = await this.getProject(projectId);
@@ -1937,24 +1861,7 @@ class ProjectsService {
     return data as ProjectPurchaseItem;
   }
 
-  /**
-   * Turn made-to-order items into real PURCHASE ORDERS (#378 C2).
-   *
-   * One order per supplier, because that is what a supplier can acknowledge, deliver against and
-   * bill. Each order is stamped with the project, so its total lands as the job's COMMITTED cost
-   * immediately — and when the supplier's bill is later raised from that order,
-   * `generate_supplier_bill_from_order` carries the job onto it (#378 Phase 1), so committed
-   * becomes actual instead of quietly disappearing.
-   *
-   * The PDF spec sheet is unchanged and is still the detailed document. This adds the thing the
-   * PDF could never be: a row the platform can count, receive against, three-way match, and hand
-   * to the supplier portal.
-   *
-   * NOTHING IS SKIPPED SILENTLY. An item with no supplier cannot be grouped onto an order, and an
-   * item with no unit cost would land on a supplier's order at zero — both are returned with a
-   * reason for the caller to show. A missing line on a purchase order is discovered on fitting
-   * day, which is the most expensive day to discover it.
-   */
+  /** Turn made-to-order items into real PURCHASE ORDERS (#378 C2). */
   async raisePurchaseOrders(
     projectId: string,
     itemIds: string[],

@@ -75,9 +75,6 @@ export function ContactSearchDropdown({
         // matter what was typed — silently, as an empty dropdown reading "no contacts found"
         // (#366 BU-7). crm-api's contacts search matches the folded `search_fold` column and
         // resolves the attached company too, which the client-side substring match never could.
-        //
-        // Over-fetch by the exclusion count so excluded contacts cannot eat result slots and
-        // empty the list; the server has no denylist filter, so the trimming stays here.
         const response = await contactsAPI.listContacts(PAGE_SIZE + excludeContactIds.length, 0, { search });
         const filteredContacts = (response.data as Contact[])
           .filter((contact) => !excludeContactIds.includes(contact.id))

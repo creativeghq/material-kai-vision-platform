@@ -162,24 +162,7 @@ export const PartyAccountSummary: React.FC<{
     },
   );
   const showCredit = heldCredit > 0.005;
-  /**
-   * The tile renders for every CUSTOMER, including at zero.
-   *
-   * Hiding it when empty made "there is nothing of theirs to release" and "this feature does not
-   * exist on this screen" look identical, and a customer with €420 of gross margin and €0 on
-   * account reads as the second. They are opposite facts: margin is profit you have ALREADY
-   * earned and the P&L already counts it; on-account is cash of theirs you are still holding.
-   * One €0.00 tile settles that question permanently; guessing cost more than the tile does.
-   *
-   * It still does not force the strip on by itself — that is the rule `showBalance` documents
-   * above, and breaking it reprints the same number twice.
-   *
-   * `!!customer` alone was not "is this a customer" — it is "does `vw_customer_account_summary`
-   * have a row", and that view is built from quotes and invoices. A business that sells straight
-   * off orders has neither, so the tile disappeared for exactly the party whose money is hardest
-   * to account for: the page then said nothing at all about whether their payment had been
-   * allocated, which is the question the tile exists to answer.
-   */
+  /** The tile renders for every CUSTOMER, including at zero. */
   const showCreditTile = !!customer || (!supplier && !!orders);
   /**
    * Two rows ("As customer" / "As supplier") only earn their keep when the party IS both and the
@@ -194,10 +177,6 @@ export const PartyAccountSummary: React.FC<{
    * a direction word beside it, which is how a party holding €1,373 of unallocated credit and
    * nothing else ended up showing "On account €1,373" next to "Balance · we owe them €1,373":
    * the same number twice, the second derived entirely from the first.
-   *
-   * `bothRoles || showCredit` was the culprit — credit alone forced the card on with nothing to
-   * net against. The rule this restores is the one stated above: Balance appears only when it
-   * says something the tiles beside it do not.
    */
   const showBalance = netPositionVisible(netTerms);
   const showTopStrip = !!orders || showBalance || (!!meta && meta.length > 0);
@@ -455,8 +434,6 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
         // invoice into one currency-less total (audit #287 T2-8). The service orders by
         // total_outstanding DESC, so [0] is the customer's LARGEST exposure rather than an
         // arbitrary row. Every workspace is single-currency today so this picks the only row;
-        // showing all currencies at once is a panel redesign, not a one-line change, and picking
-        // deterministically beats picking silently.
         const buckets = await financeService.getCustomerAgingBuckets({ workspaceId: activeWorkspaceId, companyId, contactId });
         const b = buckets[0];
         if (buckets.length > 1) {

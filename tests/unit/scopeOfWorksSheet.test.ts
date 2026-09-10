@@ -1,21 +1,4 @@
-/**
- * The Scope of Works sheet — the client-facing "what will happen" half of a proposal.
- *
- * Every other sheet type describes a THING (materials, colours, fixtures, an FF&E schedule). This
- * one describes the DOING, which is the part a client actually signs off on, and it is the piece a
- * Client View was missing.
- *
- * Two invariants, and they are the whole reason this file exists:
- *
- *   1. **It prints only client-visible tasks.** `project_tasks.visibility` already separates what
- *      the team tracks from what the client is shown. Drop that filter and a proposal prints
- *      "chase the supplier" and "check the margin" to the customer — on a document that has
- *      already been sent by the time anybody notices.
- *   2. **It prints no money.** Price lives on the FF&E schedule and the quote. A second surface
- *      that totals money is a second derivation of it, which this codebase treats as a defect
- *      rather than a convenience — and a scope sheet quietly disagreeing with the quote is exactly
- *      the shape `moneyDerivation.test.ts` exists to stop.
- */
+/** The Scope of Works sheet — the client-facing "what will happen" half of a proposal. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

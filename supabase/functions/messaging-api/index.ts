@@ -1,16 +1,6 @@
 /**
  * Messaging API Edge Function — WhatsApp via Zernio (Meta Cloud API).
- *
- * Replaces the former Twilio SMS+WhatsApp implementation. SMS is gone; WhatsApp
- * now runs on Zernio's official WhatsApp Cloud API wrapper.
- *
- * A "channel" is a connected Zernio WhatsApp account (a WABA phone number).
- * `messaging_channels.zernio_account_id` holds the Zernio accountId; the WABA
- * id / phone-number id / display number live in `config`.
- *
  * @see https://docs.zernio.com — /v1/connect/whatsapp/*, /v1/inbox/*, /v1/whatsapp/*
- *
- * Authentication: secret key (apikey header) = admin; user JWT = user-scoped.
  */
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
@@ -70,24 +60,7 @@ interface SendBulkRequest extends Omit<SendMessageRequest, 'to'> {
 }
 
 
-/**
- * Resolve a template for SENDING (#359 CM-3).
- *
- * The send paths did `.from('messaging_templates').select('*').eq('id', body.templateId)` — id
- * alone, on the service-role client. No workspace, so any id sent any tenant's template; no
- * `is_active`, so a retired one still sent; no approval check, so a row Meta had never seen went
- * out under whatever `whatsapp_template_name` it claimed.
- *
- * Four conditions, and each is a different failure:
- *   • the workspace  — otherwise this is a cross-tenant read AND a cross-tenant send
- *   • is_active      — a template retired for a reason
- *   • approved       — Meta rejects an unapproved name, and the rejection counts against the number
- *   • a template name — an "approved" row with no Meta name is a freeform send wearing a template
- *
- * Returns null when the id is unusable, and the caller refuses the send. A missing template must
- * never degrade to "send the freeform body instead": that is how a marketing blast goes out as an
- * unapproved freeform message to people who never opened a conversation.
- */
+/** Resolve a template for SENDING (#359 CM-3). */
 async function resolveSendableTemplate(
   db: SupabaseClient<any, 'public', 'public', any, any>,
   workspaceId: string,
@@ -112,18 +85,7 @@ async function resolveSendableTemplate(
   return { template: data };
 }
 
-/**
- * E.164 for the provider, and a REFUSAL when the number is not in international form (#359 CM-1).
- *
- * There were four normalizers with three behaviours. This one prefixed a bare `+`, so
- * `0030691…` became `+0030691…`. The two frontend copies default to country code **+1**, so a
- * Greek mobile typed as `6912345678` becomes a US number — a paid message to a stranger, in
- * violation of Meta's rules, and it looks exactly like a successful send.
- *
- * Guessing a country is the whole defect, so this does not: a value with no `+` and no `00` is
- * ambiguous and is refused with something the operator can act on. `normalize_msisdn` in SQL is
- * the comparator for storage; this is the outbound form.
- */
+/** E.164 for the provider, and a REFUSAL when the number is not in international form (#359 CM-1). */
 function toE164(phone: string): string | null {
   const raw = String(phone || '').trim();
   const intl = /^\+/.test(raw) ? raw.slice(1) : /^00/.test(raw) ? raw.slice(2) : null;
@@ -133,20 +95,7 @@ function toE164(phone: string): string | null {
   return `+${digits}`;
 }
 
-/**
- * May we send to this number at all? (#359 CM-1 / CM-2)
- *
- * The module ships a 330-line opt-outs tab and records every STOP keyword the webhook sees, and
- * the direct send path never looked at either — only the campaign cron did. WhatsApp opt-out is
- * both a legal and a Meta platform-policy requirement, and repeated violations degrade the
- * number's quality rating up to a ban.
- *
- * The 24-hour window was a comment on a type. Meta permits a freeform message only within 24 hours
- * of the customer's OWN last message; outside it, only an approved template. Both verdicts are
- * derived in SQL so this path, the campaign cron and the UI cannot disagree.
- *
- * Returns null when the send may proceed, or the reason it may not.
- */
+/** May we send to this number at all? (#359 CM-1 / CM-2) */
 async function whyNotSendable(
   db: SupabaseClient<any, 'public', 'public', any, any>,
   opts: { workspaceId: string; to: string; isTemplate: boolean },
@@ -212,19 +161,6 @@ function orderedTemplateParams(template: any, variables: Record<string, string>)
 /**
  * Resolve a WhatsApp channel by sender_id, else the default active one — WITHIN the
  * caller's workspaces.
- *
- * SECURITY: this had no workspace predicate at all. It runs on the
- * service-role client, so RLS does not apply, and it returned the globally-first default
- * channel — or, with `from`, ANY channel matching that sender_id. `send` then derived
- * `tenantWsId` from the RESOLVED channel and gated entitlement on that, so the tenancy
- * check validated the victim rather than the caller: a workspace-A operator could send
- * from workspace B's WABA number, on B's Zernio quota and B's Meta reputation, with
- * messaging_logs recording it under B.
- *
- * `workspaceIds` is REQUIRED and must be passed explicitly — `null` means "no scope"
- * (admin/service access only). Making it a required parameter rather than an optional one
- * is deliberate: the original bug was an omission, and an optional argument would let the
- * next caller reintroduce it silently.
  */
 async function resolveChannel(supabase: any, workspaceIds: string[] | null, from?: string) {
   // Scoped caller with no workspaces: nothing is resolvable. Return null rather than
@@ -256,19 +192,7 @@ async function resolveChannel(supabase: any, workspaceIds: string[] | null, from
 }
 
 
-/**
- * Whether a template-less send may go out as a Meta Direct Send UTILITY message.
- *
- * WhatsApp refuses a business-initiated message outside the 24h service window unless it uses
- * an approved template. Before Direct Send existed, a send with no template bound simply
- * failed at Meta for every cold recipient — the operator saw a provider error and had no way
- * to act on it except to go and get a template approved (up to 24h).
- *
- * `category: 'utility'` lifts that for UTILITY content: Meta matches or auto-creates the
- * template asynchronously. It is NOT a way around marketing rules — marketing content under
- * this category is rejected — so a marketing send still requires its approved template, and
- * asking for one here would swap a clear Meta rejection for a confusing one.
- */
+/** Whether a template-less send may go out as a Meta Direct Send UTILITY message. */
 function directSendCategory(
   template: { whatsapp_template_name?: string | null } | null | undefined,
   messageType: string | undefined,
@@ -408,10 +332,6 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       // releasing one cancels it (and disconnects the WhatsApp account on it). Those are the
       // platform's money and the platform's lifecycle, so they sit with the other operator
       // actions. Searching availability and listing what a workspace already has are reads.
-      // 'release-phone-number' is deliberately absent. A tenant may retire their own number
-      // (decided 2026-08-24): the only way out of a recurring charge was to contact support,
-      // which is not a way out. BUYING still puts a charge on the platform's Zernio account, so
-      // that stays operator-only — giving one up costs the tenant money and saves us ours.
       'purchase-phone-number',
       // Operator maintenance: both read or repair platform-level billing state.
       'reconcile-phone-numbers', 'reconcile-whatsapp-costs', 'set-whatsapp-rate',
@@ -470,21 +390,8 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       isAdminAccess(auth) ? null : await callerWorkspaceIds();
 
     switch (action) {
-      // ─────────────────────────────────────────────────────────────
       // Send single message (1+ recipients)
-      // ─────────────────────────────────────────────────────────────
-      // ─────────────────────────────────────────────────────────────
       // open-whatsapp-thread — from a CRM contact's phone number to a conversation.
-      //
-      // "Does this number have WhatsApp" is NOT answerable in advance: Meta withdrew the contact
-      // validation endpoint, and nothing in Zernio's API replaces it. Claiming otherwise would be a
-      // green tick in the CRM that means nothing. What IS true is that most mobile numbers do, so
-      // this OPENS the conversation and reports honestly if the platform refuses.
-      //
-      // It does not send anything. It resolves (or creates) the thread and hands back its id so the
-      // UI can drop the operator into the Inbox with the composer focused — where the 24-hour
-      // window rules already apply, rather than being re-implemented in a CRM button.
-      // ─────────────────────────────────────────────────────────────
       case 'open-whatsapp-thread': {
         const { workspaceId, phone, name } = requestBody;
         const wsId = await resolveTargetWorkspaceId(workspaceId);
@@ -865,15 +772,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         return jsonResponse({ success: true, channel: saved, account });
       }
 
-      // ─────────────────────────────────────────────────────────────
       // Connect a WhatsApp number via Meta Embedded Signup (the DEFAULT path).
-      //
-      // Mirrors the social flow in zernio-api/handlers/oauth.ts: Zernio brokers the OAuth,
-      // the operator picks the WABA + number on Meta's own screen, and no Meta access token
-      // ever reaches this app. 'connect-whatsapp' above is the headless sibling Zernio
-      // documents for server-to-server callers that already hold credentials — it is NOT the
-      // path a human should be pushed down, which is what the UI used to do.
-      // ─────────────────────────────────────────────────────────────
       case 'connect-whatsapp-oauth': {
         const { workspaceId, redirectUrl, onboarding } = requestBody;
 
@@ -965,15 +864,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         return jsonResponse({ success: true, channel: saved, account });
       }
 
-      // ─────────────────────────────────────────────────────────────
       // Repair number attribution.
-      //
-      // A number is bought on Zernio and recorded locally in two steps, and the second one can
-      // fail: the purchase returns success, the workspace_phone_numbers row does not land, and
-      // the platform now pays a monthly charge with nobody to bill. The purchase cannot be undone
-      // to make that safe, so the answer is a repair that can be run at any time — the profile
-      // map already says which workspace owns which number, so nothing has to be guessed.
-      // ─────────────────────────────────────────────────────────────
       case 'reconcile-phone-numbers': {
         const { data: profiles } = await supabaseClient
           .from('social_zernio_profiles').select('workspace_id, zernio_profile_id');
@@ -1021,14 +912,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         });
       }
 
-      // ─────────────────────────────────────────────────────────────
       // Read receipts, per number.
-      //
-      // Whether the customer sees a blue tick is a business decision and it differs by desk: a
-      // sales team usually wants it, a support desk triaging overnight usually does not, because
-      // "read, no reply" lands worse than silence. Stored on the channel rather than globally —
-      // one workspace can run both kinds of number.
-      // ─────────────────────────────────────────────────────────────
       case 'set-channel-read-receipts': {
         const channelId = String(requestBody.channelId || '').trim();
         const enabled = requestBody.enabled !== false;
@@ -1055,15 +939,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         return jsonResponse({ success: true, channel_id: channelId, send_read_receipts: enabled });
       }
 
-      // ─────────────────────────────────────────────────────────────
       // Charge the month's recurring channel lines.
-      //
-      // Seats and rented numbers were metered and never billed: a workspace could hold four
-      // connected accounts and a Greek number, cost the platform $15/month, and pay nothing.
-      // Idempotent on (workspace, type, month) — running this twice bills nobody twice.
-      // ─────────────────────────────────────────────────────────────
-      // Re-attempt unpaid months and lift the hold once a workspace is fully settled. Nightly,
-      // not monthly: a customer who tops up on the 3rd should not sit on hold until the 1st.
       case 'retry-failed-charges': {
         // The operator sweeps everybody (this is the nightly cron's call). Anyone else is
         // clamped to the one workspace they run — the scope is derived from the JWT and the
@@ -1102,14 +978,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         });
       }
 
-      // ─────────────────────────────────────────────────────────────
       // Grant paid channel seats to a workspace.
-      //
-      // Self-serve seat purchase needs a Stripe price that does not exist yet. This is the half
-      // that works today: an operator records the seats a workspace has agreed to pay for, the
-      // connect gate starts enforcing against the new allowance, and the monthly billing charges
-      // for what is actually connected. Replaced, not duplicated, when checkout arrives.
-      // ─────────────────────────────────────────────────────────────
       case 'set-channel-seats': {
         const targetWs = String(requestBody.workspaceId || '').trim();
         const seats = Number(requestBody.seats);
@@ -1133,19 +1002,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         return jsonResponse({ success: true, workspace_id: targetWs, seats, usage: Array.isArray(usage) ? usage[0] : usage });
       }
 
-      // ─────────────────────────────────────────────────────────────
       // Record a template rate read off an invoice.
-      //
-      // Automatic reconciliation only works where WE own the WhatsApp Business Account. Connect a
-      // number through a BSP's embedded signup and the WABA lives in THEIR Business Manager, so
-      // Meta returns nothing for it — no token, however well-scoped, can read a WABA the operator
-      // does not own.
-      //
-      // In that case the real figure exists on the partner's invoice and nowhere else, and a human
-      // has to carry it across. That is not a lesser answer than the API one: both end with a rate
-      // stamped `last_verified_at`, which is what the unverified-rates probe actually asks for. A
-      // probe nothing can satisfy fires forever and teaches everyone to ignore it.
-      // ─────────────────────────────────────────────────────────────
       case 'set-whatsapp-rate': {
         const country = String(requestBody.country || '').trim().toUpperCase();
         const category = String(requestBody.category || '').trim().toLowerCase();
@@ -1180,15 +1037,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         return jsonResponse({ success: true, rate: data });
       }
 
-      // ─────────────────────────────────────────────────────────────
       // Reconcile what Meta actually charged.
-      //
-      // The one cost this platform genuinely could not see — template messages are billed by Meta
-      // straight to the WABA and never touch Zernio's invoice, so template pricing ran entirely on
-      // seeded guesses. Meta does expose it: pricing_analytics on the WABA returns COST and VOLUME
-      // by country and category. This reads it back, stores billed-vs-actual, and rewrites the
-      // rate table from Meta's own numbers where the sample is large enough to mean anything.
-      // ─────────────────────────────────────────────────────────────
       case 'reconcile-whatsapp-costs': {
         const days = Math.min(Math.max(Number(requestBody.days) || 30, 1), 90);
         const periodEnd = new Date();
@@ -1240,16 +1089,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         });
       }
 
-      // ─────────────────────────────────────────────────────────────
       // Phone numbers: search / list / buy / release.
-      //
-      // The gap this closes: connecting WhatsApp assumed you already owned a number. Zernio
-      // sells them in 54 countries and we never offered it, so a workspace without one had no
-      // route to WhatsApp at all.
-      //
-      // Tenancy on all four is the workspace's own Zernio profile — purchases go into it, lists
-      // are filtered by it, and a release is verified against it before the id is passed on.
-      // ─────────────────────────────────────────────────────────────
       case 'search-phone-numbers': {
         const { country, numberType, prefix, locality, contains, sms, limit } = requestBody;
         const wsId = await resolveTargetWorkspaceId(requestBody.workspaceId);
@@ -1421,15 +1261,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         });
       }
 
-      // ─────────────────────────────────────────────────────────────
       // Plan headroom.
-      //
-      // Not a vanity metric. resolveWorkspaceProfile falls back to the SHARED default profile
-      // when Zernio refuses a new one at the plan ceiling — so at exactly that moment, every
-      // further workspace's accounts and conversations land in the same profile and tenant
-      // separation is gone, with the connect still reporting success. This is how you see it
-      // coming instead of discovering it afterwards.
-      // ─────────────────────────────────────────────────────────────
       case 'plan-status': {
         const plan = await getZernioPlan();
         const { count: mappedProfiles } = await supabaseClient
@@ -1446,45 +1278,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         });
       }
 
-      // ─────────────────────────────────────────────────────────────
       // Backfill the inbox from Zernio.
-      //
-      // Webhooks are a PUSH channel with no history: Zernio does not resend after a 200, and it
-      // was never registered at all until this pass, so every conversation that happened before
-      // then exists on the platform and nowhere here. There is no local signal for that — an
-      // empty inbox and an inbox that missed a month look the same.
-      //
-      // This is also the recovery path for the two states that lose events afterwards: a
-      // webhook Zernio auto-disabled after 10 failures, and a deploy window. Idempotent, so
-      // running it twice is safe.
-      // ─────────────────────────────────────────────────────────────
-      // ─────────────────────────────────────────────────────────────
-      // backfill-inbox — pull conversations Zernio holds into the unified inbox.
-      //
-      // Re-running this is NORMAL, not a repair. A coexistence number's history arrives from Meta
-      // asynchronously over hours: the first run on 2026-08-24 found 8 conversations because the
-      // sync was 19% complete, and the rest only became fetchable later. So the action is
-      // idempotent by construction — the webhook handler skips any message whose provider id is
-      // already filed (inbox_messages_wamid_unique) — and running it a second time picks up what
-      // has since landed without filing a duplicate of anything.
-      //
-      // `phone` / `conversationId` narrow it to ONE conversation, which is how you chase a
-      // specific chat that has not shown up. That is deliberately a FILTER on the same loop
-      // rather than a second importer: the one thing worse than a missing conversation is two
-      // import paths that disagree about how a message becomes a thread.
-      // ─────────────────────────────────────────────────────────────
-      // ─────────────────────────────────────────────────────────────
-      // repair-attachments — fetch media we filed a LINK to but never downloaded.
-      //
-      // An inbound media message arrives with the provider's own URL:
-      //   https://zernio.com/api/v1/whatsapp/media/{id}?accountId=...
-      // which is an authenticated API endpoint, not a file. Until the bytes are pulled server-side
-      // the browser cannot render it — it shows a broken image — and the message is stuck that way
-      // permanently, because a webhook fires once.
-      //
-      // Cheaper and narrower than the back-fill, which lists conversations from Zernio and replays
-      // every message: this reads the rows that are actually broken and fetches only those.
-      // ─────────────────────────────────────────────────────────────
       case 'repair-attachments': {
         const { workspaceId, threadId, messageId } = requestBody;
         const wsId = await resolveTargetWorkspaceId(workspaceId);
@@ -1545,35 +1339,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         });
       }
 
-      // ─────────────────────────────────────────────────────────────
       // sync-avatars — go and GET the profile photos.
-      //
-      // Every WhatsApp thread rendered as coloured initials because the only place we ever looked
-      // for a photo was `conversation.participantPicture` on an inbound webhook, and that field is
-      // OPTIONAL: measured absent on four consecutive real `message.received` payloads.
-      //
-      // `GET /v1/inbox/conversations` documents `participantPicture` on every conversation it
-      // returns, and each of our threads carries the `zernio_conversation_id` it belongs to, so
-      // the match is exact rather than a phone-number guess. Same shape as inbound media, which
-      // works for exactly this reason: we fetch the bytes instead of waiting to be handed a link.
-      //
-      // Also refreshes OUR OWN number's photo — a different endpoint, because that is a business
-      // profile rather than a conversation participant.
-      // ─────────────────────────────────────────────────────────────
-      // ─────────────────────────────────────────────────────────────
-      // zernio-probe — ask Zernio a question without shipping a release.
-      //
-      // The API key lives only in the edge runtime, so "what does this endpoint actually
-      // return?" could not be answered from a terminal. Every such question therefore cost a
-      // full deploy, and each deploy answered exactly one narrowly-guessed question. Two days of
-      // the profile-photo hunt went that way: reading the spec, guessing, shipping, learning one
-      // fact, guessing again. The spec says what a field MAY hold; only a response says what it
-      // does, and there was no way to look.
-      //
-      // GET only, and the path is appended to the pinned Zernio base by `zernioApi` — so no
-      // caller-supplied host (invariant 7 cannot be reached from here) and nothing that mutates.
-      // Admin only, because a raw read of the provider crosses every workspace on the key.
-      // ─────────────────────────────────────────────────────────────
       case 'zernio-probe': {
         if (!isAdminAccess(auth)) throw new HttpError(404, 'Not found');
 
@@ -1619,22 +1385,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         }
       }
 
-      // ─────────────────────────────────────────────────────────────
       // generate-avatar-cast — render the cast of character avatars, once.
-      //
-      // WhatsApp gives a business no customer profile picture (measured: 0 of 100 conversations,
-      // 0 of 516 contact records), so every contact needs a stand-in and it should look drawn
-      // rather than like a missing image.
-      //
-      // A CAST, not one render per contact. 516 contacts would be 516 generations to bill, store
-      // and wait for, and the style would drift between calls; a few dozen characters assigned by
-      // a hash of the contact id costs a couple of dollars once, is instant from then on, and
-      // every contact keeps the same face forever.
-      //
-      // `prompt` and `variations` are overridable so the look can be iterated from a terminal.
-      // The alternative is a deploy per attempt, which is how the profile-photo hunt burned two
-      // days — see `zernio-probe` for the same lesson.
-      // ─────────────────────────────────────────────────────────────
       case 'generate-avatar-cast': {
         if (!isAdminAccess(auth)) throw new HttpError(404, 'Not found');
 
@@ -1650,11 +1401,6 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         // Diversity is spread across the CAST deliberately — it is a set of characters, and a set
         // that is all one age or one hair length just looks broken. Nothing here is derived from
         // any real contact; assignment to a person happens later, by hash of their id.
-        //
-        // Read off `CAST`, not written out here: the picker narrows a contact's pool by each
-        // character's `gender`, so the prompt that RENDERS slot 7 and the fact that decides WHO
-        // gets slot 7 have to be one row. They were two lists, and a re-worded prompt would have
-        // moved one without the other — silently, because every face is still a 200.
         const DEFAULT_VARIATIONS = CAST.map((c) => c.look);
         const variations: string[] = Array.isArray(requestBody.variations) && requestBody.variations.length
           ? requestBody.variations.map((v: unknown) => String(v))
@@ -1723,22 +1469,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           });
         }
 
-        /**
-         * Once a day, not once a page load.
-         *
-         * The inbox calls this whenever a thread has no photo, and on WhatsApp that is now the
-         * permanent state — measured 2026-08-24 against the live number: 100 conversations and
-         * 516 contact records, zero photos in either, no errors. Meta does not give a business a
-         * customer's profile picture unless that contact has published it.
-         *
-         * So the honest cost of the auto-sync is four Zernio calls on every single page load,
-         * forever, to re-learn the same nothing. The stamp is on the CHANNEL rather than in the
-         * browser because it is a fact about the number, not about one person's tab — otherwise
-         * every teammate and every device pays it separately.
-         *
-         * `force` is the way past it, for the case where someone HAS just changed their photo.
-         * Only the throttle is skipped, never the work.
-         */
+        /** Once a day, not once a page load. */
         const THROTTLE_MS = 24 * 60 * 60 * 1000;
         if (!force && !onlyThreadId) {
           const stamps = chans
@@ -1789,19 +1520,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           if (phone) byPhone.set(phone, target);
         }
 
-        /**
-         * What the provider ACTUALLY sends, in field names.
-         *
-         * This exists because the photo question was answered twice from the SPEC and both
-         * answers were wrong — confidently enough that "participantPicture is in every payload"
-         * went into a comment as fact and a working lookup was deleted on the strength of it. A
-         * schema says what a field MAY hold; only a response says what it does. `avatarUrl` is
-         * declared on both the contacts LIST and the contacts DETAIL, and the docs do not say
-         * what fills either, so both get asked and both get reported.
-         *
-         * Key names only, never values: the question is which fields carry something, and the
-         * values are someone's private conversation.
-         */
+        /** What the provider ACTUALLY sends, in field names. */
         const shapes: Record<string, unknown> = {};
 
         let conversations = 0;
@@ -1882,28 +1601,6 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           }
 
           // ── second source: Zernio's own contact records ──
-          //
-          // MEASURED 2026-08-25 against the live number, and the answer is that neither source
-          // has a photo to give:
-          //
-          //   /inbox/conversations  100 results. `participantPicture` PRESENT on every one,
-          //                         value `null`. Zernio has the field; Meta fills nothing.
-          //   /contacts             516 results. `avatarUrl` NOT PRESENT AT ALL — not on the
-          //                         list, not on `/contacts/{id}`. It is declared in Zernio's
-          //                         OpenAPI schema and on docs.zernio.com and the live API does
-          //                         not return it. (`channels` on the detail response is the
-          //                         same: documented, absent.)
-          //
-          // Kept rather than deleted, because the two are different origins — Meta feeds the
-          // conversation, the handset's address book feeds the contact under coexistence — and a
-          // field Zernio ships later would be picked up here for free. Throttled to once a day,
-          // so the cost of asking is three requests per day, not three per page load.
-          //
-          // Do NOT re-derive this from the spec. Both wrong answers in this file's history came
-          // from reading a schema and believing it; use `zernio-probe` and look.
-          //
-          // Only for threads still without a photo, and matched on the digits of the number
-          // because contacts are keyed by `platformIdentifier` rather than by conversation id.
           if (Array.from(byPhone.values()).some((t) => !t.hasPhoto)) {
             let skip = 0;
             for (let cpage = 0; cpage < 10; cpage++) {
@@ -2002,9 +1699,6 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           // conversations = the listing failed; conversations but no pictures = the platform
           // withholds them; pictures but nothing stored = we already hold them, or those threads
           // were never imported.
-          // BOTH sources are named in the answer. "No photos" is only true once the conversation
-          // list AND the contact records have both been asked, and saying which one had them is
-          // what turns a bare zero into something anybody can act on.
           message: conversations === 0
             ? 'Zernio returned no conversations for this number.'
             : (stored + fromContacts) > 0
@@ -2077,28 +1771,8 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         for (const accountId of accountIds) {
           let convs: Array<Record<string, any>> = [];
           // A NAMED conversation is fetched, not searched for.
-          //
-          // The listing is how you discover conversations; it is not how you reach one you can
-          // already name. It does not return everything — thread 7538b29e's conversation answered
-          // `/inbox/conversations/{id}/messages` with 50 messages while appearing on no page of
-          // the list — so scanning for an id we were handed found nothing and the caller was told
-          // "WhatsApp has not handed that conversation over yet. Try again later." That is a
-          // diagnosis, it names a cause, and it was false: the conversation was there and
-          // readable the whole time. Waiting was the one thing that could not fix it.
           if (wantConversation) {
             // FETCH THE CONVERSATION, not just its id.
-            //
-            // The replay below builds the sender out of `conv.participantPhone` /
-            // `participantId` / `participantName`, because those are what the listing row
-            // carries. Handing it a bare `{ id }` leaves every one of them undefined, and the
-            // webhook handler then resolves the counterparty for an OUTGOING echo (it falls back
-            // to the thread that already owns the conversation) and drops every INCOMING one with
-            // "no resolvable phone on the sender". Measured: 11 outbound filed, 31 inbound
-            // dropped, on a conversation the repair had just successfully reached — the exact
-            // half that was missing, missing again, with `success: true` on top.
-            //
-            // The detail endpoint answers with `platform`, `participantId` and
-            // `participantUsername`, which is what the listing row would have given us.
             try {
               const det = await zernioApi(
                 'GET',
@@ -2181,12 +1855,6 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
               // live path can never diverge into two different importers — the second copy is
               // exactly how "it works live but not on replay" gets built.
               // Media keys forwarded WHOLESALE rather than picked.
-              //
-              // The replay used to hand the handler `attachments: m.attachments ?? []` — one
-              // guessed field name, resolved HERE, before the handler's normaliser could look at
-              // anything else. So a message whose media arrived under `media` or `mediaUrl` was
-              // stripped in transit and the handler correctly reported no attachment on a payload
-              // that no longer had one. Whatever Zernio calls it, it reaches the normaliser.
               const mediaPassthrough: Record<string, unknown> = {};
               for (const k of ['attachments', 'media', 'files', 'documents', 'attachment', 'file',
                                'document', 'image', 'video', 'audio', 'mediaUrl', 'fileUrl',
@@ -2231,18 +1899,6 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
               // Signed with the real webhook secret rather than let in through a service-role
               // bypass: invariant 6 is verify-before-process and fail closed, and a second door
               // added "only for replay" is the one that ends up reachable.
-              //
-              // PACED, and the failure is caught.
-              //
-              // Every replay in one backfill is a nested edge-function call, and Supabase budgets
-              // those PER TRACE — all of them share the parent invocation's trace id, so the
-              // budget is separate from (and far smaller than) the project's capacity. 40
-              // unrelated calls to this function all return 200; ~30 nested ones from a single
-              // run exhaust it. The throw then escaped this loop entirely, so a run that had
-              // already filed 30 messages returned HTTP 500 and `{"error":"Rate limit exceeded
-              // for trace …"}` — the import was real and the report of it was lost, which read as
-              // total failure and invited a re-run that hit the same wall in the same place.
-              // https://supabase.com/docs/guides/troubleshooting/edge-function-error-rate-limit-exceeded-for-trace-1094d3
               let res: Response | null = null;
               try {
                 res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/zernio-webhook-handler`, {
@@ -2356,14 +2012,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         });
       }
 
-      // ─────────────────────────────────────────────────────────────
       // Connection health, straight from Zernio.
-      //
-      // account-info reports what META thinks of ONE number (quality rating, tier). This is the
-      // orthogonal question — whether the token we hold still works at all. A revoked or expired
-      // token keeps listing as a connected account, so nothing in messaging_channels can tell
-      // the difference between "connected and idle" and "connected and unable to send".
-      // ─────────────────────────────────────────────────────────────
       case 'channel-health': {
         const wsIds = await readScopeWorkspaceIds();
         const data = await zernioApi('GET', '/accounts/health?platform=whatsapp');
@@ -2452,14 +2101,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         });
       }
 
-      // ─────────────────────────────────────────────────────────────
       // Webhook registration.
-      //
-      // Nothing ever told Zernio where to deliver events, so zernio-webhook-handler — which
-      // verifies signatures and writes the whole WhatsApp inbox — was unreachable by
-      // construction. That cannot be inferred locally: "no inbound messages" and "Zernio was
-      // never asked to send any" look identical from here.
-      // ─────────────────────────────────────────────────────────────
       case 'webhook-status': {
         const status = await getZernioWebhookStatus();
         return jsonResponse({ success: true, ...status });

@@ -1,19 +1,4 @@
-/**
- * A variable offered for pasting into an email says what kind of thing it is (#357 AE-14).
- *
- * The flow builder's helper listed ninety `{{trigger.data.*}}` tokens as one undifferentiated
- * set. Among them: one-click URLs that ACT on possession (`keep_active_url` clears a deletion
- * schedule, `invite_url` enrols whoever opens it), other people's email addresses, and internal
- * UUIDs. On screen, none of those looked any different from a title or a count.
- *
- * That is where the mistake gets made — an operator building a "notify the account manager" flow
- * pastes the keep-active link into a body that goes to somebody else, and hands them the
- * capability. The flow saves cleanly, the send succeeds, and nothing anywhere says so.
- *
- * The classification is DERIVED from the key, not hand-labelled per variable: ninety hand-kept
- * flags is the "a rule written N times" shape, and the ninety-first variable would arrive
- * unlabelled and read as safe.
- */
+/** A variable offered for pasting into an email says what kind of thing it is (#357 AE-14). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

@@ -234,18 +234,6 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
   const cashFactor = cashPct > 0 && cashPct < 100 ? 1 - cashPct / 100 : 1;
   // The per-rate ΑΝΑΛΥΣΗ ΦΠΑ table is computed FIRST, and the printed totals are then the sum of
   // its printed rows.
-  //
-  // It used to be the other way round: each row rounded `agg.vat * cashFactor` and the total
-  // separately rounded a `totVat` running sum (deleted with this comment's fix — the VAT total is
-  // now ONLY ever `vatAfter` below). Rounding N values and rounding their sum are not the
-  // same operation, so the legally-required VAT-analysis block could add up to 3.70 beside a VAT
-  // total printed as 3.71 — on the same document, in Greek, where the table exists precisely so a
-  // reader can verify the total. Deriving the total from the rows makes that impossible rather than
-  // unlikely. (audit #271 item 6)
-  //
-  // The pre-discount convention above is deliberate and UNCHANGED: lines and per-rate rows are
-  // pre-discount figures scaled by cashFactor at render, so Σ rows ≠ invoices.subtotal_net when
-  // cash_discount_pct > 0 — by design, not by drift.
   const vatAnalysis: VatAnalysisRow[] = Object.entries(vatByRate)
     .map(([pct, agg]) => {
       const net = r2(agg.net * cashFactor);
@@ -281,18 +269,7 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
   const grand = Number(inv.total ?? r2(netAfter + vatAfter + taxDelta));
   const extras: TotalsExtraRow[] = [];
   if (documentTaxes?.length) {
-    /**
-     * DOCUMENT MODE — one printed row per declared charge, under the name it was declared with.
-     *
-     * The five bucket totals are still correct here, but printing them would fold every ΑΗΗΕ
-     * recycling class into a single "Fees" figure. The label is a fact we stored and
-     * transmitted, so the customer's copy has to carry it too — and a reader who can see four
-     * charges has to be able to add them up to the four we filed.
-     *
-     * A row flagged `reduces_payable` on an ADDITIVE bucket is declared but not charged, so it
-     * prints at zero effect rather than silently inflating the visible total: `negative` here
-     * only ever means "this makes the payable smaller", which is exactly the flag's meaning.
-     */
+    /** DOCUMENT MODE — one printed row per declared charge, under the name it was declared with. */
     for (const t of documentTaxes) {
       const deductive = t.tax_type === 1 || t.tax_type === 5;
       const counts = deductive ? t.reduces_payable : !t.reduces_payable;

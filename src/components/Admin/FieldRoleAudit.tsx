@@ -1,21 +1,4 @@
-/**
- * Field-role audit (#347 phase 4.5).
- *
- * "Identity" means a product can be more than one of these at once, so a buyer must pick — size,
- * colour, finish. "Descriptive" means it describes whatever was already picked — PEI rating,
- * warranty. The distinction decides what the quote/order picker offers, what the warehouse keys
- * stock on, and what a price may belong to.
- *
- * This screen is AUDIT AND OVERRIDE, never a gate. Classification happens automatically at
- * ingest; nothing waits here for approval. A review queue would mean ingest stalls whenever
- * nobody is looking, which is how the old material_properties table ended up holding nothing at
- * all while the pipeline kept running.
- *
- * What it shows is what was decided, by WHICH signal, and why — because "the classifier said so"
- * is not reviewable. The signal matters more than the verdict: `warehouse_feedback` means two
- * stocked rows physically differed, which is not an opinion, while `seed` means a heuristic
- * guessed during the 3.1 rebuild and nothing has revisited it since.
- */
+/** Field-role audit (#347 phase 4.5). */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, ShieldCheck, TriangleAlert } from 'lucide-react';
 

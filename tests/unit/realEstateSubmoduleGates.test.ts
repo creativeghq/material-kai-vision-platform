@@ -4,23 +4,6 @@
  * (`isModuleAvailable`, `<ModuleTabGate>`, the workbench's `pmEnabled`/`investEnabled` tab
  * conditions) are UX; `_shared/entitlement.ts` states the doctrine in its own header — *module
  * entitlement enforcement at the API boundary is the real security line*.
- *
- * MEASURED 2026-08-30: seven actions reached an add-on's tables with no add-on check.
- *
- *   • `update-tenancy-lifecycle` and `rotate-tenant-portal-token` — both called by the Lettings
- *     tab itself, so the very screen the add-on unlocks had two writes outside the gate. The
- *     second mints the tenant's portal credential.
- *   • `list-inspections` / `upsert-inspection` — the tenancy inspection pair.
- *   • `delete-tenancy`, `delete-maintenance`, `delete-investment` — the whole delete surface. A
- *     workspace that had never bought Property Management could not read a tenancy and could
- *     delete one.
- *
- * Nothing looked wrong the entire time, because the tab was hidden: you have to call the function
- * directly to see it, and it is reachable directly.
- *
- * The rule is DERIVED, not a second copy of the list. Membership follows the TABLE the handler
- * touches, so a new action is covered the day it is written rather than the day someone remembers
- * to add it here — which is the failure this is replacing.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';

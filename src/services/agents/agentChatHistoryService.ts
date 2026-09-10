@@ -357,17 +357,7 @@ export class AgentChatHistoryService {
     }
   }
 
-  /**
-   * Delete a conversation and all its messages.
-   *
-   * The FK on agent_chat_messages.conversation_id is ON DELETE CASCADE, so the
-   * message rows go in one transaction. Session storage files (under
-   * generation-images `u/{uid}/sessions/{conversationId}/`) are NOT deleted
-   * synchronously — there is no AFTER DELETE storage trigger. Once the conversation
-   * row is gone its session prefix and message URLs drop out of
-   * build_storage_reference_set, and storage-orphan-cleanup-cron garbage-collects the
-   * files (generation-images 14d grace).
-   */
+  /** Delete a conversation and all its messages. */
   async deleteConversation(conversationId: string): Promise<boolean> {
     try {
       const { error } = await supabase

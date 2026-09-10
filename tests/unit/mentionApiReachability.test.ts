@@ -1,40 +1,4 @@
-/**
- * Guard: every mention-monitoring reader has a screen, and both kinds of subject have one.
- *
- * WHY THIS EXISTS
- * ---------------
- * Issue #349, found while checking that the A1–A4 work was actually visible. It was not.
- *
- * `tracked_mentions` holds two kinds of row: a PRODUCT enrolment (`product_id` set,
- * served at `/products/{id}/…`) and a free brand/keyword SUBJECT (served at
- * `/track/{id}/…`). MIVAA has served both families since the feature shipped. The client
- * only ever spoke the product one.
- *
- * The measured state, checked against the live DB on 2026-08-23:
- *
- *   - The INTERNAL flow holds **zero** subjects. Not "none openable" — none created, and
- *     none creatable: `createTrackedMention` had no caller anywhere in `src/`. The only
- *     ways in were curl and the agent tool, and the agent tool is product-only too.
- *   - The 17 rows that do exist all carry `api_key_id` — they came through the `kai_*`
- *     partner API, and `MentionMonitoringDashboard` filters `.is('api_key_id', null)` on
- *     purpose, so that screen has always rendered an empty list. Their 636 probe rows
- *     across 50 runs are reachable by the partner's own API calls and by nothing in this
- *     app.
- *   - `shareOfVoice()` had zero callers on the day it was fixed. So did both opportunity
- *     readers, which are the read side of a ~2,000-line service scoring AI Overview
- *     presence, PAA gaps and competitor rankings.
- *
- * So the product had a create path with no door and a read path that could only address
- * the minority kind of row. Nothing failed: every wrapper typechecked, every route
- * routed, the suite was green, and the admin page rendered a clean empty state.
- *
- * This is `inboxApiReachability`'s shape one level up: there, an action had no caller;
- * here, a whole ADDRESSING MODE had no screen. A typed wrapper is not a surface, and a
- * route is not one either.
- *
- * Comments are stripped before anything is counted — a file that merely mentions
- * `getSubjectOpportunities` in prose must not answer for a call site.
- */
+/** Guard: every mention-monitoring reader has a screen, and both kinds of subject have one. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, sep } from 'node:path';

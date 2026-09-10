@@ -1,18 +1,4 @@
-/**
- * Pay a supplier bill via Revolut — in context, from the Payables row (#315).
- *
- * The flow the bill deserves: open from the bill → recipient is the supplier's own CRM
- * bank account (VoP-verified when the Revolut counterparty is first created) → pick the
- * source pocket → Draft (default: a human approves in the Revolut app) or Send now.
- * The payment reference carries the bill number, so when the transfer executes, the
- * bank-feed matcher settles the bill automatically — no second bookkeeping step.
- *
- * That intent used to be defeated by the screen stating it: the reference was a free-text input
- * and `reference || bill.supplier_bill_number` let anything typed in it REPLACE the number
- * (#359 CM-19). The number is composed in now, and the real binding is a foreign key —
- * `payout_instructions.supplier_bill_id`, set here because this screen already knows the answer the
- * feed would otherwise have to guess.
- */
+/** Pay a supplier bill via Revolut — in context, from the Payables row (#315). */
 import React, { useRef } from 'react';
 import { Loader2, Send } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
@@ -112,19 +98,7 @@ export const PayViaRevolutDialog: React.FC<{
     })();
   }, [billId, workspaceId, toast]);
 
-  /**
-   * Synchronous in-flight latch, and a stable idempotency key (#359 CM-19).
-   *
-   * `busy` is React state: a double-click enters `send()` twice before the first `setBusy(true)`
-   * has rendered, and `disabled={busy}` is that same state one render behind. Eleventh instance of
-   * this class platform-wide, and the only one whose consequence is an IRREVERSIBLE duplicate bank
-   * transfer.
-   *
-   * The latch alone is not enough, because a retry after a network error is a legitimate second
-   * call. So the dialog also mints ONE request id when it opens and sends it with every attempt:
-   * Revolut deduplicates on it, and the server answers a repeat with what already happened instead
-   * of instructing a second payment.
-   */
+  /** Synchronous in-flight latch, and a stable idempotency key (#359 CM-19). */
   const sending = useRef(false);
   const requestId = useRef(crypto.randomUUID());
 

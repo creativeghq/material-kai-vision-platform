@@ -1,31 +1,4 @@
-/**
- * Blueprint zones editor — the admin side of the configurator.
- *
- * A zone is what the customer configures: bottom units, top units, an island, a worktop. This is
- * where you say what zones exist, what is GLOBAL to each (height, depth, which price list its door
- * model comes from) and what MODULE TYPES can go in it (1-door, 2-door, drawer bank) with how each
- * one is priced.
- *
- * Two rules worth knowing before you edit anything here:
- *
- *  - Binding a global to an option_group ABSORBS that group. Its rows stop being a choice of their
- *    own anywhere — they become this zone's rate table, and the zone owns the selection. That is
- *    what lets bottom and top units share one price list and still pick different finishes. Bind a
- *    group to nothing and it stays an ordinary pick-one line in the scope below.
- *  - `Publishes as` is the formula variable the zone's derived length appears under. Point it at
- *    the variable your per-metre task lines already use (`run_length`) and those lines keep working
- *    untouched, now fed by the real composition instead of a number somebody typed.
- *  - An APPLIANCES zone is priced by who supplies each row, not by what is in it. Anything the
- *    customer already owns costs nothing and still books its housing and its connections, so the
- *    two fields that matter most on an appliance are `Goes in` (which cabinet, checked against the
- *    layout) and `Needs` (sockets, water, waste, gas, duct — counted whoever buys the machine).
- *
- * `Yields` / `Needs` are the hardware and services bag, written as `key:n` pairs — `doors:2,
- * shelves:1` on a unit, `socket:1, water_in:1` on an appliance. They are what the schedule counts;
- * a key nothing consumes raises an issue rather than sitting at zero unnoticed.
- *
- * Read-only is enforced by the parent's `<fieldset disabled>`, same as BlueprintScope.
- */
+/** Blueprint zones editor — the admin side of the configurator. */
 
 import React from 'react';
 import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';

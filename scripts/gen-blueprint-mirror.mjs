@@ -1,18 +1,4 @@
-/**
- * Regenerate src/utils/blueprintComposition.ts from the authoritative edge copy.
- *
- * The composition derivation has to exist twice: the edge copy is the authoritative writer of
- * persisted plan money, and the frontend needs the same maths for the anonymous configurator's
- * live total (it has no DB and no session). Two hand-kept copies of a pricing rule is exactly the
- * failure this codebase keeps paying for, so the mirror is GENERATED — one import line rewritten,
- * nothing else — and tests/unit/blueprintComposition.test.ts fails the build if the checked-in
- * mirror is not what this script would produce.
- *
- * NO SHEBANG, deliberately: `core.autocrlf` is on and this repo has no .gitattributes, so a
- * Windows checkout can hand this file CRLF — and a `#!` line followed by CRLF makes vitest's
- * loader throw "Invalid or unexpected token" against the IMPORT in the test, nowhere near the
- * real cause. Nothing executes this file directly; package.json runs it through `node`.
- */
+/** Regenerate src/utils/blueprintComposition.ts from the authoritative edge copy. */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';

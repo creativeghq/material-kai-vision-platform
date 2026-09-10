@@ -13,20 +13,6 @@ import {
  * the model composes is the brief the prompt builders get. They read it structurally —
  * `brief.audience.painPoints.join(', ')`, `brief.brandVoice.toneAttributes.join(', ')` —
  * sixteen dereferences across plan / write / analyze.
- *
- * On 2026-09-06 the marketing agent sent this, which is a perfectly good brief:
- *
- *   { market, audience: "<prose>", language, mustCover: [...], brandVoice: "<prose>",
- *     businessContext, provenance }
- *
- * and article 8b8d7383 died at 30% with `Cannot read properties of undefined (reading
- * 'join')`, after the debit. Two properties matter here:
- *
- *   1. no input shape throws — a brief is optional, additive prompt context, so a wrong
- *      shape must never be the reason a paid run fails; and
- *   2. what the caller wrote still REACHES the model. The builders only read the keys they
- *      know, so `mustCover` / `businessContext` / `market` — the only workspace-specific
- *      information in that request — would have been dropped even had it not crashed.
  */
 
 /** The exact brief stored on article 8b8d7383-a6a9-415f-ba78-5749fbcf8454. */

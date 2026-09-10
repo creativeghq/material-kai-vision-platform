@@ -1,19 +1,4 @@
-/**
- * ai-rerank — reorder search results by relevance to a query.
- *
- * THIS SLUG MUST KEEP ITS SOURCE IN THE REPO
- * ------------------------------------------
- * It was once deployed with no source here — unreadable, unreviewable, service-role capable and
- * reachable unauthenticated — and the body could not be recovered afterwards, because
- * `get_edge_function` only ever returns the CURRENT version. This implementation exists in the
- * repo, is covered by `npm run typecheck:edge`, and requires a JWT. Keep it that way.
- *
- * The ranking itself lives in `_shared/rerank.ts`, which is what the three in-agent search paths
- * (material_search, visual_search, knowledge_base_search) call directly — they already hold the
- * candidates, so making them round-trip through HTTP to reorder their own list would add a
- * network hop and a second failure mode to something that must never break search. This function
- * is the entry point for callers that are NOT inside the agent runtime.
- */
+/** ai-rerank — reorder search results by relevance to a query. */
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';

@@ -1,38 +1,6 @@
 /**
  * Two Real Estate paths that hand something to the outside world, and both were quietly wrong
  * about what they were handing over.
- *
- * ── 1. An unmatched lead that says it matched ────────────────────────────────────────────
- * `real-estate-inbound-lead` matches a forwarded portal enquiry to a listing by the agency's own
- * `reference_code`, and falls back to the most recent live listing when it cannot — writing a
- * "please re-point this lead" banner into the message so an agent can fix it.
- *
- * The banner was gated on `!parsed.reference` — whether the email CONTAINED a reference — not on
- * whether that reference matched anything. So an enquiry quoting `ESP-9931`, where no listing
- * carries that code, took the fallback listing with NO banner and returned `matched_listing: true`.
- * The agent sees a lead about a flat in Voula sitting on a warehouse in Piraeus and nothing at all
- * saying it might be misfiled. The two states need different fixes, too: no reference means the
- * portal does not send one, while a reference that matched nothing means this listing's
- * `reference_code` is wrong here — and that will misfile every future lead for it.
- *
- * ── 2. A published post pointing at an expired URL ───────────────────────────────────────
- * `real-estate-listing-social` drafts a social post per connected account when a listing goes
- * live. `property-media` is PRIVATE, so it signed the cover photo and stored that URL in
- * `social_posts.image_urls`; `zernio-api` then handed the stored URL to the provider at publish
- * time. A draft reviewed after the signature lapsed published an imageless post — or failed —
- * and nothing in either function could tell. That is pipeline convention 7: never persist a
- * `file_url` for a private bucket, store bucket + path and mint the URL on read.
- *
- * The row now carries `metadata.media_refs` and the publisher signs at the moment of use. The
- * stored `image_urls` remains only so the draft renders in the composer.
- *
- * The reference is an ID, not a {bucket, path}, and that is the whole design. `social_posts`
- * carries a `FOR ALL` policy for workspace members, so its metadata is USER-WRITABLE — while the
- * publisher runs under the SERVICE ROLE. A path taken from there would let any member name any
- * private object in any bucket (another tenant's invoice PDF) and be handed a signed URL for it.
- * The publisher therefore accepts only `{kind: 'property_photo', id}` and reads the bucket and path
- * from `property_photos` filtered by the post's own workspace, so the worst a rewritten id can name
- * is a photo that member could already see.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';

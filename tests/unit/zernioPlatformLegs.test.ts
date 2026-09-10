@@ -1,16 +1,4 @@
-/**
- * A post that reached 3 of 4 networks does not look like one that reached 4 (#384 A).
- *
- * We subscribed to `post.platform.published` and `post.platform.failed`, Zernio delivered them,
- * the dispatcher had no branch, and it answered 200 and binned them. The aggregate events that DO
- * have branches cannot substitute: `post.partial` sets the status to `published` and records
- * `firstPlatformError` — whichever error happens to come first — so the failing network was never
- * named anywhere, and the post read as fully published.
- *
- * Both halves are needed and each is silent alone. Recording the leg with nothing rendering it
- * moves the silence one table over; rendering with nothing recorded shows an empty list that
- * looks like "all fine".
- */
+/** A post that reached 3 of 4 networks does not look like one that reached 4 (#384 A). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

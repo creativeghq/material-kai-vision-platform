@@ -1,8 +1,5 @@
 // Source of truth for the customer-facing-reply skill.
-//
-// Generated from SKILL.md by scripts/gen-skill-ts.mjs — edit the markdown, not this file.
-// A plain template literal, not String.raw: String.raw keeps the backslash of an escaped
-// backtick, so the text the model reads comes out as \`tool_name\` rather than `tool_name`.
+// DO NOT EDIT — generated from SKILL.md by scripts/gen-skill-ts.mjs. Edit the markdown.
 
 export default `---
 name: Customer-Facing Reply

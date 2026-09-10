@@ -12,13 +12,6 @@ import { HubEmptyState } from '@/components/core/hub';
 /**
  * Lead routing rules. Inbound leads used to sit on the listing until somebody noticed; response time
  * is the whole game on a buyer enquiry.
- *
- * A rule matches on the LISTING's town / region / postcode prefix — leave a field empty to mean
- * "don't care", which is how you build a catch-all. Highest priority (lowest number) wins, then the
- * lead is dealt round-robin to the next agent on that desk.
- *
- * Broker-only: routing decides who GETS the leads, so an agent editing it would be handing
- * themselves the desk. The API enforces that too — this just doesn't render the controls.
  */
 export const LeadRoutingCard: React.FC<{ ws: string | null; canManage: boolean }> = ({ ws, canManage }) => {
   const { toast } = useToast();

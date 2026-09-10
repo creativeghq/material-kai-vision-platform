@@ -1,16 +1,4 @@
-/**
- * Guard: the deploy diff is taken from what is LIVE, not from the previous commit.
- *
- * On 2026-08-17 a concurrent push cancelled the deploy for d02b5c79. The next commit was
- * test-only, so `changes` compared against a parent whose frontend had never shipped, answered
- * "no frontend change", and the run went green over a build missing two fixes. Nothing failed —
- * that is the whole problem. A cancelled deploy is invisible to a diff anchored on HEAD~1,
- * because the commit it skipped is still in the history behind it.
- *
- * The fix is a pair of markers (`deployed/frontend`, `deployed/functions`) moved ONLY by a
- * successful deploy, with every diff anchored there. This pins the three properties that make it
- * work; each is a one-line edit away from being undone, and none of them fails loudly if it is.
- */
+/** Guard: the deploy diff is taken from what is LIVE, not from the previous commit. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -63,17 +51,7 @@ describe('deploy baseline', () => {
   });
 });
 
-/**
- * Guard: the two properties that used to be free and are now load-bearing wiring.
- *
- * On 2026-08-19 this workflow was restructured for wall-clock — the lint checks moved out of
- * `unit-tests` into their own job, and the single workflow-level concurrency group (which
- * serialized entire runs, costing ~13 minutes of pure queueing across five pushes) was replaced
- * by per-job groups on only the jobs that touch a shared external resource.
- *
- * Both changes are safe, and both replaced a structural guarantee with a wiring decision that
- * fails SILENTLY if it is undone. Hence these.
- */
+/** Guard: the two properties that used to be free and are now load-bearing wiring. */
 // LF-normalized. A Windows checkout has CRLF, so an LF-anchored multiline regex matches
 // nothing and every assertion below would pass vacuously — the same shape that had to be
 // fixed in another guard this week.
@@ -135,27 +113,7 @@ describe('deploy wiring', () => {
   });
 });
 
-/**
- * Guard: one base per question. Every FUNCTION verdict is measured against the FUNCTIONS marker.
- *
- * `dorny/paths-filter` takes a single base and it is the frontend's. That was harmless while the
- * two markers moved together — and they stop the moment one area deploys and the other does not.
- * On 2026-08-23 the frontend promoted while deploy-functions was cancelled, leaving the functions
- * marker four commits behind, and two questions were then being put to the wrong baseline:
- *
- *   - `shared` — "did _shared change?" A module added in the superseded commit sits BEHIND the
- *     frontend base, so the answer came back "no" and the deploy-ALL case never fired. The
- *     directory scan still catches every function whose own files changed, but a function that
- *     merely IMPORTS the new module has an untouched directory. Replayed against that exact
- *     marker pair: 15 functions would have kept running old code against a changed `ai-client.ts`
- *     or `base-agent.ts`.
- *   - `functions` — the JOB GATE. `count=5, functions=false` was reachable, and then the job
- *     skipped with five functions pending, the marker therefore never moved, and those five
- *     stayed stranded until some later commit happened to touch a function directory.
- *
- * Neither is visible from the outside. Both fail by deploying LESS, and a deploy that ships
- * nothing is a green deploy.
- */
+/** Guard: one base per question. Every FUNCTION verdict is measured against the FUNCTIONS marker. */
 function computeStep(): string {
   const job = jobBlock('changes');
   const start = job.indexOf('id: changed-functions');

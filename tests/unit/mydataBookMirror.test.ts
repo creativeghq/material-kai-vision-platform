@@ -1,24 +1,4 @@
-/**
- * The myDATA book mirror has exactly two ways to break, and both are silent.
- *
- * 1. SOMEONE SIMPLIFIES THE COLLECTOR. `RequestMyIncome` / `RequestMyExpenses` look like
- *    they return the whole book — they are literally the book endpoints — so dropping the
- *    third call reads as a cleanup. It is not: a `<bookInfo>` row is keyed on
- *    `counterVatNumber`, so every counterparty-less family is absent from it. Measured
- *    against this platform's own book for 01/01–30/08/2026, the book feed alone reports
- *    EUR 42,658.42 of income where AADE's page says EUR 54,329.85 — short by 21%, because
- *    two February 11.1 receipts and their 11.4 credit note are invisible to it. Nothing
- *    errors. The short number is a valid number, and it is a valid number in a TAX book.
- *
- * 2. SOMEONE MERGES IT INTO PLATFORM FINANCE. The mirror's entire value is that it was
- *    derived from AADE's data rather than ours, so it can DISAGREE with us. Join it into
- *    `invoices`/`supplier_bills`/`inbound_documents`, or let a platform report read it,
- *    and the disagreement becomes impossible to observe — you would be confirming our
- *    arithmetic against itself and calling it a reconciliation.
- *
- * Neither shows up in a typecheck, an integrity probe, or a lint: the first produces a
- * plausible total, the second produces a suspiciously perfect one.
- */
+/** The myDATA book mirror has exactly two ways to break, and both are silent. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';

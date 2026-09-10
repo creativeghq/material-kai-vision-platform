@@ -1,17 +1,4 @@
-/**
- * How a supplier invoice line is READ — the one copy, and the defects it replaced.
- *
- * Two screens receive stock from a myDATA line: `ReceiveToWarehouseDialog` (the modal on an
- * expense) and `PendingProductsCard` (the intake queue). They had each answered the same six
- * questions and disagreed on four of them. Every case below is one of those disagreements, so
- * the test doubles as the record of which answer is right and why.
- *
- * The live line these are drawn from — ΤΔΑ10 1791, 2026-08-04:
- *   { quantity: 4.1, measurement_unit: 4, item_code: "11-3331-60-1", vat_category: 1,
- *     net_value: 100.48, item_description: "ΠΑΓΚΟΣ EGGER H3331 ST10 300/3 P3 IDRO 4100x600x38mm" }
- * The queue read three of those six fields and filed the line as 4.1 PIECES of a product whose
- * supplier code it had invented, at a cost that did not multiply back to the invoice.
- */
+/** How a supplier invoice line is READ — the one copy, and the defects it replaced. */
 import { describe, it, expect } from 'vitest';
 
 import {

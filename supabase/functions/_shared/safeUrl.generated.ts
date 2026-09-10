@@ -2,28 +2,7 @@
 // Regenerate: npm run vocab:mirror (part of gen:all). Freshness is enforced by
 // tests/unit/vocabularyMirrors.test.ts, which fails the build on any drift.
 
-/**
- * URLs that are safe to put in an `href` or `src` of HTML we assemble by hand.
- *
- * A DIFFERENT CONTRACT FROM `escapeHtml`, and both are needed. Escaping stops a value breaking
- * OUT of its attribute (`" onclick=…`); it does nothing about the value being a live
- * `javascript:` URL, which is already inside the quotes and perfectly well-formed. Invariant 11
- * names `escapeHtml` as the canonical escaper and is explicit that it is HTML escaping ONLY —
- * so this sits beside it rather than inside it.
- *
- * WHY IT EXISTS AT ALL (#357 AE-6). `EmailTemplateBuilderPage` assembles campaign HTML from
- * product titles, subtitles and URLs and stores it. Product data reaches this platform from PDF
- * extraction and supplier XML — CLAUDE.md treats both as untrusted — so a `url` field is
- * attacker-influenced text that ends up in an `href` in somebody's inbox.
- *
- * ALLOWLIST, NOT A DENYLIST. `javascript:` is the one everybody remembers; `data:`, `vbscript:`
- * and `file:` are the ones they forget, and the next one has not been invented yet. Only
- * `http:`, `https:` and `mailto:` pass.
- *
- * NO RELATIVE URLS. They are legitimate on a web page and meaningless in an email — there is no
- * base to resolve against, so a relative href is a dead link at best. Refusing them keeps the
- * rule simple enough to hold in one's head.
- */
+/** URLs that are safe to put in an `href` or `src` of HTML we assemble by hand. */
 
 /** Where a refused URL points instead. `#` is inert in every mail client. */
 const INERT = '#';

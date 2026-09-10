@@ -239,17 +239,7 @@ export const deliveryNotesService = {
     return data;
   },
 
-  /**
-   * Withdraw a transmitted movement document at myDATA (9.3 → CancelDeliveryNote).
-   *
-   * This is the ONLY document myDATA lets us cancel. An invoice or a retail receipt is immutable
-   * once transmitted and is corrected by a CREDIT NOTE instead — the provider has no route for
-   * cancelling one at all.
-   *
-   * Irreversible and billable: it files a cancellation document with AADE and spends provider
-   * credits, so the caller must confirm first. It is idempotent at our end — a note that already
-   * carries a cancellation mark answers `skipped` rather than filing a second one.
-   */
+  /** Withdraw a transmitted movement document at myDATA (9.3 → CancelDeliveryNote). */
   async cancelFiscal(id: string): Promise<any> {
     const { data, error } = await supabase.functions.invoke('finance-issue-invoice', {
       body: { cancel_delivery_note: { delivery_note_id: id } },
@@ -387,17 +377,7 @@ function matchWarehouseItem(line: { product_id?: string | null; sku?: string | n
   return null;
 }
 
-/**
- * FREE stock for a line, summed across every warehouse that holds it.
- *
- * matchWarehouseItem returns the FIRST matching row, and the shortfall test used its raw
- * qty_on_hand — so a product split across two warehouses raised a false alarm, reserved stock was
- * counted as available (a missed alarm), and a product with no stock row at all yielded
- * `qty_on_hand == null` which the old test read as "no shortfall" — no warning whatsoever for the
- * one case that is certainly short.
- *
- * Returns null only when the line matches NO warehouse row, which the caller treats as a shortfall.
- */
+/** FREE stock for a line, summed across every warehouse that holds it. */
 function freeStockForLine(
   line: { product_id?: string | null; sku?: string | null; description?: string | null },
   wh: WarehousePick[],

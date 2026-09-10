@@ -1,41 +1,4 @@
-/**
- * Is this failure the DATABASE being unavailable, or the caller's fault?
- *
- * THE OUTAGE THIS EXISTS FOR (2026-08-22). Postgres went unreachable for four hours. Every
- * edge function that reads the database does this:
- *
- *     const { data, error } = await supabase.from(…).select(…);
- *     if (error) throw new HttpError(400, error.message);      // 207 sites, 16 functions
- *
- * — written for the case where `error` means "your input was wrong". During the outage `error`
- * was a Cloudflare **522 Connection timed out** page, so every caller got `400 Bad Request`
- * with 2,916 bytes of HTML in the message. And `api-logger` never reports 4xx to Sentry, by
- * design, because a client error is not a bug. So a total outage looked like user error in every
- * dashboard and paged nobody, for four hours, while the logs filled with "400".
- *
- * Rewriting 207 call sites would fix today and not tomorrow: the 208th would be written the same
- * way. So the decision lives here and is applied once, in the wrapper every function already goes
- * through. A handler may keep saying 400; if the thing it is reporting is the database being
- * down, the wrapper says 503 and Sentry hears about it.
- *
- * PRECISION MATTERS IN ONE DIRECTION. Misreading a client error as an outage costs a wrong status
- * and a Sentry event. Misreading an outage as a client error is what happened above. The
- * signals below are deliberately literal — transport verbs, gateway codes, Postgres
- * unavailability SQLSTATEs — rather than anything that tries to be clever about wording.
- *
- * THE SECOND QUESTION: "permission denied" is TWO different events wearing one SQLSTATE (42501),
- * and the same 400 was hiding both.
- *
- *   - `new row violates row-level security policy` — the caller asked for something that is not
- *     theirs. Correct, expected, and the caller's own doing: **403**, never reported.
- *   - `permission denied for function is_workspace_member` — nobody GRANTed the role that needs
- *     it. No client action can fix that, and the feature behind it is dead for EVERYONE until
- *     somebody notices: **500, reported**. Both of those appeared in the logs during the outage
- *     window, indistinguishable from a typo in a request body.
- *
- * Postgres names the object when a GRANT is missing and says "row-level security policy" when a
- * policy refused, so its own wording separates them exactly. Anything else stays untouched.
- */
+/** Is this failure the DATABASE being unavailable, or the caller's fault? */
 
 /** SQLSTATE classes that mean the server could not serve, not that the request was bad. */
 const UNAVAILABLE_SQLSTATE_CLASSES = [

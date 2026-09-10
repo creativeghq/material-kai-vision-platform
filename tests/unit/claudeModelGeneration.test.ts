@@ -1,21 +1,4 @@
-/**
- * No retired Claude model id reaches a call site.
- *
- * A superseded model id is the quietest possible defect. It is a valid string, it typechecks, and
- * the provider either serves the old model (so you silently pay for and get worse output than you
- * think) or 404s a path nobody exercises in CI. Neither shows up as a failure anyone can see.
- *
- * It had spread: `claude-opus-4-8` was retired from the platform in 0d20b768, and 36 live call
- * sites in MIVAA kept passing it — the vision classifier, segmentation, OCR, product enrichment
- * and the whole RAG synthesis path — while `config.py` had already moved its DEFAULTS to
- * `claude-opus-5`. The defaults were right and the code did not read them.
- *
- * The current families are Claude 5 (`claude-opus-5`, `claude-sonnet-5`, `claude-fable-5`) and
- * `claude-haiku-4-5`, which IS current — Haiku has no 5 yet, so it is not on the retired list.
- *
- * MIVAA is a separate repo and is EMPTY in this repo's CI checkout, so it carries its own copy of
- * this check (tests/unit/test_claude_model_generation.py). Changing one means changing both.
- */
+/** No retired Claude model id reaches a call site. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';

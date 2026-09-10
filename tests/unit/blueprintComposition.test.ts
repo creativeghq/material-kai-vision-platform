@@ -1,29 +1,4 @@
-/**
- * Guards the zone composition — how a configured kitchen becomes metres, counts and money.
- *
- * WHY THIS EXISTS
- * ---------------
- * Composition introduces a SECOND source of quantity next to the typed dimensions, and a second
- * source of a number is exactly the shape that has cost this platform the most (see the money
- * derivation rules in CLAUDE.md). Two failure modes are silent by construction and both are
- * pinned here:
- *
- *  1. DOUBLE COUNTING. A zone prices its units through its own derived lines. The option_group its
- *     door-model global is bound to must therefore stop being priced as a line of its own. Miss
- *     that and every cabinet front is charged twice — and the result is a valid number, so no
- *     typecheck and no integrity probe can see it.
- *  2. MIRROR DRIFT. The derivation exists twice: the edge copy writes persisted plan money, the
- *     frontend copy drives the anonymous configurator's live total. If they disagree, the price a
- *     visitor is shown is not the price that gets recorded. The mirror is GENERATED, and the last
- *     test here catches a hand edit locally. In CI it is a belt-and-braces check rather than a
- *     gate — `npm run gen:all` runs before `npm test` and commits any drift back, so a hand-edited
- *     mirror is overwritten there rather than failing the build. That is the intended outcome for
- *     a generated file; the test is what stops you shipping one before the push.
- *
- * It asserts RULES and RELATIONSHIPS, never the starter's actual rates — those live in the DB and
- * are meant to be edited in the admin, so a test pinning them would fail on every legitimate
- * re-price.
- */
+/** Guards the zone composition — how a configured kitchen becomes metres, counts and money. */
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -468,8 +443,6 @@ describe('the anonymous starters payload carries every column the client reads',
   // is_schedule and option_key shipped: hardware counts rendered as on/off switches, and
   // `opt_gola` was never published, so every gola line's formula failed and fell back to its
   // default quantity of 0. No error, no empty result, just four fittings that quietly stopped
-  // existing. The required set is DERIVED from the client rather than restated here, so this
-  // cannot pass by being updated in lockstep with the bug.
   const CLIENT = readFileSync('src/utils/blueprintCompute.ts', 'utf8');
 
   const columnsClientReads = Array.from(new Set(
@@ -567,15 +540,6 @@ describe('what the layout implies', () => {
 });
 
 // ── Appliances ──────────────────────────────────────────────────────────────
-//
-// WHY THIS EXISTS
-// ---------------
-// An appliance is the one thing in a kitchen whose PRICE and whose CONSEQUENCES come apart. "I
-// already have a fridge-freezer" is the commonest answer on a kitchen survey; it takes the money to
-// zero and changes nothing at all about the 60cm aperture, the socket behind it or the tall housing
-// it goes in. Every failure mode below is silent by construction — a €0 line is a valid line, an
-// uncounted socket is a plausible absence, and a fridge placed in a tall unit that the layout does
-// not contain produces a perfectly confident total.
 
 const OVENS = 'Oven model';
 

@@ -17,19 +17,7 @@ import {
 } from '@/services/moodboardSheetsService';
 import { SheetTypeIllustration } from './SheetTypeIllustration';
 
-/**
- * Pre-flight modal shown when the user picks a sheet type from the dropdown.
- *
- * Purpose: let the user *see* what the sheet will look like and understand
- * what inputs the agent will gather, BEFORE jumping into the chat. This
- * eliminates the "I clicked something but nothing happened" problem and lets
- * the user back out without spending credits or starting a conversation they
- * don't want.
- *
- * Reference images live in the public `moodboard-sheet-references` bucket
- * keyed by `<sheet_type>.png`. If a reference is missing, we fall back to a
- * lucide icon glyph so the modal still works on a fresh deploy.
- */
+/** Pre-flight modal shown when the user picks a sheet type from the dropdown. */
 
 interface SheetTypeMeta {
   icon: React.ComponentType<{ className?: string }>;

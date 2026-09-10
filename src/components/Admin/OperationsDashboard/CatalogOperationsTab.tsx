@@ -1,16 +1,4 @@
-/**
- * Catalog operations tab — embedded inside /admin/operations.
- *
- * Same data + filters as the standalone CatalogOperationsPage was, but
- * renders as a tab body (no PageHeader, no top-level wrapper). Driven by
- * three shared queries against catalogsService:
- *   - listOperationsSummary()      → per-catalog rollup (view + downloads + gate)
- *   - listViewEvents(opts)         → page_view + pdf_download timeline
- *   - listAccessLogCrossCatalog()  → email-gate timeline (granted + denied)
- *
- * Resolves matched_user_id → user profile via getUserProfilesByIds so each
- * row shows the actual platform user when the visitor matched one.
- */
+/** Catalog operations tab — embedded inside /admin/operations. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {

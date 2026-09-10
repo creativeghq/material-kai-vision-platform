@@ -260,18 +260,7 @@ export const RelevancyManagement: React.FC = () => {
     setStats(prev => ({ ...prev, chunkProduct: { total: formatted.length, avgScore } }));
   };
 
-  /**
-   * Tag an image with the variant it depicts (#374 Phase 8).
-   *
-   * `get_product_variant_images` then prefers this photo for a line that chose that variant, and
-   * — the part that matters — never returns it for a line that chose a DIFFERENT one. Untagged
-   * images stay general and remain the fallback for everybody.
-   *
-   * The picker is write-only on purpose: the stored value is a canonical key, and
-   * `formatVariantKey` is explicitly display-only ("never parse this back"). Reversing a key into
-   * attributes to re-populate the control would be a second, lossy derivation of the identity the
-   * key already is. So the current tag renders as text and the picker sets a new one.
-   */
+  /** Tag an image with the variant it depicts (#374 Phase 8). */
   const setImageVariant = async (relId: string, attrs: Record<string, string>) => {
     const vkey = variantKey(attrs);
     const { error } = await supabase

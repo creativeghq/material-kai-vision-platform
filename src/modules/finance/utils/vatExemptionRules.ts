@@ -1,18 +1,4 @@
-/**
- * Which myDATA exemption cause a 0%-VAT line most likely needs.
- *
- * **This SUGGESTS; it never decides.** Novus and AADE validate the cause you send — neither
- * derives it — because picking it is a VAT-law determination that stays the issuer's legal
- * responsibility. So this produces a default for the operator to confirm, with the reasoning
- * shown, and deliberately reports low confidence rather than guessing quietly. A wrong cause is a
- * rejected or misfiled document carrying your VAT number.
- *
- * Every input is already on the record: the buyer's country and VIES-validated VAT number come
- * from their CRM party, the seller's from `finance_settings.business_country_code`, and
- * goods-vs-services from the catalog product (or the line's off-warehouse flag).
- *
- * Codes are the ΑΑΔΕ catalog in [mydataExemptionCategories.ts](src/lib/mydataExemptionCategories.ts).
- */
+/** Which myDATA exemption cause a 0%-VAT line most likely needs. */
 import { MYDATA_EXEMPTION_CATEGORIES } from '@/lib/mydataExemptionCategories';
 import { VAT_COUNTRY_OPTIONS, toVatPrefix } from '@/lib/vatCountries';
 

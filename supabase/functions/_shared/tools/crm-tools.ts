@@ -282,18 +282,7 @@ export const createManageCrmTool = (
 };
 
 
-/**
- * The deal pipeline for the agent, for EVERY deal type (#311).
- *
- * `manage_real_estate`'s manage_deal action only ever spoke about property deals and hardcoded the
- * real_estate type, so a construction or project deal was invisible to the agent layer entirely.
- * This one resolves the type by name, reads the stage set from the DATA, and refuses a stage the
- * chosen type does not define — the composite FK on (deal_type_id, stage) would reject it anyway,
- * and a named error beats a constraint violation.
- *
- * Uses the caller's JWT so RLS on crm_deals applies: the agent sees exactly the deals the person
- * asking would see on the board, including the property agent-scoping.
- */
+/** The deal pipeline for the agent, for EVERY deal type (#311). */
 export const createManageDealTool = (
   userId: string,
   workspaceId: string,

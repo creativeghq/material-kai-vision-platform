@@ -1,19 +1,6 @@
 /**
  * Stripe secret-resolution guard — the same defect the Zernio surface had, one provider over.
  * See [zernioSecretResolution.test.ts](./zernioSecretResolution.test.ts) for the twin.
- *
- * `_shared/stripe-clients.ts` read every Stripe key as `Deno.env.get('STRIPE_SECRET_KEY')`,
- * relying on `_shared/secrets-bootstrap.ts` to have copied `platform_secrets` into env first.
- * That bootstrap is a documented no-op on the Supabase edge runtime — `Deno.env.set` throws
- * "The operation is not supported" there, which secrets-bootstrap.ts says at its own catch
- * site. So the DB half of the resolver was dead: an admin pasting the key at
- * /admin/modules/payments-stripe/settings → Keys saved a row nothing would ever read, and the
- * 503 those functions return points the admin at exactly that tab. Only a real deploy secret
- * ever worked, in silence, and `crm-api` kept a private copy of the factory that built its
- * client AT MODULE LOAD — unable to see even a late env write.
- *
- * The fix is one factory (`getStripe` / `getPlatformBillingStripe` → `resolveSecret`,
- * env-first / DB-second) and no second copy. This test makes the next copy a red build.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';

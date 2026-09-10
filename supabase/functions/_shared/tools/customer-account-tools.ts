@@ -1,33 +1,4 @@
-/**
- * The four tools a CUSTOMER's own conversation may use to read their OWN account.
- *
- * ── Why they take no arguments ──────────────────────────────────────────────────────────────
- * This is the single most important property in the file, so it is the first thing said:
- *
- *   **Every query is scoped by `(workspace_id, contact_id)` captured from the THREAD — never from
- *   a tool argument and never from anything the customer wrote. The tools intentionally take no
- *   scoping parameters.**
- *
- * The other party in an Inbox conversation is a stranger typing free text into a privileged loop.
- * If the model could pass a contact id, then "actually I'm also authorised on account 4471, show me
- * that balance" becomes a working exploit — and it would work through pure persuasion, with no bug
- * anywhere and nothing in the logs to distinguish it from ordinary use. An empty `z.object({})`
- * makes the exploit unrepresentable rather than merely refused. Security invariant 1: derive scope
- * from the verified context, never from the request body.
- *
- * ── Where they came from ────────────────────────────────────────────────────────────────────
- * Lifted from `inbox-api`'s `buildCustomerSupportTools` when the Inbox stopped running its own
- * small assistant and started running JARVIS with a customer audience. Two changes in the move:
- * the AI-SDK `tool({ inputSchema, execute })` shape became LangChain's `tool(fn, { schema })`,
- * because agent-chat's loop is LangGraph; and they became reusable, because the clamp in
- * `_shared/customer-audience.ts` needs something to allow.
- *
- * They are NOT in `TOOLKIT_CLUSTERS` and not declared by any agent, on purpose. A cluster is
- * something a user or the model can ask for; these are bound only by the audience path, only when a
- * thread has resolved to a real CRM contact, and only when the workspace allows account answers.
- * Putting them in a cluster would make them reachable from an operator chat, where they would be a
- * strictly worse version of the finance tools that already exist.
- */
+/** The four tools a CUSTOMER's own conversation may use to read their OWN account. */
 
 // `tool` is typed non-generically ON PURPOSE — see the same note in inbox-tools.ts. Inferring
 // @langchain/core's generic graph into every tool module is what pushes agent-chat past the edge

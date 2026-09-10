@@ -1,17 +1,6 @@
 /**
  * Canonical storage-path builder for the `generation-images` bucket (client mirror
  * of supabase/functions/_shared/storage-paths.ts — keep the two in sync).
- *
- * Post-2026-05-31 reorg: everything a chat creates lives under one per-session
- * prefix so deleting the chat = deleting one prefix.
- *
- * Layout:
- *   u/{user_id}/sessions/{conversation_id}/gen/{filename}      AI generations
- *   u/{user_id}/sessions/{conversation_id}/uploads/{filename}  user-attached chat images
- *   u/{user_id}/moodboards/{moodboard_id}/{filename}           copy-on-promote target
- *
- * Safe fallback: when conversation context is missing we use the legacy flat
- * prefix, which the orphan cron's grace sweep still owns.
  */
 
 export interface SessionPathCtx {

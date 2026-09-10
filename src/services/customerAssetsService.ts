@@ -45,16 +45,7 @@ export interface CustomerAsset {
   warranties?: Array<Pick<AssetWarranty, 'id' | 'kind' | 'starts_on' | 'ends_on'>>;
 }
 
-/**
- * "Starts on X, runs N months — when does it end?", answered by the DATABASE.
- *
- * The obvious client-side `d.setMonth(d.getMonth() + n)` is a second implementation of the
- * expression `apply_asset_service_defaults` uses when it opens a manufacturer warranty from
- * `products.default_warranty_months`, and the two disagree on real inputs: 2026-01-31 + 1 month is
- * 2026-02-28 in Postgres and 2026-03-03 in JavaScript. A cover end date is a date the customer can
- * hold us to, and a wrong date is a valid date — nothing downstream would ever notice the drift.
- * So the client asks; it does not calculate. Null when either input is missing or months <= 0.
- */
+/** "Starts on X, runs N months — when does it end?", answered by the DATABASE. */
 export async function warrantyEndDate(startsOn: string, months: number): Promise<string | null> {
   if (!startsOn || !Number.isFinite(months) || months <= 0) return null;
   const { data, error } = await supabase.rpc('warranty_end_date', {
@@ -263,18 +254,7 @@ export function describeInterval(plan: { interval_months: number | null; interva
   return '—';
 }
 
-/**
- * Warranty state for display. `ends_on` is the only input — nothing is cached server-side.
- *
- * "Today" is the VIEWER'S calendar day (#366 BU-12). It used to be
- * `new Date().toISOString().slice(0, 10)`, which is the UTC day, so a warranty ending yesterday
- * still read `active` to a Greek operator until 03:00 — and one starting today read `pending`.
- *
- * Deliberately NOT pushed into SQL, which is where the audit pointed: the database session runs
- * in UTC, so `current_date` there is the same defect one layer down. A workspace-pinned business
- * timezone would make a server-side answer meaningful; until that exists, the operator's own
- * calendar is the only frame that matches what "expired today" means to them.
- */
+/** Warranty state for display. `ends_on` is the only input — nothing is cached server-side. */
 export function warrantyState(w: { starts_on: string; ends_on: string }): 'active' | 'expiring' | 'expired' | 'pending' {
   const today = todayLocalISO();
   if (w.starts_on > today) return 'pending';
@@ -344,21 +324,6 @@ export const customerAssetsService = {
   /**
    * Put an order line under warranty: register the unit against that order + line, then make its
    * manufacturer cover say what the operator chose.
-   *
-   * The two steps cannot collapse into one. `register` runs `apply_asset_service_defaults`, which
-   * already opens a manufacturer warranty when the product declares `default_warranty_months` — so
-   * inserting ours unconditionally would leave the unit with two manufacturer covers and no way to
-   * tell which one the reminders mean. We adopt the row the defaults created when there is one and
-   * only insert when there is not.
-   *
-   * `asset_id` is REQUIRED when the line already produced a unit. `register_customer_asset` is a
-   * plain insert with no conflict handling, and `uq_customer_assets_order_item` is unique on
-   * `source_order_item_id` — so registering a second time raises 23505 and the whole call fails.
-   * Editing the cover on an already-registered line is the common case (that is what the "covered
-   * to …" button opens), so this path must update rather than re-register.
-   *
-   * `ends_on` is the operator's answer and is passed through, never recomputed here: a cover period
-   * is a date the customer can hold us to, not a number this client is entitled to derive.
    */
   async warrantOrderLine(input: {
     order_id: string;

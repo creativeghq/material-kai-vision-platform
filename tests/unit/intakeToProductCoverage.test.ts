@@ -1,22 +1,4 @@
-/**
- * Intake → product record coverage.
- *
- * `ReceiveToWarehouseDialog` is the widest write surface in the platform: one supplier line
- * becomes a catalog product, a price, a stock row and a set of fiscal codes. Every gap found by
- * hand on the product modal has been the same shape — a field this form collects that nothing
- * ever displays again. Fiscal identity was the first batch, weight and the per-receipt
- * dimensions the second.
- *
- * So the contract is pinned here rather than re-audited by eye: every field on `LineRow` must
- * either name the surface that shows it back, or be explicitly listed as form-only state. A new
- * field added to intake fails this test until someone says where it surfaces — which is the
- * question that keeps getting skipped.
- *
- * Note what this canNOT check: whether the surface actually renders the value at runtime. It
- * checks that a decision was recorded and that the named file still exists and still mentions
- * the underlying column. That is enough to catch the failure mode we keep hitting (nobody
- * thought about it) without pretending to be an integration test.
- */
+/** Intake → product record coverage. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';

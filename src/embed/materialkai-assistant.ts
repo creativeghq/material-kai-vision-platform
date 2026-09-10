@@ -1,23 +1,4 @@
-/**
- * `<materialkai-assistant>` — the platform's tools on a merchant's page (#382 Phase 3).
- *
- *   <materialkai-assistant api-key="mk_embed_…"></materialkai-assistant>
- *
- * NOT A CHAT BOX, ON PURPOSE. A blinking cursor is the facet wizard's emptiness in a different
- * shape: most visitors do not know what to type, and every keystroke would bill the merchant a
- * model turn. This opens as BUTTONS. Each one calls `embed-agent?action=run`, which invokes one
- * allowlisted tool directly — no model, no tokens, no Anthropic spend — and returns the merchant's
- * own data.
- *
- * EVERY RESULT IS RENDERED. This is the rule the in-app agent learned the hard way: a handler that
- * only logs is the bug, and it bites hardest on a deterministic run because there is no prose to
- * fall back on — the visitor gets a cheerful "done" over an empty screen. So each tool has a real
- * renderer here, and `renderUnknown` is the backstop: a shape nobody anticipated still shows its
- * own contents rather than disappearing.
- *
- * Guest rules as its siblings: shadow DOM, no React, never throws into the host page, nothing runs
- * until the widget is near the viewport.
- */
+/** `<materialkai-assistant>` — the platform's tools on a merchant's page (#382 Phase 3). */
 import { formatMoney } from '@/utils/decimal';
 import { referralLink } from './appOrigin';
 
@@ -508,18 +489,7 @@ export class MaterialKaiAssistant extends HTMLElement {
     }
   }
 
-  /**
-   * The inputs a quick-start needs, rendered from the TOOL'S OWN SCHEMA.
-   *
-   * Nothing here is hand-written. The first version guessed the argument names and the enum values
-   * — `insulation_level: 'average'` against an enum of `none|medium|modern|passive` — so every heat
-   * pump call failed at the tool boundary, where a visitor sees only a widget that does not work.
-   * CLAUDE.md has a rule against hand-mirroring a tool's enum for exactly this reason; the server
-   * projects the schema and this renders what it says.
-   *
-   * Only REQUIRED fields are asked. A public widget that opened with eleven optional inputs would
-   * not be used at all, and every one of these tools defaults the rest sensibly.
-   */
+  /** The inputs a quick-start needs, rendered from the TOOL'S OWN SCHEMA. */
   private renderInput(host: HTMLElement) {
     if (!this.active) return;
     const tool = this.tools.find((t) => t.name === this.active);

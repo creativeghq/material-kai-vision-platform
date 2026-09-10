@@ -1,20 +1,4 @@
-/**
- * One way to search a CRM party.
- *
- * `crm_contacts` / `crm_companies` each carry a generated `search_fold` column holding every
- * searchable field, folded by `public.crm_fold()` — lowercased, accents stripped, final sigma
- * normalised. Every party picker matches THAT, with a term folded the same way by `foldedLike`.
- *
- * Before this there were a dozen pickers, each `ilike`-ing its own subset of raw columns:
- * quotes searched name/first/last/email, invoices added website and VAT, expenses dropped VAT,
- * planned payments dropped website, the supplier credit note dropped email. Every one of them
- * was accent-sensitive, so a Greek customer was findable in some dialogs and not others
- * depending on how you typed their name — and the operator's conclusion was "they aren't in the
- * system", which is how this started.
- *
- * A raw-column `ilike` on either table is that bug coming back. The allowlist below is
- * SHRINK-ONLY and every entry states why it is not a search.
- */
+/** One way to search a CRM party. */
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, sep } from 'node:path';
@@ -42,7 +26,6 @@ const RAW_ILIKE = new RegExp(
  * NOT accent-insensitive, so "Καρέλης ΑΕ" never matched the stored "ΚΑΡΕΛΗΣ ΑΕ" and the probe
  * missed exactly the case the platform built folding machinery for (#366 BU-3). They now match a
  * generated `name_fold` column — `crm_fold(name)` alone, so it stays an equality lookup — and
- * needed no exemption at all.
  */
 const ALLOWED: Record<string, { text: string; why: string }[]> = {
   'src/components/Admin/DocumentFactoriesCrmLinker.tsx': [{

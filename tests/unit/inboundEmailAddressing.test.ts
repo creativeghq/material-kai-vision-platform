@@ -1,15 +1,4 @@
-/**
- * #342 — the addressing round trip: how a user gets an address, and how a reply finds its thread.
- *
- * These four functions are the difference between "email works" and "email silently doesn't".
- * Every one of them was, at some point in this build, either absent or dead code:
- *   • `handleFromIdentity` had no transliteration, so a Greek name produced `user4821@…`
- *   • `buildOutboundMessageId` was defined and never called
- *   • `splitPlusTag` did not exist, so a reply to our own Reply-To resolved to no recipient at all
- *
- * Pure functions, so they are unit-testable outside Deno — which is the whole reason the addressing
- * logic lives in helpers rather than inline in the webhook.
- */
+/** #342 — the addressing round trip: how a user gets an address, and how a reply finds its thread. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';

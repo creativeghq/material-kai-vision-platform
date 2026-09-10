@@ -1,22 +1,4 @@
-/**
- * The 0%-VAT invoice gate: SQL refuses, TypeScript explains.
- *
- * An order is a commercial document — it declares nothing, so it may sit at 0% VAT indefinitely.
- * Generating the invoice is the step that turns that rate into a fiscal claim, and myDATA requires
- * an exemption cause (ΑΑΔΕ 1–31) on every vatCategory 7/8 line. Without one the document is
- * rejected at submission, long after the operator has moved on — so `generate_invoice_from_order`
- * refuses while it is still an order.
- *
- * The refusal travels as a PREFIX (`vat_exemption_required:`), not as prose. That prefix is the
- * contract between the SQL function and the two call sites, and this test is what stops it
- * drifting: rename it on one side only and the operator silently gets a raw Postgres error where
- * they used to get the list of offending lines and what to do about it.
- *
- * SCOPE: this covers the TypeScript half — that the prefix is recognised, that the line names
- * survive into the message, and that unrelated errors pass through untouched. Whether the SQL
- * still RAISES that prefix is enforced by the function body itself; if you change the string
- * there, change it here.
- */
+/** The 0%-VAT invoice gate: SQL refuses, TypeScript explains. */
 import { describe, expect, it } from 'vitest';
 
 import { invoiceGenerationErrorMessage } from '@/modules/finance/utils/invoiceGateMessage';

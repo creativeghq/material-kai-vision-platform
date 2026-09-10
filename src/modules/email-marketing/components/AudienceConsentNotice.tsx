@@ -1,18 +1,4 @@
-/**
- * What a campaign audience resolves to, and what it holds back — with the reason (#357 AE-8).
- *
- * `crm_contacts.marketing_consent` has existed all along: it is on the contact page, and the
- * real-estate module honours it on every alert and digest. The campaign resolver never read it, so
- * a contact with the box unticked received every campaign anyway, and a pasted address that
- * matched nobody was mailed on no basis at all.
- *
- * Now that the resolver withholds those, the count on screen gets SMALLER than the audience — and a
- * number that shrinks with no stated reason is the silent-zero shape wearing a compliance hat
- * (anti-regression rule 3). People work around an unexplained count; they act on an explained one.
- * So every withheld address is counted, named and given the thing that would fix it.
- *
- * SQL derives the verdict. This only formats it.
- */
+/** What a campaign audience resolves to, and what it holds back — with the reason (#357 AE-8). */
 import React from 'react';
 import { ShieldCheck, ShieldAlert } from 'lucide-react';
 

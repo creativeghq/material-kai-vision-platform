@@ -160,17 +160,7 @@ const COMMON_DOC_CODES = ['1.1', '2.1', '11.1', '9.3'];
 /** A myDATA tax-category reference row (withholding / fees / other taxes / stamp duty). */
 type TaxRef = { code: string; description: string; rate: number | null; rate_kind: 'percent' | 'amount' | 'per_unit' };
 
-/**
- * Resolve a line's tax amount for one bucket.
- *
- *   percent  → net × rate%
- *   per_unit → rate × QUANTITY. A Greek eco-levy is charged per piece — AADE publishes fees 16
- *              at €0.04 and fees 17 (recycling) at €0.08 each — so selling 50 appliances is 50
- *              × the rate, not the rate. Before this the row had no rate at all and the whole
- *              multiplication lived in the operator's head, which is a wrong number that looks
- *              exactly like a right one.
- *   amount   → AADE publishes no rate; the operator states it.
- */
+/** Resolve a line's tax amount for one bucket. */
 const taxAmountOf = (refs: TaxRef[], code: string, manualAmount: string, lineNet: number, quantity = 1): number => {
   if (!code) return 0;
   const r = refs.find((x) => x.code === code);
@@ -748,22 +738,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       // stores. (audit #271 item 6)
       const lineNet = round2(lineNetOf(l));
       const pct = vatPctForCat(l.vat_category || undefined, parseDecimalOr(vatRate, 0));
-      /**
-       * VAT rounds PER LINE too (#351 B2).
-       *
-       * The comment above states the rule for net — "the header must be the sum of what is
-       * actually transmitted, not of a more precise intermediate nobody stores" — and it was
-       * applied to net and never to VAT. VAT accumulated unrounded and rounded once at document
-       * level, while the printed VAT analysis derives each line's VAT and rounds it there. So
-       * `round2(Σ raw)` was compared against `Σ round2()`.
-       *
-       * Three lines of €10.10 at 24%: raw 2.424 each. Analysis prints 7.26; the header said 7.27.
-       * One cent apart on a document a customer reads and an auditor checks.
-       *
-       * Now the line VAT is rounded here, stored on the line (see `vat_amount` in itemsPayload),
-       * and the header is their sum — so the analysis and the header cannot disagree, because
-       * they are the same numbers.
-       */
+      /** VAT rounds PER LINE too (#351 B2). */
       net += lineNet; vat += round2(vatOfRaw(lineNet, pct));
       // fees / stamp / other are category-driven: 'percent' computes net × rate%, 'per_unit'
       // computes rate × quantity (a per-piece eco-levy), 'amount' uses the typed amount.
@@ -1067,18 +1042,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           discounted_price: disc || null,
           net_value: round2(round2(net) * cashFactorForLines),
           line_total: round2(round2(net) * cashFactorForLines),
-          /**
-           * The line's own VAT, stored (#351 B2 + CLAUDE.md rule 1c).
-           *
-           * `renderData` already PREFERS `it.vat_amount` and only falls back to re-deriving it
-           * when the column is null — which it always was from this dialog, which is why the
-           * printed analysis could differ from the header by a cent. Storing it makes the two the
-           * same numbers, and it is a figure we already transmit, so rule 1c says it belongs on
-           * the customer's copy.
-           *
-           * Rounded on the same rounded net the line carries, and scaled by the same cash factor
-           * the header uses, so `Σ vat_amount` IS `invoices.vat_amount`.
-           */
+          /** The line's own VAT, stored (#351 B2 + CLAUDE.md rule 1c). */
           vat_amount: round2(vatOfRaw(round2(net), pct) * cashFactorForLines),
           unit_cost_snapshot: l.unit_cost.trim() ? parseDecimalOr(l.unit_cost, 0) : null,
           selected_attributes: l.selected_attributes ?? {}, selected_color: l.color || null, selected_size: l.size || null,
@@ -1129,16 +1093,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
        * `tax_payable_delta`, which is the number the envelope builder transmits as the gross —
        * so the amounts stamped on the invoice above are provisional until this returns.
        */
-      /**
-       * ONE call, so the rows and the totals they imply commit together (rule 4).
-       *
-       * As two statements, a failure between them left the document in taxesTotals mode with
-       * `tax_payable_delta = 0` — the envelope would then carry the levy rows AND a gross that
-       * excludes them, which AADE accepts — while the operator saw an error and retried into a
-       * second set of rows. `set_invoice_document_taxes` REPLACES, so a retry converges, and it
-       * recomputes the five header totals and the delta in the same transaction. Called with an
-       * empty array on a line-mode document, which is how those get their totals derived too.
-       */
+      /** ONE call, so the rows and the totals they imply commit together (rule 4). */
       const taxRows = docTaxes
         .map((r, i) => {
           const taxType = parseInt(r.tax_type, 10);
@@ -1179,19 +1134,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           const sub = await fiscalConnectorService.submitInvoice(invoice.id);
           // Credit exhaustion at issue: the invoice is issued but the myDATA transmission
           // was blocked for lack of credits. Surface a top-up CTA; retransmit from the invoice page.
-          /**
-           * EVERY fiscal failure is reported, not just the one with a code (#351 B1).
-           *
-           * This tested `fr.code === 'insufficient_credits'` and let everything else fall through
-           * to "Invoice created". But `finance-issue-invoice`'s own catch builds
-           * `{ ok: false, error: err?.message }` with NO `code` field at all, inside a 200 — so a
-           * connector outage, a signature failure or a Novus timeout produced a success toast and
-           * an untransmitted legal document.
-           *
-           * The codes that DO carry one (`not_entitled`, `not_configured`) return 402/400, which
-           * `submitInvoice` throws on, and the catch below reports those. This branch is for the
-           * ones that arrive as a 200 saying they failed.
-           */
+          /** EVERY fiscal failure is reported, not just the one with a code (#351 B1). */
           const fr = sub?.fiscal;
           if (fr && fr.ok === false && fr.code !== 'insufficient_credits') {
             toast({

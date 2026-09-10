@@ -1,25 +1,4 @@
-/**
- * Guard for the configurator's material swap (#321 M2, #260 Phase 1).
- *
- * Two failure modes here are invisible to every other check, and both produce a *valid* render:
- *
- * 1. **Cache contamination.** `useGLTF` caches the parsed glTF by URL, and `Object3D.clone()`
- *    copies the node tree while keeping material references SHARED. Recolour "the model" in a
- *    configurator and you have recoloured the cached original — so the AR preview, a second
- *    configurator on the page, and the next component to hit that cache all quietly render the
- *    last person's fabric choice. Nothing throws. The screenshot just looks wrong to someone else.
- *
- * 2. **A target name that matches nothing.** An author types `Fabric` where the glTF material is
- *    `Fabric_Navy`; the option renders, is selectable, is priced, and changes nothing at all. That
- *    is the silent-zero shape, in the visual layer.
- *
- * So this parses the REAL fixture with the same GLTFLoader drei uses and drives the exported
- * functions the component calls — not a copy of the logic.
- *
- * Fixture note: armchair.glb has 8 meshes over exactly 3 materials (`Walnut` on four legs,
- * `Oak_Frame`, `Fabric_Navy` on seat/back/armrests). That ratio is the point — one choice must
- * repaint all four legs, and the hit count must report 1 material, not 4 meshes.
- */
+/** Guard for the configurator's material swap (#321 M2, #260 Phase 1). */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { readFileSync } from 'fs';
 import path from 'path';

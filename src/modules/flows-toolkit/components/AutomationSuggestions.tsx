@@ -1,28 +1,4 @@
-/**
- * AI Suggestions — "based on what you actually did, here is how to improve this workflow".
- *
- * The problem it exists for: NO workspace has ever built or forked an automation. Automations is
- * an empty canvas sitting in front of 87 operator defaults that run invisibly behind it, and
- * "build your first automation" is not advice — it is the blank page restated.
- *
- * The rule this surface is built on: EVERY suggestion names its evidence and its count. Not
- * "based on your usual actions" but "you were sent 22 of these and you opened 22". A number the
- * reader can check is the difference between a suggestion and a horoscope, and it is also the
- * honest admission when there is nothing to say — thin evidence produces NO suggestion rather
- * than a vague one. `get_flow_suggestions` enforces that server-side: a 30-day window, a floor of
- * 10 events, and a verdict derived in SQL. This component only formats what it is handed.
- *
- * Two things it will not do:
- *  • Invent business logic. It never proposes a task, an assignee or a stage — it has no way to
- *    know those, and a suggestion that guesses is the busywork it was built to replace.
- *  • Create anything that runs. "Set it up" writes a DRAFT (`p_activate := false`) and opens the
- *    builder on it; a draft never fires, so nothing happens behind the owner's back. Muting is
- *    the one immediate write, because it only ever REMOVES a notification.
- *
- * Deliberately absent: "you ran this agent tool 44 times, schedule it". There is no run-a-tool
- * action, and `send_agent_message` merely parks a message nothing consumes — so that card would
- * promise work that never happens. It comes back when an action can honour it.
- */
+/** AI Suggestions — "based on what you actually did, here is how to improve this workflow". */
 
 import { useCallback, useState } from 'react';
 import { Sparkles, BellOff, Mail, X, Loader2, Info } from 'lucide-react';

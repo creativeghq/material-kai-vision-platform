@@ -1,25 +1,4 @@
-/**
- * Import + health for the EU TARIC nomenclature.
- *
- * Lives on Data Health rather than in a settings screen because that is where the problem is
- * reported: `taric_reference_stale` fires when this table is empty or two months old, and the
- * fix should not be somewhere else in the app.
- *
- * CSV/TSV only. The nomenclature is published as spreadsheets on CIRCABC ("TARIC & Quota Data
- * and Information") — one "Save as CSV" beats shipping a spreadsheet parser to a browser and an
- * edge function. Column names are matched server-side against an alias table, so the EU export,
- * the Greek national export and an admin's own re-export all load without configuration.
- *
- * WHY THIS SCREEN EXISTS AT ALL — it is not a design preference. The EU publishes the 10-digit
- * TARIC nomenclature only as HTML query tools on the open-data portal; the machine-readable
- * monthly extractions live on CIRCABC behind a UUID that changes every month, with no public
- * listing API. There is no URL that can be hardcoded to mean "this month's TARIC". (The
- * Combined Nomenclature IS openly downloadable, but it is 8-digit and carries no declarability,
- * which is the one thing the picker and the classifier depend on.)
- *
- * So the URL is supplied once by a human and REMEMBERED: `taric-reference-refresh-monthly`
- * re-fetches it every month. This screen is the bootstrap and the fallback, not the routine.
- */
+/** Import + health for the EU TARIC nomenclature. */
 import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, Upload, Ship, CheckCircle2, AlertTriangle, Link2, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';

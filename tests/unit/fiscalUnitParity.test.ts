@@ -1,24 +1,4 @@
-/**
- * Fiscal measurement-unit twin-parity guard (#347, defect 15).
- *
- * AADE codes exactly seven measurement units (`mydata_reference` category `measurement_unit`:
- * pieces, kg, litres, metres, m², m³, pieces-other). Our catalogue deliberately offers more — a tile order is
- * placed in boxes and pallets, a survey line is priced by the hour — and those carry
- * `mydataCode: null` with a comment saying they must be converted before transmission.
- *
- * Nothing enforced that. `buildNovusPayload` passed `measurementUnitLabel: it.unit ?? 'ΤΜΧ'`
- * straight through, so 'pallet' could be filed as the measurement unit of an AADE-registered
- * legal document. It now refuses, which needs the uncoded set inside the Deno runtime —
- * and an edge function cannot import from `src/`.
- *
- * So there are two copies, held equal here rather than by convention. This is the same
- * arrangement `escapeHtml` uses across its three runtimes ([escapeHtmlParity.test.ts]) and it
- * exists for the same reason: the last time a value like this was hand-copied without a test,
- * the copies drifted to three different strengths.
- *
- * If a unit is added to `src/lib/units.ts`, this test tells you which side to update. Adding a
- * CODED unit means AADE published a new code — update `mydata_reference` too.
- */
+/** Fiscal measurement-unit twin-parity guard (#347, defect 15). */
 import { describe, it, expect } from 'vitest';
 
 import { UNITS, unitFromMydataCode as clientUnitFromMydataCode } from '@/lib/units';

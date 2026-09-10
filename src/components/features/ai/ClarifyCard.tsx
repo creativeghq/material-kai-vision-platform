@@ -1,25 +1,4 @@
-/**
- * ClarifyCard — the agent's structured question, rendered on the canvas (issue #370, Class D).
- *
- * The agent had no way to ask for anything except prose. It would write a wall of markdown with
- * three numbered questions, the user would answer in a sentence, and the agent would ask again.
- * `request_input` emits the question as data; this renders it.
- *
- * TWO RULES BUILT INTO THE UI, not left to the prompt:
- *
- * 1. It is DISMISSIBLE. "Decide for me" is always present and always enabled, even when fields are
- *    marked required. A question the user cannot wave away is a gate, and gates are precisely the
- *    behaviour the operating doctrine exists to stop — the agent asked for a country the tool
- *    defaults for you, twice, and searched nothing. Dismissing hands the turn back with explicit
- *    permission to proceed.
- * 2. It is NOT a confirmation. Approving a spend, a send or a fiscal document is
- *    `ActionConfirmationCard` and invariant 9, which is unchanged. This collects scope, so it is
- *    styled as an offer rather than a warning and has no destructive variant.
- *
- * The inputs are `FieldInput` from ToolkitFormModal — the same renderers the quick-start forms use,
- * so a `country` field here shows the real sourcing markets from the vocabulary table rather than
- * a second list that can drift from it.
- */
+/** ClarifyCard — the agent's structured question, rendered on the canvas (issue #370, Class D). */
 import React, { useMemo, useState } from 'react';
 import { MessageSquareQuote, Wand2 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';

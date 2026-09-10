@@ -3,19 +3,7 @@ import * as ts from 'typescript';
 import * as fs from 'fs';
 import * as path from 'path';
 
-/**
- * Prop-contract guard — the prevention layer for the finance wiring sweep.
- *
- * The whole "component accepts context as a prop but no caller passes it" class (RecordPaymentDialog
- * had an `orderId` prop with no picker + callers that dropped it, NewSupplierBillDialog had no
- * prefill anyone used, …) is invisible to typecheck and to the money-path integration tests. It is,
- * however, statically detectable: an OPTIONAL prop on a wiring-sensitive component that ZERO callers
- * ever pass is either dead (delete it) or unwired (pass it). This test fails when a watched
- * component grows such a prop, so the gap is caught at PR time instead of by a later audit.
- *
- * Scope is an explicit allowlist — this is a targeted contract on the components where dropping
- * context silently costs money/data, NOT a whole-repo lint (which would be noisy).
- */
+/** Prop-contract guard — the prevention layer for the finance wiring sweep. */
 
 const SRC = path.resolve(__dirname, '../../src');
 

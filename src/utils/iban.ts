@@ -9,24 +9,7 @@ export function normalizeIban(raw: unknown): string {
   return String(raw ?? '').replace(/[\s -]/g, '').toUpperCase();
 }
 
-/**
- * ISO 13616 mod-97 check — is this a structurally valid IBAN?
- *
- * `normalizeIban` above deliberately does NOT validate, because it runs on every keystroke and a
- * half-typed IBAN has to stay editable. Nothing validated on the way in either: there were zero
- * mod-97 checks across both repos (#366 BU-9), so a typo'd IBAN was storable as a counterparty
- * payment destination and the first thing to notice would be a failed — or misdirected —
- * transfer. Confirmation of Payee via Revolut exists, but it is optional, manual, and needs a
- * Revolut connection.
- *
- * Call it on the SERVICE WRITE PATH, never on change. The DB backstop is
- * `public.iban_is_valid(text)`, which the same-named CHECK constraint on `crm_bank_accounts`
- * uses; this copy exists so the operator gets the error at the field instead of a raw
- * constraint-violation string.
- *
- * Empty is VALID: an account may legitimately have no IBAN on file (a SWIFT/account-number
- * counterparty). This rejects a WRONG IBAN, not a missing one — same contract as the SQL twin.
- */
+/** ISO 13616 mod-97 check — is this a structurally valid IBAN? */
 export function isValidIban(raw: unknown): boolean {
   const s = normalizeIban(raw);
   if (!s) return true;

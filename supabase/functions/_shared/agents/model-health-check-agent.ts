@@ -1,41 +1,4 @@
-/**
- * Background Agent: Model Health Check
- *
- * Asks each registered provider model whether it can still be called, and writes the answer back to
- * public.generation_models.
- *
- * WHY THIS EXISTS IN THIS FORM (issue #4).
- * Replicate returned 402 Insufficient credit on every model from 2026-06-26, and the Operations page
- * reported them HEALTHY for two months. Three separate reasons, all fixed here or alongside:
- *
- *   1. Nothing ever ran this agent. There was no background_agents row for 'model-health-check' at
- *      all — the code existed and was never scheduled.
- *   2. It wrote nothing to the database. Results went into the run log and nowhere queryable.
- *   3. Provider health was inferred from ai_usage_logs, where the row is written BEFORE the upstream
- *      call and never corrected on failure — so a 100% failure rate computed as 0.000.
- *
- * The lesson from CLAUDE.md is "check the world, not the exit code": a passive detector that waits
- * for a user to hit a 402 cannot see an outage during a quiet week. This probes on a schedule.
- *
- * THE PROBE IS CREATE-THEN-CANCEL, NOT A REAL GENERATION.
- * It POSTs a prediction and cancels it immediately. That validates auth, the account balance, the
- * model's existence and its version pin — for effectively no compute — without paying for images
- * nobody looks at. It is therefore NOT proof that a generation would succeed, which is why it writes
- * last_probe_* and never touches last_verified_at (that means "a real generation succeeded").
- *
- * Config params (background_agents.config):
- *   models        string[]  Optional subset of registry model IDs (default: all enabled non-dead)
- *   providers     string[]  Optional subset of providers (default: replicate only — see below)
- *   timeout_ms    number    Per-model HTTP timeout in ms (default 20000)
- *   test_prompt   string    Override probe prompt
- *   max_models      number  Models probed per run, least-recently-probed first (default 6)
- *   min_interval_ms number  Gap between creates (default 11000 — the provider allows ~1 per 10s)
- *   deadline_ms     number  Stop starting new waits past this (default 120000, under the edge ceiling)
- *
- * A RUN DOES NOT COVER THE WHOLE ROSTER, ON PURPOSE. The provider allows about one create every ten
- * seconds, so a full sweep does not fit inside an edge invocation; see the note on `min_interval_ms`
- * in run() for the measurements. Read a run as "these N were checked", never as a full sweep.
- */
+/** Background Agent: Model Health Check */
 
 import type { AgentRunner, AgentRunContext, AgentRunResult } from './types.ts';
 import { resolveReplicateToken, REPLICATE_NOT_CONFIGURED } from '../replicate-token.ts';
@@ -137,43 +100,12 @@ export class ModelHealthCheckAgent implements AgentRunner {
     const testPrompt = String(cfg.test_prompt ?? 'modern minimalist living room');
     const providers  = (cfg.providers as string[] | undefined) ?? PROBEABLE_PROVIDERS;
 
-    /**
-     * SPACE THE CREATES OUT. This is the whole fix, and it is not optional.
-     *
-     * Replicate rate-limits prediction creates to 6 per minute with a burst of one — i.e. one
-     * create per ~10 seconds — and says so in the body of every 429 it sends. This agent used to
-     * fire the whole roster back to back, roughly one per second, so the first model returned 201
-     * and every model after it returned 429. The agent then wrote those 429s into
-     * `generation_models` as verdicts, which is how 15 of 17 healthy models came to be recorded as
-     * broken. Measured 2026-08-30: the identical five models at ~1s spacing score 1/5, and at 11s
-     * spacing score 5/5 with no 429 at all.
-     *
-     * Two traps that cost a lot of time on the way to that one-line conclusion:
-     *   • `black-forest-labs/flux-schnell` is exempt and answers 15/15 however fast you hammer it,
-     *     so any quick check written against it "proves" there is no throttle. Never verify with it.
-     *   • The 429 body attributes the limit to having "less than $5.0 in credit", which was false —
-     *     the account held $19.28. The stated REASON being wrong does not make the stated RATE
-     *     wrong, and discarding the whole message because of the bad half is what kept this hidden.
-     *
-     * At 11s a piece a run cannot cover the roster inside the edge ceiling, so it probes a SLICE,
-     * least-recently-checked first, and successive scheduled runs cover the rest.
-     */
+    /** SPACE THE CREATES OUT. This is the whole fix, and it is not optional. */
     const minIntervalMs = Number(cfg.min_interval_ms ?? 11_000);
     const maxModels  = Number(cfg.max_models ?? 6);
     const deadlineAt = Date.now() + Number(cfg.deadline_ms ?? 120_000);
 
-    /**
-     * Key audit for the providers this agent cannot probe.
-     *
-     * Their models otherwise carry NO verdict at all, and an empty status column reads as
-     * "fine" to everyone who is not looking for the difference. We cannot call these providers
-     * — nobody has written their submit shape — but "this deployment has no token for them" is
-     * knowable for free and is the single most likely reason they would fail.
-     *
-     * Only ever writes `not_configured`, and only over a row that has no verdict or the same
-     * one. It never clears a real result, and it never invents a positive: a provider whose key
-     * IS present is left untouched and honestly unprobed.
-     */
+    /** Key audit for the providers this agent cannot probe. */
     for (const [prov, keys] of Object.entries(PROVIDER_KEYS)) {
       const missing: string[] = [];
       for (const key of keys) {
@@ -224,12 +156,6 @@ export class ModelHealthCheckAgent implements AgentRunner {
     if (!replicateApiKey) {
       // Record it rather than returning quietly — "the token is missing" and "the account is empty"
       // produce identical user-visible symptoms and must be told apart on the Operations page.
-      //
-      // `not_configured`, NOT `auth_failed`. The provider was never called, so saying it rejected
-      // us is the opposite of what happened — a mislabel that cost a real investigation on
-      // 2026-08-30, when 18 rows read as a rejected key while the account was funded and the
-      // token worked. Deploying a secret and rotating one are different jobs for different
-      // people. The status is not authoritative, so this cannot retire a working roster.
       await log('error', REPLICATE_NOT_CONFIGURED);
       await supabase
         .from('generation_models')

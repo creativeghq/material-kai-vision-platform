@@ -1,15 +1,4 @@
-/**
- * Brand ambassadorships — vocabulary and pure derivations.
- *
- * A professional does not merely "prefer" a brand: they represent it, and they represent it
- * FOR SOMETHING — tiles, or lighting, or kitchens. The category is the part a reader of the
- * public profile is actually asking about ("who do you use for sanitary?"), so it is modelled
- * as a first-class part of the relationship rather than a tag on the person.
- *
- * Everything category-shaped in here comes from the generated projection of
- * `material_categories`. No key, label, or ordering is written down a second time — that copy
- * is the #368 failure, and `tests/unit/categoryVocabRegistry.test.ts` fails the build over it.
- */
+/** Brand ambassadorships — vocabulary and pure derivations. */
 import { UPLOAD_CATEGORIES, categoryDisplayName } from '@/lib/categoryFieldRegistry';
 
 /**

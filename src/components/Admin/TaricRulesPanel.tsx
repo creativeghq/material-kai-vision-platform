@@ -1,18 +1,4 @@
-/**
- * Category → TARIC heading rules.
- *
- * This screen is where the human decision for customs classification now lives. Tariff position
- * follows the MATERIAL and the FORM of an article, which the category carries and the product
- * name does not — "AMALFI GRIS 80X80" says nothing, "a ceramic tile" says 6907.
- *
- * So confirmation moved from the product to the rule. Sign off "Tiles → 6907" once and every
- * tile in the catalog inherits it, for free and identically. The alternative — a paid model
- * guess per product, confirmed one product at a time — is both more expensive and less
- * consistent, and a wrong answer has to be corrected in hundreds of places instead of one.
- *
- * Seeded rules arrive UNCONFIRMED on purpose: a heading is a legal position, and the platform
- * proposing one is not the same as a person taking responsibility for it.
- */
+/** Category → TARIC heading rules. */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Loader2, Check, Scale, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';

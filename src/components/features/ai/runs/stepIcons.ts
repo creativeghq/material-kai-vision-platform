@@ -1,14 +1,4 @@
-/**
- * The ONE lucide-name → component map for every run/workflow surface.
- *
- * WorkflowTracker and WorkflowWizardCard each carried their own copy and they had already
- * drifted (the tracker had no `Newspaper`, so the SEO pipeline's own header icon fell back
- * to a wrench). An icon resolving to the fallback is invisible — it renders perfectly, it
- * is just the wrong picture — so a third copy was not an option.
- *
- * Named imports, not `import * as`: a namespace import of lucide-react defeats tree-shaking
- * and pulls the whole icon set into the bundle.
- */
+/** The ONE lucide-name → component map for every run/workflow surface. */
 import type { ComponentType } from 'react';
 import {
   BadgeCheck, BookOpen, Bot, Briefcase, Building2, Calculator, CalendarClock, Code2,

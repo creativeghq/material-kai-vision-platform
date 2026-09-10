@@ -1,31 +1,4 @@
-/**
- * Guards the pricing chain (#332).
- *
- * Three defects motivated this file, and all three shared a shape: a rung of the markup ladder
- * that was fully built, visible in the UI, and could not fire.
- *
- *  1. **`scope='brand'` was rejected by the CHECK.** `_pricing_retail` read it and
- *     `BrandMarkupCard` wrote it, but `pricing_rules_scope_check` only ever allowed
- *     ('category','product'). Every attempt to save a brand markup raised a constraint
- *     violation, so the rung could never hold a row. Same class as the `sales` invite that was
- *     creatable in one place and rejected by a CHECK in another.
- *  2. **A third margin derivation, in TypeScript.** `PendingProductsCard` computed
- *     `cost * (1 + finance_categories.margin_pct / 100)` in the browser, disagreeing with the
- *     `pricing_rules` ladder that every other pricing path uses.
- *  3. **Quantity without its unit.** `get_product_price_break` does
- *     `coalesce(convert_to_base_unit(product, qty, unit), qty)`, so a quantity passed without
- *     its unit is silently read as already being in base units — "5 pallets" matching a
- *     threshold meant for 5 pieces. A wrong price, and a valid number, so nothing raises.
- *
- * SCOPE — read this before assuming a clean run means the invariant holds.
- * These tests scan REPO FILES. This project's SQL is applied through the Supabase MCP and never
- * committed (CLAUDE.md), so `pricing_rules_scope_check`, `_pricing_markup_ladder` and
- * `_pricing_retail` are invisible here: they live only in `pg_constraint` / `pg_proc`. This file
- * pins the TypeScript half and the vocabulary the constraint was written with. **If you change
- * the CHECK, change `ALLOWED_SCOPES` in the same commit.** The runtime half is watched by the
- * `finance.quantity_breaks_never_fire` integrity check, which reports a workspace whose
- * configured breaks never once reached a document.
- */
+/** Guards the pricing chain (#332). */
 import { describe, it, expect } from 'vitest';
 import { readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
@@ -146,19 +119,7 @@ describe('one markup derivation', () => {
    * stored data could ever see the disagreement.
    */
   it('no TypeScript reads a stored markup policy and applies it', () => {
-    /*
-     * The invariant is about WHERE THE POLICY COMES FROM, not about arithmetic.
-     *
-     * A first draft banned the `cost * (1 + pct/100)` shape outright and immediately flagged
-     * `ReceiveToWarehouseDialog`'s markup-to-price calculator — which is legitimate: the operator
-     * types a markup and sees the price, two views of one number they chose. Banning that would
-     * have forced an exemption, and an exemption list is how a rule like this rots.
-     *
-     * What must never happen is the client FETCHING the policy (`default_markup_pct`, a
-     * `margin_pct` column) and applying it, because that reimplements one rung of a five-rung
-     * ladder and silently disagrees with every other pricing path. Both real offenders did
-     * exactly that, and both produced a perfectly valid number while doing it.
-     */
+    /* The invariant is about WHERE THE POLICY COMES FROM, not about arithmetic. */
     const APPLIES = /\bcost\w*\s*\*\s*\(\s*1\s*\+[^)\n]*\/\s*100/i;
     const READS_POLICY = /select\(\s*['"][^'"]*\b(?:default_markup_pct|margin_pct)\b/;
     const offenders: string[] = [];
@@ -183,25 +144,7 @@ describe('one markup derivation', () => {
     expect(READS_POLICY.test(".select('id, name, kind')")).toBe(false);
   });
 
-  /**
-   * Calling the resolver is not enough — it has to be asked the WHOLE question.
-   *
-   * `_pricing_markup_explain` takes (workspace, cost, product, material_category, brand, supplier).
-   * Both intake previews passed NULL for product, material_category AND brand, so for a line about
-   * to become a new product only the supplier rung and the workspace default were reachable: an
-   * invoice line that plainly said EGGER on it reported "No pricing rule matches and the workspace
-   * default markup is 0% — this would be sold at cost". Approval then called `_pricing_retail` on
-   * the product it had just written, which DOES read the category and the brand off the row — so
-   * the two could reach different rungs and produce different numbers, while the card's own header
-   * said they ran the same ladder.
-   *
-   * Measured after the fix, against the live function: rung `unpriced` at €53.60 became rung
-   * `brand` at €76.11, and approval produced €76.11.
-   *
-   * The client half is what this can see: the preview call must still carry what the operator has
-   * on screen. Drop either argument and the divergence is back, silently and with a plausible
-   * number.
-   */
+  /** Calling the resolver is not enough — it has to be asked the WHOLE question. */
   it('the intake preview passes the maker and the material category, not just the cost', () => {
     const src = strippedSource(join(ROOT, 'src/services/warehouseService.ts'));
     const call = /rpc\(\s*['"]preview_pending_item_sell_price['"][\s\S]{0,400}?\)/.exec(src)?.[0] ?? '';
@@ -265,17 +208,7 @@ describe('one markup derivation', () => {
 });
 
 describe('quantity and unit travel together', () => {
-  /**
-   * The trap, verbatim from `get_product_price_break`:
-   *
-   *     coalesce(public.convert_to_base_unit(p_product_id, p_quantity, p_unit), p_quantity)
-   *
-   * A NULL or unconvertible unit does not fail — it falls back to the RAW quantity, which is
-   * then compared against a threshold expressed in base units. "5 pallets" matches a break meant
-   * for 5 pieces, and the customer gets a pallet discount on five tiles. The only safe rule is
-   * that a call passes both or neither, which is why every site builds them as one spreadable
-   * object (`breakArgs` / `qtyArgs`) rather than as two independent arguments.
-   */
+  /** The trap, verbatim from `get_product_price_break`: */
   it('no call passes p_quantity to the price resolver without p_unit', () => {
     // Restricted to files that actually price a product: `p_quantity` is also a parameter of
     // record_stock_movement, convert_to_base_unit and add_configuration_to_quote, none of which

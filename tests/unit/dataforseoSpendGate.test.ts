@@ -1,30 +1,4 @@
-/**
- * DataForSEO spend gate — invariant 10 for the SEO agent toolkit (#365 `AD-13`, `AD-14`).
- *
- * THE BUG THIS EXISTS TO STOP. Roughly fifty SEO agent tools reach DataForSEO through MIVAA using
- * `x-cron-secret` — the OPERATOR's credential. Four separate audits walked that chain looking for
- * the layer that debits the caller before the money is spent (#352 `A18` at the tool wrappers,
- * #361 `EG-4` in `seo-api`, the MIVAA route review, and `AD-13` in the raw client) and every one
- * of them found nothing. DataForSEO was not even present in `ai_model_pricing`, so there was no
- * price to charge — while `seo_site_crawl_start` accepted `max_pages` up to 1000 and a dozen Labs
- * tools accepted `limit` up to 1000.
- *
- * Nothing failed. Ungated spend is a successful call: the tool works, the card renders, the answer
- * is correct, and the bill lands on the operator. It was found by looking, not by breaking.
- *
- * WHY A TEST AND NOT A CONVENTION. The gate lives in three dispatchers. Adding a fifty-first tool
- * means adding a call to one of them — fine — but adding a new *dispatcher*, or a bare `fetch` to
- * the SEO gateway, silently reopens the hole in exactly the way the previous four audits had to
- * find by hand. This test is the thing that notices.
- *
- * The generic `dataforseo/{kind}` dispatcher now lives in its own module (`dataforseo-dispatch.ts`)
- * because the CRM's Google Business lookup needs it too and cannot import the LangChain-bearing
- * tools file. The scan follows it: a dispatcher that moves house must not fall out of coverage,
- * which is the failure mode this suite's own floor assertion exists to catch.
- *
- * SCOPE. Edge side only. MIVAA is a separate repository (and is EMPTY in CI), so a green run says
- * nothing about what its `/seo-agent/*` routes do with the request once it arrives.
- */
+/** DataForSEO spend gate — invariant 10 for the SEO agent toolkit (#365 `AD-13`, `AD-14`). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

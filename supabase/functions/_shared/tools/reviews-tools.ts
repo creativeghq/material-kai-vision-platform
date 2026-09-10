@@ -1,16 +1,4 @@
-/**
- * Reviews Tools — agent-chat surface for professional/profile reviews.
- *
- * ONE tool, actions:
- *   - list  — reviews written ABOUT the caller (profile_reviews.to_user_id = me), newest first
- *   - reply — post a public reply to one of those reviews (CONFIRM-gated: it's publicly visible)
- *
- * No edge function + no workspace scoping: profile_reviews already carries the validated contract in
- * RLS — `reviews_select_public` (read) and `reviews_update_owner_reply` (only to_user_id may set the
- * reply). So a USER-JWT client IS the contract, exactly like the finance read tool. Module `reviews`
- * gate is checked via the service client. Product reviews (material_reviews) have no reply concept and
- * are intentionally out of scope. 0 credits.
- */
+/** Reviews Tools — agent-chat surface for professional/profile reviews. */
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what

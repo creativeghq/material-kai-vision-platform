@@ -46,12 +46,6 @@ export interface Blueprint {
   /**
    * Serve this blueprint through the embed SDK, to anonymous visitors on the tenant's own site
    * (#382 Phase 1).
-   *
-   * Deliberately not `status` (lifecycle) and not `is_platform_starter` (ours, not theirs) —
-   * publication is a third, orthogonal fact. Publishing alone exposes nothing: an admin must also
-   * create an embed key whose scope covers it, exactly as a storefront-published product does.
-   * A platform starter can never be published this way; the DB refuses it, because a starter
-   * carries our default rates and would quote a visitor prices the tenant never set.
    */
   is_embed_published: boolean;
   version: number;

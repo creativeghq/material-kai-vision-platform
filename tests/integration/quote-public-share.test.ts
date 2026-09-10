@@ -31,14 +31,6 @@ suite('quote-public-share · anonymous token surface', () => {
 
   // The shared page's money is DERIVED (`get_quote_totals`), not read off the quote row — #358
   // PQ-6, so the page a customer signs cannot show a figure the invoice will disagree with.
-  //
-  // So the fixture has to seed a real LINE, not a stamped `grand_total`. It used to stamp
-  // `grand_total: 1234.56` with no `quote_items` at all, which asserted nothing about the
-  // derivation and started failing the moment the function switched to it (`expected +0 to be
-  // 1234.56` — the derived total of a quote with no lines is correctly zero).
-  //
-  // 1 × 1234.56 at vat_rate 0 derives grand_total 1234.56, so the expectations below are unchanged
-  // and now actually exercise the path the customer sees.
   const SHARED_TOTAL = 1234.56;
 
   const seedQuote = async (over: Record<string, unknown>) => {

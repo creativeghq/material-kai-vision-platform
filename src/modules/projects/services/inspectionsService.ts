@@ -1,16 +1,4 @@
-/**
- * Inspections — the checklist somebody walks the site with.
- *
- * Two things live in SQL rather than here, and both for the same reason:
- *
- *  - **The verdict.** `get_project_inspections` derives whether an inspection passed from its
- *    items, every read. Storing it is the wrong-number shape: an item gets re-answered, the header
- *    still says "passed", and a valid string disagrees with the list under it while nothing raises.
- *  - **Turning a failure into work.** `raise_snag_from_inspection_item` creates the snag AND stamps
- *    the item in one call, with the stamp as the claim. Two calls would leave a snag with no link
- *    back on a dropped connection, and the inspector — who saw an error — would press again and
- *    get a second one for the same defect.
- */
+/** Inspections — the checklist somebody walks the site with. */
 import { supabase } from '@/integrations/supabase/client';
 
 export {

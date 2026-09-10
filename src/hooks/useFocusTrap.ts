@@ -12,16 +12,6 @@ const FOCUSABLE = [
 
 /**
  * Contain Tab inside an overlay, and give focus back when it closes.
- *
- * Radix `<Dialog>` does this; the overlays built by hand out of a `fixed inset-0` div do not, and
- * the consequence is not subtle: opening one leaves focus on the trigger BEHIND the overlay, so
- * Tab then walks the page underneath — invisible focus activating controls the user cannot see.
- * On close, focus falls to `<body>` and a screen reader restarts from the top of the document.
- *
- * Used where converting to Radix would mean restyling a bespoke full-screen layout (an editing
- * canvas, a camera view). Pair it with `useEscapeKey`. For anything NEW, use `<Dialog>` instead —
- * this exists to retrofit what is already here, not to sanction more of it.
- *
  * @param ref     the overlay's root element
  * @param active  whether the overlay is open; nothing is attached while false
  */

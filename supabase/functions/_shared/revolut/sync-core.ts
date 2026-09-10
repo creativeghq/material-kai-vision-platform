@@ -175,16 +175,7 @@ export async function notifyCardSpends(service: any, workspaceId: string): Promi
   return sent;
 }
 
-/**
- * Re-read lines that are still in a non-terminal state.
- *
- * `/transactions?from=` filters on CREATION time, so once a pending transaction drifts
- * past the watermark overlap the list endpoint never returns it again. If its
- * `TransactionStateChanged` webhook was also missed, the row sits `pending` forever —
- * and reconciliation, which only considers `completed`, never sees the money. The feed
- * looks healthy the whole time, so `ops.revolut_feed_stalled` stays quiet: a textbook
- * silent zero. This closes it by asking for those transactions by id.
- */
+/** Re-read lines that are still in a non-terminal state. */
 async function recoverStaleTransactions(service: any, cfg: RevolutConfigRow, issuer: string, mapping: Map<string, string>): Promise<number> {
   const { data } = await service
     .from('revolut_bank_transactions')

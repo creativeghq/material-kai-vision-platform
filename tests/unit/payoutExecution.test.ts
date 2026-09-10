@@ -1,24 +1,4 @@
-/**
- * Sending money is not recording it, and the order of the send is the safety (#315).
- *
- * Two rails can now move money — Revolut Business and Viva — and one dialog offers the operator
- * the choice between instructing a transfer and writing down one that happened elsewhere. Three
- * distinct ways that goes wrong, none of which any typecheck can see because each produces a valid
- * number on a valid row:
- *
- *   1. **Both halves run.** A send that also writes a `payments` row books the cost twice: once
- *      optimistically here, once again when the bank feed reconciles the outgoing line. The books
- *      then disagree with the bank in the direction that looks like the supplier was overpaid.
- *   2. **The audit is written after the call.** An instruction that vanishes into a timeout leaves
- *      no trace, so nobody can tell "it never went" from "it went and we did not hear back" — and
- *      the operator presses the only button on the screen.
- *   3. **The name check is skipped.** Minting a Revolut counterparty is what runs Confirmation of
- *      Payee; creating one implicitly inside the send routes every payment around the single
- *      control standing between a mistyped IBAN and an irreversible transfer to a stranger.
- *
- * These are source-order assertions on purpose: a check that runs after the side effect is not a
- * check, and that is a property of where the lines sit, not of what they return.
- */
+/** Sending money is not recording it, and the order of the send is the safety (#315). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';

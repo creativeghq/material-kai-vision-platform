@@ -31,28 +31,7 @@ interface HubSideNavProps {
   'aria-label'?: string;
 }
 
-/**
- * SIDE NAV — the settings/section rail (Settings, Finance sections, Admin).
- *
- * Three decisions worth keeping:
- *
- *  - **The active row is a tinted row with a leading accent bar**, not a filled
- *    pill. A rail of 20 rows with a saturated pill on one of them is a rail with
- *    a button in it; the bar marks position without competing with the page's
- *    actual primary action.
- *  - **Groups have headings, and headings are not clickable.** A nav where some
- *    parents navigate and some only expand teaches nothing about which is which.
- *    A parent with children is a disclosure; a leaf is a link.
- *  - **It scrolls independently** (`sticky` + own overflow), so a long section
- *    list does not drag the page's scroll position around.
- *  - **Below `lg` it is not a rail at all — it is a horizontal strip.** A rail
- *    is a column, and a column of 11 full-width rows on a phone is 500px of
- *    navigation before the first word of content: the section you asked for
- *    renders below the fold, so the page reads as empty. `.section-rail`
- *    (index.css) flattens the group/list nesting into one swipeable row of
- *    chips, and `useStripAffordance` keeps the active one in view and fades
- *    whichever edge still has sections on it.
- */
+/** SIDE NAV — the settings/section rail (Settings, Finance sections, Admin). */
 export const HubSideNav: React.FC<HubSideNavProps> = ({
   groups,
   activeId,
@@ -98,18 +77,7 @@ export const HubSideNav: React.FC<HubSideNavProps> = ({
   );
 };
 
-/**
- * A group separator for a rail built from a FLAT list of rows.
- *
- * `HubSideNav` groups its items structurally, so a plain heading is enough. Finance's and HR's
- * section rails are Radix `TabsList`s — every trigger is a sibling, there is no group element to
- * hang a heading off — so the flanking rules are what turns a caption into a boundary.
- *
- * The rules are `--hairline`, the app's ONE rule colour. They were `foreground/50` in Finance and
- * `foreground/40` in HR: two copies of one component that had already drifted, and both several
- * times heavier than any other line in the app, so a 10px muted caption arrived flanked by the
- * loudest strokes on the screen. One copy now, at the weight every other divider uses.
- */
+/** A group separator for a rail built from a FLAT list of rows. */
 export const HubRailSectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <div data-rail-heading="" className="flex w-full items-center gap-2 px-3 pb-1 pt-3">
     <span className="h-px flex-1 bg-hairline" aria-hidden="true" />

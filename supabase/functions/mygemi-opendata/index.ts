@@ -1,32 +1,4 @@
-/**
- * mygemi-opendata
- *
- * REST/JSON client for the ΓΕΜΗ (GEMI) OpenData API — Greek Commercial Registry.
- *   https://opendata-api.businessportal.gr/api/opendata/v1
- *   Docs: https://opendata.businessportal.gr/techdocs/
- *
- *   POST /functions/v1/mygemi-opendata
- *     body: { afm: string, company_id?: string, workspace_id?: string, reason?: string }
- *     body: { action: 'creds-status' }                          → is the platform key set?
- *
- *   Returns: { ok, source: 'gemi'|'cache', checked_at, gemi: {...} }
- *
- * Auth / key model — DELIBERATELY UNLIKE ΑΑΔΕ (myaade-rgwspublic2):
- *   ΑΑΔΕ RgWsPublic2 needs PER-WORKSPACE Special Access Codes because each lookup burns
- *   the tenant's TAXISnet quota and notifies the looked-up ΑΦΜ under the tenant's identity.
- *   ΓΕΜΗ OpenData is public open data behind a single application api_key issued to the
- *   operator — no per-lookup identity, no notification, no per-tenant quota. So ONE platform
- *   key (env GEMI_API_KEY → platform_secrets) serves every workspace. Caller only needs to be
- *   an authenticated user; writing the cache onto a CRM company still requires ownership/admin.
- *
- * Contract (verified against the live OpenAPI 2.0 spec):
- *   GET /companies?afm=NNNNNNNNN            → { searchMetadata, searchResults: [Company] }
- *   GET /companies/{arGemi}                 → Company (full)
- *   auth: header `api_key: <key>`
- *   Company: { arGemi, afm, coNameEl, coNamesEn[], coTitlesEl[], coTitlesEn[], city, street,
- *              streetNumber, zipCode, legalType{id,descr}, status{id,descr}, gemiOffice{id,descr},
- *              incorporationDate, isBranch, autoRegistered, activities[] }
- */
+/** mygemi-opendata */
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { resolveSecret } from '../_shared/secrets.ts';

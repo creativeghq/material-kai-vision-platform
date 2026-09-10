@@ -666,12 +666,6 @@ export const actionPaletteItems = paletteItems.filter(i => i.category === 'actio
 /**
  * The human name for a trigger, read from the palette — which is where these are already named,
  * once, for all 133 of them.
- *
- * Anything that has to SAY "when X happens" needs this, and the temptation is a little local
- * `Record<string, string>` covering the dozen triggers that surface happens to show. FlowsPage
- * has exactly that map with 11 entries; a second reader adding a third copy is how a trigger ends
- * up named two different things on two screens. Falls back to the raw event name with its
- * separators opened up, so an unnamed trigger reads as words rather than rendering blank.
  */
 export function triggerLabel(triggerType: string): string {
   const hit = triggerPaletteItems.find(
@@ -680,19 +674,7 @@ export function triggerLabel(triggerType: string): string {
   return hit?.label ?? triggerType.replace(/[_.]/g, ' ');
 }
 
-/**
- * The tenant-safe subset a workspace user may drop in the visual builder — DERIVED, not restated.
- *
- * This was a hand-typed list, and it had drifted WIDER than the enforcer, which is the dangerous
- * direction: `payment_reversed`, `asset.warranty_expiring` and `appointment_booked` were offered
- * as draggable nodes that `enforce_tenant_flow_allowlist` rejects, so the node dragged, the flow
- * saved, and the write died on a raw 42501 naming a constraint the user has never heard of. None
- * of the three had an emitter stamping workspace_id either, so the flow could never have fired
- * even had the insert passed.
- *
- * Composing it from the vocabulary means the builder cannot offer what the database refuses.
- * Condition nodes are pure logic and always allowed — only trigger/action subtypes are listed.
- */
+/** The tenant-safe subset a workspace user may drop in the visual builder — DERIVED, not restated. */
 export const TENANT_ALLOWED_SUBTYPES: ReadonlySet<string> = new Set<string>([
   ...TENANT_TRIGGERS,
   ...TENANT_ACTIONS,

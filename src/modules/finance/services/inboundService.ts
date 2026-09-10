@@ -17,12 +17,6 @@ export type { InboundLinkSummary } from '@/modules/finance/utils/inboundCorrelat
 /**
  * `get_inbound_document_detail` — what was on a document, merged with the delivery note that
  * itemises it when the document names nothing itself.
- *
- * `detail.status` and `money.line_costs` are the two fields that must never be dropped on the way
- * to a component: the first says whether these lines are the document's own or borrowed and from
- * where, and the second says whether the per-item cost is real. A reader that ignores either sees
- * two zero-valued lines under a 505.19 invoice and has no way to tell that the split is unknown
- * rather than free.
  */
 export interface InboundDocumentDetail {
   document: {
@@ -259,14 +253,6 @@ export const inboundService = {
    * Ordered by ISSUE DATE, which is the date the table shows and the only one the operator has
    * any reason to think in. It used to order by `created_at` — when WE happened to poll the row
    * — and the two agreed by accident for as long as there was a single inlet fetching daily.
-   *
-   * Backfilling history broke the accident on the first run: 87 self-transmitted documents
-   * spanning 2024-02 to 2026-06 were all inserted within the same second, so they took the top 87
-   * places and buried every supplier invoice under four and a half pages of them. The documents
-   * were not misfiled — the list was answering "most recently fetched" to a question nobody asked.
-   *
-   * Returns the total as well as the page, because the cap below is otherwise invisible: a list
-   * that stops at 500 of 1,857 looks exactly like a list of 500.
    */
   async list(workspaceId: string, limit = INBOUND_LIST_LIMIT): Promise<{ rows: InboundDocument[]; total: number }> {
     const { data, error, count } = await supabase
@@ -301,18 +287,7 @@ export const inboundService = {
   },
 
 
-  /**
-   * Every received document issued by one ΑΦΜ — the supplier's documents on their CRM record.
-   *
-   * The link is a LIVE match on the VAT number: `inbound_documents` stores no company id, so a
-   * CRM company created today instantly claims documents polled months ago, and nothing ever
-   * needs backfilling. Matched on the raw string, the digits-only form and the EL-prefixed form,
-   * because myDATA sends '099430615' where a CRM row may hold 'EL099430615'.
-   *
-   * Returns the TOTAL alongside the page for the same reason [[list]] does: the biggest issuer
-   * on this workspace has 206 documents and the old cap was 200, so its history rendered as a
-   * complete list that was quietly missing its oldest six.
-   */
+  /** Every received document issued by one ΑΦΜ — the supplier's documents on their CRM record. */
   async listForIssuerVat(
     workspaceId: string,
     vat: string,
@@ -377,19 +352,7 @@ export const inboundService = {
     };
   },
 
-  /**
-   * The issuer's business identity, which myDATA does NOT transmit.
-   *
-   * `RequestDocs` sends the issuer as ΑΦΜ + country + branch, sometimes a name and address, and
-   * nothing else — measured on live data, 1,147 of 1,732 issuer blocks carry no address at all.
-   * Δ.Ο.Υ., Γ.Ε.ΜΗ. number, activity (ΚΑΔ), phone, email and website are the supplier's own
-   * letterhead; on our side they come from the registries via [[researchCompany]] and live on the
-   * CRM company row. So the preview reads them from there rather than pretending AADE sent them.
-   *
-   * Matched on the NORMALISED VAT key (#353 CRM-4), not the three spellings it used to guess
-   * at — a row stored as `GR 800 370 260` was none of them. Returns null when the issuer isn't
-   * in CRM.
-   */
+  /** The issuer's business identity, which myDATA does NOT transmit. */
   async issuerProfile(workspaceId: string, vat: string | null): Promise<IssuerProfile | null> {
     const vatKey = normalizeVat(vat);
     if (!vatKey) return null;
@@ -473,16 +436,6 @@ export const inboundService = {
   /**
    * The expenses inbox grouped by SUPPLIER — because that is the unit of every decision made
    * about it.
-   *
-   * 1,866 myDATA documents arrived and every one sits in the generic myAADE bucket that
-   * `finance-inbound-sync` stamps on arrival. Filing them one at a time is 1,866 decisions;
-   * grouped by issuer it is 241, and the top 45 issuers carry 1,324 of the documents — 71%.
-   * A supplier's invoices almost always belong in one category, so this is the queue that
-   * actually clears.
-   *
-   * Returns EVERY issuer, not only the ones with something outstanding: this is the surface a
-   * supplier's history is read from, and a list that empties itself as the backlog clears would
-   * answer "who do we buy from?" with a blank page.
    */
   async issuersSummary(workspaceId: string): Promise<ExpenseIssuerRow[]> {
     const { data, error } = await (supabase as any).rpc('inbound_issuers_summary', {
@@ -492,17 +445,7 @@ export const inboundService = {
     return (data ?? []) as ExpenseIssuerRow[];
   },
 
-  /**
-   * File every one of a supplier's still-unfiled documents at once.
-   *
-   * Returns how many moved. Only documents still sitting in a SYSTEM bucket are touched — one
-   * the operator filed deliberately is never re-filed by a bulk action.
-   *
-   * Filing an issuer also teaches the platform: `remember_inbound_issuer_category` records the
-   * default and `finance-inbound-sync` applies it to everything that arrives afterwards, so the
-   * same supplier never needs filing twice. That is why the RPC refuses a system category as the
-   * target — it would move the documents and teach nothing.
-   */
+  /** File every one of a supplier's still-unfiled documents at once. */
   async fileIssuer(workspaceId: string, issuerVat: string, categoryId: string): Promise<number> {
     const { data, error } = await (supabase as any).rpc('inbound_file_issuer', {
       p_workspace_id: workspaceId,

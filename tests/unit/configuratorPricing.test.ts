@@ -1,16 +1,4 @@
-/**
- * A flat per-metre line prices off the DERIVED run length (#382).
- *
- * THE DEFECT THIS EXISTS FOR. `<materialkai-configurator>` seeded its flat scope against the
- * blueprint's typed dimension defaults and let `composeEstimate` do the rest. That reads correctly
- * — `composeEstimate` does return merged `dims` — but it prices the flat items exactly as they are
- * handed in, so installation was billed on a run length that appeared nowhere on screen.
- *
- * Caught by running the built widget against the live endpoint on 2026-08-23, not by any check in
- * this repo: a 1.60 m layout with a 10/m fitting rate showed 490 where the blueprint derives 496.
- * Both are valid numbers, both typecheck, and the zone half was right the whole time — which is
- * what makes the ordering worth a test rather than a comment.
- */
+/** A flat per-metre line prices off the DERIVED run length (#382). */
 import { describe, expect, it } from 'vitest';
 
 import type { Composition, RateItemLike, ZoneDef } from '../../src/utils/blueprintComposition';

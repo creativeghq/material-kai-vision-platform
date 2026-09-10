@@ -93,16 +93,7 @@ describe('character avatar cast', () => {
   });
 });
 
-/**
- * One person is ONE face.
- *
- * The inbox draws a counterparty five times — list row, header, message rows, profile drawer,
- * details rail — and the seed decides which of the 24 characters they get. Two sites seeding
- * differently is two people on screen, and it is completely silent: both URLs load, both faces
- * are from the cast, both look designed. Thread `d3a43bcd…` shipped exactly that — its header
- * seeded on the thread id (`cast/016`, a woman) while every one of the man's messages seeded on
- * his participant id (`cast/021`).
- */
+/** One person is ONE face. */
 describe('one person is one face', () => {
   const THREAD = { id: 'd3a43bcd-1490-47c0-b10e-86e24ee8c37c' };
   const CUSTOMER = 'bed5590f-483c-414e-9501-6a0e56666ffd';
@@ -148,18 +139,7 @@ describe('one person is one face', () => {
   });
 });
 
-/**
- * WHICH HALF of the cast, from the name.
- *
- * The hash alone is a coin flip on a set that is half women and half men, and it loses that flip
- * in front of the operator: `Desislava Slavova` — every token of it grammatically feminine — was
- * drawn as slot 001, an older man with a grey beard and glasses, beside her own messages. "We do
- * not guess" was the stated policy; a 50/50 guess was the behaviour.
- *
- * So the rule is narrow on purpose: answer where the answer is IN the name (an honorific, a
- * Slavic declension, a Greek final sigma, a listed given name) and return null everywhere else,
- * because null is the whole cast, i.e. exactly what every contact had before.
- */
+/** WHICH HALF of the cast, from the name. */
 describe('reading a gender off a name', () => {
   it('reads the name in the screenshot', () => {
     expect(nameGender('Desislava Slavova')).toBe('female');

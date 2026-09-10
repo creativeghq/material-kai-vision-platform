@@ -1,14 +1,4 @@
-/**
- * Guards the workspace-role catalog against the two ways it has already drifted:
- *
- *  1. A role accepted by `workspace_invites_role_check` but REJECTED by
- *     `workspace_members_role_check` — which is exactly what made every `sales`,
- *     `realestate_agent` and `employee` invite fail at redemption (the INSERT into
- *     workspace_members threw a CHECK violation). The DB is the real gate; this test keeps the
- *     TS catalog honest and forces the two lists to stay a superset/subset pair.
- *  2. A role with no `resolvePersona` branch, which silently falls through to `staff` and
- *     hands the invitee finance/CRM/warehouse capabilities the inviter never intended.
- */
+/** Guards the workspace-role catalog against the two ways it has already drifted: */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

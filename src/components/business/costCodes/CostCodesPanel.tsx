@@ -1,19 +1,4 @@
-/**
- * Cost code management — the workspace's own cost breakdown structure.
- *
- * There are no platform defaults to show read-only here (unlike project categories or deal types):
- * a cost breakdown is a numbering convention the firm chose, so every row is theirs. The starter
- * library is a COPY offered on an empty workspace, not a shared list — install it and rename
- * everything, or ignore it and type your own.
- *
- * Archive, not delete, is the normal retirement. The FK on every table that codes money is
- * ON DELETE RESTRICT, so a code that has ever been used cannot be removed at all — and blanking
- * the classification on historic costs would be the wrong answer even if it could.
- *
- * Writes are RLS-gated to workspace owners/admins. The controls are hidden for everyone else
- * rather than left armed to fail, but the hiding is UX only; `cost_codes`'s policies are the
- * boundary.
- */
+/** Cost code management — the workspace's own cost breakdown structure. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Plus, Trash2, Loader2, Archive, ArchiveRestore, Pencil, Check, X, Ruler, Download,

@@ -5,12 +5,6 @@
  *  3. Personal / confidential — for support contact.
  *  4. My company — type / operating mode / main activity.
  *  + Bank & logo.
- *
- * Labels are English-only (translations come later). Fields marked `bilingual`
- * (name/activity/address/city/country) store BOTH a Greek and an English value for
- * dual-language invoices — instead of two columns, a top EN/GR switch picks which
- * language you're entering. Every field carries a placeholder example.
- * Per-workspace (finance_settings); each business fills its own.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, Save, Upload, Building2, ImageIcon, Copy, Sparkles } from 'lucide-react';

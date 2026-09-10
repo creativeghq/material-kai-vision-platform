@@ -3,9 +3,6 @@
 // (sections + create actions), so e.g. Sales → Quotes (New Quote · Open), CRM (Users · Contacts …).
 // The RIGHT rail follows that SAME selection — its shortcuts are per-hub (LAUNCHER_HUB_SHORTCUTS),
 // so the menu changes as you move through it instead of repeating one fixed trio under every hub.
-// Only Recent stays global, because "where I was last" is not a hub fact. Data comes from
-// useLauncherApps (active/available + entitlement-aware enable/request) and the verified
-// LAUNCHER_* deep-links.
 import React, { useEffect, useMemo, useState } from 'react';
 import { LayoutGrid, ArrowUpRight, Loader2, Plus, Lock, LifeBuoy, Settings, Check, ChevronRight, Sparkles, Wrench } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -61,7 +58,6 @@ export const AppLauncher: React.FC = () => {
   // promoted app is only offered under its own hub, and dropping it from the group here would drop
   // the hub itself from the left rail the moment every one of its apps was promoted, taking the
   // apps with it. Only ACTIVE apps are ever promoted, so an available-to-add app keeps its hub card
-  // and its Enable button.
   const hubGroups = useMemo(() => groupAppsByHub(allApps), [allApps]);
 
 

@@ -1,29 +1,4 @@
-/**
- * What the composer OFFERS to attach must equal what agent-chat ACCEPTS.
- *
- * The limits were three `const`s inside agent-chat's request handler — `MAX_IMAGES`,
- * `MAX_DOCUMENTS`, `MAX_MULTIMODAL_CHARS` — and the guard they backed was correct: it refuses an
- * oversized turn with 413 before any model call, because attachments become native
- * vision/document blocks with no per-item cap while the turn fee is flat.
- *
- * The composer knew none of that. `attachDocumentFiles` was an unbounded
- * `setAttachedDocuments(prev => [...prev, ...docs])`, so a user attached 19 PDFs, saw 19 chips,
- * pressed send, waited through 19 base64 reads and an upload, and got back:
- *
- *   Agent execution failed: 413 - {"error":"Too many documents attached: 19 (max 6 per turn)."}
- *
- * Two separate defects, both of them silent until a user finds them:
- *
- * 1. An OFFER the enforcer refuses. The catalog-PDF branch eight lines away had always clamped to
- *    one and said so; the read-document branch clamped to nothing. Nothing could have caught it —
- *    the numbers were not reachable from the surface that needed them.
- * 2. A refusal rendered as a STACK TRACE. AgentHub's catch translated exactly one shape (the 402
- *    credits refusal, itself the subject of creditRefusalIsAnOffer.test.ts) and printed the raw
- *    status plus the raw JSON for everything else — while the function had written a perfectly
- *    readable sentence and put it in the body.
- *
- * So: one predicate, mirrored to both runtimes, and a refusal that reads like one.
- */
+/** What the composer OFFERS to attach must equal what agent-chat ACCEPTS. */
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';

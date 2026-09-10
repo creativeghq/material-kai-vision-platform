@@ -1,22 +1,4 @@
-/**
- * A deal's forecast can be measured against what it actually billed (#378 C3).
- *
- * `quotes`, `orders` and `invoices` all carry `deal_id`, and every chain function that creates one
- * from another dropped it — measured: 0 mentions across all eight, against 2 each for
- * `project_id`, which had exactly this defect in exactly these functions and was fixed under class
- * A of the same issue. So a won deal's paper trail stopped at the quote, and `get_deal_forecast`
- * weighted a number somebody TYPED into `crm_deals.value` with nothing to compare it to.
- *
- * The fix is SQL — the chain carries `deal_id`, the probe that guards `project_id` was generalised
- * to both columns, and `get_deal_forecast` returns the actuals beside the forecast so accuracy is
- * one call and one scope rather than a subtraction someone does in TypeScript.
- *
- * SQL in this project is applied through the MCP and never committed, so this file guards the
- * TypeScript half only, and a green run here does NOT prove the chain carries the column. That is
- * verified by a rolled-back probe: quote(deal) → order → pre-invoice, asserting the deal id on
- * both, plus a probe that watches the integrity detector FIRE on a function that names
- * `project_id` and not `deal_id` — the exact case the project-only version was blind to.
- */
+/** A deal's forecast can be measured against what it actually billed (#378 C3). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';

@@ -1,15 +1,6 @@
 /**
  * One implementation per date primitive — the same rule `moneyPrimitives.test.ts` enforces for
  * money, for the same reason.
- *
- * `formatDate`/`fmtDate` was declared in eighteen files and `timeAgo` in eleven. Several passed
- * `undefined` as the locale, which hands the decision to the viewer's browser: the same timestamp
- * rendered "Aug 5, 2026" for one user and "5 Αυγ 2026" for another, on the same screen, against the
- * English-default rule. Nothing about that is visible in a diff or a type.
- *
- * The guard permits a local declaration that DELEGATES (the file imports from `@/utils/datetime`),
- * because several call sites legitimately wrap the canonical with their own options — a `fallback`
- * of "Never", a null return, `withTime`. What it forbids is a fresh `Intl`/`toLocale*` formatter.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';

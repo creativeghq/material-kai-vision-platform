@@ -1,36 +1,4 @@
-/**
- * Definitive rebuild of the product-knowledge corpus from the split_v2 export.
- *
- * ── Why this file is committed ────────────────────────────────────────────────
- * The corpus that reached kb_docs on 2026-08-26 is the OUTPUT of this script, and
- * the boundaries below are ~200 lines of judgement that cannot be re-derived from
- * the export: `product-knowledge_split_v2.zip` is a Notion export that was cut at
- * every `##` heading, so it contains 673 fragments and NO record of where one
- * document ended and the next began. Re-running an import without this file would
- * reproduce the 673-entry knowledge base it replaced.
- *
- * Usage:
- *   unzip product-knowledge_split_v2.zip -d <dir>/kb
- *   node scripts/utilities/rebuild-product-knowledge-kb.mjs     # writes merged3.json
- * then diff merged3.json against kb_docs by slug + content hash and apply only the
- * delta — a full re-import re-chunks ~9,800 rows and bursts the embedding path.
- *
- * Three corrections over the first attempt, all of them load-bearing:
- *
- *  1. NO DROPPING BY TITLE. Pass 1 dropped runs 179-196 and four Product Bible
- *     fragments because their titles repeated. Measured afterwards, those runs
- *     share only 8-29% of their paragraphs with the copy that was kept — same
- *     section headings, different articles. Dropping them destroyed 174 unique
- *     paragraphs. A document is only dropped when its content is genuinely
- *     contained in another (see TRUE_DUPLICATES), and that is decided by
- *     paragraph overlap, never by name.
- *  2. UNWELD. Content the exporter wrote with `#` was never cut, so it stayed
- *     glued to the preceding `##` fragment. Two shapes: a trailing title that
- *     belongs to the NEXT document (MOVE_TO_NEXT), and a whole separate article
- *     sitting inside an unrelated one (NEW_DOCUMENT).
- *  3. Same-named but genuinely different articles get an explicit
- *     "(alternate version)" suffix rather than colliding in the UI.
- */
+/** Definitive rebuild of the product-knowledge corpus from the split_v2 export. */
 import fs from 'node:fs';
 import path from 'node:path';
 

@@ -1,20 +1,4 @@
-/**
- * Calculator tools — deterministic, free, no upstream API.
- *
- * THE MATH IS NOT HERE. Both models are imported from GENERATED mirrors of the canonical
- * frontend modules (`src/lib/calculators/*.ts`), produced by `npm run vocab:mirror` and held
- * byte-identical by tests/unit/vocabularyMirrors.test.ts.
- *
- * This file used to carry a second implementation of each, under a header reading "keep the two
- * in sync" — a convention, which is precisely what the mirror script exists to replace. The
- * heat-pump constants happened to still agree; the heating-cost pair had already diverged, with
- * the tool hardcoding the calorific values and efficiencies the canonical version accepts as
- * overrides, so `/tools/heat-pump` could be told "our oil is 10.2 kWh/L" and the agent could not.
- * A duplicated DERIVATION is the same defect shape as a duplicated vocabulary and worse to
- * detect: both answers are plausible numbers (#395).
- *
- * Each tool emits its result chunk so AgentHub can render an inline card.
- */
+/** Calculator tools — deterministic, free, no upstream API. */
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what
@@ -182,16 +166,6 @@ export const createHeatingCostComparisonTool = (onChunk: ChunkSink) => {
 };
 
 // ── Kitchen cost ──────────────────────────────────────────────────────────
-//
-// UNLIKE the two calculators above, this one holds NO rates. Kitchen pricing lives in the
-// `kitchen_cabinets` platform-starter blueprint, which is also what /tools/kitchen-cost and the
-// projects Plan tab read — so re-pricing in the Blueprints admin moves all three at once, and a
-// mirrored copy here would immediately become a second, wrong source.
-//
-// For the same reason the schema carries NO enum of models or worktops: those are rows. The tool
-// matches free text against the blueprint's own labels and REPORTS what it could not match, so
-// the agent corrects itself instead of silently quoting the default. The only structural coupling
-// is the three dimension keys, and an unknown one is ignored rather than assumed.
 
 const KITCHEN_PROJECT_TYPE = 'kitchen_cabinets';
 

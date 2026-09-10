@@ -5,17 +5,7 @@ import { AnnotationLayer } from './AnnotationLayer';
 import { moodboardSheetsService } from '@/services/moodboardSheetsService';
 import { LivePreviewPanel } from './LivePreviewPanel';
 
-/**
- * Elevation + Render Pair canvas.
- *
- * Two annotation modes share the same backdrop:
- *   - Dimension lines: two-click placement (first click = start, second = end),
- *     then user types the value (e.g. "2725"). Stored normalized [0..1].
- *   - Tile callouts: single click + label (e.g. "Porcelain 600×1200 mm").
- *
- * The render image (bottom half of the PDF) is uploaded separately above the
- * canvas and not annotated.
- */
+/** Elevation + Render Pair canvas. */
 
 export interface Dimension {
   x1: number;

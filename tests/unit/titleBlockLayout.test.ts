@@ -1,17 +1,4 @@
-/**
- * Title-block layout geometry.
- *
- * Every element in the block is positioned by hand-written arithmetic against a
- * 4-column grid. Nothing enforces that a cell's content actually stays in its
- * cell, and the failure is silent: the PDF renders fine, the text just sits in
- * the wrong box or runs past the border. It only becomes visible when a
- * neighbouring cell fills up — which is exactly how the branding block was found
- * to be 8pt left of its divider, hanging into the CHECKED BY column, months
- * after it shipped.
- *
- * These are pure arithmetic checks on the same constants layout.ts uses, so they
- * catch a mis-placed column without rendering or rasterising anything.
- */
+/** Title-block layout geometry. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

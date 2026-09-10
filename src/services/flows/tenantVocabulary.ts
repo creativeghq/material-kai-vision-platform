@@ -1,36 +1,4 @@
-/**
- * THE tenant flow vocabulary. One source; everything else reads or is generated from it.
- *
- * This fact — "which triggers and actions may a workspace's own automation use?" — was typed out
- * by hand in FOUR places: the SQL enforcer, the agent tool's zod enum, the visual builder's
- * palette, and the guard test's own pin. Nothing made them agree, so they agreed by memory, and
- * the palette drifted wider than the enforcer: `payment_reversed`, `asset.warranty_expiring` and
- * `appointment_booked` were offered as draggable nodes that `enforce_tenant_flow_allowlist`
- * rejects. The node drags, the flow saves, and the write dies on a raw 42501 naming a constraint
- * the user has never heard of.
- *
- * Now: this file is the source, `paletteItems.ts` imports it, the Deno copy under
- * `_shared/tools/` is GENERATED (`npm run vocab:mirror`, part of `gen:all`), and the guard test
- * reads this file instead of restating it. Two things a human types — this and
- * `tenant_flow_allowed_triggers()` / `tenant_flow_allowed_actions()` in SQL — and the test pins
- * them to each other. The SQL half cannot be generated from here: it lives in the database and CI
- * has no Supabase token (the same blocker that stops `types:generate` running there).
- *
- * KEEP THIS FILE IMPORT-FREE. It is byte-copied across the Vite/Deno boundary — Vite resolves the
- * `@/` alias, Deno resolves by URL — so a single import makes the mirror unbuildable.
- *
- * ADMISSION RULE FOR A NEW TRIGGER — it is not "is this tenant-ish":
- * flow-engine matches a workspace-owned flow ONLY as
- *   `and(is_global.eq.false, workspace_id.eq.<ws>)`
- * and falls back to `eq('is_global', true)` for an event it cannot attribute to a workspace. So a
- * trigger qualifies only once a trusted server-side emitter puts `workspace_id` IN THE PAYLOAD —
- * verify the payload, not that an emitter exists. Without it the tenant flow never fires, and
- * through Reuse it is worse: `fork_workspace_flow_default` switches the platform default off in
- * the same transaction, so the owner ends up with FEWER notifications and nothing raises.
- * `appointment_booked` shipped in exactly that state (`appointments` has no workspace_id column).
- *
- * Guarded by tests/unit/flowEventContract.test.ts.
- */
+/** THE tenant flow vocabulary. One source; everything else reads or is generated from it. */
 
 /** Triggers a workspace-owned flow may listen for. Mirrors `tenant_flow_allowed_triggers()`. */
 export const TENANT_TRIGGERS = [
@@ -77,17 +45,7 @@ export const TENANT_TRIGGERS = [
   'video_generation_completed', 'video_generation_failed',
 ] as const;
 
-/**
- * Actions a workspace-owned flow may run. Mirrors `tenant_flow_allowed_actions()`.
- *
- * The first five tell a person; the last four write a record. Until 2026-08-31 only the first
- * five were here, so 64 triggers all ended the same way — a human is told, and the human does
- * the work. The record-writing four were already implemented in flow-engine, with palette items
- * and config forms; this list was the only thing making them unreachable.
- *
- * `create_planned_payment` is implemented and deliberately NOT here: it creates a money
- * obligation, which is a trust decision of its own rather than a rider on four safe actions.
- */
+/** Actions a workspace-owned flow may run. Mirrors `tenant_flow_allowed_actions()`. */
 export const TENANT_ACTIONS = [
   'send_email', 'send_whatsapp', 'create_notification', 'send_agent_message', 'send_campaign',
   'create_task', 'advance_deal_stage', 'add_note', 'assign_user',

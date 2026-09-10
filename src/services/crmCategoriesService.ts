@@ -55,22 +55,7 @@ export interface ResolvedRecipient {
   category_slugs: string[];
 }
 
-/**
- * Every write here BINDS its error and throws (#389).
- *
- * `supabase-js` RESOLVES on an RLS denial rather than throwing, so an unbound write is
- * completely silent — a surrounding try/catch does not catch it, because nothing threw,
- * and the caller proceeds as though the write landed.
- *
- * It matters more in this file than in a generic one. The `role` and `employment`
- * category lists are DERIVED from `workspace_members.role` and `hr_employees` by
- * `crm_resync_auto_category_members`, so rows here legitimately appear and disappear on
- * their own. A manual assignment that silently failed is invisible against that
- * backdrop: there is no "it should still be there" to notice.
- *
- * Both halves of each reconciliation are checked. A successful add with a failed remove
- * leaves membership wrong in a way that looks deliberate.
- */
+/** Every write here BINDS its error and throws (#389). */
 class CrmCategoriesService {
   async list(): Promise<CrmCategorySummary[]> {
     const { data, error } = await supabase
@@ -217,19 +202,7 @@ class CrmCategoriesService {
     return (data || []).map((r: any) => r.category_id);
   }
 
-  /**
-   * Refuse a hand-assignment to an AUTO kind, with a message someone can act on (#353 CRM-22).
-   *
-   * This is the COURTESY, not the guarantee. `trg_crm_category_no_manual_auto_member` is the
-   * guarantee — a BEFORE INSERT/UPDATE trigger, so it covers every caller including the edge
-   * functions and anything reaching the table directly, and it cannot be outrun. Without this
-   * though, the operator sees a raw `check_violation` and has no idea that the answer lives in
-   * Profile → Team or the HR roster.
-   *
-   * The list page already filters its options through `isHandAssignableKind`; the service used
-   * to take a raw id and write it. CLAUDE.md's rule for exactly that shape: the offer and the
-   * gate must read the same answer.
-   */
+  /** Refuse a hand-assignment to an AUTO kind, with a message someone can act on (#353 CRM-22). */
   async assertHandAssignable(categoryIds: string[]): Promise<void> {
     const ids = categoryIds.filter(Boolean);
     if (ids.length === 0) return;

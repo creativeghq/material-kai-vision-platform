@@ -328,17 +328,7 @@ export const projectRequestsService = {
     if (error) throw error;
   },
 
-  /**
-   * Requests on this project that look like the same question.
-   *
-   * ADVISORY, always. It returns candidates for a person to judge and never blocks the write —
-   * a check that refused would eventually suppress a real question on a Friday afternoon, and an
-   * unasked RFI costs far more than a duplicate one. The ranking rule lives in SQL so the offer
-   * and any later report cannot disagree about what "similar" means.
-   *
-   * Failing this lookup must never cost the request: a duplicate check that throws would stop
-   * somebody raising a question, which is the exact outcome it exists to avoid.
-   */
+  /** Requests on this project that look like the same question. */
   async findSimilar(
     projectId: string,
     title: string,

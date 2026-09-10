@@ -4,10 +4,6 @@
 //   - the same credential storage (AADE_USERNAME + AADE_PASSWORD via resolveSecret)
 //   - the same XML-extraction quirks (multiple namespace prefixes, NULL/--- sentinels)
 // Functions that wrap a specific ΑΑΔΕ operation should:
-//   1. Call resolveAadeCredentials() to get { username, password, afmCalledBy, sources }
-//   2. Compose the operation-specific <Body> via buildSoapEnvelope(creds, bodyXml)
-//   3. POST to the operation's endpoint with the SOAP 1.2 headers
-//   4. Use pickTag / pickAllTagBlocks / summarizeError to parse the response
 
 import { resolveSecret, type ResolvedSecret } from '../secrets.ts';
 
@@ -80,21 +76,7 @@ async function resolveOperatorAadeCredentials(supabase: SupabaseLike): Promise<A
   };
 }
 
-/**
- * Resolve the ΑΑΔΕ Special Access Codes for a lookup, per-workspace.
- *
- * Policy:
- *   1. The workspace's own `workspace_aade_credentials` row wins (sources='workspace').
- *   2. If it has no usable row AND it is the operator's ROOT workspace, fall back to
- *      env / platform_secrets (AADE_USERNAME / AADE_PASSWORD / AADE_AFM_CALLED_BY).
- *   3. Any other workspace with no row gets empty creds → the caller returns
- *      `aade_not_configured`. Tenants NEVER use the operator's master credentials.
- *
- * When `workspaceId` is omitted the resolver returns empty creds (missing) — every
- * call site is expected to pass the active workspace id.
- *
- * Throws nothing — the caller checks `username` / `password` for empty strings.
- */
+/** Resolve the ΑΑΔΕ Special Access Codes for a lookup, per-workspace. */
 export async function resolveAadeCredentials(
   supabase: SupabaseLike,
   workspaceId?: string | null,

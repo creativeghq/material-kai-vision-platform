@@ -1,16 +1,4 @@
-/**
- * Filter definitions for the four Materials Data tabs.
- *
- * Three of the four (products / images / chunks) used to carry a byte-identical
- * "search box + source Select + inherited jobId" block, and the Embeddings tab carried a
- * source + model Select that was never applied to its query at all. One builder now owns the
- * shared dimensions and each tab adds only the columns that actually exist on its table.
- *
- * Every field here is SERVER-side (`column`), so `applyFiltersToQuery` keeps the pushdown and
- * the exact `count: 'exact'` that pagination depends on. The two exceptions are marked below:
- * fields with neither `column` nor `accessor`, which the tab applies by hand because the
- * predicate (`is null` on a vector column) has no generic mapping.
- */
+/** Filter definitions for the four Materials Data tabs. */
 import { CalendarDays, Database, FileText } from 'lucide-react';
 import { NONE_VALUE, type FilterField, type FilterGroupDef, type FilterOption } from '@/components/core/filters';
 

@@ -1,18 +1,6 @@
 /**
  * Profile → Keys: one place for a workspace's third-party access, laid out as a
  * left sidebar of sections + a content pane (instead of one long scroll).
- *
- * Sections group the BYOK cards + connections by domain:
- *  - Finance & Tax  → myAADE Special Access Codes, myDATA REST inbound, Stripe payouts
- *  - Email          → Resend
- *  - Documents      → branded PDF template
- *  - HR & Payroll   → Ergani            (only when the HR module is enabled)
- *  - Shipping       → courier creds     (only when the Stock module is enabled)
- *  - Social & Messaging → Social, WhatsApp
- *
- * Everything is scoped to the active workspace; the BYOK cards self-gate via
- * is_workspace_finance_manager RLS. The cards themselves are the same ones mounted
- * in Finance → Settings / the module pages — this is just the tidy home for them.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -64,21 +52,7 @@ const ConnectionRow: React.FC<{
   </div>
 );
 
-/**
- * What "leave it blank" actually does (#360 CB-1 / CB-2).
- *
- * The Finance section said *"Leave blank to use the platform defaults."* It is not true, and the
- * backends say so in their own comments: `_shared/aade/soap.ts` — *"Tenants NEVER use the
- * operator's master credentials"* — and `resolveWorkspaceEmailSender`, since #357 AE-1, exempts
- * only a system send with no workspace and the operator's own root workspace.
- *
- * A wrong mental model here is worse than a silent bug, because the tenant ACTS on it: they leave
- * the fields empty believing there is a fallback, and then their invoices are not submitted to
- * AADE and their email does not send — and nothing on this screen ever said otherwise.
- *
- * Stated once, at the top, because it is one rule for every card below. Per-section prose is how
- * two sections came to describe two different platforms.
- */
+/** What "leave it blank" actually does (#360 CB-1 / CB-2). */
 const ByokRuleNote: React.FC = () => (
   <div className="rounded-sm border border-hairline bg-surface-sunken px-3 py-2 text-xs leading-relaxed text-muted-foreground">
     <span className="font-medium text-foreground">These are your own accounts.</span>{' '}

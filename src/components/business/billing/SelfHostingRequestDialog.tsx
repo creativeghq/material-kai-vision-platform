@@ -1,14 +1,4 @@
-/**
- * Self-hosting enquiry, from the plans page.
- *
- * Replaces the Enterprise tier's Subscribe button. Running this platform on someone else's
- * infrastructure is a conversation — a checkout would collect money for something nobody has
- * scoped yet.
- *
- * The form asks for the least it can and still be answerable: who to reply to, and what they
- * need. Everything else is optional, because a required field on an enquiry form is a reason not
- * to send it.
- */
+/** Self-hosting enquiry, from the plans page. */
 import React, { useState } from 'react';
 import { Loader2, Send } from 'lucide-react';
 import {

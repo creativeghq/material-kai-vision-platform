@@ -1,26 +1,4 @@
-/**
- * gsc-api — Google Search Console integration for connected websites.
- *
- * One website (public.user_websites) connects to one GSC property. Tokens live in
- * public.website_gsc_connections (service-role only — never exposed to the browser);
- * daily search-analytics rows land in public.gsc_performance.
- *
- * OAuth is SERVER-SIDE by design. Google's redirect_uri points at THIS function
- * (a GET), not the SPA — because the app's supabase-js client has
- * `detectSessionInUrl` + PKCE on, and would otherwise intercept Google's `?code=`
- * as a login code, fail, and bounce the user to the login screen. The function
- * exchanges the code, stores the connection, then 302-redirects to the app with a
- * clean `?gsc=connected` (no code param ever touches the SPA).
- *
- * Auth model: `state` is an HMAC-signed `{website_id, user_id, ts}` minted at
- * authorize-time — AFTER authenticate()+userCanAccessWorkspace() proved the caller
- * owns the website. The GET callback carries no JWT (it's a browser redirect from
- * Google), so it trusts that signed, short-lived state; forgery needs the service key.
- *
- * Actions (user JWT, POST): authorize · list_properties · set_property · sync · disconnect
- * Action (x-cron-secret, POST): cron-sync — nightly refresh of every active connection.
- * GET ?code&state — Google's redirect target (server-side callback).
- */
+/** gsc-api — Google Search Console integration for connected websites. */
 
 import { createClient } from '@supabase/supabase-js';
 import { withApiLogging } from '../_shared/api-logger.ts';
@@ -110,24 +88,7 @@ function propertyDomain(property: string): string {
     : domainOf(p).toLowerCase();
 }
 
-/**
- * Is `property` a property this connected website may legitimately claim?
- *
- * DERIVED, not asserted (#364 EX-8). `set_property` used to write whatever string arrived in the
- * body: a member could bind their website row to any property their Google account happened to
- * reach — an agency or ex-employer account often reaches several — and from then on
- * `gsc_performance` filled with a different site's search data under this website's id, which is
- * what every SEO surface downstream reports on. Nothing anywhere said the two were unrelated.
- *
- * Two conditions, both required:
- *   1. the property is in the OAuth account's own `sites.list` — Google's answer to "what may
- *      this token see", so the check cannot be satisfied by asserting it here; and
- *   2. it covers the website's domain, either exactly or as a parent (a `sc-domain:example.com`
- *      property legitimately covers `shop.example.com`).
- *
- * `siteUnverifiedUser` is rejected: Search Console lists properties a user has merely been shown,
- * with no verified relationship to the site.
- */
+/** Is `property` a property this connected website may legitimately claim? */
 function propertyClaimError(sites: any[], property: string, websiteUrl: string): string | null {
   const entry = (sites || []).find((s) => s?.siteUrl === property);
   if (!entry) {

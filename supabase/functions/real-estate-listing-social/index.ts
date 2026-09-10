@@ -1,39 +1,11 @@
-/**
- * real-estate-listing-social — turns a published listing into a ready-to-publish social post.
- *
- * Called by the seeded `realestate.listing_published` flow (`run_edge_function`), so an agency can
- * retarget, pause or condition it from the Flows builder rather than waiting on a deploy.
- *
- * It creates a **draft** `social_posts` row per connected account and stops there, deliberately:
- *
- *  • `zernio-api` authorises publishing against a real workspace MEMBER (`auth.user.id`). This
- *    function runs service-role from a flow, with no user. Publishing from here would mean either
- *    forging that identity or weakening the check — and that check is what stops one tenant
- *    publishing through another tenant's connected account.
- *  • Posting to an agency's public channels is outward-facing and effectively irreversible. A draft
- *    that is one click from going out removes all the manual work without taking that decision away.
- *
- * The caption is built from the listing's own fields rather than generated. It costs no credits, and
- * an unreviewed AI caption on a property ad is exactly where fair-housing language goes wrong.
- */
+/** real-estate-listing-social — turns a published listing into a ready-to-publish social post. */
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { isCronAuthorized } from '../_shared/auth.ts';
 
-/**
- * A draft is only ever a PREVIEW url, and it must not be the thing that gets published.
- *
- * `property-media` is private, so any URL for it expires. This used to persist a 7-day signed URL
- * into `social_posts.image_urls` and hand that to the provider at publish time — so a draft that
- * sat over a weekend and a bank holiday went out with a link Meta fetches and gets a 403 from,
- * and the post publishes with no image or fails outright. That is pipeline convention 7 exactly:
- * never persist a `file_url` for a private bucket; store bucket + path and mint the URL on read.
- *
- * The row now carries `metadata.media_refs`, and `zernio-api` re-signs from those at the moment
- * it publishes. `image_urls` keeps a short-lived URL purely so the draft renders in the composer.
- */
+/** A draft is only ever a PREVIEW url, and it must not be the thing that gets published. */
 const MEDIA_PREVIEW_TTL_SECONDS = 7 * 24 * 3600;
 
 const money = (n: number | null, ccy: string) =>
@@ -87,14 +59,6 @@ serve(withApiLogging('real-estate-listing-social', async (req) => {
     .order('is_cover', { ascending: false }).order('sort_order').limit(1).maybeSingle();
   let imageUrl: string | null = null;
   // The durable half — an ID, deliberately NOT a bucket and path.
-  //
-  // `social_posts` carries a `FOR ALL` policy for workspace members, so its `metadata` is
-  // user-writable. A {bucket, path} here would be a path taken from a row the user controls and
-  // then resolved with the SERVICE ROLE at publish time: a member could point it at any private
-  // object in any bucket — another tenant's invoice PDF — and be handed a signed URL for it.
-  // That is invariant 8 wearing a jsonb hat. The publisher resolves this id against
-  // `property_photos` scoped to the post's own workspace, so the worst a rewritten metadata can
-  // name is a photo that member could already see.
   const mediaRefs: Array<{ kind: 'property_photo'; id: string; type: 'image' }> = [];
   if (cover?.storage_path) {
     const { data: signed } = await supabase.storage

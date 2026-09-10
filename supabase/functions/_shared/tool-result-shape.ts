@@ -1,21 +1,4 @@
-/**
- * One derivation of "what did this tool call actually produce".
- *
- * Two consumers need the same answer and had two different ones:
- *   - `agent_tool_call_logs` (agent-chat) records `result_count` / `zero_result` / `success`;
- *   - the memory promotion gate needs "did this turn DO anything" to decide whether a turn is
- *     worth distilling at all.
- *
- * The second one was `(finalResult.toolResults?.length ?? 0) > 0` — the COUNT OF CALLS. In
- * conversation 96da9fc8 the agent ran three knowledge_base_search calls that each returned
- * nothing and one no-op `load_toolkit`, replied with a clarifying question, and that expression
- * said `true`. The guard in agent-memory.ts that exists precisely to refuse a clarifying turn
- * stood down, and the distiller promoted the assistant's own invented geography as a durable
- * fact about the user. CLAUDE.md's rule for this shape is "check the world, not the exit code";
- * counting calls is checking the exit code.
- *
- * So: one module, one answer, both callers.
- */
+/** One derivation of "what did this tool call actually produce". */
 
 /**
  * Tools whose result is never evidence that the turn accomplished anything for the user.
@@ -70,27 +53,6 @@ export function shapeToolResult(raw: unknown): ToolResultShape {
   }
 
   // Countable shapes. SUMMED, not first-match — and that is the whole point of this block.
-  //
-  // This used to be an `else if` ladder with `products` ahead of `articles`. Every tool with a
-  // single result array was fine; `knowledge_base_search` was not, because it returns FOUR
-  // arrays at once (`articles`, `products`, `entities`, plus `totalResults`) and always
-  // initialises `products: []` whether or not any product matched. So the `products` branch
-  // matched first, on an empty array, on every call — and the `articles` branch below it was
-  // unreachable code. A KB search returning five document sections logged `result_count: 0,
-  // zero_result: true`.
-  //
-  // Both consumers were wrong in the same direction, and the second one costs more than the
-  // reporting does: `turnProducedWork()` shares this derivation, so the memory promotion gate
-  // concluded a successful KB-grounded turn had produced nothing and declined to distil it. The
-  // agents could not form long-term memory from the one retrieval path that works.
-  //
-  // Proved against production: system_logs recorded "Knowledge base search complete: 5 results
-  // in 22.27s" for a query agent_tool_call_logs stored as 0 (2026-08-18, workspace ffafc28b).
-  //
-  // Summing is safe because no tool aliases the same list under two of these keys — verified
-  // across supabase/functions/_shared/tools/*.ts, where only the KB search returns more than
-  // one of them. `entities` is counted for the first time here: certificate/logo/spec hits from
-  // a PDF were never countable at all under the ladder.
   const COUNTABLE_KEYS = ['results', 'data', 'products', 'matches', 'articles', 'entities'] as const;
   let total: number | null = null;
   for (const key of COUNTABLE_KEYS) {
@@ -137,22 +99,7 @@ export function turnProducedWork(
   });
 }
 
-/**
- * Turn an upstream API's error body into something a reader can act on.
- *
- * Nine tool files each carried `String(parsed).slice(0, 200)`, where `parsed` is the JSON-PARSED
- * response body — so `String({error: 'Thread not found'})` produced the literal string
- * `[object Object]`. That was the entire error the agent received, and the entire error the user
- * saw: no status, no message, nothing to act on. The 2026-08-26 tool sweep found it live on
- * `manage_inbox`, `manage_contracts`, `manage_job_sites`, `list_my_job_searches`,
- * `get_price_summary`, `seo_domain_intersection` and `seo_onpage_issues` — seven tools whose
- * every failure was indistinguishable from every other failure.
- *
- * A wrong error message is worse than a missing one: it looks like the tool reported something.
- *
- * Prefers the fields upstreams actually use, falls back to compact JSON, and never returns the
- * default `Object.prototype.toString` rendering.
- */
+/** Turn an upstream API's error body into something a reader can act on. */
 export function describeUpstreamError(status: number, parsed: unknown, max = 300): string {
   const prefix = status ? `${status}: ` : '';
   if (parsed == null) return `${prefix}no response body`;

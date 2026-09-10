@@ -1,28 +1,4 @@
-/**
- * Canonical "external API provider not configured" response.
- *
- * Used by every edge function that calls an external API client (Stripe,
- * Resend, Twilio, Replicate, OpenAI, Anthropic, MIVAA, etc.) when the
- * required secret is unset in both env and `platform_secrets`. Returns a
- * uniform shape so the frontend can branch on `code: 'provider_not_configured'`
- * regardless of which provider failed.
- *
- * Pattern at call site:
- *
- *   import { notConfiguredResponse } from '../_shared/api-provider-errors.ts';
- *
- *   if (!resendApiKey()) {
- *     return notConfiguredResponse({
- *       provider: 'Resend',
- *       settingsPath: '/admin/modules/email/settings → Keys',
- *     });
- *   }
- *
- * The Stripe surface uses `noPaymentProviderResponse` from `stripe-clients.ts`
- * which is a typed alias of this same shape — kept separate because the
- * customer-facing wording for payments differs from the admin-facing wording
- * for back-office services like Resend / Twilio / Replicate.
- */
+/** Canonical "external API provider not configured" response. */
 
 export interface ProviderConfig {
   /** Display name shown in the error message (e.g. `'Resend'`, `'Twilio'`). */

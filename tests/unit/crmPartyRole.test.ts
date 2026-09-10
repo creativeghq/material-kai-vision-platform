@@ -1,24 +1,4 @@
-/**
- * CRM party-role guard.
- *
- * The bug this exists to stop: `crm_companies.is_customer` (and `crm_contacts.is_client`)
- * DEFAULTED TO TRUE at the column. Every path that creates a supplier correctly set
- * `is_supplier: true` and said nothing about the other flag — so the column default filed the
- * company as a customer as well. Adding an issuer to CRM from the myDATA expenses inbox
- * produced a party that was BOTH, and a company we only ever buy from turned up in the customer
- * pickers, the AR statements and the receivables aging.
- *
- * Six code sites and two SQL functions had the same shape, because none of them was wrong: the
- * omission was the bug, and an omission is invisible in review. `is_customer` now defaults to
- * false (migration `crm_companies_is_customer_default_false`), which fixes the SQL creators
- * outright, and the "stated no role -> customer" convention that API callers relied on moved
- * into the crm-api companies POST handler, where a request CAN be inspected for whether it
- * stated a role at all.
- *
- * A direct insert cannot be inspected that way, so it has to say what it is creating. This test
- * fails the build when a supplier-creating insert goes back to leaving the customer flag to
- * whatever the column happens to default to.
- */
+/** CRM party-role guard. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -101,10 +81,6 @@ describe('CRM party role is stated, never defaulted', () => {
    * under a comment reasoning that B2B research prospects a party we want to sell to. The
    * toolkit's only discovery tool is `b2b_manufacturer_search`, which finds factories, so every
    * porcelain tile plant the agent saved was filed as a customer with no way to say otherwise.
-   *
-   * A pinned literal is invisible to the guard above, which only constrains inserts that claim
-   * `is_supplier` — so it gets its own case. The role must be a tool PARAMETER (the operator sees
-   * it on the confirmation card and can change it), and it must default to supplier.
    */
   it('lets the B2B discovery save choose the party role instead of pinning it', () => {
     const src = stripComments(

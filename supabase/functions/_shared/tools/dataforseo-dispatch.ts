@@ -1,22 +1,4 @@
-/**
- * The ONE way an edge function reaches DataForSEO.
- *
- * This used to live inside `seo-agent-tools.ts` as a module-private helper, which was fine while
- * the SEO agent was the only caller. It is not any more: the CRM's Google Business lookup needs
- * the same upstream, and importing `seo-agent-tools.ts` to get at it would drag @langchain/core's
- * generic graph into a plain REST handler.
- *
- * Everything that made the original correct comes with it, because each piece is a bug we already
- * shipped once:
- *
- *  - **Invariant 10** — credits are reserved BEFORE the operator's `x-cron-secret` spends money
- *    upstream, and settled against the cost DataForSEO itself reports (#365 `AD-13`).
- *  - **`metered_upstream`** — MIVAA charges its own flat unit for callers that do not reserve, so
- *    without this flag every gated call was billed twice (#365, 134 duplicate charges in 30 days).
- *  - **HTTP 200 is not success** — DataForSEO puts the verdict in `status_code` (#365 `AD-14`).
- *
- * A raw `fetch` to the SEO gateway from anywhere else is ungated spend. Add a caller here instead.
- */
+/** The ONE way an edge function reaches DataForSEO. */
 
 import { openSpendGate, dataForSeoTaskError, type SpendGate } from './dataforseo-spend-gate.ts';
 import { describeUpstreamError } from '../tool-result-shape.ts';

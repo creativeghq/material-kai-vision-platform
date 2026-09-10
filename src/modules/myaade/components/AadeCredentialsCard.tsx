@@ -2,12 +2,6 @@
  * Per-workspace ΑΑΔΕ Special Access Codes (username + password) for the RgWsPublic2
  * registry/VAT lookup. Finance-manager-gated; the password is stored in
  * workspace_aade_credentials and never returned to the browser (only `has_password`).
- *
- * These are the "Ειδικοί Κωδικοί Πρόσβασης ΑΑΔΕ" — distinct from the myDATA REST API
- * credentials in InboundSetupCard (those are aade-user-id + subscription-key for the
- * received-documents poller). Each workspace runs lookups under its OWN codes, against
- * its own TAXISnet quota and audit inbox; only the operator's root workspace falls back
- * to the platform env default.
  */
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';

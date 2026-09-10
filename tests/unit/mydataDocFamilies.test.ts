@@ -1,26 +1,4 @@
-/**
- * myDATA document-family vocabulary guard.
- *
- * The bug this exists to stop (issue #278, phase 0): the "create invoice" document-type picker
- * kept its OWN copy of the family→label map and labelled family 6 "Self-billing", while the
- * codes it listed underneath came from `mydata_reference` and read "Self-Delivery Record" /
- * "Self-Supply Record". Appendix Par.1 is unambiguous — 6.1/6.2 are goods taken for own use.
- * Self-billing (αυτοτιμολόγηση) is not a family at all: it is the header flag
- * `invoices.self_pricing` on an ordinary 1.x/2.x document.
- *
- * An operator looking for self-billing therefore picked 6.x and filed the wrong document type
- * against AADE. Nothing could catch it: the code was valid, the description was correct, the
- * transmission succeeded. Only the group header lied.
- *
- * The durable fix is one map (`MYDATA_TYPE_FAMILY`), so these tests fail the build if a second
- * hardcoded copy comes back or if family 6 is described as self-billing again.
- *
- * SCOPE. This scans REPO FILES. The two other places this vocabulary lives are invisible here:
- * the `mydata_reference` table (the per-code descriptions, which were always right) and the
- * `invoice_items_invoice_detail_type_check` CHECK constraint — this project's SQL is applied
- * through the Supabase MCP and never committed (CLAUDE.md), so a green run says nothing about
- * either. Changing the allowed `invoiceDetailType` values means changing the CHECK too.
- */
+/** myDATA document-family vocabulary guard. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';

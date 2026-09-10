@@ -1,27 +1,4 @@
-/**
- * `<materialkai-product>` — the embeddable product widget (#321 M1 bullet 3, #258 Phase 1).
- *
- * Drops into a merchant's own page with two lines and renders one of their published products in
- * 3D, with an AR button on phones that support it:
- *
- *   <script src="https://app.materialshub.gr/embed/materialkai-product.js" defer></script>
- *   <materialkai-product api-key="mk_embed_…" product-id="…"></materialkai-product>
- *
- * DESIGN CONSTRAINTS, all of them consequences of "this runs on someone else's website":
- *
- * • **No React.** The host page's framework is unknown and irrelevant; this is a custom element
- *   built on three.js directly. That is also why the placement math was pulled out into
- *   `modelTransform.ts` — the in-app viewer and this bundle share the FUNCTION, not a copy of it.
- * • **Shadow DOM.** The host's CSS must not reach in and our styles must not leak out. A widget
- *   that inherits `* { box-sizing }` from a random theme is a support burden with no upside.
- * • **`?key=` rather than the `x-embed-key` header.** A custom header makes the request non-simple
- *   and costs a CORS preflight on every load; a plain GET costs none. The key is publishable and
- *   already in the page source, so putting it in the query string reveals nothing new.
- * • **Never throw into the host page.** Every failure renders a quiet message in our own box.
- *   Breaking a merchant's product page because our API had a bad minute is not acceptable.
- * • **Lazy-load on visibility.** three.js plus a GLB is real weight; a widget below the fold does
- *   not pay for itself until it is seen.
- */
+/** `<materialkai-product>` — the embeddable product widget (#321 M1 bullet 3, #258 Phase 1). */
 import {
   ACESFilmicToneMapping, AmbientLight, DirectionalLight, PerspectiveCamera, PMREMGenerator,
   Scene, SRGBColorSpace, WebGLRenderer,

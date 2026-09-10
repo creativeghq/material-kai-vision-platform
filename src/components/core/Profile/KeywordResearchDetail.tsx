@@ -16,18 +16,7 @@ import {
   type SerpFeatureGroup,
 } from './seo/serpFeatures';
 
-/**
- * The full read of one keyword-research run.
- *
- * The list view showed five columns — keyword, topic, count, volume, date — while
- * the stored blob held the AI Overview's cited sources, the image pack, the local
- * pack, product carousels, People Also Ask, 17 keyword clusters and 9 ranked
- * competitors. This is that blob, read.
- *
- * The SERP inventory is deliberately an INVENTORY: every feature Google can put
- * on a page is listed with a present/absent verdict, because an absent featured
- * snippet is a finding, not a blank. See `seo/serpFeatures.ts`.
- */
+/** The full read of one keyword-research run. */
 
 interface ResearchBlob {
   topic?: string;

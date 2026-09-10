@@ -35,8 +35,8 @@ describe('the dictation reader', () => {
   });
 
   it('debits before the model call', () => {
-    const debitAt = EDGE.indexOf('debitOrRefuse');
-    const callAt = EDGE.indexOf('callClaudeMessages');
+    const debitAt = EDGE.indexOf('await debitOrRefuse(');
+    const callAt = EDGE.indexOf('await callClaudeMessages(');
     expect(debitAt).toBeGreaterThan(-1);
     expect(callAt).toBeGreaterThan(-1);
     expect(debitAt).toBeLessThan(callAt);

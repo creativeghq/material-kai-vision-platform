@@ -1,29 +1,4 @@
-/**
- * XML Field Mapping Dictionary
- *
- * Deterministic rule-shortcut for the XML import field-detection step. Used by
- * `xml-import-orchestrator` (and any other edge function that needs to suggest
- * a product-schema target for an XML tag name).
- *
- * Architecture:
- *   1. The orchestrator's preview pass detects every tag name in the feed.
- *   2. For each tag, `lookupField()` does a direct dictionary hit + regex
- *      fallback. ~60-80% of fields in a typical feed resolve here.
- *   3. Fields the dictionary couldn't confidently match (confidence < 0.85
- *      or fell through to `metadata`) are sent to Claude in a single batched
- *      prompt as the AI residual pass.
- *
- * To add coverage for a new language or supplier:
- *   - Add lowercase tag entries to MAPPING_RULES (toLowerCase() is called on
- *     the XML tag before lookup, so entries here MUST be lowercase).
- *   - For digit-suffix patterns (image1, dim2), prefer REGEX_RULES.
- *   - Confidence ≥ 0.85 short-circuits the AI residual call; use that for
- *     unambiguous matches only. Lower confidence values cost nothing — they
- *     just don't bypass the AI pass.
- *
- * Test: the orchestrator's preview pass logs the rule-shortcut hit rate;
- * watch for it in Supabase function logs after adding entries.
- */
+/** XML Field Mapping Dictionary */
 
 export interface MappingSuggestion {
   mapping: string;

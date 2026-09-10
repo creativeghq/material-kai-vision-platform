@@ -103,18 +103,7 @@ async function recordAudit(supabase: any, workspaceId: string, userId: string, r
 }
 const audit = (ctx: ErganiCtx, row: AuditRow) => recordAudit(ctx.supabase, ctx.workspaceId, ctx.userId, row);
 
-/**
- * Refuse a second filing of the same document for the same record (#354 HR-2 / HR-3).
- *
- * Three of the six filing paths had no duplicate guard at all — hire, leave and the generic
- * submit — while separation, overtime and schedule checked their own `status === 'submitted'`
- * column. That column is the weaker check anyway: it is written AFTER the ministry accepts the
- * filing, and that write can fail, leaving a document filed under protocol P123 and a local row
- * still reading `draft` for the next operator to file again.
- *
- * `hr_ergani_submissions` is written as part of the success path, so it is what the guard reads.
- * A cancelled submission does not block — that is what `ergani-cancel` is for.
- */
+/** Refuse a second filing of the same document for the same record (#354 HR-2 / HR-3). */
 async function assertNotAlreadyFiled(
   ctx: ErganiCtx, code: string, entityType: string, entityId: string | null,
 ): Promise<void> {
@@ -140,16 +129,7 @@ async function assertNotAlreadyFiled(
   }
 }
 
-/**
- * A local write that follows a SUCCESSFUL ministry filing (#354 HR-2).
- *
- * These were all unchecked. The filing cannot be undone, so a failure here must not be reported as
- * a failure — the operator would re-file. It must not be reported as a plain success either, which
- * is what happened: `{ ok: true }` while the row stayed `draft`. So the failure is recorded on the
- * audit row (which already holds the protocol) and returned to the caller as `local_write_failed`.
- * The duplicate guard reads that same audit row, so the stale local status cannot cause a second
- * filing either way.
- */
+/** A local write that follows a SUCCESSFUL ministry filing (#354 HR-2). */
 async function stampAfterFiling(
   ctx: ErganiCtx, auditId: string | null, what: string,
   write: () => PromiseLike<{ error: unknown }>,
@@ -678,15 +658,6 @@ export async function handleErgani(action: string, ctx: ErganiCtx): Promise<Resp
     }
 
     // ── Cancel a submitted document, and release the record it belongs to ─────
-    //
-    // `cancelDocument` has existed in the client since this module shipped and the header comment
-    // above claimed cancel was implemented — no route ever called it. That gap became load-bearing
-    // with the duplicate guard (#354 HR-3): "this record was already filed, cancel it first" is not
-    // an instruction anyone could follow while cancelling was unreachable.
-    //
-    // Cancelling releases BOTH records that could block a re-file: the audit row (what the guard
-    // reads) and the entity's own status column (what the route-level checks read). Leaving either
-    // behind would mean a cancelled filing that still cannot be re-filed.
     case 'ergani-cancel': {
       requireManage();
       const id = String(body?.submission_id ?? '');

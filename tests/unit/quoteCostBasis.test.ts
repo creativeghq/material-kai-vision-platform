@@ -1,17 +1,6 @@
 /**
  * Guard: the seller's cost basis is not a column on a row the customer can read, and quote money
  * is derived in SQL. (Audit #358 — PQ-2, PQ-6, PQ-13, PQ-14.)
- *
- * `quotes.margin_pct` and `quote_items.cost_snapshot*` sat on rows the customer legitimately
- * reads: `consolidated_quotes_select_public` grants on `auth.uid() = user_id` (a customer IS the
- * user_id of their own quote request) and `quote_items_select` granted on bare workspace
- * membership, which the `client` role a project customer is issued satisfies. A row-level policy
- * cannot say "this principal may read this row but not these columns", which is precisely why
- * `check_security_invariants()` reported the schema clean while the exposure was real.
- *
- * The columns moved to `quote_costs` / `quote_item_costs`, gated on `is_workspace_sell_side`.
- * These assertions are over source text, because the failure mode is a future edit re-adding the
- * old names to a `quote_items` write — which would be a valid query returning a 200 either way.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -215,10 +204,6 @@ describe('the cost basis is withheld at the COLUMN, everywhere it flows', () => 
   // and both of those tables' SELECT policies are plain workspace membership — which the `client`
   // role a project customer is issued satisfies. Locking one table and not the others just moves
   // where the customer reads it from.
-  //
-  // Each of these columns is now unselectable by `authenticated` at the database, so naming one in
-  // a browser query fails the WHOLE query. That is loud, but it is loud on the USER's screen — this
-  // test is what makes it loud in CI instead.
   const WITHHELD: Record<string, string[]> = {
     invoice_items: ['unit_cost_snapshot', 'line_cost', 'line_margin'],
     order_items: ['unit_cost'],

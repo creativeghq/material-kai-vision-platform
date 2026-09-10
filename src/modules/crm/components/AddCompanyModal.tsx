@@ -24,10 +24,6 @@ type Role = 'customer' | 'supplier';
  * `CompanyIdentityLookup`, the same control every other create-a-business surface uses. The
  * fetched identity prefills the create form so it can be reviewed before saving —
  * the row is NOT written here. On continue we navigate to the new-company form
- * with the role + prefill in router state.
- *
- * Suppliers land in a lean form (no pricing/invoicing schema); customers get the
- * full commercial card set. See CompanyDetailPage role gating.
  */
 export const AddCompanyModal: React.FC<{
   open: boolean;

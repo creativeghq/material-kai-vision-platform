@@ -200,15 +200,6 @@ export const AgentConfigsPage: React.FC = () => {
 
       // ONE atomic RPC — the history row and the prompt update in a single transaction, admin
       // check inside. (#365 AD-21)
-      //
-      // Two things this replaced. The history insert and the prompt update were separate client
-      // calls, so a failed update could leave a history row describing a change that never
-      // happened. And the update itself DID NOT WORK for a global prompt: `prompts` UPDATE
-      // requires `is_workspace_member(workspace_id)`, global prompts live in workspace
-      // 00000000-…-0000, and nobody is a member of it — so PostgREST matched no row, answered 204,
-      // and the toast below said "updated successfully" while the model kept getting the old text.
-      // Verified live: 0 rows. Since #347 phase 3P prompts have no code fallback, so that silence
-      // lasts until somebody reads the agent's output and disbelieves it.
       const { error: rpcErr } = await (supabase.rpc as unknown as (
         fn: string, args: Record<string, unknown>,
       ) => Promise<{ error: { message: string } | null }>)('update_prompt_with_history', {
@@ -292,19 +283,7 @@ export const AgentConfigsPage: React.FC = () => {
     return labels[type] || type;
   };
 
-  /**
-   * An agent prompt this page will happily DISPLAY and the runtime cannot LOAD.
-   *
-   * `getAgentSystemPrompt` selects `system_prompt` and nothing else, and throws when it is empty.
-   * The viewers here fall back to `prompt_text` for display, which is convenient and, for an
-   * agent row, actively misleading: `property-advisor` shipped with its whole persona in
-   * `prompt_text`, looked perfectly configured on this page, and threw on the first message of
-   * every conversation — while the orchestrator routed real-estate questions straight into it.
-   * Nobody noticed for as long as nobody opened that agent.
-   *
-   * Editing and saving fixes it: update_prompt_with_history writes `system_prompt` for
-   * prompt_type='agent'. The badge is there so somebody knows to.
-   */
+  /** An agent prompt this page will happily DISPLAY and the runtime cannot LOAD. */
   const isUnreadableAtRuntime = (prompt: Prompt) =>
     prompt.prompt_type === 'agent' && !prompt.system_prompt?.trim();
 

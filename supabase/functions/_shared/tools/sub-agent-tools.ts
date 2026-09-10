@@ -61,9 +61,6 @@ async function logSubAgentUsage(opName: string, response: any, userId: string | 
     // the user's reservation against THREE TIMES its cost. `ai-client.ts` carried the identical
     // pair and its removal comment names them as the bug ("Opus at 15.00/75.00, real rate
     // 5.00/25.00"); the literal simply survived over here, where nothing was looking.
-    //
-    // A missing row means the cost is UNKNOWN, so the reservation is released rather than settled
-    // against a guess: the only thing worse than not charging is charging a number nobody derived.
     const price = await resolveTokenPrice(supabase, SUB_AGENT_MODEL);
     if (!price) {
       console.warn(`[sub-agent] no ai_model_pricing row for ${SUB_AGENT_MODEL} — releasing the reservation unsettled`);

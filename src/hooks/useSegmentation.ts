@@ -1,16 +1,4 @@
-/**
- * useSegmentation
- *
- * Automatically segments a 3D render when generation completes.
- * For each image it:
- *   1. Calls POST /api/images/segment  → zones with bbox
- *   2. Crops each zone using Canvas API → data URL
- *   3. Calls POST /api/rag/search per crop → matched materials
- *   4. Uploads each crop to Supabase Storage
- *   5. Persists everything to generation_3d_segments
- *
- * Results are loaded from DB on subsequent renders (no re-run needed).
- */
+/** useSegmentation */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';

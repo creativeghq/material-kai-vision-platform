@@ -1,32 +1,4 @@
-/**
- * Inbound Email Worker (Cloudflare Email Routing) — issue #342, §1.
- *
- * Mail for the receiving domain arrives here, gets stored as a raw `.eml` in private Supabase
- * Storage, and is handed to the `email-webhooks` edge function for routing.
- *
- * ── THE ONE RULE ────────────────────────────────────────────────────────────────────────────
- * This Worker resolves NO TENANCY. It never looks up a workspace, a user, an address row or a
- * thread, and it holds no database credential. A Cloudflare Worker lives outside this repo's
- * enforcement — no semgrep ruleset, no `check_security_invariants()`, no typecheck, no review
- * path — so every tenancy decision stays in the edge function, where invariant 1 is actually
- * enforced. `tests/security/inbound-email-isolation.test.ts` greps this file and fails the build
- * if `workspace_id` or a `user_email_addresses` lookup ever appears in it.
- *
- * Unknown recipients still get `setReject()` at SMTP time — but the Worker does not decide that.
- * It ASKS (`inbound_begin`) and relays the verdict. Knowing which addresses exist is a tenancy
- * fact; relaying a boolean is not.
- *
- * It also holds no service-role key. `inbound_begin` returns a short-lived signed upload URL
- * scoped to one object path, so the Worker's blast radius is "can upload one email" rather than
- * "full database access".
- *
- * Flow per message:
- *   1. recipient domain check          → setReject on anything else (cheap, no network)
- *   2. size cap                        → setReject (Cloudflare's own ceiling is 25 MiB)
- *   3. POST inbound_begin              → { accept, upload_url, storage_path } | { accept: false }
- *   4. PUT the raw stream to upload_url
- *   5. POST inbound_stored             → the edge function parses, gates and routes it
- */
+/** Inbound Email Worker (Cloudflare Email Routing) — issue #342, §1. */
 
 // Minimal ambient shapes for the Email Workers runtime. Declared inline rather than pulling in
 // @cloudflare/workers-types, so this directory stays dependency-free (wrangler bundles with

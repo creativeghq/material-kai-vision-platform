@@ -4,18 +4,7 @@ import { join } from 'node:path';
 
 import { stripComments } from '../helpers/stripComments';
 
-/**
- * A tenant never sends on the operator's credentials (#357 AE-1).
- *
- * CLAUDE.md states it for the whole BYOK set: "a tenant NEVER falls back to the operator's
- * master credentials." `resolveWorkspaceEmailSender` did exactly that — a workspace with
- * incomplete BYOK sent through the operator's Resend account and domain, and the only thing in
- * the way was an OPT-IN `requireWorkspaceSender` flag most callers never passed.
- *
- * The exposure is shared, which is what makes a silent fallback the wrong default: every
- * tenant's bounces, complaints and spam reports land on the operator's sending domain and
- * degrade deliverability for everyone else on it.
- */
+/** A tenant never sends on the operator's credentials (#357 AE-1). */
 
 const ROOT = join(__dirname, '..', '..');
 const code = (p: string) => stripComments(readFileSync(join(ROOT, p), 'utf8').replace(/\r\n/g, '\n'));

@@ -32,17 +32,7 @@ export {
 } from '@/utils/fixtureRuns';
 export type { FixtureRun, RunDef } from '@/utils/fixtureRuns';
 
-/**
- * Symbol-plan canvas — drives lighting_plan, plumbing_plan and electrical_plan.
- *
- * Backdrop is either an uploaded floor plan image OR a plain rectangle drawn
- * from user-typed room dimensions. The user picks a symbol type from the
- * palette, then clicks anywhere on the backdrop to place it. All symbols are
- * stored as normalized [0..1] coords so the PDF builder can re-place them on
- * any canvas size. The symbol palette is injected via `fixtureDefs` so the
- * same widget renders lighting fixtures or plumbing fixtures — the glyph set
- * mirrors the PDF builder's drawFixtureSymbol / drawPlumbingSymbol.
- */
+/** Symbol-plan canvas — drives lighting_plan, plumbing_plan and electrical_plan. */
 
 export interface FixtureDef {
   type: string;
@@ -562,13 +552,6 @@ export function FixtureSymbolCanvas({
                   onChange={(e) => setTitleBlock((tb) => ({
                     ...tb,
                     // Empty clears the stored date, falling back to render-time.
-                    //
-                    // Stored as the bare `YYYY-MM-DD` the input already gives us. It used
-                    // to be `new Date(value).toISOString()`, which round-tripped stably
-                    // through the `.slice(0, 10)` above and so was a smell rather than a
-                    // defect — but now that the auto-stamp writes a local date (#385
-                    // FN-6), two formats in one field is how the next reader picks the
-                    // wrong one.
                     date_iso: e.target.value || undefined,
                   }))}
                   className="h-7 text-xs"

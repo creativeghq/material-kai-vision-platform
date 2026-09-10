@@ -1,32 +1,4 @@
-/**
- * A flat-rate provider call must be able to say whether it worked.
- *
- * `ops.silent_zero`'s provider-failure arm asks "is this provider failing on essentially every
- * attempt", and it reads `ai_usage_logs.metadata->>'success'`. It skips a row without that key —
- * correctly, because a row that never learned its outcome cannot be judged.
- *
- * The consequence was invisible: `debitExternalServiceCredits` writes its row BEFORE the upstream
- * call (invariant 10 — debit first, so a refusal costs nothing), which means at insert time the
- * outcome is genuinely unknowable and the key cannot be set. So every flat-rate provider debited
- * that way is outside the probe's reach entirely. It caught Perplexity's `sonar` — 35 calls, 0
- * successes — only because MIVAA's Python logger records the outcome after the call. The
- * edge-side providers had no equivalent.
- *
- * Measured 2026-08-30: `metadata.success` coverage across `ai_usage_logs` reached 96% this week
- * (from ~27%), and the entire remainder was `dataforseo-request` and `firecrawl-scrape` — the two
- * debited through this path.
- *
- * ## What this change does and does NOT cover
- *
- * `dataforseo-spend-gate` is wired, and that single chokepoint covers EVERY `dataforseo_*`
- * operation without touching a call site — the gate already distinguishes "reported a cost"
- * from "reported none", which it calls a defect, so the verdict was there to be recorded.
- *
- * The other flat-rate callers of `debitExternalServiceCredits` are NOT yet stamped. That is
- * stated here rather than left implied: partial coverage nobody has written down is how a probe
- * gets trusted for more than it checks. The plumbing (`usage_log_id` +
- * `recordExternalServiceOutcome`) is what each of them needs, and it now exists.
- */
+/** A flat-rate provider call must be able to say whether it worked. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

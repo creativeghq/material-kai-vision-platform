@@ -2,29 +2,7 @@
 // Regenerate: npm run vocab:mirror (part of gen:all). Freshness is enforced by
 // tests/unit/vocabularyMirrors.test.ts, which fails the build on any drift.
 
-/**
- * The presentation-sheet value-sets, written ONCE (#391).
- *
- * `SheetType` was declared in six files — `MoodboardSheetsTab`, `moodboardSheetsService`,
- * three files inside `generate-moodboard-sheet-pdf`, and `presentation-sheet-tool` — with
- * twelve values each, agreeing only by memory. It is the largest duplication in the sweep
- * by copies × values.
- *
- * THE DATABASE IS THE ENFORCER
- * -----------------------------
- * `moodboard_sheet_type` is a Postgres ENUM, so an unknown value is rejected at the write
- * with a `22P02` naming a type the user has never heard of, and a value missing from a
- * copy simply never appears as an option. The set here equals the enum exactly, verified
- * against `pg_enum` on 2026-08-27 and pinned by `tests/unit/sheetVocabulary.test.ts`.
- *
- * Adding a sheet type is a migration AND an edit here, in one commit.
- *
- * THIS FILE IS IMPORT-FREE, ON PURPOSE
- * -------------------------------------
- * It is mirrored into `supabase/functions/` byte-for-byte by `npm run vocab:mirror`
- * (Vite resolves `@/`, Deno resolves by URL — one import and the mirror will not load).
- * Same-runtime consumers import THIS file.
- */
+/** The presentation-sheet value-sets, written ONCE (#391). */
 
 /**
  * Every sheet type, in the enum's own order.

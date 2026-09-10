@@ -1,30 +1,4 @@
-/**
- * `ai_usage_logs` provenance columns — the writer must be ABLE to fill them (#365 follow-up).
- *
- * THE SHAPE THIS EXISTS TO STOP, which this repo has now hit three times on the same table:
- *
- *   2026-08-12  `workspace_id` — the column existed, 19 of 31 edge insert sites never set it.
- *   #365 AD-15  `ai_call_logs.user_id/workspace_id` — the LOGGER had no fields for them, so no
- *               caller could have passed them however careful it was.
- *   this one    `ai_usage_logs.job_id` / `module_slug` / `product_id` — `debitExternalServiceCredits`
- *               is the writer behind 5,192 of the table's rows and its signature had nowhere to
- *               put any of the three.
- *
- * Every time, the column was fine, the data was consistent, nothing raised, and the loss was only
- * visible by counting. A missing key in an insert is valid TypeScript and a valid row.
- *
- * WHAT THIS ASSERTS. Only that the plumbing EXISTS — the parameter is accepted and reaches the
- * insert. It deliberately does not assert that every call site passes one: plenty of spend
- * genuinely has no background job (an interactive tool call is not a job), and a rule that forced
- * an id would get satisfied with an invented one, which is worse than a null.
- *
- * A note on what "unwritten" meant here, because the first diagnosis was wrong. MIVAA's
- * `ai_call_logger.py` DOES write `job_id` into its `ai_usage_logs` mirror. The column is empty
- * platform-wide for two other reasons: the edge writers had no parameter (fixed here), and
- * `background_jobs` is currently EMPTY, so the one pipeline that threads a real job id has not
- * produced a row. Absence of data is not absence of plumbing — worth checking in that order next
- * time.
- */
+/** `ai_usage_logs` provenance columns — the writer must be ABLE to fill them (#365 follow-up). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

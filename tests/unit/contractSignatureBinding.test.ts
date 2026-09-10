@@ -1,23 +1,6 @@
 /**
  * Guard: a signed contract's terms are settled, and its signature says WHAT was signed
  * (#356 `RC-1`, `RC-2`).
- *
- * Three facts only mattered together, which is why each had survived on its own:
- *   1. `update` had no status gate — `value`, `body_markdown`, dates and counterparty stayed
- *      editable after signature.
- *   2. The PDF re-rendered from live data onto a fixed path with `upsert: true`.
- *   3. `contract_signatures` recorded who and when, and nothing about what.
- *
- * So a buyer signs at €300,000, someone edits `value` to €330,000 and regenerates, and the new
- * file carries the OLD signature block against the NEW terms at the SAME URL. The previously
- * signed artifact no longer exists anywhere. Two people downloading "the signed contract" weeks
- * apart get different commercial terms under identical signature metadata, and the system
- * cannot answer which one was agreed to.
- *
- * The hash logic is exercised for real here rather than asserted over source text — it is
- * ordinary pure code and a canonicalisation that silently changes is the failure that matters.
- * The wiring (gates, immutable path) is checked against source, because it lives inside a Deno
- * handler this suite cannot invoke.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';

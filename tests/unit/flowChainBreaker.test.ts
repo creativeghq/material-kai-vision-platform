@@ -4,18 +4,7 @@ import { join } from 'node:path';
 
 import { stripComments } from '../helpers/stripComments';
 
-/**
- * A pair of flows triggering each other is bounded (#357 AE-3).
- *
- * `flow-engine` caps ONE flow at 120 runs/minute, which stops a flow that re-triggers itself. It
- * does nothing about the shape the audit describes: flow A fires on `event_a` and emits
- * `event_b`, flow B does the reverse, each stays far under its own cap, and the pair runs
- * indefinitely sending mail.
- *
- * The in-graph `visited` set cannot see it either — that prevents cycles WITHIN one execution,
- * and this chain leaves the process at every hop (action → row write → DB trigger → event → next
- * flow). The only thing every hop shares is the workspace the events are happening in.
- */
+/** A pair of flows triggering each other is bounded (#357 AE-3). */
 
 const ROOT = join(__dirname, '..', '..');
 const src = stripComments(

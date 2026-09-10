@@ -2,13 +2,6 @@
  * Layer B custom pricing rules. Applied at quote-time on top of the level discount
  * (multiplicative).
  *   • category_extra — a blanket extra % off a category, any customer
- *
- * `volume_category` was RETIRED in #347 phase 1.4 and must not come back here: the CHECK
- * constraint refuses it, so offering it would let an operator fill a form whose save fails on a
- * constraint error. "≥ N units of a category → % off" is now a category-scoped
- * `product_price_breaks` row, which resolves its threshold through `convert_to_base_unit` —
- * this rule compared the RAW quantity, so 5 pallets and 5 pieces matched the same threshold.
- * (cash_payment is schema-ready but surfaced once a payment-context hook exists, to avoid an inert rule.)
  */
 import React, { useEffect, useState } from 'react';
 import { Loader2, Plus, Trash2, SlidersHorizontal } from 'lucide-react';

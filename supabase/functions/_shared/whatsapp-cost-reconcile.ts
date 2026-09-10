@@ -1,21 +1,4 @@
-/**
- * Close the loop on the one cost this platform could not see.
- *
- * WhatsApp template messages are billed by Meta straight to the WABA. They never appear on
- * Zernio's invoice, so every figure in the product was priced off a seeded guess — and the guess
- * is what decides whether template resale runs at ~33% margin or at a loss.
- *
- * Meta exposes the answer itself: `GET /{WABA_ID}/pricing_analytics` returns COST and VOLUME by
- * country and pricing category. We already store the WABA id on the channel, so this reads the
- * real number back, writes it beside what we charged, and rewrites the rate table from it.
- *
- * Two things it refuses to smooth over:
- *  - Meta withholds COST for a WABA on a Solution Partner's credit line. That comes back as
- *    absent, not zero, and is recorded as `cost_available: false`. A zero-cost month and an
- *    unreported one look identical in a total and mean opposite things.
- *  - A rate is only rewritten from a meaningful sample. One delivered message in a country is an
- *    anecdote, and letting it overwrite the rate would make pricing lurch on noise.
- */
+/** Close the loop on the one cost this platform could not see. */
 import { resolveSecret } from './secrets.ts';
 
 // deno-lint-ignore no-explicit-any

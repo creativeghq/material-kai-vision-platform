@@ -35,14 +35,6 @@ const TabsList = React.forwardRef<
         // A VERTICAL rail (Finance's section nav) gets the rule on its trailing
         // edge instead, and no fixed height — a 36px-tall stack of 19 sections
         // is not a thing. Radix stamps data-orientation on the list itself.
-        //
-        // SCOPED TO `lg:` ON PURPOSE. Radix keeps `data-orientation="vertical"`
-        // at every width, so unscoped these six said "stack me" on a phone too —
-        // and each one is `[data-orientation=vertical]`-qualified, i.e. MORE
-        // specific than the `.section-rail` class that turns the rail into a
-        // strip, and emitted after it. The strip therefore came out with the
-        // column's stretch, no gaps and no bottom rule while looking like it had
-        // been fixed. Below `lg` the horizontal base above IS the strip.
         'lg:data-[orientation=vertical]:h-auto lg:data-[orientation=vertical]:flex-col lg:data-[orientation=vertical]:items-stretch lg:data-[orientation=vertical]:gap-0 lg:data-[orientation=vertical]:border-b-0 lg:data-[orientation=vertical]:border-r',
         className,
       )}
@@ -64,15 +56,6 @@ const TabsTrigger = React.forwardRef<
       // reaches every tab-shaped nav in the platform — Radix Tabs here, the
       // Finance vertical rail, and the hand-rolled strips that never imported
       // this file. What lives here is only the box: size, padding, focus.
-      //
-      // Why not a filled pill (what this used to be): a filled accent pill is
-      // the exact silhouette of a primary button, so "the section you are in"
-      // and "the button you should press" were the same object. An underline
-      // is a location marker and reads as one instantly.
-      //
-      // min-h-9 on mobile: the mobile stylesheet turns a tab row into a
-      // horizontal scroll strip, and a short target inside a scroll container
-      // gets swallowed as a drag instead of a tap.
       'relative inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap px-3 py-1.5 text-sm ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50 md:min-h-0',
       className,
     )}

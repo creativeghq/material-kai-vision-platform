@@ -1,23 +1,4 @@
-/**
- * Edge endpoint ↔ OpenAPI parity guard.
- *
- * `scripts/edge-endpoints.json` is the hand-maintained source of truth that
- * `scripts/build-openapi-edge.mjs` compiles into the PUBLIC spec at
- * public/api/openapi-edge.json. Nothing tied it to the functions that actually
- * exist, so deleting an edge function left its entry behind and the published
- * spec kept advertising a dead endpoint.
- *
- * That is exactly what happened: 51ff18b6 (web-scrape path) and 75e9e843 (3 dead
- * functions) removed 11 functions between them; all 11 stayed in the spec until
- * this guard was added. Two live functions were also missing from it.
- *
- * Invariants:
- *   1. Every spec entry maps to a real supabase/functions/<name> dir — a phantom
- *      endpoint in a public API spec is worse than an undocumented one.
- *   2. Every real function is in the spec, OR on the KNOWN_UNDOCUMENTED debt
- *      list — so a NEW function without docs fails CI.
- *   3. The debt list may only shrink.
- */
+/** Edge endpoint ↔ OpenAPI parity guard. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -30,26 +11,13 @@ const FUNCTIONS_DIR = join(ROOT, 'supabase/functions');
 // documenting each; never grow. A new undocumented function should fail instead.
 // Emptied: contracts-api and stock-api both gained spec entries, and the
 // "stays honest" assertion correctly failed until they were pruned. Keep at zero.
-// Emptied again: the Real Estate surfaces (api/public/feed + the buyer-digest and
-// rent-invoicing crons), the consolidated monitoring-cron, the moodboard dormancy pair and
-// crm-lead-score all gained spec entries. Keep at zero — a cron being internal is a reason to
-// document its auth and payload, not a reason to hide it from the spec.
 const KNOWN_UNDOCUMENTED = new Set<string>([]);
 
 interface EndpointEntry { name: string }
 
 const entries = (): EndpointEntry[] => JSON.parse(readFileSync(SPEC, 'utf8'));
 
-/**
- * Real function dirs. `_shared` (and any _prefixed dir) is library code, not an endpoint.
- *
- * An edge function is defined by having an `index.ts` entrypoint — NOT merely by being a
- * directory. `npm run typecheck:edge` runs `deno check --node-modules-dir=auto`, which
- * materialises `supabase/functions/node_modules/`; without this rule that directory is
- * read as an undocumented edge function and `npm test` fails. Two documented commands
- * that cannot both be run is a trap, so match `scripts/check-edge-functions.mjs`, which
- * already filters on `existsSync(index.ts)`.
- */
+/** Real function dirs. `_shared` (and any _prefixed dir) is library code, not an endpoint. */
 const functionDirs = (): string[] =>
   readdirSync(FUNCTIONS_DIR, { withFileTypes: true })
     .filter((d) => d.isDirectory() && !d.name.startsWith('_') && !d.name.startsWith('.'))

@@ -1,22 +1,6 @@
 import { destinationPhrases } from '@/config/appDestinations';
 
-/**
- * Turn "go to Profile → Social Accounts" into a link that actually goes there.
- *
- * Agent replies name places in the platform constantly — it is how a tool says "I cannot do this
- * part, you can". Naming a place and then not linking to it leaves the reader to hunt through a
- * seventeen-tab settings page for a tab whose exact wording they only half remember. The
- * destinations are already declared once (`src/config/appDestinations.ts`); this turns the words
- * into the link.
- *
- * Rewrites the MARKDOWN, not the DOM, so the result flows through the normal renderer and the
- * link is a link in saved history too.
- *
- * What it must never touch:
- *   • code — fenced blocks and inline spans (a path inside code is being quoted, not offered)
- *   • anything already bracketed — an existing `[label](url)`, or a bare `[label]`
- *   • raw URLs and HTML tags
- */
+/** Turn "go to Profile → Social Accounts" into a link that actually goes there. */
 
 const SEPARATOR_CLASS = '→|—>|->|›|»|▸|>';
 // Separator as it appears BETWEEN two named segments. Spaces and tabs only — NOT `\s`, which

@@ -1,17 +1,4 @@
-/**
- * Unit-of-measure conversion.
- *
- * The scenario these exist for: a 1200×2400 gypsum board is 2.88 m², invoiced by the square
- * metre, counted by the piece and shipped by the pallet. Before the ladder existed a supplier
- * line of 288 m² added 288 PIECES to the stock row, because `record_stock_movement` takes a bare
- * number and no unit. 288 is a perfectly valid quantity — no constraint, no typecheck and no
- * integrity probe could see that it was 2.88× wrong.
- *
- * Two properties matter more than the arithmetic:
- *   1. An unknown conversion returns NULL, never the input. A silent 1:1 fallback IS the bug.
- *   2. Rounding happens on the result, not the factor — 1/2.88 rounded first, times 288, is
- *      99.999936 boards.
- */
+/** Unit-of-measure conversion. */
 import { describe, it, expect } from 'vitest';
 import { convertToBase, convertPrice, availableUnits, type ProductUom } from '@/lib/uom';
 

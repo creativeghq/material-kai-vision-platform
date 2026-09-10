@@ -2,11 +2,6 @@
  * Messaging Channels Tab
  * Connect + manage WhatsApp sender numbers via Zernio (Meta Cloud API).
  * A channel = a connected Zernio WhatsApp account (WABA phone number).
- *
- * Connecting goes through Meta Embedded Signup, brokered by Zernio — the same one-click
- * flow the social accounts tab uses. No Meta access token is ever typed into this app.
- * Pasting WABA credentials by hand still exists behind "already have Meta credentials",
- * because Zernio documents that endpoint for server-to-server callers who hold them.
  */
 
 import React, { useState, useEffect } from 'react';

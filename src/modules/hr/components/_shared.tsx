@@ -72,16 +72,6 @@ export function filingTone(status: string): string {
 /**
  * HR's empty state — now a thin adapter over the platform `HubEmptyState` rather than a second
  * implementation of one.
- *
- * It had no `action` slot at all, across 42 call sites in 17 files. So the module's empty screens
- * described the way out in prose — "Create departments to organise your team", "Create a run — it
- * pulls active employees…", "Upload contracts, IDs, certificates" — and then made the reader go
- * find the button themselves. `hint` maps to `description`; `action` is the addition.
- *
- * `variant` is forwarded because the distinction is load-bearing: "you have no employees" offers
- * Add employee, "no employees match your filters" must offer Clear filters and NEVER the create
- * action — inviting somebody with 400 employees and a department filter set to add a 401st is how
- * duplicate people get onto a payroll.
  */
 export function EmptyState({
   icon,

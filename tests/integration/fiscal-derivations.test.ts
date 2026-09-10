@@ -2,41 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { hasCreds, serviceClient, createUser, createWorkspace, addMember, teardown, runId, type TestUser } from './_harness';
 
-/**
- * The fiscal derivation chain: quote → invoice → receipt → settlement.
- *
- * Every assertion here FAILS ON THE CODE AS IT SHIPPED, which is the point (#263: "every
- * audit/pentest finding gets a regression test that fails on the old code"). These are all SQL
- * functions, so nothing else in the suite can see them — `moneyDerivation.test.ts` scans repo
- * files and this project's SQL lives only in `pg_proc`, which is exactly how the upsell bug
- * survived a green build for months.
- *
- * What each test locks down, and what it looked like before (#271, #287):
- *
- *  1. `get_quote_totals` folds accepted upsells into the taxable base.
- *  2. `issue_invoice_from_quote` invoices the DERIVED total, not the cached `quotes.grand_total`
- *     that nothing recomputes when an upsell is accepted — the customer saw a Final including
- *     their extras and would have been invoiced the figure from before they accepted.
- *  3. `pos_issue_receipt` is ONE transaction. The old three-round-trip sequence raised on every
- *     sale (an `issued` invoice cannot take line inserts) AFTER committing a legal ΑΑΔΕ number,
- *     so every POS sale gapped the legal series. Its header must also equal Σ its lines — myDATA
- *     rejects a document whose lines do not foot.
- *  4. `get_order_settlements` must not add a USD allocation to a EUR order. It used to sum
- *     `amount` with no currency check, producing a figure in no currency at all.
- *  5. `amount_paid` is CASH; credit-note relief lands in `amount_credited`; `amount_due` nets
- *     both — so a credit-noted invoice neither reads as "paid in cash" nor reappears in aging.
- *  6. `issue_credit_note` caps CUMULATIVE credit at the invoice total (#351 B4). It used to check
- *     the request in front of it and nothing else, so crediting 6 of 10 and reopening the form —
- *     which defaulted back to all 10 — produced EUR 198.40 of transmitted legal documents against
- *     a EUR 124 invoice.
- *  7. `pos_issue_receipt` is idempotent on its client token (#351 C1). A retry after a dropped
- *     connection returned a SECOND receipt with its own legal number, its own payment and its own
- *     stock movement.
- *  8. `bill_time_entries_to_invoice` / `bill_trip_expenses_to_invoice` are ONE transaction and
- *     apply the filters their callers' doc comments always claimed (#351 S4/S2/S3). The TypeScript
- *     they replaced wrote the invoice, its lines and the source stamps as three separate calls, so
- *     a failure on the last one left the work billed and still marked unbilled.
- */
+/** The fiscal derivation chain: quote → invoice → receipt → settlement. */
 const suite = hasCreds ? describe : describe.skip;
 
 suite('fiscal derivations · quote → invoice → receipt → settlement', () => {

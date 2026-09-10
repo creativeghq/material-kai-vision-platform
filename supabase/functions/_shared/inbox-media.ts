@@ -11,24 +11,7 @@ import { fetchImageGuardedOrNull } from './fetch-image.ts';
 
 /** Where inbound MEDIA lands — the same bucket and prefix inbox-api writes outbound ones to. */
 export const INBOX_ATTACHMENT_BUCKET = 'generation-images';
-/**
- * Where inbound DOCUMENTS land — the private bucket the email path already uses.
- *
- * `generation-images` carries a MIME allowlist of image, video and 3D types, so Storage refused
- * every `application/pdf` and every spreadsheet a customer sent over WhatsApp: measured
- * 2026-09-05, all 15 WhatsApp file attachments on record were `fetch_failed` with no path,
- * while all 77 photos were stored. The failure was reported as "not downloaded yet", which
- * reads as the vendor's fault; it was ours. The orphan cron protects any bucket recorded on a
- * message, and the inbox signs URLs per bucket, so a document can live here without a second
- * reader of anything.
- *
- * The bucket is PRIVATE and the browser signs with the member's own JWT, so a storage policy has
- * to let the member see the object: `pdf_docs_inbox_thread_read` (storage.objects) admits
- * `inbox/<thread_id>/...` to whoever can read that thread — it is an EXISTS over inbox_threads
- * under the caller's role, so thread visibility stays the one rule. The email path had written
- * this prefix since it shipped with no such policy; no email attachment had ever been stored, so
- * nothing had hit it. Keep the path shape `inbox/<thread_id>/<file>` or the policy stops matching.
- */
+/** Where inbound DOCUMENTS land — the private bucket the email path already uses. */
 export const INBOX_DOCUMENT_BUCKET = 'pdf-documents';
 
 /** Media goes to the public image bucket; anything else to the private document bucket. */
@@ -135,20 +118,7 @@ export function extensionFor(contentType: string, fileName?: string): string {
 }
 
 
-/**
- * Store a counterparty's profile picture on their thread.
- *
- * Shared for the same reason as the media download above: TWO callers reach it — the webhook,
- * when a live payload happens to carry `conversation.participantPicture`, and messaging-api's
- * `sync-avatars`, which is the one that actually gets them.
- *
- * The picture is DOWNLOADED, never linked. A platform CDN url expires, and the api-hosted ones
- * need our bearer key, so a stored link renders as a broken square in the browser — the same
- * reason inbound media is pulled rather than referenced.
- *
- * Returns whether an image was actually stored, so a caller can report a real count instead of
- * assuming its own success.
- */
+/** Store a counterparty's profile picture on their thread. */
 export async function storeParticipantPicture(
   supabase: any,
   threadId: string,
@@ -195,22 +165,7 @@ export async function storeParticipantPicture(
 }
 
 
-/**
- * OUR OWN number's WhatsApp Business photo — the one customers see beside our messages.
- *
- * Separate from `storeParticipantPicture` because it is a different question with a different
- * endpoint: a business profile, not a conversation participant. Confusing the two is what made me
- * tell the operator their photo was unavailable — a counterparty's genuinely is withheld by Meta
- * unless the contact allows it, ours never was.
- *
- * Shared because BOTH `sync-channels` (which runs on connect) and `sync-avatars` need it, and one
- * copy of "download the profile photo into storage" is the rule the media path already learned.
- *
- * Returns the config fragment to merge, so the caller decides how it is written — `sync-channels`
- * folds it into the larger channel update it is already making, `sync-avatars` writes it alone.
- * `profile: null` means the lookup failed; a profile with `avatar_path: null` means the number
- * simply has no photo set, which is a different answer and only one of them is ours to fix.
- */
+/** OUR OWN number's WhatsApp Business photo — the one customers see beside our messages. */
 export async function fetchOwnBusinessAvatar(
   supabase: any,
   accountId: string,

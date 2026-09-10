@@ -1,16 +1,4 @@
-/**
- * One lighting rig, driven by the shared preset catalogue (#335).
- *
- * `LIGHTING_PRESETS` has existed and been usable in the material lighting viewer for a while —
- * natural daylight, golden hour, overcast, showroom spots, warm evening, night — each carrying its
- * HDRI, sun, ambient and any spot/point lights. Every OTHER 3D surface ignored it and hardcoded
- * three lights and the `apartment` environment, so a tenant could light a material sample the way
- * they wanted and had no say over the product viewer or the room they were planning.
- *
- * This is that catalogue rendered as a component, so the product viewer and the room planner light
- * their scenes from the same source instead of from literals. Nothing new is invented here; the
- * numbers are the ones already written down.
- */
+/** One lighting rig, driven by the shared preset catalogue (#335). */
 import React, { useEffect } from 'react';
 import { Environment } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';

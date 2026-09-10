@@ -51,19 +51,6 @@ export function createLogHelper(supabase: DbClient, runId: string) {
 // but historically never wrote to ai_usage_logs, so the Operations dashboard
 // underreported background-agent spend by 100%. Helper centralizes the insert
 // and is fire-and-forget — never blocks or breaks the agent's hot path.
-// Pricing comes from `ai_model_pricing` via `resolveTokenPrice`, the same resolver
-// ai-client.ts uses. It used to be a static table here, and the table was WRONG:
-// it priced `claude-opus-4-8` at $15/$75 while the database says $5/$25, so every
-// background-agent run reported 3x its real cost. Nothing could catch that — an
-// over-report is a plausible number, the agents ran fine, and the dashboard it fed
-// was the only place the figure was ever read.
-//
-// That is the second-price-surface failure CLAUDE.md names: `ai_model_pricing` is
-// the ONE USD source. A static mirror drifts the moment a rate changes, and this one
-// had also never learned that Opus 4.8 is not Opus-3-era pricing.
-//
-// An unresolvable model logs $0 rather than a guess — `resolveTokenPrice` returns
-// null and `get_ai_model_usage_coverage()` reports models that never reach a row.
 
 export async function logAgentAiUsage(
   supabase: DbClient,

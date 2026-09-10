@@ -3,11 +3,6 @@
  * extracted from a PDF document (via document_entities + products metadata)
  * and lets an admin one-click promote each one into the CRM as a Business
  * (crm_companies row, automatically flagged is_supplier=true).
- *
- * Match strategy: case-insensitive name comparison against crm_companies.name.
- * Same convention SupplierProductsTab uses on the other side of the link, so
- * what shows here as "Linked" will also surface that supplier's products on
- * the company detail page.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';

@@ -62,23 +62,7 @@ const LOW_CONFIDENCE = 0.5;
 const SUPPLIER_CODE_KEY_RE =
   /(taric|hs[_\s-]?code|hscode|cn[_\s-]?code|cncode|commodity[_\s-]?code|customs[_\s-]?code|tariff[_\s-]?code|combined[_\s-]?nomenclature|συνδυασμ|δασμολογ|τελωνειακ)/i;
 
-/**
- * What the model is asked for when a RULE was reachable but a fact was missing.
- *
- * This is the inversion that makes rule-driven classification work for everything, not just the
- * categories somebody remembered to map: the model supplies the FACT — "this is a sofa", "this
- * is water-based" — and the rules decide the tariff position from it.
- *
- * The split is deliberate and not merely stylistic:
- *   • form and material are PERCEIVABLE. A model reads them off a name, a description and a
- *     photo reliably, and a human can check the answer at a glance.
- *   • a tariff code is a LEGAL CONCLUSION, and a measured spec like water absorption is a lab
- *     result. Neither is perceivable, and a confident-sounding guess at either is exactly the
- *     failure this design exists to avoid.
- *
- * A perceived fact is also reusable: stored on the product, it feeds search, filters and any
- * later rule, where a one-off code answer helps nothing else.
- */
+/** What the model is asked for when a RULE was reachable but a fact was missing. */
 const FACT_SCHEMA = z.object({
   product_type: z.string().describe(
     'What the article IS, as a short lowercase noun — "sofa", "dining table", "wall tile", ' +
@@ -197,18 +181,7 @@ const PRODUCT_COLUMNS =
 // ── Stage A: a code the supplier already declared ──────────────────────────────────────────
 
 /** Flatten nested jsonb into `a.b.c` → scalar so a code can be found however deep it sits. */
-/**
- * Write a classification, and know whether it landed (#360 CB-17).
- *
- * Every write in this file was a bare `.update({...})` with the result
- * discarded — and the function then RETURNED the status it had meant to store. A CHECK violation
- * (`taric_source: 'category_rule'` was in no allowlist), an RLS refusal or a dropped connection
- * all produced the same thing: a caller told the product was `confirmed`, and a product that was
- * never classified. The silent-zero shape, on the one field that decides what gets declared to
- * customs.
- *
- * Throws, so the per-product catch records it as `failed` instead of reporting a success.
- */
+/** Write a classification, and know whether it landed (#360 CB-17). */
 async function writeClassification(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,

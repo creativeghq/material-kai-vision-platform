@@ -4,11 +4,6 @@ import { hasCreds, serviceClient, createUser, createWorkspace, addMember, teardo
 
 // Public careers API (`hr-careers`) — anonymous, so this calls it with NO Authorization header,
 // exactly as a logged-out visitor's browser does.
-// Exists because of a shipped regression: consolidating the `meta` and `get-job` selects onto one
-// shared column list silently dropped `description`/`requirements` from the detail response. The
-// API still returned 200 with a plausible-looking payload, so an eyeball check of the JSON passed
-// — the public page just rendered its "Full details coming soon" empty state on every role. A
-// contract assertion on the FIELDS, not the status code, is what catches that class of bug.
 const suite = hasCreds ? describe : describe.skip;
 
 const ANON_KEY = process.env.SUPABASE_ANON_KEY || '';

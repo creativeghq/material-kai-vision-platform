@@ -1,20 +1,4 @@
-/**
- * Binding a customer share link to the person it was issued for (#357 AE-12).
- *
- * `/i/:token` authorises by possession of a URL. That is fine for READING — the link is an
- * invitation, and challenging someone before they can see the conversation they were invited to
- * would make the feature useless. It is not fine for WRITING: `token_send_message` posts as the
- * contact the token is bound to, so a forwarded mail, a quoted reply chain or a shared mailbox
- * hands a stranger the ability to speak as the customer.
- *
- * So writing costs a one-time code, sent to the address the link was issued for, and the browser
- * then holds a short-lived proof. The proof is an HMAC rather than a stored session: there is no
- * row to leak and no table to reap, it expires on its own, and rotating the secret revokes every
- * outstanding one at once.
- *
- * The proof travels in the request body, NOT in the URL — the whole defect being fixed is a
- * credential that survives being pasted into an email.
- */
+/** Binding a customer share link to the person it was issued for (#357 AE-12). */
 
 /** How long a verified browser may keep writing before it is challenged again. */
 export const SENDER_PROOF_TTL_HOURS = 12;

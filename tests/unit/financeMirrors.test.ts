@@ -1,16 +1,4 @@
-/**
- * The two generated finance mirrors must be what `npm run finance:mirror` would produce.
- *
- * Both source modules answer a question a legal document depends on:
- *   • who it is addressed to (issue-time snapshot + separate billing identity), and
- *   • the legal ground for charging no VAT on a 0% line.
- *
- * The React preview and the pdf-lib generator run on different runtimes and cannot share an
- * import, so each answer exists twice. Hand-keeping the second copy is exactly what let the
- * printer read the LIVE CRM row while the myDATA transmission read the frozen snapshot — the
- * paper and the envelope disagreeing with nothing to surface it. The copies are generated
- * instead, and this test fails the build the moment one goes stale.
- */
+/** The two generated finance mirrors must be what `npm run finance:mirror` would produce. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

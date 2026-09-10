@@ -1,25 +1,4 @@
-/**
- * A paid module is enforced where the tool runs, not where the nav tile is drawn (#395).
- *
- * `_shared/entitlement.ts` states the doctrine in its own header: *module entitlement enforcement
- * at the API boundary is the real security line; nav and route guards are UX only.* An agent tool
- * IS an API boundary — it reaches the same tables the page does without passing the page's
- * `EntitlementGuard` — and half of them were not asking.
- *
- * MEASURED 2026-08-29: of the 19 tool files whose catalog entry declares a `moduleSlug`, 9 checked
- * entitlement and 10 did not. Five of the ten asked `modules.enabled` — the PLATFORM-WIDE publish
- * flag, true for everyone — which reads like a gate and refuses nobody. At that moment three of
- * the four non-root workspaces were not entitled to Catalogs, Deals, Expenses, Job Research,
- * Mention Monitoring or Price Monitoring, and could use all six by asking the agent. The nav tile
- * was hidden the whole time, which is precisely why nothing looked wrong.
- *
- * The same read found the mirror defect: the Expenses toolkit declared `moduleSlug: 'finance'`,
- * and there is no `finance` row in `public.modules` — the slug is `sales-finance` everywhere else
- * in the repo. `enabledModules.includes('finance')` is therefore false in every workspace, so the
- * toolkit was hidden from EVERYONE including the operator root, and none of its four tools has an
- * `AgentToolEntry`, so the command palette did not list them individually either. A whole feature
- * unreachable from both browse surfaces, by one wrong word.
- */
+/** A paid module is enforced where the tool runs, not where the nav tile is drawn (#395). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -162,22 +141,7 @@ describe('#395 — a paid module is enforced in the tool, not in the nav', () =>
   });
 });
 
-/**
- * The two halves of a paid module have to name each other.
- *
- * `moduleSlug` on the catalog cluster is what makes the PICKER hide a module this workspace has
- * not bought; `moduleGate(workspaceId, slug)` in the tool is what makes the REFUSAL real. The
- * checks above walk the declared slugs, which is exactly the wrong direction for the failure
- * that actually happened: the Quotes cluster declared NO slug, so `quotes` — `is_addon`,
- * `price_tier: 'pro'` — was absent from the checklist rather than failing it, and
- * `quote-tools.ts` asked nobody. A guard that derives what to check from the thing that is
- * missing reports clean by construction.
- *
- * So this reads the OTHER side: what the tool files actually gate on. A file that calls
- * `moduleGate(_, 'x')` says its feature is paid; the cluster holding its tools must say the same
- * slug, or the picker offers a paid cluster to a workspace the tool will then refuse — a starter
- * that exists only to return `not_entitled`.
- */
+/** The two halves of a paid module have to name each other. */
 describe('a paid module is named on BOTH sides', () => {
   const EXEMPT: Record<string, string> = {
     // The seven SEO clusters gate on `seo-toolkit` inside dataforseo-spend-gate.ts and declare no

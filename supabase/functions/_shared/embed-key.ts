@@ -1,22 +1,4 @@
-/**
- * Embed-key authentication for the public embed surface (#321 M1, #258).
- *
- * The one place a `material_kai_keys` row turns into a workspace. Every public embed endpoint
- * goes through `authenticateEmbedKey` and uses the workspace it returns — the key IS the tenancy
- * binding, so no embed request ever reads a workspace id from a body, a query param or a header
- * (CLAUDE.md invariant 1: the caller does not get to name its own tenant).
- *
- * Three gates, cheapest first:
- *   1. the key resolves to an active, unexpired row        → else 401
- *   2. the browser's Origin is in that key's allowlist      → else 403
- *   3. the key is under its per-minute quota                → else 429
- *
- * Gate 2 binds browsers only and gate 3 binds everyone; see the note in `_shared/cors.ts` on why
- * that is the honest reading of a publishable key rather than a gap.
- *
- * All three refusals are CORS-READABLE by design — see `readableRefusal`. Only responses that
- * carry product data use the strict per-key headers.
- */
+/** Embed-key authentication for the public embed surface (#321 M1, #258). */
 import type { DbClient } from './supabase-client.ts';
 import { embedCorsHeaders } from './cors.ts';
 
@@ -38,18 +20,7 @@ export interface EmbedKeyContext {
   cors: Record<string, string>;
 }
 
-/**
- * Combine id restrictions, where `null` means "no restriction" and `[]` means "nothing matches".
- *
- * That distinction is the whole reason this is a named, tested function rather than an inline
- * `&&`. The two values are both falsy-ish to a reader, they are one keystroke apart, and getting
- * them backwards fails in opposite and equally silent directions: treating `[]` as "unrestricted"
- * serves the ENTIRE catalog through a scoped key, and treating `null` as "nothing" serves an empty
- * shelf through a working one. Neither raises.
- *
- * Intersection, not union — every restriction present must hold (a key scoped to a category, asked
- * for only_3d, gets the products that are both).
- */
+/** Combine id restrictions, where `null` means "no restriction" and `[]` means "nothing matches". */
 export function intersectIdFilters(...filters: (string[] | null)[]): string[] | null {
   const present = filters.filter((f): f is string[] => f !== null);
   if (present.length === 0) return null;
@@ -76,22 +47,7 @@ export function readEmbedKey(req: Request): string | null {
   return null;
 }
 
-/**
- * A refusal the CALLING PAGE CAN READ.
- *
- * This deliberately carries permissive CORS, which is the opposite of what it did first — and the
- * first version was wrong in a way only running it revealed. A browser cannot read the status of a
- * CORS-blocked response: `fetch` rejects with a bare `TypeError: Failed to fetch`. So refusing
- * opaquely collapsed "your key is invalid", "this site is not on the allowlist" and "the network
- * is down" into one indistinguishable failure, and the widget's message for the most likely
- * integration mistake was literally unreachable code.
- *
- * Answering readably is safe, and does NOT make the allowlist advisory. The allowlist protects
- * PRODUCT DATA, and every response that carries product data still uses the strict per-key headers
- * from `embedCorsHeaders`. A refusal carries no tenant data at all — only the fact of the refusal,
- * which the caller already knows because their request failed. It grants no capability a plain
- * `curl` did not already have, since CORS binds browsers and nothing else.
- */
+/** A refusal the CALLING PAGE CAN READ. */
 function readableRefusal(req: Request, message: string, status: number): Response {
   return new Response(JSON.stringify({ error: message }), {
     status,

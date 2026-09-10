@@ -55,25 +55,7 @@ interface Props {
   onEdit: () => void;
 }
 
-/**
- * DEAL DRAWER — everything about one deal without leaving the board.
- *
- * A pipeline card can hold a title, a party and a number. Everything else a person needs before
- * they pick up the phone — what was agreed last time, where it has been, what it is worth, who
- * owns it — used to require navigating away to the deal page and losing the board. A side drawer
- * keeps the column in view, which is what makes it usable while working a list.
- *
- * ── The note rule ───────────────────────────────────────────────────────────────────────────
- * A note typed here is written against the deal's CONTACT or COMPANY, with `deal_id` recording
- * where it was typed. One row, not two. That means it shows up on that party's CRM record page
- * automatically — `crm_record_timeline` already reads `crm_notes`, so nothing there had to change
- * — while the deal can still show the subset written against it.
- *
- * The tempting alternative is a `deal_notes` table plus a copy onto the party. That gives you two
- * rows that say the same thing until somebody edits one, and then a permanent question about
- * which is true. The drawer says out loud where the note is going, because a note that silently
- * lands on someone's CRM record is a surprise the first time it is discovered.
- */
+/** DEAL DRAWER — everything about one deal without leaving the board. */
 export const DealDrawer: React.FC<Props> = ({ deal, stages, canManage, onClose, onChanged, onEdit }) => {
   const { toast } = useToast();
   const [notes, setNotes] = useState<CrmDealNote[] | null>(null);

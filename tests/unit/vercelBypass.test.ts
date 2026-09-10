@@ -1,15 +1,4 @@
-/**
- * The deployment-protection bypass used by the route-load smoke.
- *
- * This is guarding a gate, so the thing worth testing is the failure mode rather than the happy
- * path. `fe-smoke` now runs against an unaliased `*.vercel.app` production candidate and decides
- * whether `promote` releases it. That candidate sits behind Vercel SSO, so without the bypass
- * header every request is served the login page — which renders cleanly, has no error boundary
- * and logs no console errors. All 42 route assertions would PASS and a broken build would be
- * promoted.
- *
- * So "no secret" must be a hard failure and never a quiet empty header set.
- */
+/** The deployment-protection bypass used by the route-load smoke. */
 import { describe, it, expect, afterEach } from 'vitest';
 import { bypassHeaders } from '../e2e/vercelBypass';
 

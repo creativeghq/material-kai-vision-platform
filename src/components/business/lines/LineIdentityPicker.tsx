@@ -1,17 +1,4 @@
-/**
- * Which variant is this line? (#347 phase 5.2)
- *
- * One picker, used by the order line AND the quote line, because they answer the same question
- * and the moment they answer it differently the platform has a fifth vocabulary for "which one".
- *
- * The fields are whatever the registry calls identity for this product's category — never a
- * hardcoded size/colour pair. That pair is what the quote line carried before, which is exactly
- * why an order could not record a finish, a wood type, or a bowl shape.
- *
- * It renders as a single inline control rather than a column per field: a tiles product has
- * 22 identity fields today, and a table row cannot hold 22 selects. The resolver already
- * withholds fields with only one possible value, so what opens here is the set of REAL choices.
- */
+/** Which variant is this line? (#347 phase 5.2) */
 import React, { useEffect, useState } from 'react';
 import { ChevronDown, PackageCheck } from 'lucide-react';
 

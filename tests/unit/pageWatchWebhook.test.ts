@@ -1,30 +1,4 @@
-/**
- * Page-monitoring guards (#331).
- *
- * WHY THIS FILE EXISTS
- * --------------------
- * Firecrawl does not sign its webhooks. No HMAC, no signature header, no timestamp.
- * The only authentication the provider offers is `webhook.headers` — values we hand
- * them at monitor-creation time and they echo back. So one shared secret, compared
- * correctly, in the right ORDER, is the entire boundary between the public internet
- * and a tenant's change log.
- *
- * That makes the usual "verify the signature" advice untestable here and the ordering
- * invariant unusually load-bearing. Three specific ways this breaks, none of which a
- * typecheck or an integration test on the happy path would notice:
- *
- *   1. The secret is unset in an environment and the handler falls through to
- *      processing. Everything looks fine — deliveries succeed — while anyone who
- *      knows the URL can write diffs and fire notifications into any workspace.
- *   2. The body is parsed, or worse a row is written, BEFORE the comparison. The
- *      check is present, reads as correct in review, and guards nothing.
- *   3. `provided === expected`. Functionally identical, and behind an unsigned
- *      webhook there is no second factor to fall back on when the prefix leaks.
- *
- * SCOPE. These scan repo files, so they cover the TypeScript half only. RLS on
- * `page_watches` / `page_watch_changes` lives in the database and is invisible here;
- * a green run says nothing about it.
- */
+/** Page-monitoring guards (#331). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -204,19 +178,9 @@ describe('page-watch CRUD — tenancy and spend', () => {
 describe('the Firecrawl wire contract — pinned to what the live API accepts', () => {
   /**
    * WHY THESE EXIST
-   * ---------------
    * Every one of these was got WRONG in the first version of this feature, which
    * was written from the Monitoring docs and shipped behind a module that was off,
    * so nothing ever exercised it. Verified against the live API on 2026-08-16:
-   *
-   *   • `webhook` is top-level. Under `notification` the create returns 400
-   *     `Unrecognized key in body` — so every watch creation failed, 100%.
-   *   • the update method is PATCH. `PUT /v2/monitor/{id}` is not a route.
-   *   • there is no `enabled` key; pausing is `status: 'paused' | 'active'`.
-   *
-   * A wrong verb and a misplaced key are both perfectly typed and perfectly
-   * reviewable. Only the provider can say they are wrong, and it only says so at
-   * runtime — which is why they are pinned here instead of trusted.
    */
   const src = code(read(CRUD));
 

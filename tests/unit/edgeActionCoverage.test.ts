@@ -1,30 +1,4 @@
-/**
- * Every ACTION an edge function dispatches on is in the public OpenAPI spec.
- *
- * `edgeEndpointsCoverage.test.ts` guards the FUNCTION list: a function without a spec entry, or a
- * spec entry without a function, fails the build. Nothing guarded the layer below it, and that is
- * where the spec actually lived — these are action-discriminated handlers, so `POST /inbox-api`
- * being "documented" says nothing about whether its 44 actions are.
- *
- * They largely were not. Measured 2026-08-29, before this guard existed:
- *
- *     mivaa-gateway      36 of 116 documented
- *     real-estate-api    65 of 96, plus 7 documented actions deleted from the code
- *     inbox-api          20 of 44
- *     messaging-api      12 of 37
- *     zernio-api          8 of 20
- *     stripe-api          2 of 9
- *     pinterest-api       3 real, 8 documented — the whole OAuth half had been deleted and the
- *                         public spec kept advertising get_auth_url / callback / get_boards /
- *                         get_board_pins / disconnect
- *
- * 115 actions were missing and 13 were fictional. None of it was visible from anywhere: an
- * undocumented action works perfectly for whoever already knows it exists, and a documented one
- * that no longer exists fails only for the integrator who believed the spec.
- *
- * This runs in both directions, because they are different bugs. Undocumented is a gap; documented
- * -but-absent is a promise the platform cannot keep.
- */
+/** Every ACTION an edge function dispatches on is in the public OpenAPI spec. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -105,12 +79,6 @@ function codeActions(fnName: string): Set<string> {
     // `switch (action)` and `switch (String(action))` — the identifier must be EXACTLY `action`.
     // flow-engine's `actionType`, and the `operator` / `conditionType` switches beside it, are
     // different vocabularies.
-    //
-    // The block is delimited by INDENTATION, not by counting braces. Counting them looked right
-    // and was not: comments are blanked, but string and template literals are not, so a lone `{`
-    // or `}` inside one closes the block early. That is what it did to messaging-api — the
-    // counter finished 1,500 lines short and reported ten live actions as fictional. Indentation
-    // is reliable here because eslint enforces it, and it cannot be thrown by a string.
     const lines = src.split('\n');
 
     /**
@@ -199,21 +167,7 @@ describe('edge action ↔ OpenAPI coverage', () => {
     ).toEqual([]);
   });
 
-  /**
-   * The two directions need DIFFERENT strictness, which is why they are not one test.
-   *
-   * Finding an UNDOCUMENTED action means knowing exactly what the dispatcher routes, so that half
-   * parses the dispatch. Finding a FICTIONAL one does not: these functions discriminate on
-   * `action`, `body.action`, `mode`, `path[0]` and a `Record` of handlers, and chasing every
-   * dialect precisely produced false positives on five functions whose actions were all real —
-   * a guard that cries wolf about live endpoints gets muted, and then it is guarding nothing.
-   *
-   * So this half asks only: does the name appear as a string literal in the function's source?
-   * Weak, and enough — it is exactly the state pinterest-api was in. Its OAuth half was deleted
-   * outright, so `get_auth_url` / `callback` / `get_boards` / `get_board_pins` / `disconnect`
-   * survived only in one comment saying they were gone, while the public spec still advertised
-   * all five. Comments are blanked, so that is caught.
-   */
+  /** The two directions need DIFFERENT strictness, which is why they are not one test. */
   it('every action in the spec appears in the function that claims to route it', () => {
     const ghosts: string[] = [];
     for (const entry of dispatching) {

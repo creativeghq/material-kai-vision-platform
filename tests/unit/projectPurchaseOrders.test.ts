@@ -1,23 +1,4 @@
-/**
- * Made-to-order items becoming real purchase orders (#378 C2).
- *
- * Before this, a door or a window carried a supplier, a spec and a price and produced a PDF that
- * got emailed. That was the whole path — so the committed cost was invisible to the job's P&L,
- * nothing could be received against them, three-way match had nothing to match, and the supplier
- * could not acknowledge or give an ETA through the portal they already have. On the longest-lead,
- * most expensive items on the job.
- *
- * This CALLS the planner rather than grepping the service, because grouping and exhaustiveness are
- * behavioural properties. A text guard has already failed this codebase twice by accepting a
- * same-shaped helper in place of the real one.
- *
- * What it protects, in order of expense:
- *   1. An item silently dropped. "3 ordered" while the fourth is left behind is discovered on
- *      fitting day, which is the most expensive day to discover it.
- *   2. Two currencies on one order. One order carries one currency; converting silently is the
- *      money bug this platform keeps finding.
- *   3. The same door ordered twice.
- */
+/** Made-to-order items becoming real purchase orders (#378 C2). */
 import { describe, it, expect } from 'vitest';
 import { planPurchaseOrders, type PurchaseItemForOrder } from '@/modules/projects/utils/purchaseOrders';
 

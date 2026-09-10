@@ -6,20 +6,6 @@ import { cn } from '@/lib/utils';
 /**
  * TAG — a squared, low-saturation label. Not a pill, and not a solid block of
  * brand colour.
- *
- * Two rules this encodes:
- *
- *  - **Shape separates label from action.** Buttons are squared with a 4px
- *    radius; a tag is squared with 2px. When both were pills, a toolbar of
- *    chips and buttons had no readable grammar.
- *  - **A status is tinted, not filled.** A saturated fill has the visual weight
- *    of a primary button, so a table with a status column read as a table with
- *    a button in every row. Semantic variants are a pale tint + a deep text
- *    colour + a matching hairline, which is legible at 11px and still lets the
- *    row's own text stay the loudest thing in the row.
- *
- * `default` (solid accent) survives for the one case that wants weight: a count
- * badge on a nav item.
  */
 const badgeVariants = cva(
   'inline-flex items-center gap-1 rounded-xs border px-1.5 py-0.5 text-xs font-semibold leading-4 transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1',

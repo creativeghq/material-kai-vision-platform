@@ -1,22 +1,4 @@
-/**
- * The script that decides which prompts are "never read" must not under-detect (#347 phase 3P).
- *
- * `scripts/prompt-readers.mjs` derives `prompts.used_in` from loader CALL SITES, and
- * `ops.prompt_never_read` reports any active prompt it did not attribute. So an extractor that
- * misses a call site does not fail — it manufactures a finding, and a probe that cries wolf gets
- * ignored and then switched off.
- *
- * Two ways it under-detected, both found 2026-08-30 by running it:
- *
- *  1. **`TS_LOADERS[fn]` inherited from `Object.prototype`.** Any call ending in `.toString`
- *     (`validateUrl.toString()`) resolved to a real function, was invoked as
- *     `Object.prototype.toString.call(args)`, returned the string `"[object Array]"`, and
- *     destructuring a STRING gave its characters — prompt_type `"["`, category `"o"`. The guard
- *     caught it, so nothing was mis-attributed; what it cost was noise on every run, and that
- *     noise hid (2).
- *  2. **`PROMPT_TYPES` had drifted from the database.** `embed` and `system` are both in use and
- *     were both missing, so every loader call for them was dropped silently.
- */
+/** The script that decides which prompts are "never read" must not under-detect (#347 phase 3P). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';

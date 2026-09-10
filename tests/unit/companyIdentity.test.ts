@@ -1,22 +1,4 @@
-/**
- * One way to add a business.
- *
- * "Create a company" was implemented three times, and the record you got depended entirely on
- * which screen you happened to be on:
- *   • CRM → Add company        — ΑΑΔΕ → ΓΕΜΗ → web research, ~25 populated columns
- *   • Expenses → payee         — name + two booleans
- *   • Invoices → add client    — name + an UNVERIFIED VAT + email, and that VAT goes on a
- *                                fiscal document and into myDATA
- * Same table, same counterparty, three different depths of record. The stored data is valid in
- * every case, so no integrity check and no typecheck can see it — the second and third surfaces
- * just quietly produce a worse CRM.
- *
- * `CompanyIdentityLookup` is now the one control and `QuickAddCompanyDialog` the one writer.
- * This test pins:
- *   1. the payload/dedupe derivations (pure, and each rule below was a real bug), and
- *   2. that the create-a-business surfaces still route through the shared control — the drift
- *      here is a FOURTH hand-rolled quick-create, which is exactly how we got three.
- */
+/** One way to add a business. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -53,10 +35,6 @@ describe('normalizeVat — one key, not a list of guessed spellings (#353 CRM-4)
    * against the RAW `vat_number` column. Enumerating what a human might type is unbounded, and
    * it missed the ordinary case: a row saved as `GR 800 370 260` is none of the three, so the
    * probe said "no duplicate" and the business was created twice.
-   *
-   * Vectors below are `public.crm_vat_norm()` output captured from the live database
-   * 2026-08-28. Re-capture with:
-   *   select t, public.crm_vat_norm(t) from (values ('…')) v(t);
    */
   const VECTORS: Array<[string | null, string | null]> = [
     ['800370260', '800370260'],

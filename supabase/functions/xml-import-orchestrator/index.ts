@@ -12,31 +12,21 @@ import {
   type MappingSuggestion,
 } from '../_shared/xml-field-dictionary.ts';
 
-// ---------------------------------------------------------------------------
 // XML parser setup
 // The previous implementation relied on deno_dom's DOMParser in `text/html`
 // mode, which silently accepted malformed XML and normalized all tag names to
 // lowercase. fast-xml-parser gives us a proper XML parser with explicit
 // configuration over casing, array coercion, and attribute handling.
-// ---------------------------------------------------------------------------
 const PRODUCT_ARRAY_TAGS = new Set([
   'product', 'item', 'material', 'producto', 'articulo', 'produit',
 ]);
 const CATEGORIES_CATEGORY_JPATH_SUFFIX = '.categories.category';
 
-// ---------------------------------------------------------------------------
 // Safety envelope
 // Supabase Edge Functions run on Deno Deploy with a 256 MB memory cap and ~2 s
 // of synchronous CPU per invocation. fast-xml-parser builds a full DOM in JS
 // memory (~2–5× the XML byte size) and holds the parsed products array until
 // they've been chunk-inserted into data_import_job_products. That's the true
-// memory ceiling here; after chunk-insert the edge function is done and the
-// Python side page-reads products by index without ever holding all of them.
-// Tunable via env vars (set on the Supabase edge-function deployment):
-//   XML_IMPORT_MAX_MB          — raw decoded XML size cap
-//   XML_IMPORT_MAX_PRODUCTS    — product count cap per import
-//   XML_IMPORT_INSERT_CHUNK    — rows per product-batch INSERT to PostgREST
-// ---------------------------------------------------------------------------
 function envInt(name: string, defaultValue: number, min: number = 1): number {
   const raw = Deno.env.get(name);
   if (!raw) return defaultValue;
@@ -70,21 +60,6 @@ const xmlParser = new XMLParser({
 type XmlNode = Record<string, any>;
 
 // A DOCTYPE declaration is refused outright (#363 `EE-15`).
-//
-// Supplier XML is the platform's largest untrusted-input surface, and a DOCTYPE's internal
-// subset is the only place a document may declare its own entities. That is the billion-laughs
-// vector: a handful of nested `<!ENTITY>` definitions expand to gigabytes inside a 256 MB
-// isolate, and the expansion happens AFTER the MAX_XML_BYTES check, so a 25 MB document that
-// passes the size cap can still exhaust memory. fast-xml-parser 4.5.0 takes `processEntities`
-// as a plain boolean and offers none of the expansion limits (`maxTotalExpansions`,
-// `maxExpandedLength`) that later majors added, so there is no configuration that bounds it.
-//
-// Rejecting the DOCTYPE rather than setting `processEntities: false` is deliberate: turning
-// entity processing off would also stop decoding `&amp;`/`&lt;`, which real supplier feeds use
-// constantly, silently corrupting product names. Predefined entities and numeric character
-// references need no DOCTYPE, so refusing one costs legitimate feeds nothing while removing
-// custom entities entirely — including any EXTERNAL entity declaration, which closes classic
-// XXE by construction regardless of what a future parser version chooses to resolve.
 const DOCTYPE_RE = /<!DOCTYPE/i;
 
 /** Parse an XML string into a plain-object tree with lowercased tag names. */
@@ -132,12 +107,6 @@ function findProductNodes(doc: XmlNode): XmlNode[] {
  * Read the text value of a named child element from a product node.
  * Matches the old `getElementText` contract: returns undefined when missing
  * or blank, returns trimmed string otherwise.
- *
- * Handles the four shapes fast-xml-parser can produce for a child:
- *   - string (simple text content)
- *   - { '#text': string, ...attrs } (element with attributes or mixed)
- *   - array of either of the above (when multiple siblings with same tag)
- *   - number/boolean (we disabled parseTagValue, but guard anyway)
  */
 function getText(node: XmlNode | undefined, tagName: string): string | undefined {
   if (!node) return undefined;
@@ -341,23 +310,7 @@ function detectXMLFields(xmlContent: string): {
   return { fields: out, total_rows: productNodes.length };
 }
 
-/**
- * Hybrid field-mapping suggester.
- *
- * Architecture (see `_shared/xml-field-dictionary.ts`):
- *   1. Dictionary first — `classifyFields` buckets every detected tag into
- *      confident / ambiguous / unknown based on `AI_BYPASS_CONFIDENCE`.
- *   2. AI only for the residual — `ambiguous` + `unknown` get sent to Haiku
- *      in a single batched prompt. Confident dictionary hits are returned
- *      as-is, no API call.
- *   3. Cheap model — Haiku (claude-haiku-4-5) is plenty for "which target
- *      does this XML tag map to". Opus would be ~20× the cost for marginal
- *      gain on a simple categorization task.
- *
- * To extend coverage for a new language or supplier: edit the dictionary
- * file, NOT this function. The dictionary is shared across edge functions
- * and gets first crack at every field.
- */
+/** Hybrid field-mapping suggester. */
 /**
  * The forced tool for the residual-field classifier (invariant 9).
  *
@@ -499,8 +452,6 @@ async function suggestFieldMappings(
       // replaces was free-form text plus `content.match(/\{[\s\S]*\}/)` — a salvage regex
       // that takes the first `{` to the last `}` and hopes. That greedy span happily
       // swallows a preamble's example JSON, and any shape that parses is accepted: a
-      // confidence of "high", a mapping of `null`, an object where a number belongs. Same
-      // defect class as document_classifier.py and consensus_validator.py in mivaa#12.
       tools: [FIELD_MAPPING_TOOL],
       tool_choice: { type: 'tool', name: FIELD_MAPPING_TOOL.name },
     }, { task: 'xml_field_mapper', userId: userId ?? undefined, workspaceId });
@@ -1121,10 +1072,6 @@ function invertMappings(mappings: Record<string, string>): Map<string, string[]>
  *   2. If none yielded a value, fall back to manualValues[target] with
  *      source='default'.
  *   3. Otherwise undefined / source='missing'.
- *
- * This is the chokepoint that implements the "Fill-the-Gaps" semantics: a
- * mapped-and-present row keeps its real data; a mapped-but-empty or unmapped
- * row gets the operator's job-level default.
  */
 function resolveTargetValue(
   node: XmlNode,
@@ -1158,9 +1105,6 @@ const STRUCTURAL_TARGET_FIELDS = [
 // these as top-level on product_data (data_import_service.py:599, 605, 678).
 // Anything mapped to one of these targets MUST land both at the top level AND
 // in metadata under the canonical target name, so:
-//   (a) properties.price / properties.dimensions JSONB writes find the value
-//   (b) the text-embedding concat picks it up
-//   (c) facet canonicalization sees the whitelisted key
 const ATTRIBUTE_TARGET_FIELDS = [
   'price', 'color', 'colors', 'dimensions', 'size',
   'designer', 'collection', 'finish', 'material',
@@ -1444,17 +1388,6 @@ function validateProducts(products: ProductData[]): { valid: boolean; errors: st
 /**
  * Create the data_import_jobs row AND chunk-insert the products into the
  * child table data_import_job_products.
- *
- * We do NOT store the products array on data_import_jobs.metadata anymore.
- * That previously forced the entire array to live as a single JSONB blob
- * which the Python side had to load into memory before batching. With a
- * child table, the Python service pages through products with
- * `batch_size` rows per fetch and never holds more than one batch in memory.
- *
- * Products are batched into chunks of PRODUCT_INSERT_CHUNK_SIZE rows per
- * INSERT. The chunk size is a tradeoff between round-trip count and
- * individual payload size — 100 rows × ~5 KB = ~500 KB per INSERT, well
- * under the PostgREST default body limit.
  */
 const PRODUCT_INSERT_CHUNK_SIZE = envInt('XML_IMPORT_INSERT_CHUNK', 100);
 

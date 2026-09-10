@@ -4,18 +4,7 @@ import { join } from 'node:path';
 
 import { stripComments } from '../helpers/stripComments';
 
-/**
- * CRM tenancy (#353 CRM-5/6/9).
- *
- * All three are the pattern CLAUDE.md names as the recurring root cause of pentest #250 —
- * "service-role client + trust a body-supplied id" — reached three different ways:
- *
- *  • CRM-5 asked the RIGHT question of the WRONG subject: "may the caller see this contact"
- *    instead of "is this contact in the same tenant as this company".
- *  • CRM-6 asked no tenancy question at all, and its stand-in (`created_by`, or a GLOBAL account
- *    tier) is not one.
- *  • CRM-9 took the tenant for billing straight from the request body.
- */
+/** CRM tenancy (#353 CRM-5/6/9). */
 
 const ROOT = join(__dirname, '..', '..');
 const code = (p: string) => stripComments(readFileSync(join(ROOT, p), 'utf8').replace(/\r\n/g, '\n'));
@@ -31,9 +20,6 @@ describe('#353 CRM-5 — a contact cannot be attached across tenants', () => {
     // `contactInScope` said yes to a contact from any of them. A caller in workspaces A and B
     // could attach one of B's contacts to a company in A — and GET /companies/{id} returns
     // nested contact name, email and phone, so B's PII became readable by every member of A.
-    // Searched FORWARD from the branch, because `crm_company_contacts` is also read by the GET
-    // handler earlier in the file — anchoring on its first occurrence sliced an empty string,
-    // and an empty string satisfies nothing, so the case would have failed for the wrong reason.
     const from = src.indexOf('let createdContactId');
     const branch = src.slice(from, src.indexOf("from('crm_company_contacts')", from));
     expect(branch.length, 'the attach branch slice is empty — the anchors moved').toBeGreaterThan(200);

@@ -5,9 +5,6 @@
  *   - optional "your KB price is at the Nth percentile" callout when a KB
  *     proposal is present
  *   - collapsible list of the individual retailer hits (cheapest first)
- *
- * Stateless on the backend — does NOT enroll the product into monitoring.
- * Reuses the monitoring cache if the product is already monitored (≤6h old).
  */
 
 import React, { useMemo, useState } from 'react';

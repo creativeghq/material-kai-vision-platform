@@ -11,14 +11,6 @@ import { taricService, formatTaricCode, type TaricCode } from '@/services/taricS
 /**
  * Searchable TARIC commodity-code picker, replacing the free-text boxes that used to accept
  * anything at all.
- *
- * Only declarable lines (product line suffix 80) are offered — an intermediate line is real
- * nomenclature but cannot appear on a declaration, so offering it would just move the rejection
- * from here to the border. A code already stored on the record is resolved on mount so a value
- * that has since expired or was typed by hand before this picker existed shows as unrecognised
- * instead of silently looking fine.
- *
- * `value` is the 10-digit code (digits only) or '' when unset.
  */
 export const TaricCombobox: React.FC<{
   value: string;

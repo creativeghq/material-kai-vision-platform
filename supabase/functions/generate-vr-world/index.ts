@@ -1,14 +1,4 @@
-/**
- * Generate VR World Edge Function
- *
- * Orchestrates WorldLabs Marble API to generate explorable 3D worlds
- * from interior design images. Handles:
- * 1. Image upload to WorldLabs
- * 2. World generation via Marble API
- * 3. Polling for completion
- * 4. Storing asset URLs in vr_worlds table
- * 5. Credit debit/refund
- */
+/** Generate VR World Edge Function */
 
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../_shared/http.ts';
@@ -276,13 +266,6 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
     const assets = extractAssetUrls(world);
 
     // Step 5: Update record with completed data.
-    //
-    // The error is CHECKED (#364 EX-13). This was a bare `await` and the response below is built
-    // from local variables, so a failed write returned `success: true, status: 'completed'` to a
-    // caller whose row was still sitting at `generating` with no asset URLs — the world existed
-    // only in that one HTTP response, and the poller never saw it finish. Throwing lands in the
-    // catch below, which marks the row failed and refunds. The asset URLs are lost either way;
-    // what changes is that the user is told, and paid back.
     const { error: completeError } = await supabase
       .from('vr_worlds')
       .update({

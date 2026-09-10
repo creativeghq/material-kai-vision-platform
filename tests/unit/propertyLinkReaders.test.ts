@@ -1,20 +1,4 @@
-/**
- * #378 class C — a link that only works in the direction that writes it.
- *
- * A cross-module foreign key is easy to ship half-built: the picker saves, the value persists,
- * and every screen that writes it looks correct. The side that should READ it simply does not
- * exist, and nothing anywhere reports a problem. `orders.property_id` and
- * `supplier_bills.property_id` sat that way until `PropertyCommercialCard` was written;
- * `projects.property_id` sat that way until `PropertyProjectsCard`.
- *
- * The failure this guards is REGRESSION rather than absence: deleting the reader, or unmounting
- * it from the workbench, restores the exact original state — a write-only link — and no test,
- * typecheck or lint would notice, because everything that writes it still compiles and still
- * works.
- *
- * Adding a third closed link is one row. It does NOT prove the reader renders anything useful,
- * only that the chain column → RPC → component → mount is unbroken.
- */
+/** #378 class C — a link that only works in the direction that writes it. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';

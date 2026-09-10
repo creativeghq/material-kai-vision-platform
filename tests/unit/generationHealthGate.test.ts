@@ -1,14 +1,4 @@
-/**
- * The registry decides whether a model can run, and it must be asked BEFORE the credit debit.
- *
- * MIVAA's interior roster consults `generation_models`, so a down model never enters the grid.
- * The edge functions did not, and the two Replicate models reachable ONLY from the edge —
- * `flux-depth-pro` (redesign / copy-style) and `runway-gen4-turbo` (video) — therefore went
- * debit → call → fail → refund on every attempt. Measured 2026-08-22: a `mode:'redesign'` call
- * debited 20 credits, got `500 REPLICATE_API_TOKEN not set` (the token is on the MIVAA droplet,
- * NOT in the edge environment), and refunded 20. The ledger nets to zero, so billing looks
- * perfect and the user just waits for a generic failure.
- */
+/** The registry decides whether a model can run, and it must be asked BEFORE the credit debit. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

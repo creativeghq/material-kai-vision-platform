@@ -1,46 +1,4 @@
-/**
- * SEOGenericCard — one renderer for every Wave 1B–3 chunk type.
- *
- * Strategy: each tool emits a chunk with `{ type, ...payload }`. Rather
- * than building 20+ separate React components, this single card detects
- * the chunk shape and picks the right inline mini-renderer. Saves ~2k LoC
- * vs one-card-per-tool and keeps AgentHub.tsx tidy.
- *
- * Surfaces render on THEME tokens (bg-card / text-foreground / muted / border)
- * so the same card is legible in the light canvas, the dark canvas AND the dark
- * chat bubble — never a hardcoded white-on-dark wash. Each section carries a
- * one-line plain-language primer so a non-technical reader knows what the raw
- * DataForSEO numbers mean and what to do with them; empty/absent values are
- * spelled out as words (and, where relevant, framed as an opportunity) instead
- * of bare "none"/null/raw field keys.
- *
- * Card kinds it handles (in order of declaration):
- *   - seo_keyword_difficulty_card / seo_keywords_card / seo_intent_card
- *   - seo_serp_audit_card
- *   - seo_url_audit_card
- *   - seo_domain_snapshot_card / seo_ranked_keywords_card / seo_domain_competitors_card
- *   - seo_keyword_gap_card / seo_traffic_estimation_card
- *   - seo_backlinks_summary_card / seo_backlinks_anchors_card / seo_referring_domains_card
- *   - seo_site_crawl_started_card / seo_site_crawl_status_card
- *   - seo_sentiment_card / seo_domain_tech_card
- *   - seo_llm_mentions_card
- *   - seo_youtube_card / seo_local_pack_card / seo_trends_card
- *   - seo_site_review_card / seo_brand_audit_card
- *   - seo_gsc_striking_distance_card / seo_gsc_movers_card / seo_my_rankings_card / seo_site_report_card
- *   - seo_onpage_issues_card
- *   - seo_backlinks_timeseries_card / seo_backlinks_competitors_card
- *   - seo_historical_rank_card / seo_keywords_for_site_card
- *   - seo_keyword_ideas_card / seo_related_keywords_card / seo_search_volume_card
- *   - seo_domain_intersection_card
- *   - seo_ai_overview_card / seo_google_maps_card / seo_gbp_info_card
- *   - seo_dataforseo_raw_card (escape-hatch fallback)
- *
- * Every `seo_*_card` chunk AgentHub emits must have a branch here. There is no
- * second dispatch table: AGENT_RESULT_TITLES is never consulted for these types,
- * because the `seo_*_card` branch in AgentHub catches them first. A missing
- * branch is therefore not a missing title — it is a raw JSON dump in the user's
- * chat. Guarded by tests/unit/seoCardCoverage.test.ts.
- */
+/** SEOGenericCard — one renderer for every Wave 1B–3 chunk type. */
 
 import type { ReactNode } from 'react';
 import { safeHref } from '@/utils/safeUrl';
@@ -1228,17 +1186,7 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
     );
   }
 
-  // ══════════════════════════════════════════════════════════════════
   // Wave 4 — the fourteen card types that had no renderer.
-  //
-  // All fourteen were listed in AGENT_RESULT_TITLES, which reads like coverage
-  // and is not: AgentHub routes EVERY `seo_*_card` chunk to this component
-  // before that map is ever consulted, so a type with no branch here fell
-  // through to the bottom-of-file fallback and the user got a raw
-  // `JSON.stringify(data)` dump in the chat. Among them were the most valuable
-  // tools in the toolkit — AI Overview, Search Console striking-distance,
-  // keyword ideas, search volume.
-  // ══════════════════════════════════════════════════════════════════
 
   // ── Search Console: striking distance ─────────────────
   if (t === 'seo_gsc_striking_distance_card') {

@@ -1,17 +1,4 @@
-/**
- * Shared Flow Event Emitter
- *
- * Reusable utility for emitting flow trigger events from any edge function
- * or internal service. Calls the flow-engine's trigger-event action which
- * finds all active flows matching the event type and executes them.
- *
- * Usage (from edge functions):
- *   import { emitFlowEvent } from '../_shared/flow-events.ts';
- *   await emitFlowEvent('invoice_issued', { invoice_id: '...', workspace_id: '...' });
- *
- * Usage (fire-and-forget, non-blocking):
- *   emitFlowEvent('vr_world_created', { world_id: '...' }); // no await
- */
+/** Shared Flow Event Emitter */
 
 import type { DbClient } from './supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
@@ -80,7 +67,6 @@ export async function emitAgentEvent(
  * per-recipient `user_id` silently delivers nothing. This resolves the recipients
  * and fires one enriched event per recipient (mirrors the `module_access_requested`
  * pattern). `buildData(recipientUserId)` must return the payload including
- * `user_id: recipientUserId`, `title`, `body`, `type`.
  */
 export async function emitFlowEventToWorkspaceRoles(
   workspaceId: string,
@@ -108,17 +94,7 @@ export async function emitFlowEventToWorkspaceRoles(
   }
 }
 
-/**
- * Short-lived cache of trigger types that have at least one ACTIVE flow.
- *
- * Every emit used to cost an unconditional HTTP round-trip to `flow-engine`, even when no
- * flow could possibly match. Two of the hottest paths in the platform emit into nothing:
- * `search_executed` (every search, from agent-chat and unifiedSearchService) and
- * `user_login` (every sign-in) — neither has a flow row, so each was a full function
- * invocation whose only outcome was "matched 0 flows".
- *
- * TTL is deliberately short: activating a flow in the builder takes effect within it.
- */
+/** Short-lived cache of trigger types that have at least one ACTIVE flow. */
 const TRIGGER_CACHE_TTL_MS = 30_000;
 let _triggerCache: { at: number; types: Set<string> } | null = null;
 
@@ -141,20 +117,7 @@ async function activeTriggerTypes(): Promise<Set<string> | null> {
   }
 }
 
-/**
- * The ONE emitter for `inbox.message_received`.
- *
- * Every inbound channel notifies the same way, so the payload has to be built the same way — and it
- * was not. The seeded default flow ("Inbox Message → Notify Recipient") addresses its send to
- * `{{trigger.data.email}}`. The in-app path resolved that address; the inbound-EMAIL path and the
- * WhatsApp webhook both omitted it. So a customer emailing or messaging in produced a flow run that
- * resolved no recipient and delivered nothing — `ops.flow_sends_skipped_no_recipient` counted the
- * skips while the operator just saw silence. Nothing errored; the notification simply never arrived.
- *
- * Resolving the address HERE is what makes that unrepeatable: callers pass user ids, never an
- * address, so a channel added later cannot forget the key. Same reason `workspace_id` is carried —
- * the WhatsApp path dropped it and tenant-scoped flows could not match.
- */
+/** The ONE emitter for `inbox.message_received`. */
 export async function emitInboxMessageEvent(opts: {
   /** Who to notify. Ids only — the address is resolved here. */
   userIds: string[];

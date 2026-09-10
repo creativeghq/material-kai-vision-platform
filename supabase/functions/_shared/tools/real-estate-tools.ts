@@ -2,12 +2,6 @@
 // entitlement + realestate.* RBAC are enforced server-side in real-estate-api (this tool just calls
 // it with the caller's JWT). Read-only actions today (0 credits) — AI listing copy (draft_description)
 // lands with the P2 AI wave; syndicate lands with the P3 engine.
-// `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
-// graph into every module that defines a tool, and that instantiation — not file size — is what
-// makes agent-chat exceed 12 GB and drop out of the edge typecheck gate entirely (inbox-api is a
-// comparable 2.8k lines and checks fine). Erasing it here costs the `tool()` config shape, which
-// `npm run tools:manifest` + tests/unit/toolkitCoverage.test.ts already enforce from the AST, and
-// buys a compiler over the tool bodies, which nothing had before.
 const { tool } = await import('npm:@langchain/core@1.2.9/tools') as {
   tool: <S extends { _output: unknown }>(
     fn: (input: S['_output']) => unknown,

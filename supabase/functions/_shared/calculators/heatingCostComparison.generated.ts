@@ -2,28 +2,7 @@
 // Regenerate: npm run vocab:mirror (part of gen:all). Freshness is enforced by
 // tests/unit/vocabularyMirrors.test.ts, which fails the build on any drift.
 
-/**
- * Annual heating-cost comparison — pure, deterministic, no I/O.
- *
- * Faithful port of the operator's Google Sheet
- * "ΥΠΟΛΟΓΙΣΜΟΣ ΜΕΘΟΔΩΝ ΘΕΡΜΑΝΣΗΣ" (verified cell-by-cell, 2026-06-12). Every
- * default below reproduces the sheet to the euro for its example inputs
- * (200 m², 132 kWh/m²·yr → heat pump 4 COP cheapest at ~€1,455/yr).
- *
- * Sheet formula map (source of truth):
- *   G5 useful demand   = specificEnergy × area
- *   H5 delivered       = G5 × 1.16286            (distribution gross-up)
- *   oil litres         = H5 / 10.71              (burner-efficiency cell is unused in the sheet)
- *   gas kWh            = H5
- *   a/c kWh            = H5 / COP   (COP = 2 simple, 3 inverter)
- *   heat-pump kWh      = H5 / COP                (default 4)
- *   wood kg            = H5 / (efficiency × 6.0101) × 1.34   (1.34 = empirical wood factor)
- *   cost               = units × unitPrice
- *
- * The frontend page and the agent tool `calculate_heating_cost_comparison`
- * (mirror in supabase/functions/_shared/tools/calculator-tools.ts) both use
- * this — keep them in sync.
- */
+/** Annual heating-cost comparison — pure, deterministic, no I/O. */
 
 export type AcType = 'inverter' | 'simple';
 export type HeatingMethodKey = 'oil' | 'gas' | 'ac' | 'heat_pump' | 'energy_fireplace' | 'non_energy_fireplace';

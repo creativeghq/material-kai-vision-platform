@@ -1,15 +1,6 @@
 /**
  * Project covers — the ladder (own picture → moodboard image → library scene) and the
  * library itself.
- *
- * What would silently go wrong without this:
- *  - a concept added to the library with no file behind it renders a broken image on every
- *    card that derives it — a 404 is a valid <img>, nothing raises;
- *  - a Greek stem that is also inside an unrelated word (`αυλ` in Παύλος) gives a customer's
- *    project a garden for no reason the owner can see;
- *  - `/covers` missing from the SPA catch-all serves index.html (HTTP 200) for every asset, so
- *    a "does it 200?" check passes while every cover is a blank box;
- *  - a surface that stops walking the ladder shows a different picture from the others.
  */
 import { describe, expect, it } from 'vitest';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';

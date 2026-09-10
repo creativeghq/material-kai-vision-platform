@@ -1,33 +1,4 @@
-/**
- * Money OUT — the ONE implementation, for every rail that can move it.
- *
- * Two providers can now send: Revolut Business (`POST /pay`, or a draft a human approves in the
- * Revolut app) and Viva.com (`/banktransfers/v1/…:send`). Writing that twice would be two answers
- * to "what did we instruct and did it happen", which is the shape CLAUDE.md's one-derivation rule
- * exists to stop — so the audit, the idempotency claim and the ordering live here, and each
- * provider contributes only the call that actually moves the money.
- *
- * THE ORDER IS THE SAFETY, and it is asserted by tests/unit/payoutExecution.test.ts:
- *
- *   1. resolve + tenancy-check every id from the request body (invariant 1 — the service client
- *      makes the manual check mandatory, it does not excuse it),
- *   2. REPLAY an existing instruction with the same request_id — a retry after a dropped
- *      connection is the case a disabled button cannot cover, and this is an IRREVERSIBLE bank
- *      transfer,
- *   3. write the audit row BEFORE the provider is called, so an instruction that vanishes into a
- *      timeout still left a trace,
- *   4. call the provider,
- *   5. stamp the outcome — including `failed`, which is not a payment and must not block a
- *      genuine retry.
- *
- * WHAT THIS DELIBERATELY DOES NOT DO: write a `payments` row. Instructing a transfer is not the
- * same act as money arriving, and the books already have one way to learn that it did — the bank
- * feed, which reconciles the outgoing line back to `payout_instructions.supplier_bill_id` and
- * settles the bill through the ordinary allocation path. Recording the payment here as well is
- * how the same cost gets paid twice on the books: once by us optimistically, once by the feed.
- * The caller that wants "the money already moved elsewhere, just write it down" wants
- * `recordPayment`, which is a different button and always has been.
- */
+/** Money OUT — the ONE implementation, for every rail that can move it. */
 import {
   createPayment,
   createPaymentDraft,

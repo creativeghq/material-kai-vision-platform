@@ -1,16 +1,4 @@
-/**
- * Pricing an intake line. Issue #342 §3.
- *
- * ONE resolver, always: `get_product_price_for_workspace`. The model never supplies a price and
- * this module never computes one — it asks the same RPC `QuotesService.addItem` and
- * `quote-tools.resolveLine` ask, with the same `audience: 'seller'`, so a line proposed from a
- * WhatsApp message is priced identically to the same line typed into a quote.
- *
- * A product the resolver cannot price comes back `null`, and the line is flagged for a human.
- * Null means NO PRICE — never a fallback, never a list price standing in for a customer price.
- * The customer-specific layers (company/contact discounts, the markup ladder) only apply because
- * the party is passed in, which is why pricing is re-run when the reviewer assigns the customer.
- */
+/** Pricing an intake line. Issue #342 §3. */
 
 import type { DbClient } from '../supabase-client.ts';
 
@@ -34,18 +22,7 @@ export async function resolveLinePrice(
     productId: string;
     companyId: string | null;
     contactId: string | null;
-    /**
-     * The line's quantity and its unit. #332 step 1c INVERTED the earlier decision here.
-     *
-     * This call used to omit `p_quantity` on the stated grounds that `QuotesService.addItem` and
-     * `quote-tools.resolveLine` omitted it too, so intake would otherwise be the platform's only
-     * caller firing an untested pricing path. Both of those now pass it, and so does every other
-     * site, which turns the same argument the other way round: omitting it here would make order
-     * intake the only path that quotes a customer the single-unit price for a pallet order.
-     *
-     * Together or not at all — `get_product_price_break` coalesces an unconvertible unit back to
-     * the raw quantity, so a qty without its unit matches the wrong threshold.
-     */
+    /** The line's quantity and its unit. #332 step 1c INVERTED the earlier decision here. */
     quantity?: number | null;
     unit?: string | null;
   },

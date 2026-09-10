@@ -1,60 +1,6 @@
 /**
  * Automatic knowledge grounding — the workspace's own documents reach the model whether or not
  * the model thinks to ask for them.
- *
- * WHY THIS EXISTS
- * ---------------
- * `knowledge_base_search` is bound for every agent that declares it, in the always-on `core`
- * toolkit. It is one call away on every single turn. And on 2026-08-23, asked "What is product
- * discovery?", the agent made ZERO tool calls: it answered from its own general knowledge and
- * then asked which sense of the term was meant — while the workspace held a 253-section document
- * literally titled "Product Bible / Product Discovery", which a direct query returns at 0.676
- * relevance in 6.4 seconds. Rephrased as "what does OUR knowledge base say", the same agent
- * searched immediately and quoted the document.
- *
- * So the retrieval worked, the tool was bound, and the answer depended on how the question was
- * phrased. That is the whole problem: a prompt rule telling the agent to search first is a
- * suggestion, and this codebase already knows what suggestions are worth — `agent-memory.ts` says
- * it in as many words about a rule the distiller kept breaking: *an instruction is not an
- * enforcement mechanism*.
- *
- * WHY NOT A CLASSIFIER
- * --------------------
- * The obvious alternative is an LLM gate: a cheap call deciding "does this need the knowledge
- * base?". It would be worse. It adds a second probabilistic step whose failure mode is EXACTLY
- * the one being removed — a model deciding not to look — and it costs a round trip to do it. The
- * cleverness has to come from always having the material, not from getting better at guessing
- * whether to fetch it.
- *
- * Nor is the gate a text heuristic. This repo has already paid for that lesson once:
- * `shouldRouteToHaiku` used to tier turns by the LENGTH of the user's message, and was cut down
- * to nothing after measurement, with the verdict recorded in place — "Length is not complexity".
- * Keyword-matching for question shapes is the same mistake wearing a different hat: "tell me
- * about our onboarding" has no question mark and is squarely a knowledge ask.
- *
- * So: ground UNCONDITIONALLY, and skip only on facts — never on a guess about intent. The
- * relevance floor decides what is worth injecting, which is a measurement, not an opinion.
- *
- * ON LATENCY — measured, not estimated, and it is not free.
- *
- * An earlier draft of this comment claimed ~6s. That was the raw MIVAA round trip; the bound tool
- * also re-ranks, and the real figure is the same as the tool call it replaces. Measured live
- * 2026-08-23: model-initiated `knowledge_base_search` 12.5s / 13.4s / 16.7s, grounding 15.5s.
- *
- * So the honest account is: on a turn that NEEDS the knowledge base this costs nothing extra — it
- * moves a call that was going to happen anyway to before the turn, and tells the agent not to
- * repeat it (verified: the model now calls `read_document_section` and never re-searches). On a
- * turn that does not need it, it is ~15s spent for nothing.
- *
- * That trade is deliberate while the alternative is a gate that can say no. The way to improve it
- * is to make the LOOKUP cheaper — the re-ranker is an extra model call inside the tool, and this
- * path applies its own relevance floor and cap, so it does not need one — not to reintroduce a
- * guess about whether to look.
- *
- * ON SECURITY. Retrieved KB text is ingested content — authored by users, and now travelling into
- * a privileged position in the system prompt. It is fenced as DATA (security invariant 9), the
- * same way `agent-memory` fences recalled memories, and for the same reason: a document that says
- * "ignore your instructions" is a document, not an instruction.
  */
 
 /** Sections below this cosine score are noise, and noise in the system prompt is worse than absence. */
@@ -69,18 +15,7 @@ const MAX_CHARS = 11000;
 /** Per-section cap, so one long section cannot crowd out three relevant ones. */
 const MAX_SECTION_CHARS = 1800;
 
-/**
- * How many DOCUMENTS get read out into continuous text before the turn starts.
- *
- * Vector search returns fragments — a section is ~1.3k chars and an answer routinely runs past
- * its edge. Injecting fragments alone left the agent one useful move short, so it spent a whole
- * MODEL TURN calling `read_document_section` to get readable text: measured 2–3 calls at ~350ms
- * of tool time each, but a full Opus round trip to decide on them. Against a 38–45s turn where
- * retrieval is only ~2–4s, that round trip is the expensive part, not the retrieval.
- *
- * So the best hits arrive already read out. Two documents, not four: the point is to answer in
- * one turn, not to paste a manual into the prompt.
- */
+/** How many DOCUMENTS get read out into continuous text before the turn starts. */
 const EXPAND_TOP_DOCS = 2;
 
 /** Sections either side of a hit when reading it out. Enough to carry a definition and its setup. */
@@ -251,18 +186,7 @@ export async function groundTurnInWorkspaceKnowledge(opts: {
   return { block, sections: rendered.length, checked: true };
 }
 
-/**
- * Read the best hit in each of the top documents out into continuous text.
- *
- * Reuses the BOUND `read_document_section` tool for the same reason grounding reuses the bound
- * search tool: it carries the workspace scoping, the corpus routing (kb vs pdf ids are disjoint)
- * and the token budget, and a second copy here would be free to drift from all three.
- *
- * Best-per-DOCUMENT: two hits inside one chapter expand to overlapping windows, so the second
- * costs a round trip to re-fetch text the first already returned. Failure of any one expansion is
- * silent by design — the fragment is still there, and a missing expansion is a smaller answer, not
- * a broken one.
- */
+/** Read the best hit in each of the top documents out into continuous text. */
 async function expandTopHits(
   // deno-lint-ignore no-explicit-any
   tools: any[],

@@ -1,22 +1,4 @@
-/**
- * PriceLookupDrawer
- *
- * Admin-only drawer that asks the KAI agent to compose a price proposal
- * from the "Pricing" category of the Knowledge Base.
- *
- * Used from:
- *  - Product detail modal ("Get price from KB" button)
- *  - Quote line item (AddProductsSheet / QuoteItemsList "Get price" button)
- *
- * Flow:
- *  1. User clicks trigger → drawer opens.
- *  2. We POST to the agent-chat edge function (SSE stream).
- *  3. We collect `price_lookup_matches` and `price_proposal` chunks.
- *  4. We render the reasoning chain + sources.
- *  5. Admin clicks "Use this price" → onConfirm() callback fires.
- *
- * Never auto-fills. Always requires an explicit confirm click.
- */
+/** PriceLookupDrawer */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, FileText, Globe2, Loader2, Sparkles, X, Zap } from 'lucide-react';
@@ -75,13 +57,6 @@ export interface PriceConfirmPayload {
    * The EFFECTIVE unit price the operator confirmed — the one number this drawer commits to.
    * It is whatever is in the price field at confirm time, which is seeded from the proposal's
    * `final_unit_price` (already discount-inclusive) and freely editable after that.
-   *
-   * There used to be a second field, `discount_price`, re-derived here as
-   * `proposal.list_price × (1 − discount_percent/100)`. That was a second derivation of this
-   * same quantity and the two disagreed in both directions: it ignored an operator edit of the
-   * price field, and being unrounded it produced 67.00000000000001 where this reads 67 — enough
-   * for `QuoteItemsList`'s `discounted_price !== unit_price` test to render a discount badge
-   * striking through 67 to show 67.00. Consumers take THIS number; nothing recomputes it.
    */
   unit_price: number;
   /**

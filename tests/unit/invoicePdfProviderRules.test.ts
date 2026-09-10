@@ -1,27 +1,4 @@
-/**
- * What the customer's copy must carry, because WE render it and the provider does not.
- *
- * The platform serves its own PDF and never surfaces the provider's (#193). That decision moves
- * the provider's "General Provider Rules" onto us: everything their template would have printed,
- * ours has to. Read against the real document rules 2026-09-06 (#319), three were missing or
- * wrong and none of them could fail a typecheck — a document with no provider attribution is a
- * perfectly valid PDF.
- *
- *   1. "Each document issued through the Provider's services must display the Provider's name
- *      and website." Absent entirely — the words Novus and timologisi appeared nowhere in the
- *      generator.
- *   2. "The date and time of issuance should be clearly and legibly indicated." Both were
- *      printed, but through `toLocaleDateString()` with no timezone — and edge functions run in
- *      UTC, so a Greek business issuing at 00:30 Athens printed YESTERDAY's date on a document
- *      AADE numbered under today.
- *   3. "the Unique Payment Identity - transaction id combined with the Payment Signature […]
- *      must be included, for each amount payable separately." Nothing about a POS payment
- *      reached the paper.
- *
- * These are pinned by reading the generator rather than by rendering, because rendering needs
- * pdf-lib, fonts and a database; the failure mode being guarded against is a line being deleted,
- * which the source shows perfectly well.
- */
+/** What the customer's copy must carry, because WE render it and the provider does not. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

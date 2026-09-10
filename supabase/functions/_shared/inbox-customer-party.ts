@@ -1,20 +1,6 @@
 /**
  * WHO the customer on an Inbox thread is — one derivation, for everything that prices, lists or
  * answers on their behalf.
- *
- * Three copies of this used to live in inbox-api and agent-chat (the context rail, the card
- * resolver, the customer-audience account scope), and they had already drifted: one read the
- * newest quote, one the newest eight, one had no company at all — so the rail listed an order the
- * assistant then said did not exist. One function; every reader gets the same party.
- *
- * Everything comes from the THREAD — the active customer participant's CRM contact, and the
- * company the platform already links that contact to (the most recent quote or project). Never
- * from a message, and never from a request body: this is what makes the customer-audience tools
- * safe to scope with it.
- *
- * `isBusiness` follows the SQL predicate `invoice_buyer_is_business` — a linked company, a
- * contact of type `company`, or a VAT number on the contact — so the card that says "incl. VAT"
- * and the invoice that later says 11.x agree on which kind of buyer this is.
  */
 
 import type { DbClient } from './supabase-client.ts';

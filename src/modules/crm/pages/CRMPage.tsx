@@ -198,9 +198,6 @@ export const CRMManagement: React.FC = () => {
   // crm_company_contacts junction. Resolve it to a contact-id allowlist and reuse the
   // same server-side `ids` param as the category filters, rather than teaching the list
   // endpoint a junction join.
-  // Bounded lookup backing the company dropdowns (the contacts "company" filter, the bulk
-  // "Assign company" action, and the companies "Business activity" facet). Separate from the
-  // paged table feed, which no longer holds every company — this is a picker, not the data set.
   const [companyLookup, setCompanyLookup] = useState<Array<{ id: string; name: string; profession: string | null }>>([]);
 
   // Per-tab selection (users keyed by user_id; contacts/companies by id)
@@ -527,9 +524,6 @@ export const CRMManagement: React.FC = () => {
    * `supplier` on a legal document, and on a company it also overwrites the ΑΑΔΕ ΚΑΔ activity
    * the lookup filled in. Segmentation belongs to `contact_group`, the categories, and
    * is_client / is_supplier — all of which are already offered.
-   *
-   * The users bar keeps it: `user_profiles.professional_type` is a genuine enum column with no
-   * fiscal role, and it is the one the professional-type categories auto-sync from.
    */
   const contactBulkActions: BulkSelectAction[] = [
     { key: 'company', label: 'Assign company', placeholder: 'Pick a company', options: companyNameOptions },

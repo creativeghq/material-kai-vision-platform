@@ -1,15 +1,4 @@
-/**
- * SEO Pipeline Edge Function (Async Orchestrator)
- *
- * Orchestrates the full SEO article pipeline:
- * 1. Research → 2. Plan → 3. Write → 4. Analyze → 5. Finalize
- *
- * Follows the Interior Designer async pattern:
- * - Creates seo_articles record immediately
- * - Updates status/progress after each stage (for frontend polling)
- * - Stores intermediate results in stages_data JSONB
- * - Credits delegated to sub-functions
- */
+/** SEO Pipeline Edge Function (Async Orchestrator) */
 
 import { createClient } from '@supabase/supabase-js';
 import { escapeHtml } from '../../_shared/html.ts';
@@ -45,24 +34,7 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 
-/**
- * The four stages, called IN-PROCESS.
- *
- * They used to be `fetch`ed as standalone edge functions — `seo-research`, `seo-plan`,
- * `seo-write`, `seo-analyze`. Those functions do not exist and never did after the SEO
- * surface was consolidated into this one (`seo-api`, action-routed); only the call sites
- * inside this file were left pointing at the old names. So every run POSTed to a 404,
- * `result.success` came back undefined, and stage 1 threw the generic
- * `seo-research returned failure` — which is exactly what every `seo_articles` row records.
- * The pipeline has therefore never produced an article since the consolidation, while
- * still creating the row, charging the module and reporting a plausible error.
- *
- * They are handlers of the shape `(req, body) => Response` and read `req` only for the
- * method check and `authenticate(req)`, so handing them THIS request re-authenticates the
- * same caller at the same level and needs no service-key round trip. In-process also drops
- * four self-invocations of `seo-api` (four cold starts, four nested calls against the same
- * Supabase trace budget) off a path that is already one long request.
- */
+/** The four stages, called IN-PROCESS. */
 const STAGE_HANDLERS: Record<string, (req: Request, body: any) => Promise<Response>> = {
   research: handleResearch,
   plan: handlePlan,
@@ -142,13 +114,6 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
     const maxFixIterations = body.max_fix_iterations || 3;
 
     // Get workspace ID.
-    // Was `.single()`, which ERRORS (PGRST116, "multiple rows returned") for any user who
-    // belongs to more than one workspace — and the error was not destructured, so
-    // workspaceId silently became null. The article then failed the
-    // `seo_articles_ws_select` RLS predicate (is_workspace_member(workspace_id)), so no
-    // colleague could see it, and resolveWebsite(null) could not pick the workspace's
-    // default site either. Prefer an explicit body.workspace_id reconciled against
-    // membership; otherwise take the caller's most recent active membership.
     const requestedWs = typeof body.workspace_id === 'string' ? body.workspace_id : null;
     let memberQuery = supabase
       .from('workspace_members')
@@ -176,20 +141,6 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
     }
 
     // ── Idempotency (#361 `EG-8`) ────────────────────────────────────────────────────────
-    //
-    // This handler is one long synchronous request: research alone debits 18 credits and fires
-    // six DataForSEO calls, then the writer and the analyzer each run a model, and the whole
-    // thing takes minutes. Nothing linked one attempt to the next, so a caller whose connection
-    // timed out and retried — or an agent tool invoked twice — ran the entire pipeline again
-    // and paid for all of it again. Two guards, both BEFORE the article row and every debit:
-    //
-    //   1. An explicit `idempotency_key` returns the run it already started.
-    //   2. Failing that, an in-flight run for the same keyword is returned rather than
-    //      duplicated. This is the retry case specifically: the first attempt is still going,
-    //      the caller has simply stopped waiting for it.
-    //
-    // Neither blocks a deliberate re-run: a finished article is not in-flight, so asking for
-    // the same keyword again tomorrow starts a fresh one, as it should.
     const idempotencyKey = typeof body.idempotency_key === 'string' && body.idempotency_key.trim()
       ? body.idempotency_key.trim().slice(0, 200)
       : null;
@@ -301,27 +252,6 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
     console.log(`[seo-pipeline] Article ${articleId} created. Starting pipeline for "${body.target_keyword}"`);
 
     // ── Return the article id NOW; the stages run past the response ──────────────────────
-    //
-    // The comment here used to say "Return the article ID immediately" directly above code
-    // that ran all five stages inline and returned only once they finished. Everything
-    // downstream was built for the version in the comment: `create_seo_article` describes
-    // itself as async, emits `article_generation_started` so the frontend can start polling,
-    // and `SEOArticleViewer` polls `seo_articles` until it reads `completed` or `failed`.
-    //
-    // Awaiting the stages cannot work, and not by a small margin. agent-chat caps a tool at
-    // `DEFAULT_TOOL_TIMEOUT_MS = 90s`, while a real run is research ~4s + plan ~25s + write
-    // 60-120s + analyze with up to two fix passes. Article d8037c81 reached "Writing article
-    // with Claude Opus..." at 12:25:58 and the turn died on
-    // `Tool 'create_seo_article' timed out after 90s` (Sentry KAI-T5) while the isolate was
-    // still writing. Raising that cap is not the fix either: the agent-chat invocation has a
-    // ~150s wall of its own, so the tool would still lose the race, just later.
-    //
-    // `runInBackground` is `EdgeRuntime.waitUntil`, so the isolate stays alive for the stages
-    // after this response is sent. If the platform tears it down anyway, the row is left
-    // mid-stage — which is exactly what d8037c81 did, sitting at `writing` / 45% forever —
-    // so `seo.article_stuck_in_stage` sweeps those and records a real reason.
-    // `articleId` stays `string | null` for the catch below; this is the narrowed copy the
-    // background work closes over, so it cannot go null underneath it.
     const backgroundArticleId: string = articleRow.id;
     runInBackground(
       runPipelineStages({
@@ -517,10 +447,6 @@ async function runPipelineStages(ctx: {
       // on 2026-09-06 (Sonnet 5 took 154s for the same brief, so the model choice does not
       // rescue a 180s budget either). At 180s the stage was killed mid-generation and the run
       // died as `The write stage did not finish within 180s.`
-      //
-      // This only works because the stages run under EdgeRuntime.waitUntil: a request-bound
-      // call is capped by the gateway at `{"code":"IDLE_TIMEOUT","message":"Request idle
-      // timeout limit (150s) reached"}`, which a direct `write` call hits every time.
     }, 300_000);
 
     const contentMarkdown = writeResult.data.content_markdown;
@@ -693,8 +619,6 @@ async function runPipelineStages(ctx: {
     // signal in two ways:
     //   1. Boost any existing platform article whose target_keyword matches
     //      a related-search term (stronger than generic keyword overlap).
-    //   2. For related searches with NO matching article yet, surface them
-    //      in suggestedLinks as "write-this-next" cluster opportunities.
     const relatedSearches = research.serpSignals?.relatedSearches || [];
     let suggestedLinks = extractInternalLinks(finalMarkdown);
     let existingArticlesFinal = existingArticles;
@@ -814,14 +738,6 @@ async function runPipelineStages(ctx: {
  * excluded — identity is never rewritten by the pipeline. `idempotency_key` in particular is
  * set once at insert and must stay that way: a key that can be moved onto another row is not
  * a deduplication key, it is a way to hand a caller somebody else's article (#361 `EG-8`).
- *
- * This exists because the pipeline was writing 15+ fields that are not columns
- * (`html_content`, `meta_title`, `article_plan`, `overall_score`, `credits_used`,
- * `processing_time_ms`, `keyword_research_id`, …). PostgREST rejects the WHOLE statement
- * when any one column is unknown, so those updates landed nothing — and took the REAL
- * columns in the same payload down with them. That is why finished articles had
- * `title = NULL`, `slug = NULL`, no markdown and a status stuck mid-pipeline, while the
- * endpoint returned `{success: true}` and the credits were already spent.
  */
 const ARTICLE_COLUMNS = new Set([
   'target_keyword', 'content_type', 'content_brief', 'status', 'progress_percentage',
@@ -937,20 +853,7 @@ function safeHref(escapedUrl: string): string {
   return SAFE_HREF_RE.test(probe) ? escapedUrl : '#';
 }
 
-/**
- * Basic markdown → HTML conversion.
- *
- * The input is NOT trusted. It is model output, and the model was given Google's AI Overview
- * text, the current featured snippet, PAA answers and competitor headings — all authored by
- * whoever ranks for the watched query. This used to interpolate that straight into HTML: raw
- * `<script>` in the markdown passed through untouched, and `[x](javascript:…)` became a live
- * href (#361 `EG-6`, invariant 11).
- *
- * So the source is escaped ONCE, up front, with the canonical escaper — every tag emitted
- * below is then a tag this function wrote, and every character that came from the model is
- * text. The remaining hole after escaping is the one attribute we emit, which `safeHref`
- * closes.
- */
+/** Basic markdown → HTML conversion. */
 function markdownToHtml(markdown: string): string {
   let html = escapeHtml(markdown);
 
@@ -1090,17 +993,7 @@ function buildSchemaMarkup(
   return schemas.length === 1 ? schemas[0] : schemas;
 }
 
-/**
- * Append a visible byline + AI-disclosure block to the article markdown.
- *
- * Google's helpful-content self-assessment is explicit that the "Who / How / Why"
- * answers should be *visible to readers*, not only present in structured data — so
- * this goes into the markdown the operator copies into their CMS, not just the JSON-LD.
- *
- * Returns the markdown unchanged when the brief has no `provenance` block. That is the
- * deliberate behaviour: the pipeline never fabricates an author, and the analyzer
- * reports the omission as a `provenance` fix instead.
- */
+/** Append a visible byline + AI-disclosure block to the article markdown. */
 function appendProvenanceBlock(
   markdown: string,
   brief: NormalizedBrief | null,
@@ -1184,18 +1077,7 @@ function extractInternalLinks(
   }));
 }
 
-/**
- * Match this article's plan against the user's indexed website pages.
- *
- * Strategy:
- *  1. Check the user has a connected website (user_websites where is_active and is_default).
- *     Falls back to any active website if no default is set.
- *  2. Build an embedding from the article's plan (title + meta + section headings + secondary keywords).
- *  3. Call match_user_website_pages RPC for top 8 semantic matches.
- *  4. For each match, propose an anchor text by picking the secondary keyword most likely to fit.
- *
- * Silent-failure-safe: any error returns empty array — inter-linking simply omits the section.
- */
+/** Match this article's plan against the user's indexed website pages. */
 async function buildSiteMatches(
   supabase: any,
   userId: string,

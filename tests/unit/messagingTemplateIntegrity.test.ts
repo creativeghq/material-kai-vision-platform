@@ -1,19 +1,4 @@
-/**
- * A messaging template belongs to a business, and an approved one is frozen (#359 CM-3 / CM-4).
- *
- * CM-4: `messaging_templates` had NO workspace column at all, and the `templates` action selected
- * every row on the service-role client. A template body IS business copy — prices, offers, the way
- * a company talks to its customers — so every tenant could read every other tenant's.
- *
- * CM-3: the send path resolved a template by id alone, with no workspace, no `is_active` and no
- * approval check. And Meta approves a template by NAME: editing the row after approval keeps the
- * approved name while changing what it says, which is how a business sends marketing copy under a
- * utility approval and has its number rated down for it.
- *
- * The freeze is a SQL trigger, so no writer can go round it. What this file can see is the
- * checkout: that the send path asks the right four questions, that the listing is scoped, and that
- * nothing writes the generated `is_approved` column by hand.
- */
+/** A messaging template belongs to a business, and an approved one is frozen (#359 CM-3 / CM-4). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

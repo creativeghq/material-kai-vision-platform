@@ -1,34 +1,4 @@
-/**
- * The assistant knows who it is speaking FOR, and can tell its speakers apart.
- *
- * ── What went wrong ─────────────────────────────────────────────────────────────────────────
- * 2026-08-24, a WhatsApp thread with a supplier. Asked `your email address, please`, the Inbox
- * assistant replied: *"I'm sorry, but I don't have an email address to share here."*
- *
- * It was telling the truth about its own context. The entire description of the business it was
- * answering for was `Business: ${workspaces.name}` — which on that workspace reads **"Default
- * Workspace"**. One table over sat the trading name (MATERIALS BANK ΕΕ), the VAT number
- * (EL802349569), the street, the city, the ΚΑΔ profession, and an active workspace mailbox
- * (`user_email_addresses`) whose replies file straight back onto the Inbox thread. The assistant
- * could quote an invoice balance to the cent and could not name its own company.
- *
- * Nothing failed. Every call succeeded, the reply was polite and grammatical, and a refusal is a
- * valid string — so no typecheck, no integrity probe and no health signal could see it. The only
- * detector was a human reading the thread.
- *
- * Two more of the same shape were in the same function:
- *   - every transcript line was labelled `Customer/Team`, because a member's reply carries
- *     `message_type='text'` exactly like the customer's. The model could not tell what the customer
- *     had asked from what a colleague had already promised.
- *   - `m.body || '[attachment]'` only mentioned an attachment when the body was EMPTY, so an email
- *     carrying an invoice PDF *and* a covering sentence rendered as the sentence alone.
- *
- * ── Why a source-scan test ──────────────────────────────────────────────────────────────────
- * The failure is an ABSENCE in a prompt. There is no return value to assert on and no row to
- * check: the code was already correct in every mechanical sense. So this test pins the presence of
- * the context block and the reachability ladder, and fails when either is deleted or when a second
- * hand-rolled reader of `finance_settings.business_*` reappears next to the derivation.
- */
+/** The assistant knows who it is speaking FOR, and can tell its speakers apart. */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -36,19 +6,7 @@ import { stripComments } from '../helpers/stripComments';
 
 const read = (p: string) => readFileSync(resolve(process.cwd(), p), 'utf8');
 
-/**
- * The same file with its prose removed.
- *
- * Every "this must NOT appear" assertion below names the OLD code it is banning — and this repo
- * documents a fix by quoting the defect it replaced, so the banned string is guaranteed to appear
- * in the comment that explains why it is banned. Scanning the raw file therefore fails on a
- * CORRECT fix, which is the most annoying possible false positive: it punishes writing down what
- * happened.
- *
- * `stripComments` is the shared scanner, never a local pair of regexes — see
- * `tests/helpers/stripComments.ts` for the ten hand-rolled copies it replaced, and for the
- * `/api/rag/*` case that made thirty of them silently delete the code they were guarding.
- */
+/** The same file with its prose removed. */
 const code = (p: string) => stripComments(read(p));
 
 /**
@@ -161,11 +119,6 @@ describe('business identity reaches the model that speaks for the business', () 
     // The guard moved with the logic: the Inbox no longer builds its own prompt, so the decision
     // now lives where the prompt is assembled — agent-chat, keyed on the thread's own channel and
     // social_kind rather than on anything a caller passed.
-    //
-    // It matters because the block ends with "share any of the above when asked" while the
-    // public-thread guardrail says never post a phone number or an email under our own post.
-    // Handing the model both and hoping it picks the second is a coin flip, not a rule — the same
-    // reason the account tools are withheld outright there rather than refused in prose.
     const src = code(AGENT_CHAT);
     expect(src).toMatch(/if \(workspaceId && !\(forCustomer && customerPublicThread\)\)/);
     expect(src).toMatch(/customerPublicThread = t\.channel === 'social'/);

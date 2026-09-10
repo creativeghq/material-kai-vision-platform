@@ -1,29 +1,4 @@
-/**
- * MEP calculations — the step that turns a drawing into a check.
- *
- * SCOPE, AND WHY IT IS NARROW.
- *
- * Everything here is derived from first principles: Ohm's law for voltage drop,
- * arithmetic for connected load, the lumen method for average illuminance. Every
- * coefficient a standard would normally supply — utilisation factor, maintenance
- * factor, diversity, conductor resistivity — is an explicit INPUT with a stated
- * default, never a number invented inside a lookup table.
- *
- * Deliberately NOT implemented:
- *   • pipe sizing (EN 806-3) and drainage gradients (EN 12056) — both require
- *     loading-unit and diameter tables that cannot be derived, only transcribed;
- *   • cable current-carrying capacity and its correction factors (IEC/HD 60364
- *     Appendix B) — same reason;
- *   • diversity factors — convention, not physics.
- *
- * A fabricated table would produce a number that looks authoritative and is
- * wrong, which is worse than no number at all. Those need a source the user
- * trusts, so the functions here answer only what arithmetic can answer, and
- * return null everywhere an input is missing.
- *
- * NOTHING HERE IS A SUBSTITUTE FOR A QUALIFIED ENGINEER'S SIGN-OFF. These are
- * sanity checks that catch the obviously-wrong before it reaches site.
- */
+/** MEP calculations — the step that turns a drawing into a check. */
 
 /** Copper resistivity, Ω·mm²/m, at ~70 °C conductor operating temperature. */
 export const RHO_COPPER_70C = 0.0225;

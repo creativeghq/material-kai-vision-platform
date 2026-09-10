@@ -1,14 +1,4 @@
-/**
- * "Which building is this at?" — for a record whose only real-estate link is `property_id`.
- *
- * Sibling of `ProjectLinkField`, and an ADAPTER for the same reason: the search, the workspace
- * scoping and the legality rules stay in `search_order_link_targets`, and what lives here is the
- * property-only configuration plus the label, in one place so every surface that asks the question
- * gets the same answer.
- *
- * The label comes from `propertyLabel` — the platform’s single answer to what a building is called
- * — so the field cannot read `Untitled property` right after the operator picked one by name.
- */
+/** "Which building is this at?" — for a record whose only real-estate link is `property_id`. */
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { OrderLinkPicker } from '@/modules/finance/components/OrderLinkPicker';

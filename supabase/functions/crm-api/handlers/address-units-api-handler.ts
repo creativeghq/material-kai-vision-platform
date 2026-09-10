@@ -13,11 +13,6 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
  * Sub-unit (secondary / branch / ΑΑΔΕ establishment) addresses for a CRM company or contact.
  * The party's main address stays inline on crm_companies / crm_contacts; these are the
  * additional named units a document (invoice / quote / project / delivery note) can opt into.
- *
- *   POST   /crm-api/address-units            {company_id|contact_id, label, ...address}
- *   GET    /crm-api/address-units?company_id= | ?contact_id=
- *   PATCH  /crm-api/address-units/{id}
- *   DELETE /crm-api/address-units/{id}
  */
 
 const UNIT_WRITABLE_COLUMNS = [

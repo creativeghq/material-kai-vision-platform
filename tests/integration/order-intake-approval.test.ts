@@ -1,22 +1,4 @@
-/**
- * #342 — approving an Inbox order proposal into a real order, against the live database.
- *
- * This tier exists because the thing worth guarding is a SQL privilege boundary, and a
- * source-level grep cannot see one. `create_order_from_thread_intake` is the ONE path that lets a
- * `sales` member write to `orders`, which they otherwise cannot touch at all
- * (`is_workspace_finance_manager` = owner/admin). It is safe only because the privilege has no
- * reachable parameter: `order_type` and `status` are literals inside the function.
- *
- * So the assertions are about what the grant CANNOT be talked into doing:
- *   • a sales member gets a DRAFT SALES order — never confirmed, never a purchase order
- *   • the same member still cannot write `orders` directly, so the RPC is the only door
- *   • a non-member is refused outright (BOLA / invariant 1)
- *   • approving twice returns the SAME order (idempotent — a double-click is not two orders)
- *   • the money is `recompute_order_totals`', not the payload's
- *   • a `product_id` from another workspace degrades to an ad-hoc line rather than being written
- *
- * Runs under REAL signed-in users so RLS is exercised, not bypassed. Self-skips without creds.
- */
+/** #342 — approving an Inbox order proposal into a real order, against the live database. */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import {
   hasCreds, serviceClient, createUser, createWorkspace, addMember, teardown, runId,

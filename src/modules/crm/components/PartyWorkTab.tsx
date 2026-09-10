@@ -1,39 +1,4 @@
-/**
- * Everything booked against one CRM party — company or person — behind one section rail.
- *
- * It replaces the Projects tab and absorbs Warranties and (on a contact) Property, because those
- * were three tabs answering one question badly: "what is going on with this client?". A project,
- * the moodboard that won it, the quote that came out of it, the order that fulfilled it and the
- * warranty that followed are one story, and the record page told it in five places.
- *
- * WHY A RAIL AND NOT A STACK
- * --------------------------
- * The first cut stacked every group vertically. For a brand-new client that reads fine — for an
- * active one it is twelve card headers and several hundred rows in a single scroll, which is a
- * worse answer than the five tabs it replaced. `HubSideNav` is the platform's archetype for
- * exactly this (see CLAUDE.md: build the archetype, do not re-derive it per page): the rail
- * carries the counts, one section renders at a time, and it collapses to full width below `lg`.
- *
- * ONE QUERY, DERIVED IN SQL
- * -------------------------
- * `get_party_work(kind, id)` returns the whole union already typed and sorted. The alternative —
- * a card per entity with its own fetch, its own loading state and its own idea of what "status"
- * means — is what produced the scattering in the first place, and it is how a thirteenth entity
- * type ends up half-wired. Adding one is one UNION branch in the function; it appears here
- * automatically, needing only a label and a route below.
- *
- * The function deliberately does NOT return a url. Routes move — `/admin/finance` never existed
- * and six call sites linked to it anyway — so the mapping lives here in the client where
- * `deepLinkTargets.test.ts` can see it, not baked into a database function nothing checks.
- *
- * WHAT IS A `panel` AND WHAT IS A `kind`
- * --------------------------------------
- * A `kind` is a derived, read-only list straight out of the union. A `panel` is a real management
- * surface the pages already own (Projects, Equipment, the property buyer profile) — passed in as
- * a slot so this component never has to know their prop shapes, and so it stays importable
- * without dragging the projects and real-estate modules in behind it. A panel's kind is excluded
- * from the derived side via `excludeKinds`, or the same rows would be listed twice.
- */
+/** Everything booked against one CRM party — company or person — behind one section rail. */
 import React from 'react';
 import { Link } from 'react-router-dom';
 import {

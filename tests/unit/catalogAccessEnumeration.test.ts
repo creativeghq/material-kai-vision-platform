@@ -1,29 +1,4 @@
-/**
- * A public gate that answers questions about your customer list has to be throttled.
- *
- * `catalog-access?action=request` is unauthenticated and takes any email, returning
- * `granted_access: true|false` — i.e. "is this address in your CRM, or granted this catalog?".
- * Nothing capped it. Anyone holding a published catalog slug could walk a list and read the
- * workspace's customer base back one `false` at a time.
- *
- * The catalog CONTENTS were never the exposure. The AUDIENCE was, and the audience is the CRM.
- *
- * ── Design decisions this pins, because each is easy to "simplify" wrongly ─────────────────
- *
- * COUNT FAILURES, NOT ATTEMPTS. A mailshot puts many people on this endpoint within minutes and
- * nearly all of them succeed; an enumerator produces almost nothing but failures. Throttling total
- * attempts would brake hardest exactly when the endpoint is doing its job.
- *
- * TWO DIMENSIONS. The per-IP cap is only as good as the IP. The per-CATALOG ceiling bounds what a
- * distributed sweep can learn about one audience however many addresses it claims to come from —
- * the same reasoning `hr-careers` carries for its own workspace-wide ceiling.
- *
- * ONE MESSAGE, AND BEFORE THE LOOKUP. A throttle whose wording or timing differs by which limit was
- * hit is a smaller oracle, not the absence of one.
- *
- * FAIL CLOSED. Shared with every other limiter here (`rateLimitFailsClosed.test.ts` enforces that
- * half repo-wide): the load that breaks the counting query is the sweep the count exists to stop.
- */
+/** A public gate that answers questions about your customer list has to be throttled. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

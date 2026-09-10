@@ -1,14 +1,4 @@
-/**
- * The loading and failure chrome every R3F canvas in this app needs (#321).
- *
- * Extracted from `ARPreviewModal`, which owned the only copies, when the #260 configurator became
- * the second surface mounting `ProductModelStage`. A copied error boundary is the kind of thing
- * that drifts silently — one of them stops reporting the error message, or catches a different
- * set of failures — and nobody notices, because both still look like a boundary.
- *
- * A boundary is not optional here: a WebGL context failure or a malformed GLB throws during
- * render, and without one the whole page unmounts to a blank screen.
- */
+/** The loading and failure chrome every R3F canvas in this app needs (#321). */
 import React from 'react';
 
 export const CanvasLoader: React.FC<{ label?: string }> = ({ label = 'Loading 3D preview...' }) => (

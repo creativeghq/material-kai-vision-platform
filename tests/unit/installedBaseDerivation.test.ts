@@ -1,23 +1,4 @@
-/**
- * Installed base (#343) — the two rules this feature can silently break.
- *
- * 1. ONE DERIVATION OF "NEXT DUE".
- *    The next service date is the `due_on` of a plan's single open `customer_asset_service_events`
- *    row, enforced by a partial unique index. There is no `next_due_on` column and nothing
- *    recomputes the date client-side. This is the same shape as the money-derivation rule: a
- *    wrong date is a valid date, so neither typecheck nor an integrity probe can see the drift.
- *    Five implementations of "how much is settled" is how that rule was learned; this stops the
- *    installed base repeating it with dates.
- *
- * 2. REMINDERS GO THROUGH FLOWS, NOT THROUGH A HARDCODED SEND.
- *    `CLAUDE.md` forbids a `user_notifications` insert or an `email-api` call at a new call site.
- *    The reminder cron must only ever EMIT — otherwise an admin cannot pause, retarget or add a
- *    channel without a deploy, which is exactly the state the whole Flows migration undid.
- *    `crm-meeting-reminders`, the file this cron was modelled on, still contains a hardcoded
- *    `user_notifications` insert; that precedent is why this is asserted rather than assumed.
- *
- * Both are scanned from source because both survive a green typecheck.
- */
+/** Installed base (#343) — the two rules this feature can silently break. */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -61,15 +42,6 @@ describe('one derivation of "next due"', () => {
     // setMonth/setDate/addMonths on the frontend would be a second implementation of
     // `next_service_due(...)`. The only date maths allowed client-side is "today", used for
     // form defaults and for classifying a warranty the server already dated.
-    //
-    // The UTC spellings are matched too, and that is not hypothetical tidiness: the order-side
-    // warranty dialog first shipped its end date as `d.setUTCMonth(d.getUTCMonth() + n)`, which
-    // the original pattern waved straight through. Postgres and JavaScript disagree there —
-    // 2026-01-31 + 1 month is 2026-02-28 in `make_interval`, 2026-03-03 in `Date` — so the twin
-    // was a real second answer, not a stylistic one. `warranty_end_date(date, integer)` is now
-    // the single implementation and both the trigger path and the client call it.
-    // `setDate` stays permitted: `warrantyState` uses "today + 60 days" to CLASSIFY a period the
-    // server already dated, which is the sanctioned case above. Producing a stored date is not.
     const dateMaths = /\.set(UTC)?(Month|FullYear)\(|addMonths\(|\baddDays\(/;
     for (const p of [SERVICE, TAB, PRODUCT_PANEL, ORDERS_PANEL]) {
       const src = stripComments(read(p));

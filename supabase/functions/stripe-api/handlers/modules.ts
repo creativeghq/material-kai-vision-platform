@@ -4,16 +4,6 @@
 //   deactivate-module  { workspace_id, module_slug }
 //   request-module     { workspace_id, module_slug }   (non-owner → notify owner)
 //   list-stripe-products                               (operator only)
-// An add-on module binds to a Stripe PRODUCT (1:1). The charge uses that product's
-// default_price, resolved fresh at activation — so it's always the current price and two
-// modules can never collide on a shared price id.
-// Security baseline:
-//   - authenticate() returns a service-role client (RLS bypassed) → we bind every
-//     action to the CALLER, never to a body-supplied id. Activation requires the
-//     caller to be the OWNER of the target workspace (or the platform operator).
-//   - Entitlement grants for PAID add-ons happen ONLY in the signature-verified
-//     stripe-webhooks handler. Here we only grant the FREE (plan-covered) path,
-//     after verifying owner + that the plan tier already covers the module.
 
 import type { DbClient } from '../../_shared/supabase-client.ts';
 import { grantBundle, revokeBundle } from '../../_shared/module-bundle.ts';
@@ -408,20 +398,7 @@ async function createAddonProduct(auth: AuthResult, body: Record<string, unknown
   });
 }
 
-/**
- * Does the price we SHOW match the price Stripe CHARGES?
- *
- * Found the hard way: subscription_plans said Pro $99 and Enterprise $299 while Stripe was billing
- * €25 and €500. Enterprise was charging roughly twice what the page advertised, in a different
- * currency, and nothing anywhere compared the two — the catalogue is what the pricing page renders
- * and Stripe is what takes the money, and neither has ever had to agree with the other.
- *
- * A wrong price is a valid price, so no typecheck and no integrity probe could see it. This is the
- * comparison, and it runs where the SQL probes cannot: only Stripe knows Stripe.
- *
- * Drift is logged at WARNING as well as returned, so a scheduled run lands somewhere a human
- * already looks (the admin Log Viewer) instead of in a cron response nobody reads.
- */
+/** Does the price we SHOW match the price Stripe CHARGES? */
 async function verifyCataloguePrices(auth: AuthResult): Promise<Response> {
   if (!isAdminAccess(auth) && !(await isOperator(auth.supabase, auth.userId))) {
     return json({ error: 'Operator access required', code: 'not_operator' }, 403);
@@ -521,18 +498,7 @@ async function verifyCataloguePrices(auth: AuthResult): Promise<Response> {
   return json({ ok: drift.length === 0, checked: (addons?.length ?? 0) + (plans?.length ?? 0), drift });
 }
 
-/**
- * Self-hosting enquiry from the plans page.
- *
- * Replaces the Enterprise tier, which was a purchasable plan nobody could sensibly buy: running
- * this platform on someone else's infrastructure is a conversation, not a checkout.
- *
- * The ROW is written first and the notification second. A flow can be paused and an email can
- * bounce; a self-hosting enquiry is the most valuable message this platform receives, so a
- * delivery failure must cost a delay rather than the lead. `notified` records whether delivery
- * actually happened instead of assuming it did — the same reason the back-fill now counts what
- * lands rather than what returned 200.
- */
+/** Self-hosting enquiry from the plans page. */
 async function requestSelfHosting(auth: AuthResult, body: Record<string, unknown>): Promise<Response> {
   const userId = auth.userId;
   if (!userId) return json({ error: 'Sign in required' }, 401);

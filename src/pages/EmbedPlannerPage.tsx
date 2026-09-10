@@ -1,25 +1,4 @@
-/**
- * `/embed/planner?key=…` — the room planner, for a merchant's visitor (#341 join 4).
- *
- * THE DOOR THE SDK WAS MISSING. The advertised flow is ask → configure → see → PLACE → price, and
- * "place" existed only inside the platform. A visitor on someone else's website could configure a
- * product and price it, and had no way to find out whether it fits.
- *
- * WHY A HOSTED PAGE RATHER THAN A WIDGET. The planner is React + R3F; shipping that into a
- * merchant's page means a 3D scene graph and a React runtime on every product page, for a feature
- * most visitors never open. The widget links here instead, so there is ONE planner — the same
- * canvas the platform uses — and the merchant's page stays two lines.
- *
- * NOTHING IS WRITTEN. An anonymous visitor cannot create a `room_layouts` row: RLS requires
- * workspace membership, and inventing an anonymous write path to a tenant table to store furniture
- * positions would be a new attack surface bought for a convenience. The arrangement lives in the
- * browser and travels WITH the enquiry, the same way the AI impression does — so the merchant
- * receives a lead saying what the visitor wanted AND how they laid it out.
- *
- * The catalogue comes through the embed API, so the key's scope, its origin rules and the
- * published-only gate all apply exactly as they do to the widget. This page never touches the
- * database directly.
- */
+/** `/embed/planner?key=…` — the room planner, for a merchant's visitor (#341 join 4). */
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Loader2, Plus, Ruler, Trash2, RotateCw } from 'lucide-react';

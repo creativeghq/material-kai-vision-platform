@@ -1,29 +1,4 @@
-/**
- * "What is this about?" — the subject of a meeting or an appointment (#378 N10 / C4).
- *
- * WHY THIS IS NOT `OrderLinkPicker`
- * ---------------------------------
- * That control answers a different question — "what is this COST or ORDER for?" — over filing
- * targets whose legality it enforces (a purchase line may not be appended to a customer's sales
- * order; a trip is a filing target and never a merge target). Its groups resolve to five different
- * COLUMNS on the documents that mount it.
- *
- * A calendar entry asks one question with one answer: the project, deal, property or order this
- * meeting is about, at most one, enforced by `*_single_subject_ck` on both tables. Bending the
- * order picker to that would mean switching four of its groups off and adding two it does not have.
- *
- * WHY IT EXISTS AT ALL
- * --------------------
- * C4 gave `appointments` four subject columns and the UI wrote two of them: `deal_id` and
- * `order_id` were declared, typed, CHECK-constrained and reachable from nothing. `crm_meetings` —
- * the calendar that owns the invites, the reminders and the reminder cron, and the one
- * `property_viewings` foreign-keys into — had no subject at all. One control, both surfaces, all
- * four kinds, so neither table can drift into holding columns nobody can fill.
- *
- * The WRITE is always an RPC (`set_appointment_subject` / `set_meeting_subject`), never a direct
- * column update: RLS can see the row's own tenancy but not the SUBJECT's, so "is this target in
- * the right workspace" has to be answered server-side.
- */
+/** "What is this about?" — the subject of a meeting or an appointment (#378 N10 / C4). */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Check, ChevronsUpDown, FolderKanban, Building2, Handshake, Receipt, X } from 'lucide-react';
 

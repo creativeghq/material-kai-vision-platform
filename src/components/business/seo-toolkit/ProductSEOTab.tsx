@@ -1,18 +1,4 @@
-/**
- * ProductSEOTab — per-product SEO panel mounted on ProductDetailModal.
- *
- * Auto-derives a target keyword from `product.name + manufacturer + category`
- * and fires three reads in parallel:
- *   1. seo_research_keyword (full SERP signals + AI Overview + featured snippet)
- *   2. seo_ranked_keywords for the manufacturer's homepage_domain (when set)
- *   3. seo_domain_snapshot for the manufacturer's homepage_domain
- *
- * Caches results 24h via seo_research_runs lookup so revisiting the modal
- * doesn't re-fire DataForSEO. "Refresh" button bypasses cache.
- *
- * Mounts as a TabsContent inside ProductDetailModal.tsx (admin-only, mirrors
- * the MentionMonitorTab pattern). For non-admin users we hide the tab.
- */
+/** ProductSEOTab — per-product SEO panel mounted on ProductDetailModal. */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Search, RefreshCw, ExternalLink, Sparkles } from 'lucide-react';

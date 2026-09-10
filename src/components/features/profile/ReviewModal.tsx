@@ -90,16 +90,6 @@ export const ReviewModal: React.FC<{
     };
 
     // A ZERO-ROW update is a failure, not a success (#385 FN-3).
-    //
-    // The error was already being destructured here, so this was never the `{ data }`-only
-    // oversight. The problem is subtler: an RLS denial makes supabase-js RESOLVE with no
-    // error and no rows, so `error` was null and the modal said "Review updated" while
-    // nothing had changed. `profile_reviews` had no author UPDATE policy at all — only
-    // the reviewee's reply policy — so that was every edit, every time.
-    //
-    // The policy now exists. This check stays because it is the half that does not depend
-    // on the database being configured correctly: `.select('id')` makes the update report
-    // what it actually touched.
     const { data: written, error } = existingReview
       ? await supabase.from('profile_reviews').update(payload).eq('id', existingReview.id).select('id')
       : await supabase.from('profile_reviews').insert(payload).select('id');

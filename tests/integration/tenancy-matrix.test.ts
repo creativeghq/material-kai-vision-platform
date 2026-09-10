@@ -2,32 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { hasCreds, serviceClient, createUser, createWorkspace, addMember, teardown, runId, type TestUser } from './_harness';
 
-/**
- * Cross-workspace isolation, parametrized (#263 item 1).
- *
- * `tenancy.test.ts` proves the shape on ONE table (`crm_companies`) in depth. This drives the same
- * three probes across a table PER MODULE, because the recurring leak is never "RLS is broken" — it
- * is one new table shipped without the policy its neighbours have. A per-table list is the only
- * thing that catches that, and it is deliberately the source of truth: adding a workspace-scoped
- * table without adding it here is a reviewable omission.
- *
- * The three probes, and why each is separate:
- *   1. B cannot SELECT A's row BY DIRECT ID — the leak signature. Not "B's list is short": B
- *      legitimately sees more than wsA (signup auto-joins a shared workspace), so only
- *      containment of the OTHER tenant's row is meaningful.
- *   2. B cannot UPDATE A's row — a SELECT policy without a matching USING on write is a real and
- *      common half-fix.
- *   3. Service role CAN see it — without this, a table that failed to seed would pass probes 1
- *      and 2 for entirely the wrong reason. Every negative assertion needs its positive control.
- *
- * WHY NOT A STRUCTURAL CHECK OVER ALL 243 workspace_id tables: I tried. 22 have no
- * membership-referencing policy and all 22 are legitimate — user_id-scoped (`projects`,
- * `user_preferences`), service-role-only (`facet_canonical_values`), platform-operator
- * (`data_integrity_findings`), parent-FK-scoped (`project_products`), or deny-all
- * (`kb_doc_chunks`). A check emitting 22 benign rows would bury the one real finding and teach
- * people to ignore `check_security_invariants()`, which returns 0 today. The dangerous shape —
- * an always-true write policy — is already covered there by `4-always-true-policy`.
- */
+/** Cross-workspace isolation, parametrized (#263 item 1). */
 const suite = hasCreds ? describe : describe.skip;
 
 /** The list. One representative table per module; `seed` supplies its NOT NULL columns. */

@@ -1,15 +1,4 @@
-/**
- * Viva.com connection test (per-workspace BYOK).
- *
- * POST { workspace_id } → runs the stored credentials against Viva for real and returns a
- * per-step verdict. Exists because every field on the setup card is silently wrong until a
- * customer pays: a mistyped 4-digit source code authenticates, saves, and fails only at the
- * first sale. See `runVivaConnectionTest` for what each step proves.
- *
- * Tenancy (invariant 1): the caller must be a finance manager of the TARGET workspace,
- * checked under their own RLS via `supabaseAsUser` — the service client is used only after
- * that passes, and a mismatch returns 404 rather than 403 so workspace ids can't be probed.
- */
+/** Viva.com connection test (per-workspace BYOK). */
 
 // deno-lint-ignore-file no-explicit-any
 
@@ -69,19 +58,7 @@ Deno.serve(withApiLogging('viva-config-test', async (req) => {
 
   const result = await runVivaConnectionTest(ctx);
 
-  /**
-   * The money-out half, tested SEPARATELY because it is a separate entitlement.
-   *
-   * It runs after `runVivaConnectionTest` rather than inside it for two reasons: that function
-   * returns early on a checkout failure, and the two halves are genuinely independent — a merchant
-   * whose card credentials are wrong may still have working transfer credentials, and reporting
-   * "not tested" for one because the other failed is the kind of missing verdict this codebase
-   * treats as a defect rather than a gap.
-   *
-   * Listing the wallets IS the test: it is the same scope every transfer needs, and the result is
-   * the list the operator has to choose a source account from, so a passing check hands back
-   * something usable instead of a tick.
-   */
+  /** The money-out half, tested SEPARATELY because it is a separate entitlement. */
   const checks = [...result.checks];
   // `currency` is resolved here, from the same table that encodes it on the way out — a wallet
   // list that mislabelled 978 as GBP would have the operator paying out of the wrong balance.

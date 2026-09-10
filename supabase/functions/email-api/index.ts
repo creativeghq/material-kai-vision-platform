@@ -18,19 +18,7 @@ import { resolveWorkspaceEmailSender, checkWorkspaceSendQuota } from '../_shared
 import { recordEmailEvent, DOCUMENT_ENTITY_TYPES } from '../_shared/document-events.ts';
 import type { DocumentEntityType } from '../_shared/document-events.ts';
 
-/**
- * Which document is this email about?
- *
- * Two accepted spellings, because the callers predate the delivery trail:
- *  - explicit `entityType` / `entityId` on the request body (new callers), and
- *  - the `tags` those callers already send — `{ feature:'invoice_email', invoice_id }`
- *    from finance-send-invoice-email, `{ feature:'quotes', quote_id }` from
- *    send-quote-email — so they gain a trail without being edited.
- *
- * An unrecognised type is dropped rather than passed through: it would violate
- * email_logs_entity_type_check and take down the send itself, which is a far
- * worse outcome than a missing trail.
- */
+/** Which document is this email about? */
 function resolveEntityLink(body: SendEmailRequest): { entityType: DocumentEntityType | null; entityId: string | null } {
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const known = new Set<string>(DOCUMENT_ENTITY_TYPES);
@@ -109,19 +97,7 @@ interface SendEmailRequest {
    *  NO platform-key fallback. Returns 503 (code=workspace_sender_required) when the workspace has
    *  no verified BYOK config, so the campaign never goes out from the platform domain. */
   requireWorkspaceSender?: boolean;
-  /**
-   * WHOSE email this is, for the log row only — never for sender selection or quota.
-   *
-   * `workspace_id` above means three things at once: which BYOK sender to use, whose daily cap to
-   * count against, and who owns the log row. An operator flow emailing a tenant's customer from
-   * the PLATFORM sender must not take the first two (that is the deliberate "platform-sent and
-   * unmetered" path), and so it was passing none of them — leaving 144 of 146 `email_logs` rows
-   * with no workspace. `email_logs_member_select` is
-   * `workspace_id IS NOT NULL AND is_workspace_member(workspace_id)`, so those tenants could not
-   * see their own customers' order and payment emails at all.
-   *
-   * Ignored when `workspace_id` is set; that one already carries the attribution.
-   */
+  /** WHOSE email this is, for the log row only — never for sender selection or quota. */
   attribution_workspace_id?: string;
 }
 
@@ -176,27 +152,10 @@ async function hmacHex(message: string, secret: string): Promise<string> {
   return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** Build the public one-click unsubscribe URL + List-Unsubscribe headers for a marketing send.
+/**
+ * Build the public one-click unsubscribe URL + List-Unsubscribe headers for a marketing send.
  *  The token is an HMAC of `workspace:lower(email)` under CRON_SECRET (verified by email-unsubscribe).
- *
- *  THROWS when CRON_SECRET is unset. It used to return null — "fail-open on the header,
- *  never block the send" (#387).
- *
- *  That reasoning is right for the wrong category of mail. For a TRANSACTIONAL email,
- *  never blocking the send is correct: the recipient asked for it and a missing header
- *  costs nothing. For a MARKETING send the safe failure is inverted — not sending is
- *  recoverable, sending bulk mail without a working opt-out is not.
- *
- *  What was actually lost was quieter than "no unsubscribe link". The body link fell
- *  back to a generic `${appBase}/unsubscribe`, so the email still LOOKED compliant; what
- *  vanished was the `List-Unsubscribe` / `List-Unsubscribe-Post` header pair, and the
- *  fallback link carried no workspace and no recipient token — so the page it opened
- *  could not tell who had clicked, and could not honour the request without the person
- *  re-entering their details. That is the exact friction one-click exists to remove.
- *
- *  RFC 8058 one-click unsubscribe has been a REQUIREMENT for bulk senders under the
- *  Gmail and Yahoo rules since February 2024, so this cost deliverability as well as
- *  compliance — and deliverability damage is not something a later fix undoes. */
+ */
 async function buildUnsubscribe(
   workspaceId: string, email: string, fromEmail: string, campaignId?: string | null,
 ): Promise<{ url: string; headers: Record<string, string> }> {
@@ -392,10 +351,6 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         // Reject a malformed recipient BEFORE any provider work. A `to` of the literal string
         // "null" is what a flow template renders when its recipient variable is absent (the
         // seeded Order-Dispatched flow does this whenever the customer has no email on file).
-        // Handing that to Resend is a guaranteed rejection that surfaced as a 500 — an
-        // our-fault status for what is really a bad request — and left the row stuck at
-        // `queued` forever, retried on every re-run. 400 is the honest code, and api-logger
-        // deliberately skips Sentry for 4xx so this stops looking like an outage.
         const addrOf = (raw: string) => {
           const m = raw.match(/<([^>]+)>\s*$/);   // accept "Name <a@b.com>" as well as "a@b.com"
           return (m ? m[1] : raw).trim();
@@ -414,9 +369,6 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         // send from workspace B's verified domain — billed to B's key, counted against
         // B's quota, stamped to B. Require membership when a workspace_id is supplied
         // (server-to-server admin-secret callers are exempt — trusted system sends).
-        // Attribution is bound to the caller on exactly the same terms as the sender. It is a
-        // weaker capability — it names an owner rather than spending one's quota — but an
-        // unbound one would let anyone drop a row into a stranger's email history.
         const attributionWorkspaceId = body.workspace_id ?? body.attribution_workspace_id ?? null;
         if (!isAdminAccess(auth) && attributionWorkspaceId) {
           if (!(await userCanAccessWorkspace(supabaseClient, auth.userId, attributionWorkspaceId))) {
@@ -431,15 +383,6 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         // PRODUCTION on purpose — that is how the suite covers real RLS — and on 2026-07-28 a
         // test flipping a delivery note to `issued` fired the seeded Order-Dispatched flow and
         // produced 134 attempted sends from the production domain.
-        //
-        // The recipient-validity guard above closed that specific case, because the address
-        // rendered as the literal "null". The next one will not be malformed; it will be a valid
-        // address belonging to a real person. This is the guard that does not depend on the
-        // payload being obviously wrong.
-        //
-        // Reported as a 200 with `skipped`, not an error: the caller is a flow node doing exactly
-        // what it should, and failing it would make every fixture-tenant test red for a reason
-        // that is not a defect. (#292 item 1)
         if (body.workspace_id) {
           const { data: ws } = await supabaseClient
             .from('workspaces').select('is_fixture').eq('id', body.workspace_id).maybeSingle();
@@ -459,18 +402,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         // otherwise the platform key + global email_settings sender.
         const sender = await resolveWorkspaceEmailSender(supabaseClient, body.workspace_id);
 
-        /**
-         * BYOK gate, now for EVERY send rather than the ones that opted in (#357 AE-1).
-         *
-         * `resolveWorkspaceEmailSender` returns `source: 'unconfigured'` for a TENANT workspace
-         * with incomplete BYOK — it no longer silently hands back the operator's key. The root
-         * exemption moved in there too: it was written out twice in this file (here and in
-         * `resolveContactsKey`), which is two copies of a rule that must not disagree.
-         *
-         * `requireWorkspaceSender` is now implied for every send with a workspace. It is still
-         * accepted, and still means something narrower: STRICTLY the workspace's own key, which
-         * excludes the operator's root workspace sending on the platform default.
-         */
+        /** BYOK gate, now for EVERY send rather than the ones that opted in (#357 AE-1). */
         if (sender.source === 'unconfigured') {
           return new Response(
             JSON.stringify({
@@ -533,25 +465,9 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         // field skipped suppression entirely, and so did setting it. The one path the comment
         // claimed to close ("the freeform / multi-`to` bypass") is precisely the path that
         // declares itself transactional: SendEmailDialog sends free-text operator-composed mail
-        // to a CRM contact as `transactional`, and so did the meeting-invite sender and the
-        // real-estate buyer digest. (#366 BU-2)
-        //
-        // Suppression is now the DEFAULT and exemption is the allowlist below.
         let unsubHeaders: Record<string, string> | undefined;
 
         // Which sends may skip an opt-out, and it is NOT a caller-declared class.
-        //
-        // Two conditions, both required. The feature names a specific document-or-account send;
-        // and the request must be server-to-server (`isAdminAccess` = service-role/admin-secret
-        // bearer, which is how one edge function invokes another). That second half is what
-        // makes this unforgeable rather than another honour system: a browser session holds a
-        // user JWT and authenticates at `level: 'user'`, so nothing a page can send — tags
-        // included — buys the exemption. The freeform CRM composer and the meeting invite are
-        // browser sends, which is exactly why they are the two that were bypassing.
-        //
-        // What is NOT here is the point of the list. `buyer_digest` is a periodic push to a
-        // saved search; `email_marketing` / `presentation_catalogs` / `automations` are
-        // campaigns. Those are marketing whatever the caller calls them.
         const TRANSACTIONAL_FEATURES = new Set([
           'invoice_email',        // finance-send-invoice-email — a fiscal document
           'finance_statement',    // finance-send-statement — an account statement
@@ -629,9 +545,6 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           // and target exactly one recipient — otherwise the opt-out link would be minted for the wrong
           // person. Bulk marketing is fanned out one-recipient-per-send by campaign-processor, so this
           // never blocks that path.
-          // Read AFTER the suppression filter above, which may have rewritten body.to. Minting the
-          // opt-out token from a stale address would hand the recipient a link that unsubscribes
-          // someone else.
           const primaryTo = Array.isArray(body.to) ? body.to[0] : body.to;
           if (!body.workspace_id) {
             throw new HttpError(400, 'A marketing email requires workspace_id (for suppression + a workspace-scoped unsubscribe link).');
@@ -835,9 +748,6 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         // drainer, no retry and no reaper for email_logs. Before this catch existed a
         // failed send left `status='queued'`, `error_message` NULL and
         // `updated_at == created_at` forever, and the caller's 500 was the only trace.
-        // Two "Your order DN-2026-000x has shipped" mails sat like that for 16 days —
-        // the customer was never told and nothing anywhere said so (audit 2026-08-13).
-        // Explicit failure marker over an ambiguous empty state, per pipeline convention §1.
         let messageId: string;
         try {
           messageId = await sendViaResend(sender.apiKey, {
@@ -1175,21 +1085,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         );
       }
 
-      /**
-       * ASK RESEND. Never assert (#357 AE-11).
-       *
-       * This used to be `mark-domain-verified`: a button that wrote
-       * `verification_status: 'verified'` because the operator said they had done the DNS work in
-       * the Resend dashboard. Not a spoofing vector — Resend enforces verification at send time,
-       * so a self-asserted flag cannot make an unverified domain deliverable — but the two states
-       * diverge silently, and the screen then says Verified while every send fails upstream with
-       * an opaque error.
-       *
-       * FAIL CLOSED, in the specific sense that matters here: when the provider cannot be reached,
-       * the stored row is left EXACTLY as it was. Writing anything — 'pending', a fresh
-       * provider_checked_at — would restate an unverified claim as a freshly confirmed one, which
-       * is worse than the stale claim it replaced.
-       */
+      /** ASK RESEND. Never assert (#357 AE-11). */
       case 'verify-domain': {
         if (req.method !== 'POST') throw new HttpError(405, 'Method not allowed');
 
@@ -1261,7 +1157,6 @@ Deno.serve(withApiLogging('email-api', async (req) => {
       // tenant's rendered email bodies (html_body, text_body, to_email,
       // bcc_emails, variables). It had no caller: the frontend reads email_logs
       // directly via emailService.getEmailLogs(), under RLS, which is correct.
-      // Do not reintroduce it without `.in('workspace_id', await listUserWorkspaceIds(...))`.
 
       case 'analytics': {
         let fromDate: string | null = null;
@@ -1279,17 +1174,6 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         }
 
         // DERIVED FROM email_logs, not from the `email_analytics` table.
-        // `email_analytics` has ZERO writers — no code, no trigger, no cron (repo grep: the
-        // generated types, this read, and reset-platform's truncate; pg_trigger and
-        // pg_proc: nothing). So every rate here read 0% forever while email_logs actually
-        // held 134 `failed` / 2 `queued` / 1 `delivered`. An operator watching this
-        // dashboard would conclude email was healthy DURING A TOTAL OUTAGE — the exact
-        // silent-zero shape the platform has probes for.
-        // Deriving live rather than adding a writer, per the one-derivation rule: a cached
-        // copy is a second source that can drift, and email_logs already carries every
-        // metric as a timestamp column.
-        // Also scoped to the caller's workspaces — this ran service-role and unfiltered,
-        // the same shape as the `logs` action that was removed for leaking cross-tenant.
         let query = supabaseClient
           .from('email_logs')
           .select('created_at, sent_at, delivered_at, opened_at, clicked_at, bounced_at, complained_at');

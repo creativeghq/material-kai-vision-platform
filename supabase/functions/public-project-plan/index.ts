@@ -1,14 +1,4 @@
 // public-project-plan — anonymous lead-gen estimator for /tools/project-plan.
-// In-repo public path for the Blueprint engine. The compute is PURE (no paid
-// upstream APIs) so it lives here, not in MIVAA. Turnstile-gated + metered against
-// the same `public_lookup_log` table the other public tools use (combined 2/day per
-// IP). Reads platform-starter blueprints via the service role and computes a
-// read-only estimate from the visitor's dimensions using default inline rates — no
-// save, no workspace data. Actions:
-//   starters  {}                                        -> { starters: [...] }
-//   estimate  {blueprint_id, dimensions, turnstile_token} -> { result }
-// Frontend re-reads the shared MIVAA quota after a successful estimate; this fn
-// enforces the IP limit itself and logs a success row so the counts stay consistent.
 
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { jsonResponse as json } from '../_shared/http.ts';
@@ -39,38 +29,13 @@ function clientIp(req: Request): string {
   return ip === 'unknown' ? '0.0.0.0' : ip;
 }
 
-/**
- * Uses the shared Turnstile helper so there is one verify in the codebase rather than four.
- *
- * This gate WORKS and always has — `TURNSTILE_SECRET_KEY` is set as a Supabase edge secret, so the
- * previous `Deno.env.get` read it fine. Verified against production before changing it: the live
- * endpoint answers "Bot check failed" (Cloudflare rejected the token) and not "Bot check is not
- * configured" (secret missing). I had assumed the opposite and was wrong.
- *
- * What the shared helper adds is a SECOND configuration route: `resolveSecret` falls back to
- * `platform_secrets`, so a key saved from the admin UI also works. `bootstrapForFunction()` cannot
- * provide that on its own — it copies platform_secrets into env with `Deno.env.set`, which this
- * runtime denies while the bootstrap swallows the throw. So an env-only read is correct today and
- * silently breaks the day someone configures the key from the admin screen instead of the CLI.
- * (#257 C28)
- */
+/** Uses the shared Turnstile helper so there is one verify in the codebase rather than four. */
 async function verifyTurnstile(supabase: DbClient, token: string, ip: string): Promise<boolean> {
   const { ok } = await verifyTurnstileShared(supabase, token, ip);
   return ok;
 }
 
-/**
- * Throws when the budget cannot be ANSWERED, rather than reporting zero used.
- *
- * The count is the enforcement decision. `const { count } = await …` discarded the error and
- * `count ?? 0` turned any failure — a timeout, a policy change, a bad index — into "this IP has
- * used none of its quota", which disengages the brake for everyone at once and looks like a quiet
- * day in the logs. `real-estate-public.enforceLeadRateLimit` already carries this reasoning at
- * length; this is the same brake on the other public tool, and it was still failing open.
- *
- * Turnstile sits in front of this, but a captcha is a different control: it filters bots, not
- * volume, and a solved token is exactly what an abusive caller has.
- */
+/** Throws when the budget cannot be ANSWERED, rather than reporting zero used. */
 async function quotaUsed(supabase: DbClient, ip: string): Promise<number> {
   const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
   const { count, error } = await supabase
@@ -264,15 +229,6 @@ const handler = withApiLogging('public-project-plan', async (req: Request): Prom
     const currency = bp.source_currency || 'EUR';
 
     // Destination: the OPERATOR workspace, always.
-    //
-    // /tools/kitchen-cost is a platform surface with no tenant in the request — an anonymous
-    // visitor on the public site belongs to nobody — so the lead goes to the operator, which is
-    // `workspaces.is_root` (the same row `is_platform_operator()` keys on). There is deliberately
-    // no configuration knob and nothing is read from the body: a body-supplied destination would
-    // let anyone post enquiries into another tenant's inbox (invariant 1).
-    //
-    // When this calculator is later embedded FOR a specific dealer, that tenant must come from
-    // the signed embed key that identifies them, never from a request field.
     const { data: roots } = await supabase
       .from('workspaces')
       .select('id, name')

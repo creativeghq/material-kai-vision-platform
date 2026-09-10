@@ -1,16 +1,4 @@
-/**
- * VirtualStagingModal
- *
- * 3-step flow: Room picker → Style picker → step-3 (editable) → Accept & Generate
- *
- * Serves two tools via the `variant` prop — same room/style pickers, different
- * step 3 + submit:
- *  - variant="staging" (default): stage an uploaded room with AI furniture.
- *    Step 3 = furniture items; submit → virtual-staging pipeline (20 cr).
- *    Used from ProgressiveImageGrid / uploaded message images / prompt library.
- *  - variant="design": design a room from scratch. Step 3 = optional details;
- *    submit → the caller composes a prompt and sends it to the agent (generate_3d).
- */
+/** VirtualStagingModal */
 
 import React, { useState, useEffect } from 'react';
 import {

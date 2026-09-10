@@ -1,14 +1,4 @@
-/**
- * ISO 3166-1 alpha-2 region codes, for **country of origin** on customs and Intrastat data.
- *
- * Deliberately NOT `VAT_COUNTRY_OPTIONS`: that list is keyed on the VAT prefix, where Greece is
- * `EL`. Origin is an ISO fact — Greece is `GR` — and a tariff declaration carrying `EL` as an
- * origin is wrong. The two lists look interchangeable and are not, which is exactly why this
- * one exists separately instead of being a filter over the other.
- *
- * Names are resolved at runtime through `Intl.DisplayNames` rather than being written out here,
- * so there is no hand-maintained country-name table to drift and translations come free.
- */
+/** ISO 3166-1 alpha-2 region codes, for **country of origin** on customs and Intrastat data. */
 
 /** Every assigned ISO 3166-1 alpha-2 code. */
 const ISO_3166_ALPHA2 = [

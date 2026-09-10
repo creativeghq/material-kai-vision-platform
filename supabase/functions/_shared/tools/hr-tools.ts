@@ -8,16 +8,6 @@ import { ABSENCE_TYPES, EMPLOYMENT_TYPES, isAbsenceType } from '../hrVocabulary.
 // questions ("who's on leave this week?", "record a sick day for John", "add an employee",
 // "HR overview") from chat, instead of navigating the /hr module UI.
 // DESIGN: the tool is a thin natural-language front-end over the existing `hr-api` edge function.
-// It calls hr-api over HTTP with the CALLER'S JWT, so hr-api authenticates AS the user and applies
-// its full security stack (workspace binding via userCanAccessWorkspace, isModuleEnabled('hr'),
-// assertEntitled(ws,'hr') 402, and the owner/admin-only RBAC — reads need hr.view, writes need
-// hr.manage). We re-implement NONE of that here; workspace_id is server-derived (never model-supplied).
-// SECURITY:
-//  • Gated on isModuleEnabled('hr') + is_workspace_entitled('hr') for a clean upsell message; hr-api
-//    is the real enforcer (a plain member calling a write still gets 403 from hr-api regardless).
-//  • Requires a real user JWT — without one (partner kai_ keys / admin-secret paths) hr-api can't
-//    identify the caller, so the tool fails closed with a clear message rather than calling service-role.
-//  • workspaceId is passed from agent-chat's server-resolved value, not from the model's tool args.
 
 // deno-lint-ignore-file no-explicit-any
 

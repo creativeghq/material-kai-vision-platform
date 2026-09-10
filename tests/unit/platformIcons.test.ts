@@ -1,14 +1,4 @@
-/**
- * The social networks are labelled with their OWN marks, from one registry.
- *
- * Profile → Social Accounts shipped with a camera for Instagram, two silhouettes for Facebook, a
- * briefcase for LinkedIn and a musical note for TikTok — emoji, not marks, rendering differently on
- * every OS. The map was copy-pasted into three components, so "fix the icons" meant fixing them in
- * three places and the fourth surface got whatever its author felt like.
- *
- * These cases pin both halves: the registry is complete for every platform the connect flow offers,
- * and no surface goes back to keeping its own idea of what a network looks like.
- */
+/** The social networks are labelled with their OWN marks, from one registry. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';

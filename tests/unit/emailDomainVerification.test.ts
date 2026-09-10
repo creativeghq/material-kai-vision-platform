@@ -1,17 +1,4 @@
-/**
- * A verified domain says WHO verified it, and when (#357 AE-11).
- *
- * `mark-domain-verified` wrote `verification_status: 'verified'` because the operator pressed a
- * button. The UI text was explicit about what it was: verify in the Resend dashboard, then assert
- * it here.
- *
- * Not a spoofing vector — Resend enforces domain verification at send time, so a self-asserted flag
- * cannot make an unverified domain deliverable. The defect is divergence: this screen claims
- * Verified while every send fails at the provider with an opaque error, and nothing in the platform
- * can tell the two apart. A status with no provenance also cannot be distinguished from a status
- * nobody has ever checked, which is anti-regression rule 3 — a metric is a value or a stated reason
- * there is no value.
- */
+/** A verified domain says WHO verified it, and when (#357 AE-11). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

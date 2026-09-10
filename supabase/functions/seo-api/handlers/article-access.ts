@@ -1,16 +1,4 @@
-/**
- * Loading an article the caller is allowed to touch, and writing an analysis back to it.
- *
- * Both live here because both were about to exist twice. The ownership check is invariant 1:
- * the caller comes from the verified JWT, the article is looked up by id, and a miss and a
- * FOREIGN article return the same 404 — never 403, which would confirm the id exists. Copying
- * fifteen lines of that into a second handler is how one copy ends up with the weaker check.
- *
- * The write is here for the same reason. `content_analysis` is not a column: the pipeline
- * diverts it into `stages_data.extra` (naming a non-existent column makes PostgREST reject the
- * WHOLE update). So persisting an analysis means a read-merge-write of one jsonb field, and a
- * second hand-rolled merge is a chance to drop a sibling key that somebody else wrote.
- */
+/** Loading an article the caller is allowed to touch, and writing an analysis back to it. */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../../_shared/http.ts';

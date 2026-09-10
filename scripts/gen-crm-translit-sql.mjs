@@ -1,20 +1,4 @@
-/**
- * Emit the SQL twin of `transliterateGreek` from the SAME mapping table the TypeScript uses.
- *
- * WHY GENERATED RATHER THAN HAND-WRITTEN. The transliteration has to exist in both runtimes:
- * the searchable column is GENERATED (so, SQL) and the query pattern is built in the browser
- * (so, TypeScript). That is the split `crm_fold` / `foldForSearch` already live with — and they
- * are hand-kept twins, which is exactly how the three `escapeHtml` copies drifted to three
- * different strengths. A mapping of 41 pairs kept in step by hand would drift on the first
- * addition; a generated one cannot.
- *
- * The output is a committed `.sql` file rather than a direct migration, because the function has
- * to be APPLIED to the database as well as written down. `tests/unit/greekTransliterationParity.test.ts`
- * fails when the committed file no longer matches the source, which is the prompt to regenerate
- * AND re-apply.
- *
- * Regenerate: npm run crm:translit-sql
- */
+/** Emit the SQL twin of `transliterateGreek` from the SAME mapping table the TypeScript uses. */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';

@@ -1,18 +1,4 @@
-/**
- * Shared credit reserve → settle helper (invariant #10).
- *
- * Paid tools whose upstream cost is only known AFTER the call (token-metered LLMs,
- * variable scrapes) must gate the caller BEFORE spending money and settle the exact
- * amount after. The pattern (mirrors real-estate-api/ai.ts):
- *
- *   const res = await reserveCredits(supabase, userId, workspaceId, CEILING, 'op');
- *   if (!res.ok) return res.message;            // 0-credit user blocked, no upstream spend
- *   try { ...upstream... } catch { await refundCredits(supabase, userId, workspaceId, CEILING, 'op'); throw; }
- *   await settleCredits(supabase, userId, workspaceId, CEILING, actualCredits, 'op');
- *
- * `debit_credits` fails soft (returns success=false) and routes pool-vs-personal,
- * so reserve just inspects that flag. Refund/settle are best-effort (never throw).
- */
+/** Shared credit reserve → settle helper (invariant #10). */
 
 // deno-lint-ignore no-explicit-any
 type Sb = any;

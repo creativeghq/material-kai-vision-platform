@@ -1,30 +1,6 @@
 /**
  * Guard: a supplier's bank details are READ off their invoice, and reading one is not the same
  * as agreeing to pay it.
- *
- * WHAT THIS FEATURE IS. Almost every supplier invoice prints the account to pay it into, and the
- * platform already opens every one of those documents in front of a model — `scan-receipt` for
- * the expense form, `inbox-attachment-intelligence` for everything that lands in the Inbox. Until
- * now the IBAN on the paper was re-keyed by hand onto the counterparty, or not captured at all.
- *
- * WHY THE SHAPE MATTERS MORE THAN THE FEATURE. `crm_bank_accounts` is a payment DESTINATION:
- * `_shared/payments/payout.ts` loads a row from it and sends real money on Revolut/Viva. Anyone
- * can email us a PDF. So the one thing this must never become is "a document arrived, therefore a
- * new place to send money exists". Every property below is a way that could happen quietly:
- *
- *   1. ONE contract for the payment block, spliced into both forced tools — two hand-written
- *      copies would drift about what "the IBAN on the document" means, and one of them is on the
- *      path that files it.
- *   2. Neither reader writes to `crm_bank_accounts`, and the client's suggestion API cannot
- *      either: the ONLY door is `crm_accept_bank_account_suggestion`, which needs a member's JWT
- *      and claims the row before it inserts.
- *   3. A misread IBAN is RECORDED with the verdict on it, never dropped — dropping it is a
- *      hidden row, and "we read the document and found nothing" would be a lie.
- *   4. A sighting is only filed when a party is actually known. An unbound one would sit in a
- *      queue nobody looks at.
- *   5. What the ASSISTANT is told is masked. It reads inbox threads and writes replies into
- *      them; an assistant able to recite a supplier's IBAN is one paraphrase away from handing a
- *      payment destination to whoever is on the other end.
  */
 
 import { describe, it, expect } from 'vitest';

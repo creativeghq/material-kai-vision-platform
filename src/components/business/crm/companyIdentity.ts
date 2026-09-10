@@ -33,25 +33,7 @@ export const emptyCompanyIdentity = (
   ...init,
 });
 
-/**
- * The `crm_companies` payload a draft implies.
- *
- * Three rules, each of which was a bug somewhere before this was shared:
- *  1. The TYPED name wins over the registry one — the operator saw both and left what they left.
- *  2. `is_supplier` / `is_customer` are the CALLER's answer and are always written explicitly.
- *     Both columns default to false, but the crm-api POST applies a "stated no role at all → it
- *     is a customer" convention, so a supplier created without naming its flags still lands as a
- *     customer — and then shows up in customer pickers, AR statements and the receivables aging
- *     for a company we only ever buy from. Naming both flags is what opts out of that guess.
- *     (The convention used to be a column DEFAULT TRUE on is_customer; it moved into the handler
- *     because only a request can be inspected for whether it stated a role.)
- *  3. The country code is only written when it was actually ANSWERED. `countryCode` selects which
- *     registry to ask — it is not a statement about where the business is — and it defaults to
- *     'EL'. Writing it unconditionally stamped every by-name create as Greek, which is a fact
- *     nobody supplied, on a column that drives VAT treatment and VIES eligibility. So: what a
- *     lookup resolved, else the selected country but ONLY if a VAT number was entered alongside
- *     it, else nothing. Stored upper-case — `vat_number` prefixes assume it.
- */
+/** The `crm_companies` payload a draft implies. */
 export const companyIdentityPayload = (
   d: CompanyIdentityDraft,
   roles: { is_supplier?: boolean; is_customer?: boolean } = {},

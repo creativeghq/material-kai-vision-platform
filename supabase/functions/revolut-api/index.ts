@@ -1,22 +1,4 @@
-/**
- * Revolut Business connection management (#315) — per-workspace BYOK.
- *
- * Actions (POST JSON `{ action, workspace_id, ... }`), all gated on the caller being a
- * finance manager of the target workspace via the RLS-bound user client — the service
- * client is used only AFTER that check passes (CLAUDE.md invariant 1; 404 on mismatch).
- *
- *   init             mint the RSA keypair server-side + store the redirect URI.
- *                    The private key never leaves the server; the response carries the
- *                    public key + redirect URI for the operator to paste into the
- *                    Revolut dashboard (which hands back a client_id).
- *   authorize-url    the consent URL to send the operator to once client_id is saved.
- *   oauth-complete   exchange the auth code from the consent redirect for tokens.
- *   register-webhook create the webhooks-v2 subscription and store its signing secret.
- *   accounts         live Revolut accounts + the current finance_bank_accounts mapping.
- *   map-account      link/unlink a Revolut account (currency pocket) to a bank account row.
- *   sync-now         run the shared sync core for this workspace inline.
- *   disconnect       drop tokens + webhook; keypair and client_id survive for reconnect.
- */
+/** Revolut Business connection management (#315) — per-workspace BYOK. */
 
 // deno-lint-ignore-file no-explicit-any
 
@@ -57,22 +39,7 @@ function webhooksV2Base(cfg: RevolutConfigRow): string {
   return revolutHosts(cfg.environment).api.replace('/api/1.0', '/api/2.0');
 }
 
-/**
- * Refuse to settle anything with an INTERNAL leg (#351 D1).
- *
- * A pocket transfer produces `out €1,000` + `in €1,000`, both ours, and the auto-matcher stamps
- * them `ignored` — NOT `matched` — so they stayed offerable in the feed's row menu, and the server
- * only checked provider, direction and not-already-matched. Matching the inbound leg to an invoice
- * of the same amount records a bank-transfer payment and the invoice reads settled though no
- * customer paid a thing.
- *
- * `docs/banking-revolut.md` already warns about exactly this — *"the feed is per-leg: match a row
- * in isolation and an internal pocket move settles a customer invoice."* The hazard was documented
- * and the UI permitted it. #359 CM-12 fixed the AUTOMATIC half; this is the manual one.
- *
- * The same `legShapeIsComplete` predicate, so a transaction whose shape is not fully known is
- * refused rather than assumed external.
- */
+/** Refuse to settle anything with an INTERNAL leg (#351 D1). */
 async function assertNotInternalLeg(service: any, workspaceId: string, tx: any): Promise<void> {
   const { loadLegShapes, legShapeIsComplete } = await import('../_shared/revolut/reconcile.ts');
   const shapes = await loadLegShapes(service, workspaceId, [String(tx.transaction_id ?? '')]);
@@ -566,19 +533,7 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
     }
 
     case 'send-payment': {
-      /**
-       * Money OUT from a Revolut pocket.
-       *
-       * The implementation moved to `_shared/payments/payout.ts` when Viva gained the same ability
-       * (`finance-send-payment` is the other entry). Everything that made this safe — the caller's
-       * idempotency key, the audit row written before Revolut is called, the tenancy check on
-       * `supplier_bill_id`, the refusal to send to an account whose holder name was never verified
-       * — lives there now, once, rather than here and again in the new screen.
-       *
-       * This entry keeps its own signature: it names a Revolut POCKET directly, because the screens
-       * that call it (Payables → Send, the treasury card) picked one from Revolut's own account
-       * list rather than from `finance_bank_accounts`.
-       */
+      /** Money OUT from a Revolut pocket. */
       const crmBankId = String(body?.crm_bank_account_id ?? '');
       const sourceAccountId = String(body?.source_revolut_account_id ?? '');
       const amount = Number(body?.amount ?? 0);
@@ -589,18 +544,7 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
       if (!crmBankId || !sourceAccountId) throw new HttpError(400, 'crm_bank_account_id and source_revolut_account_id are required');
       if (!(amount > 0)) throw new HttpError(400, 'amount must be positive');
 
-      /**
-       * The caller's idempotency key (#359 CM-19).
-       *
-       * `request_id` was a fresh `crypto.randomUUID()` per call, which is the opposite of an
-       * idempotency key: two clicks produced two request ids and Revolut executed both. It is an
-       * IRREVERSIBLE bank transfer, and the eleventh instance of the double-submit class platform
-       * wide — the only one whose consequence is money leaving twice.
-       *
-       * The dialog now mints one id when it opens and sends it with every attempt, so a repeat is
-       * deduplicated by Revolut itself rather than by hoping the button was disabled in time.
-       * Validated as a UUID because it is passed to the provider.
-       */
+      /** The caller's idempotency key (#359 CM-19). */
       const clientRequestId = typeof body?.request_id === 'string'
         && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.request_id)
         ? body.request_id
@@ -661,19 +605,7 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
       const skipped: Array<{ bill: string; reason: string }> = [];
       const requestId = crypto.randomUUID();
 
-      /**
-       * A bill already out for payment is NOT drafted again.
-       *
-       * Nothing stopped a second run covering the same bills: a double-click, or a retry after
-       * the draft call timed out with the draft already created at Revolut. The operator then
-       * has two drafts that look alike, and approving both pays every supplier twice. The
-       * approval step is what makes this survivable, not what makes it safe — the whole point of
-       * a bill run is that one approval executes many payments, so "there are two of them" is
-       * exactly the thing an approver is least likely to catch.
-       *
-       * A payout that FAILED is not a payment, so those do not block a genuine retry. Anything
-       * else — drafted, awaiting approval, executed — does.
-       */
+      /** A bill already out for payment is NOT drafted again. */
       const DEAD_PAYOUT_STATES = ['failed', 'cancelled', 'declined', 'expired', 'reverted'];
       const { data: livePayouts, error: livePayoutErr } = await service
         .from('payout_instructions')
@@ -722,13 +654,6 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
           request_id: `${requestId}:${bill.id}`,
           kind: 'draft',
           // WE INSTRUCTED THIS PAYMENT, SO WE KNOW WHICH BILL IT PAYS (#359 CM-19).
-          //
-          // `supplier_bill_id` is the real binding — `reconcileOutgoingRevolut` reads it first and
-          // only falls back to matching the reference TEXT when it is absent, which CM-19 calls
-          // "guessing at something we recorded". Three of the four instruction paths set it
-          // (`send-payment`, `confirm-bill-match`, the reconciler itself); this one — the bulk run,
-          // the path that pays the most bills at once — did not, so every bill paid through it
-          // reconciled by guess. It is also what the duplicate guard above reads.
           supplier_bill_id: bill.id,
           amount: Number(bill.amount_due),
           currency: String(bill.currency ?? 'EUR').toUpperCase(),

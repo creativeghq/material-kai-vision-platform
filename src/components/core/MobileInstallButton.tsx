@@ -11,14 +11,6 @@ interface MobileInstallButtonProps {
 /**
  * "Install app" affordance for the mobile menu. Adds MaterialsHub to the phone's
  * home screen as a standalone app icon.
- *
- * - Chromium (Android/desktop) with a captured prompt: fires the native install
- *   prompt directly.
- * - iOS Safari: no programmatic prompt — reveals the Share → "Add to Home
- *   Screen" steps inline.
- * - Anything else (e.g. Android before Chrome fired `beforeinstallprompt`):
- *   reveals generic "open the browser menu" steps so there's always a path.
- * - Renders nothing once the app is already installed.
  */
 export const MobileInstallButton: React.FC<MobileInstallButtonProps> = ({ onDone }) => {
   const { isInstallable, canPrompt, isIOS, promptInstall } = usePwaInstall();

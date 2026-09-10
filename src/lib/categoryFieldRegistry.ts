@@ -1,29 +1,4 @@
-/**
- * Category resolution for the product surfaces.
- *
- * WHAT USED TO BE HERE (#368 PD-5). 900 lines of `CATEGORY_DISPLAY_REGISTRY` — which sections
- * each of ten categories shows, which fields sit in each section, and what every field is
- * called. That is the answer `material_metadata_fields` + `material_categories` exist to give,
- * and this was the SEVENTH copy of it. It had drifted the way copies do:
- *
- *   - `building_materials` has been a live category in the DB for months and was absent from
- *     the union here, so a product the extractor classified `door` or `window` could not
- *     resolve and fell through to `general_materials`. Nothing failed; the product just quietly
- *     rendered under the wrong heading.
- *   - 124 of the 250 curated labels here disagreed with the registry's, and the registry had
- *     the worse ones ("Wattage W", "Cri Ra"). Those labels are now IN the registry.
- *   - 14 fields are named differently per category — `body_material` is "Material" for kitchen
- *     and lighting, "Body Material" elsewhere — which the registry could not express at all.
- *     It has `label_by_category` now, the same shape as `description_by_category`.
- *   - six fields the pipeline writes and this file displayed (`designers`, `studio`,
- *     `philosophy`, `inspiration`, `applications`, `traffic_level`) were not registry rows at
- *     all. They are now.
- *
- * The sections and labels are read at runtime by `fieldRegistryService`. What stays here is
- * category RESOLUTION, which has to be synchronous (a card renders a category badge before any
- * fetch resolves) and which already had a source: `categoryVocab.generated.ts`, the committed
- * projection of `material_categories`.
- */
+/** Category resolution for the product surfaces. */
 
 import {
   CATEGORY_DISPLAY_NAMES,

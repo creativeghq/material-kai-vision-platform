@@ -1,19 +1,6 @@
 /**
  * Card→person expense attribution (#315): import Revolut card expenses into the HR
  * expense-report system, attributed to the right employee, receipt included.
- *
- * The chain is deterministic — no name matching:
- *   expense.card_id → card.holder_id → team member EMAIL → hr_employees (via the
- *   roster's CRM contact email) → user_id → that person's monthly "Revolut card"
- *   expense report (card_type 'monthly', created on demand) → trip_expense_items row
- *   (payment_method 'company_card', approval_status default 'pending' — the normal
- *   review flow applies) → receipt fetched from Revolut and stored exactly where the
- *   manual upload path puts it (pdf-documents / trip-expenses/…).
- *
- * `revolut_expenses` is the idempotency ledger: one row per Revolut expense id, ever.
- * An expense whose holder email matches no employee is recorded as `unmatched_person`
- * and NEVER silently invents a CRM/HR entity (Greek-name rule: entities are matched,
- * not created).
  */
 
 // deno-lint-ignore-file no-explicit-any
@@ -213,17 +200,7 @@ export async function importRevolutExpenses(service: any, cfg: RevolutConfigRow)
         continue;
       }
 
-      /**
-       * CLAIM IT FIRST (#359 CM-14).
-       *
-       * The unique constraint on `(workspace_id, revolut_expense_id)` was there all along — it
-       * just was not reached until after the expense line and the receipt had been written. A
-       * crash or a second overlapping run in that window imported the same Revolut expense again
-       * as a second reimbursable line, and the employee is paid twice.
-       *
-       * Inserting the marker BEFORE the work makes the database decide the race: whoever loses
-       * gets a duplicate-key error and skips.
-       */
+      /** CLAIM IT FIRST (#359 CM-14). */
       const { error: claimErr } = await service.from('revolut_expenses').insert({
         ...ledger,
         matched_user_id: person.userId,

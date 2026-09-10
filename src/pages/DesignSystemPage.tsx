@@ -68,18 +68,7 @@ import type { HubColumn, HubSort } from '@/components/core/hub';
 import { useTheme } from '@/contexts/ThemeContext';
 import { formatMoney } from '@/utils/decimal';
 
-/**
- * SPECIMEN SHEET — every surface of the design system on one page.
- *
- * This is a working page, not a screenshot: it renders the real components with
- * the real tokens, so it changes the moment the system does. That is the point —
- * a design system documented only in prose drifts from the code within a
- * release, and then the prose is worse than nothing because people trust it.
- *
- * The theme/accent switcher at the top is here rather than buried in settings
- * because the one thing you cannot check from a screenshot is whether a surface
- * survives all four combinations (light/dark × green/blue).
- */
+/** SPECIMEN SHEET — every surface of the design system on one page. */
 
 interface DemoRow {
   id: string;

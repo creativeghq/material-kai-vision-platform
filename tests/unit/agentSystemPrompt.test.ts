@@ -2,29 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
-/**
- * The system prompt is a MESSAGE. It is never a call option.
- *
- * `ChatAnthropic.invocationParams()` builds an ALLOWLISTED request object — model,
- * stop_sequences, stream, max_tokens, tools, tool_choice, thinking, context_management,
- * container, betas, output_format, mcp_servers — and drops every other key without a word.
- * The Anthropic `system` field is filled from exactly one place: a SystemMessage sitting
- * FIRST in the messages array (`_convertMessagesToAnthropicPayload` reads `messages[0]` and
- * nothing else). So `model.invoke(messages, { system })` sends the model no instructions at
- * all, and `{ cache_control }` alongside it caches nothing.
- *
- * This has now happened three times in this repo:
- *   - the sub-agent tools, found 2026-08-11;
- *   - `agent-chat`'s main graph — every JARVIS turn since the function was written, with
- *     ~10.2K tokens of persona + doctrine + skills assembled and thrown away (measured: 10.2K
- *     built, 3.4K median actually sent), plus a comment promising a 90% cache discount that
- *     was never once earned;
- *   - `_shared/langgraph-core.ts`, the runner behind every background agent.
- *
- * It is invisible in all three: the request succeeds, the model answers from the user turn
- * alone, and the answer reads fine. No typecheck catches it either while the model is `any`.
- * Hence a test.
- */
+/** The system prompt is a MESSAGE. It is never a call option. */
 
 const ROOT = join(__dirname, '..', '..');
 const FN_DIR = join(ROOT, 'supabase', 'functions');

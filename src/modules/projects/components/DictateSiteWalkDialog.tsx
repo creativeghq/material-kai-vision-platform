@@ -1,20 +1,4 @@
-/**
- * Dictate a site walk.
- *
- * Speak while walking; the transcript is structured into a diary entry and the defects mentioned
- * in it, and NOTHING is written until the person has looked at the proposal. A transcription
- * mishears — "the ensuite tile is cracked" and "the ensuite tiler is back" differ by one sound —
- * and a defect filed straight off a mishearing is a job somebody gets sent to do.
- *
- * Everything the reader could not place is shown rather than dropped: an unmatched room, a
- * mangled sentence, a defect that arrived with no title. A dictation that quietly loses one of
- * the six faults somebody just walked past is worse than no dictation, because they believe it
- * was recorded.
- *
- * Speech recognition is the browser's, so it can simply be absent (Firefox, older WebViews). That
- * is stated plainly with the way out — type the note instead — rather than rendering a dead
- * button.
- */
+/** Dictate a site walk. */
 import React, { useEffect, useState } from 'react';
 import { Loader2, Mic, Square, Check, AlertTriangle, ClipboardList, CalendarDays } from 'lucide-react';
 

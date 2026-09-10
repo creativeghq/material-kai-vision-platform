@@ -1,20 +1,4 @@
-/**
- * Listing-import validation guard.
- *
- * The importer is the one place where a file a stranger emailed the agency becomes rows in
- * `properties`. Two things must hold, and neither is visible to the typecheck:
- *
- *  1. **The write is allowlisted.** `normaliseImportRow` builds its payload field by field from
- *     IMPORT_WRITABLE. If anyone ever "simplifies" it to a spread, a crafted CSV header could set
- *     `workspace_id`, `commission_pct`, `is_public` or `listing_agent_id` — invariant 8, the exact
- *     mass-assignment shape the security section exists to stop.
- *  2. **Bad rows are REPORTED, not silently coerced.** An importer that quietly turns a junk price
- *     into 0, or a junk energy class into a published listing, is worse than one that refuses: the
- *     agency finds out from a portal, months later.
- *
- * `normaliseImportRow` is dependency-free precisely so this test can import it; the XML half lives
- * in `real-estate-import-xml.ts` because its esm.sh import cannot resolve under a Node runner.
- */
+/** Listing-import validation guard. */
 import { describe, it, expect } from 'vitest';
 import { normaliseImportRow, IMPORT_WRITABLE } from '../../supabase/functions/_shared/real-estate-import';
 

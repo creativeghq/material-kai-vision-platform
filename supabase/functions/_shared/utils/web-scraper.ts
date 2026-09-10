@@ -17,24 +17,7 @@ export interface ScrapeResult {
   error?: string;
 }
 
-/**
- * Scrape a URL using Firecrawl API and return clean markdown + metadata
- *
- * THE URL IS VALIDATED HERE, AT THE ONE CHOKEPOINT (#352 A9). Every caller passes a URL that
- * ultimately came from a model argument or a user field — `analyze_inspiration_url` and
- * `company_website_scrape` most directly.
- *
- * The severity is genuinely lower than a raw `fetch(userUrl)`: the request below goes to
- * Firecrawl's own fixed host with the target in the BODY, so this runtime never resolves or
- * connects to the caller's URL and our metadata endpoint is not reachable through it. That is
- * why invariant 7's "never fetch a user URL raw" was not, strictly, being broken.
- *
- * It is still validated, for two reasons that survive that mitigation. An internal or malformed
- * address is a scrape that cannot succeed, and the callers DEBIT A CREDIT before finding out.
- * And "somebody else's infrastructure resolves it" is a property of a vendor we do not control,
- * so it is worth not asking them to fetch `http://169.254.169.254/` on our account. `assertSafeUrl`
- * is the shared guard — https-only here, since a page worth scraping is served over TLS.
- */
+/** Scrape a URL using Firecrawl API and return clean markdown + metadata */
 export async function scrapeUrl(url: string, timeoutMs = 30000): Promise<ScrapeResult> {
   const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
   if (!FIRECRAWL_API_KEY) {

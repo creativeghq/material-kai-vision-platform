@@ -1,16 +1,6 @@
 /**
  * Payload coercion for the template engine (issue #322) — deliberately dependency-free so it can
  * be unit-tested without the Supabase client.
- *
- * A template payload is stored jsonb: it is exactly as trustworthy as whatever wrote it — a
- * hand-edited template, an older adapter, a seeded starter with a typo. Two consequences, both
- * handled here rather than at each call site:
- *
- *  - **A value a CHECK constraint rejects must not reach the insert.** It would fail *partway
- *    through* building a record and leave half a project behind. `oneOf` returns null for anything
- *    outside the accepted set, so the row lands with a default instead of aborting the import.
- *  - **A missing or malformed value must not become `NaN` or `"undefined"`.** `num`/`str` narrow
- *    to something the column will accept.
  */
 
 /**
@@ -57,17 +47,7 @@ export const depositPct = (v: unknown): number | null => {
   return n > 0 && n <= 100 ? n : null;
 };
 
-/**
- * The PostgREST `select=` clause for an allowlist — or `null` when there is nothing to select.
- *
- * `fields.join(', ')` on an empty array is `''`, and PostgREST treats `?select=` as **`*`**:
- * verified against the live API, which returned every column of the row. That turns an empty
- * allowlist — the strongest possible declaration, used by `hr_onboarding` precisely because its
- * parent is an employee record — into "capture the whole employee", salary and AMKA and PIN hash
- * included. The declaration said one thing and the query did the opposite.
- *
- * `null` means: do not issue the query at all.
- */
+/** The PostgREST `select=` clause for an allowlist — or `null` when there is nothing to select. */
 export const parentSelect = (fields: readonly string[]): string | null =>
   (fields.length ? fields.join(', ') : null);
 

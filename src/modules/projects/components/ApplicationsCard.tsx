@@ -1,25 +1,4 @@
-/**
- * Applications for payment.
- *
- * The table shows the CLAIM and the ANSWER side by side, because the gap between them is the
- * number a contractor chases and a single "amount" column hides it entirely.
- *
- * Every figure except those two is derived by `get_project_applications` — retention this
- * application, retention held to date, previously certified, net due, variance. None of it is
- * recomputed here: an application is cumulative, so the payment due is the difference from what
- * was certified before it, and a second implementation of that subtraction is how the same money
- * ends up with two answers.
- *
- * The last column says whether a claim has become a fiscal document yet, and ISSUING IS AN ACT,
- * not a side effect of reaching a status. An application is a commercial document — it declares
- * nothing to AADE — exactly as an order does not until `generate_invoice_from_order` runs. So
- * there is a button, offered only once the amount has been agreed: invoicing a figure nobody has
- * certified means crediting it when the customer cuts it, against a document already transmitted.
- *
- * What remains for an accountant is narrower than "is this fiscal": the myDATA document TYPE
- * (2.1, treating building work as a service) and whether a given contract is reverse-charged.
- * Both are single expressions in `issue_invoice_from_application`.
- */
+/** Applications for payment. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, Plus, Receipt, Trash2, Check, FileText } from 'lucide-react';
 

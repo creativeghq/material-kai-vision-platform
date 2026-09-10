@@ -1,19 +1,6 @@
 /**
  * "Both of these belong to the same tenant" — the check that was missing in two modules at once
  * (#356 `RE-4`, #353 `CRM-5`).
- *
- * The shape: a route authenticates the caller's workspace correctly, then accepts a foreign key
- * out of the request body and stores it. Both halves are individually valid — the workspace is
- * real and verified, the contact id is a real contact — and nothing ever checks them against
- * each other. Later a service-role read joins the row and returns that contact's name, email and
- * phone to whoever owns the parent record.
- *
- * It is invariant 1 applied one level down: the caller does not get to name a row from another
- * tenant just because they named their own workspace honestly.
- *
- * Written as one helper rather than a per-site query because it appeared four times in real
- * estate and again in CRM, and the version people write inline tends to `select('id')` without
- * the workspace filter — which proves the row exists rather than that it is theirs.
  */
 import { HttpError } from './api-logger.ts';
 

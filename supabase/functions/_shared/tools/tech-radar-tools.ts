@@ -1,25 +1,4 @@
-/**
- * Tech Radar Tools — Pepper's (product-business agent) "background brain".
- *
- * The idea: we run a solution that works one way today. Feed that to the radar
- * and it researches the CURRENT tech landscape — libraries, frameworks, infra,
- * services, architectural patterns, AND AI models — and proposes concrete
- * improvements, scored with the ThoughtWorks ring vocabulary
- * (adopt / trial / assess / hold).
- *
- * Tools (registered on `kai` today; mirrored onto Pepper's allowed_tools so the
- * Agent-Fabric dispatcher inherits them when it lands):
- *   - review_solution   — one-shot deep review of a solution → ringed findings
- *   - track_tech_radar  — "keep watching this": creates a background_agents cron
- *                         monitor so the review re-runs and surfaces NEW deltas
- *   - list_tech_radar   — read tracked subjects + their latest findings
- *   - update_finding    — accept / dismiss / progress a finding (keeps it actionable)
- *
- * Research runs via Claude's built-in web_search (same as b2b_manufacturer_search,
- * no extra API key) + a structured-output pass. Internal flow = no credit debit
- * (mirrors price/mention/job internal monitoring); cost is still logged to
- * ai_usage_logs for the operations dashboard.
- */
+/** Tech Radar Tools — Pepper's (product-business agent) "background brain". */
 
 import { reserveCredits, refundCredits, settleCredits } from '../credit-reserve.ts';
 
@@ -208,9 +187,6 @@ export async function researchSolution(
           // INTERNET, and the structured output of this pass is PERSISTED to
           // `tech_radar_findings` and returned verbatim later by `review_solution` /
           // `list_tech_radar` — so an injection here is an injection with persistence.
-          // The forced `tools` + `tool_choice` above already constrains the SHAPE of the
-          // answer; it does nothing about the CONTENT being steered, which is what the
-          // delimiters address.
           `${wrapUntrusted('web research notes', researchText)}\n\n` +
           `Convert this into concrete radar findings. Use rings honestly: most ideas are ` +
           `'assess' or 'trial'; reserve 'adopt' for clear wins and 'hold' for things to avoid ` +

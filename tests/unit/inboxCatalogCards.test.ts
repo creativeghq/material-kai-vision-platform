@@ -1,25 +1,6 @@
 /**
  * Guard: a product suggested from the Inbox reaches the customer in the CHANNEL's own shape,
  * priced for THEM, and never carries anything a member typed as HTML.
- *
- * The properties that make the feature a feature, each of which rots silently:
- *
- *   1. The client sends IDS ONLY and inbox-api resolves the card — name, image, link and above
- *      all the price — for the customer on the thread, through the same price resolver a quote
- *      line uses and the ONE derivation of who that customer is. A price typed into a chat is a
- *      second derivation of a money quantity.
- *   2. WhatsApp gets an interactive `cta_url` card (image header, body, link button), one per
- *      card — never a pasted URL, never a carousel nobody could verify Meta delivers. A card with
- *      no public page degrades to image-with-caption, and to plain text with no image; it never
- *      links to a page the customer cannot open, and the member's words are never cut to fit.
- *   3. The email HTML escapes EVERY field with the canonical escaper, refuses non-http(s) URLs
- *      in href/src, and carries a text alternative listing the same cards.
- *   4. Several WhatsApp sends for one stored message are RECORDED as they go, a failure names
- *      the part that did not go, and a retry with the same token RESUMES there — never a second
- *      message that delivers the first parts twice (CLAUDE.md anti-regression rule 4).
- *   5. `manage_inbox` can READ a thread without leaving read receipts, with everything the other
- *      party may have written fenced as data (invariant 9), and the customer-audience account
- *      tools answer about the same party the rail shows.
  */
 
 import { describe, it, expect } from 'vitest';

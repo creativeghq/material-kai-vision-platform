@@ -4,11 +4,6 @@
 // standard-14 fonts (Helvetica et al.), so to render PDFs in Open Sans we embed
 // the TTF via fontkit. The static instances cover Latin + Greek + Cyrillic +
 // Euro (verified), so Greek invoices render correctly.
-// Bytes are fetched once per worker and cached in memory. If the fetch fails we
-// fall back to Helvetica so PDF generation (incl. legal invoices) NEVER breaks
-// on a font hiccup — worst case a PDF looks like it did before this change.
-// Requires the importing function's deno.json to map `pdf-lib` and
-// `@pdf-lib/fontkit`.
 import { PDFDocument, StandardFonts, type PDFFont } from 'pdf-lib';
 // @pdf-lib/fontkit's published types declare no default export, so `import fontkit from`
 // failed to typecheck (TS1192) even though esm.sh's interop makes it work at runtime.

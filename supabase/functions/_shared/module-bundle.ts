@@ -1,16 +1,4 @@
-/**
- * A module purchase can entitle more than one module.
- *
- * Channels is one add-on covering `messaging` and `social-media`, because they share one Zernio
- * account and one cost pool: selling them separately would charge twice for a cost incurred once,
- * and buying either alone would still trigger the other's per-account fees.
- *
- * The bundle lives in `modules.grants_slugs`, not in these functions. Grant and revoke are three
- * different files on three code paths (free activation, Stripe webhook grant, subscription
- * deleted), and a bundle hardcoded into the grant but missed in the revoke leaves paid-for access
- * behind after cancellation — which nobody reports, because nobody complains about still having
- * something.
- */
+/** A module purchase can entitle more than one module. */
 // deno-lint-ignore no-explicit-any
 type SupabaseLike = { from: (t: string) => any };
 

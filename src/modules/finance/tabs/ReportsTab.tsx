@@ -427,17 +427,7 @@ function primarySortKey(report: ReportKind): string {
   }
 }
 
-/**
- * Sum money columns PER CURRENCY.
- *
- * Every report now returns the currency its money is in, so a total across them is never produced:
- * a sum of euros and dollars is a confident figure in no currency at all, and that is precisely the
- * kind of wrong number nothing downstream can catch. A single-currency workspace - the common case -
- * gets exactly one group and a display identical to before this existed.
- *
- * Reports that carry no currency column (the VAT ones, myDATA reconciliation, open tasks) fall back
- * to one 'EUR' group, which is what the formatter was doing for them already.
- */
+/** Sum money columns PER CURRENCY. */
 function groupMoney(rows: any[], keys: string[]): Array<[string, Record<string, number>]> {
   const m = new Map<string, Record<string, number>>();
   for (const r of rows) {

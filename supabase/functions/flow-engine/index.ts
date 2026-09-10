@@ -96,18 +96,7 @@ const FLOW_RUN_BASE_CREDITS = 20;
  * (+ their workspace pool if known). For a tenant flow fired by a 'system' trigger, bill the
  * flow owner against the flow's workspace pool.
  */
-/**
- * Does this workspace have a usable BYOK Resend sender?
- *
- * ASKS THE RESOLVER rather than re-deriving it (#357 AE-1). This used to be a hand-written copy
- * of `resolveWorkspaceEmailSender`'s `source === 'workspace'` condition — its own comment said
- * "mirrors", which is the word that precedes a drift. It was the third copy of that rule; the
- * other two lived in `email-api` and are gone too.
- *
- * It matters more here than it looks: a wrong answer decides whether a tenant flow's email goes
- * out on the tenant's domain or the operator's, and the resolver now REFUSES the second case
- * outright, so a divergent copy would report "no BYOK" and then send anyway.
- */
+/** Does this workspace have a usable BYOK Resend sender? */
 async function workspaceHasByok(supabase: DbClient, workspaceId: string): Promise<boolean> {
   const sender = await resolveWorkspaceEmailSender(supabase, workspaceId);
   return sender.source === 'workspace';
@@ -253,17 +242,7 @@ async function executeCondition(
   switch (conditionType) {
     case 'if_else': {
       const { field, operator, value } = config as { field: string; operator: string; value: string };
-      /**
-       * AN UNCONFIGURED CONDITION IS FALSE, NEVER TRUE (#357 AE-15).
-       *
-       * With a blank `field` and a blank `value`, `equals` compares '' to '' and returns TRUE —
-       * so a half-built if_else took its true branch on every event rather than none. That is
-       * the wrong direction for a node whose job is to narrow: the failure mode is a flow that
-       * fires on everything, which for a Send Email branch means mailing everybody.
-       *
-       * `evaluateComparison` already returns false for an unknown operator; this covers the
-       * other half, where the operator is valid and there is nothing to apply it to.
-       */
+      /** AN UNCONFIGURED CONDITION IS FALSE, NEVER TRUE (#357 AE-15). */
       if (!String(field ?? '').trim() || !String(operator ?? '').trim()) {
         return {
           output: { result: false, reason: 'condition_not_configured' },
@@ -291,17 +270,7 @@ async function executeCondition(
         conditions: Array<{ field: string; operator: string; value: string }>;
         logic: 'and' | 'or';
       };
-      /**
-       * AN EMPTY FILTER BLOCKS, IT DOES NOT PASS (#357 AE-15).
-       *
-       * `[].every(Boolean)` is TRUE, so a filter with no conditions and `and` logic — the
-       * default — let every record through. A filter node exists to narrow; one that has not
-       * been configured yet passing everything is the dangerous direction. "Only VIP customers"
-       * with nothing filled in meant everybody.
-       *
-       * Stopping the branch is the fail-closed answer, and it is visible: the run output says
-       * why rather than looking like a filter that legitimately matched nothing.
-       */
+      /** AN EMPTY FILTER BLOCKS, IT DOES NOT PASS (#357 AE-15). */
       if (!Array.isArray(conditions) || conditions.length === 0) {
         return {
           output: { passed: false, reason: 'filter_not_configured', results: [] },
@@ -440,11 +409,6 @@ async function executeAction(
       //   • the template never resolved            -> still contains "{{…}}"   (caught)
       //   • the template resolved to JSON null     -> String() yields the LITERAL "null",
       //     which is non-empty and brace-free, so it sailed through and got handed to Resend.
-      // The seeded "Order Dispatched" flow does exactly this whenever the customer has no
-      // email on file (`_notify_order_dispatched` passes customer_email: null): every dispatch
-      // then produced a 500 from email-api and a permanently `queued` row in email_logs, retried
-      // on every re-run. Anything not email-shaped is an upstream payload bug — skip it, and put
-      // the offending value in the run output so the flow run says WHY instead of failing blind.
       const emailTo = String(resolved.to ?? '').trim();
       const emailParts = emailTo.split(',').map((p) => p.trim()).filter(Boolean);
       const emailToValid = emailParts.length > 0
@@ -472,15 +436,6 @@ async function executeAction(
       //    (never silently fall back to the platform domain for a tenant's own automation).
       //  • OPERATOR/global flow: use the EVENT's workspace when it carries one (invoice/payment/
       //    receipt events do) AND that workspace has BYOK → sends from that tenant's domain;
-      //    otherwise (no event workspace, or no BYOK — e.g. platform subscription/role emails)
-      //    fall back to the platform sender. requireWorkspaceSender is false here, so it degrades
-      //    gracefully rather than failing.
-      // Hold the id, not just the verdict. `!!scope?.workspaceId && !scope?.isGlobal` was a
-      // boolean TypeScript cannot narrow through, so every use inside the branch needed a
-      // `scope!` assertion — and an assertion is a promise the compiler stops checking.
-      // Both are `const`, so aliased-condition narrowing makes `tenantWorkspaceId`
-      // provably non-null inside `if (emailIsTenant)`. `|| null` (not `?? null`) keeps the
-      // original `!!` semantics, where an empty string is not a workspace.
       const tenantWorkspaceId = !scope?.isGlobal ? (scope?.workspaceId || null) : null;
       const emailIsTenant = tenantWorkspaceId !== null;
       let emailWorkspaceId: string | null = null;
@@ -585,21 +540,7 @@ async function executeAction(
       const method = String(resolved.method || 'POST');
       const timeoutMs = Number(resolved.timeout_ms) || 30000;
 
-      /**
-       * SSRF GUARD ON A CONFIG-SUPPLIED URL (#357 AE-10, invariant 7).
-       *
-       * This was `fetch(String(resolved.url))` — raw, from the edge runtime's network position,
-       * with the URL coming out of a stored flow config and template variables substituted into
-       * it. Invariant 7 is unambiguous: any server-side fetch of an influenced URL goes through
-       * the shared guard — https-only, DNS-resolved, RFC1918/loopback/link-local and
-       * `169.254.169.254` rejected, redirects refused.
-       *
-       * `http_request` is operator-only (not in `tenant_flow_allowed_actions`), which caps who
-       * can point it somewhere — but a flow config is a stored, editable artifact, and "the
-       * person who edits automations can reach the metadata endpoint" is not an acceptable
-       * resting place. Resolved ONCE here, before the retry loop, so a redirect-to-internal
-       * cannot slip in between attempts.
-       */
+      /** SSRF GUARD ON A CONFIG-SUPPLIED URL (#357 AE-10, invariant 7). */
       let safeUrl: string;
       try {
         safeUrl = await assertSafeUrl(String(resolved.url ?? ''), { allowSchemes: ['https:'] });
@@ -691,9 +632,6 @@ async function executeAction(
       // delegates the actual fan-out to the Python backend so credit metering,
       // dedupe, and channel resolution stay in one place.
       // Required resolved fields:
-      //   alert_type: 'price_drop' | 'new_retailer' | 'promo_started' | 'anomaly_detected'
-      //   product_id  OR  tracked_query_id
-      //   retailer_name, retailer_domain, title, body, payload, action_url
       const { data: moduleRow } = await supabase
         .from('modules')
         .select('enabled')
@@ -1274,12 +1212,6 @@ async function executeAction(
        * is why the audit downgraded it from Critical, but "an admin can grant themselves
        * anything by editing a config row" is still an escalation sitting in a config.
        * `workspace_members`, `credit_transactions` and `roles` were all reachable.
-       *
-       * The list is EMPTY, which is measured rather than lazy: no flow in the database uses
-       * `log_event` at all. Its documented purpose is a dedup marker for recurring scheduled
-       * flows, and no marker table exists to write one to. So an empty allowlist breaks nothing
-       * that works today and turns the next use into a deliberate, reviewed decision instead of
-       * a config edit — which is the whole difference here.
        */
       if (!LOG_EVENT_ALLOWED_TABLES.has(table)) {
         throw new Error(
@@ -1314,10 +1246,6 @@ async function executeAction(
        * service role lets a stored flow config call ANY edge function with platform authority —
        * including the ones that treat a service-role bearer as an admin caller. That is a
        * privilege-escalation primitive, not an integration point.
-       *
-       * The list is what flows ACTUALLY call, read out of `graph_definition` across every flow
-       * in the database: two. Adding a third is a code change with a review attached, which is
-       * the point — the alternative is that anyone who can edit a flow can reach everything.
        */
       if (!RUN_EDGE_FUNCTION_ALLOWED.has(fnName)) {
         throw new Error(
@@ -1429,24 +1357,7 @@ async function executeAction(
       return { output: { updated: !!data, fields: Object.keys(patch) } };
     }
 
-    /**
-     * Put work on somebody's list (#378 Phase 4).
-     *
-     * The first action that creates a business record outside quotes and moodboards. Until this
-     * existed the action vocabulary was communication and enrichment only, so every automation —
-     * however good its trigger — ended the same way: a human is told, and the human does the work.
-     * `run_edge_function` and `http_request` were the escape hatches, which meant the automation
-     * that DID exist was code, and invisible to the admin who is supposed to own it in Flows.
-     *
-     * A task deliberately, and not an invoice. Money-moving and legally-numbered documents produce
-     * a PREFILL and never a finished record — an invoice conjured behind the operator skips
-     * numbering, buyer-risk and myDATA classification. A task is the safe end of that spectrum:
-     * reversible, owned by a person, and worthless to forge.
-     *
-     * The project is looked up scoped to the flow's workspace BEFORE the insert. flow-engine runs
-     * with the service role, so RLS is not the boundary here — this check is (invariant 1). A flow
-     * whose config names a project in another tenant writes nothing and says why.
-     */
+    /** Put work on somebody's list (#378 Phase 4). */
     case 'create_task': {
       const projectId = String(resolved.project_id ?? '');
       const title = String(resolved.title ?? '').trim();
@@ -1489,18 +1400,7 @@ async function executeAction(
       return { output: { created: true, task_id: (data as { id?: string } | null)?.id ?? null, project_id: projectId } };
     }
 
-    /**
-     * Move a deal along the pipeline (#378 Phase 4).
-     *
-     * "Quote accepted -> Won", "invoice paid -> Closed" — the moves a salesperson makes by hand
-     * after something that already fired an event. No money, fully reversible, and the DB refuses
-     * an illegal destination on its own: stages are per deal TYPE, enforced by a composite FK on
-     * (deal_type_id, stage), so a construction deal physically cannot be moved into
-     * "Conveyancing". That rule lives in the schema rather than in this caller's good intentions.
-     *
-     * Scoped to the flow's workspace before the write, for the same reason create_task is:
-     * flow-engine holds the service role, so RLS is not the boundary here.
-     */
+    /** Move a deal along the pipeline (#378 Phase 4). */
     case 'advance_deal_stage': {
       const dealId = String(resolved.deal_id ?? '');
       const stage = String(resolved.stage ?? '').trim();
@@ -1526,19 +1426,7 @@ async function executeAction(
       return { output: { moved: !!data, deal_id: dealId, from, to: stage } };
     }
 
-    /**
-     * Schedule money that is expected to move (#378 Phase 4).
-     *
-     * Allowed under the prefill rule where create_expense and raise_purchase_order are not, and the
-     * distinction is not a technicality: a planned payment MOVES NO MONEY. It is an entry in the
-     * cash-flow forecast, and `planned_payments.paid_payment_id` is what links it to the real
-     * payment if and when one happens. Nothing is numbered, nothing is transmitted to AADE, and
-     * deleting one costs nothing. An invoice or a supplier bill conjured behind the operator is a
-     * different animal entirely — those stay prefills.
-     *
-     * "Invoice issued -> schedule the chase" and "bill received -> schedule the payment" are the
-     * two this exists for, which is why the settlement target is accepted and verified.
-     */
+    /** Schedule money that is expected to move (#378 Phase 4). */
     case 'create_planned_payment': {
       const title = String(resolved.title ?? '').trim();
       const amount = Number(resolved.amount);
@@ -1584,21 +1472,7 @@ async function executeAction(
       return { output: { created: true, planned_payment_id: (data as { id?: string } | null)?.id ?? null, direction, amount } };
     }
 
-    /**
-     * Attach a document to the job or the deal it belongs to (#378 Phase 4).
-     *
-     * Creates nothing and moves nothing: it writes one foreign key that already exists on the
-     * document. The partner to the link work in #378 — "quote accepted -> attach it to the deal",
-     * "invoice issued -> file it under the job".
-     *
-     * The project half is usually unnecessary, and that is deliberate: since Phase 1 the SQL chain
-     * functions carry `project_id` down from the parent themselves, so a flow should not be
-     * re-doing what `generate_invoice_from_order` already did. This exists for the links nothing
-     * derives — chiefly the DEAL, which no chain function knows about.
-     *
-     * BOTH ends are checked against the flow's workspace. flow-engine holds the service role, so a
-     * config naming another tenant's deal would otherwise attach this document to it.
-     */
+    /** Attach a document to the job or the deal it belongs to (#378 Phase 4). */
     case 'link_document': {
       const docKind = String(resolved.document_kind ?? '');
       const docId = String(resolved.document_id ?? '');
@@ -1725,8 +1599,6 @@ async function executeFlowGraph(
         // below (`context[nodeId] = output`) overwrites context.trigger. If we
         // only spread the fields flat here, {{trigger.data.X}} stops resolving and
         // every create_notification skips with "unresolved_user_id" — which had
-        // silently broken hire_me / profile / moodboard notifications. Re-nest
-        // `data` while also keeping the flat fields for any {{trigger.X}} usage.
         output = { ...triggerData, data: triggerData };
       } else if (node.type === 'conditionNode' && node.data.conditionType === 'loop') {
         // Fan-out: run the directly-connected downstream action node(s) once per
@@ -1907,20 +1779,7 @@ const RUN_EDGE_FUNCTION_ALLOWED = new Set<string>([
 
 const MAX_FLOW_RUNS_PER_MINUTE = 120;
 
-/**
- * Runs per minute across ALL flows in one workspace — the chain breaker (#357 AE-3).
- *
- * The per-flow cap above stops a flow that re-triggers ITSELF. It cannot see a ping-pong: flow A
- * fires on `event_a` and emits `event_b`, flow B does the reverse, each stays far under 120, and
- * the pair runs forever sending mail. The chain leaves the process at every hop (action → row
- * write → DB trigger → event → next flow), so no in-graph counter can follow it. The one thing
- * every hop shares is the workspace the events are happening in.
- *
- * MEASURED, not guessed: across 8,246 real runs the busiest single minute for an entire
- * workspace is 22, and the busiest minute for one flow is 15. 200 is nine times the observed
- * peak — a legitimate burst (a bulk import fanning out) has room, while a runaway pair reaches
- * it in seconds because each hop is a sub-second round trip.
- */
+/** Runs per minute across ALL flows in one workspace — the chain breaker (#357 AE-3). */
 const MAX_WORKSPACE_FLOW_RUNS_PER_MINUTE = 200;
 
 async function handleExecuteFlow(
@@ -1999,10 +1858,6 @@ async function handleExecuteFlow(
     // unanswerable query into "this flow has run zero times this minute" — and the condition most
     // likely to make this count fail is a database already under load from the runaway loop this
     // exists to stop. The brake came off exactly when it was needed.
-    //
-    // The trade-off is deliberate: a transient error now refuses ONE run rather than allowing an
-    // unbounded number. Flow runs are re-triggered by their events, so a refusal is a delay; the
-    // other direction is unmetered execution and spend.
     if (runCountErr) {
       console.error(`[flow-engine] could not count recent runs for flow ${flow_id} — refusing (fail closed):`, runCountErr.message);
       return jsonResponse({ success: false, error: 'run_rate_unverifiable', data: { flow_id } }, 429);
@@ -2182,8 +2037,6 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 // (emitFlowEvent from edge functions / DB triggers), NEVER by the browser. A plain authenticated
 // user must not be able to POST trigger-event with one of these and drive a global notification/email
 // flow with attacker-chosen data (e.g. fake "invoice_paid" / "role_upgrade_approved" to any recipient).
-// The frontend's own event set (profile_followed, moodboard_commented, review_submitted, …) is
-// intentionally NOT here, so legitimate user-initiated notifications keep working.
 const SERVER_ONLY_EVENTS = new Set<string>([
   'invoice_paid', 'invoice_issued', 'receipt_issued',
   'stripe_payment_succeeded', 'stripe_payment_failed',
@@ -2205,17 +2058,7 @@ const SERVER_ONLY_EVENTS = new Set<string>([
   'seo.article_refresh_due',
 ]);
 
-/**
- * Queue this event for every active tenant endpoint that opted into its type (#330).
- *
- * Queue, not deliver: a tenant's endpoint can be slow, down, or hostile, and none of that may
- * be allowed to slow or fail the emit that triggered it. `workspace-webhook-dispatcher` does
- * the actual POST, with the SSRF guard, the signature and the retry schedule.
- *
- * Subscriptions are matched by explicit opt-in (`event_types` contains this type). There is no
- * "all events" option on purpose — an endpoint that silently starts receiving newly-added event
- * types leaks data by default.
- */
+/** Queue this event for every active tenant endpoint that opted into its type (#330). */
 async function enqueueTenantWebhooks(
   supabase: DbClient,
   workspaceId: string,
@@ -2305,11 +2148,6 @@ async function handleTriggerEvent(
    * `trigger_config` narrows an event flow to a subset of its events — "only when the deal reaches
    * Estimate", not "on every stage move". Until this existed the column was decorative: matching
    * was trigger_type + active only, so a stage-triggered email fired on EVERY move.
-   *
-   * The rule is generic on purpose, so it works for any trigger type without the engine learning
-   * anyone's domain: every key in trigger_config must EQUAL the same-named key in the event data.
-   * A blank value means "any", and scheduling keys are not filters. Compared as strings because
-   * the config comes from a form and the payload from code, so 5 and "5" must agree.
    */
   const SCHEDULING_KEYS = new Set(['cron', 'timezone']);
   const matchesConfig = (cfg: Record<string, unknown> | null | undefined): boolean => {
@@ -2334,17 +2172,7 @@ async function handleTriggerEvent(
     return jsonResponse({ success: false, error: error.message }, 500);
   }
 
-  /**
-   * Per-workspace overrides on the OPERATOR's seeded defaults (`workspace_flow_preferences`).
-   *
-   * A global flow runs inside every workspace, so before this the seeded "Inbox Message → Notify
-   * Recipient" mailed every member on every WhatsApp reply with no off switch anywhere — the flow
-   * is invisible to the tenant by design (is_global is the operator's), so there was nothing to
-   * pause. The overlay is read here rather than baked into the match query because it is SPARSE:
-   * no row means the platform default, and the overwhelmingly common case is no rows at all.
-   *
-   * Only global flows are subject to it — a tenant's OWN flow is already theirs to pause.
-   */
+  /** Per-workspace overrides on the OPERATOR's seeded defaults (`workspace_flow_preferences`). */
   const mutedByFlow = new Map<string, string[]>();
   let flows = configMatched;
   if (workspaceId && configMatched.length) {

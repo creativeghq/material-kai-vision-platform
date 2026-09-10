@@ -38,21 +38,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
  */
 const KAI_SYSTEM_AGENT_ID = '00000000-0000-0000-0000-000000000001';
 
-/**
- * The conversation the finished report comes back to.
- *
- * `input_data.conversation_id` is not bookkeeping — it is the ONLY thing that decides whether the
- * user ever sees the work. The runner calls `postResultToChat` when it is set and skips the post
- * entirely when it is not, and the completion notification links to that chat. A run dispatched
- * without one produces a full report that exists only in `agent_runs.output_data`, behind the
- * admin monitoring list, while this tool has already told the user "I'll post the results back
- * here in this conversation".
- *
- * A chat dispatch that arrives without a conversation therefore gets one, rather than being
- * quietly downgraded to the admin page. Callers that already have a conversation are untouched.
- * If this insert fails we dispatch anyway — losing the destination is better than losing the work,
- * and the run is still reachable in the admin list.
- */
+/** The conversation the finished report comes back to. */
 async function ensureResultConversation(
   userId: string,
   agentKey: string,
@@ -172,11 +158,6 @@ export const createDispatchBackgroundTaskTool = (
         // seconds after creation, and the agent, reading `success: true`, told the user "results
         // will land in this thread". They never could. A tool that reports success for work it
         // never confirmed started is worse than one that fails loudly.
-        //
-        // The runner executes the task INLINE and only responds when it finishes, so we cannot
-        // simply await it — that would block the chat turn for the whole task. But a REJECTION
-        // (404/403/422) comes back in ~2s while real work takes minutes, so racing a short window
-        // separates the two: settled-and-not-ok means refused; still pending means running.
         const verdict = await Promise.race([
           dispatch.then((res) => (res.ok ? 'accepted' : `refused_${res.status}`)).catch(() => 'unreachable'),
           new Promise<string>((resolve) => setTimeout(() => resolve('running'), 8000)),
@@ -337,10 +318,6 @@ Returns video_url when complete, or prediction_id if still processing (poll chec
         // were none of them, so any agent that took the description at its word got
         // a failed generation. 'wan2.1-i2v-720p' dropped 2026-08-12 (issue #4) — 404
         // upstream, so it was a fourth way to say the same thing.
-        // The long-form models were live in the generator and in the UI picker for weeks
-        // before they were offered HERE, so an agent asked for a 30-second reel and got
-        // ten silent seconds from the auto-selection — the model existed, the tool just
-        // could not name it.
         model: z.enum([
           'veo-2', 'kling-v3.0', 'runway-gen4-turbo',
           'wan-3.0-480p', 'wan-3.0-720p', 'wan-3.0-1080p',

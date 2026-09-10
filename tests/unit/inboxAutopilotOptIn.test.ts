@@ -1,23 +1,4 @@
-/**
- * Guard: the AI answers a customer only when a person asked it to, and never on an import.
- *
- * On 2026-08-24 a WhatsApp number was connected in coexistence mode and its existing chats were
- * back-filled. The assistant introduced itself into 8 real conversations and sent 22 replies —
- * to the operator's own suppliers, in threads where the operator was the CUSTOMER. Two defects,
- * each harmless alone:
- *
- *  1. `cfg.auto_respond !== false` — written out by hand in FOUR files. An opt-OUT: the workspace
- *     had `settings.inbox_agent` NULL, had never been asked, and got an AI on its customers.
- *  2. The back-fill replays history through the LIVE webhook path (on purpose — one importer),
- *     so an import is indistinguishable from N customers writing in at once.
- *
- * Nothing failed. Every insert succeeded, every webhook returned 200, the toast was green. The
- * only reason it stayed bounded is that Meta refused delivery on all 22 for being outside the
- * 24-hour service window — i.e. luck, not design.
- *
- * These assertions are cheap and the failure they prevent is not recoverable: a message sent to
- * a customer cannot be unsent.
- */
+/** Guard: the AI answers a customer only when a person asked it to, and never on an import. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';

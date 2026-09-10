@@ -2,36 +2,8 @@
 /**
  * Viva.com webhook receiver (multi-tenant BYOK).
  *
- * SECURITY MODEL — read this before changing anything here.
- *
- * Viva's payment webhooks (1796/1797/1798/2054) carry **no per-message signature**. The
- * verification-key handshake authenticates US TO VIVA at registration time; it does not
- * authenticate an individual delivery. `Viva-Signature-256` exists only on Viva's Data
- * Services contract, which has a shared `secret` to key the HMAC — payment webhooks have
- * none, so there is nothing to verify against.
- *
- * We therefore satisfy security invariant #6 differently, and more strongly:
- *
- *   THE WEBHOOK IS A TRIGGER, NEVER DATA.
- *
- * Nothing in the POST body is trusted for money. We take only the transaction id from it,
- * then re-read the transaction from Viva's API with the tenant's own credentials and
- * trust ONLY that response's orderCode / statusId / amount. A forged POST therefore buys
- * an attacker nothing: either the transaction doesn't exist, or it does and is genuinely
- * paid. Viva's own documentation mandates this read-back.
- *
- * Defence in depth on top of that:
- *   - the tenant is resolved from EventData.MerchantId against workspace_viva_config —
- *     an unknown merchant is dropped, so this endpoint cannot be used to poke at
- *     arbitrary workspaces;
- *   - the invoice is resolved from OUR invoice_payment_intents row, never from a
- *     body-supplied invoice id (BOLA, invariant #1);
- *   - ingestion is idempotent on (provider, provider_ref) = ('viva', TransactionId),
- *     which matters because Viva retries 24 times, hourly, until it gets a 2xx.
- *
- * GET on this URL returns the verification key, which is what Viva's dashboard requires
- * before it will accept the URL. There is no API to register merchant webhooks, so each
- * tenant does that step by hand — see the setup card in Finance → Settings → Payments.
+ * THE WEBHOOK IS A TRIGGER, NEVER DATA: every figure is read back with `retrieveVivaTransaction`,
+ * never taken from the POST body.
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -190,12 +162,6 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
 
   // Resolve the TENANT from the merchant id. Unknown merchant → drop (and say so
   // blandly): this endpoint must not become a probe for which workspaces exist.
-  //
-  // ORDER MATTERS: this runs BEFORE the actionable filter, so that a delivery we ignore
-  // is still RECORDED. The whole diagnostic value is seeing that 4865 (Order Updated —
-  // a cancellation notice) arrives while 1796 never does, which is the shape of a tenant
-  // who picked the wrong event type in Viva's dropdown. Filter first and the one symptom
-  // of that mistake is thrown away unseen.
   const merchantId = String(data?.MerchantId ?? '');
   if (!merchantId) {
     console.warn('[viva-webhooks] delivery without MerchantId', messageId);
@@ -244,17 +210,7 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
     return json({ ok: true, ignored: true, event_type_id: eventTypeId });
   }
 
-  /**
-   * ONE DELIVERY, ONE PROCESSING (#360 CB-9).
-   *
-   * Viva retries 24 times, hourly, until it gets a 2xx, and these payment webhooks carry no
-   * per-message signature — so a replay is indistinguishable from a new notification. The card
-   * path was covered by accident (`recordInvoicePayment` is idempotent on the TransactionId);
-   * the reversal path had nothing, so a refund raised its alarm on every one of those retries,
-   * and the 2054 account-transaction path re-polled every pending order each time.
-   *
-   * The claim IS the row. A duplicate key means somebody already has this delivery.
-   */
+  /** ONE DELIVERY, ONE PROCESSING (#360 CB-9). */
   if (messageId) {
     const { error: claimErr } = await db.from('payment_webhook_events').insert({
       provider: 'viva',
@@ -327,11 +283,6 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
     // `provider_order_code = rawOrderCode(rawBody)` — the REVERSAL message's own order code,
     // not the original payment's — and matched `''` whenever that returned null, so it hit
     // the wrong row or none at all.
-    // There is also no correct row to repoint it at: the reversal carries only `ParentId`
-    // (the original TransactionId) while intents are keyed by `provider_order_code`, and
-    // `invoice_payment_intents` has no provider_ref column to join on. Cancelling would be
-    // wrong regardless — the intent was genuinely fulfilled; the money came back afterwards.
-    // Reversing settled books is the credit note's job.
     let paymentRow: { id: string; workspace_id: string | null } | null = null;
     if (parentId) {
       const { data: pay } = await db
@@ -376,18 +327,7 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
       body: 'Viva reversed a payment. The original payment is still allocated, so the invoice still reads as paid — issue a credit note to reverse it.',
       action_url: '/finance?tab=doc_payments',
     };
-    /**
-     * THE REVERSAL GOES IN THE BOOKS, NOT JUST IN A NOTIFICATION (#360 CB-7).
-     *
-     * Everything this branch did was announce: a console.error and a flow event, both of which
-     * are `.catch(() => {})`. So money that LEFT the account left no durable trace at all — the
-     * invoice still reads as paid (correct: reversing settled books from an unsigned message is
-     * the credit note's job), but there was nothing to reconcile the credit note against, and
-     * nothing at all if the notification failed to deliver.
-     *
-     * It lands in the bank feed as money OUT, unmatched, which is what it is. A person places it
-     * against the credit note they raise.
-     */
+    /** THE REVERSAL GOES IN THE BOOKS, NOT JUST IN A NOTIFICATION (#360 CB-7). */
     if (wsId) {
       const feed = await upsertVivaFeedRow(db, wsId, {
         ref: `viva-reversal-${parentId || rawOrderCode(rawBody) || messageId}`,
@@ -473,18 +413,7 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
     .maybeSingle();
 
   if (!intent) {
-    /**
-     * MONEY WE CANNOT PLACE IS STILL MONEY (#360 CB-5).
-     *
-     * This returned 200 `ignored`, and Viva stops retrying on a 2xx — so a verified, captured
-     * card payment whose intent row is missing was collected and never recorded anywhere. The
-     * intent row can genuinely be absent: #351 FE-2 found its insert is unchecked, so the
-     * mapping may never have been written for a payment the customer completed.
-     *
-     * It goes into the bank feed as UNMATCHED money in. That is durable, visible, and
-     * reconcilable by hand. Only if we cannot even do that do we refuse the acknowledgement, so
-     * Viva keeps retrying rather than the payment vanishing.
-     */
+    /** MONEY WE CANNOT PLACE IS STILL MONEY (#360 CB-5). */
     console.warn(`[viva-webhooks] no intent for orderCode ${orderCode} (merchant ${merchantId}) — recording as unmatched`);
     const feed = await upsertVivaFeedRow(db, cfg.workspace_id, {
       ref: `viva-tx-${transactionId}`,
@@ -515,18 +444,7 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
     return json({ ok: true, ignored: true }, 200);
   }
 
-  /**
-   * THE AMOUNT MUST BE THE AMOUNT WE ASKED FOR (#360 CB-8).
-   *
-   * `recordInvoicePayment` was called with whatever the read-back reported, with nothing
-   * comparing it to the intent. The read-back is trustworthy — it comes from Viva's API under the
-   * tenant's own credentials — but "trustworthy" is not "expected": an order paid for a different
-   * amount than the one we created settles an invoice it does not cover, and there is no second
-   * check anywhere downstream.
-   *
-   * A mismatch is not settled and not thrown away: it lands in the feed as unmatched money for a
-   * person to place. Compared in cents, because these are floats.
-   */
+  /** THE AMOUNT MUST BE THE AMOUNT WE ASKED FOR (#360 CB-8). */
   const expected = Number(intent.amount ?? 0);
   const paid = Number(tx.amount ?? 0);
   if (expected > 0 && Math.round(expected * 100) !== Math.round(paid * 100)) {
@@ -670,22 +588,7 @@ async function upsertVivaFeedRow(db: any, workspaceId: string, row: {
   }
 }
 
-/**
- * RF / bank-transfer settlement.
- *
- * Triggered by an `Account Transaction Created` (2054) event, which says only "the wallet
- * balance changed" — it does NOT identify an order. So for each of this workspace's
- * still-pending bank-reference intents we poll the ORDER state and book the ones Viva now
- * reports Paid (StateId === 3). Most 2054s (card settlements, fees, payouts) find no
- * pending RF intents and cost one cheap query.
- *
- * providerRef is `viva-rf-<orderCode>` — a bank transfer has no card TransactionId, and the
- * orderCode is the stable unique key for this settlement, so it gives us idempotency the
- * same way the card TransactionId does.
- *
- * SETTLEMENT IS STILL THE READ-BACK, not the webhook body: the money is only booked after
- * Viva's own order API confirms StateId === 3.
- */
+/** RF / bank-transfer settlement. */
 async function settlePendingRfOrders(db: any, cfg: any, ctx: any): Promise<Response> {
   // Newest-first + capped: without an explicit order, 50 immortal stale intents could
   // nondeterministically starve the genuinely-fresh RF that was just paid (audit M1).

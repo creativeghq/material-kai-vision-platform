@@ -1,26 +1,4 @@
-/**
- * `manufacturer_analytics_events.event_type` contract guard (issue #350).
- *
- * This table has TWO independent producers that never see each other:
- *   • src/services/manufacturerAnalyticsService.ts  — in-app product engagement (`product_*`)
- *   • supabase/functions/products-3d-api/index.ts   — the embeddable 3D widget (`embed_*`)
- *
- * For most of its life the table had NO check constraint, despite the service's header comment
- * claiming one. The result was a table that quietly accepted anything: all 43 rows in production
- * turned out to be `embed_*`, while every reader — the Factory Analytics geo panel, the CRM Market
- * tab — filtered for `product_*` types that no constraint guaranteed and no row ever carried. The
- * readers showed "no engagement yet" rather than failing, which is the silent-zero shape.
- *
- * There is now a real CHECK (migration `manufacturer_analytics_event_bus_foundation`). The failure
- * this test prevents is the NEXT one: a producer adds an event type, the migration is forgotten,
- * and every one of those events is rejected at insert time. The beacon swallows the error, so it
- * reads as zero forever — exactly what `EMBED_EVENT_TYPES`' own comment warns happened to
- * `embed_configure` before #341.
- *
- * DB_EVENT_TYPES below mirrors the live CHECK. Adding a type to either producer without adding it
- * here fails this test; adding it here without applying the migration fails at runtime. Keep all
- * three in step.
- */
+/** `manufacturer_analytics_events.event_type` contract guard (issue #350). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';

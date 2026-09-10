@@ -1,14 +1,4 @@
-/**
- * Order intake — the shared brain behind both channels. Issue #342 §3.
- *
- * Called from ONE chokepoint (`maybeRunOrderIntake` in `inbox-api`), immediately before the agent
- * reply, at all three places an inbound customer message lands. WhatsApp reaches it through
- * `zernio-webhook-handler` and email through `email-webhooks`, both of which already call
- * `internal_agent_reply` — so neither webhook needed a change.
- *
- * The result is a PROPOSAL stored on `inbox_threads.metadata.order_intake`. Nothing is written to
- * `orders` here, or anywhere, until a member approves it.
- */
+/** Order intake — the shared brain behind both channels. Issue #342 §3. */
 
 import type { DbClient } from '../supabase-client.ts';
 import { buildTranscript, classifyOrderIntent, extractOrderLines } from './extract.ts';

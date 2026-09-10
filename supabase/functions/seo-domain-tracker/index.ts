@@ -1,15 +1,4 @@
-/**
- * seo-domain-tracker — weekly Rankings + Backlinks snapshots per connected website.
- *
- * Pulls DataForSEO domain rank overview (ranking keywords, traffic, position buckets,
- * movement), backlinks summary (backlinks, referring domains, spam), and the top
- * ranked keywords — for the site's MARKET (resolved from its GSC top country, else
- * its TLD, else US) — into seo_domain_snapshots + seo_domain_keywords.
- *
- * Actions (user JWT): run — snapshot one website now.
- * Action (x-cron-secret): cron-run — weekly snapshot of every active website.
- * verify_jwt disabled at the gateway (config.toml); run self-authenticates (invariant #1).
- */
+/** seo-domain-tracker — weekly Rankings + Backlinks snapshots per connected website. */
 
 import { createClient } from '@supabase/supabase-js';
 import { withApiLogging } from '../_shared/api-logger.ts';
@@ -76,17 +65,7 @@ async function resolveMarket(supabase: any, websiteId: string, domain: string): 
   return { country, language: A2_TO_LANG[country] || 'en' };
 }
 
-/**
- * DataForSEO dispatcher via MIVAA's seo-agent route.
- *
- * Returns the items AND whether an empty result was a clean "we have nothing for
- * this target". Those are different facts and the caller has to be able to tell
- * them apart: /backlinks/summary/live answers `status_code: 20000, "Ok.",
- * result_count: 0, result: null` for a domain the backlink index has never seen,
- * which is a true answer — not a failure, and not zero backlinks either.
- * Collapsing it into `[]` is what left every stored snapshot's backlink columns
- * NULL with nothing anywhere recording why.
- */
+/** DataForSEO dispatcher via MIVAA's seo-agent route. */
 async function dfs(kind: string, params: Record<string, unknown>): Promise<{ items: any[]; answered: boolean }> {
   const resp = await fetch(`${MIVAA_GATEWAY_URL()}/api/v1/seo-agent/dataforseo/${kind}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET() },
@@ -163,9 +142,6 @@ async function trackWebsite(supabase: any, website: { id: string; workspace_id: 
     // domains/domain rank — and the dashboard, unable to tell that apart from a
     // site with no links, simply hid the row. Every stored snapshot for the one
     // connected site is in exactly that state. Record WHICH source failed; the
-    // reader is then told "we could not fetch this" instead of being shown
-    // nothing at all. `source_errors` is what `get_website_seo_overview` reads
-    // to decide `collector_failed` vs `no_data`.
     const sourceErrors: Record<string, string> = {};
     const sourceStatus: Record<string, string> = {};
     const note = (key: string, e: unknown) => {
@@ -275,17 +251,7 @@ async function trackWebsite(supabase: any, website: { id: string; workspace_id: 
   }
 }
 
-/**
- * Snapshot every tracked competitor for one website.
- *
- * ONLY the rank-overview call, deliberately. A backlinks_summary per competitor
- * would double the cost of every weekly run for a figure the comparison chart does
- * not plot, and this loop scales with however many rivals an operator adds. The
- * site's own snapshot still fetches backlinks.
- *
- * One competitor failing must not abort the rest, nor the run: each is caught,
- * recorded with its own `source_status`, and the loop continues.
- */
+/** Snapshot every tracked competitor for one website. */
 async function trackCompetitors(
   supabase: any,
   website: { id: string; workspace_id: string },

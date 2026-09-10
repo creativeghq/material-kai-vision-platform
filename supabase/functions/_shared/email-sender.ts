@@ -1,14 +1,4 @@
-/**
- * Per-workspace Resend BYOK resolution + send-cap enforcement.
- *
- * A workspace brings its OWN Resend API key + verified sender (workspace_email_config) so its
- * mail goes out from its own account/domain. When it has not, the send is REFUSED — a tenant
- * never falls back to the operator's credentials (#357 AE-1, and CLAUDE.md's BYOK rule). The
- * platform key serves system sends (no workspace) and the operator's own root workspace.
- *
- * The daily send cap is OURS (platform-controlled): per-workspace override (admin-set) or the
- * global `email_workspace_daily_limit` system setting. Counted off email_logs.workspace_id.
- */
+/** Per-workspace Resend BYOK resolution + send-cap enforcement. */
 
 // deno-lint-ignore no-explicit-any
 type SupabaseLike = any;
@@ -81,26 +71,7 @@ export async function resolveWorkspaceEmailSender(
     }
   }
 
-  /**
-   * A TENANT NEVER FALLS BACK TO THE OPERATOR'S CREDENTIALS (#357 AE-1).
-   *
-   * CLAUDE.md states it directly for the BYOK set: "a tenant NEVER falls back to the operator's
-   * master credentials." This function used to do exactly that — a workspace with incomplete
-   * BYOK sent through the operator's Resend account and domain, and the only thing standing in
-   * the way was an OPT-IN `requireWorkspaceSender` flag that most callers do not pass.
-   *
-   * The exposure is shared and reputational, which is what makes a silent fallback the wrong
-   * default: every tenant's bounces, complaints and spam reports land on the operator's sending
-   * domain and degrade deliverability for everyone else on it.
-   *
-   * TWO cases legitimately use the platform key, and they are not tenants:
-   *   - no workspace at all — a system send (alerts, platform notifications);
-   *   - the operator's own ROOT workspace, which IS the platform.
-   *
-   * That root exemption already existed, written out twice inside `email-api`
-   * (`requireWorkspaceSender` gate, `resolveContactsKey`). It belongs here, once, so every
-   * caller gets the same answer — including the ones that never thought to ask.
-   */
+  /** A TENANT NEVER FALLS BACK TO THE OPERATOR'S CREDENTIALS (#357 AE-1). */
   if (workspaceId) {
     const { data: ws } = await supabase
       .from('workspaces').select('is_root').eq('id', workspaceId).maybeSingle();

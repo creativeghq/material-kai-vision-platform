@@ -1,30 +1,4 @@
-/**
- * Catalog cards in an Inbox message — a product or a service, suggested to the customer.
- *
- * ONE shape, stored on the message (`inbox_messages.metadata.cards`), rendered three ways:
- *
- *   • WhatsApp — Meta's interactive `cta_url` message: image header, body, one link button. One
- *     send per card; the member's words ride in the first card's body when they fit, and go out
- *     as their own text message first when they do not. No public link → the image with the
- *     facts as its caption; no image either → plain text. All of those are SESSION messages, so
- *     the 24h-window check that gates every freeform reply already gates these. (Meta's media
- *     carousel is deliberately not used: Zernio accepts it, but whether Meta delivers it as a
- *     session message could not be verified, and its failure would arrive asynchronously after
- *     the member has seen a "sent" bubble.)
- *   • Email — an HTML table (thumbnail · name · price · button) under the member's own words, with
- *     a text alternative that lists the same cards. Every field is escaped with the canonical
- *     escaper (invariant 11) and every href/src goes through the http(s) allowlist; a card is
- *     tenant-authored data, and a product called `<script>` is a product called `<script>`.
- *   • In-app — the Inbox transcript and the customer's `/i/:token` page render the same cards.
- *
- * The client sends IDS ONLY. Name, image, link and — above all — the PRICE are resolved by
- * `inbox-api` for the customer on the thread, through the same `get_product_price_for_workspace`
- * resolver a quote line uses, and the printed price line is derived ONCE here (`price_line`), so
- * the chat bubble, the email and the WhatsApp card cannot word the same price differently.
- *
- * Pure: no Deno APIs, no DB. Imports only mirrored vocabularies and the escaper, so vitest can
- * load it directly.
- */
+/** Catalog cards in an Inbox message — a product or a service, suggested to the customer. */
 
 import { escapeHtml } from './html.ts';
 import { safeHref, safeImageSrc } from './safeUrl.generated.ts';

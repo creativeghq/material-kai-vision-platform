@@ -1,24 +1,4 @@
-/**
- * Generate Social Video Edge Function
- *
- * Generates short-form social media videos.
- *
- * DEFAULT: h3-max-768p → 25 credits (H3 Max — fal's post-train of MiniMax H3).
- * 5-15 seconds with stereo audio, rendered in seconds rather than minutes — the reel
- * format itself, and the only model here designed for it. It is delegated to
- * generate-interior-video-v2 like every other model below.
- *
- * Also selectable, all delegated: veo-2 (50), wan-3.0-480p/720p/1080p (30/55/110, 30s),
- * seedance-2.5-480p/720p (60/125, 30s one-pass).
- *
- * kling-3.0 (20) is the ONE model still run here, through Replicate, and it is the reason
- * the default moved: Replicate has been answering `auth_failed` to every probe, so the
- * previous default could not produce a video at all. Everything delegated runs on its
- * provider's own key and is unaffected.
- *
- * Credits are debited upfront and are non-refundable.
- * Uses async polling pattern: returns prediction_id if generation exceeds 50s.
- */
+/** Generate Social Video Edge Function */
 
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { jsonResponse } from '../_shared/http.ts';
@@ -32,19 +12,7 @@ import { captureException } from '../_shared/sentry.ts';
 import { fetchBinaryGuarded } from '../_shared/fetch-image.ts';
 import { assertSafeUrl, SSRFError } from '../_shared/ssrf-guard.ts';
 
-/**
- * Download a finished Replicate video into our own bucket and return the public URL.
- *
- * The success path used to write `pollResult.output` straight onto social_posts.video_url.
- * Replicate's output URLs expire within about an hour, so the user paid 15-20 credits, saw
- * the video once, and the stored link 404'd by the time the post was scheduled or published.
- * generate-interior-video-v2 already downloads before persisting; this path did not.
- * 
- *
- * Returns null on failure so the caller can refuse to persist an expiring URL rather than
- * silently storing one — the mistake generate-social-image's storeImage() still makes by
- * returning the upstream URL when the upload errors.
- */
+/** Download a finished Replicate video into our own bucket and return the public URL. */
 async function storeVideo(
   supabase: DbClient,
   videoUrl: string,
@@ -180,17 +148,6 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
   const body = await req.json();
 
   // ── action: 'status' — collect a job that outran the 50s inline poll ──
-  //
-  // Everything below returns `status: 'processing'` with a job_id when Replicate has not
-  // finished inside the request, and until now NOTHING ever came back for that job. The only
-  // thing that touched those rows was `reconcile_stuck_generation_videos`, which after 30
-  // minutes marks them FAILED and refunds — so a video that Replicate finished at 90 seconds
-  // was thrown away and reported as a failure, with the credits handed back and the render
-  // paid for at the provider. A slow video was, structurally, always a lost video.
-  //
-  // This is the collector. It lives here rather than in the tool because completing a job means
-  // downloading the file into our bucket, attaching it to the post and writing the billing row
-  // — the same three steps the inline success path does, and they belong in one place.
   if (body?.action === 'status') {
     const jobId = typeof body.job_id === 'string' ? body.job_id : '';
     if (!jobId) return jsonResponse({ success: false, error: 'job_id is required' }, 400);
@@ -448,9 +405,6 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
       // currently cannot render at all), a social video was generated, charged, stored, and
       // never written onto the post it was made for. `social_posts.video_url` was reachable
       // only through the Replicate path.
-      // CHECKED: reporting `post_id` back over a rejected update would tell the caller the reel
-      // is on the draft when it is not, and the next step (publish) would send a post with no
-      // video and no error anywhere.
       let attachError: string | null = null;
       if (post_id && veoResult.video_url) {
         const { data: existingPost } = await supabase

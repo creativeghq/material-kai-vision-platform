@@ -1,25 +1,4 @@
-/**
- * What was posted about this listing (#378 N6).
- *
- * THE FINDING, AND THE HALF OF IT THAT WAS ALREADY TRUE
- * ----------------------------------------------------
- * The issue says "marketing content connects to nothing it markets… marketing ROI is structurally
- * unanswerable rather than merely unreported". Half right, and the true half is the interesting
- * one: `real-estate-listing-social` has always announced a published listing and always recorded
- * WHICH property it announced — as `metadata->>'property_id'`, a jsonb key with no foreign key, no
- * index and nothing able to JOIN it. The data was being written and was unreachable to any
- * derivation, which is a different defect from "the link does not exist".
- *
- * `social_posts.property_id` is a real column now, and this is its reader: the announcement is
- * visible where the listing lives instead of only in the social module.
- *
- * WHAT IT DELIBERATELY DOES NOT DO
- * --------------------------------
- * It does not compute engagement or reach. `social_post_analytics` is a separate table with its
- * own collectors, and a second surface totalling those numbers is a second derivation of them.
- * This says what went out and what state it is in — the question the property page could not
- * answer at all.
- */
+/** What was posted about this listing (#378 N6). */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Loader2, Share2 } from 'lucide-react';
 

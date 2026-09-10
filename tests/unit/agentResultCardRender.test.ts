@@ -1,19 +1,4 @@
-/**
- * What the agent's result card ACTUALLY renders.
- *
- * AgentResultCard is the only renderer for all 127 result types in AGENT_RESULT_TITLES, so its
- * shape handling is the Agent Hub's presentation layer. Every other guard in this repo scans
- * source; this one renders the component to HTML with a real payload and asserts the output,
- * because the defects it exists to catch are invisible in source:
- *
- *   • `{ flows: [...] }` came out as one grey chip per row with `Name: x  Status: y` inside it —
- *     fine at one row, a wall at twenty, unscannable down a column.
- *   • a timestamp printed verbatim as `2026-08-18T20:02:46.275904+00:00`, which is the single
- *     most "this is a debug view" detail on the screen.
- *   • a stored enum printed as `quote_approved`.
- *
- * The payload below is the real one from conversation daf3efb3, with rows added to make it a list.
- */
+/** What the agent's result card ACTUALLY renders. */
 import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -176,17 +161,7 @@ describe('AgentResultCard offers the next action', () => {
   });
 });
 
-/**
- * The record layer — conversation 46b837fb, "show me the first 5 expenses by supplier".
- *
- * The agent answered TWICE in that conversation: a prose table in the chat with a Supplier column
- * and real amounts, and this card on the canvas with the whole payload nested under a field
- * labelled "Data", a Notes column instead of a supplier, and `328` in one column next to `EUR` in
- * another. Same six expenses, two different answers depending on which half of the screen you
- * were looking at — and nothing on the canvas was clickable.
- *
- * The payload below is the real one, plus the identity columns `list_recent_expenses` now selects.
- */
+/** The record layer — conversation 46b837fb, "show me the first 5 expenses by supplier". */
 const EXPENSES = {
   data: {
     count: 2,

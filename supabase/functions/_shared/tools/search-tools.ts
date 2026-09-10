@@ -30,18 +30,7 @@ import { resolveTokenPrice } from '../ai-logger.ts';
 // One wording for every untrusted block (security invariant 9).
 import { wrapUntrusted } from '../untrusted.ts';
 
-/**
- * Rerank whichever result array a MIVAA /api/rag/search payload came back with, in place.
- *
- * MIVAA returns different keys per strategy (`results` for fused multi-vector, `chunks` and
- * `products` for the KB-ish shapes), so this reorders every array it recognises rather than
- * assuming one. Anything it does not recognise is left exactly as received.
- *
- * Fully inert when there is nothing to rank: rerankResults returns the input untouched, with no
- * model call, for fewer than 2 candidates — which is every search on this platform until the
- * catalog pipeline produces products. Wiring it now means it starts working the day data arrives
- * rather than needing to be remembered then.
- */
+/** Rerank whichever result array a MIVAA /api/rag/search payload came back with, in place. */
 const RERANKABLE_KEYS = ['results', 'chunks', 'products'] as const;
 
 // deno-lint-ignore no-explicit-any
@@ -57,22 +46,7 @@ const toCandidate = (r: any, i: number): RerankCandidate => ({
   understandingScore: typeof r?.understanding_score === 'number' ? r.understanding_score : undefined,
 });
 
-/**
- * Why a search came back empty — "nothing matched" or "there is nothing to match".
- *
- * Those are the same empty list to the agent, and telling them apart is not optional judgement:
- * it decides whether reformulating is smart or futile. Watched live on 2026-08-22, with
- * `products` at 0 rows, the agent ran TEN `material_search` calls in one turn at ~13s each —
- * broadening "porcelain" to "gres" and "stoneware", then firing a deliberate control query whose
- * own stated intent was *"confirm whether any tile products exist in the catalog at all"*. It had
- * correctly worked out what to ask and had no way to be told. Two minutes of the user's time, and
- * it still could not conclude anything, because a zero result carries no information about the
- * corpus behind it.
- *
- * So on a zero result — and ONLY then, this costs nothing in the common case — count the corpus
- * and say which of the two happened. `null` means the count itself failed: unknown is not empty,
- * and reporting "the catalogue is empty" because a count errored would be the same bug inverted.
- */
+/** Why a search came back empty — "nothing matched" or "there is nothing to match". */
 async function describeEmptyResult(
   corpus: 'products' | 'kb_docs',
   workspaceId: string,
@@ -114,28 +88,7 @@ async function describeEmptyResult(
   };
 }
 
-/**
- * Which corpora in this workspace actually contain anything.
- *
- * MIVAA's knowledge-base endpoint runs one branch per requested `search_type`, and each branch
- * costs a vector search whether or not the table behind it holds a single row. Measured against
- * the live workspace on 2026-08-23, same query, same 6 results returned either way:
- *
- *   search_types=["kb_docs"]                      →  4.1s
- *   search_types=["kb_docs","chunks","products"]  → 17.2s
- *
- * Thirteen seconds to search `document_chunks` and `products`, both of which are at 0 rows. That
- * was two thirds of every knowledge lookup on the platform, and it is pure waste — not a
- * trade-off, not a quality/latency balance. Nothing is lost by not searching an empty table.
- *
- * (This is where the time went. The re-ranker was the obvious suspect and was innocent: it is one
- * Haiku reorder that never drops a result. Worth measuring before optimising.)
- *
- * Probes with `limit(1)` rather than a count — the question is "is there anything", and an exact
- * count over a large catalogue is the expensive way to ask it. Cached briefly per isolate: the
- * answer changes only when a workspace first ingests, and a short TTL keeps that window small
- * rather than pinning "empty" for the rest of the isolate's life.
- */
+/** Which corpora in this workspace actually contain anything. */
 const CORPUS_TABLE: Record<string, string> = {
   kb_docs: 'kb_docs',
   chunks: 'document_chunks',
@@ -420,17 +373,6 @@ export const createVisualSearchTool = (workspaceId: string, images: string[], us
         const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
 
         // Two different endpoints, on purpose.
-        //
-        // `/api/rag/search?strategy=image` ranks on the SLIG visual vector alone and
-        // never reads `aspect` — the request model accepted the field, the image branch
-        // dropped it, and every "match this photo's TEXTURE" call quietly returned plain
-        // visual similarity while looking like it had worked.
-        //
-        // It cannot be fixed by passing the flag harder: the per-aspect collections hold
-        // no image vectors at all. They hold Voyage embeddings of vision-analysis TEXT,
-        // so an image reaches them only by running the same analyze → serialize → embed
-        // pipeline ingestion ran. `/api/search/by-<aspect>` is the endpoint that does
-        // exactly that, which is why the aspect path goes there instead.
         const url = new URL(
           aspect
             ? `${MIVAA_GATEWAY_URL}/api/search/by-${aspect}`
@@ -788,19 +730,7 @@ export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = fal
   );
 };
 
-/**
- * LangChain Tool: Read Document Section
- *
- * The read half of "locate-then-read". `knowledge_base_search` finds WHERE an answer
- * lives (docId + chunkIndex); this reads the surrounding sections in document order.
- *
- * It exists because vector search returns disconnected fragments: an answer that runs
- * past a section boundary is unreachable by similarity alone, and the agent's only
- * other move is to guess new keywords and hope the missing half scores above threshold.
- * Reading outward from a known-good hit is both cheaper and more reliable.
- *
- * Cost: none — pure SQL on the backend, no embedding and no LLM call.
- */
+/** LangChain Tool: Read Document Section */
 export const createReadDocumentSectionTool = (workspaceId: string, isAdmin = false, agentId?: string) => {
   return tool(
     async ({ docId, chunkIndex, before = 1, after = 2, query = '', maxTokens = 6000, source = 'kb', productId }) => {

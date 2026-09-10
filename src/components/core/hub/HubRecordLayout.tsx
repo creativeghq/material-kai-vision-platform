@@ -17,19 +17,6 @@ interface HubRecordLayoutProps {
 /**
  * RECORD LAYOUT — the three-column shell for a single record (contact, company,
  * deal, order, property).
- *
- * The columns are not decoration; each answers a different question, and mixing
- * them is what turns a record page into a wall:
- *
- *   left    WHO/WHAT is this        — identity + stored fields
- *   centre  WHAT HAPPENED           — activity, notes, emails, tasks
- *   right   WHAT IS IT CONNECTED TO — deals, tickets, companies, files
- *
- * The rails are fixed-width and the centre is fluid, because the rails hold
- * label/value pairs (which have a natural width and look broken stretched) while
- * the centre holds prose and lists (which want the room). Below `lg` the whole
- * thing stacks in that same order — identity, then activity, then associations —
- * which is also the order of decreasing usefulness on a phone.
  */
 export const HubRecordLayout: React.FC<HubRecordLayoutProps> = ({
   left,
@@ -186,17 +173,7 @@ interface HubPropertyProps {
   layout?: 'stacked' | 'inline';
 }
 
-/**
- * One stored field: label + value.
- *
- * Stacked by default. A side-by-side label/value pair inside a 300px rail
- * leaves ~140px for the value, so every email address, address line and company
- * name truncates — and a truncated value in a properties panel is worse than no
- * panel, because it looks like the data is short rather than clipped.
- *
- * An absent value renders an em dash, never an empty line: "we have no phone
- * number" and "this row failed to render" must not look the same.
- */
+/** One stored field: label + value. */
 export const HubProperty: React.FC<HubPropertyProps> = ({ label, children, layout = 'stacked' }) => {
   const empty = children === null || children === undefined || children === '';
   const value = empty ? <span className="text-muted-foreground">—</span> : children;

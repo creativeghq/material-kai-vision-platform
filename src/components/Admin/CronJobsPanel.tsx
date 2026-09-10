@@ -85,20 +85,7 @@ const formatDuration = (ms: number | null): string => {
   return `${(ms / 60000).toFixed(1)}m`;
 };
 
-/**
- * What a cron's status actually means.
- *
- * pg_cron marks a `SELECT net.http_post(...)` job succeeded the moment the request is ENQUEUED —
- * it never sees the response. 38 of this platform's 70 jobs are that shape, so "Success" here was
- * never evidence that the work happened. The nightly integrity sweep 500'd for two days behind a
- * green badge, and the panel had no way to know.
- *
- * So three distinct states, not two:
- *   • the invocation returned <400  → Success (verified — we saw the response)
- *   • the invocation returned >=400 → Function failed, RED, whatever pg_cron claims
- *   • no invocation recorded        → "not confirmed", neutral. 19 of 38 jobs sit here, so this
- *     must NOT read as an alarm; it reads as the honest "we don't know" it is.
- */
+/** What a cron's status actually means. */
 const StatusBadge: React.FC<{
   status: string | null;
   invocationStatus?: number | null;

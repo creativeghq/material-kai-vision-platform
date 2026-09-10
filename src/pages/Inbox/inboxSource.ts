@@ -1,22 +1,6 @@
 /**
  * Where a conversation came from — the ONE derivation, used by the badge, the filter and the
  * thread header alike.
- *
- * `channel` is the TRANSPORT (how we talk back: whatsapp / email / social / in-app). It is not
- * the same question as "where did this land from", and answering the second with the first is
- * what made the platform carry two inboxes: a "Hire me" enquiry off a public profile page and a
- * cold email are both `channel='email'`, yet one is a stranger who found your profile and the
- * other is someone who already had your address. They were kept apart by living in two different
- * TABLES with two different screens, which is a distinction the reader has to learn rather than
- * see.
- *
- * So: SOURCE is derived from the transport wherever the transport genuinely answers it, and read
- * from `metadata.source` only where it does not. That is the rule for adding one — an explicit
- * `metadata.source` is new information (a form on a public page), never a restatement of the
- * channel the row already carries. A second copy of `channel` under another name would drift the
- * moment one of them is written and the other is not.
- *
- * Pinned by tests/unit/inboxSource.test.ts.
  */
 import { Mail, MessageCircle, MessageSquare, MessagesSquare, Share2, UserRound, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -36,14 +20,6 @@ export type InboxSourceKey =
 /**
  * How a source is PAINTED, in the two forms the Inbox needs it — and each class is a
  * light/dark PAIR, which is the whole point of this type existing.
- *
- * The source tags were written once, against the dark theme, in raw palette shades
- * (`bg-amber-500/15 text-amber-300`). The platform has FOUR themes — dark/light x
- * green/blue — and a `-300` shade is a pale, high-lightness colour: it reads on
- * plum-black and it is invisible on cream. So in both light themes the "Email" tag was
- * pale yellow on near-white, at roughly 1.6:1. Nothing raised: a wrong colour is a valid
- * class. `src/utils/statusTone.ts` had already solved this shape for status words
- * (`text-emerald-600 dark:text-emerald-400`); this is the same pairing for sources.
  */
 export interface SourceTone {
   /**

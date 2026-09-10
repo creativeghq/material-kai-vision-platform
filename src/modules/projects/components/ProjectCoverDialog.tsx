@@ -1,12 +1,6 @@
 /**
  * COVER PICKER — how an owner sets the picture a project wears on the grid and at the top of
  * its Overview.
- *
- * Four ways in, one save: borrow an image from one of the project's moodboards, pick a scene
- * from the library, upload a photo, or render one from a prompt. Nothing is persisted until
- * "Use this cover" — a generated image that is not chosen still sits in the generation history
- * (its credits were spent), it just never becomes the cover. "Use automatic" clears the owner's
- * choice and the ladder in utils/projectCover.ts takes over again.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';

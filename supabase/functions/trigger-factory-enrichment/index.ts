@@ -1,26 +1,4 @@
-/**
- * trigger-factory-enrichment
- *
- * Called by all 3 import pipelines (PDF, XML, Scraping) after products are
- * inserted/updated. Does two things:
- *
- *   1. Propagates the best available factory object to all products in the
- *      same scope (source_document_id OR scrape_session_id).
- *
- *   2. If the resulting completeness score is still below 0.9, queues a
- *      background agent job (agent_type = 'factory-enrichment') so Apollo,
- *      Firecrawl, and Hunter.io can fill the remaining gaps.
- *
- * Request body:
- *   workspace_id        string   (required)
- *   product_ids         string[] (optional) specific product IDs to check
- *   scope_column        'source_document_id' | 'scrape_session_id'  (optional)
- *   scope_value         string   (optional) value for scope_column
- *   force_enrichment    boolean  (optional, default false) skip score check
- *
- * Response:
- *   { propagated, queued_job_id? }
- */
+/** trigger-factory-enrichment */
 
 const SUPABASE_URL              = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;

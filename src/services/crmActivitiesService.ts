@@ -87,10 +87,6 @@ class CrmActivitiesService {
    * supplier bills, payments in and out, credit notes, shipments) are DERIVED from the
    * documents themselves; crm_activities / crm_notes / crm_meetings supply only the
    * entries that have no document (notes, calls, emails sent, lead status changes).
-   *
-   * Never re-assemble this feed here: a write-log of business events goes stale the
-   * moment a document is edited or deleted — the log this replaced was still showing
-   * four "Invoice created" entries for invoices that no longer existed.
    */
   async listTimeline(target: CrmActivityTarget, limit = 200): Promise<TimelineItem[]> {
     const { data, error } = await supabase.rpc('crm_record_timeline', {
@@ -115,18 +111,7 @@ class CrmActivitiesService {
     }));
   }
 
-  /**
-   * Add an internal note (also surfaces in the merged timeline).
-   *
-   * `dealId` links the note to the deal it was written from WITHOUT changing who it is about.
-   * That distinction is the whole design: a note typed into a deal is still a note about the
-   * contact or the company, so it targets them and appears on their record page with no extra
-   * plumbing — `crm_record_timeline` already reads `crm_notes`. The deal only needs to be able to
-   * show the subset written against it, which is what the column is for.
-   *
-   * The alternative — a separate deal-notes table, copied onto the party — gives you two rows
-   * saying the same thing that disagree the moment one is edited.
-   */
+  /** Add an internal note (also surfaces in the merged timeline). */
   async addNote(target: CrmActivityTarget, body: string, dealId?: string | null): Promise<void> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not signed in');

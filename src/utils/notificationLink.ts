@@ -1,26 +1,4 @@
-/**
- * Where a notification's `action_url` actually goes.
- *
- * `user_notifications.action_url` is a plain string written by four runtimes that cannot see the
- * router — edge functions, MIVAA (Python), frontend services, and a plpgsql trigger — and the bell
- * fed it straight to `navigate()`. `navigate()` treats ANY string as a PATH, so an absolute URL
- * becomes the path `/https://app.materialshub.gr/agent-hub`, matches no route, and lands on the
- * catch-all. Every job-research digest shipped that way: the row is well-formed, the URL is
- * correct, the notification is the right notification — and clicking it 404s.
- *
- * Absolute is not always the mistake, which is why this resolves per-URL instead of banning it.
- * The digest's `action_url` is also the CTA of the email that carries the same digest, and the
- * moodboard dormancy warning points at `…/functions/v1/moodboard-keep-active?token=…`, an endpoint
- * that is genuinely not a route in this app.
- *
- *   • app-relative path            → navigate()
- *   • absolute, one of our origins → strip to path + search + hash, navigate()
- *   • absolute, http(s) elsewhere  → open in a new tab
- *   • anything else                → nothing; a click handler never dereferences `javascript:`
- *
- * Producers should still write a path (guarded by tests/unit/deepLinkTargets.test.ts). This is the
- * half that cannot be fixed by a producer: rows written months ago are already in the table.
- */
+/** Where a notification's `action_url` actually goes. */
 
 export type NotificationTarget =
   /** An in-app destination — hand `to` to react-router's `navigate()`. */

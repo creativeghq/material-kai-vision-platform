@@ -2,12 +2,6 @@
  * B2B Tools: validateEmailWithZeroBounce, createB2BManufacturerSearchTool,
  * createCompanyWebsiteScrapeTool, createCompanyEnrichmentTool,
  * createContactDiscoveryTool, createEmailValidateTool, createSaveToCRMTool
- *
- * Workflow chunks: each tool emits step_progress for the b2b-research wizard.
- * Run_id stability comes from the agent passing `_workflow_run_id` (extracted
- * from `[workflow:b2b-research/<step>:<run_id>]` prefix). The first tool
- * (search) generates and emits the workflow_plan; the last (save_to_crm)
- * emits workflow_finished.
  */
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
@@ -140,36 +134,13 @@ export async function validateEmailWithZeroBounce(
  * Uses Claude's built-in web_search to find B2B manufacturers.
  * No extra API key required — uses ANTHROPIC_API_KEY.
  */
-/**
- * Opus 5 at effort:low, measured against Sonnet 5 on the identical 6-company Polish sweep:
- *
- *            time    searches   input tok   domains   sources/rec   cost
- *   opus-5    52s        8         35k        100%       1.2       $0.21
- *   sonnet-5  65s       19         89k        100%       0.0       $0.31
- *
- * Opus wins on every axis including price — Sonnet burned 19 searches and 89k tokens getting less.
- * The cheaper-tier intuition is backwards for this task, so this is pinned rather than left to a
- * "use the cheap model for tool calls" reflex. Opus also surfaced small specialist factories
- * (Fabryka Mebli Wersal, Ropez, Brattex) where Sonnet returned the household names you would find
- * without a tool at all.
- */
+/** Opus 5 at effort:low, measured against Sonnet 5 on the identical 6-company Polish sweep: */
 const SEARCH_MODEL = 'claude-opus-5';
 /** The model the website-analysis pass runs on. Named so the price lookup and the usage row
  *  cannot name two different models, which is exactly what they did. */
 const ANALYSIS_MODEL = 'claude-opus-5';
 
-/**
- * Apollo circuit breaker.
- *
- * Telling the agent "do not retry" is a request; this is the mechanism. On 2026-08-19 a single
- * "save these two companies to my CRM" spent 190 seconds calling company_enrichment into a 403
- * over and over and never reached the save. Once Apollo has answered 401/402/403 the account is
- * unusable and every further call in the next few minutes will fail identically — at ~1s of
- * latency each, plus the model round trip to decide to try again.
- *
- * Short TTL on purpose: this is about not hammering a dead provider inside one conversation, not
- * about caching an outage. Funding the account should take effect within a minute, not a deploy.
- */
+/** Apollo circuit breaker. */
 let apolloUnavailableUntil = 0;
 const APOLLO_BREAKER_MS = 120_000;
 const apolloIsKnownDown = () => Date.now() < apolloUnavailableUntil;
@@ -183,20 +154,7 @@ const APOLLO_DOWN_PAYLOAD = JSON.stringify({
     + 'name), and note in one line that enrichment was skipped.',
 });
 
-/**
- * POST to Anthropic, retrying the TRANSIENT failures — inside a DEADLINE.
- *
- * 529 (overloaded), 429 (rate limited) and 5xx say "the upstream was busy", not "your request was
- * wrong", and this call had no retry at all: two 529s seven seconds apart killed a real sweep on
- * 2026-08-18 and sent the agent hunting for a background lane it did not need.
- *
- * But retrying blindly is worse than not retrying. The agent-chat tool runner kills a tool at 90s
- * — tighter than the 150s edge idle timeout — and a single search already takes ~52s. Two naive
- * retries would therefore guarantee the timeout, turning a recoverable blip into a hard failure
- * and burning two full-price calls on the way. So each attempt is only started if there is
- * plausibly time left for it; otherwise the last response is returned and the caller reports a
- * retryable upstream failure, which is the honest answer.
- */
+/** POST to Anthropic, retrying the TRANSIENT failures — inside a DEADLINE. */
 async function postAnthropicWithRetry(init: RequestInit, budgetMs = 85_000): Promise<Response> {
   const BACKOFF_MS = [2000, 6000];
   const startedAt = Date.now();
@@ -295,21 +253,7 @@ const RECORD_MANUFACTURERS_TOOL = {
   strict: true,
 };
 
-/**
- * The structured verdict `company_website_scrape` exists to produce.
- *
- * A REAL Anthropic tool with a forced `tool_choice`, not a prompt that asks for JSON. Security
- * invariant 9 requires exactly that of any classifier whose verdict drives a DB write, and this
- * one does: `is_manufacturer` and `is_b2b` flow into `save_to_crm`.
- *
- * What was there instead: a DB prompt ending "Return ONLY valid JSON, no markdown formatting",
- * a regex that stripped ```json fences, and a catch that stuffed whatever came back into
- * `raw_analysis`. That salvage path was not a rare fallback — measured on 2026-08-25, the first
- * time this pass had run at all since it moved to a model that rejects `temperature`, Opus was
- * handed 15 000 unfenced characters of somebody's homepage under a loose instruction and simply
- * CONTINUED THE DOCUMENT: 652 characters of the site's own marketing copy, zero fields. A forced
- * tool cannot do that — the only shape it can emit is this one.
- */
+/** The structured verdict `company_website_scrape` exists to produce. */
 const COMPANY_PROFILE_TOOL = {
   name: 'record_company_profile',
   description:
@@ -369,15 +313,6 @@ function fenceUntrustedPage(content: string): string {
 /**
  * The sourcing markets are DATA — `reference_vocabularies['sourcing_markets']`, loaded by the
  * caller and passed in (issue #370, Class A).
- *
- * They used to be a const right here, reachable by nothing but the scope string a few lines below.
- * The model could not read it from the prompt, the schema (`region` was a bare `z.string()`), the
- * description (it named the five region KEYS and never their members) or the KB. Asked to "search
- * the countries list we have in place" the agent searched the Knowledge Base three times, found
- * nothing, INVENTED a list, and presented it as ours — Bulgaria in the wrong region, 13 markets
- * missing. A wrong country list is a valid country list, so nothing raised.
- *
- * Now one row set feeds the `region` enum, the description the model reads, and the picker form.
  */
 export const createB2BManufacturerSearchTool = (
   /** Active `sourcing_markets` terms, in sort order. Loaded by agent-chat's registerTools. */
@@ -401,12 +336,6 @@ export const createB2BManufacturerSearchTool = (
       // estimated 7.5 credits from the web-search surcharge alone; the token half is ten times
       // that again, because a server-side search turn carries every fetched result back through
       // the context (66.6k input tokens on average).
-      //
-      // Set at the observed MAXIMUM rather than the average, for the reason web-research-tools
-      // states about its own ceiling: an under-set ceiling is not a lost charge, it is a gate
-      // that lets through a caller who cannot afford the call — which is the only thing the
-      // gate exists to stop. The reservation is released immediately, so a high ceiling costs
-      // an affordable caller nothing.
       const _blocked = await b2bAffordabilityGate(userId, 150, 'b2b_manufacturer_search');
       if (_blocked) return _blocked;
       // CLAMP, don't just document. The schema says >10 will blow the 90s tool timeout, but a
@@ -415,12 +344,6 @@ export const createB2BManufacturerSearchTool = (
       // three times in a row, having spent full price on each. A measured 6-company search takes
       // ~52s, so anything past ~10 cannot return. Capping here converts a guaranteed timeout into
       // a smaller result plus an explicit instruction to call again, which the agent can act on.
-      // 8, not 10. The clamp landed on 2026-08-18 and did NOT stop the timeouts — six more
-      // followed on 08-22. The arithmetic says why: 6 companies measured at ~52s, so 10 lands
-      // around 85s against what was then a 90s wall, i.e. inside the noise of a single slow
-      // upstream call. agent-chat now gives this tool 110s specifically (see
-      // LONG_RUNNING_TOOL_TIMEOUT_MS), and 8 keeps the expected run near 70s so the extra budget
-      // is headroom rather than the new wall.
       const MAX_PER_CALL = 8;
       const requestedLimit = limit;
       if (limit > MAX_PER_CALL) limit = MAX_PER_CALL;
@@ -431,7 +354,6 @@ export const createB2BManufacturerSearchTool = (
       // `Czechia` / `Türkiye` / `UK` are ours under another name. An unresolved one is NOT an
       // error (any country is searchable), but it is worth a line in the log, because the visible
       // symptom of getting this wrong is nothing at all: the search runs and quietly loses the
-      // local-language half of its query.
       const market = resolveMarket(markets, country);
       if (market) country = market.value;
       else if (country) console.warn(`[b2b_manufacturer_search] "${country}" is not a defined sourcing market — searching it in English only`);
@@ -627,9 +549,6 @@ export const createB2BManufacturerSearchTool = (
         // this call takes ~68s and spends ~76 credits, and a validation that re-ran it
         // would double both to learn nothing new about the incumbent. The challenger
         // completes the row later, against the same stored query.
-        //
-        // Best-effort and never blocking: the search has already succeeded and been
-        // paid for, so a bookkeeping failure must not turn it into an error.
         let validationId: string | null = null;
         try {
           const { data: vRow } = await supabase
@@ -729,7 +648,6 @@ export const createB2BManufacturerSearchTool = (
         // timed out after 90s`. A default of 30 could therefore never return: the call was
         // guaranteed to be killed before it answered, which reads to the agent as a broken tool
         // rather than an over-large request. Ask for more than ~10 and you need the background
-        // lane, not a bigger timeout.
         limit: z.number().optional().default(8).describe('Max manufacturers per call, hard-capped at 8. A larger number is silently clamped, not honoured — one call researches at most 8 companies. For more, run several calls (vary country/region/category) or dispatch a background task.'),
         _workflow_run_id: z.string().optional().describe('Workflow run_id from `[workflow:b2b-research/search:<run_id>]` prefix.'),
       }),
@@ -771,9 +689,6 @@ export const createCompanyWebsiteScrapeTool = (
         // billed -- this scrape is charged whether or not it returns content -- only about
         // whether we find out we cannot bill for it before or after we pay. (audit #312)
         // Tracked, so the row this debit writes can learn whether the scrape actually worked.
-        // The debit runs first (invariant 10), which means the row is born not knowing — and
-        // `ops.silent_zero` skips a row with no `metadata.success`, so without this a Firecrawl
-        // outage is invisible to the probe that exists to catch exactly that.
         const { refusal: scrapeRefusal, usageLogId: scrapeUsageLogId } =
           await debitOrRefuseTracked(supabase, userId, 'firecrawl-scrape', 'company_website_scrape', 1, { url });
         if (scrapeRefusal) return scrapeRefusal;
@@ -804,10 +719,6 @@ export const createCompanyWebsiteScrapeTool = (
               // address and its VAT number, so leaving this on meant paying to fetch the page and
               // then discarding the three fields most worth having, before asking a model to find
               // contact details in text they had been stripped from.
-              //
-              // The cost of turning it off is some nav boilerplate in the markdown the analysis
-              // model reads. That trade is worth taking here: this tool profiles a COMPANY, and the
-              // legal footer is signal for that, not noise.
               onlyMainContent: false,
             }),
             signal: controller.signal,
@@ -869,13 +780,6 @@ export const createCompanyWebsiteScrapeTool = (
           // The model name comes from ANALYSIS_MODEL, not a literal. This constructor carried its
           // own `'claude-opus-4-8'` string while the cost log below read ANALYSIS_MODEL — the very
           // drift the constant was introduced to stop, reintroduced one scope down.
-          //
-          // NO `temperature`. It was 0.3 here, and sampling parameters are REMOVED on Opus 4.7+
-          // and Sonnet 5: langchain-anthropic's validateInvocationParamCompatibility throws before
-          // the request is sent. So this pass threw on EVERY call and the catch below quietly
-          // handed back a 2 000-character preview instead — see the comment there.
-          // The shape is enforced by a forced tool, not requested in prose. `tool_choice` pins the
-          // one tool, so the model's only legal move is to fill this schema in.
           const analysisModel = new ChatAnthropic({
             model: ANALYSIS_MODEL,
             maxTokens: 2048,
@@ -902,8 +806,6 @@ ${fenceUntrustedPage(markdown.substring(0, 15000))}`;
           // yet a third model (Opus 4.7). One derivation, from ai_model_pricing. The agent tool
           // currently only debits the firecrawl scrape (~$0.001) but the Opus
           // pass on a 15K-char page costs orders of magnitude more — without
-          // this log + debit, every scrape silently absorbs $0.05-0.15 of
-          // platform cost.
           try {
             const usage = (analysisResponse as any).usage_metadata
               ?? (analysisResponse as any).response_metadata?.usage
@@ -967,17 +869,6 @@ ${fenceUntrustedPage(markdown.substring(0, 15000))}`;
           companyData = profileCall.args;
         } catch (analysisError) {
           // A FAILED ANALYSIS IS A FAILED CALL. Say so at the top level.
-          //
-          // This used to set `company_data.error` and a `raw_markdown_preview` of the first 2 000
-          // characters, and the response still said `success: true`. The model reading it could
-          // not tell a short page from a truncated one, so on 2026-08-25 an agent asked to
-          // enumerate a competitor's brands from `pwb-brand-sitemap.xml` received the first ~29
-          // slugs of ~100, concluded "the scraper truncates at ~2000 chars", and spent its whole
-          // iteration budget inventing workarounds for a bug that was in this catch block. Eight
-          // paid Firecrawl fetches, one useful answer between them.
-          //
-          // No preview: a partial page shaped like a whole one is worse than no page. The agent
-          // is told which tool actually returns page text instead.
           analysisFailure = analysisError instanceof Error ? analysisError.message : String(analysisError);
           console.error('Claude analysis error:', analysisError);
           companyData = null;
@@ -1220,50 +1111,7 @@ export const createCompanyEnrichmentTool = (userId: string, onProgress?: (status
   );
 };
 
-/**
- * B2B Research Tool: Official-registry lookup — FREE, and deliberately so.
- *
- * The paid providers (Apollo here, Explee in #334) sell employee counts, revenue and
- * technographics. Those are not the only things worth knowing about a factory, and they were the
- * only things we were paying to learn. The official registries answer a different and, for a
- * SOURCING workflow, more load-bearing question — is this a real, active legal entity, what is it
- * called on paper, where is it registered, what is its registration number — and they answer it
- * for nothing, from public endpoints that need no key and no account.
- *
- * This is NOT a second copy of `create_company_from_vat`. That tool goes VAT → company through
- * ΑΑΔΕ / VIES, which is the right path when someone hands you a VAT number. Discovery runs the
- * other way: `b2b_manufacturer_search` yields a NAME and a website and no VAT at all, so the VIES
- * path cannot be entered from it. This closes that gap by starting from the name, and the
- * registration id it recovers is what makes the existing VIES/ΑΑΔΕ path reachable afterwards.
- * Chain them; do not reimplement either.
- *
- * GLEIF is the always-on source — 3.4M legal entities worldwide, so it answers for every one of
- * the 30 `sourcing_markets`. On top of it sits `NATIONAL_REGISTRIES`, a ROUTING TABLE keyed by
- * country: the authoritative national register, where that country publishes one for free.
- *
- * The table is the point. Adding a country is one entry — an endpoint and a mapper — not a new
- * branch in the tool body, and the covered list is derived from the table in one place so the
- * tool description, the response and the guard test cannot disagree about what is covered.
- *
- * Every entry below was run against the live endpoint before it was added. What did NOT survive
- * that, and should not be re-added without re-measuring:
- *   • Germany (OffeneRegister) — persistent 502. The service is down, not slow.
- *   • Greece (ΓΕΜΗ)           — no public API. Greece is served by ΑΑΔΕ through
- *                               `create_company_from_vat`, which needs the ΑΦΜ.
- *   • BG, SI, HR, LT, LV, UA, IT, PT — no free machine-readable company lookup; the "open data"
- *                               portals publish dataset CATALOGUES, not a company endpoint.
- *   • UK (Companies House) and NL (KVK) — both 401. Free, but they need a registration key, so
- *                               they are a decision to make rather than something to just wire.
- *   • OpenStreetMap           — was in here as "the free phone source" and was removed. Overpass
- *                               times out on a country-wide name regex (it is not a name search
- *                               engine) and Nominatim returned a phone for none of four test
- *                               manufacturers. It reported `unavailable` on 100% of calls while
- *                               the tool still looked healthy — the silent-zero shape exactly.
- *
- * Every source reports `hit` / `miss` / `unavailable` SEPARATELY (pipeline convention 1). A single
- * empty return would collapse "the Czech register has no such company" into "the Czech register
- * was down", and only the first of those means the answer is actually no.
- */
+/** B2B Research Tool: Official-registry lookup — FREE, and deliberately so. */
 const REGISTRY_TIMEOUT_MS = 12000;
 
 type RegistrySource = { status: 'hit' | 'miss' | 'unavailable'; error?: string; [k: string]: unknown };
@@ -1295,20 +1143,7 @@ async function registryFetch(
   }
 }
 
-/**
- * Does the searched-for name actually appear in this company's legal name?
- *
- * GLEIF's `filter[fulltext]` searches every indexed field, not just the name — a director's
- * surname, an "other name", an address line. Searching Italy for **Marazzi** returns
- * **PRO-BIKE SRL as the top result**, and the word Marazzi is nowhere in that company's name. Six
- * genuine MARAZZI companies rank below it. Handed straight to the agent that is not a bad match,
- * it is a DIFFERENT COMPANY presented as a confident hit, with a real LEI and a real address on it.
- *
- * Transliterated before folding, because dropping a non-matching result would otherwise break the
- * case this platform cares most about: GLEIF holds Karelia as `ΚΑΠΝΟΒΙΟΜΗΧΑΝΙΑ ΚΑΡΕΛΙΑ ΑΝΩΝΥΜΟΣ
- * ΕΤΑΙΡΕΙΑ`, and a Latin query never touches Greek text. `foldForSearch` handles case and accents
- * and explicitly does NOT transliterate — that is `transliterateToLatin`'s job, and both are needed.
- */
+/** Does the searched-for name actually appear in this company's legal name? */
 function nameMatchesQuery(query: string, legalName: unknown): boolean {
   const fold = (v: unknown) => foldForSearch(transliterateToLatin(String(v ?? '')) ?? String(v ?? ''))
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
@@ -1379,33 +1214,8 @@ async function lookupGleif(name: string, country?: string): Promise<RegistrySour
   };
 }
 
-/**
- * The national-registry routing table.
- *
- * `keyedBy` is the part that decides the call shape, not a detail:
- *   • 'name' — the register has a name search, so it runs CONCURRENTLY with GLEIF.
- *   • 'id'   — the register only answers on its own registration number (Poland's KRS, Romania's
- *              CUI). Those wait for GLEIF, because GLEIF's `registeredAs` IS that number, which is
- *              what turns "I have a company name" into a national-register hit with no VAT and no
- *              paid provider in between.
- *
- * `timeoutMs` overrides the default only where a register is measurably slow. Slovakia's RPO takes
- * ~5s consistently; the default 12s would be a coin-flip for it, and a timeout there would be
- * reported as `unavailable` — the register saying nothing is not the same as the register being
- * down, and the whole point of the per-source verdicts is keeping those apart.
- */
-/**
- * Pick the CURRENT entry out of a register's versioned list.
- *
- * Slovakia and Finland both return every name and address a company has ever had, each with a
- * validity window. Taking the first — or the last — element gives you whichever one the register
- * happened to order first: the Slovak lookup for "Slovenské magnezitové závody" returned the
- * 1993 state-enterprise name, expired in 1995, presented as the company's name. A wrong-but-real
- * company name is the money-number defect wearing different clothes: it is a valid string, so
- * nothing raises, and the operator writes to a company that has not existed for thirty years.
- *
- * An open window (`validTo` / `endDate` absent) is current. Failing that, the latest start wins.
- */
+/** The national-registry routing table. */
+/** Pick the CURRENT entry out of a register's versioned list. */
 function currentVersion<T extends Record<string, any>>(arr: unknown, from: string, to: string): T | null {
   if (!Array.isArray(arr) || !arr.length) return null;
   const open = arr.filter((x) => x && !x[to]);
@@ -2307,9 +2117,6 @@ export const createSaveToCRMTool = (userId: string, workspaceId: string, onProgr
         // agent found was filed as a customer. That is not cosmetic — a company with `is_supplier`
         // false has its Products tab and factory link suppressed, and it turns up in customer lists
         // and A/R views it has no business being in.
-        //
-        // Defaulting to supplier rather than customer because this toolkit's only discovery tool
-        // finds manufacturers; a party we intend to sell to has to be named as one.
         const partyRole: 'supplier' | 'customer' | 'both' = company.role ?? 'supplier';
         const roleLabel = partyRole === 'both' ? 'supplier and customer' : partyRole;
 
@@ -2319,9 +2126,6 @@ export const createSaveToCRMTool = (userId: string, workspaceId: string, onProgr
         // its OWN research — the companies and the contact names come from a web search it just
         // ran, not from anything the user typed. On 2026-08-19 a single sentence produced two
         // companies and three named people in the live CRM with no approval step anywhere.
-        //
-        // `confirm` is on NEVER_ASK in the quick-start catalog, so a form can never pre-answer it
-        // on the user's behalf — the approval has to come from the card.
         if (confirm !== true) {
           const contactLine = contacts?.length
             ? ` and ${contacts.length} contact${contacts.length === 1 ? '' : 's'} (${contacts.map((c: any) => c.name).filter(Boolean).slice(0, 3).join(', ')})`
@@ -2351,17 +2155,6 @@ export const createSaveToCRMTool = (userId: string, workspaceId: string, onProgr
 
         // Dedupe on the SAME folded key crm-api uses (#366 BU-3), because this is a second
         // create path and it was skipping the first one's guarantee.
-        //
-        // crm-api refuses a create whose `name_fold` already exists and hands back the row it
-        // found; the QuickAddCompanyDialog probe is only a courtesy on top of that. This tool
-        // wrote straight to `crm_companies` with the service-role client, so none of it applied:
-        // "save Nowy Styl to my CRM" twice produced Nowy Styl twice. `name_fold` is a generated
-        // column over `crm_fold(name)`, so the match survives Greek case and accents — "Καρέλης
-        // ΑΕ" finds the stored "ΚΑΡΕΛΗΣ ΑΕ", which a plain ilike on the raw column never did.
-        // Duplicates are not cosmetic: they are what makes spend-per-supplier and AP aging wrong.
-        //
-        // A failed LOOKUP does not fall through to the insert, for the same reason it does not in
-        // crm-api: a duplicate is cheap to detect and expensive to unpick.
         {
           const probeFailed = (why: string) => JSON.stringify({
             success: false,
@@ -2386,11 +2179,6 @@ export const createSaveToCRMTool = (userId: string, workspaceId: string, onProgr
           // S.A.", "PARADYŻ Sp. z o.o." — is one company with one website, and the next sweep will
           // spell it the other way. The fold survives case and accents; it does not survive a legal
           // suffix appearing or a transliteration changing.
-          //
-          // There is no domain COLUMN to match on — `website` is free text ("https://www.x.com/en",
-          // "x.com/", "X.COM") — so this is a narrowing ilike followed by an exact compare of the
-          // normalised host. The ilike alone is not the test: "%paradyz.com%" also matches
-          // "notparadyz.com", which is a different company.
           const wantDomain = domainFromUrl(company.website);
           if (wantDomain) {
             const { data: candidates, error: domainError } = await supabase
@@ -2476,10 +2264,6 @@ export const createSaveToCRMTool = (userId: string, workspaceId: string, onProgr
             // same PERSON legitimately reaches this tool twice: once from a supplier sweep, once
             // from a customer one, and the second pass would mint a second `crm_contacts` row for
             // an address we already hold.
-            //
-            // EMAIL is the only key used. Name is deliberately not: two people genuinely called
-            // "Μαρία Παπαδοπούλου" at two factories are two people, and collapsing them loses one.
-            // An email address is one inbox belonging to one person.
             let existingContactId: string | null = null;
             if (contact.email) {
               const { data: priorContact, error: contactDupError } = await supabase
@@ -2647,24 +2431,7 @@ export const createSaveToCRMTool = (userId: string, workspaceId: string, onProgr
   );
 };
 
-/**
- * B2B Research Tool: Validation lane (issue #394)
- *
- * The SECOND FLOW. `b2b_manufacturer_search` records its run as the incumbent half of
- * a pair; this completes the pair by running a different provider over the SAME stored
- * query, then reports coverage and verifiability.
- *
- * WHY IT IS A SEPARATE FLOW AND NOT A FLAG. The incumbent search takes ~68s and spends
- * ~76 credits. Running both on every call would double both to learn nothing new about
- * the incumbent, and two sequential 68s searches cannot finish inside the tool timeout
- * anyway. Validation is a deliberate act on a run that already happened.
- *
- * WHAT IT DOES NOT DO. It does not pick a winner and it does not merge the two result
- * sets into the CRM. For research there is no single right answer — a challenger that
- * surfaces companies the incumbent missed has done something useful, provided they
- * exist. The output is evidence for a human, and the objective half of that evidence is
- * whether the domains resolve.
- */
+/** B2B Research Tool: Validation lane (issue #394) */
 export const createB2BResearchValidateTool = (
   userId: string,
   workspaceId: string | null,

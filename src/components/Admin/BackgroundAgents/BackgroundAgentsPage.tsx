@@ -81,19 +81,7 @@ export function BackgroundAgentsPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  /**
-   * `?run=<id>` — the destination of the "task finished" bell notification.
-   *
-   * Until this existed the notification's `action_url` was a bare `/agent-hub`, which from any
-   * other page opens an empty new chat and from `/agent-hub` itself is a literal no-op: the user
-   * clicks "finished", nothing moves, and the report the run produced is reachable only by
-   * scrolling this admin list. The run's own output is rendered in its expanded row, so the link
-   * points here and opens that row.
-   *
-   * The list is capped and this platform produces ~120 runs a day, so the named run is usually
-   * NOT in it — fetch it and prepend. A run that is genuinely gone (7-day retention) has to say so;
-   * silently showing the unfiltered list would read as "here it is".
-   */
+  /** `?run=<id>` — the destination of the "task finished" bell notification. */
   const [searchParams, setSearchParams] = useSearchParams();
   const deepLinkRunId = searchParams.get('run');
   const deepLinkedRef = useRef<string | null>(null);

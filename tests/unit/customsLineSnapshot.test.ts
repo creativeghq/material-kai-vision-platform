@@ -1,15 +1,4 @@
-/**
- * Customs facts must be SNAPSHOTTED on the document line, never re-read from the product.
- *
- * `products.taric_code` is a current value; a declaration is a historical statement. The EU
- * republishes the nomenclature every month, so a report that joins back to the product would
- * quietly restate a past period each time a code was renumbered — a whole class of wrong that
- * produces no error and no visible symptom until an audit.
- *
- * `invoice_items` already snapshots `unit_cost_snapshot` and `measurement_unit_code` for exactly
- * this reason. These tests pin the same discipline for the customs trio, on the surfaces that
- * consume it.
- */
+/** Customs facts must be SNAPSHOTTED on the document line, never re-read from the product. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

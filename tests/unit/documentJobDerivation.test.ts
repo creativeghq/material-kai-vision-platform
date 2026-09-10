@@ -1,21 +1,4 @@
-/**
- * A delivery note and a cheque know their job by DERIVATION, never by a column (#378 L5).
- *
- * WHY NO COLUMN
- * -------------
- * Both are downstream of a document that already holds the job: a note is cut FROM an order, a
- * cheque settles an invoice or a supplier bill. A `project_id` on either would be a second copy of
- * that fact, free to disagree the moment somebody re-files the parent — and `get_project_pnl`
- * reads the PARENTS, so the copy would not even be the number the P&L used. This is the same rule
- * as every other derived quantity here: derive it, or add a drift check. Deriving is cheaper.
- *
- * WHY THE CHEQUE RULE IS A DIRECTION
- * ----------------------------------
- * A cheque carries BOTH `invoice_id` and `supplier_bill_id`. "Whichever is set" would let a cheque
- * holding both point at the wrong side of the trade — the mistake `moneyDerivation.test.ts` exists
- * to stop, one document down. Money IN settles a customer invoice; money OUT settles a supplier
- * bill. The direction decides, so a cheque with both is still unambiguous.
- */
+/** A delivery note and a cheque know their job by DERIVATION, never by a column (#378 L5). */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

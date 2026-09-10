@@ -110,16 +110,7 @@ describe('the tenders service', () => {
   });
 });
 
-/**
- * The guard I did not have, and should have.
- *
- * I shipped this feature with the SQL, the service and the probes complete and the UI a shell:
- * of nine service methods the card called four, so a package could never be filled, nobody could
- * be invited and no rate could be entered. The comparison rendered an empty package for ever.
- * Unreachable work is the failure this codebase guards against everywhere else — a tool in no
- * cluster, a push site no agent lists, a cost-code column no screen can set — and tendering had
- * no equivalent check.
- */
+/** The guard I did not have, and should have. */
 describe('every tender operation is reachable from a screen', () => {
   const UI = [
     CARD,

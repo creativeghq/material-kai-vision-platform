@@ -57,32 +57,10 @@ function pickCompanyFields(body: Record<string, unknown>): Record<string, unknow
   return out;
 }
 
-/**
- * Fields that assert THIS SERVER verified a VAT number against a tax authority (#353 CRM-7).
- *
- * They are stamped from a `vat_validation_receipts` row written by `myaade-rgwspublic2` /
- * `vies-validate`, never taken from the request. They stay in `COMPANY_WRITABLE_COLUMNS` above
- * only so the shape of that list still describes the row; `stripServerStampedFields` removes
- * them from every client payload before it reaches a write.
- *
- * The descriptive halves — `vat_validated_name`, `vat_validated_address` and their `_latin`
- * twins — are deliberately NOT here. They are what the registry SAID, not a claim that anyone
- * asked it; the worst a client can do is store a wrong name.
- */
+/** Fields that assert THIS SERVER verified a VAT number against a tax authority (#353 CRM-7). */
 const SERVER_STAMPED_VAT_COLUMNS = ['vat_validated', 'vat_validated_at', 'vat_validation_source'] as const;
 
-/**
- * Commercial terms — who this customer pays and how much (#353 CRM-7).
- *
- * Writable by workspace OWNER and ADMIN only. Before this, every role the handler admits could
- * set them: `sales`, and the GLOBAL `supplier` and `architect` tiers, which are true in every
- * workspace at once. A supplier account could raise a customer's credit limit.
- *
- * The check is on the caller's role IN THE TARGET WORKSPACE, not on the global tier, because a
- * supplier or architect who OWNS their own workspace legitimately manages their own customers'
- * terms — they are an `owner` there. Global tier says what someone is on the platform; the
- * workspace role says what they may do to this row.
- */
+/** Commercial terms — who this customer pays and how much (#353 CRM-7). */
 const COMMERCIAL_TERMS_COLUMNS = ['discount_percent', 'discount_notes', 'credit_limit', 'user_level_key'] as const;
 
 /** The workspace roles permitted to move commercial terms. */
@@ -190,18 +168,7 @@ async function companyWorkspaceInScope(
 // nested crm_contacts join on GET /companies/{id}.
 const contactInScope = (contactId: string, scope: CrmScope) => rowInScope(supabase, 'crm_contacts', contactId, scope);
 
-/**
- * The workspace a contact actually lives in, or null if it does not exist (#353 CRM-5).
- *
- * `contactInScope` answers "may the CALLER see this contact", which is a different question from
- * "does this contact belong to the same tenant as this company" — and the join is a statement
- * about the second. `_scope.ts`'s own header says it: scope is "an admission gate, NOT per-row
- * authorization".
- *
- * Deliberately UNSCOPED. It is used only to compare against a workspace the caller has already
- * been admitted to, and scoping it would reintroduce the same array-membership answer that is
- * the bug. A caller who is not admitted to the company never reaches this call.
- */
+/** The workspace a contact actually lives in, or null if it does not exist (#353 CRM-5). */
 async function contactWorkspace(contactId: string): Promise<string | null> {
   const { data } = await supabase
     .from('crm_contacts').select('workspace_id').eq('id', contactId)
@@ -272,14 +239,6 @@ export async function handleCompanies(req: Request): Promise<Response> {
       // Resolve the target workspace: an explicit body workspace_id must be in scope (any
       // workspace for a global operator). workspace_id is NOT NULL, so a caller that omits it
       // still needs a concrete home workspace.
-      //
-      // It used to fall back to `scope.workspaceIds[0]` — third instance of that shape after
-      // CM-22 (#359) and EX-3 (#364), and closed here for the same reason (#366 BU-10). It was
-      // never a tenancy hole: `scopeAllows` 403s a workspace the caller cannot reach. It is
-      // wrong-tenant-BY-DEFAULT — a caller omitting the field filed the company in whichever
-      // workspace happened to sort first, and nothing anywhere raised. Defaulting is only
-      // unambiguous when there is exactly one workspace to default to; with a choice to make,
-      // the caller has to make it.
       const requestedWs = (body.workspace_id as string | undefined) || undefined;
       if (requestedWs && !scopeAllows(scope, requestedWs)) {
         return new Response(
@@ -305,8 +264,6 @@ export async function handleCompanies(req: Request): Promise<Response> {
       // the receivables aging. The column now defaults to false and the "said nothing -> it's a
       // customer" convention lives here instead, because only a request can be inspected for
       // whether it stated a role at all. A caller that names either flag is taken at its word.
-      // Strip what the client may not assert (#353 CRM-7), then stamp VAT verification from a
-      // receipt this server wrote — never from the request.
       const companyFields = {
         ...(await stripServerStampedFields(pickCompanyFields(body), userId, targetWs, scope)),
         ...(await stampVatValidation(body.vat_number, targetWs)),
@@ -316,19 +273,6 @@ export async function handleCompanies(req: Request): Promise<Response> {
       }
 
       // Server-side dedupe (#366 BU-3). The client probe in QuickAddCompanyDialog is a courtesy:
-      // it is debounced, non-blocking and swallows its own errors, so Create could always win the
-      // race. This is the guarantee — one query, on the same folded key, immediately before the
-      // insert. `name_fold` is a generated column holding `crm_fold(name)`, so the match survives
-      // Greek case and accents: "Καρέλης ΑΕ" finds the stored "ΚΑΡΕΛΗΣ ΑΕ", which plain `ilike`
-      // on the raw column never did. Duplicates are not cosmetic — they are what makes
-      // spend-per-supplier and AP aging wrong later.
-      //
-      // `allow_duplicate: true` is the escape hatch for the genuine case (two distinct legal
-      // entities sharing a trading name). Refusing by default and opting in is the right way
-      // round: the accidental duplicate is silent, the deliberate one is typed by a human.
-      // The query, the key and the fail-closed rule now live in `_partyDedupe.ts`, because
-      // `crm_contacts` needed the same guarantee and a second copy is where the judgement
-      // drifts (#378 F2).
       const companyDuplicate = await guardDuplicateParty(
         supabase, 'crm_companies', targetWs, body.name, body.allow_duplicate === true, corsHeaders,
       );
@@ -478,9 +422,6 @@ export async function handleCompanies(req: Request): Promise<Response> {
       // contact_name, contact_email, contact_phone, contact_position, role,
       // is_primary, notes }.
       // Mirrors the inverse flatten in contacts-api-handler's GET /contacts/{id}.
-      // `role` is the OPTIONAL per-attachment role; `contact_position` is the person's
-      // own job title from their profile. Most attachments never state a role, so the
-      // page falls back to the title rather than rendering an empty column.
       const attachments = (data as { crm_company_contacts?: Array<{
         id: string; contact_id: string; role: string | null; is_primary: boolean;
         notes: string | null; created_at: string;
@@ -709,21 +650,7 @@ export async function handleCompanies(req: Request): Promise<Response> {
         contact_id = created.id;
         createdContactId = created.id;
       } else {
-        /**
-         * SAME TENANT AS THE COMPANY, not merely somewhere in the caller's scope (#353 CRM-5).
-         *
-         * `scope.workspaceIds` is an ARRAY of every workspace the caller is an active member of,
-         * so `contactInScope` said yes to a contact from ANY of them. A caller in workspaces A
-         * and B could therefore attach one of B's contacts to a company in A — and
-         * `GET /companies/{id}` returns nested contact name, email and phone, so B's contact PII
-         * became readable by every member of A, including members with no access to B at all.
-         *
-         * The create-and-attach branch above was already right: it stamps `workspace_id:
-         * companyWs`. Only this branch compared against the wrong thing.
-         *
-         * Both failures return the same 404 as a genuinely missing contact, so the response
-         * cannot be used to discover which ids exist in a workspace the caller cannot read.
-         */
+        /** SAME TENANT AS THE COMPANY, not merely somewhere in the caller's scope (#353 CRM-5). */
         const contactWs = await contactWorkspace(contact_id);
         if (!contactWs || contactWs !== companyWs) {
           return new Response(

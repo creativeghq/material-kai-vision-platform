@@ -13,24 +13,6 @@ import {
 /**
  * "What is this for?" — one field answering the question a cost always has an answer to, whether
  * that answer is a project, a customer, or an order that already exists.
- *
- * The grouping is load-bearing, not decorative. Three rows here look almost identical — an existing
- * PURCHASE order to merge into, an existing SALES order, and a purchase order this cost merely
- * rides along with — and they do three different things:
- *
- *   • a purchase order for the SAME supplier shares our direction (money OUT), so the lines MERGE into it
- *   • a sales order settles on money IN, so it is only ever LINKED (`covers_order_id`)
- *   • any other purchase order gets this cost as an EXPENSE on it (`supplier_bills.order_id`) —
- *     freight, customs, an installer: costs OF a purchase, not purchases of their own
- *
- * Appending purchase lines to a customer's sales order would bill the customer what we paid our
- * supplier. `search_order_link_targets` is what decides which orders may be merged into, so the
- * picker cannot offer an illegal target even if this file is edited carelessly.
- *
- * Two further answers are FILING ONLY — a trip card and a property. Neither creates a record,
- * merges a line or moves a cent; they write one nullable column and exist so the question has an
- * answer at all. They are off by default for the same reason `allowCostOf` is: a caller that
- * offers a row it does not handle ships a row that silently does nothing.
  */
 /** One literal, so a new group cannot be added to the type and forgotten in a fallback. */
 const EMPTY_TARGETS: LinkTargetSearch = {

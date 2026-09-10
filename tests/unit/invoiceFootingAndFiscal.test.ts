@@ -1,15 +1,6 @@
 /**
  * The document adds up, the transmission failure is reported, and an internal transfer cannot
  * settle a customer invoice (#351 B2 / B1 / D1).
- *
- * B2 is arithmetic, and the arithmetic is checked here rather than asserted about: three lines of
- * €10.10 at 24% give raw VAT 2.424 each. The printed analysis sums per-line ROUNDED values (7.26);
- * the header rounded the raw sum ONCE (7.27). One cent apart on a document a customer reads and an
- * auditor checks — and myDATA rejects a document whose lines do not foot to its header.
- *
- * The comment in `totals` states that exact rule and applies it to NET. It was never applied to
- * VAT, and — found while fixing it — the cash discount scaled the header without scaling the lines,
- * so with "paid upfront" ticked the net did not foot either.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';

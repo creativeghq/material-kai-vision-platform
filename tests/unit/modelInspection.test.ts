@@ -1,15 +1,4 @@
-/**
- * Guard for reading a model's own facts at upload (#321 M0, deferred item).
- *
- * These numbers are load-bearing in a way that is easy to miss: `width_m` / `depth_m` are what the
- * room planner draws footprints from and what AR uses for true-to-scale placement. Typed by hand
- * they are a guess with a decimal point; measured wrong they produce a plan that looks correct and
- * a delivery that does not fit. Nothing downstream can tell a wrong measurement from a right one.
- *
- * The empty-scene case is the M0 bug moved earlier: a GLB that parses but has nothing to draw has
- * an empty bounding box, `min.y` is +Infinity, and the placement it produces poisons every matrix
- * in the scene. Catching it at upload means the file is refused instead of a product page breaking.
- */
+/** Guard for reading a model's own facts at upload (#321 M0, deferred item). */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync } from 'fs';
 import path from 'path';

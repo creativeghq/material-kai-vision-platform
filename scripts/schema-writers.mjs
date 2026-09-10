@@ -1,49 +1,5 @@
 #!/usr/bin/env node
-/**
- * Schema-writer lint — does this checkout still agree with the live schema?
- *
- * WHAT IT CATCHES
- * ---------------
- * The failure that produced it, on 2026-08-17. `quote_items.line_total` became
- * `GENERATED ALWAYS`, and `quotes.extras_total` was dropped in favour of a derivation. Four
- * different kinds of writer were left behind, and each was discovered separately, by something
- * breaking:
- *
- *   add_configuration_to_quote   plpgsql, inserts line_total   → caught post-deploy by db.plpgsql-lint
- *   add_layout_to_quote          plpgsql, inserts line_total   → same
- *   apply_rfq_prices_to_quote    plpgsql, updates line_total   → same
- *   quote-public-share/index.ts  edge, selects extras_total    → every shared quote link returned
- *                                                                not_found, with HTTP 200
- *   fiscal-derivations.test.ts   fixture, inserts extras_total → suite died in beforeAll
- *   quote-public-share.test.ts   fixture, stamps a derived total → asserted 0 against 1234.56
- *
- * Postgres refuses a non-DEFAULT write to a generated column and PostgREST refuses an unknown one,
- * so every one of these is a hard runtime error — and every one of them was invisible until
- * something ran. `db.plpgsql-lint` covers the SQL side and covers it well; nothing covered the
- * other three.
- *
- * WHY IT NEEDS THE DATABASE
- * -------------------------
- * Migrations here are applied straight to the live project — there are no migration files in the
- * repo (CLAUDE.md) and `types.ts` cannot be regenerated locally. So the repo contains no statement
- * of what the schema is, and a repo-only guard would be comparing a checkout against nothing. The
- * column registry comes from `schema_column_registry()`, service-role only.
- *
- * WHEN TO RUN IT
- * --------------
- *   npm run schema:writers          — after applying ANY migration that drops a column or makes
- *                                     one generated. That is the earliest possible catch: the
- *                                     migration is already live at that point, and CI has not run.
- * It also runs as the `db.schema-writers` production smoke check, which is the backstop for
- * anything applied without running it by hand.
- *
- * WHAT IT DELIBERATELY DOES NOT DO
- * --------------------------------
- * It does not try to understand every query shape. A select containing `*`, a template
- * interpolation, or a spread is SKIPPED rather than guessed at, and skips are counted and printed
- * — a guard that silently narrows its own coverage is the failure mode this repo keeps finding, so
- * the number is always on screen. What it does check, it checks exactly.
- */
+/** Schema-writer lint — does this checkout still agree with the live schema? */
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -153,24 +109,6 @@ function parseSelectList(list) {
 /**
  * Blank everything that is not code — string CONTENTS and comment bodies — preserving length so
  * every offset still lines up with the original.
- *
- * Two separate lessons, one pass:
- *
- *  • Strings. Structure detection otherwise reads punctuation that is really data: a `{` inside
- *    `` `E2E line ${rid}` `` skews brace depth, and a `,` inside a message splits a key list. The
- *    first version dodged that by skipping any object containing `${`, which skipped most inserts
- *    in the repo — including the exact fixture writing a generated `line_total`.
- *  • Comments. A comment inside an object literal routinely contains an apostrophe or a quoted
- *    error message, and to a string scanner that opens a string that never closes, swallowing the
- *    real keys below it. That is precisely what hid the `extras_total` write in
- *    `fiscal-derivations.test.ts` — a comment explaining the very column being written.
- *
- * ONE scanner, not a pair of regexes — the argument `tests/helpers/stripComments.ts` makes at
- * length, and for the same reason: a `//` line containing `/*` opens a block comment that the
- * regex version closes far below, deleting real code in between. This is a second implementation
- * only because that helper is TypeScript loaded by vitest and this is a plain `.mjs` CLI; it is
- * held equivalent to the canonical one by tests/unit/schemaWriterLint.test.ts rather than by
- * convention, which is how the escapeHtml twins are kept honest.
  */
 export function blankNonCode(src) {
   const out = src.split('');
@@ -300,17 +238,6 @@ export function extractUsages(src, file) {
     // what matters: a chain 40 lines later belongs to a different table, and attributing its
     // columns to this one reported real code as broken (`user_websites.update({page_count})`
     // blamed on `user_website_pages`, forty lines above it).
-    // The window decides WHICH `.from()` owns a call — it stops at the next one, because a chain
-    // 40 lines below belongs to a different table (attributing its columns here reported real code
-    // as broken). It is NOT used to read the call's contents: an object literal with a long
-    // comment in it runs past any fixed cap, `balanced()` then never finds its closing brace, and
-    // the whole insert is written off as "unparseable" — which is how a fixture writing a dropped
-    // column sat right in front of this guard and produced nothing.
-    // ANY `.from(` ends the window, including `.from(targetTable)` with a variable. Only matching
-    // a QUOTED one meant an unquoted chain was invisible as a boundary, so the window ran past it
-    // and blamed the NEXT chain's columns on this table — `from(targetTable).select('total')` in
-    // ordersService reported as `payments.total`, which is a column neither of them has.
-    // `Array.from(` is excluded: it is not a query and truncating there would lose real coverage.
     const nextFrom = src.slice(m.index + m[0].length).search(/(?<!Array)\.from\(/);
     const end = m.index + m[0].length + (nextFrom === -1 ? WINDOW : Math.min(nextFrom, WINDOW));
     const window = src.slice(m.index, end);
@@ -371,21 +298,7 @@ export function scanRepo(root = ROOT) {
  */
 export const problemKey = (p) => `${p.file}|${p.table}.${p.column}|${p.kind}`;
 
-/**
- * EMPTY, and it should stay that way.
- *
- * This guard's first run found 33 problems across 26 call sites — every one a real runtime error
- * waiting for its code path, and every one now fixed rather than exempted. Among them: sixteen
- * `ai_usage_logs.api_provider` inserts that had been failing silently on the billing table, a
- * Pinterest OAuth flow writing five columns that no longer existed, an `agent_runs` zombie-recovery
- * UPDATE that never ran, and four read paths (AR page, seasonality chart, F&E schedule, review
- * notifications) querying columns that had been renamed out from under them.
- *
- * It is kept as a mechanism because a real migration may legitimately need a staged fix — but it is
- * shrink-only and enforced: an entry matching nothing FAILS the run, so a stale exemption cannot
- * sit here absorbing the next genuine finding on the same file and column. Adding a line to make a
- * build pass is the one thing it is not for.
- */
+/** EMPTY, and it should stay that way. */
 export const KNOWN_DRIFT = new Set([]);
 
 export async function run() {

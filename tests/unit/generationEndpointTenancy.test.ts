@@ -1,37 +1,6 @@
 /**
  * Guard: the paid generation endpoints bind the tenant, validate the URL, and never
  * report a failure as a success. (Audit #364 — EX-1, EX-7, EX-12, EX-13, EX-14.)
- *
- * Every one of these defects produced a HTTP 200 and a plausible-looking row, which is why none
- * of them was visible to a typecheck, an integrity probe or a health signal:
- *
- *   EX-1   `workspace_id` came from the request BODY and then decided which credit pool was
- *          debited, which workspace owned the `generation_3d` / `generation_videos` / `vr_worlds`
- *          row, and which admins could read the `ai_usage_logs` row through its
- *          `is_workspace_admin(workspace_id)` policy. `debit_credits` falls back to the personal
- *          wallet for a non-member, so this was never credit theft — the ROWS still landed in a
- *          stranger's tenant, on their cost dashboard and in their generation history.
- *
- *   EX-7   the same body-supplied image URL was handed to Replicate / Veo / Kling — which fetch
- *          it from THEIR network — before anything validated it, and the provider's output URL
- *          was then downloaded with a bare `fetch()`: no guard, redirects followed, no size cap.
- *
- *   EX-12  a Replicate prediction that `succeeded` with no usable output returned
- *          `success: true, status: 'completed', video_url: null`, kept the credits, and wrote an
- *          `ai_usage_logs` row for a video that does not exist.
- *
- *   EX-13  the VR completion write was a bare `await` whose error was discarded, while the
- *          response was rebuilt from local variables — so a failed write told the caller the
- *          world was ready and left the row on `generating` forever.
- *
- *   EX-14  two of the five generators ended their `ai_usage_logs` insert with
- *          `.then(() => {}, () => {})`, discarding both failure modes. That is the
- *          `stamp_job_refresh_cost` shape: spend charged to a tenant, reported against nobody.
- *
- * Static, over source text — a runtime test would need a live Supabase, a funded Replicate
- * account and a DNS resolver willing to lie. So this pins the SHAPE at each call site, which is
- * what actually regressed: `generate_video`'s own earlier fix stopped at the push site, and this
- * is the same lesson.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'node:fs';

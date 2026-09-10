@@ -1,33 +1,4 @@
-/**
- * Guard: the workspace's own documents reach the model without the model deciding to fetch them.
- *
- * THE DEFECT THIS REPLACES
- * -----------------------
- * `knowledge_base_search` is in the always-on `core` toolkit, bound on every turn for every agent
- * that declares it. Measured live on 2026-08-23:
- *
- *   "What is product discovery?"                 → 0 tool calls, answered from general knowledge,
- *                                                  then asked which sense was meant
- *   "What does OUR knowledge base say about it?" → searched, read two sections, quoted the doc
- *
- * Same agent, same bound tools, opposite behaviour — decided by phrasing. The workspace holds a
- * 253-section document literally titled "Product Bible / Product Discovery" that a direct query
- * returns at 0.676 relevance.
- *
- * A prompt rule ("search before answering") fixes that most of the time, and most of the time is
- * exactly the problem: `agent-memory.ts` records the same lesson about a rule its distiller kept
- * breaking — an instruction is not an enforcement mechanism. So retrieval stopped being the
- * model's decision.
- *
- * WHAT THIS TEST PINS
- * -------------------
- * The two things that would quietly turn grounding back into a suggestion:
- *   1. the gate degrading into a guess about the message (an LLM classifier or a keyword/length
- *      heuristic — the latter is a mistake this repo already paid for in `shouldRouteToHaiku`,
- *      whose own comment reads "Length is not complexity");
- *   2. the retrieved text losing its DATA fence, which would make every KB document a
- *      prompt-injection vector into the system prompt (security invariant 9).
- */
+/** Guard: the workspace's own documents reach the model without the model deciding to fetch them. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

@@ -46,17 +46,7 @@ export const EmailDomainsTab: React.FC<EmailDomainsTabProps> = ({ onDomainVerifi
     }
   };
 
-  /**
-   * Synchronous in-flight latches (#357 AE-17).
-   *
-   * `saving` / `checkingDomain` are React state and cannot stop a submit that is already
-   * queued — the second click fires before the first `setSaving(true)` has rendered, and the
-   * button's `disabled` is that same state one render behind. Adding a domain twice is noise;
-   * checking one twice races the read-back that `onDomainVerified` triggers, and spends two
-   * Resend calls to learn the same thing.
-   *
-   * A ref is set and read in the same synchronous turn. State is not.
-   */
+  /** Synchronous in-flight latches (#357 AE-17). */
   const addingDomain = useRef(false);
   const verifyingDomains = useRef<Set<string>>(new Set());
 

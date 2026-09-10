@@ -1,45 +1,4 @@
-/**
- * The one way a guard test gets at the repo's source, and the reason it only pays for it once.
- *
- * 225 of the 271 files in this directory are source-level greps — that is the enforcement
- * mechanism this codebase runs on, and the COUNT was never the problem. The cost distribution
- * was: measured 2026-08-29, `npm test` ran 3,732 tests in 53s, and **31 files held ~80% of it**,
- * with three of them (`deepLinkTargets` 40.1s, `pricingChain` 35.5s, `profileSectionLinks` 22.5s)
- * costing more than the other 3,700 tests put together.
- *
- * Almost none of that was assertion time. 79 test files walk the tree with `readdirSync`, 48 of
- * them declared their own `walk()`, and the slow ones then re-read and re-comment-stripped all
- * 1,616 files under `src` + `supabase/functions` ONCE PER `it()` — `pricingChain` did six full
- * passes to serve eight tests. The walk was usually hoisted to module scope; the READ almost
- * never was, and the read is the expensive half.
- *
- * So this is the twin of `stripComments`: that file turned ten drifted copies into one correct
- * scanner, this one turns 48 hand-rolled walks into one cache. Same shape of problem one layer
- * up — a copy nobody can see is a copy that drifts.
- *
- * Caches are module-level and therefore PER TEST FILE (vitest isolates each file in its own
- * worker), which is exactly the scope that was being wasted. Two indexes over overlapping roots
- * in the same file share the read and strip caches, so a file is read once and stripped once
- * however many guards consult it.
- *
- * ── CRLF is normalized on the way in, deliberately ────────────────────────────────────────────
- * Every accessor here works in LF. `stripComments` already normalized; the `read` helpers these
- * replaced did it by hand in some files and not others, which is the split `stripComments.ts`
- * documents: a guard's anchor describes source STRUCTURE — `"from('quote_items')\n      .insert("`
- * — and on a Windows checkout with `core.autocrlf=true` every one of those newlines is CR LF on
- * disk, so the anchor silently cannot match. `quoteCostBasis` failed exactly that way locally
- * while passing in CI. Normalizing in one place means `blankedSource` offsets still align, because
- * they align against the same normalized string the caller is handed.
- *
- * ── Exclusions are per-caller ON PURPOSE ──────────────────────────────────────────────────────
- * The 48 walks did not agree: some skipped `dist`, some `_generated`, some neither. Those are not
- * cosmetic differences — a guard's file set IS its coverage, so silently widening one can turn it
- * red on generated code it was never meant to police, and silently narrowing one makes it stop
- * seeing the thing it exists to catch WITHOUT failing, which is the worst available outcome for a
- * test whose whole job is to notice. Callers pass what they excluded before; this helper
- * standardizes the caching, not the policy. `node_modules` is the sole unconditional skip,
- * because no guard has ever wanted it.
- */
+/** The one way a guard test gets at the repo's source, and the reason it only pays for it once. */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { stripComments, blankComments } from './stripComments';

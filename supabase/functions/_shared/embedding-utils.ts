@@ -1,17 +1,5 @@
 
-/**
- * Shared MIVAA Embedding Utilities for Supabase Functions
- *
- * This module provides centralized embedding generation utilities through MIVAA gateway
- * that ensure consistency across all Supabase Edge Functions. It uses the same configuration
- * standards as the frontend application but routes through MIVAA for centralized AI management.
- *
- * Environment Variables Required:
- * - MIVAA_GATEWAY_URL: Main app URL for MIVAA gateway access
- * - MIVAA_API_KEY: API key for MIVAA authentication
- * - EMBEDDING_MODEL: The embedding model to use (default: text-embedding-ada-002)
- * - EMBEDDING_DIMENSIONS: The vector dimensions (default: 1536)
- */
+/** Shared MIVAA Embedding Utilities for Supabase Functions */
 
 export interface EmbeddingResponse {
   embedding: number[];
@@ -140,13 +128,6 @@ export async function generateStandardEmbedding(
       // serves, and `generate_embedding` is not in that proxy's action map either. So the
       // call 404'd on every attempt, from every caller, since it was written: agent
       // long-term memory recall silently degraded to its recency fallback on every turn
-      // (100% of `agent_memories` rows have `embedding IS NULL`), and each turn paid ~3s of
-      // retries for it. Nothing failed loudly because every caller treats "no embedding" as
-      // a degradation rather than an error.
-      //
-      // `/api/embeddings/clip-text` is the voyage-4 TEXT endpoint despite the name — the
-      // CLIP one is `/clip-image`. `verify_internal_access` on it accepts the `mk_` platform
-      // key as a Bearer token, which is what MIVAA_API_KEY holds.
       const response = await fetch(`${MIVAA_CONFIG.gatewayUrl}/api/embeddings/clip-text`, {
         method: 'POST',
         headers: {
@@ -322,20 +303,7 @@ export function validateEmbedding(embedding: number[]): boolean {
   return embedding.every(val => typeof val === 'number' && isFinite(val));
 }
 
-/**
- * `generateSemanticAnalysis` was here and has been deleted.
- *
- * It POSTed `{action:'semantic_analysis'}` at `${gatewayUrl}` + the edge proxy's own path — the
- * same wrong URL `generateStandardEmbedding` carried, so it 404'd on every attempt. It also
- * named an action the `mivaa-gateway` map does not define, and it had NO callers: dead code that
- * could not have worked if something had called it.
- *
- * Nothing needs restoring here. Vision in this platform is Anthropic-only and goes through the
- * real ingestion path (`tools=[VISION_ANALYSIS_TOOL]` + forced `tool_choice`); a second,
- * gateway-shaped vision helper on the side is exactly the drift CLAUDE.md keeps warning about.
- * The `SemanticAnalysisRequest` / `SemanticAnalysisResponse` interfaces above are kept — they
- * describe the MIVAA route's wire shape and cost nothing.
- */
+/** `generateSemanticAnalysis` was here and has been deleted. */
 
 /**
  * Get current embedding configuration info

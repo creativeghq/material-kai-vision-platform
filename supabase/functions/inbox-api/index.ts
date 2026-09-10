@@ -4,13 +4,6 @@
 //   • JWT actions  — authenticated member/operator/customer-account flows.
 //   • Token actions — service-role, unauthenticated; a tokenized customer with scoped
 //                     read/reply to ONE thread, plus the token_claim conversion handshake.
-// All directional ACL walls (operator↔everyone, dealer↔customer, sales jump-in, etc.) are
-// enforced HERE at thread-create / participant-add time — never at read time. RLS on the
-// tables only gates direct client reads/realtime to "active participant OR platform operator".
-// Channel send-router: an `internal` thread stores only; `whatsapp`, `email` and `social`
-// threads store AND relay (WhatsApp via Zernio's inbox, with Meta's 24h service window
-// applying — freeform in-window; `social` via Zernio's comment or DM endpoint depending on
-// what kind of social thread it is).
 
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { jsonResponse as json } from '../_shared/http.ts';
@@ -112,20 +105,7 @@ interface Attachment {
 const ACTIVE_MEMBER = (s: string | null | undefined) => !s || s === 'active';
 const BUSINESS_ROLES = new Set(['owner', 'admin', 'member', 'staff', 'sales']);
 
-/**
- * Who a thread is WITH — the active customer participant, earliest joined.
- *
- * Returned to the client as `counterparty_participant_id` so every place that draws this person's
- * face seeds on the same row. The inbox used to seed the header on the THREAD id and each message
- * on the SENDER PARTICIPANT id, which is two hashes, two cast slots and two faces for one man.
- * Deriving it here rather than in the client is what stops the mailbox list, the header and the
- * transcript each answering "who is this thread with" separately.
- *
- * Ordered, not just picked: one live thread carries two customers, and `.find()` on an unordered
- * PostgREST result would swap their faces between page loads.
- *
- * NULL for an internal (team) thread, which genuinely has no counterparty.
- */
+/** Who a thread is WITH — the active customer participant, earliest joined. */
 function counterpartyParticipantId(
   rows: Array<{ id: string; participant_type: string; status?: string; joined_at?: string | null }>,
 ): string | null {
@@ -138,16 +118,6 @@ function counterpartyParticipantId(
 /**
  * Which of the 24 cast characters a customer participant wears — derived HERE, for the same
  * reason `counterpartyParticipantId` is.
- *
- * The id decides which character; the NAME decides which half of the cast it is drawn from, so
- * that a woman is not handed a bearded man by a coin flip (see `characterAvatar.ts`). The name is
- * the catch: the client holds four different strings for one counterparty — `thread.subject` in
- * the mailbox list and the header, the WhatsApp profile name in the drawer, `crm_contacts.name`
- * on every message row — and a pool resolved per screen gives one person two faces the instant
- * those disagree. That bug has already shipped once here, off a different input.
- *
- * So: the CRM name where the contact is filed, the thread subject where it is not, answered once
- * and sent as a number. The client renders the number.
  */
 function counterpartyAvatarSlot(
   participantId: string | null,
@@ -248,19 +218,7 @@ async function resolveThreadAccess(
   return { canRead: false, isMember: false, participant: null };
 }
 
-/**
- * A thread you cannot read does not exist, as far as you are concerned (#359 CM-11).
- *
- * Invariant 1 is explicit: *"Return 404 (not 403) on ownership mismatch to avoid id enumeration."*
- * These handlers answered `403 You are not a participant of this thread`, which confirms the id is
- * real, that a conversation exists behind it, and — for the workspace-scoped variants — that it
- * belongs to a tenant the caller can name. `loadThreadIntake` already did the right thing and
- * returned `404 Conversation not found`; the rest did not.
- *
- * The distinction that survives: a 403 is still correct for a CAPABILITY refusal to somebody who
- * can already see the thread — "only members may leave private notes" tells them nothing they did
- * not know. So `canRead` is the 404, and `isMember` stays a 403 behind it.
- */
+/** A thread you cannot read does not exist, as far as you are concerned (#359 CM-11). */
 function assertThreadVisible(access: { canRead: boolean }): void {
   if (!access.canRead) throw new HttpError(404, 'Conversation not found');
 }
@@ -291,24 +249,6 @@ async function ensureMemberParticipant(
 /**
  * Meta's 24h service window: outside 24h since the customer's last inbound WhatsApp message,
  * only an approved template may be sent. Inbound messages carry metadata.direction='incoming'.
- *
- * `inbox_messages` answers this for any thread whose inbound messages we hold, which is almost
- * all of them — the live webhook files every one. It does NOT answer it for a thread we hold no
- * inbound message for, and those exist: a thread born from a `message.sent` echo (the operator
- * writes from their handset under coexistence) is created around an OUTBOUND message with none of
- * the conversation's history behind it. There, "no incoming row" is a fact about our table and not
- * about the customer, and treating the two as one produced a banner the operator could see was
- * absurd — thread c7e4f75a showed a single message sent twenty minutes earlier under "the 24-hour
- * reply window has closed", while the customer's actual last message sat in Zernio dated 18 days
- * back. Both readings said "closed"; only one of them was an answer.
- *
- * So: local first, and ask Zernio only when local has nothing to say. That keeps the common path
- * to one indexed read, and it is self-limiting — the moment a real inbound message arrives the
- * local answer takes over for good.
- *
- * The verdict still FAILS CLOSED. `source` says how it was reached so the caller can tell a
- * measured "closed" from an unknown one, and `open` is false for both: Meta would reject the send
- * anyway, and a stored message the customer never receives is worse than a blocked composer.
  */
 async function whatsappWindow(
   db: DbClient,
@@ -401,23 +341,7 @@ async function resolveThreadCustomerScope(
   return { contactId: party.contactId, companyId: party.companyId };
 }
 
-/**
- * Editable inbox-agent persona/policy — `prompts` row (prompt_type='agent', category='inbox').
- *
- * There is no inline fallback, and that is the point. A byte-similar
- * FALLBACK_INBOX_PERSONA used to sit here behind `|| `, loaded with a query whose
- * error was DISCARDED (`const { data } = await ...`). supabase-js resolves rather
- * than throws on an RLS denial, so a permissions change or a database blip would
- * have swapped the operator's edited persona for the hardcoded one — silently,
- * indefinitely, with every health signal green. `_shared/rerank.ts` has the same
- * story written in its comments: its FALLBACK_PROMPT ran 100% of the time while
- * the admin's row sat in the table untouched.
- *
- * getAgentSystemPrompt reads `system_prompt` specifically. That matters here: this
- * row's `prompt_text` is a placeholder note ("this column is unused for the inbox
- * agent"), so a naive swap to the generic loadPrompt() — which prefers prompt_text
- * — would have replaced the whole persona with that sentence.
- */
+/** Editable inbox-agent persona/policy — `prompts` row (prompt_type='agent', category='inbox'). */
 async function loadInboxAgentPersona(db: DbClient): Promise<string> {
   return await getAgentSystemPrompt(db, 'inbox');
 }
@@ -429,19 +353,11 @@ async function loadInboxAgentPersona(db: DbClient): Promise<string> {
  * message_type='agent', billed to the workspace pool (or owner personal) via debit_credits. Available to every
  * workspace (no module gate); every reply costs credits and is skipped (left for a human) when the
  * owner can't pay. Only fires on a fresh inbound CUSTOMER message (loop/takeover guard below).
- * Best-effort — any failure leaves the thread for a human, never throws.
  */
 /**
  * Order intake (#342 §3). Runs immediately BEFORE `maybeRunAgentReply` at every place an inbound
  * customer message lands, so both channels get it from one chokepoint and neither webhook needed
  * a change.
- *
- * It produces a PROPOSAL on `inbox_threads.metadata.order_intake`. Nothing reaches `orders` until
- * a member approves it — see `create_order_from_thread_intake`.
- *
- * Same guard as the agent reply: only a fresh inbound CUSTOMER text triggers it, so the assistant
- * quoting an order back, a member's reply, or a system event cannot re-trigger extraction and
- * re-bill for it. Best-effort throughout — a failure leaves the thread for a human.
  */
 async function maybeRunOrderIntake(db: DbClient, threadId: string): Promise<void> {
   try {
@@ -546,20 +462,6 @@ async function maybeRunAgentReply(db: DbClient, threadId: string): Promise<void>
 
     // ── Billing ──────────────────────────────────────────────────────────
     // No debit here any more, and no refund, because there is nothing left to refund.
-    //
-    // This used to charge a FLAT one-credit fee before generating, then hand it back on
-    // a blank draft or a failed post. That fee was calibrated for what this function used to be: a
-    // single ~700-token call with three tools. The turn now runs on JARVIS, where cost depends on
-    // what the question needed — a grounded, tool-using answer is not the same purchase as a
-    // one-liner, and pretending otherwise would either overcharge every short reply or quietly
-    // subsidise every long one.
-    //
-    // agent-chat already meters the real turn into `agent_usage_logs` against `owner`, and gates
-    // it up front with `preflight_credits` — which returns 402 when the owner cannot pay, and
-    // `buildAgentDraft` turns that into an empty draft, i.e. exactly the old "leave it for a
-    // human" outcome. Keeping our own debit on top would be two ledgers for one reply, which is
-    // the precise shape that made `credit_transactions` and `ai_usage_logs` disagree about which
-    // feature had run (see `billedTo` below).
     let replyText: string;
     try {
       replyText = await buildAgentDraft(db, thread, { userId: owner, task: 'inbox_agent_reply' });
@@ -595,28 +497,7 @@ async function maybeRunAgentReply(db: DbClient, threadId: string): Promise<void>
 /** A file the model cannot open, named so it can at least say what arrived. */
 interface TranscriptAttachment { name?: string; filename?: string; type?: string; mime_type?: string }
 
-/**
- * The conversation as the model reads it.
- *
- * Two things this fixes, both of which the one-line `.map()` it replaced got wrong.
- *
- * **1. The speakers were merged.** Every row was labelled `Customer/Team` unless it was the
- * assistant's own — and a member's reply is `message_type='text'` exactly like the customer's, so
- * there was no way to tell "the customer asked for a discount" from "my colleague offered one".
- * The participant row is what separates them, and it is the same read the reply guard already
- * trusts to decide whether the latest message is even answerable.
- *
- * **2. An attachment was invisible.** `m.body || '[attachment]'` only fired when the body was
- * EMPTY, so an email carrying an invoice PDF *and* a covering sentence rendered as the sentence
- * alone. The model then answered as though nothing had been sent. Naming the file does not let it
- * read the file — it lets it say "I can see invoice-4471.pdf and I've passed it to the team",
- * which is true, instead of "I can't open PDFs", which reads as a refusal.
- *
- * Provider placeholders (`[Unsupported message]` from Zernio, for a WhatsApp document we never
- * downloaded) are rewritten to say what actually happened. Left alone, the model treats the phrase
- * as the customer's words and argues with it — which is precisely how one thread went, three
- * messages deep, while the customer insisted they had sent the invoice.
- */
+/** The conversation as the model reads it. */
 const PROVIDER_PLACEHOLDER_BODIES = new Set(['[unsupported message]', '[unsupported]', '[media]']);
 
 async function buildTranscript(
@@ -729,17 +610,7 @@ async function buildAgentDraft(
   const transcript = await buildTranscript(db, threadId, rows);
   if (!transcript.trim()) return '';
 
-  /**
-   * Tell the assistant how this customer sounds, using the SAME reading the drawer shows.
-   *
-   * Without it the reply is written blind: an apology owed to somebody chasing a third time
-   * reads identically to a cheerful confirmation, because the model sees the words and not the
-   * temperature of them. It is usually free — the drawer's read is cached against the last
-   * message id, and this asks for the same one.
-   *
-   * Best-effort on purpose. A failed reading must not cost the customer their reply, so a throw
-   * here degrades to the plain transcript rather than to silence.
-   */
+  /** Tell the assistant how this customer sounds, using the SAME reading the drawer shows. */
   let agentInput = transcript;
   try {
     // The operator's switch for the RECURRING cost specifically. `enabled` still gates the read
@@ -781,16 +652,6 @@ async function buildAgentDraft(
   // that is the change: there is ONE assistant on this platform and the Inbox runs it. A customer
   // conversation now gets the same 36k system prompt, the same shared operating doctrine, the same
   // unconditional grounding in the workspace's own documents and the same reasoning the operator
-  // gets in their own chat — so improving JARVIS improves every customer conversation, instead of
-  // improving one of two assistants while the customer-facing one stays at 816 characters.
-  //
-  // `audience: 'customer'` is what makes that safe rather than reckless. agent-chat clamps 166
-  // tools down to a read-only handful, drops long-term memory in BOTH directions, unbinds the
-  // meta-tools and fences this transcript as DATA. The clamp is on the agent's PERMITTED set, so
-  // `load_toolkit` cannot widen it either. See `_shared/customer-audience.ts`.
-  //
-  // Only the service-role bearer may claim that audience, which is why this is a function-to-
-  // function call and not something the browser could ever make.
   const resp = await fetch(`${SUPABASE_URL}/functions/v1/agent-chat`, {
     method: 'POST',
     headers: {
@@ -836,18 +697,7 @@ async function buildAgentDraft(
   return await readAgentChatReply(resp, threadId);
 }
 
-/**
- * Pull the final answer out of agent-chat's stream.
- *
- * agent-chat speaks newline-delimited JSON, not `data:`-prefixed SSE — one object per line, of
- * which we want exactly one: `final_result`, whose `text` is the reply. Everything else on the
- * wire (heartbeats, `tool_call`, `text_chunk`, `agent_routed`) exists for the Studio's live view
- * and means nothing to a WhatsApp message that is sent whole.
- *
- * Reading the body to the end rather than bailing on the first match is deliberate: `final_result`
- * is the second-to-last chunk, `done` follows it, and abandoning a half-read body leaves the
- * upstream isolate writing into a closed pipe.
- */
+/** Pull the final answer out of agent-chat's stream. */
 async function readAgentChatReply(resp: Response, threadId: string): Promise<string> {
   const raw = await resp.text();
   let text = '';
@@ -1012,19 +862,7 @@ async function uploadAttachment(
   threadId: string,
   att: { filename?: string; content_type?: string; data_base64?: string } & Partial<Attachment>,
 ): Promise<Attachment> {
-  /**
-   * An already-stored reference must be one of THIS thread's own files (#359 CM-7).
-   *
-   * This passed any `{ storage_bucket, storage_object_path }` through untouched, and the relay
-   * then signs it and delivers it — so `{ bucket: 'pdf-documents', path: 'payslips/…' }` sent an
-   * internal document to an external WhatsApp number or email address. Any private object the
-   * service role could reach was attachable, which is all of them.
-   *
-   * The bucket and the `inbox/<threadId>/` prefix are both checked: the prefix alone would still
-   * allow another conversation's attachments, which is a cross-customer disclosure inside one
-   * tenant. Anything else has to be uploaded as bytes, which lands it under this thread's prefix
-   * by construction.
-   */
+  /** An already-stored reference must be one of THIS thread's own files (#359 CM-7). */
   if (att.storage_object_path) {
     const bucket = att.storage_bucket || ATTACHMENT_BUCKET;
     const path = String(att.storage_object_path);
@@ -1067,25 +905,7 @@ async function normalizeAttachments(
   return out;
 }
 
-/**
- * The client's picks (a kind and a product id each) → cards the customer can be shown.
- *
- * Everything but the id is derived HERE, for THIS thread's customer:
- *   • the product must belong to the thread's workspace — a foreign id is simply not a card —
- *     and the kind is the product's own `item_type`, not the client's word for it;
- *   • the PRICE is `get_product_price_for_workspace` for the customer party (the ONE derivation
- *     of who that is: `threadCustomerParty`), through the same `resolveLinePrice` an intake line
- *     and a quote line use (one derivation per money quantity — a member cannot type a price
- *     into a card), shown gross to a consumer and net to a business buyer, with VAT at the
- *     product's own category when it has one — the rate the invoice will apply — and the
- *     workspace default otherwise;
- *   • the LINK is the workspace storefront only when the store is OPEN, the product is published
- *     there with a list price, AND the storefront would show this customer the same number the
- *     card does — a customer-specific price is not what the store charges, and a button to a
- *     page that disagrees with the card is worse than no button. A listed service links to the
- *     seller's public profile when that profile is public. Otherwise: no link, never an app
- *     route the customer cannot open.
- */
+/** The client's picks (a kind and a product id each) → cards the customer can be shown. */
 async function resolveInboxCards(
   db: DbClient,
   thread: Record<string, unknown>,
@@ -1181,20 +1001,7 @@ async function resolveInboxCards(
   });
 }
 
-/**
- * The WhatsApp sends one stored message needs, and the record of which of them went.
- *
- * A message with cards is SEVERAL sends for ONE row (a text, then a card each; an attachment
- * after). That makes partial delivery a real state, and CLAUDE.md anti-regression rule 4 says
- * what to do with one: record each leg as it completes, name the half that failed, and let a
- * retry RESUME at the first leg that did not run instead of storing a second message and
- * delivering the first legs twice.
- *
- * `metadata.relay_legs[i]` is written after every leg — one write per leg, so a crash between
- * two of them still leaves the truth on the row. `wamid` is the first leg's provider id (what
- * every existing reader expects) and `wamids` all of them, so a delivery receipt or an outbound
- * echo for ANY leg matches this row.
- */
+/** The WhatsApp sends one stored message needs, and the record of which of them went. */
 interface WhatsAppRelayLeg {
   ok: boolean;
   wamid?: string | null;
@@ -1395,19 +1202,7 @@ async function insertMessageAndNotify(
   const preview = (messageType === 'note' || messageType === 'system')
     ? undefined
     : (body ? body.replace(/\s+/g, ' ').slice(0, 140) : cards.length ? cardsPreview(cards) : '[attachment]');
-  /*
-   * The STATUS is not set here any more, and that is the point.
-   *
-   * This line used to be `status: 'open'` unconditionally, and two other writers said the same
-   * thing in their own words — the Zernio social refresh and the inbound-email handler. Three
-   * copies of one rule, all three wrong in the same way: our OWN reply, an agent reply and even a
-   * private note reopened the conversation. Which is exactly backwards for Follow-up, because the
-   * moment you mark a thread "chase this" is right after you answered it.
-   *
-   * `inbox_message_moves_thread_state` (an AFTER INSERT trigger on `inbox_messages`) owns it now,
-   * so a fourth writer cannot get it wrong and the rule is readable in one place. Only
-   * `last_message_at` and the preview belong to the caller.
-   */
+  /* The STATUS is not set here any more, and that is the point. */
   await db
     .from('inbox_threads')
     .update({
@@ -1434,16 +1229,6 @@ async function insertMessageAndNotify(
        * the first card's body when it fits, so the customer reads one thing, not a paragraph
        * followed by a stray box. A file attachment sent alongside cards follows as its own
        * message, because Zernio carries one attachment per send.
-       *
-       * Several sends for one stored message: `relayWhatsAppLegs` records each as it goes
-       * (`relay_legs`, `wamids`), stores the first id as `wamid` for the receipt matcher, and
-       * stops at the first failure — the message the member then sees names WHICH part did not
-       * go, and a retry with the same client token resumes there (anti-regression rule 4).
-       *
-       * sendWhatsAppReply NEVER throws — _shared/zernio.ts catches everything and returns
-       * { success: false, error }. Before the result was read, a Zernio rejection (expired
-       * token, missing add-on, closed 24h window, rate limit) still produced a message bubble in
-       * the operator's thread and a cleared composer, while the customer received nothing.
        */
       const legs = await whatsAppLegsFor(db, body, cards, attachments);
       const result = await relayWhatsAppLegs(db, {
@@ -1753,19 +1538,7 @@ function orderConfirmationText(intake: OrderIntake, orderNumber: string | null):
   return `${head}\n\n${lines.join('\n')}${tail}`;
 }
 
-/**
- * Tell the customer their order was accepted (#342 §4a) — and REPORT which channel did it.
- *
- * This exists because of a gap #209 left open and this feature walks straight into: `send_message`
- * returns 409 on a freeform WhatsApp reply outside Meta's 24-hour service window. An order that
- * arrives at 18:00 and is approved at 09:00 the next morning is outside it. Without this, the
- * order would be created and the confirmation would silently fail — a real order the customer was
- * never told about, with nothing complaining. That is the platform's signature silent-zero shape.
- *
- * Approval NEVER rolls back because a message failed: the order is the commitment, the message is
- * best-effort. But the outcome is stored on the intake, so "approved but never told" is a state
- * you can query rather than a guess.
- */
+/** Tell the customer their order was accepted (#342 §4a) — and REPORT which channel did it. */
 async function sendOrderConfirmation(
   db: DbClient,
   thread: Record<string, unknown>,
@@ -1873,31 +1646,7 @@ async function sendOrderConfirmation(
   }
 }
 
-/**
- * Thread metadata a CLIENT may set (#359 CM-6).
- *
- * `create_thread` wrote `metadata: payload.metadata ?? {}` — the request body, verbatim, into a
- * column the relay then reads to decide where a message goes. `insertMessageAndNotify` takes the
- * outbound email address from `metadata.email_from` and the sending mailbox from `metadata.email_to`,
- * and the WhatsApp branch reads `metadata.contact_phone` the same way.
- *
- * So a member could create a thread with `channel: 'email'` and any pair of addresses they liked,
- * post a message, and have the platform deliver arbitrary text to an arbitrary recipient FROM the
- * tenant's own verified mailbox. That is an open relay wearing a conversation, and combined with
- * the model-settable `confirm` on `manage_inbox` (#352) it is reachable by an agent acting on an
- * inbound message: the attacker emails you, the agent reads it, the agent mails whoever the
- * injected text names.
- *
- * Invariant 8, exactly: never spread a request body into a DB write when a field in it is a trust
- * decision. Routing identity is SERVER-derived — the inbound path writes it from the envelope it
- * actually received, and a member-created thread reaches a customer through a participant record,
- * not through an address they typed.
- *
- * The allowlist is decorative keys only. Anything not named here is DROPPED rather than rejected:
- * an unknown key is almost always a client sending something harmless it invented, and failing the
- * whole create would break callers to no benefit — but silently keeping it is how `email_from`
- * would come back.
- */
+/** Thread metadata a CLIENT may set (#359 CM-6). */
 const CLIENT_SETTABLE_THREAD_METADATA = ['source', 'note', 'tags', 'external_ref'] as const;
 
 /** Keys the RELAY reads. Named so the guard test can assert none of them is settable. */
@@ -2734,21 +2483,7 @@ async function handleJwtAction(
        */
       const peek = payload.peek === true && isMember;
 
-      /**
-       * A customer gets the same projection the PUBLIC token path gives them (#359 CM-10).
-       *
-       * This returned `select('*')` on participants and messages and the whole thread row to
-       * anybody who could read the thread — including a client-role user on a customer thread.
-       * That is: every internal member's `user_id` and `last_read_at`, the workspace's own mailbox
-       * address and Zernio account id out of `thread.metadata`, and each message's delivery
-       * metadata and provider ids.
-       *
-       * `token_get_thread` — the unauthenticated version of exactly this screen, for exactly this
-       * audience — already projected narrowly. The JWT path simply never did, and the two serve
-       * the same person: one with an account, one without.
-       *
-       * Notes were already excluded, which is the loud half of the rule. This is the quiet half.
-       */
+      /** A customer gets the same projection the PUBLIC token path gives them (#359 CM-10). */
       const { data: participants } = await db
         .from('inbox_participants')
         .select(isMember ? '*' : 'id, participant_type, thread_role')
@@ -2773,15 +2508,6 @@ async function handleJwtAction(
 
       // The thread row itself carries the routing metadata the relay reads — the mailbox we send
       // from, the provider conversation id — plus assignment and internal counters.
-      //
-      // `counterparty_participant_id` rides along for the same reason `list_threads` returns it:
-      // the header and the message rows must seed one person's face on one row. Derived from the
-      // participants just fetched, so it costs nothing. Member-only — the customer projection
-      // below is a deliberate narrowing (#359 CM-10) and nothing on that path draws a cast face.
-      //
-      // `avatar_slot` rides along on the participants for the same reason again: the transcript
-      // draws one face per SENDER, and a thread can hold two customers. Answering per row from
-      // whatever name that row happens to hold is what gives one person two faces.
       const customerParts = ((participants || []) as unknown as Array<{
         id: string; participant_type: string; contact_id?: string | null;
       }>).filter((p) => p.participant_type === 'customer');
@@ -2834,16 +2560,6 @@ async function handleJwtAction(
         await db.from('inbox_participants').update({ last_read_at: new Date().toISOString() }).eq('id', access.participant.id);
 
         // ...and tell the PLATFORM, not just our own table.
-        //
-        // Opening a thread moved `last_read_at` here and nowhere else, so the customer's message
-        // stayed marked unread in WhatsApp: an operator could read a message, answer it, and the
-        // sender's app would still show it as never seen. Zernio's unread counts drifted from
-        // ours permanently for the same reason.
-        //
-        // The receipt belongs on THIS path rather than in the `mark_read` action, because this is
-        // the one every screen already calls to open a thread — which is exactly why `mark_read`
-        // has no caller and is listed as such in inboxApiReachability. Best-effort: a failed
-        // receipt must never stop an operator reading their own inbox.
         const meta = ((thread.metadata as Json) || {}) as Record<string, unknown>;
         const convId = String(meta.zernio_conversation_id || '');
         if (convId && (thread.channel === 'whatsapp' || thread.channel === 'social')) {
@@ -2924,18 +2640,7 @@ async function handleJwtAction(
       const qtyWanted = payload.qty_wanted != null ? Number(payload.qty_wanted) : null;
       const customMsg = payload.message != null ? String(payload.message).trim() : '';
 
-      /**
-       * The sourcing demand must be the BUYER'S own line (#359 CM-9).
-       *
-       * `demand_id` was taken from the body and stored unverified, and `accept` later wrote a
-       * `stock_allocations` row keyed on it — so naming another tenant's quote line got an
-       * allocation written against it, and the accept path read that line's `product_id` back.
-       * Two ids each individually valid, never checked against each other: the fifth confirmed
-       * instance of this shape (CRM-5 #353, RE-4 #356, PQ-4 #358).
-       *
-       * Verified HERE, where the id enters, rather than only at accept: an unverified id sitting
-       * in a stored row is a decision already taken.
-       */
+      /** The sourcing demand must be the BUYER'S own line (#359 CM-9). */
       const demandType = (payload.demand_type === 'order_item' || payload.demand_type === 'quote_item')
         ? payload.demand_type
         : null;
@@ -3077,17 +2782,7 @@ async function handleJwtAction(
         supplierCompanyId = (newSup as Record<string, any>).id;
       }
 
-      /**
-       * Re-checked at accept, not merely at create (#359 CM-9).
-       *
-       * The row was written by a verified caller, but a stored id is still an id — the quote could
-       * have moved workspace, or a row could predate the check above. Confirming before an
-       * allocation is written costs one call and removes the class.
-       *
-       * The `quote_items` read below had NO workspace filter at all, and could not have had a
-       * simple one: `quote_items` carries no workspace, so tenancy lives on the parent quote.
-       * That is exactly why the predicate is in SQL.
-       */
+      /** Re-checked at accept, not merely at create (#359 CM-9). */
       let productId: string | null = null;
       if (inq2.demand_type && inq2.demand_id) {
         const { data: stillOurs } = await db.rpc('demand_line_belongs_to_workspace', {
@@ -3287,24 +2982,7 @@ async function handleJwtAction(
       return json({ contact: contact || null, company, quotes: quotes || [], projects: projects || [], invoices, orders, metrics });
     }
 
-    /*
-     * link_preview — what a URL in this conversation actually points at.
-     *
-     * ── Why it is gated on the THREAD and not just on being signed in ──
-     * This resolves a URL server-side, which is a fetch primitive. The SSRF guard is the control
-     * that matters (https-only, DNS-validated, RFC1918/link-local refused, every redirect hop
-     * re-validated, 256 KB cap), but the reachable SET is narrowed too: the URL has to be one the
-     * caller's own thread already contains, checked with the SAME parser the bubble renders with.
-     * So this cannot be pointed at an arbitrary address by an arbitrary caller, and a URL nobody
-     * pasted is simply not previewable.
-     *
-     * ── Cached with a REASON, never with a blank ──
-     * `cache_status` distinguishes "the page states no metadata" (final) from "we could not read
-     * it" (retryable) from "the guard refused the address" (final, and not a fault). All three
-     * render as no card; only one of them is worth retrying, and without the column they are the
-     * same row. A successful fetch is not re-fetched for 30 days; a failure is retried after one
-     * hour, because the usual cause is the far side being briefly down.
-     */
+    /* link_preview — what a URL in this conversation actually points at. */
     case 'link_preview': {
       const threadId = String(payload.thread_id || '');
       const url = String(payload.url || '').trim();
@@ -3379,19 +3057,7 @@ async function handleJwtAction(
       return json({ preview: store });
     }
 
-    /*
-     * pin_message — put one message at the top of the conversation, for everyone.
-     *
-     * A PIN is the thread's ("read this first"); a STAR, below, is one person's ("I must come
-     * back to this"). They look like the same feature and are not: two colleagues starring
-     * different messages in a shared inbox must not overwrite each other, which is exactly what
-     * one boolean on the message row would do. So a pin lives on the message and a star lives in
-     * a table keyed by the person.
-     *
-     * Local to this inbox. WhatsApp's own pin is a property of the customer's chat on their own
-     * phone and Zernio exposes no way to set it, so claiming to have pinned it for them would be
-     * a lie the operator cannot see through.
-     */
+    /* pin_message — put one message at the top of the conversation, for everyone. */
     /*
      * enrich_attachments — run the attachment reader on one message, on demand.
      *
@@ -3430,17 +3096,7 @@ async function handleJwtAction(
       });
     }
 
-    /*
-     * ask_spreadsheet — a question about a CSV/XLSX a customer or supplier sent.
-     *
-     * MIVAA loads the file into an in-memory DuckDB, a forced tool writes ONE read-only SELECT,
-     * the SQL is parsed and allow-listed, the engine is locked before it runs, and the answer
-     * comes back with the SQL and the rows that produced it (the GAIK TabularAgent security
-     * model, adopted 2026-09-05; no Python execution anywhere). Member-only; the asker pays:
-     * credits are RESERVED here before MIVAA spends a token (invariant 10) and settled against
-     * the usage it reports. MIVAA writes the ai_usage_logs rows; this side writes the credit
-     * ledger — one derivation each, so the two cannot disagree about which feature ran.
-     */
+    /* ask_spreadsheet — a question about a CSV/XLSX a customer or supplier sent. */
     case 'ask_spreadsheet': {
       const threadId = String(payload.thread_id || '');
       const question = String(payload.question || '').trim().slice(0, 1000);
@@ -3608,18 +3264,7 @@ async function handleJwtAction(
       return json({ ok: true, starred });
     }
 
-    /*
-     * forward_message — send what somebody said into another conversation.
-     *
-     * Membership of BOTH threads is checked, and separately. Forwarding is the one action that
-     * moves words across a tenancy boundary, so "I can read the source" is not the question —
-     * the question is whether the caller may also WRITE to the destination, and a customer
-     * participant may not.
-     *
-     * It goes through `insertMessageAndNotify` rather than an insert, because that is the
-     * function that relays to WhatsApp, re-signs attachment URLs and notifies. A forward that
-     * only wrote a row would appear in our transcript and never reach the customer.
-     */
+    /* forward_message — send what somebody said into another conversation. */
     case 'forward_message': {
       const fromThreadId = String(payload.thread_id || '');
       const messageId = String(payload.message_id || '');
@@ -3684,18 +3329,7 @@ async function handleJwtAction(
       return json({ message: msg });
     }
 
-    /*
-     * delete_message — take a message out of THIS inbox.
-     *
-     * Named for what it does. Zernio exposes no unsend, so a message already delivered still sits
-     * on the customer's phone; calling this "delete for everyone" would be the platform claiming
-     * an effect it cannot produce — the same shape as a sent bubble for a message Meta refused.
-     * The client says "Remove from this inbox" and says why.
-     *
-     * Soft, because a conversation is a record: `deleted_at` keeps the row for anyone auditing
-     * the thread, while every reader (`get_thread`, the list previews, the agent context) already
-     * filters on `is('deleted_at', null)`.
-     */
+    /* delete_message — take a message out of THIS inbox. */
     case 'delete_message': {
       const threadId = String(payload.thread_id || '');
       const messageId = String(payload.message_id || '');
@@ -3732,15 +3366,6 @@ async function handleJwtAction(
     /*
      * set_follow_up — "bring this back on Thursday", and optionally "chase them if they have not
      * replied by then".
-     *
-     * ONE mechanism for both halves of what the operator asked for. A reminder is a follow-up
-     * with no message; an automatic chase is the same row with `follow_up_message` set. "Send it
-     * if there is no reply in X days" needs no separate concept either: the customer replying is
-     * what CANCELS it, and that cancellation lives in the message trigger, so it happens whatever
-     * channel the reply came in on and whichever function wrote it.
-     *
-     * Setting one moves the thread to Follow-up, because that IS the Follow-up bucket — a status
-     * with no date was the shelf nobody walked past.
      */
     case 'set_follow_up': {
       const threadId = String(payload.thread_id || '');
@@ -3933,17 +3558,7 @@ async function handleJwtAction(
           .insert(valid.map((label_id) => ({ thread_id: threadId, label_id, created_by: userId })));
       }
 
-      /*
-       * `inbox.thread_labeled` — "tell me when a conversation is marked Urgent".
-       *
-       * Only on an ADDITION, and only naming the ones added: a label is the operator's own word
-       * for "this needs somebody", and it is the moment it goes ON that anybody wants to know.
-       *
-       * The NAMES ride along, not just the ids. A flow condition is written by a person looking
-       * at their own labels, and a uuid in a condition field is a value nobody can author or
-       * read. `workspace_id` is stamped because a tenant fork matches on it — without it the
-       * fork never fires and `fork_workspace_flow_default` has already switched the default off.
-       */
+      /* `inbox.thread_labeled` — "tell me when a conversation is marked Urgent". */
       const addedIds = valid.filter((id) => !before.has(id));
       if (addedIds.length) {
         const addedNames = addedIds
@@ -4058,9 +3673,6 @@ async function handleJwtAction(
       // now a real JARVIS turn, agent-chat meters it against `userId` in `agent_usage_logs` and
       // refuses up front with a 402 when they cannot pay. Charging a fixed fee on top would bill
       // the same reply into two ledgers that then disagree.
-      // What the MEMBER wants the reply to do ("offer the oak decking", "say the order ships
-      // Monday"). Optional; trusted because it comes from the member's own JWT-authenticated
-      // request, and passed to agent-chat OUTSIDE the customer-data fence for that reason.
       const instruction = typeof payload.instruction === 'string' ? payload.instruction.trim().slice(0, OPERATOR_INSTRUCTION_MAX) : '';
       const draft = await buildAgentDraft(db, thread, {
         userId, task: 'inbox_agent_suggest', operatorInstruction: instruction || undefined,
@@ -4504,18 +4116,7 @@ async function resolveToken(db: DbClient, token: string, allowClaimed = false) {
   return t;
 }
 
-/**
- * Sender verification for a share link (#357 AE-12).
- *
- * A `/i/:token` link authorises by possession, and `token_send_message` posts as the contact the
- * token is bound to — so anyone who comes by the URL (a forwarded mail, a quoted reply chain, a
- * shared mailbox, a leaked archive) could write into a customer's conversation as that customer.
- *
- * READING stays link-only, deliberately: the link is an invitation, and challenging someone before
- * they can see the conversation they were invited to would make the feature useless. That read is
- * bounded by the 30-day TTL and by the token dying on claim. WRITING costs a one-time code sent to
- * the address the link was issued for.
- */
+/** Sender verification for a share link (#357 AE-12). */
 const CHALLENGE_TTL_MINUTES = 10;
 const MAX_CHALLENGE_ATTEMPTS = 5;
 /** Per token, per hour. A code arriving unbidden is itself a nuisance to the customer. */
@@ -4783,13 +4384,6 @@ const TOKEN_ACTIONS = new Set([
 // profile_contact_requests straight from the browser and RLS only allows `authenticated` — so a
 // logged-out visitor always got "Failed to send". The form was inert for exactly the audience it
 // exists to serve. It posts here instead: Turnstile-gated, rate-limited, service-role insert.
-//
-// It now lands in the SAME Inbox as every other conversation, tagged `source: 'public_profile'`,
-// instead of a private table with its own screen. What that table could not do, and this does:
-// a reply that actually reaches the sender (their answer threads back in by email), assignment,
-// labels, archive, the AI draft, search, and a CRM contact for the lead. It could not even do
-// what it looked like it did — `profile_contact_requests` had no DELETE policy, so the "delete
-// message" button in that screen removed the row from the list and nothing from the database.
 const CONTACT_MAX_PER_RECIPIENT_HOUR = 20;   // stops one profile being flooded
 const CONTACT_MAX_PER_SENDER_WINDOW = 3;
 const CONTACT_SENDER_WINDOW_MS = 10 * 60_000;
@@ -5292,21 +4886,7 @@ async function handleProfileContact(db: DbClient, req: Request, payload: Json): 
   });
 }
 
-/**
- * How does this customer feel, and what should we say back?
- *
- * ONE derivation, two callers: the Mood panel in the drawer, and the assistant just before it
- * drafts a reply. A second read for the agent would let the screen say "frustrated" while the
- * reply is written as though nothing were wrong — and the operator would believe whichever one
- * matched what they already thought.
- *
- * Cached on the thread against the LAST MESSAGE ID, which is exactly what "has anything happened
- * since?" means. The drawer opens on every thread click and the assistant asks on every reply, so
- * an uncached read would bill a model call per glance.
- *
- * Returns null when there is nothing to read — a two-message thread has no mood, and inventing
- * one would put a confident label on noise.
- */
+/** How does this customer feel, and what should we say back? */
 /**
  * The operator's switches for conversation reading (Admin → Operations → Inbox AI).
  *
@@ -5338,17 +4918,7 @@ async function sentimentSettings(
   // default (on), and only an explicit false turns something off.
   const globalOn = v.enabled !== false;
 
-  /**
-   * Global OR module — never AND.
-   *
-   * The platform switch turns this on for everyone. When it is off, a workspace that has bought
-   * the `inbox-ai` add-on still gets it, because they are paying for it specifically. An AND
-   * would make the operator's cost control a kill switch for paying tenants, which is a
-   * different thing entirely and not what it is labelled as.
-   *
-   * The module is only consulted when the global is OFF: while it is on, everybody has the
-   * feature and an entitlement round-trip per analysis would buy nothing.
-   */
+  /** Global OR module — never AND. */
   let via: 'platform' | 'module' | 'off' = globalOn ? 'platform' : 'off';
   if (!globalOn && workspaceId) {
     if (await isWorkspaceEntitled(db, workspaceId, 'inbox-ai')) via = 'module';
@@ -5422,12 +4992,6 @@ async function readConversationSentiment(
   // ids are opaque uuids: a model asked to echo one back gets a character wrong often enough to
   // matter, and a mood keyed to an id that matches nothing renders as no border at all.
   // WHO SPOKE, from the two places that actually know.
-  //
-  // `metadata.direction` is the live stamp and covers everything the webhook has filed. It is
-  // absent on the outbound rows that predate it, and there an unstamped message reads as the
-  // CUSTOMER's — which hands the model our own words as theirs and asks how the customer feels
-  // about them. The participant type is the fallback, and it is the same answer `buildTranscript`
-  // reaches for a few hundred lines up.
   const { data: sentimentParts } = await db.from('inbox_participants')
     .select('id, participant_type').eq('thread_id', threadId);
   const sentimentTypeById = new Map<string, string>(
@@ -5533,17 +5097,7 @@ async function readConversationSentiment(
     if (!use?.input) throw new Error('the model returned no verdict');
     verdict = use.input as Record<string, unknown>;
 
-    /*
-     * Book the spend.
-     *
-     * This is a raw fetch to Anthropic rather than a call through `_shared/ai-client.ts`, which
-     * means nothing logs it for us — and an unlogged call is invisible to every cost view, which
-     * is the silent-zero shape exactly. The operator's switch for this feature sits next to a
-     * figure read from this table; without the insert that figure is a permanent, convincing $0
-     * and the switch looks free.
-     *
-     * Haiku 4.5 rates, per million tokens.
-     */
+    /* Book the spend. */
     const inTok = Number(body?.usage?.input_tokens ?? 0);
     const outTok = Number(body?.usage?.output_tokens ?? 0);
     const rawUsd = (inTok / 1e6) * 1.0 + (outTok / 1e6) * 5.0;
@@ -5632,19 +5186,7 @@ async function handler(req: Request): Promise<Response> {
   // 401 — stored, shown in the transcript, never delivered.
   await ensureZernioSecrets(db);
 
-  /*
-   * internal_send_follow_up — the scheduled chase, sent by the cron as the person who scheduled it.
-   *
-   * A separate entry point rather than `send_message` with a borrowed identity, because
-   * `send_message` requires a real JWT and a cron has no session to present at 4am. Impersonating
-   * through the ordinary action would mean making it accept a body-supplied `user_id`, which is
-   * invariant 1 in reverse — so the impersonation lives HERE, behind the service-role bearer,
-   * where it is one narrow thing a cron does and not a field on the endpoint everybody calls.
-   *
-   * Everything else is the ordinary send path: the same 24-hour window check, the same
-   * `insertMessageAndNotify` (relay, notify, receipts). A follow-up that skipped it would be a
-   * message the operator can see and the customer never got.
-   */
+  /* internal_send_follow_up — the scheduled chase, sent by the cron as the person who scheduled it. */
   if (action === 'internal_send_follow_up') {
     const authHeader = req.headers.get('authorization') || '';
     if (authHeader !== `Bearer ${SERVICE_ROLE_KEY}`) throw new HttpError(401, 'Unauthorized');
@@ -5696,17 +5238,6 @@ async function handler(req: Request): Promise<Response> {
     // #342: this is the shared inbound chokepoint for BOTH channels — zernio-webhook-handler
     // (WhatsApp) and email-webhooks (email) already call it, so neither needed a change to get
     // order intake. Intake runs first so the assistant's reply can acknowledge the order.
-    //
-    // BACKGROUNDED, and this became necessary when the reply moved onto JARVIS. Both callers are
-    // provider webhooks that `await` this request: Zernio and the mail webhook want a prompt 200
-    // and retry when they do not get one. The old one-shot answered in a few seconds; a real
-    // agent turn grounds itself in the knowledge base and may call tools, which is tens of
-    // seconds — comfortably inside the edge function's own 150s ceiling, and comfortably past
-    // what a webhook will wait for. A retry would then deliver the same message twice.
-    //
-    // `runInBackground` (EdgeRuntime.waitUntil), never a bare floating promise: the isolate is
-    // torn down the moment this handler resolves, and an unkept promise dies mid-flight with
-    // nothing thrown and nothing logged — the platform's dominant failure shape.
     runInBackground(
       (async () => {
         await maybeRunOrderIntake(db, threadId);

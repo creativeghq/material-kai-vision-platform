@@ -1,23 +1,4 @@
-/**
- * "Record it, or actually send it" — the one control that makes that a choice.
- *
- * Before this, the platform had both halves and no way to pick between them: Payables → Pay
- * recorded a payment that had happened somewhere else, Payables → Send moved money through
- * Revolut, they were different buttons opening different dialogs, and only a supplier BILL could
- * reach the second one. So paying anybody the platform did not already hold a bill for was
- * impossible, and nothing in the UI ever said that recording was not paying.
- *
- * The two are not variations of one action and this deliberately does not blur them:
- *
- *  - **Record** writes the books. The money moved (or will move) in someone's banking app. It is
- *    the right answer for cash, for a standing order, for a transfer someone already made.
- *  - **Send** instructs a bank. It writes NO payment row — the bank feed does that when the
- *    transfer actually lands, and settles the bill through the same allocation path as everything
- *    else. Recording it here as well is how one cost gets paid twice on the books.
- *
- * Which rails are offered is derived, never guessed: `payout_provider` comes off
- * `vw_bank_account_balances`, so an account that cannot send simply does not offer to.
- */
+/** "Record it, or actually send it" — the one control that makes that a choice. */
 import React from 'react';
 import { AlertTriangle, Banknote, Loader2, ShieldCheck, Send } from 'lucide-react';
 import { Label } from '@/components/core/ui/label';

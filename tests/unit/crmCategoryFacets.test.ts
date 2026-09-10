@@ -1,18 +1,4 @@
-/**
- * The CRM list filters offer categories as FACETS, not as a catalogue.
- *
- * The bug this pins: `?tab=companies` → Filters → Membership → Category listed every
- * non-industry category — access roles, HR employment, lead status, lead source — none of
- * which can hold a company at all (`crm_resync_auto_category_members` fills `role` with
- * platform users and `employment` with contacts). The only ones that matched were the
- * professional-type "Suppliers" category, restating the Relationship filter one group up
- * with a fraction of its rows. Picking any of the rest returned an empty table with no
- * explanation.
- *
- * Two rules, both easy to undo by "just passing all the categories in":
- *   1. A filter option must be able to narrow the list it is offered on.
- *   2. A category whose membership is DERIVED is never offered for hand assignment.
- */
+/** The CRM list filters offer categories as FACETS, not as a catalogue. */
 import { describe, it, expect } from 'vitest';
 
 import { categoryFacetOptions, type CategoryFacetRow } from '../../src/modules/crm/pages/crmFilters';

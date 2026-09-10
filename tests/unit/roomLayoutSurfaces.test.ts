@@ -1,22 +1,4 @@
-/**
- * Room-plan surfaces guard (#341).
- *
- * The planner understood only objects with a footprint. A tile has no footprint — you apply it to a
- * surface — so half a materials catalogue could not go on a plan at all, and adding one as an
- * object drew it as a small rectangle on the floor like a rug.
- *
- * Two things about surfaces are easy to get wrong and impossible to see afterwards:
- *
- *   1. AREA MUST BE DERIVED. It is a function of the room's dimensions. A stored copy goes stale
- *      the moment someone resizes the room, and the plan then quotes last week's floor with
- *      nothing to flag it — the same shape as every other cached-derived-number bug here.
- *   2. A COUNT AND AN AREA MUST NOT BE ADDED TOGETHER. `quote_items` is UNIQUE (quote_id,
- *      product_id), so one product can occupy only one line. Two lamps plus 24 m² of the same
- *      product is not "26" of anything.
- *
- * The area maths itself is pinned here because it is the number a customer orders against: get the
- * wall height wrong and a tiling job is short by a wall.
- */
+/** Room-plan surfaces guard (#341). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -93,25 +75,7 @@ describe('the surfaces feature keeps its two invariants', () => {
   });
 });
 
-/**
- * One room model, by LINKING — and one measurement (#378 N8).
- *
- * `project_rooms` is the room OF RECORD (8 inbound foreign keys); `room_layouts` is an ARRANGEMENT
- * of products inside a room. The issue proposed folding the second into the first, which read as a
- * merge would delete nine capabilities — placement items, derived footprints, the six-face surface
- * areas, `add_layout_to_quote`, the lighting preset, the canvases, the Client View embed, the
- * public `/embed/planner`, and existence with no project at all.
- *
- * So they are LINKED, and `project_room_id` is NULLABLE: a NOT NULL kills the embed planner (an
- * anonymous visitor has no project) and the showroom layout.
- *
- * THE COLLISION THIS GUARDS. The two tables measured the same room in different units —
- * `project_rooms` in integer MILLIMETRES, `room_layouts` in numeric METRES — and surface area, the
- * number a tiling order is placed against, derives from the metres. Two stored copies of one
- * measurement is this codebase's oldest bug shape. The link therefore had to avoid CREATING it:
- * a linked layout takes the room's dimensions, resolved once in SQL, and both the plan and its
- * areas read the SAME view. Drawn at 6m and ordered at 5m is the failure being prevented.
- */
+/** One room model, by LINKING — and one measurement (#378 N8). */
 describe('a plan and its tile order use one set of dimensions', () => {
   it('the planner reads the RESOLVED view, never the raw table', () => {
     const svc = read('src/services/roomPlannerService.ts');
@@ -144,18 +108,7 @@ describe('a plan and its tile order use one set of dimensions', () => {
   });
 });
 
-/**
- * Lighting presets, everywhere (#335).
- *
- * The catalogue — natural daylight, golden hour, overcast, showroom spots, warm evening, night —
- * has been usable in the material lighting viewer for a while. Every other 3D surface hardcoded
- * three lights and the `apartment` environment, so a tenant could light a material sample the way
- * they wanted and had no say over the product viewer or the room they were planning.
- *
- * Two things to hold: nothing goes back to literals, and the storable values cannot drift from the
- * offerable ones — a CHECK constraint listing a preset the code does not have (or vice versa) fails
- * only when someone picks that one.
- */
+/** Lighting presets, everywhere (#335). */
 describe('lighting presets are shared, not hardcoded', () => {
   const PRESETS = ['natural_daylight', 'golden_hour', 'overcast', 'showroom_spots', 'warm_evening', 'night'];
 

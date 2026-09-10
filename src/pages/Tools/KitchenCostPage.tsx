@@ -1,24 +1,4 @@
-/**
- * Kitchen cost calculator (/tools/kitchen-cost) — anonymous lead-gen configurator.
- *
- * Same engine as the Project plan estimator, different skin. The kitchen itself is described
- * through the blueprint's ZONES — bottom units, top units, island, worktop — each with its own
- * globals (height, depth, door model) and a list of modules (kind × width × how many). Everything
- * the flat scope still needs (`run_length`, `wall_run_length`, `worktop_length`) is DERIVED from
- * that composition, so installation and handles keep pricing per metre off a real layout.
- *
- * Before this, the whole kitchen was three sliders and three hardcoded "Drawer unit N" option
- * groups, which is why it could never say four drawer banks, a wall unit count, or an island.
- *
- * The layout is derived from the blueprint, NOT hardcoded: zones come from `composition_schema`,
- * every remaining `option_group` becomes a single-choice control and every ungrouped task becomes
- * a switch. Re-price or restructure the "New Kitchen" starter in the admin and this page follows
- * without a deploy. Pricing is the shared blueprintCompute + blueprintComposition, so what a
- * visitor sees matches what the backend engine writes when the same blueprint reaches a project.
- *
- * Registered OUTSIDE <AuthGuard> in App.tsx — no login required. Sending the estimate is the
- * only metered write (Turnstile-gated); browsing and configuring are pure client-side math.
- */
+/** Kitchen cost calculator (/tools/kitchen-cost) — anonymous lead-gen configurator. */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, CookingPot, Loader2, Ruler, Send, Sparkles } from 'lucide-react';

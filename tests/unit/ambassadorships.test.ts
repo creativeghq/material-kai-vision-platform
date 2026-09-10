@@ -8,21 +8,7 @@ import {
 } from '../../src/lib/ambassadorships';
 import { UPLOAD_CATEGORIES } from '../../src/lib/categoryFieldRegistry';
 
-/**
- * Brand ambassadorships (Profile → Ambassador).
- *
- * Nobody approves an ambassadorship: being on the platform's supplier list is the whole
- * condition. What is left to get wrong is silent, which is why it is tested rather than trusted:
- *
- *  1. The relationship and brand-source vocabularies exist TWICE — as a TypeScript union and as
- *     a Postgres CHECK constraint. A value added on one side only is either an insert that
- *     always fails or a state the UI cannot name.
- *  2. The supplier LINK is what carries the brand's own view of who promotes it
- *     (`list_supplier_brand_ambassadors` joins on it). A form that stops sending
- *     `platform_supplier_id` breaks that view while every profile still renders perfectly.
- *  3. Category keys and labels must come from the registry projection. The #368 defect was
- *     exactly this: a hand-written category map that disagreed with the database.
- */
+/** Brand ambassadorships (Profile → Ambassador). */
 
 const SRC = join(process.cwd(), 'src');
 

@@ -1,18 +1,6 @@
 /**
  * Finance → Settings → e-Invoicing. Per-workspace control surface for Novus → myDATA
  * transmission. Ties together the three things that make outbound e-invoicing work:
- *
- *  1. Master connection — the operator's single Novus API key (NOT per-tenant). This card
- *     only reports whether it's configured + sandbox/live; the key lives in platform_secrets
- *     and never reaches the browser.
- *  2. Enable toggle — writes workspace_fiscal_bindings (Novus across legal_invoice /
- *     pre_invoice_notice / tax_submission). On by default.
- *  3. Issuer completeness — every Novus invoice MUST carry a full issuer identity (name,
- *     profession, tax office, address, VAT). Flags any mandatory field still blank in the
- *     Business Identity card so submissions don't fail with a myDATA ValidationError.
- *  4. TaxisNet authorization — the manual Novus portal + signed-contract flow per issuer VAT
- *     (Provider docs §6). It's a STATE, not a key; tracked on finance_settings so the tenant
- *     can see where they are in onboarding.
  */
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';

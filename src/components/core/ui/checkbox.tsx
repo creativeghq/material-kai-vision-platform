@@ -4,21 +4,7 @@ import { Check, Minus } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
-/**
- * CHECKBOX. 16px, 2px radius, neutral hairline at rest and accent when set.
- *
- * Two details that matter more than they look:
- *
- *  - **An unchecked box is outlined in a NEUTRAL colour, not the accent.** It
- *    used to be `border-primary`, so an untouched box was drawn in the same
- *    colour as a checked one — an empty selection column read as fully selected
- *    at a glance.
- *  - **Indeterminate gets its own glyph (a dash), not the tick.** Radix renders
- *    `Indicator` for both `checked` and `indeterminate`, so a tick with nothing
- *    else to distinguish it says "all rows selected" when the truth is "some".
- *    On a bulk action — delete, assign, export — that difference is the whole
- *    question.
- */
+/** CHECKBOX. 16px, 2px radius, neutral hairline at rest and accent when set. */
 const Checkbox = React.forwardRef<
   React.ElementRef<typeof CheckboxPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof CheckboxPrimitive.Root>

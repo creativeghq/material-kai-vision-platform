@@ -1,18 +1,4 @@
-/**
- * A share link proves possession of a URL, not identity (#357 AE-12).
- *
- * `/i/:token` authorises by possession, and `token_send_message` posted as the contact the token
- * was bound to. So a forwarded mail, a quoted reply chain, a shared mailbox or a leaked archive
- * handed whoever held it the ability to write into a customer's conversation AS that customer.
- *
- * Reading stays link-only — the link is an invitation, and challenging someone before they can see
- * the conversation they were invited to would make the feature useless; that read is bounded by
- * the 30-day TTL and by the token dying on claim. WRITING now costs a one-time code sent to the
- * address the link was issued for, and the browser then holds a short-lived HMAC proof.
- *
- * The proof primitives are exercised for real here; the wiring is read out of the source, because
- * `inbox-api/index.ts` is a Deno entrypoint that cannot be imported under vitest.
- */
+/** A share link proves possession of a URL, not identity (#357 AE-12). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

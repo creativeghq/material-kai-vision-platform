@@ -1,17 +1,4 @@
-/**
- * Test-collection guard — "is every test we wrote actually RUN?"
- *
- * vitest.config.ts lists its `include` globs explicitly, one per tier. A test file written
- * anywhere else is silently never collected, and nothing says so: the suite stays green and the
- * file looks like coverage. This has bitten twice —
- *   • tests/security/** was missing from `include` for ~5 weeks (a #183 guard that never ran), and
- *   • three src/services/__tests__/ suites sat uncollected long enough to rot (Jest-era
- *     `jest.mock` in a vitest repo, asserting a column name that was itself the bug). Deleted
- *     along with the three dead services they covered.
- *
- * So: every test file in the repo must live under a collected tier, or be explicitly declared
- * here as running on a different runner (Playwright).
- */
+/** Test-collection guard — "is every test we wrote actually RUN?" */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';

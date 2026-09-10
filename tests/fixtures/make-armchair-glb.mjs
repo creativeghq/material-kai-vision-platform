@@ -3,14 +3,6 @@
  * real-world scale in meters, with NAMED sub-meshes and named PBR materials
  * (what the #260 configurator swaps per part). Geometry comes from three.js;
  * the GLB container is packed by hand so this runs headless with no DOM.
- *
- *   node tests/fixtures/make-armchair-glb.mjs tests/fixtures/armchair.glb
- *
- * Shape notes, because the first pass read as a stack of blocks: upholstery is
- * RoundedBoxGeometry with a generous corner radius (sharp box corners are what
- * make a chair look like packaging), the legs are turned profiles on a lathe
- * rather than cylinders, and they splay outward. Nothing here is axis-aligned
- * and square except the plinth.
  */
 import { LatheGeometry, Vector2, Matrix4 } from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
@@ -53,8 +45,6 @@ const PLINTH_INSET = 0.13;
  * its smooth normals stretch across the whole surface, and it renders as a
  * glassy see-through blob. (That is exactly what the first reshape did to the
  * arms — 0.052 m of radius on a 0.11 m width.)
- * Segments only control corner smoothness and cost vertices quadratically
- * (seg2 = 900 a box, seg3 = 1764), so 3 is the ceiling worth paying for here.
  */
 const soft = (w, h, d, r) =>
   new RoundedBoxGeometry(w, h, d, 3, Math.min(r, Math.min(w, h, d) * 0.28));

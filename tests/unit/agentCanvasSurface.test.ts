@@ -1,26 +1,4 @@
-/**
- * The Agent Studio surface: one chat, and an artifact you OPEN.
- *
- * WHAT THIS REPLACED. The canvas was a permanent left-docked PANE, so the chat spent every
- * conversation as a 400px right rail. `handleSendMessage` selected the turn's run before a single
- * tool had reported, so EVERY turn put a tab on the strip and took the screen — and most turns
- * produce prose. Conversation d3ec683e is four of those in a row: four canvas pages holding a
- * checklist of nothing, beside a column of text a third of the window wide.
- *
- * Three things have to stay true for that not to come back, and each of them failed once already
- * in some other form:
- *
- * 1. STARTING a turn opens nothing; PRODUCING something opens it. (agentRunProgress.test.ts pins
- *    the run half; this file pins the surface.)
- * 2. An artifact is named ONCE. The stream used to hand-write thirty `<ArtifactCard kind="…"
- *    title="…">` calls — a second copy of the mapping `getCanvasArtifact` makes — so a result
- *    could be called one thing on its chip and another on its tab, and a new kind needed four
- *    edits to appear everywhere.
- * 3. Anything that gets a chip can be DRAWN. `ClarifyCard` had an artifact kind, a tab and a chip
- *    and no renderer, so clicking it opened a blank pane and nothing failed — the renderer's
- *    fallback returns null for a payload it does not know, which looks like an empty canvas
- *    rather than an error.
- */
+/** The Agent Studio surface: one chat, and an artifact you OPEN. */
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -81,9 +59,6 @@ describe('an artifact is named once', () => {
      * bubble's own colour in the other. The bubble also re-themes its children by attribute
      * selector (`html.light .msg-assistant [class*="bg-white"]`, …), so anything in there is
      * styled by where it sits instead of by what it is.
-     *
-     * Outside, it is an ordinary panel on the page ground and the three-surface ladder applies.
-     * Once, because a per-payload copy is how the thirty hand-written chips happened.
      */
     const calls = hub.split('renderArtifactCard(message)').length - 1;
     expect(calls, 'the artifact card must have exactly one placement in the stream').toBe(1);

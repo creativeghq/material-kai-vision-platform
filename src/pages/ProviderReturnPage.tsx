@@ -4,20 +4,7 @@ import { Loader2, AlertCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { financeService } from '@/modules/finance/services/financeService';
 
-/**
- * Provider return leg.
- *
- * Viva cannot take a success/cancel URL per API call: it uses whatever is configured on
- * the payment SOURCE in the merchant's dashboard, and returns the customer with
- * `?t={transactionId}&s={orderCode}&lang=`. So every tenant points their source at THIS
- * one route, and we resolve the order code back to the right invoice's pay page.
- *
- * The order code is read as a raw STRING from the query — it is int64 and would lose its
- * last digits if it ever went through Number().
- *
- * We deliberately do not display payment status here: settlement is confirmed by webhook
- * (with a server-side read-back), not by the fact that a browser landed on this URL.
- */
+/** Provider return leg. */
 const ProviderReturnPage: React.FC = () => {
   const [search] = useSearchParams();
   const [error, setError] = useState<string | null>(null);

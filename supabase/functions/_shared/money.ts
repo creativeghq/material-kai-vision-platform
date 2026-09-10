@@ -1,16 +1,4 @@
-/**
- * Money primitives for the Deno runtime — round it, print it.
- *
- * DELIBERATE CROSS-RUNTIME MIRROR of `src/utils/decimal.ts`, for the same reason
- * `_shared/fiscal/invoice-builder.ts` mirrors `VAT_PCT_TO_CATEGORY`: edge functions run on Deno
- * and cannot import a Vite-aliased module. Keep the two in step when either changes.
- *
- * Before this file, the edge side carried eight `round2` copies and twelve money formatters
- * (`money` ×8, `fmtMoney` ×4). Six of the eight `round2`s omitted the epsilon nudge, so a
- * half-cent rounded one way in `expense-math` and the other in `quote-tools`. The formatters had
- * drifted across `en-IE`, `en-GB`, `en-US`, `el-GR`, hand-rolled symbol ladders, and a bare
- * `toFixed(2)` — one of them twice inside a single file.
- */
+/** Money primitives for the Deno runtime — round it, print it. */
 
 /**
  * Round to 2 decimals (currency).
@@ -23,16 +11,7 @@ export function round2(n: number): number {
   return Math.round(((Number(n) || 0) + Number.EPSILON) * 100) / 100;
 }
 
-/**
- * VAT-inclusive price from a net one.
- *
- * `product_prices.list_price` is NET everywhere in this platform, and every consumer-facing
- * surface shows gross — so this conversion is a money derivation with more than one caller
- * (the online storefront and the #321 embed API both publish the same product at the same
- * price). It lives here for the reason the file header describes: the moment it is written out
- * twice, the two copies are free to round differently, and a wrong price is a valid `number`
- * that nothing downstream can flag.
- */
+/** VAT-inclusive price from a net one. */
 export function grossFromNet(net: number | null | undefined, vatRatePct: number | null | undefined): number {
   const rate = Number(vatRatePct);
   return round2(Number(net ?? 0) * (1 + (Number.isFinite(rate) ? rate : 0) / 100));

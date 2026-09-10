@@ -1,18 +1,4 @@
-/**
- * 2D top-down room canvas (#321 M3, #259 Phase 1).
- *
- * SVG rather than a 3D scene on purpose: Phase 1 needs no geometry, and a top-down plan is the
- * view people actually arrange furniture in. Phase 2 swaps this for an R3F scene consuming the
- * same rows.
- *
- * Everything is metres. Pixels appear only where the SVG is drawn, via a single scale computed by
- * `fitScale` and passed down — two components deriving "px per metre" separately is how a plan ends
- * up with furniture at a different scale from its own room.
- *
- * Dragging updates local state on every pointer move and writes to the database only on release.
- * A write per frame would be ~60 round trips a second, and the intermediate positions are not
- * facts anyone wants stored.
- */
+/** 2D top-down room canvas (#321 M3, #259 Phase 1). */
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { RotateCw, Trash2 } from 'lucide-react';
 import {

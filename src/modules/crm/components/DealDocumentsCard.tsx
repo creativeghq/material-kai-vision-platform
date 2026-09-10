@@ -1,17 +1,4 @@
-/**
- * What a deal actually turned into (#378 C3).
- *
- * `crm_deals` linked to a project and a property; nothing linked a document to a DEAL. So the
- * pipeline's weighted forecast and the invoiced revenue were two unrelated numbers — forecast
- * accuracy could not be measured, "what did this deal become" had no answer, and a won deal had to
- * be re-typed as a quote.
- *
- * The list is DERIVED by `get_deal_documents`; this formats it and does not assemble its own
- * answer from three queries. Attaching is offered for documents that already exist and belong to
- * the same party — this panel deliberately CREATES nothing: raising a quote is a decision with its
- * own form, its own pricing and its own numbering, and a "New quote" button here would be a fourth
- * way to make one.
- */
+/** What a deal actually turned into (#378 C3). */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FileText, Loader2, Link2, Link2Off, Package, Receipt, Plus } from 'lucide-react';

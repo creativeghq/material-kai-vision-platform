@@ -26,25 +26,7 @@ export interface ProductVariant {
   sku: string;
 }
 
-/**
- * Shape of the values that live under `products.metadata` (JSONB).
- *
- * Most fields can arrive in one of three shapes depending on extraction path:
- *   - raw primitive: `"Matte"`, `"R10"`
- *   - wrapper: `{value: "Matte", confidence: 0.9}` (Stage 0 AI extractor)
- *   - array: `["Matte", "Glossy"]` (when multiple variants exist)
- *
- * Because of this polymorphism we type everything as `unknown` and let the
- * render layer (`extractValue` / `renderValue`) discriminate at use site —
- * a stricter type would force callers to write the same discrimination
- * code anyway, only with `as` casts everywhere.
- *
- * The named sub-containers (`commercial`, `appearance`, etc.) are written
- * by the Stage 4.7 rollup and the Stage 0 AI extractor; the index signature
- * absorbs any other top-level field. Unknown fields land in
- * `_discovered_extra` — see the Additional Properties dynamic-discovery
- * section in ProductDetailModal.
- */
+/** Shape of the values that live under `products.metadata` (JSONB). */
 export interface ProductMetadata {
   // Top-level rollup outputs (Stage 4.7)
   material_category?: unknown;
@@ -113,10 +95,6 @@ export interface Product {
    * from PostgREST always carries one — it is optional here only because synthetic products that
    * never round-trip the DB (the `src/data/demo/*.json` fixtures, the moodboard-item adapter) are
    * built client-side without a workspace. Those correctly fail the ownership check.
-   *
-   * Declared rather than cast at the point of use: this is what gates stock, cost and fiscal data
-   * on the product record, and a cast there would let a rename silently turn every one of those
-   * surfaces off instead of failing the build.
    */
   workspace_id?: string | null;
   /** Source PDF document this product was extracted from (when applicable) */

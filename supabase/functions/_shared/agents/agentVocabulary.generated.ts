@@ -2,32 +2,7 @@
 // Regenerate: npm run vocab:mirror (part of gen:all). Freshness is enforced by
 // tests/unit/vocabularyMirrors.test.ts, which fails the build on any drift.
 
-/**
- * The background-agent value-sets, written ONCE (#391).
- *
- * `AgentRunStatus` and `LogLevel` were declared identically in `backgroundAgents.ts` and
- * `supabase/functions/_shared/agents/types.ts` — the same two lines on both sides of the
- * Vite/Deno boundary, agreeing only by memory.
- *
- * NOT UNIFIED WITH `configSchemas.logLevel`
- * ------------------------------------------
- * That one is `z.enum(['error', 'warn', 'info', 'debug'])` — the same four values in a
- * different order — and it is the PLATFORM'S logging configuration, not the level on an
- * `agent_run_logs` row. Identical values are not one fact. #391 is explicit about this:
- * unify by MEANING, never by signature, because two vocabularies that happen to match
- * today must stay free to diverge. Folding them together would make a change to one
- * silently change the other.
- *
- * THE DATABASE IS THE ENFORCER
- * -----------------------------
- * `agent_runs_status_check` and `agent_run_logs_level_check`. The status set is also
- * exactly the `processing_status` ENUM, which is why the sweep grouped them: one fact
- * enforced in two places, so this source must equal both. Pinned by
- * `tests/unit/agentVocabulary.test.ts`.
- *
- * THIS FILE IS IMPORT-FREE, ON PURPOSE — byte-mirrored to the edge by
- * `npm run vocab:mirror`.
- */
+/** The background-agent value-sets, written ONCE (#391). */
 
 /** `agent_runs_status_check`, and the `processing_status` enum. */
 export const AGENT_RUN_STATUSES = [

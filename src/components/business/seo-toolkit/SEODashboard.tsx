@@ -1,19 +1,4 @@
-/**
- * SEODashboard — admin landing page for the SEO toolkit at /admin/seo.
- *
- * Four tabs, each backed by the seoToolkitApi service:
- *   1. Keyword Research — history of every chat-driven research run, with
- *      starred / labelled / re-render-from-history actions.
- *   2. Domain Audit — list of tracked domains with denormalised current_*
- *      metrics + per-domain trendline + manual re-audit button.
- *   3. Backlinks — focused view of backlink-related metrics across tracked
- *      domains (referring domains count + spam score trend).
- *   4. Competitive Intel — multi-domain matrix view (your-brands × top
- *      competitors × shared-keyword count) computed on demand.
- *
- * Every "fire a fresh call" action goes through the same agent-tools surface
- * we already shipped — this page just persists / displays / re-runs.
- */
+/** SEODashboard — admin landing page for the SEO toolkit at /admin/seo. */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';

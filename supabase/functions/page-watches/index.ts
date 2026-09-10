@@ -1,17 +1,4 @@
-/**
- * Page watches — CRUD over `page_watches`, mirrored to Firecrawl monitors (issue #331).
- *
- * One Firecrawl monitor per watch, one URL per monitor. Firecrawl allows 1–50
- * targets in a monitor, but bundling them would mean a shared schedule, a shared
- * goal, and a webhook payload we would have to fan back out by URL. One-to-one
- * keeps `firecrawl_monitor_id` a key we can resolve a tenant from, which is what
- * the webhook's tenancy check depends on.
- *
- * The local row is the source of truth for WHAT is watched and WHO owns it.
- * Firecrawl owns the schedule, the snapshot and the diff. When the two disagree
- * — a monitor deleted upstream, a row deleted here — the local row wins and the
- * remote is reconciled toward it.
- */
+/** Page watches — CRUD over `page_watches`, mirrored to Firecrawl monitors (issue #331). */
 
 import { serviceClient, type DbClient } from '../_shared/supabase-client.ts';
 import { authenticate, getUserId, userCanAccessWorkspace } from '../_shared/auth.ts';
@@ -30,17 +17,6 @@ const MODULE_SLUG = 'page-monitoring';
 /**
  * How often a watch runs. The key is what we store and show; the value is what
  * Firecrawl is actually given.
- *
- * We send CRON, not the natural-language `schedule.text` the Monitoring docs
- * advertise, because their parser rejects most of what an operator would type.
- * "every day at 09:00" is accepted; "every Monday at 08:00" — the second example
- * in our own placeholder text until 2026-08-16 — comes back
- * `Unsupported schedule text`, which at create time left a saved watch that was
- * never actually watching anything. A fixed list of cadences mapped to cron
- * cannot fail that way.
- *
- * Mirrored in src/services/pageWatchService.ts and pinned equal by
- * tests/unit/pageWatchWebhook.test.ts.
  */
 const SCHEDULE_CRON: Record<string, string> = {
   'every hour': '0 * * * *',
@@ -68,22 +44,7 @@ async function moduleEnabled(supabase: Db): Promise<boolean> {
   return !!(data as { enabled?: boolean } | null)?.enabled;
 }
 
-/**
- * Shape of the monitor we ask Firecrawl to keep for one watched page.
- *
- * VERIFIED AGAINST THE LIVE API 2026-08-16, not against the docs — the first
- * version of this function was written from the docs and every create it ever
- * made was rejected:
- *
- *   • `webhook` is a TOP-LEVEL key. Nesting it under `notification` (which is
- *     what the Monitoring page shows) returns 400 `Unrecognized key in body`,
- *     `path: ["notification"], keys: ["webhook"]`. `notification` carries email
- *     and nothing else.
- *   • `markdown` does not have to be listed alongside `changeTracking` here.
- *     The change-tracking docs say it is required; the monitor adds it itself,
- *     and a monitor created without it diffs correctly (checked: baseline `new`,
- *     then `same` against the stored snapshot).
- */
+/** Shape of the monitor we ask Firecrawl to keep for one watched page. */
 function buildMonitorBody(args: {
   name: string;
   url: string;
@@ -432,12 +393,6 @@ Deno.serve(withApiLogging('page-watches', async (req) => {
 
       // Pausing locally must pause upstream too, or a deactivated watch keeps
       // billing Firecrawl credits on its schedule for a page nobody reads.
-      //
-      // VERIFIED 2026-08-16: the method is PATCH — `PUT /v2/monitor/{id}` is not a
-      // route at all ("Cannot PUT"), so the previous version of this call could not
-      // have reached Firecrawl even once. It takes a PARTIAL body, and pausing is
-      // `status: 'paused' | 'active'`; there is no `enabled` key and sending one
-      // fails the whole request with 400 `Unrecognized key in body`.
       const remote = await firecrawl(apiKey, `/v2/monitor/${monitorId}`, {
         method: 'PATCH',
         body: {

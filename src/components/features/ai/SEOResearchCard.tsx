@@ -1,17 +1,4 @@
-/**
- * SEOResearchCard — the `seo_research_keyword` agent tool's artifact.
- *
- * Renders a single keyword's full SERP-research snapshot as a tabbed,
- * self-explaining report: a plain-language reading + recommended actions up
- * top, then AI Overview, featured snippet, knowledge panel, SERP-feature
- * signals, top competitors, People Also Ask, related searches and keyword
- * ideas.
- *
- * Surfaces render on THEME tokens (bg-card / text-foreground / muted / border)
- * so the same card is legible in the light canvas, the dark canvas AND the dark
- * chat bubble — never a hardcoded white-on-dark wash. Data shape mirrors the
- * `seo_research_card` chunk from `_shared/tools/seo-agent-tools.ts`.
- */
+/** SEOResearchCard — the `seo_research_keyword` agent tool's artifact. */
 
 import { useState } from 'react';
 import { safeHref } from '@/utils/safeUrl';

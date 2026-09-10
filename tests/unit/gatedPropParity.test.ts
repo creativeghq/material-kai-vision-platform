@@ -1,53 +1,4 @@
-/**
- * A capability gated on an optional prop must be offered by EVERY host — or have ONE wiring site.
- *
- * THE DEFECT THIS EXISTS FOR
- * --------------------------
- * `InboundDocActionsMenu` gates entries on the handler being supplied:
- *
- *     const canAddDetail = needsDetail && … && !!onAddLineDetail && …;
- *     {canAddDetail && <DropdownMenuItem onClick={onAddLineDetail}>Add line detail</…>}
- *
- * A host that omits the prop does not get a disabled entry, or an error, or a type failure — the
- * entry is NOT THERE. The props must stay optional for the component to degrade, so the type
- * system cannot see the omission, and a render test would have to prove a negative about a
- * dropdown that is closed. Two tables rendered that menu, one passed `onAddLineDetail` and the
- * other never had, and "say what was actually on this document" was unreachable from two of three
- * surfaces on 1,161 of 1,769 received documents.
- *
- * `inboundDocActionsParity.test.ts` is that rule at one component. This is the rule everywhere,
- * and it caught three more (#378 F1–F3):
- *
- *   • `RecordPaymentDialog` — `fiscalDocKind` OFFERED the myDATA rows and `onIssueDoc` PERFORMED
- *     the filing, as two independent optionals. Pass the first without the second and the operator
- *     picks "Issue a retail receipt (ΑΛΠ) to myDATA", the payment saves, and nothing is issued
- *     under a success toast. The prop is gone entirely now: the offer is a property of the ORDER,
- *     so the dialog derives it from whichever order is selected. Folding the pair into one object
- *     closed the latent half; deriving it closed the live one, because the generic payment screens
- *     pick their order INSIDE the dialog and had no order for a host to resolve from.
- *   • `ContactSearchDropdown` / `CompanySearchDropdown` — `allowCreate` off on the three screens
- *     where a party that does not exist yet actually turns up. The dropdown IS the duplicate
- *     check, so its absence does not stop a create; it moves the create somewhere unchecked.
- *   • `PipelineBoard` — `canManageTypes` off on Real Estate, so its empty state said "Add one and
- *     its board appears here" with `action={undefined}`. Note `emptyStates.test.ts` could not see
- *     that: the surface IS `HubEmptyState` and it DOES pass `action` — conditionally, at one host.
- *
- * WHAT IT CHECKS, AND THE TWO REFINEMENTS THAT KEEP IT HONEST
- * ----------------------------------------------------------
- * For every component with two or more hosts: a prop that is optional AND used as a render gate
- * must be passed by all of them or none of them.
- *
- *   1. CO-GATED PROPS ARE ONE GROUP. `HubDataTable` computes
- *      `selectable = !!selected && !!onSelectedChange`, so a host that passes NEITHER has opted out
- *      of selection cleanly. Judging each prop alone reports that as a defect. A host must pass all
- *      of a group or none of it.
- *   2. A DEGENERATE MOUNT IS NOT A HOST. `IndustrySelect` renders a `readOnly` placeholder while it
- *      loads, with no options and a no-op handler. Requiring the create handler there is asking a
- *      spinner to offer a capability.
- *
- * Source-text on purpose, for the reason the inbound test already gives: the props are optional by
- * design and must stay that way.
- */
+/** A capability gated on an optional prop must be offered by EVERY host — or have ONE wiring site. */
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -128,19 +79,7 @@ function allOptionalProps(src: string): Set<string> {
   return new Set([...src.matchAll(/\b([a-z]\w*)\?\s*:/g)].map((m) => m[1]));
 }
 
-/**
- * Of those, the ones used as a RENDER GATE rather than merely read.
- *
- * The distinction is the whole point: this file exists because an ENTRY DISAPPEARS, not because a
- * prop is consulted. `prop && (` / `prop && <` is the JSX-conditional idiom; `!!prop` is the
- * deliberate boolean coercion, which catches the laundered form the inbound menu used
- * (`const canAddDetail = … && !!onAddLineDetail && …` and then `{canAddDetail && <…>}`).
- *
- * A bare `prop &&` inside an `if`, or a `prop ? a : b` picking a label, is NOT a gate — the
- * control still renders. `ProductDetailModal` now places a product in the room planner by
- * default and consults the handler only to decide which behaviour and label to use; reporting
- * that as a withheld capability would be asking it to un-fix itself.
- */
+/** Of those, the ones used as a RENDER GATE rather than merely read. */
 function gatingProps(src: string, optional: Set<string>): Set<string> {
   const gated = new Set<string>();
 
@@ -161,11 +100,6 @@ function gatingProps(src: string, optional: Set<string>): Set<string> {
     // `prop ? <JSX…> : undefined | null` — renders NOTHING when withheld, which is exactly the
     // `HubEmptyState action={canManageTypes ? <Button/> : undefined}` shape that `emptyStates`
     // cannot see.
-    //
-    // The true branch must be JSX. `onRowClick ? 'cursor-pointer' : undefined` and
-    // `onRowClick ? () => onRowClick(row) : undefined` also render nothing when withheld — but
-    // what they withhold is an AFFORDANCE on a row that is still there, not an entry that
-    // vanishes. A table whose rows have nowhere to go legitimately omits the handler.
     for (const m of line.matchAll(/\b(\w+)\s*\?\s*<[^?]*?:\s*(undefined|null)\b/g)) {
       if (optional.has(m[1])) gated.add(m[1]);
     }
@@ -175,18 +109,7 @@ function gatingProps(src: string, optional: Set<string>): Set<string> {
   return new Set([...gated].filter((p) => !new RegExp(`\\b${p}\\s*=\\s*true`).test(src)));
 }
 
-/**
- * Refinement 1 — a gate that also needs host-owned STATE is configuration, not a capability.
- *
- * `HubDataTable` computes `selectable = !!selected && !!onSelectedChange`, where `selected` is the
- * Set of ids the HOST owns. A host with no selection state cannot opt in and has not silently lost
- * anything: bulk selection is a feature you wire up, not one the component decides to hide from
- * you. Contrast the shape this file exists for — `onAddLineDetail`, `allowCreate`,
- * `canManageTypes`, `issueDoc` — where the host supplies no data at all and the prop is purely a
- * switch, so omitting it can only ever be an oversight.
- *
- * So: a gating prop co-gated with a non-handler, non-flag optional prop is DROPPED from the check.
- */
+/** Refinement 1 — a gate that also needs host-owned STATE is configuration, not a capability. */
 function stateBackedGates(src: string, gated: Set<string>, everyOptional: Set<string>): Set<string> {
   const dropped = new Set<string>();
   const isSwitch = (p: string) => /^(on[A-Z]|allow|can|show|enable)/.test(p);
@@ -326,15 +249,6 @@ describe('a gated capability is offered by every host', () => {
      * #378 F1, in its final form. The offer (`fiscalDocKind`, which put the myDATA rows in the
      * picker) and the issuer (`onIssueDoc`) were two independent optional props, so a caller could
      * offer a document it had no way to issue — and only one of seven surfaces passed either.
-     *
-     * Folding them into one object made the pair a type error, which closed the latent half. It
-     * did not close the LIVE half: on the generic payment surfaces the order is chosen inside the
-     * dialog, so there is no order for a host to resolve from and nothing to hand in.
-     *
-     * So the prop is gone entirely. Whether an order can still produce a sales document — and
-     * which one — is a property of the ORDER, derived by `resolveOrderIssueOffer` beside the
-     * `issueSalesDocumentForOrder` that acts on it. There is no pair left to half-pass, on any
-     * surface, present or future.
      */
     const dialog = SOURCES.get(join(SRC, 'modules', 'finance', 'components', 'RecordPaymentDialog.tsx'));
     expect(dialog, 'RecordPaymentDialog moved — re-point this check').toBeTruthy();

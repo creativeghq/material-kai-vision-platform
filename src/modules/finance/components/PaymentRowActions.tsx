@@ -1,22 +1,4 @@
-/**
- * Per-row Edit + Delete for a payment on the party Payments list.
- *
- * Edit is METADATA-ONLY (account, date, reference, notes) — amount and allocations are
- * immutable here because they drive invoice settlement + treasury balances.
- *
- * There is NO method control, here or anywhere else. The account answers it (a cash account IS
- * cash, a bank account books as a transfer) and `PaidFromSelect` derives `payments.method` from
- * the account's kind. A second control could only contradict the first.
- *
- * Delete is Greek-law-correct:
- *  - If the payment settles NO transmitted invoice → hard delete (reopens any
- *    non-transmitted invoice it settled). Audited via payment_audit_log.
- *  - If it settles a TRANSMITTED invoice (invoices.fiscal_mark present) → the invoice
- *    can't be deleted; we issue a credit note (return, correlated 5.1) against it, then
- *    ask whether the received money is refunded to the customer (records a money-out that
- *    subtracts from totals) or kept as customer credit. The original payment is left in
- *    place (a transmitted document is never silently removed).
- */
+/** Per-row Edit + Delete for a payment on the party Payments list. */
 import React, { useEffect, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle , DialogDescription } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
@@ -185,22 +167,7 @@ const ReturnPaymentDialog: React.FC<{
   const [method, setMethod] = useState<PaymentMethod>((payment.method as PaymentMethod) ?? 'bank_transfer');
   const [busy, setBusy] = useState(false);
 
-  /**
-   * What this return has already done (#351 A1).
-   *
-   * A return is a LOOP of credit notes followed by a refund, with nothing recording which of them
-   * succeeded. A failure on the third of four invoices, or on the refund, showed one generic
-   * "Return failed" and left the whole flow retryable — and a retry re-issued the credit notes
-   * that already existed. With "Transmit to myDATA" on, those are transmitted legal documents,
-   * and the customer's account is credited twice for one return.
-   *
-   * `issue_credit_note` now caps cumulative credit at the invoice total (#351 B4), so the second
-   * copy would be refused rather than issued — but "refused" reaches the operator as a raw error
-   * on a flow that half-worked, which is not a recovery. This is: each leg is remembered, a retry
-   * resumes at the first one that has not happened, and the toast says exactly where it stopped.
-   *
-   * A ref, not state: it must be correct on the very next click, not on the next render.
-   */
+  /** What this return has already done (#351 A1). */
   const doneRef = useRef<{ credited: Set<string>; refunded: boolean }>({ credited: new Set(), refunded: false });
   const busyRef = useRef(false);
 

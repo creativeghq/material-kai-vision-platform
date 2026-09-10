@@ -25,14 +25,6 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
  * DataForSEO credentials, resolved the way this platform resolves every admin-editable secret:
  * `resolveSecret` reads env FIRST and falls back to `platform_secrets`. Never `Deno.env.get`
  * alone.
- *
- * This handler is the ONLY DataForSEO caller that runs inside an edge function — its ~30 sibling
- * SEO tools proxy to MIVAA, which holds the credentials in its own host env. So when this read
- * `Deno.env.get('DATAFORSEO_LOGIN')` it got nothing, and `seo_keyword_research` answered
- * "DataForSEO credentials not configured" while every other SEO tool worked. The credentials were
- * configured the whole time — just not anywhere this function could see, and the
- * `secrets-bootstrap` that would have put them in env is a no-op on this runtime because
- * `Deno.env.set` throws here.
  */
 async function dataforseoCredentials(supabase: { from: (t: string) => any }): Promise<{ login: string; password: string }> {
   const [login, password] = await Promise.all([
@@ -126,20 +118,6 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
     if (entResponse) return entResponse;
 
     // Billed to the WORKSPACE, not to whoever pressed the button.
-    //
-    // All four article stages passed `p_workspace_id: null` — research, plan, write and analyze,
-    // debit and refund alike, nine call sites — while the line above had just resolved the
-    // workspace. Null means `debit_credits` never consults the pool at all: it goes straight to
-    // the clicker's personal wallet. So the module is entitled per workspace, the article is
-    // filed under `workspace_id`, and a 42-52 credit run came out of one person's own balance.
-    // Every other paid path here (toolkit_audit, social) routes to the workspace.
-    //
-    // Passing the id is safe rather than a change of policy: `debit_credits` tries the pool,
-    // and on `no_pool` / `not_a_member` falls back to the personal wallet — which is every
-    // workspace today, since `workspace_credits` has no rows at all. It only starts mattering
-    // the day someone funds a pool, which is exactly when getting it wrong would be expensive.
-    // `refund_credits` re-derives the same way, so a failed stage pays back the wallet it took
-    // from instead of moving money between the two.
     const { data: debitResult, error: debitError } = await supabase.rpc(
       'debit_credits',
       {
@@ -164,13 +142,6 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
     console.log(`[seo-research] Starting research for "${body.target_keyword}" (user: ${userId})`);
 
     // Run DataForSEO research + mention-monitoring opportunities IN PARALLEL.
-    // The opportunities call hits MIVAA's /opportunities-stateless endpoint,
-    // which fans out to DataForSEO SERP / Labs (PAA, AI Overview, featured
-    // snippet, related searches, top organic, video / news / shopping
-    // carousels, knowledge graph, paid bidders) on the SAME keyword. Adds
-    // ~3-5s latency in the worst case but runs concurrently with the main
-    // research, so total wall-clock cost is unchanged. The stateless
-    // endpoint authenticates via x-cron-secret — no extra user credits.
     const client = new DataForSEOClient(dfs.login, dfs.password);
     const countryCode = dfsLocationToCountry(locationCode);
     const [research, serpSignals] = await Promise.all([

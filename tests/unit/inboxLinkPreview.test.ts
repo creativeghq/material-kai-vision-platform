@@ -1,15 +1,4 @@
-/**
- * A pasted link is a LINK, and where we can say so, it is the page it points at.
- *
- * The inbox rendered `{m.body}` as plain text, so a customer's product URL arrived as 180
- * characters of percent-encoded slug that could not even be clicked — while the question being
- * asked ("is your decking like this one?") had its answer in that page's own photograph.
- *
- * Two halves with different failure modes, so both are pinned here: the LINK must work with no
- * network at all, and the CARD must be absent honestly — a page that states no metadata, a page
- * we could not read and an address the SSRF guard refused are three different facts and only one
- * of them is worth retrying.
- */
+/** A pasted link is a LINK, and where we can say so, it is the page it points at. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

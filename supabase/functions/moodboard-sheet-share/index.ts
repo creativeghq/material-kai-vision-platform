@@ -2,17 +2,6 @@
  * Public share lookup for presentation artifacts. Handles BOTH:
  *   1. A single moodboard presentation sheet  → { sheet, pdf_url, expired }
  *   2. A project Client View deliverable       → { client_view }  (+ feedback write)
- *
- * One function, two token namespaces (random uuids, no collision). The client
- * view path was folded in here rather than living in its own function — see the
- * merge-functions rule.
- *
- * POST /functions/v1/moodboard-sheet-share
- *   { token }                                  → sheet OR client_view payload
- *   { token, feedback, session_id }            → write client feedback
- *
- * Anonymous-friendly: the gateway accepts the project anon key in
- * Authorization: Bearer, then the service role is used internally to bypass RLS.
  */
 
 import type { DbClient } from '../_shared/supabase-client.ts';
@@ -31,17 +20,7 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const SITE_PHOTO_BUCKET = 'pdf-documents';
 const SITE_PHOTO_TTL_SECONDS = 60 * 60;
 
-/**
- * Anonymous feedback is a WRITE from a link that is meant to be forwarded.
- *
- * A client-view URL travels by email and group chat; possession of it is not evidence of who is
- * holding it. Every accepted feedback row also emits `client_view_feedback_received`, which
- * notifies (and can email) the deliverable's owner — so an unthrottled endpoint is both a storage
- * cost and a way to flood somebody's inbox from a link they shared with a client.
- *
- * Same shape and the same budget as `real-estate-public`'s anonymous lead cap, which is the
- * pattern this follows: hash the trusted-hop IP, never store it raw.
- */
+/** Anonymous feedback is a WRITE from a link that is meant to be forwarded. */
 const FEEDBACK_HOURLY_LIMIT = 12;
 /** And what ONE caller may contribute to that, so a flood cannot lock out the real client. */
 const FEEDBACK_PER_CALLER_HOURLY_LIMIT = 6;
@@ -267,15 +246,6 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
     );
 
     // ── Tenancy binding for the EMBEDDED artifacts (#365 AD-26) ──────────────────────────────
-    //
-    // The ids below come from the view row rather than the request, so a token holder cannot
-    // inject one — but nothing checked that the linked quote / VR world / room plan belongs to the
-    // same workspace as the view itself. These reads run on the SERVICE ROLE, so RLS is not
-    // standing behind them: a client_view row that ends up pointing at another tenant's quote
-    // hands that quote — with its prices — to whoever holds this token. Same shape as FE-16
-    // (#351): a token scoped to one document serving a second.
-    //
-    // Resolve the view's workspace once and require every embedded artifact to match it.
     const { data: ownerProject } = await supabase
       .from('projects').select('workspace_id').eq('id', view.project_id).maybeSingle();
     const viewWorkspaceId = (ownerProject as { workspace_id: string } | null)?.workspace_id ?? null;
@@ -428,7 +398,6 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
       // openable by anyone holding the URL. Every internal reader moved with it; THIS one — the
       // client-facing handover list — was left building `getPublicUrl` against the old bucket, so
       // it emitted URLs for a file that is not there. Not a leak any more: just every snag photo
-      // on a client view silently a broken image, with the list itself still rendering.
       photo_urls: (s.photo_paths || []).map((p: string) => snagPhotoUrls[p]).filter(Boolean),
     }));
 

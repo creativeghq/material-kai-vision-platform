@@ -4,19 +4,7 @@ import { join } from 'node:path';
 
 import { stripComments } from '../helpers/stripComments';
 
-/**
- * An unconfigured condition blocks; it never fires on everything (#357 AE-15).
- *
- * Two always-true paths existed, and both point the same wrong way — a node whose job is to
- * NARROW, passing everything when it has not been filled in:
- *
- *   • `[].every(Boolean)` is TRUE, so a `filter` with no conditions and `and` logic (the default)
- *     let every record through. "Only VIP customers" with nothing filled in meant everybody.
- *   • `if_else` with a blank field and blank value compares '' to '' under `equals` and takes the
- *     TRUE branch on every event.
- *
- * On a Send Email branch, "fires on everything" means mailing everybody.
- */
+/** An unconfigured condition blocks; it never fires on everything (#357 AE-15). */
 
 const ROOT = join(__dirname, '..', '..');
 const engine = stripComments(

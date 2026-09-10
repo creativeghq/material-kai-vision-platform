@@ -1,16 +1,4 @@
-/**
- * Appointments Tools — agent-chat surface over the existing CRM Meetings infra.
- *
- * ONE tool, actions:
- *   - list     — upcoming appointments (crm_meetings, meeting_at >= now), workspace-scoped
- *   - schedule — create an appointment with optional email/WhatsApp reminders to yourself
- *
- * Deliberately NOT a net-new booking module: crm_meetings already has the table, the reminder cron
- * (crm-meeting-reminders), the reminder_at trigger, and clean RLS (insert = owner, read = workspace),
- * so a USER-JWT client IS the validated contract — like manage_reviews / manage_finance. Scheduling is
- * a self-calendar entry (reminders fire to the OWNER, not the customer), so it is NOT confirm-gated —
- * same risk class as create_project. Module `crm` + workspace entitlement gated. 0 credits.
- */
+/** Appointments Tools — agent-chat surface over the existing CRM Meetings infra. */
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what

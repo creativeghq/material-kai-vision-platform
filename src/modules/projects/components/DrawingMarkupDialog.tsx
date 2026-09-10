@@ -1,21 +1,4 @@
-/**
- * Mark up a drawing: cloud the bit that is wrong, say why, measure it, raise it as an RFI.
- *
- * THE ONE STRUCTURAL DECISION is that every coordinate stored here is normalised 0–1 against the
- * page, never a pixel. A pixel coordinate is meaningless the moment somebody opens the same sheet
- * at a different zoom, on a phone, or at a different render DPI — the cloud lands elsewhere on the
- * drawing, still looking like a perfectly good markup, and the reader queries the wrong detail.
- * The arithmetic lives in `lib/drawingMarkup.ts` so it can be tested without a canvas.
- *
- * THE SCALE IS SET BY DRAWING A KNOWN LINE, never read off the title block. A sheet printed "1:50"
- * survives being photocopied at 90%; the drawing does not. Until somebody calibrates it, every
- * measure line reads "not measured" — never zero, because a zero in a takeoff is a quantity
- * somebody orders.
- *
- * The markup layer is SVG rather than a second canvas: it hit-tests, it scales with the page for
- * free, and it stays selectable text where it should be. The PDF page underneath is a canvas
- * because that is what pdf.js renders to.
- */
+/** Mark up a drawing: cloud the bit that is wrong, say why, measure it, raise it as an RFI. */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';

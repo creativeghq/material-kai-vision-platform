@@ -1,21 +1,4 @@
-/**
- * Platform defaults — the workspace owner's switchboard over the OPERATOR's seeded flows.
- *
- * The seeded `system-default` flows are `is_global` with `workspace_id IS NULL`, and the engine
- * matches `is_global.eq.true` for EVERY workspace. So they genuinely run inside this workspace,
- * raising its bells and sending its members email, while being invisible on every tenant surface —
- * "stop emailing me every time a WhatsApp reply lands" had no answer anywhere in the product.
- *
- * This surface is the answer, and it is deliberately NOT the flow list:
- *  • it reads `get_workspace_flow_defaults`, a projection — title, description, channels, state.
- *    `graph_definition` never crosses the boundary, so a tenant learns what a notification IS,
- *    never how the operator builds one. The CLAUDE.md rule that a tenant read of `flows` carries
- *    `.eq('is_global', false)` therefore still holds: this does not read `flows` at all.
- *  • it offers OFF switches, never Edit/Delete. The one operator row stays the single source, so a
- *    fix to a default still reaches every workspace; a workspace records only its deviation.
- *  • only the operator's `tenant_configurable` flows appear. Legal/deliverability alarms and
- *    customer-facing document delivery are excluded server-side, not hidden by this component.
- */
+/** Platform defaults — the workspace owner's switchboard over the OPERATOR's seeded flows. */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Bell, ChevronDown, Mail, MessageCircle, Pencil, Recycle, Search, ShieldCheck, SlidersHorizontal, Wand2 } from 'lucide-react';
@@ -139,11 +122,6 @@ export function PlatformDefaultsSection({ onOpenFlow, refreshTick = 0 }: Props) 
    * Reuse = FORK. The operator's row keeps serving every workspace that has not touched it;
    * this one takes a copy and the global is switched off here in the same transaction, so the two
    * never both fire.
-   *
-   * The billing line in the confirm is not boilerplate. A platform default is an operator flow and
-   * runs FREE; the copy is an ordinary workspace automation, so flow-engine debits 20 credits per
-   * run from the workspace pool. On a busy trigger — inbox messages above all — that is a real
-   * bill the owner has to agree to before, not discover after.
    */
   const reuse = async (row: FlowDefault) => {
     if (!activeWorkspaceId) return;

@@ -1,27 +1,4 @@
-/**
- * seo-content-freshness — content decay for generated SEO articles.
- *
- * The article pipeline wrote articles and never looked at one again. Grepping
- * `seo-api/` and `_shared/seo-types.ts` for freshness / decay / staleness / refresh-due
- * returned nothing at all (issue #349 C1), which matters because an article updated
- * inside the last three months is cited materially more often by answer engines than
- * the same article left to age. A page nobody revisits does not break, does not error,
- * and does not appear in any list — it just stops being cited.
- *
- * What is derived where:
- *   - `seo_article_refresh_due_at(...)` in SQL is the ONE definition of "when is this
- *     due". This function never re-adds an interval to a date.
- *   - `seo_article_freshness` (security_invoker view) is the queue. The client reads it
- *     directly under RLS; there is no queue endpoint here, because a second read path
- *     is a second answer.
- *
- * Actions:
- *   cron-sweep (x-cron-secret) — emit `seo.article_refresh_due` for every article whose
- *   due date has passed and that has not already been nudged for THIS cycle.
- *
- * verify_jwt is disabled at the gateway (see config.toml) so the cron can reach it; the
- * only action self-authenticates through isCronAuthorized.
- */
+/** seo-content-freshness — content decay for generated SEO articles. */
 
 import { createClient } from '@supabase/supabase-js';
 import { withApiLogging } from '../_shared/api-logger.ts';

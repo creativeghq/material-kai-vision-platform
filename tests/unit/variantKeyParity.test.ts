@@ -1,26 +1,4 @@
-/**
- * Variant key — the TypeScript twin must equal the SQL one (#347 phase 7).
- *
- * "Which variant is this line?" is answered as a string in two languages: `variantKey()` here,
- * because the browser prices a line before it is saved, and `public._variant_key(jsonb)` in SQL,
- * because the resolver and the warehouse key on it. Both write and read the SAME
- * `product_prices.variant_key`.
- *
- * A twin that disagrees does not fail — it prices. One product quietly grows two price rows that
- * each look correct, and which one a line gets depends on where it was priced. That is the exact
- * shape this issue exists to remove (five registries, four money derivations), and the exact shape
- * escapeHtml drifted into when it was "kept in sync by convention" across three runtimes.
- *
- * So the fixtures below are the contract, and they are transcribed from a live run of the SQL
- * function rather than from reading it — reading it is how you encode the same misunderstanding
- * twice. Re-verify with:
- *
- *   select label, coalesce(public._variant_key(v::jsonb),'<NULL>')
- *     from (values ('a','{"finish":"matte"}')) t(label, v);
- *
- * SCOPE. This pins agreement on the fixtures. It cannot see a divergence on an input neither side
- * was asked about, so add a fixture whenever the key's shape changes.
- */
+/** Variant key — the TypeScript twin must equal the SQL one (#347 phase 7). */
 import { describe, expect, it } from 'vitest';
 
 import { variantKey } from '@/services/lineIdentityRules';

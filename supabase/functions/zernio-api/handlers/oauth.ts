@@ -1,23 +1,4 @@
-/**
- * Zernio OAuth handler
- *
- * Connects / disconnects social media accounts via Zernio.
- * Zernio is the OAuth broker — we ask it for an authUrl, the user authorises on
- * the platform, then Zernio redirects back to our app with the connected
- * accountId. The frontend then calls `action: 'callback'` to persist the account.
- *
- * Zernio groups accounts under a per-workspace "profile" (resolved lazily).
- *
- * Actions:
- *   POST { action: 'connect', platform, workspace_id, redirect_url? }
- *     → Returns a Zernio OAuth authUrl for the user to visit
- *   POST { action: 'callback', zernio_account_id, platform, workspace_id }
- *     → Called after OAuth completes; fetches account details and upserts social_accounts
- *   POST { action: 'disconnect', social_account_id }
- *     → Marks account inactive, revokes the Zernio connection
- *   GET  { action: 'list', workspace_id }
- *     → Returns all connected accounts for the workspace (from our DB)
- */
+/** Zernio OAuth handler */
 
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../../_shared/http.ts';

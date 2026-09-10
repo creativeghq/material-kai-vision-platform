@@ -1,17 +1,4 @@
-/**
- * "We could not read this" is not "there is nothing" (#360 CB-21).
- *
- * On a monitoring surface, zero is a meaningful answer: no new mentions, no price changes. That is
- * precisely why a FAILED read must not look like one. `.catch(() => null)` on a panel's data
- * source turns an outage into a calm empty state, on the screens whose entire purpose is noticing
- * that something changed — CLAUDE.md's dominant historical bug, pointed at the feature that exists
- * to detect it.
- *
- * The same shape the SEO surfaces already fixed with `seo_metric`'s `collector_failed` status;
- * this is the minimum version of it for the reads that have no SQL derivation behind them.
- *
- * Import-free so a test can load it directly.
- */
+/** "We could not read this" is not "there is nothing" (#360 CB-21). */
 
 export type ReadResult<T> =
   | { ok: true; value: T }

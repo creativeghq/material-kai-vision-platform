@@ -1,24 +1,4 @@
-/**
- * Knowledge-Graph Traversal Tools — agent-chat surface for the relational graph.
- *
- * These tools let the KAI agent walk the EXISTING relational edges (products ↔
- * projects ↔ quotes ↔ invoices ↔ suppliers ↔ price history) that also power the
- * feature UIs. Each tool is a thin wrapper over a tenancy-guarded
- * SECURITY DEFINER RPC (see migration `phase1_knowledge_graph_traversal_rpcs`);
- * the RPC scopes every query by workspace_id, so the tools only pass ids.
- *
- * Tools (6):
- *   - product_provenance       — maker(s) bought from, projects, quote/invoice footprint, latest tracked price
- *   - product_price_history    — windowed retailer price series + min/median/max
- *   - projects_using_product   — which projects consume a product
- *   - products_in_project      — the product line-up of a project
- *   - customer_overview        — quotes + invoices (AR aging) + projects for a company  [customer_360]
- *   - supplier_overview        — bills (AP aging) + POs + products supplied             [supplier_360, admin/finance only]
- *
- * Cost discipline: every tool is 0 credits (DB-only RPC reads).
- * Resolution: id args may be given directly, or resolved from a sku / name so the
- * agent can chain from a material_search / find_project result OR a bare name.
- */
+/** Knowledge-Graph Traversal Tools — agent-chat surface for the relational graph. */
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what
@@ -418,24 +398,7 @@ export const createFindProductsBySpecTool = (
 
 // ── 11) price_my_spec (#337 — the embed's "price it", in chat) ──────────────
 
-/**
- * Answer "I want X like this — what does it cost?" the same way the website embed does.
- *
- * SIBLING OF `find_products_by_spec`, NOT A DUPLICATE. That one filters NUMERIC ranges (IP rating,
- * PEI class, thickness, wattage) and returns a list. This one takes a CATEGORICAL specification —
- * the nouns and adjectives a customer actually says, "a lounge armchair in linen, sunset" — and
- * returns a VERDICT: exact, near, or nothing, which is what decides between quoting a price and
- * opening a quote request.
- *
- * IT CALLS THE SAME RPC THE EMBED CALLS. `resolve_product_spec` is the one derivation of that
- * verdict; a second implementation here would be free to disagree with the widget on a customer's
- * own website, which is the failure mode this codebase keeps paying for. The tool is a thin
- * wrapper — the matching rule, the tenancy scope and the "near matches carry no price" decision all
- * stay in SQL.
- *
- * NO PRICE ON A NEAR MATCH, and none invented here. A near match is a suggestion; putting a number
- * on it would have the agent quote a figure nobody approved.
- */
+/** Answer "I want X like this — what does it cost?" the same way the website embed does. */
 export const createPriceMySpecTool = (
   workspaceId: string,
   onChunk?: (chunk: any) => void,
@@ -481,13 +444,6 @@ export const createPriceMySpecTool = (
         });
         const row = (p ?? {}) as Record<string, unknown>;
         // STAGE 4 OF THE FLOW — "place it" (#341 join 4).
-        //
-        // The room planner was built, tested and reachable from nothing but its own nav tile, so
-        // the flow went straight from "here is a picture" to "here is a price" and the one stage
-        // that answers "will it actually fit" never happened. It is only ever offered for a
-        // product that HAS a model: the planner places things at their real size, and a product
-        // with no model has no size to place. Answered here rather than left to the agent, which
-        // would otherwise guess — and a link to an empty planner is worse than no link.
         const { data: models } = await sb.from('product_3d_models')
           .select('format').eq('product_id', matches[0].product_id).limit(1);
         const hasModel = Array.isArray(models) && models.length > 0;
@@ -507,15 +463,6 @@ export const createPriceMySpecTool = (
       const verdict = priced ? 'exact' : (res.match_kind === 'exact' ? 'none' : res.match_kind ?? 'none');
 
       // ON A MISS, HAND BACK THE REAL VOCABULARY.
-      //
-      // The agent does not know this workspace's facet KEYS. Asked "how much for a navy armchair"
-      // it will reasonably send {"color": "navy"} when the key is `available_colors`, get nothing,
-      // and tell the customer we do not stock it — a confident wrong answer, which is worse than
-      // an error. It cannot guess its way out either: the keys are whatever this tenant's catalog
-      // happens to use.
-      //
-      // So a miss returns what could have been asked, and the guidance tells the agent to retry
-      // before concluding anything. Only on the SECOND miss is "we don't have it" trustworthy.
       let vocabulary: unknown = undefined;
       if (!priced) {
         const { data: vocab } = await sb.rpc('get_embed_spec_options', {

@@ -6,13 +6,6 @@ import type { DeliveryTrail } from '@/services/documentDeliveryService';
 /**
  * The delivery-trail list cell: three small icons — was it emailed, did they
  * open the page, did they act — with the actual timeline on hover.
- *
- * Design-system notes: plain coloured glyphs, no Badge and no pill background
- * (tables render status as plain coloured words here). The cell is a single
- * focusable trigger so the timeline is reachable by keyboard, not mouse-only.
- *
- * This component FORMATS a derived trail. It performs no derivation of its own —
- * see documentDeliveryService.
  */
 
 interface Props {

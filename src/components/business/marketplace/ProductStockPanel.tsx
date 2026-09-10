@@ -1,24 +1,4 @@
-/**
- * Physical stock for one catalog product, on the product record.
- *
- * The modal used to say nothing at all about stock — a comment in it still explained that this
- * is "a quote-based platform, retail/wholesale/stock aren't tracked", which stopped being true
- * once multi-warehouse stock, movements and marketplace listings shipped. So an operator could
- * receive 200 m² into the Athens depot and the product record showed no sign of it.
- *
- * It also surfaces the physical facts that only ever existed on the STOCK row — weight, the
- * per-receipt dimensions, the supplier's own product code. `products` has no columns for those,
- * so before this panel they were write-only: entered at intake, never displayed anywhere except
- * the warehouse table.
- *
- * VISIBILITY IS THE CALLER'S JOB and is deliberately not re-derived here. The panel renders
- * whatever it is given; `ProductDetailModal` decides who may mount it (`warehouse.manage`, own
- * workspace, `stock` module). Note that RLS on `warehouse_items` / `stock_movements` is only
- * `is_workspace_member(...)` — it enforces TENANCY, not role — so this gate is the only thing
- * separating a warehouse reader from, say, an invited employee. That gap, and the
- * `is_workspace_stock_reader` predicate that would close it, are written up under
- * "Who sees stock on the product record" in docs/warehouse-and-billing.md.
- */
+/** Physical stock for one catalog product, on the product record. */
 import React, { useEffect, useState } from 'react';
 import { formatVariantKey } from '@/services/lineIdentityRules';
 import { Loader2, Boxes, ArrowDownLeft, ArrowUpRight, Settings2, Store } from 'lucide-react';

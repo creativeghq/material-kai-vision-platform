@@ -1,31 +1,4 @@
-/**
- * What the article does NOT say that it should — and what it already says that competitors do.
- *
- * The previous derivation was this, in full:
- *
- *     for (const comp of competitors) if (comp.title) gaps.push(comp.title);
- *     ...
- *     { topic, competitorCount: 3, relevanceScore: 0.6 }   // "Approximate"
- *
- * So a "gap" was a COMPETITOR'S PAGE TITLE that did not appear verbatim in the body — meaning
- * `Gap: ΨΑΡΑΔΕΛΛΗΣ | ΠΛΑΚΑΚΙΑ` said "you have not printed a rival's brand name", and closing it
- * would have been actively bad advice. The two numbers beside every row were constants: 3 and
- * 0.6 for every gap, 0 and 0.7 for every gain, on every article ever produced. Nothing could see
- * it — a hardcoded number is a valid number, and the panel rendered them faithfully.
- *
- * A gap is now a TOPIC someone searches for, from the research that has already been paid for:
- *
- *   • `keyword`            — a researched secondary keyword, carrying its real search volume.
- *   • `question`           — a People Also Ask question the body does not answer.
- *   • `competitor_heading` — a section heading shared by the ranked pages.
- *
- * and every number beside it is measured: the volume is DataForSEO's, and `competitorCount` is a
- * count of the competitors that actually mention the term.
- *
- * It reads `research_tab_data`, which is STORED on the article, rather than the full research
- * result, which is not. That is deliberate: it means `reanalyze` can rebuild this for an article
- * written months ago, instead of the fix reaching only articles generated after today.
- */
+/** What the article does NOT say that it should — and what it already says that competitors do. */
 
 import type { MissingTopic } from '../../_shared/seo-types.ts';
 
@@ -68,22 +41,7 @@ export function normalizeText(s: string): string {
     .trim();
 }
 
-/**
- * Does the body cover this term?
- *
- * Every significant token has to appear, stem-matched. Greek inflects the ending of almost every
- * word (πλακάκια / πλακακιών / πλακάκι), so an exact phrase test under-reports badly.
- *
- * The stem is 80% of the token, not "the token minus two characters". Minus-two was the first
- * version and it reported this article as covering "πρακτικερ πλακακια μπανιου" — Praktiker's
- * brand — because the body contains the ordinary Greek adverb «πρακτική»: both reduce to
- * `πρακτικ` at seven characters. 80% keeps `πρακτικε` distinct from `πρακτικη` while still
- * catching the declensions it exists for, which for a nine-letter word is the difference between
- * a measurement and a coincidence.
- *
- * Tokens shorter than four characters are skipped — they are articles and prepositions, and
- * requiring them would fail on word order rather than on meaning.
- */
+/** Does the body cover this term? */
 export function stemOf(token: string): string {
   return token.slice(0, Math.max(4, Math.ceil(token.length * 0.8)));
 }
@@ -134,18 +92,7 @@ function namesACompetitor(term: string, brands: string[]): boolean {
   });
 }
 
-/**
- * How many of the ranked pages cover this term — or null when that cannot be measured.
- *
- * Measured over titles AND section headings. With no headings anywhere there is nothing to
- * measure against: a title is four or five words of marketing, so every multi-word local keyword
- * scores 0 against every competitor, and a column of zeroes reads as "no competitor covers any of
- * this" when what it means is "we did not look". Measured on the real article: ten competitors,
- * zero headings between them, and every count 0.
- *
- * `CompetitorData.headings` is declared in seo-types and the SERP client never fills it. The day
- * it does, this starts answering — no further change needed here.
- */
+/** How many of the ranked pages cover this term — or null when that cannot be measured. */
 function competitorsMentioning(term: string, competitors: GapCompetitor[]): number | null {
   const measurable = competitors.some((c) => (c.headings ?? []).length > 0);
   if (!measurable) return null;

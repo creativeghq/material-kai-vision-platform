@@ -1,17 +1,4 @@
-/**
- * Data access for brand ambassadorships (`profile_ambassadorships`).
- *
- * Reads and writes go straight at the table: its RLS is the boundary and says exactly what the
- * product means — your own rows, and rows on a PUBLIC profile. Nobody approves an ambassadorship;
- * being on the platform's supplier list is the whole condition.
- *
- * Two things need an RPC and get one: the brand list itself (an operator-owned registry, so only
- * its business-identity fields are exposed) and the brand's own "who promotes me" view (which
- * has to read `user_profiles` past an RLS policy that would blank every name).
- *
- * The table post-dates the last `types.ts` regeneration (which cannot run locally — no access
- * token), hence the casts. They are confined to this file.
- */
+/** Data access for brand ambassadorships (`profile_ambassadorships`). */
 import { supabase } from '@/integrations/supabase/client';
 import type { Ambassadorship, AmbassadorshipDraft } from '@/lib/ambassadorships';
 

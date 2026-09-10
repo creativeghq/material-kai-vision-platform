@@ -1,16 +1,4 @@
-/**
- * Add one question and answer to the article's FAQ section.
- *
- * The only way to get a question into an article was Research → Questions, which appends
- * `## <question>` plus a TODO marker to the BOTTOM of the document — below the conclusion, outside
- * the FAQ, and with no answer. For a question that is the wrong place twice over: it breaks the
- * FAQ block the viewer renders as an accordion, and it breaks `faq_schema`, which is what a
- * FAQPage rich result is built from.
- *
- * So this puts the pair where it belongs, in the section that already exists, and keeps
- * `faq_schema` in step. The insertion is a pure function so it can be tested without a model call
- * — where the text lands is the part that can silently go wrong.
- */
+/** Add one question and answer to the article's FAQ section. */
 
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../../_shared/http.ts';

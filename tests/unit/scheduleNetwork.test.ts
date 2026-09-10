@@ -1,14 +1,4 @@
-/**
- * The critical path method, and what a baseline measures.
- *
- * This replaced a longest-single-chain heuristic that was wrong in two ways: it reported ONE chain
- * when a real programme routinely has several equally critical, and it produced no FLOAT — the
- * number a site manager actually uses, because "this has four days of slack" is what decides
- * whether a late delivery matters.
- *
- * Pure functions over tasks and edges, so every case here is exact arithmetic rather than a
- * plausible-looking Gantt.
- */
+/** The critical path method, and what a baseline measures. */
 import { describe, it, expect } from 'vitest';
 import {
   computeNetwork, criticalPathIds, baselineVarianceDays,

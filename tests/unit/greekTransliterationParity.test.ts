@@ -7,24 +7,7 @@ import { transliterateGreek as edgeTransliterate } from '../../supabase/function
 import { readMappings } from '../../scripts/gen-crm-translit-sql.mjs';
 import { foldForSearch } from '@/components/core/filters/types';
 
-/**
- * Greek→Latin search transliteration exists THREE times, and they must agree (#353 CRM-1).
- *
- *   • src/services/crm/greekTransliteration.ts                       — the source (browser)
- *   • supabase/functions/_shared/crm/greekTransliteration.generated  — generated mirror (Deno)
- *   • public.crm_translit(text)                                      — SQL, writes the column
- *
- * Three, because a search compares a query built in the browser against a column generated in
- * Postgres, and the duplicate probe runs in Deno. The same split `crm_fold`/`foldForSearch`
- * already live with — and the reason `searchFoldParity.test.ts` exists.
- *
- * The two TypeScript twins are imported and compared for real. SQL cannot run here, so its half
- * is pinned two ways: the committed `.sql` is checked to be REGENERATABLE from the same mapping
- * table, and the VECTORS below are frozen output captured from `public.crm_translit()` against
- * the live database. Re-capture with:
- *
- *   select t, public.crm_translit(public.crm_fold(t)) from (values ('…')) v(t);
- */
+/** Greek→Latin search transliteration exists THREE times, and they must agree (#353 CRM-1). */
 
 const ROOT = join(__dirname, '..', '..');
 const SOURCE = 'src/services/crm/greekTransliteration.ts';

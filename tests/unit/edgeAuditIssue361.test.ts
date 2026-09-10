@@ -1,14 +1,4 @@
-/**
- * Guards for audit #361 — the findings that are not covered by an existing guard file.
- *
- * The gateway's three (`EG-1`–`EG-3`) live in `mivaaGatewayAuthorization.test.ts`, and the SSRF
- * site `EG-18` is pinned by the stored-URL sweep in `imageFetchGuard.test.ts`. What is left is a
- * set of one- and two-line properties that are individually small and were individually invisible:
- * a hard-coded currency symbol, a persisted signed URL, a re-derived money quantity, an
- * unfenced prompt interpolation. None of them raise, none of them fail a typecheck, and all of
- * them produce a plausible-looking result — which is why they need a test that reads the source
- * rather than a reviewer who remembers.
- */
+/** Guards for audit #361 — the findings that are not covered by an existing guard file. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

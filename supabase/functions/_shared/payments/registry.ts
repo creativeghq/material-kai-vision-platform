@@ -1,23 +1,4 @@
-/**
- * Payment provider registry + per-workspace resolution.
- *
- * A provider is usable by a workspace only when THREE things hold:
- *   1. **Published** — `modules.enabled` for `payments-<slug>`: the operator's
- *      platform-wide catalog/kill-switch (lets us disable a broken provider for
- *      everyone without touching tenants).
- *   2. **Entitled**  — `is_workspace_entitled(workspace, 'payments-<slug>')`: the
- *      tenant's own grant, written when the owner clicks Enable.
- *   3. **Configured** — the tenant actually connected the provider (credentials
- *      present). Derived, not a permission.
- *
- * (1) ∧ (2) is the load-bearing part. Checking only (1) — which is what the frontend
- * `resolvePaymentProviders` does today — means one tenant enabling a provider turns it
- * on for EVERY tenant. Checking only (2) would let a tenant keep using a provider the
- * operator has pulled. Both must hold, mirroring `useWorkspaceModuleNav`.
- *
- * (3) is reported rather than filtered by default, so the seller-facing settings UI can
- * say "entitled but not connected" instead of the provider silently vanishing.
- */
+/** Payment provider registry + per-workspace resolution. */
 
 import { isWorkspaceEntitled } from '../entitlement.ts';
 import { stripeProvider } from './stripe-provider.ts';

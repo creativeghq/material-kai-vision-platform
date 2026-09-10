@@ -5,20 +5,6 @@ import { stripComments as sharedStripComments, blankComments as sharedBlankComme
 /**
  * Every event a tenant can subscribe an outbound webhook to (#330) must be a real
  * `TriggerType`.
- *
- * The failure this prevents is silent and lands on the TENANT, not on us. A subscription to an
- * event string the platform never emits is accepted, stored, and listed in their dashboard —
- * and then simply never fires. From their side that is indistinguishable from a broken endpoint
- * or a broken integration, and they will debug their own server first.
- *
- * TypeScript cannot catch it: `SUBSCRIBABLE_EVENT_TYPES` lives in `supabase/functions/_shared`
- * (Deno) and the union lives in `src/services/flows/types.ts` (Vite). Edge functions cannot
- * import across that boundary — which is exactly why the list is a hand-maintained copy, and
- * exactly why it needs a guard.
- *
- * The union parser is deliberately the same shape as flowEventContract.test.ts, including the
- * comment-stripping: a section comment inside the declaration contains a semicolon, and a naive
- * parser truncates the union at roughly half its members and then happily "passes".
  */
 const UNION_FILE = 'src/services/flows/types.ts';
 const LIST_FILE = 'supabase/functions/_shared/webhook-events.ts';

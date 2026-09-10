@@ -1,23 +1,4 @@
-/**
- * Viva.com as a `PaymentProvider` (per-tenant BYOK).
- *
- * Unlike Stripe (platform key + Connect destination), every tenant brings their OWN Viva
- * merchant account and funds settle directly to their wallet. We never fall back to the
- * operator's credentials — an unconfigured workspace simply cannot charge.
- *
- * THREE HOST FAMILIES, and they are not interchangeable:
- *   accounts.*  — OAuth2 token issuance
- *   api.*       — OAuth2-authenticated REST (create order, retrieve transaction)
- *   www.*       — Basic-auth legacy API, RF codes, and the customer checkout redirect
- *
- * UNIT CONVENTIONS DIFFER PER CALL — do not share a parser:
- *   create order request   → MINOR units (10037 = €100.37), min 30
- *   webhook EventData      → MAJOR units, signed (negative on reversal)
- *   retrieve transaction   → MAJOR units, camelCase
- *
- * Docs: https://developer.viva.com/apis-for-payments/payment-api/
- *       https://developer.viva.com/payment-tools/rf-code-payments/
- */
+/** Viva.com as a `PaymentProvider` (per-tenant BYOK). */
 
 import { parseEnabledMethods } from './types.ts';
 import type {
@@ -195,18 +176,7 @@ export async function mintInvoiceRf(
   return { orderCode, rfCode };
 }
 
-/**
- * Generate the 20-digit RF Creditor Reference for an order (Greek merchants only).
- *
- * Two things worth knowing:
- *  1. This endpoint takes NO authentication — which makes an orderCode semi-secret.
- *     Never expose one on a public surface beyond the buyer who owns it.
- *  2. Viva does NOT publish this call's success schema: the OpenAPI `200` example is the
- *     placeholder string "200 No Content" while the prose says it returns the RF code.
- *     So the parser below is deliberately defensive — it accepts the plausible shapes and
- *     otherwise regex-scans for the RF pattern, logging the raw body so the first real
- *     demo call tells us the true shape instead of failing silently.
- */
+/** Generate the 20-digit RF Creditor Reference for an order (Greek merchants only). */
 export async function generateRfCode(
   orderCode: string,
   ctx: PaymentProviderContext,
@@ -233,17 +203,7 @@ export async function generateRfCode(
   return rf;
 }
 
-/**
- * Pull an RF code out of the RF-generation response.
- *
- * CONFIRMED against Viva demo (2026-08-03), which Viva does NOT document — the real
- * success body is:  {"rfPaymentCode":"RF12907263102785539868300"}
- * i.e. `rfPaymentCode`, value `RF` + ~23 digits (longer than the "20-digit" the prose
- * claims). The parser stays defensive anyway (unknown-key + regex fallbacks) so a future
- * shape change degrades to a logged raw body rather than a silent wrong parse.
- *
- * RF is an ISO-11649 Creditor Reference: `RF` + 2 check digits + up to 21 more chars.
- */
+/** Pull an RF code out of the RF-generation response. */
 export function parseRfCode(rawBody: string): string | null {
   // RF + 2 check digits + 8..25 trailing chars. Deliberately wider than the observed 23
   // so we never under-match a valid code again.
@@ -278,11 +238,6 @@ export const vivaProvider: PaymentProvider = {
   // RF generation is confirmed against Viva demo (2026-08-03): the code + parser + the
   // {"rfPaymentCode":"RF…"} response shape are all verified live, and settlement reconciles
   // via order-state polling (retrieveVivaOrder, StateId===3) driven by the 2054 webhook.
-  // There is NO independent periodic sweep (audit H2) — settlement depends on the tenant's
-  // registered 2054 webhook; the `ops.payment_intents_stale` probe surfaces RF intents that
-  // sit pending on a payable invoice so a broken webhook cannot stay silent. Still needs ONE
-  // real bank transfer to confirm the 2054→StateId=3 timing end-to-end; until then a tenant
-  // enables it deliberately per-workspace (methods jsonb), never on by default. Card is proven.
   methods: ['card', 'bank_reference'],
   currencies: VIVA_CURRENCIES,
 
@@ -302,12 +257,6 @@ export const vivaProvider: PaymentProvider = {
     // CRITICAL (settlement invariant): this gate is the AUTHORITATIVE "can Viva be offered?" check —
     // the customer pay page offers a provider purely on resolveContext≠null. It MUST require everything
     // the settlement loop needs, or a customer can pay a charge that can never be recorded:
-    //   • merchant_id — the ONLY key viva-webhooks uses to map an inbound delivery back to this
-    //     workspace. Missing it ⇒ the webhook drops every delivery ⇒ paid-but-unsettled.
-    //   • api_key — required by retrieveVivaTransaction, the webhook's security read-back boundary.
-    //   • webhook_verified_at — proves the tenant actually completed webhook setup, so deliveries arrive.
-    // (Previously only client_id+client_secret were required, matching the client-side "connected"
-    // definition to the server's; the two had diverged.)
     if (!data || !data.enabled) return null;
     if (!data.client_id || !data.client_secret) return null;
     if (!data.merchant_id || !data.api_key || !data.webhook_verified_at) return null;
@@ -413,18 +362,7 @@ export const VIVA_ORDER_STATE = {
   PAID: 3,
 } as const;
 
-/**
- * Re-read an ORDER's state (`GET /api/orders/{orderCode}`, Basic auth on the www. host).
- *
- * This is how RF / bank-transfer settlement is confirmed. A bank transfer produces NO card
- * `TransactionId` — the `Account Transaction Created` (2054) webhook only tells us "money
- * moved on the wallet", not which order. So instead of a transaction read-back we poll the
- * order the RF code was minted against: `StateId === 3` means the transfer landed. Keyed on
- * orderCode alone, which we hold in `invoice_payment_intents`.
- *
- * Verified against Viva demo 2026-08-03: returns `{OrderCode, StateId, RequestAmount, …}`,
- * amount in MAJOR units.
- */
+/** Re-read an ORDER's state (`GET /api/orders/{orderCode}`, Basic auth on the www. host). */
 export async function retrieveVivaOrder(
   orderCode: string,
   ctx: PaymentProviderContext,
@@ -457,23 +395,7 @@ function extractOrderCodePascal(rawBody: string): string | null {
   return m ? m[1] : null;
 }
 
-/**
- * Non-destructive end-to-end check of a tenant's stored Viva credentials.
- *
- * WHY THIS EXISTS: every field on the setup card is silently wrong until a real customer
- * pays. A mistyped `source_code` (Viva issues a 4-DIGIT code per payment source; the old
- * card copy suggested the literal string "Default") authenticates fine, stores fine, and
- * only fails at `POST /checkout/v2/orders` — i.e. at the first sale. So we do that POST
- * here, deliberately, on demand.
- *
- * It creates a real €0.30 order and reads it back. No money moves: nobody is sent to the
- * checkout page, and `paymentTimeout` expires it in five minutes. The read-back is the
- * part that actually proves the source code, since Viva echoes `SourceCode` back and a
- * wrong-but-existing code would otherwise pass silently.
- *
- * The webhook leg is NOT testable from here — Viva provides no way to trigger a delivery —
- * which is exactly why `webhook_event_types` records what really arrives instead.
- */
+/** Non-destructive end-to-end check of a tenant's stored Viva credentials. */
 export interface VivaCheck {
   key: 'oauth' | 'merchant' | 'order' | 'source_code' | 'transfer';
   label: string;

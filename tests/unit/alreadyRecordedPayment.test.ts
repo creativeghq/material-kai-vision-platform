@@ -1,29 +1,4 @@
-/**
- * A payment made in the bank's own app and written down here is ONE payment.
- *
- * THE DEFECT THIS EXISTS FOR
- * --------------------------
- * The reconciler reasons about DOCUMENTS — an open invoice, an open bill — and allocates the feed
- * line against whichever one still owes. It has no concept of money already booked. So when an
- * operator pays a supplier in the Revolut app and then records that payment here (which is the
- * honest thing to do, and what the "Just record it" option is for), the line that arrives days
- * later has two possible outcomes and neither is right:
- *
- *   - the bill is FULLY settled, so it is not in the candidate set at all and the line sits
- *     `unmatched` forever — visible in the review queue, inviting a human to match it by hand and
- *     book the same money twice;
- *   - the bill is PARTLY settled, so the remainder is open AND cent-equal to this very line, and
- *     the amount rule allocates it a second time. The bill then reads paid on half the money.
- *
- * Both are silent. A doubled allocation is a valid number on a valid row, `uncheckedSupabaseWrites`
- * cannot see it because every write IS checked, and no integrity probe can tell a genuine second
- * transfer from a duplicated one.
- *
- * WHY THE ASSERTIONS ARE ABOUT ORDER
- * ----------------------------------
- * The check has to run BEFORE the ladder, in both directions. Asking afterwards is asking after
- * the money has already been allocated, which is not a check.
- */
+/** A payment made in the bank's own app and written down here is ONE payment. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

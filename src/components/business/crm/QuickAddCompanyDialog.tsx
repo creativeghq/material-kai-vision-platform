@@ -1,11 +1,5 @@
 // Create a business from anywhere OUTSIDE the CRM pages — an expense payee, a bill issuer, a
 // counterparty on a form — with the same identity lookup the CRM "Add company" flow uses.
-//
-// The difference from `AddCompanyModal` is only what happens at the end: that one hands the
-// resolved identity to the full create form for review, because you went to CRM to add a
-// company. Here you were doing something else (booking an expense) and just need the
-// counterparty to exist, so it writes the row and hands it straight back. The identity captured
-// is identical either way — that is the whole point of sharing `CompanyIdentityLookup`.
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { Loader2, Building2 } from 'lucide-react';
 
@@ -99,17 +93,6 @@ export const QuickAddCompanyDialog: React.FC<Props> = ({
 
   // Dedupe probe. VAT first (authoritative, and matched across every spelling a row might be
   // stored under), name second. Debounced because it runs as you type.
-  //
-  // The name half used to be `ilike('name', name)` — case-insensitive but NOT accent-insensitive,
-  // so "Καρέλης ΑΕ" never found the stored "ΚΑΡΕΛΗΣ ΑΕ" and the probe missed exactly the case the
-  // platform built folding machinery for (#366 BU-3).
-  //
-  // It now matches `name_xscript` (#353 CRM-1), which folds AND transliterates Greek to Latin,
-  // so the probe finally sees across ALPHABETS too: `Παπαδόπουλος` and `Papadopoulos` are one
-  // key. Folding alone could never do that, and a CRM that cannot see it holds the same party
-  // twice, once per script. `foldedName` is the client half, held identical to the Deno mirror
-  // and the SQL function by tests/unit/greekTransliterationParity.test.ts. Still an EQUALITY
-  // match, not a substring one — this is a dedupe, not a search box.
   useEffect(() => {
     if (!open) return;
     const vat = draft.vatNumber.trim();

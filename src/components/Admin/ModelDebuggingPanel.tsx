@@ -280,22 +280,7 @@ const ModelDebuggingPanel: React.FC<ModelDebuggingPanelProps> = ({ embedded = fa
     }
   };
 
-  /**
-   * Read the REAL probe result for these models. (#365 AD-24)
-   *
-   * What this replaced: a 2-second `setTimeout`, after which the panel wrote
-   * `status: 'working'`, `successRate: 100` and `avgDuration: Math.random() * 10 + 3` into its
-   * own state, persisted that to localStorage, and raised a toast reading "test completed
-   * successfully". No request was made to anything. The duration was a random number presented as
-   * a measurement, and the 100% was a success rate for a test that never ran — on the screen an
-   * operator opens specifically to find out whether a model is broken.
-   *
-   * It was also a duplicate. `model-health-check-agent` genuinely probes these models and writes
-   * `generation_models.last_probe_at / last_probe_status / last_probe_error`, and
-   * `GenerationProviderHealth` already renders it. So this panel now reads the same source
-   * instead of inventing a second, fictional one — and when a model has never been probed it says
-   * exactly that rather than calling it working.
-   */
+  /** Read the REAL probe result for these models. (#365 AD-24) */
   const refreshProbeStatus = async () => {
     setIsLoading(true);
     try {

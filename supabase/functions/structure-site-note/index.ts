@@ -1,33 +1,4 @@
-/**
- * structure-site-note — a site walk's dictation becomes the records it described.
- *
- * The site log and the snag list already existed and both were typed by hand, which is why they
- * are empty: nobody stops on a scaffold to fill in a form. The competitor's whole site pitch is
- * "walk the site and talk", and they are right that it is the input method that decides whether
- * the records get made at all.
- *
- * ONE WALK PRODUCES TWO KINDS OF RECORD, which is the thing worth modelling. A manager walking a
- * job says "quiet day, plasterers in, still waiting on the electrician — oh, and the ensuite tile
- * is cracked and the second bedroom window does not close". That is a diary entry AND two
- * defects, and they are separate records because they get assigned and closed separately. A
- * function that returned one blob of text would leave somebody to split it up by hand, which is
- * the work this is supposed to remove.
- *
- * It writes NOTHING. The proposal comes back, the person confirms it, and `siteService` does the
- * writes by the normal path — the same prefill-then-confirm shape as the receipt and title-block
- * scanners. A transcription mishears; a defect written straight to the list off a mishearing is a
- * job somebody gets sent to do.
- *
- * INVARIANTS:
- *   1  Tenancy — the workspace comes from the PROJECT row, never the body, and the caller is
- *      checked against it. A project in another workspace reports as not found.
- *   9  The transcript is DATA. The prompt says so and the call uses real `tools` with forced
- *      `tool_choice`; there is no free-form JSON and no salvage parser.
- *   10 Credits are debited BEFORE the model call, through `debitOrRefuse`.
- *
- * The prompt lives in the database (`prompts.category = 'site_note_structure'`) and this RAISES
- * when the row is missing. No code fallback: a fallback is invisible when it fires.
- */
+/** structure-site-note — a site walk's dictation becomes the records it described. */
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';

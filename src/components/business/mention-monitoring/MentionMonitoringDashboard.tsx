@@ -1,20 +1,4 @@
-/**
- * MentionMonitoringDashboard — admin cross-catalog view of all tracked subjects.
- *
- * Lists every internal-flow tracked_mentions row (api_key_id IS NULL) with per-subject
- * KPIs, and OPENS one.
- *
- * The docstring used to say "admin can click a row to open the per-product tab", and the
- * only affordance was an `Open` link rendered `if (r.product_id)` — pointing at a
- * different page entirely. Every tracked row on this platform has `product_id IS NULL`
- * (they are brand and keyword subjects, which is what the subject flow is for), so the
- * link rendered for none of them: 17 subjects listed, 0 openable, and 636 probe rows
- * behind them with no screen at all.
- *
- * A row now opens `MentionMonitorTab` in a sheet, addressed by `tracked_mention_id`.
- * The product link stays for the rows that have one, because the product page carries
- * everything else about a product.
- */
+/** MentionMonitoringDashboard — admin cross-catalog view of all tracked subjects. */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';

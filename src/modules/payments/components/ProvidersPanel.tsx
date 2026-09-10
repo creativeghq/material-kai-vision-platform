@@ -1,15 +1,6 @@
 /**
  * Payment Providers panel — lists every enabled module with
  * `provides.payments=true`. Mounted on /admin/modules/payments/settings → Providers.
- *
- * Today: Stripe (via payments-stripe module).
- * Future: PayPal / Adyen / Viva / bank-transfer / ERPs that bring native payment
- * processing — each declares `provides: { payments: true }` in its manifest and
- * appears here automatically. No code change in this panel needed.
- *
- * Multi-provider by design — admins may operate several simultaneously and
- * offer the customer a choice at checkout. Different from `useInvoiceProvider`
- * (single winner).
  */
 import React from 'react';
 import { Link } from 'react-router-dom';

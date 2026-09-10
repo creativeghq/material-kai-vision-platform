@@ -1,18 +1,4 @@
-/**
- * The subcontractor's pricing page — `/bid/:token`.
- *
- * Nobody here has an account, and they never need one. The token is the whole boundary, and it is
- * per BID: this page can only ever show one subcontractor's own lines, so a forwarded link cannot
- * reveal what a competitor quoted.
- *
- * Everything on it is deliberately plain. The person opening it is standing in a van or an office
- * that has never heard of this platform, and the only thing they came to do is put a rate against
- * some lines and send it back.
- *
- * A BLANK LINE STAYS BLANK. It is submitted as null, not zero — "we did not price this" and "we
- * will do it for nothing" are different answers, and treating the first as the second is how a bid
- * wins on what it left out.
- */
+/** The subcontractor's pricing page — `/bid/:token`. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Loader2, Send, CheckCircle2 } from 'lucide-react';

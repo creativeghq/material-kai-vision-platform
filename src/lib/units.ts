@@ -1,13 +1,4 @@
-/**
- * Canonical units of measure, tied to the AADE myDATA `measurement_unit` codes.
- *
- * The codebase grew six independent unit lists (order lines, quote lines, invoice PDF label
- * map, blueprint picker, and two Python category-default maps) that agree on nothing — one
- * says `sqm`, another `m2`, a third `m²`. This is the canonical one, keyed to the codes AADE
- * actually accepts (`mydata_reference` category `measurement_unit`), so a unit chosen here
- * can always be transmitted. New surfaces should use this; the older lists are being folded
- * in as each is touched.
- */
+/** Canonical units of measure, tied to the AADE myDATA `measurement_unit` codes. */
 
 export interface UnitDef {
   /** Stable key persisted in `warehouse_items.unit`, `product_prices.unit`, etc. */

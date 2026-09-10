@@ -1,15 +1,4 @@
-/**
- * Runs — the pipes, cables and circuits joining symbols on a services plan.
- *
- * This is the primitive the plans never had. Until now every sheet was a scatter
- * of independent points, which is why nothing downstream could be computed: you
- * cannot size a pipe or find a voltage drop without knowing what connects to
- * what, and how far it travels.
- *
- * Kept out of FixtureSymbolCanvas deliberately. The canvas imports the Supabase
- * client for its product search, and pure geometry that decides how much cable
- * someone orders should be testable without a database.
- */
+/** Runs — the pipes, cables and circuits joining symbols on a services plan. */
 
 export interface FixtureRun {
   id: string;

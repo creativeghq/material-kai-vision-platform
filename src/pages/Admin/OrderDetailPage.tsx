@@ -7,17 +7,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { OrderDetailDialog } from '@/modules/finance/components/OrdersPanel';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 
-/**
- * Dedicated page for ONE order: `/finance/orders/:orderId`.
- *
- * An order needs a URL of its own. Reachable only as a modal over the Orders list, "open the
- * order" from a receivable, an invoice or a notification lands you on the list with a dialog on
- * top — nothing to bookmark or send someone. This is the order equivalent of
- * `/finance/invoices/:id`.
- *
- * It renders the EXISTING `OrderDetailDialog` rather than a second copy of the order form, so
- * the page and the list row can never drift apart. Closing returns to wherever you came from.
- */
+/** Dedicated page for ONE order: `/finance/orders/:orderId`. */
 const OrderDetailPage: React.FC = () => {
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();

@@ -1,14 +1,4 @@
-/**
- * Module entitlement layer (the third gate, alongside tenancy + role/capability).
- *
- * A feature is usable only if its **module** is available to the ACTIVE workspace:
- *   available = workspace is root (operator) OR the module is a free baseline tier
- *               OR the workspace has been granted (purchased) an entitlement for it.
- *
- * Resolved server-side by `get_workspace_module_access` (member-guarded), so it's RLS-proof and
- * the same authority the backend uses. Consume via `isModuleAvailable(slug)`; gate on `loading`
- * before trusting it so paid surfaces don't flash for a frame.
- */
+/** Module entitlement layer (the third gate, alongside tenancy + role/capability). */
 import { useEffect, useMemo, useState } from 'react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supabase } from '@/integrations/supabase/client';

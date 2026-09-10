@@ -1,35 +1,4 @@
 // The one way an edge function fetches an image from a URL.
-//
-// There were five, at three different strengths, and the differences were invisible
-// because every one of them returned plausible bytes:
-//
-//   _shared/pdf/branding.ts        no guard · redirect:'follow' · cap AFTER arrayBuffer · http ok
-//   generate-moodboard-.../layout  no guard · follows redirects · no cap
-//   generate-virtual-staging       no guard · follows redirects · no cap
-//   generate-region-edit           guarded  · redirect:'error'  · no cap
-//   generate-interior-gemini       guarded  · redirect:'error'  · no cap
-//
-// The first three are invariant 7 violations (audit #352 `A8`): a model- or
-// user-supplied `image_url` is fetched server-side with no SSRF guard, and
-// `redirect: 'follow'` means a public URL can 302 to 169.254.169.254 and be
-// followed. Discarding the body afterwards does not un-send the request.
-//
-// The last two were guarded and still unbounded: `await res.arrayBuffer()` on an
-// attacker-chosen URL reads whatever the server sends into the isolate's memory.
-// A cap consulted after the read is not a cap — that is the same defect MIVAA's
-// image_download_service had, where an absent Content-Length skipped the check and
-// a malformed one fell through to `pass`.
-//
-// So the cap here is applied WHILE streaming and aborts the moment it is passed:
-// peak memory is bounded by `maxBytes` regardless of what the server claims in its
-// headers or actually sends.
-//
-// Sibling implementation: mivaa-pdf-extractor/app/services/images/image_download_service.py.
-// A sixth runtime gets a sixth caller of this, never a sixth copy.
-//
-// `fetchBinaryGuarded` is the same machinery without the image content-type rule, for the
-// provider-output VIDEO downloads that were each hand-rolling their own unguarded, uncapped
-// `fetch(url).arrayBuffer()` (#364 EX-7).
 
 import { assertSafeUrl, SSRFError } from './ssrf-guard.ts';
 
@@ -59,18 +28,7 @@ export interface FetchBinaryOptions {
    *  Omit to accept anything. */
   contentTypePrefix?: string;
   timeoutMs?: number;
-  /**
-   * Extra request headers — an Authorization bearer, in practice.
-   *
-   * Some media lives behind the vendor's own API rather than on a public CDN: WhatsApp
-   * attachments arrive as `https://zernio.com/api/v1/whatsapp/media/{id}`, which answers 401
-   * without the key. Before this existed the only way to fetch one was a bare `fetch()`, i.e.
-   * around the guard — so the option is here precisely so that "I need a header" stops being a
-   * reason to skip DNS validation and the size cap.
-   *
-   * The CALLER decides which hosts get a credential; `redirect: 'error'` below is what stops one
-   * being replayed to somewhere else.
-   */
+  /** Extra request headers — an Authorization bearer, in practice. */
   headers?: Record<string, string>;
 }
 
@@ -99,19 +57,7 @@ export async function fetchImageGuarded(
   return { bytes, mimeType: mimeType || 'image/jpeg' };
 }
 
-/**
- * The same guard for a non-image body — a generated VIDEO, mainly.
- *
- * Every provider-output download in the generation set was `await fetch(url)` followed by
- * `await res.arrayBuffer()`: no SSRF guard, `redirect: 'follow'`, no size cap, and (in two of
- * them) no `res.ok` check either, so an HTML error page was uploaded to the bucket as an mp4
- * and handed to the user as their finished video (#364 EX-7). The URL comes back from
- * Replicate rather than from the request body, but it is still a URL this runtime resolves and
- * fetches: the guard belongs at the fetch, not at the field that happened to carry it.
- *
- * Same contract as `fetchImageGuarded` — https-only by default, redirects refused, and the cap
- * enforced against the bytes actually delivered rather than the Content-Length claim.
- */
+/** The same guard for a non-image body — a generated VIDEO, mainly. */
 export async function fetchBinaryGuarded(
   url: string,
   opts: FetchBinaryOptions = {},
@@ -155,23 +101,7 @@ export async function fetchBinaryGuarded(
   }
 }
 
-/**
- * Fetch a TEXT body — an HTML page, for a link preview — re-guarding every redirect hop.
- *
- * `fetchBinaryGuarded` refuses redirects outright, and its own comment says why: the guard
- * validated the host it was handed, and a followed redirect moves the request to a host nothing
- * checked. That is the correct default and it is unusable for a page a person pasted into a
- * conversation, where `http`→`https`, apex→`www` and every link shortener are one hop each.
- *
- * So the hops are followed HERE, and the comment's own instruction is honoured literally: each
- * `Location` is resolved against the URL it came from and run through `assertSafeUrl` again
- * before it is fetched, so hop three gets exactly the DNS and address checks hop one got. A
- * public URL that 302s to `169.254.169.254` is refused at the second hop rather than followed.
- *
- * Bounded three ways on purpose — hops, bytes and time. The bytes matter most: the metadata we
- * want lives in `<head>`, so 256 KB reads it on every real page and a 4 GB "text/html" response
- * cannot be streamed into the isolate looking for a `<title>`.
- */
+/** Fetch a TEXT body — an HTML page, for a link preview — re-guarding every redirect hop. */
 export async function fetchTextGuarded(
   url: string,
   opts: {
@@ -243,16 +173,7 @@ export async function fetchImageGuardedOrNull(
   }
 }
 
-/**
- * Read the body, aborting the moment it exceeds `maxBytes`.
- *
- * Exported because a few call sites legitimately need the CAP without the URL guard — a
- * download whose URL came back from a provider's own API response to our authenticated
- * request, where there is no user-influenced host to validate but the response is still
- * somebody else's bytes arriving in a 256 MB isolate (#363 `EE-4`). Reach for
- * `fetchBinaryGuarded` unless that is genuinely the situation; an unguarded fetch plus this is
- * strictly weaker, and the missing half is the half that matters when the URL is influenced.
- */
+/** Read the body, aborting the moment it exceeds `maxBytes`. */
 export async function readCapped(res: Response, maxBytes: number): Promise<Uint8Array> {
   if (!res.body) {
     // No stream to meter (some runtimes/mocks). Fall back to a buffered read and

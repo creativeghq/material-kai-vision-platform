@@ -1,19 +1,4 @@
-/**
- * Snags (punch list) + site visit log — WS4 (#285).
- *
- * Photos are stored as OBJECT PATHS on an array column, never as URLs (pipeline convention 7 —
- * persisted URLs expire, re-deriving is free). Both arrays are registered in
- * `build_storage_reference_set()`, so `storage-orphan-cleanup-cron` leaves the blobs alone.
- * Deleting a snag drops its paths out of that set and the cron reclaims them — cleanup is GC-based,
- * not trigger-based (docs/storage-buckets.md).
- *
- * They live in the PRIVATE bucket. They used to go to `generation-images` and be rendered through
- * `getPublicUrl()` — a defect photo of the inside of a client's home, and the dated site log that
- * is "internal only and has no collaborator read policy at all", served to anyone holding the URL
- * with no session at all (#358 PQ-9). Same treatment as real-estate `property-media`: private
- * bucket, signed URL minted per read. Routing is path-based, so the feature identity is the
- * top-level `project-site/` folder, not the bucket name (docs/storage-buckets.md).
- */
+/** Snags (punch list) + site visit log — WS4 (#285). */
 import { supabase } from '@/integrations/supabase/client';
 import { emitProjectLifecycle } from '@/modules/projects/services/projectsService';
 

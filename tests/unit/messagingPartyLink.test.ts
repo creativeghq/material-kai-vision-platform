@@ -1,43 +1,4 @@
-/**
- * An outbound message belongs to a PARTY, and the party record shows it (#378 N5).
- *
- * THE DEFECT
- * ----------
- * `messaging_logs` recorded `to_number` as text and nothing else. The CRM record could not show
- * what had been sent to that person, and the only readers of the table were two admin dashboards
- * counting rows. (The consent half of this finding — checking `messaging_optouts` before sending —
- * was already closed by #359 CM-1/2/5; this is the other half.)
- *
- * WHY STORED RATHER THAN DERIVED, WHICH IS THE UNUSUAL CHOICE HERE
- * ---------------------------------------------------------------
- * A link that can be derived normally should be — that is why a delivery note and a cheque have no
- * `project_id` (#378 L5). A phone number is different because it is REASSIGNABLE: deriving the
- * party on read means a number moving to a new contact silently rewrites who we messaged last
- * year. Same argument as `invoices.counterparty_snapshot` — a record of what happened is frozen at
- * the moment it happened.
- *
- * WHY A TRIGGER RATHER THAN THREE CALL SITES
- * ------------------------------------------
- * Three inserts exist today (`messaging-api` twice, `messaging-processor` once) plus a webhook that
- * updates. Resolving in each is three copies of one rule and a fourth sender inherits nothing.
- * BEFORE INSERT is also exactly the semantic wanted: who this number belonged to WHEN WE SENT.
- *
- * THE KEY, AND THE BUG THE FIRST CUT HAD
- * --------------------------------------
- * The first resolver matched on digits-only, so `+306912345678` resolved and `00306912345678` —
- * the same number written the other legal way — did not. That is #359 CM-1 reproduced one table
- * over: "an opt-out written in one shape and checked in another is a guard that cannot see. It
- * never matches, nothing raises." Here it fails open in the quieter direction — the message still
- * sends, it just lands on nobody's record — so there is no symptom beyond a party page that stays
- * empty. Found by probing, not by reading.
- *
- * `public.msisdn_key` is now the one SQL answer to "is this the same number", and it deliberately
- * does NOT guess a country for a bare national number: guessing +1 for a Greek mobile is how a
- * message reaches a real stranger, billed and in violation (#359 CM-1).
- *
- * The SQL is verified by CALLING it in a rolled-back probe. What is pinned here is the client
- * contract — that the party surface actually renders the kind.
- */
+/** An outbound message belongs to a PARTY, and the party record shows it (#378 N5). */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

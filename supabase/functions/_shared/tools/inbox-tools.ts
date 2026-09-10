@@ -1,28 +1,4 @@
-/**
- * Inbox Tools — agent-chat surface for the multi-tenant customer Inbox.
- *
- * ONE tool, actions:
- *   - list     — recent customer conversations (optionally by status, or by label)
- *   - read     — one conversation: its recent messages (fenced as customer DATA) plus who the
- *                customer is and their orders, quotes and open invoices from the context rail
- *   - reply    — send a reply into a conversation (CONFIRM-gated: it's a real customer-facing message)
- *   - status   — set a thread open/snoozed/closed
- *   - handover — hand a thread to the AI assistant (agent_state=active) or take it back (off)
- *   - labels   — what labels this workspace has
- *   - label    — set the thread's labels
- *
- * ── Labels are NAMED here, not identified ──
- * `label` originally took `label_ids` and nothing else, and no action returned any: a label id is
- * a uuid the model has no way to come by, so "tag this urgent" was an offered capability that
- * could not be performed. It reads as a working tool right up to the point of use, which is the
- * worst shape a tool can have. So `labels` lists them and every label argument accepts a NAME,
- * resolved here against the workspace's own set — the model works in the vocabulary the operator
- * typed, and an unknown name comes back as an error naming the ones that exist.
- *
- * `reply` is a customer-facing send → confirm-gated (Approve/Decline). Everything runs through the
- * validated inbox-api as the user (JWT) — its directional ACL/scope applies. Module `inbox` +
- * entitlement gated.
- */
+/** Inbox Tools — agent-chat surface for the multi-tenant customer Inbox. */
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what
@@ -197,16 +173,6 @@ export const createManageInboxTool = (
       if (action === 'read') {
         // "What is this conversation about, and what is their order status?" — the transcript
         // and the same customer context the Inbox rail shows, in one call.
-        //
-        // `peek: true` is what makes this a READ: inbox-api's `get_thread` otherwise stamps the
-        // caller's last_read_at and sends the customer a read receipt, and "brief me on this
-        // thread" must not show the customer blue ticks for a message nobody has looked at.
-        // The transcript is the SAME derivation the assistant's own reply uses (attachments
-        // named, provider placeholders rewritten, offered cards listed), newest messages, and
-        // it comes back to the model fenced as DATA — all of it, including the subject, because
-        // the other party wrote parts of it and a sender the platform could not identify (a
-        // social DM, a removed participant) is still the other party (invariant 9). The
-        // context figures are ours and go back plain.
         if (!thread_id) return JSON.stringify({ success: false, error: 'read needs thread_id.' });
         const [t, c] = await Promise.all([
           callInbox('get_thread', { thread_id, peek: true }, jwt),

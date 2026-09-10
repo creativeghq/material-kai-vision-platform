@@ -1,20 +1,4 @@
-/**
- * What an appointment is ABOUT (#378 C4).
- *
- * The tenancy hazard this guards is specific and easy to reintroduce: `appointments` has **no
- * workspace_id**. Its RLS is keyed on `professional_user_id`, so a professional writing
- * `project_id` straight onto their own appointment passes every row-level check there is — while
- * pointing it at a job in a workspace they have nothing to do with. RLS cannot see the SUBJECT's
- * workspace; only `set_appointment_subject` checks both.
- *
- * So the rule is not "use an RPC because RPCs are nice". It is: **a direct column write here is a
- * cross-tenant link**, and the moment someone replaces the RPC call with
- * `supabase.from('appointments').update({ project_id })` — which will look like a simplification —
- * the check is gone and nothing fails.
- *
- * The single-subject rule lives in the DB (`appointments_single_subject_ck`) and is probed there;
- * an appointment about two things is about neither.
- */
+/** What an appointment is ABOUT (#378 C4). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -59,16 +43,6 @@ describe('the appointment subject is written through the guarded RPC', () => {
     /**
      * The rule is unchanged — an option with no picker behind it is a row that silently does
      * nothing — but the shape it guards is not.
-     *
-     * This used to read a `<SelectItem>` list and pair each entry with a per-kind adapter, which
-     * encoded the very design that shipped the defect: the Select offered TWO of the four subjects
-     * the table declares, so `deal_id` and `order_id` were constrained, typed, handled by the RPC
-     * and reachable from nothing (#378 N10). A test that checks "everything offered has a picker"
-     * passes perfectly while half the columns are unreachable, because they were never offered.
-     *
-     * One control now offers and searches all four, shared with the CRM calendar.
-     * `calendarSubject.test.ts` holds the stronger invariant — every declared kind must be
-     * SEARCHABLE, not merely listed — for both surfaces at once.
      */
     expect(src, 'the page must mount the shared subject control').toContain('<SubjectLinkField');
     expect(

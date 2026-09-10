@@ -1,26 +1,4 @@
-/**
- * XML Field Mapping Modal — "Fill the Gaps"
- *
- * Dynamic preview panel that detects per-XML what's missing / sparse / in
- * conflict against the platform's product schema and lets the operator
- * resolve each case inline before import.
- *
- * The category was picked on the upload screen — this modal no longer asks
- * for it. Every other target field is rendered per-row based on its detected
- * state:
- *
- *   - blocking_required   (required target with 0 mapped tags OR all empty)
- *   - present             (required target with 1 mapped tag, 100% coverage)
- *   - partial             (required target with 1 mapped tag, partial coverage)
- *   - conflict            (required target with ≥2 mapped tags)
- *   - optional_present    (optional target with at least 1 mapped tag)
- *   - optional_missing    (optional target with no mapped tag)
- *
- * For partial / conflict / optional rows we let the operator type a job-level
- * default value that becomes a per-row fallback at import time — this is the
- * actual escape hatch for sparse supplier feeds (e.g. Panagoulas, which only
- * has <Manufacturer> on ~74% of rows).
- */
+/** XML Field Mapping Modal — "Fill the Gaps" */
 
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -116,18 +94,7 @@ const KNOWN_TARGETS = new Set(TARGET_FIELDS.map((t) => t.value));
  */
 const ALLOWED_TARGETS = new Set([...KNOWN_TARGETS, 'metadata']);
 
-/**
- * Columns a SUPPLIER'S XML may never name, whatever a mapping says (#365 `AD-34`, invariant 8).
- *
- * The mapping saved here is applied by the importer to build a product row, so a target outside
- * TARGET_FIELDS is a mass-assignment vector wearing a dropdown: the operator maps a tag, or an
- * upstream suggestion maps one for them, and supplier-controlled text lands in a trust field.
- * These are the names that decide what something costs, who owns it and whether it is trusted —
- * all server-set, none of them a supplier's to state.
- *
- * Belt and braces with ALLOWED_TARGETS: that one bounds the set positively, this one makes the
- * refusal legible if TARGET_FIELDS ever grows a name it should not have.
- */
+/** Columns a SUPPLIER'S XML may never name, whatever a mapping says (#365 `AD-34`, invariant 8). */
 const NEVER_MAPPABLE = new Set([
   'id', 'workspace_id', 'user_id', 'created_by', 'updated_by',
   'cost', 'cost_source', 'markup_percent', 'supplier_company_id',

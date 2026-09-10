@@ -1,18 +1,4 @@
-/**
- * Revolut Business BYOK setup card (#315).
- *
- * Mounted in Profile → Keys (WorkspaceKeysTab) and on the banking-revolut module settings
- * page — one card, two entry points, no second implementation to drift.
- *
- * Setup is a strict ladder, and the card renders it as one:
- *   1. Generate keys   — the edge function mints the RSA pair; only the PUBLIC key is
- *                        shown here, for pasting into Revolut dashboard → Settings → API.
- *   2. Save client_id  — the dashboard hands it back after the key is added.
- *   3. Authorise       — full-page redirect to Revolut's consent screen; the callback
- *                        route exchanges the code and registers the webhook.
- *   4. Map accounts    — link each Revolut currency pocket to a Finance bank account so
- *                        synced transactions land against the right row.
- */
+/** Revolut Business BYOK setup card (#315). */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Copy, Landmark, Loader2, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';

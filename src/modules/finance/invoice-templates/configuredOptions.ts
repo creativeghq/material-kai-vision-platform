@@ -1,22 +1,4 @@
-/**
- * What the customer chose, on the document that charges them for it (#375).
- *
- * A configured line's price is the base plus the deltas of the options picked in the configurator.
- * Until now those choices reached the quote line and stopped: the order, the invoice and the PDF
- * the customer holds said only the product's name, while the price silently included the extras.
- * That is anti-regression rule 1c — a figure that is stored and charged is a figure that is
- * PRINTED — and its failure mode is a document the reader cannot reconcile, which is worse than a
- * missing one because it looks complete.
- *
- * READ FROM THE LINE'S FROZEN SNAPSHOT, never from `product_option_values`. Renaming "Brass" to
- * "Antique brass" next spring must not rewrite an invoice issued last autumn — the same reason
- * the printed counterparty comes from `counterparty_snapshot` rather than a live CRM read.
- *
- * Deliberately NOT `selected_attributes`. That column is the line's variant identity: `_variant_key()`
- * turns it into a key the warehouse resolver and the variant price rows are looked up by. The
- * configurator used to write option labels into it, so a configured line claimed to be a variant
- * nobody has ever stocked or priced.
- */
+/** What the customer chose, on the document that charges them for it (#375). */
 
 export interface ConfiguredOption {
   group_id?: string;

@@ -1,30 +1,4 @@
-/**
- * What the Apps menu offers must be what the app HAS.
- *
- * `deepLinkTargets.test.ts` guards the loud half — a launcher chip pointing at a `?tab=` key that
- * renders no pane. This is the quiet half, and `launcher-sections.ts` names it in its own header:
- *
- *     "a tab that EXISTS but is listed nowhere here — a gap, not a break."
- *
- * A gap raises nothing. Every chip present resolves, every test passes, and a section of the app is
- * simply unreachable from the menu. Finance had FIFTEEN: the page's rail carried 25 sections and
- * `LAUNCHER_SECTIONS.finance` was a hand-written 10, so Receipts, Credit Notes, Expenses, By
- * Supplier, Delivery Notes, Cheques, Planning, Assets, Time & Billing, AI Assessment, the myDATA
- * Book, myDATA Transmissions, Sourcing, Settings and the Supplier Portal were in the product and in
- * no menu. HR was missing Departments, Assets, Accounting, Departures and Ergani — the ministry
- * filing surface. CRM was missing Pipeline, its own first tab. Real Estate was missing Syndication.
- *
- * That header called it not machine-checkable. It is, in the two shapes that matter:
- *
- *   1. Finance is now DERIVED — the rail and the chips are one list (`FINANCE_SECTIONS`), so the
- *      gap cannot reopen by omission. What is pinned here is that the derivation is still a
- *      derivation and nobody has re-typed the list beside it.
- *   2. For a page whose rail is written as literal `<TabsTrigger value="…">`, the rail IS readable
- *      from source. Every trigger must be a chip or be named below with a reason.
- *
- * Exemptions are shrink-only and each carries the reason it is not a chip. "It felt like too many"
- * is not one of them — the App Launcher is how a phone reaches a section rail that does not fit.
- */
+/** What the Apps menu offers must be what the app HAS. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

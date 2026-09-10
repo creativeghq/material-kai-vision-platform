@@ -2,33 +2,9 @@
 // Regenerate: npm run vocab:mirror (part of gen:all). Freshness is enforced by
 // tests/unit/vocabularyMirrors.test.ts, which fails the build on any drift.
 
-/**
- * The fiscal-connector value-set, written ONCE (#391).
- *
- * `FiscalCapability` was the same six-line union in `fiscalConnectorService` and
- * `_shared/fiscal/types.ts` — one fact on both sides of the Vite/Deno boundary.
- *
- * THE DATABASE IS THE ENFORCER
- * -----------------------------
- * `workspace_fiscal_bindings_capability_check`. Pinned to the constraint text by
- * `tests/unit/paymentVocabulary.test.ts`.
- *
- * THIS FILE IS IMPORT-FREE, ON PURPOSE — byte-mirrored to the edge by
- * `npm run vocab:mirror`.
- */
+/** The fiscal-connector value-set, written ONCE (#391). */
 
-/**
- * `workspace_fiscal_bindings_capability_check`.
- *
- * A workspace binds each capability to a connector INDEPENDENTLY, which is the whole
- * reason this is a set rather than a single `fiscal_connector_slug` column: a tenant can
- * transmit legal invoices through Novus while numbering them locally. That also means the
- * order here carries no precedence — a binding is per capability, and there is no winner.
- *
- * Contrast `PAYMENT_PROVIDER_SLUGS`, which is multi-select for a different reason: fiscal
- * picks ONE connector per capability, payments offer several methods at once and let the
- * customer choose.
- */
+/** `workspace_fiscal_bindings_capability_check`. */
 export const FISCAL_CAPABILITIES = [
   'legal_invoice',
   'pre_invoice_notice',
@@ -43,32 +19,7 @@ export function isFiscalCapability(v: unknown): v is FiscalCapability {
   return typeof v === 'string' && (FISCAL_CAPABILITIES as readonly string[]).includes(v);
 }
 
-/**
- * myDATA `movePurpose` — AADE's Σκοπός Διακίνησης table, the reason goods are on a lorry.
- *
- * WHAT WAS WRONG. The platform offered SEVEN purposes, hand-written in four places (the
- * invoice dialog, the delivery-note dialog, the admin detail page and the transmitter's own
- * label map), all agreeing with each other and all wrong from code 6 onwards:
- *
- *   - `6` was offered as "Movement between premises". AADE 6 is **Φύλαξη / Storage**.
- *     Ενδοδιακίνηση — the actual movement-between-your-own-premises — is **8**, which was
- *     not offered at all. So a transfer between two of the operator's own warehouses was
- *     filed as a storage movement.
- *   - `7` was offered as "Consignment". AADE 7 is
- *     **Επεξεργασία / Συναρμολόγηση / Αποσυναρμολόγηση**.
- *   - `9`–`20` did not exist here: Purchase, ship and aircraft supply, free distribution,
- *     warranty, loan, storage with third parties, other transfers, courier.
- *
- * Same shape as the payment-method rotation and found the same way (a competitor's public
- * API docs, 2026-08-29): every value is a valid integer in range, both halves of the app
- * agreed, and the document AADE registers says something the operator never chose.
- *
- * `19` is the escape hatch and carries `otherMovePurposeTitle` — free text naming the
- * purpose. Anything the table cannot express goes there rather than being approximated by a
- * neighbouring code.
- *
- * THIS FILE IS IMPORT-FREE, ON PURPOSE — byte-mirrored to the edge by `npm run vocab:mirror`.
- */
+/** myDATA `movePurpose` — AADE's Σκοπός Διακίνησης table, the reason goods are on a lorry. */
 export interface MydataMovePurpose {
   code: number;
   en: string;
@@ -130,36 +81,7 @@ export function isMydataMovePurpose(code: unknown): boolean {
   return Number.isInteger(n) && MYDATA_MOVE_PURPOSES.some((p) => p.code === n);
 }
 
-/**
- * AADE income classification, DERIVED FROM THE DOCUMENT TYPE.
- *
- * Two independent axes, and the tax authority validates the pair against the document type:
- *
- *  - the TYPE says which market — `E3_561_001` wholesale (Appendix 19: "Wholesale Sales of
- *    Goods and Services – for Traders") vs `E3_561_003` retail ("Retail Sales … – Private
- *    Clientele"). Document family `11.x` is retail; everything else is wholesale.
- *  - the CATEGORY says what was sold — `category1_1` "Commodity Sale Income" vs `category1_3`
- *    "Provision of Services Income". Families `2.x` (service invoice) and `11.2` (retail
- *    service receipt) are services; the rest are goods.
- *
- * WHY THIS IS DERIVED AND NOT A DEFAULT. Both halves used to fall back to a flat
- * `('E3_561_001','category1_1')` — the wholesale-goods pair — for every line whose product
- * carried no per-product override, which is the ordinary case. AADE does not accept that pair
- * off `1.x`, so the fallback made two whole document families untransmittable:
- *
- *    11.1 → 313 "Classification type E3_561_001 is forbidden for Classification category
- *               category1_1 combined with invoice type Item11_1"
- *    2.1  → 331 "Could not load/found valid validation doc for classification with category
- *               category1_1 and type E3_561_001"
- *
- * i.e. every POS retail receipt and every service invoice was rejected at the provider, while
- * the wholesale invoice next to it went through — so the settings page looked configured and
- * the connector looked healthy. Confirmed against the Novus sandbox 2026-09-06 (issue #319):
- * with the pair derived, 1.1 / 2.1 / 11.1 / 11.2 are all accepted.
- *
- * An explicit per-product or per-line classification still wins — this is only what to use when
- * nothing more specific was recorded.
- */
+/** AADE income classification, DERIVED FROM THE DOCUMENT TYPE. */
 export function mydataIncomeClassificationType(documentType: string | null | undefined): string {
   const t = String(documentType ?? '');
   // A self-delivery / self-supply (6.x) is not a sale to anybody — AADE refuses the sales pair
@@ -174,23 +96,7 @@ export function mydataIncomeClassificationCategory(documentType: string | null |
   return t.startsWith('2.') || t === '11.2' ? 'category1_3' : 'category1_1';
 }
 
-/**
- * WHICH LEDGER A DOCUMENT TYPE CLASSIFIES INTO — or neither.
- *
- * Not every document declares income. AADE rejects the wrong ledger outright, and all three
- * verdicts below were read off the sandbox rather than inferred (2026-09-06, #319):
- *
- *  - `expenses` — a Τίτλος Κτήσης (3.1/3.2) records what WE paid someone not obliged to invoice.
- *    Sending `incomeClassification` on one is error 231 "incomeClassification is forbidden";
- *    `expensesClassification` is accepted.
- *  - `none` — a SELF-BILLED document (αυτοτιμολόγηση, the `selfPricing` header flag). The issuer
- *    is not declaring their own income on a document the buyer drew up, so BOTH ledgers are
- *    refused — 231 for income, 313 for expenses — and it transmits cleanly with neither.
- *  - `income` — everything else, including 6.x once it uses its own pair (above).
- *
- * A movement document (9.3) is a fourth case handled at the envelope, where it classifies as
- * `category3` (Transport) with no type at all.
- */
+/** WHICH LEDGER A DOCUMENT TYPE CLASSIFIES INTO — or neither. */
 export type MydataClassificationLedger = 'income' | 'expenses' | 'none';
 
 export function mydataClassificationLedger(

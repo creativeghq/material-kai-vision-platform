@@ -1,20 +1,4 @@
-/**
- * Every flow ACTION must actually do something.
- *
- * `flowEventContract.test.ts` guards the trigger half — an emitted event no flow can listen for.
- * The action half had no guard at all, and it fails in a worse way: flow-engine's dispatch ends in
- *
- *     default: return { output: { skipped: true, reason: `Unknown action type: ${actionType}` } };
- *
- * so an action with no executor does not throw. The flow RUNS, reports success, records a step, and
- * changes nothing. That is the silent-zero shape with a green tick on it — the admin who built the
- * automation has no way to tell it from one that worked.
- *
- * Three things must line up for an action to exist at all:
- *   1. flow-engine can execute it            (or the flow does nothing)
- *   2. the palette offers it                 (or nobody can add it to a flow)
- *   3. the node has an icon                  (or the canvas renders a blank)
- */
+/** Every flow ACTION must actually do something. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -99,12 +83,6 @@ describe('an action that CREATES a record is held to the prefill rule', () => {
    * Money-moving and legally-numbered documents produce a PREFILL, never a finished record — the
    * same rule the template system follows. An invoice conjured behind the operator skips
    * numbering, buyer-risk and myDATA classification.
-   *
-   * `planned_payments` is deliberately NOT on this list, and the distinction is not a technicality:
-   * a planned payment moves no money. It is an entry in the cash-flow forecast, and
-   * `paid_payment_id` is what links it to the real payment if one ever happens. Nothing is
-   * numbered, nothing reaches AADE, and deleting one costs nothing. Recorded here so the next
-   * person can see it was decided rather than missed.
    */
   const FORBIDDEN_CREATES = ['invoices', 'orders', 'payments', 'supplier_bills', 'credit_notes'];
 

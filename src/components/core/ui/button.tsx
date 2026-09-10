@@ -4,25 +4,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 
 import { cn } from '@/lib/utils';
 
-/**
- * BUTTON — rectangular, 4px radius, flat fill, no lift.
- *
- * The previous button was a fully-rounded pill that rose 2px and grew its
- * shadow on hover. Two problems, in order of how much they cost:
- *
- *  1. A pill is the same silhouette as a status chip, a filter chip and an
- *     active tab — all of which this platform also rendered as pills. In a
- *     toolbar you could not tell an action from a label without reading it.
- *     Squaring the action and squaring the tag differently is what makes a
- *     toolbar scannable.
- *  2. `hover:-translate-y-0.5` moves the target out from under the pointer,
- *     and in a row of buttons it shoves the row.
- *
- * Hierarchy is carried by FILL, not by size: `default` (solid accent) is the
- * one primary action on a screen; `secondary` (accent outline) is its partner;
- * `outline` (neutral hairline) is everything else; `ghost` is icon/table-row
- * chrome. If a screen has two solid buttons, one of them is wrong.
- */
+/** BUTTON — rectangular, 4px radius, flat fill, no lift. */
 const buttonVariants = cva(
   'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-sm text-sm font-semibold ring-offset-background transition-colors duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
   {

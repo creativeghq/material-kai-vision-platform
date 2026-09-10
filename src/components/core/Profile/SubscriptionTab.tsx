@@ -48,17 +48,7 @@ export const SubscriptionTab: React.FC = () => {
 
   const tiers = stripeService.getSubscriptionTiers();
 
-  /**
-   * The plan ids the SERVER recognises (#360 CB-12).
-   *
-   * This screen used to post `tier.priceId` — a Stripe price id baked into the bundle from
-   * `VITE_STRIPE_PRO_PRICE_ID` — and the checkout handler charged whatever it was told. The price
-   * belongs to `subscription_plans`; the client's job is to name a plan.
-   *
-   * The tier CARDS are still the hardcoded list (a separate problem: the code says "Enterprise"
-   * where the DB says "Request Self Hosting"). What changes here is what gets SENT, and the
-   * mapping is exact because the plan rows are named `free` / `pro` / `enterprise`.
-   */
+  /** The plan ids the SERVER recognises (#360 CB-12). */
   const [planIdByName, setPlanIdByName] = useState<Record<string, string>>({});
   useEffect(() => {
     let cancelled = false;
@@ -159,11 +149,6 @@ export const SubscriptionTab: React.FC = () => {
       // Looked up by `key.api_key` before (#390) — which required the list to return
       // the plaintext credential, for a check that could only ever confirm what the
       // caller already had in hand. The row's own `is_active` is the same answer.
-      //
-      // Verification against the real credential is deliberately NOT possible from the
-      // browser: `verify_api_key` takes a candidate key, so an anon- or
-      // authenticated-executable version would be an oracle confirming whether a
-      // guessed key exists. This reports STATUS, and the copy below says so.
       const { data, error } = await supabase
         .from('api_keys')
         .select('id, is_active, expires_at')

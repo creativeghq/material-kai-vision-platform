@@ -1,18 +1,4 @@
-/**
- * The settlement sweep must actually be invoked by the code path that records money.
- *
- * `auto_allocate_workspace` / `_auto_allocate_payment` shipped in 0965287d, which removed the
- * manual "Apply credit" button on the grounds that "money received now lands on what is owed
- * without anyone pointing it there". The RPC was created and granted — but nothing ever called it:
- * not the frontend, not an edge function, not cron. Settlement-by-itself simply did not happen, and
- * because an unallocated payment is a perfectly valid row, nothing complained. ORD-2026-0002 sat
- * with €2,854 received and €0 allocated until a repair migration and a since-deleted button placed
- * it by hand.
- *
- * This is the "silent zero" shape from CLAUDE.md: the mechanism exists, the metric it should move
- * stays at zero, and no typecheck or integrity probe can see it. The only thing that catches a
- * caller-less function is a test that asserts the call site.
- */
+/** The settlement sweep must actually be invoked by the code path that records money. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

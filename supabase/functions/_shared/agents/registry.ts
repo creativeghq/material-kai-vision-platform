@@ -1,16 +1,4 @@
-/**
- * Background Agent Registry
- *
- * Maps agent_type strings (stored in background_agents.agent_type)
- * to concrete AgentRunner implementations.
- *
- * To add a new agent:
- *   1. Create `your-agent.ts` implementing AgentRunner
- *   2. Import and add it here
- *   3. (If the agent belongs to a feature module) tag it in
- *      `MODULE_AGENT_SLUG` below so it's gated on module-enabled.
- *   4. It immediately appears in the UI's "Agent Type" dropdown.
- */
+/** Background Agent Registry */
 
 import type { AgentRunner, AgentTypeCatalogEntry } from './types.ts';
 import { ProductEnrichmentAgent }   from './product-enrichment-agent.ts';

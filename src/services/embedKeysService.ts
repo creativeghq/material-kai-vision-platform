@@ -1,17 +1,6 @@
 /**
  * Embed keys (#321 M1, #258) — the keys a workspace pastes into its own website to render
  * products and 3D models through `products-3d-api`.
- *
- * Storage is `material_kai_keys`, whose RLS admits only workspace owners/admins
- * (`is_workspace_admin`), so these calls need no manual workspace filter to be SAFE — but they
- * carry one anyway, because a missing filter would otherwise return every key the caller can
- * administer across all their workspaces, and this UI is scoped to the active one.
- *
- * **These keys are publishable, not secret.** They ship in the page source of the customer's
- * site — that is what they are for. The controls that matter are the origin allowlist, the
- * per-minute quota, and the fact that `products-3d-api` only ever serves storefront-published
- * rows. The UI says so out loud, because a key labelled "secret" that is pasted into public HTML
- * teaches the wrong lesson about every other key on that page.
  */
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
@@ -20,22 +9,7 @@ import type { Tables } from '@/integrations/supabase/types';
 // module with no client import — see the header of src/utils/embedOrigins.ts.
 export { normalizeOriginList, isWildcardOriginList } from '@/utils/embedOrigins';
 
-/**
- * A key row.
- *
- * Widened past the generated types on purpose. `types:generate` needs a Supabase access token
- * nobody has locally and CI never regenerates the file, so `Tables<'material_kai_keys'>` is
- * frozen at the schema of whenever it was last produced by hand — it is missing every column
- * added since, including the seven below, which are all live and NOT NULL in the database.
- *
- * The failure mode this prevents is the quiet one: without the widening, `key.key_kind` is a type
- * error at best, and at worst a caller writes `(key as any).key_kind` and loses the union — so a
- * `tools` key gets handed a catalogue snippet with nothing to say it is wrong. Hand-editing
- * `types.ts` is not the fix (it is generated, and the next real regeneration silently drops the
- * edit); stating the delta here, next to the union it needs, is.
- *
- * Delete a line from this intersection when the generated file genuinely carries that column.
- */
+/** A key row. */
 export type EmbedKey = Tables<'material_kai_keys'> & {
   key_kind: EmbedKeyKind;
   tools_enabled: boolean;
@@ -144,18 +118,7 @@ export async function searchScopeProducts(workspaceId: string, term: string): Pr
   return (data ?? []).map((p) => ({ id: p.id, label: p.name ?? '(unnamed)' }));
 }
 
-/**
- * The workspace's own configurators, for a blueprint-scoped key (#382 Phase 1).
- *
- * Only rows this workspace OWNS. Platform starters are deliberately absent: they carry
- * `workspace_id IS NULL` and our default rates, so serving one through a tenant's key would quote
- * a visitor prices that tenant never set. The DB refuses it too
- * (`blueprints_embed_publish_requires_workspace`) — this is the same rule read from the UI side so
- * the picker cannot offer what the constraint would reject.
- *
- * Unpublished blueprints ARE offered. Scoping a key to one is how a merchant sets up before
- * flipping it live, and the endpoint checks publication independently on every request.
- */
+/** The workspace's own configurators, for a blueprint-scoped key (#382 Phase 1). */
 export async function listScopeBlueprints(workspaceId: string): Promise<EmbedScopeOption[]> {
   const { data, error } = await supabase
     .from('blueprints')
@@ -234,20 +197,7 @@ export interface EmbedAnalyticsSummary {
   by_key: Array<{ embed_key_id: string; events: number }>;
   top_pages: Array<{ page: string; events: number }>;
   daily: Array<{ day: string; events: number }>;
-  /**
-   * What the widget SPENT, alongside what it did.
-   *
-   * `visualize` is the only action on the embed surface that costs money, and it is triggered by an
-   * anonymous stranger on the merchant's own website and charged to the merchant's pool. Until the
-   * writer started stamping `source` / `embed_key_id` / `workspace_id` on the usage row, that spend
-   * was indistinguishable from an operator generating a product shot in-app — so a merchant could
-   * see their daily cap but never what it had cost them, and nobody could say which key was
-   * burning credits.
-   *
-   * `by_key` covers only rows written since that attribution shipped; older embed generations are
-   * counted nowhere, because inferring which historical row came from a widget would be a guess
-   * dressed as a number.
-   */
+  /** What the widget SPENT, alongside what it did. */
   generation: {
     count: number;
     credits: number;
@@ -294,10 +244,6 @@ export const embedKeysService = {
         // Normalized together: the CHECK requires values to be empty for 'all' and non-empty
         // otherwise, so sending a stale list alongside 'all' is a constraint violation rather than
         // a harmless extra field.
-        // A TOOLS key is scoped to nothing, and saying so explicitly beats leaving whatever the
-        // form last held: it serves no catalogue by construction, so a stale product list on the
-        // row would be a claim the endpoint then ignores — a discrepancy somebody would eventually
-        // have to reconcile.
         scope_type: input.key_kind === 'tools' ? 'all' : input.scope_type,
         scope_values: input.key_kind === 'tools' || input.scope_type === 'all' ? [] : input.scope_values,
         key_kind: input.key_kind ?? 'catalog',

@@ -1,21 +1,4 @@
-/**
- * A workflow chunk names a workflow that exists, and a step that belongs to it (#395).
- *
- * `WorkflowTracker` resolves everything from the chunk: `getWorkflow(runtime.definition_id)` gives
- * the header name, the icon, and the step list each incoming `step_id` is matched against. A step
- * the definition does not contain still renders — `title={s.def?.title || s.id}` — as a raw id row
- * with no title, no icon and no description, bolted onto whatever plan was named.
- *
- * That is what `translate_pdf_to_catalog` did: it emitted a `catalog-build` plan and
- * `step_id: 'translate' as any`, while the registry puts `translate` in `catalog-translate` — on
- * that step's own `tool_id`, pointing back at this very tool. The `as any` was the tell, and the
- * comment beside it claimed the wizard "advances from Translate PDF → Generate PDF
- * automatically", which `catalog-build` has no Translate PDF step to do.
- *
- * Two hand-kept lists across the Vite/Deno boundary — `STEPS` in `_workflow-chunks.ts` and the
- * `steps:` arrays in `workflowRegistry.ts` — whose own header says they "must match exactly".
- * They did. Nothing held them there.
- */
+/** A workflow chunk names a workflow that exists, and a step that belongs to it (#395). */
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -131,10 +114,6 @@ describe('#395 — the workflow step vocabulary is one list, twice', () => {
      * serialised into a chat message, not passed to the tool as arguments, so a mismatched FIELD
      * NAME is translated by the model rather than dropped. That is why this checks the tool
      * exists and not that the field names line up.
-     *
-     * Documentation that names nothing is still a defect in this codebase: `unlinkedOnly`
-     * promised a guarantee it did not implement, and the ops tools' comment claimed an isAdmin
-     * gate that was not there. Both were found by reading the comment and then the code.
      */
     const manifest = readFileSync(join(ROOT, 'src/components/features/ai/toolManifest.generated.ts'), 'utf8');
     const toolNames = new Set([...manifest.matchAll(/^ {4}name: '([a-z0-9_]+)',$/gm)].map((m) => m[1]));

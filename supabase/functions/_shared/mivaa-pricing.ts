@@ -38,19 +38,7 @@ export const MIVAA_ACTION_PRICING: Record<string, MivaaRoutePricing> = {
   'images_upload_analyze': { creditCost: 1, operationType: 'image_upload_analyze', description: 'Upload and analyze image' },
 };
 
-/**
- * Actions that are FREE — no credit deduction.
- *
- * EVERY action in mivaa-gateway's ACTION_MAP must appear here or in MIVAA_ACTION_PRICING.
- * `getMivaaActionCost` returns null for both "free on purpose" and "nobody classified it", so an
- * unlisted action is billed at zero and looks exactly like a deliberate decision — the silent-zero
- * shape. 29 of 116 actions were in that state, including `rag_chat` (an LLM completion) and
- * `search_knowledge_base` (the same 7-vector fusion search two priced actions run).
- *
- * Held by tests/unit/mivaaGatewayPricing.test.ts, which reads ACTION_MAP out of the gateway.
- * Being free is fine; being unclassified is not. Add the action with the group comment that says
- * WHY, or price it.
- */
+/** Actions that are FREE — no credit deduction. */
 export const FREE_ACTIONS = new Set([
   // Health checks
   'health_check', 'rag_health', 'kb_health', 'images_health', 'embeddings_health',

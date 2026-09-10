@@ -1,15 +1,6 @@
 /**
  * RFIs and submittals — the rules that separate them from the client-facing kinds they share a
  * table with.
- *
- * They live in `project_requests` on purpose: they are the same threaded, status-tracked question
- * the client kinds are, and a `project_rfis` table would duplicate the message threading, the
- * status machine, the resolved_at trigger and the two Flows events, then drift from all four.
- *
- * What must NOT be shared is the audience. A question is a conversation with the customer; an RFI
- * is a question about a problem in the architect's information. Defaulting one visible is a
- * one-word mistake that publishes the project's open problems to the person paying for it, and
- * nothing about it looks wrong in a diff.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';

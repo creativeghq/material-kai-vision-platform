@@ -1,14 +1,4 @@
-/**
- * Contracts Tools — agent-chat surface for the Contracts & e-Signature module.
- *
- * ONE tool, actions:
- *   - list — recent contracts (optionally by status/context)
- *   - send — send a DRAFT contract for e-signature (CONFIRM-gated: it emails a signing link)
- *
- * `send` is a real outbound legal action → confirm-gated (Approve/Decline card). Everything runs
- * through the validated contracts-api as the user (JWT), so its auth/scope applies. Module
- * `contracts` + entitlement gated.
- */
+/** Contracts Tools — agent-chat surface for the Contracts & e-Signature module. */
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what

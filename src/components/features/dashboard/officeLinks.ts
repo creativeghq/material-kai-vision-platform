@@ -1,22 +1,4 @@
-/**
- * Where every My Office figure goes when you click it.
- *
- * A dashboard tile is a claim about a specific set of records ("4 confirmed orders"), so its link
- * has to open THAT set — not the module's front door. All four blocks pointed at a bare
- * `/finance`, `/finance`, `/quotes`, `/crm`, and two of those addresses do not even show the
- * records the tile counted: `/finance` opens the Dashboard pane, and `/crm` opens **Users** — the
- * platform accounts list, while the tile counted `crm_companies`. Nothing failed; the route
- * resolved and the page rendered, just not the one the number came from.
- *
- * The destinations live here rather than inline in the JSX for two reasons:
- *   • the tab keys and filter keys come from each module's own routes file, so a rename over
- *     there is a compile error here rather than a link that quietly opens the wrong pane;
- *   • `dashboardLinks.test.ts` reads this module to check every destination resolves to a real
- *     route AND names a tab whenever the page it lands on has tabs.
- *
- * Every filter is encoded by the shared `filterUrl`, which is the same encoder the list surfaces
- * read back. A hand-written `?status=draft` would be a valid URL that no list parses.
- */
+/** Where every My Office figure goes when you click it. */
 import { filterUrl } from '@/components/core/filters/filterUrl';
 import {
   FINANCE_TAB, ORDERS_FILTER_KEY, AR_FILTER_KEY, AP_FILTER_KEY,

@@ -1,15 +1,4 @@
-/**
- * Per-channel send pacing.
- *
- * `messaging_channels.max_send_rate` is an admin-facing control ("Rate Limit (per min)" in
- * MessagingChannelsTab) that was **inert**: both send loops slept a hardcoded constant
- * instead — `setTimeout(res, 100)` in messaging-processor (600/min) and `setTimeout(res, 50)`
- * in messaging-api's send-bulk (1200/min). An admin who lowered the rate to 10/min after a
- * Meta throttling warning changed nothing at all. Its sibling on the same row,
- * `daily_quota`, IS enforced — which is what made the gap easy to miss.
- *
- * One derivation, used by both loops, so they cannot drift apart again.
- */
+/** Per-channel send pacing. */
 
 /** Fallback when a channel has no rate set. Matches the column default. */
 const DEFAULT_RATE_PER_MIN = 100;

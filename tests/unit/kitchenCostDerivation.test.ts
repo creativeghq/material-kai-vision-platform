@@ -1,17 +1,6 @@
 /**
  * Guards the blueprint→money rules shared by the public kitchen calculator, the kitchen lead
  * capture and the `calculate_kitchen_cost` agent tool.
- *
- * WHY THIS EXISTS
- * ---------------
- * `calculate_kitchen_cost` is reachable only through `agent-chat`, and agent-chat is the ONE
- * entrypoint the edge typecheck gate excludes ("type graph exceeds 12 GB even alone"). `tsconfig`
- * excludes `supabase/**` too. So the code deciding which lines get priced had no compiler and no
- * test covering it. Moving the selection into `_shared/blueprint/compute.ts` made it importable
- * from here; this file is the guard that pays for that move.
- *
- * It asserts RULES, never prices. The rates live in the `kitchen_cabinets` blueprint and are meant
- * to be edited in the admin — a test pinning them would fail on every legitimate re-price.
  */
 
 import { describe, it, expect } from 'vitest';

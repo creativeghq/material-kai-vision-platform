@@ -7,14 +7,6 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 
 // Public online storefront (public link / mini-store).
 // Anonymous, no auth. Three actions (discriminated by `action`):
-//   • meta     {slug}                         → storefront config + workspace branding
-//   • products {slug}                         → published products with gross prices
-//   • checkout {slug, items[], customer}      → recompute server-side, create a DRAFT 11.1
-//                                               retail receipt + items, mint a pay token,
-//                                               return /pay/:token (existing Stripe flow).
-// Prices are ALWAYS recomputed from product_prices server-side — the client cart is never
-// trusted for amounts. The order is a draft until the buyer pays (existing stripe-webhooks
-// flips it to paid), so abandoned carts never burn a legal receipt number.
 
 
 const publicAppUrl = () => Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr';
@@ -142,16 +134,6 @@ Deno.serve(withApiLogging('finance-storefront', async (req) => {
         });
       }
       // Header derived FROM THE LINES, in one direction only.
-      //
-      // This used to accumulate a per-unit GROSS (`round2(unitNet * (1 + vat/100)) * qty`) and then
-      // back-extract the net from it, while the lines stored `round2(unitNet * qty)`. Those are two
-      // different numbers: 3 x 9.99 gives lines of 29.97 and a header of 29.98, and 29.97 + 7.19
-      // came to 37.16 against a stored total of 37.17. myDATA rejects a document whose lines do not
-      // foot to the header, so the arithmetic had to pick one direction — net upward, matching the
-      // line values that are actually transmitted. (audit #271 item 6)
-      //
-      // Net-up also removes the double rounding: rounding a unit to cents, multiplying, then
-      // dividing the VAT back out rounds three times and drifts with quantity.
       const totalNet = round2(lines.reduce((s, l) => s + l.net_value, 0));
       const totalVat = round2(totalNet * vatRate / 100);
       const totalGross = round2(totalNet + totalVat);

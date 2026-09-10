@@ -2,25 +2,7 @@
 // Regenerate: npm run vocab:mirror (part of gen:all). Freshness is enforced by
 // tests/unit/vocabularyMirrors.test.ts, which fails the build on any drift.
 
-/**
- * VAT registration code → ISO-3166 alpha-2.
- *
- * Two codes in the EU differ between the two schemes, and Greece is one of them: the EU VAT
- * prefix is **EL** and the ISO country code is **GR**. Our CRM stores the VAT code (that is what
- * an ΑΦΜ, an invoice header and myDATA all carry), and every service keyed on ISO — a maps
- * query, a SERP location, a shipping rate table — silently does the wrong thing with it.
- *
- * "Silently" is the whole problem. DataForSEO's `country_to_location` does not reject an unknown
- * code: it falls through to its default, which is the United States. So a Greek supplier's
- * Google Business lookup was run against Michigan, billed, and reported as "no listing" — a
- * plausible answer, produced by asking the wrong question, with nothing anywhere saying so.
- *
- * The relation was already restated ad hoc in seven places as `['EL', 'GR'].includes(cc)`, which
- * answers "is this Greek" and cannot answer "what does ISO call it". This is the one table.
- *
- * IMPORT-FREE, ON PURPOSE — byte-mirrored to Deno by `npm run vocab:mirror`, because the edge
- * side needs the same answer before it spends money on an upstream lookup.
- */
+/** VAT registration code → ISO-3166 alpha-2. */
 
 /** Codes where the VAT scheme and ISO-3166 disagree. Everything else is identical in both. */
 export const VAT_TO_ISO_COUNTRY: Readonly<Record<string, string>> = {

@@ -1,22 +1,6 @@
 /**
  * "Allocate as profit" from the PARTY screen — take margin across everything this customer has
  * bought, in one go, instead of opening each order in turn.
- *
- * It is the same act as `AllocateProfitDialog` at a different scope, and deliberately not a
- * different KIND of record: the RPC spreads the amount oldest-first and writes one
- * `finance_profit_allocations` row PER ORDER. So each order's own banner still reports itself
- * correctly afterwards, and each take stays separately reversible from the order it came off.
- *
- * What this does and does NOT do — unchanged from the per-order door:
- *  - The CASH DOES NOT MOVE. Nothing is issued to anyone, nothing reaches myDATA.
- *  - It does NOT add income to the P&L a second time: the revenue and cost are already in there
- *    and already net to this figure. This is the record of the decision.
- *  - The cap is re-read by the RPC — this dialog's number can be stale.
- *
- * The figure comes from `get_party_profit_position`, which aggregates the SAME per-order
- * derivation the order screen uses. It is NOT `getCustomerProfitability().profit_unallocated`:
- * that is the P&L view (invoice lines + uninvoiced orders), a different quantity, and showing it
- * beside this button would put two answers to "how much may I take" on one card.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';

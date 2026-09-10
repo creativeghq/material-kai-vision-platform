@@ -1,23 +1,4 @@
-/**
- * The channels billing tables have a reader, and it says which kind of empty it is (#383 part 1).
- *
- * `whatsapp_cost_reconciliation` (nightly 04:20) and `channel_recurring_charges` (1st of the month
- * 05:10) were written by cron and rendered NOWHERE. Both are empty today, which is exactly the
- * moment to build the surface: the alternative is the first month's data arriving with nobody
- * watching, and the row that matters most — `status = 'failed'`, a workspace that could not pay
- * for its numbers — being written and never seen while the platform keeps paying Zernio for them.
- *
- * Three things here are wrong-but-plausible if they regress, which is why they are pinned:
- *
- *  1. **`cost_available = false` is not `$0`.** Meta withholds COST for a WABA on a Solution
- *     Partner's credit line — our situation today — so a zero reads as a free month. Same for the
- *     margin: a margin against an unknown cost is a guess with a decimal point.
- *  2. **A failed charge is not just another row.** Sorted chronologically it is buried by the
- *     newest month. `needs_attention` is derived in SQL so this list and any future alert cannot
- *     disagree about what counts as a problem.
- *  3. **"No charges yet" and "the reader failed" are opposite facts.** One is healthy in month
- *     one; the other means the number you are looking at is not evidence of anything.
- */
+/** The channels billing tables have a reader, and it says which kind of empty it is (#383 part 1). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

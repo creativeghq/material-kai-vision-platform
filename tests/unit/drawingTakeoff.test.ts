@@ -1,19 +1,4 @@
-/**
- * Takeoff from a drawing — transcription, and the line it must never cross.
- *
- * A model asked how many square metres of screed are on a plan WILL answer with a number. That
- * number is indistinguishable from a correct one: it is plausible, it is a valid quantity, and
- * somebody orders materials against it. Nothing downstream — not a typecheck, not an integrity
- * probe, not a person reading the BoQ a month later — can tell a measured figure from a
- * transcribed one.
- *
- * So the rule is: only what the design team PRINTED on the sheet. Every row carries the schedule
- * and row it came from, and that citation is the only thing separating this feature from guessing.
- *
- * The second rule is the one that has now appeared four times in this construction work: a
- * quantity that was never stated is NULL, never 0. A zero in a takeoff is a quantity somebody
- * orders none of, which is a decision nobody made.
- */
+/** Takeoff from a drawing — transcription, and the line it must never cross. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

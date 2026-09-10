@@ -1,20 +1,4 @@
-/**
- * mivaa-gateway ↔ pricing parity guard.
- *
- * `getMivaaActionCost` returns null for two different facts: "free on purpose" and "nobody ever
- * classified this". The gateway then forwards the call with no debit either way, so an action
- * added to ACTION_MAP and to nothing else bills zero and is indistinguishable from one that is
- * free by decision. That is the silent-zero shape from CLAUDE.md rule 2: a plausible zero, no
- * error, no failed check, nothing to notice.
- *
- * It had happened 29 times out of 116 — among them `rag_chat` (a Claude completion) and
- * `search_knowledge_base` (the same 7-vector fusion search that costs 0.5 credits under two other
- * action names). Neither is metered on the MIVAA side either: rag_routes.py contains no
- * meter_operation call at all, so those turns were free end to end.
- *
- * Being free is fine. Being UNCLASSIFIED is not — the whole point is that the decision is written
- * down next to the reason for it.
- */
+/** mivaa-gateway ↔ pricing parity guard. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

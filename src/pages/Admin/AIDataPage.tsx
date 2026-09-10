@@ -1,15 +1,6 @@
 /**
  * AI Data — unified admin shell mounting Metadata Management,
  * Relevancy Management, and Duplicate Detection as tabs.
- *
- * Routes:
- *   /admin/ai-data                          (defaults to ?tab=metadata)
- *   /admin/ai-data?tab=metadata
- *   /admin/ai-data?tab=relevancy
- *   /admin/ai-data?tab=duplicates
- *
- * Old standalone routes (/admin/metadata, /admin/relevancy,
- * /admin/duplicate-detection) redirect here.
  */
 
 import React, { useCallback, useState } from 'react';

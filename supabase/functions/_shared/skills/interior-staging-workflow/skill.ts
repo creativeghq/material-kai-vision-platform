@@ -1,9 +1,6 @@
 // Source of truth for the Interior Staging Workflow skill.
 // See note in b2b-manufacturer-research/skill.ts about .ts-not-.md.
-//
-// Generated from SKILL.md — edit the markdown, not this file.
-// A plain template literal, not String.raw: String.raw keeps the backslash of an escaped
-// backtick, so the text the model reads comes out as \`tool_name\` rather than `tool_name`.
+// DO NOT EDIT — generated from SKILL.md by scripts/gen-skill-ts.mjs. Edit the markdown.
 
 export default `---
 name: Interior Staging Workflow

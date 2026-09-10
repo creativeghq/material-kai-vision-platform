@@ -1,21 +1,4 @@
-/**
- * Public marketing landing page — /home.
- *
- * Registered OUTSIDE <AuthGuard> in App.tsx (no login required). This is the
- * canonical, publicly-reachable "home page" used for Google OAuth branding
- * verification: it loads with no login, states the app name (MaterialsHub)
- * prominently, and explains what the platform does + its functionality.
- *
- * Self-contained (no Layout / no workspace machinery) so it renders for
- * anonymous visitors and search-engine / verification crawlers.
- *
- * KEEPING IT HONEST: every entry below names something that is actually shipped
- * and reachable. FEATURES is the core platform, APPS mirrors the module catalog
- * (`modules` table + each module's manifest.json), and TOOLS mirrors the public
- * grid in `src/pages/Tools/ToolsHubPage.tsx`. When a module ships or a public
- * tool is added, update the matching array here — a landing page that lags the
- * product is how prospects end up asking for things that already exist.
- */
+/** Public marketing landing page — /home. */
 
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';

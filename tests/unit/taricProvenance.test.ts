@@ -1,17 +1,6 @@
 /**
  * A classification says where it came from, and a write that failed is not a success
  * (#360 CB-17) — plus the paid monitoring actions latch (#360 CB-20).
- *
- * CB-17 reads "the client can mark a classification confirmed/manual". Most of that is correct by
- * design and is recorded here so nobody "fixes" it later: a TARIC code is the DECLARER'S
- * responsibility, so a workspace member typing one and marking it confirmed is the feature. It is
- * NOT the `vat_validated` shape from #353 CRM-7, which asserts that a third party verified
- * something.
- *
- * Two things were genuinely wrong, and both are about the audit trail rather than the code:
- * accepting a classifier suggestion was recorded as `manual` — an approval written as an
- * authorship — and every write in `taric-classify` discarded its result while the function
- * returned the status it had meant to store.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';

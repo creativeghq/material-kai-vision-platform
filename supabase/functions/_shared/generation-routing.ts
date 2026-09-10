@@ -1,17 +1,4 @@
-/**
- * One derivation for "which image model runs, and what does it cost".
- *
- * This used to be two parallel ternary chains inside generate-interior-gemini: one
- * picking the credits, one picking the label. Nothing tied them together, so they
- * could disagree — and they did. `product-shot` billed the Grok rate whenever a
- * caller asked for Grok, then called Gemini anyway, because only the credit chain
- * knew about the tier. A wrong-but-valid number, invisible to typecheck and to any
- * integrity probe, exactly the shape CLAUDE.md's money-derivation rule exists for.
- *
- * Here `credits` is looked up BY `modelLabel` — the same string that names the
- * provider actually invoked — so the model you bill for is structurally the model
- * you call. Callers must branch on `provider`, never re-derive it from the tier.
- */
+/** One derivation for "which image model runs, and what does it cost". */
 
 export type GenerationTier = 'fast' | 'pro' | 'grok' | 'chatgpt';
 export type RoutedProvider = 'gemini' | 'grok' | 'flux' | 'openai';
@@ -65,10 +52,6 @@ function usesFlux(mode: string, useGrok: boolean): boolean {
  * generate-interior-gemini calls Gemini unconditionally — so asking for the Grok
  * tier here billed grok-aurora and ran Gemini, the same wrong-but-valid number
  * that `product-shot` already had to be fixed for.
- *
- * Declaring the gap HERE rather than at each call site is the point of this
- * module: a mode Grok cannot serve resolves to Gemini's provider, label AND
- * credits together, so the three cannot disagree.
  */
 const GROK_UNSUPPORTED_MODES = new Set([
   'floor-plan-render',

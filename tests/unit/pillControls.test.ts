@@ -1,42 +1,4 @@
-/**
- * A button is not a pill. Neither is a tab, and neither is a chip.
- *
- * THE DEFECT THIS EXISTS FOR
- * --------------------------
- * `designSystem.test.ts` already asserts that the `button.tsx` PRIMITIVE is not `rounded-full` —
- * and that is where the check stopped. A call site can hand `className="rounded-full"` straight
- * past the primitive, and 716 of them did, across 214 files. So the rule was enforced in exactly
- * the one place nobody was going to break it, and unenforced everywhere it actually broke.
- *
- * The reason the platform cares is silhouette collision, which is why the rule names three things
- * and not one. In a dense data UI a pill button, a filled-pill tab and a status chip are the same
- * shape, so "where I am", "what I can press" and "what state this row is in" stop being
- * distinguishable at a glance. Radius is doing semantic work here; it is not decoration.
- *
- * WHAT IS FLAGGED
- * ---------------
- * `rounded-full` appearing in the OPENING TAG of a <Button>, <TabsTrigger>, <Badge>, or a raw
- * <button> that is CHIP-shaped (horizontally padded via px-*, and not square-sized).
- *
- * WHAT IS NOT, AND WHY THE EXEMPTION IS SHAPE-BASED RATHER THAN A LIST
- * -------------------------------------------------------------------
- * The design system permits `rounded-full` for "avatars, dots and status pips". Those have a
- * shape signature a scan can recognise and a maintainer cannot forget to update: a square-sized
- * control (`w-9 h-9`, `size-8`) or one padded uniformly (`p-1.5`) rather than horizontally. That
- * covers the colour swatch in the material picker, the ✕ on an attached image, the prev/next
- * arrows floating over a product photo, and the brush-size dots — all genuinely round, none of
- * them colliding with a tab or a chip.
- *
- * An allowlist of file paths would have rotted the first time one of those files was renamed; the
- * shape test cannot rot, because the shape IS the reason.
- *
- * RATCHET, NOT A WALL
- * -------------------
- * Anything still carrying the shape is recorded per-file in the baseline and the count may only go
- * DOWN. Regenerate ONLY after removing some:
- *
- *     WRITE_PILL_BASELINE=1 npx vitest run tests/unit/pillControls.test.ts
- */
+/** A button is not a pill. Neither is a tab, and neither is a chip. */
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync, statSync, writeFileSync, existsSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
@@ -158,16 +120,10 @@ describe('buttons, tabs and chips are rectangular', () => {
 
   /**
    * THE GAP THIS CLOSES
-   * -------------------
    * `findPillControls` reads the OPENING TAG of the control itself, so it never saw a segmented
    * control: there the `rounded-full` is on the track `<div>` and the segments are square. Four
    * shipped that way — Documents, Business identity, GSC breakdown, Sourcing — each a separate
    * hand-roll, each fully round, and each with a SQUARE accent fill sitting inside the round
-   * outline, because none of the four gave the selected segment a radius. The two edges visibly
-   * fought, which is how it finally got reported.
-   *
-   * Use `HubSegmented`. It is the only one of these in the platform now, so this is a hard zero
-   * rather than a ratchet.
    */
   it('no rounded-full track wrapping segment buttons', () => {
     const tracks: string[] = [];

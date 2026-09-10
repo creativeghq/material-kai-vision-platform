@@ -57,19 +57,7 @@ export async function embedImageBytes(
   }
 }
 
-/**
- * The ONE place a sheet image turns into bytes — eleven builders call it.
- *
- * Two kinds of value arrive here now (#392):
- *
- *   • `sheet-asset://<path>` — the sheet's own private copy, downloaded straight from storage
- *     with the service client. No signed URL is minted: this runs server-side, so a URL would be
- *     a round trip and a secret to leak for no benefit.
- *   • an http(s) URL — a legacy sheet stored before snapshotting, or an image whose copy failed.
- *     Still fetched through the SSRF guard, because those URLs come from user-editable rows.
- *
- * One missing image must not abandon a whole sheet, so this still returns null either way.
- */
+/** The ONE place a sheet image turns into bytes — eleven builders call it. */
 let _storage: any = null;
 function storageClient(): any {
   if (!_storage) {

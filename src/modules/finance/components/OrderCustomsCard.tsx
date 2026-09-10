@@ -1,16 +1,4 @@
-/**
- * What an order will cost at the border, before it ships.
- *
- * Since 1 July 2026 a low-value EU import — under €150, IOSS included — is charged **€3 of duty
- * per tariff sub-heading**, not per parcel. Three sub-headings on one consignment is €9. That
- * makes "can these lines be consolidated into fewer sub-headings?" a real commercial question,
- * and it is invisible unless something counts them, which is the whole point of this card.
- *
- * Everything shown is derived by `get_order_customs_preview` from the codes SNAPSHOTTED on the
- * order lines — not re-read from the products. A line keeps the code it carried when the order
- * was placed, because the nomenclature is republished monthly and a past order must not be
- * silently restated.
- */
+/** What an order will cost at the border, before it ships. */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Loader2, Ship, AlertTriangle, ArrowUpRight } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';

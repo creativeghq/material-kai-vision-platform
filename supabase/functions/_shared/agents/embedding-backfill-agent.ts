@@ -1,35 +1,4 @@
-/**
- * Background Agent: Embedding Backfill
- *
- * Safety net for the inline embedding generation on the product-create path
- * (admin / dealer / XML). Inline creation embeds text + image vectors
- * synchronously, but the image block swallows failures ("Don't raise — product
- * is already created"), so a transient Voyage/SLIG/Opus hiccup leaves a product
- * text-searchable but silently missing vectors. This agent detects and repairs
- * those by calling MIVAA's existing, bounded, idempotent backfill endpoints.
- *
- * It does NOT generate embeddings itself — it orchestrates the per-type
- * backfill endpoints and records what was fixed / failed / is stuck.
- *
- * Scope is derived from the clock (single cron row, every 15 min):
- *   - 'full'   on the first tick of config.nightly_hour_utc — clears old backlog
- *   - 'recent' on every other tick — repairs rows created in the last window_hours
- * An explicit input.scope ('recent'|'full') overrides (used by manual "Run now").
- *
- * Self-throttling: every family pre-counts deficient rows and no-ops when zero,
- * so a clean platform costs nothing per tick.
- *
- * Config (background_agents.config):
- *   window_hours      number  Recent lookback (default 48)
- *   nightly_hour_utc  number  UTC hour for the daily full scan (default 3)
- *   batch_size        number  Voyage batch size passed through (default 50)
- *   recent / full     { max_products, max_chunks, max_images }  per-scope caps
- *
- * Targeting note (v1): product text + image aspects are repaired by explicit ID
- * (with per-row stuck tracking in embedding_backfill_state). Chunk text +
- * understanding run as bounded global scans — ID targeting for those is deferred
- * to the MIVAA-side `chunk_ids` / `image_ids` params (see .claude plan, Phase 1).
- */
+/** Background Agent: Embedding Backfill */
 
 import type { AgentRunner, AgentRunContext, AgentRunResult } from './types.ts';
 
@@ -91,13 +60,6 @@ export class EmbeddingBackfillAgent implements AgentRunner {
      * `mivaaGatewayUrl` is the BARE base — every other caller adds its own `/api` prefix
      * (`kai-task-agent` fetches `${mivaaGatewayUrl}/api/rag/search`). These five calls did not,
      * and every admin backfill route lives on `APIRouter(prefix="/api")`, so all five 404'd.
-     *
-     * It never showed. When a family has nothing to scan the code returns `{scanned: 0,
-     * status: 'ok'}` WITHOUT calling MIVAA, so the 404 is only reachable on a run that has real
-     * work — and `products` was empty platform-wide. 691 consecutive runs reported `completed`
-     * with `scanned: 0`, and the first run that finally had one product to embed returned
-     * `HTTP 404: {"detail":"Not Found"}`. The safety net for every un-embedded product on the
-     * platform had never once run.
      */
     const callMivaa = async (path: string, body: Record<string, unknown>): Promise<any> => {
       const res = await fetch(`${mivaaGatewayUrl}${path}`, {
@@ -115,13 +77,6 @@ export class EmbeddingBackfillAgent implements AgentRunner {
     await heartbeat();
     try {
       // Services are excluded, and the exclusion is the point of the cap being finite.
-      // This agent repairs what the CREATE path was supposed to embed; services are written
-      // by servicesService with no ingest-core call, so an embedding was never owed on them
-      // and nothing searches one (`search_products_by_embedding` serves RAG + product
-      // enrichment, never the services list). Repairing them anyway meant a workspace's
-      // service list could fill this tick's 100 slots while genuine products whose
-      // embedding actually failed waited behind — a repair queue starved by rows that
-      // were never broken. `item_type` is NOT NULL default 'good', so neq drops nothing else.
       let q = supabase.from('products').select('id')
         .is('text_embedding_1024', null)
         .neq('item_type', 'service')

@@ -49,18 +49,7 @@ export const VR_CREDIT_COSTS: Record<string, number> = {
   'marble-1.1': 190,       // 1580 WL cr = $1.264 × 1.50 markup
 };
 
-/**
- * Inpainting credit costs.
- *
- * Never hand-maintain these numbers here. A local ladder drifts from what the backend meters
- * — a flat `image-inpaint` key that ignores the user's model choice — and the displayed price
- * becomes fiction in both directions, losing money on every Pro run.
- *
- * `ai_model_pricing` is the single source: sam_routes meters the `inpaint-*` key for
- * the model it actually runs, and `loadInpaintingCreditCosts()` below reads the same rows,
- * so display and debit cannot drift. These constants remain ONLY as the offline fallback
- * for a first paint or a failed fetch, and are kept equal to the seeded rows.
- */
+/** Inpainting credit costs. */
 export const INPAINTING_CREDIT_COSTS: Record<'flux-fill-pro' | 'flux-fill-dev' | 'sd-inpainting', number> = {
   'flux-fill-pro': 7.5,   // $0.050 x 1.50 markup x 100
   'flux-fill-dev': 3.75,  // $0.025 x 1.50 markup x 100

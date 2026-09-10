@@ -1,16 +1,4 @@
-/**
- * Unified AI Client for Supabase Edge Functions
- *
- * Uses Vercel AI SDK (ai@6) with Google and Anthropic providers.
- * Replaces raw fetch() for Gemini and @anthropic-ai/sdk for Claude.
- *
- * Usage:
- *   import { generateWithGemini, generateWithClaude } from '../_shared/ai-client.ts';
- *
- * Environment variables required:
- *   - GOOGLE_GENERATIVE_AI_API_KEY
- *   - ANTHROPIC_API_KEY
- */
+/** Unified AI Client for Supabase Edge Functions */
 
 // ── Environment setup (MUST run before npm imports) ──
 // We seed globalThis.process.env at module-load with whatever Deno.env currently has so npm
@@ -56,17 +44,6 @@ import { createAnthropic } from 'npm:@ai-sdk/anthropic@3';
 // the resolved 4.0.17 and every deploy took whatever npm called latest that morning. That
 // is the exact shape that got the Python `anthropic` SDK removed (a pin trap broke the
 // `tools` kwarg) and that produced `fix(ai-client): AI SDK v4 API against a v6 pin`.
-//
-// AND THE MAJOR IS 3, NOT 4 — the pin above was right about pinning and wrong about the
-// number. A provider package's major tracks the MODEL SPECIFICATION it implements, not the
-// model line it can reach: the whole `@ai-sdk/klingai@4` series depends on
-// `@ai-sdk/provider@4` (`specificationVersion: 'v4'`, the AI SDK 7 line), while `npm:ai@6`
-// resolves `@ai-sdk/provider@3` and its `resolveVideoModel` throws
-// `AI_UnsupportedModelVersionError` on anything that is not `'v3'`. That throw happens
-// BEFORE the network call, so with the @4 pin EVERY Kling generation failed 100% of the
-// time — credits refunded, nothing in `ai_usage_logs`, and a pin that reads deliberate.
-// 3.0.41 is the current v3-spec release and carries the identical `kling-v3.0-*` ids.
-// Upgrading `ai` to 7 is what unlocks the @4 line; do both together or neither.
 import { createKlingAI } from 'npm:@ai-sdk/klingai@3';
 // Seedance 2.5 (ByteDance) over BytePlus ModelArk. Major 1 for exactly the reason above:
 // `@ai-sdk/bytedance@2` is spec v4. 1.0.38 is spec v3 and speaks the same Ark
@@ -109,11 +86,6 @@ const _logSupabase = (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY)
 // Prices are NOT defined here. They live in `ai_model_pricing` and are resolved through
 // `resolveTokenPrice` (see _shared/ai-logger.ts) — one derivation, admin-editable, with
 // the hardcoded literal in ai-logger as the only fallback.
-//
-// This file used to carry its own five-entry table that never consulted the DB. It priced
-// Gemini 3.5 Flash at 0.50/3.00 (real rate: 1.50/9.00) under a comment admitting the
-// numbers were an unconfirmed guess, and Opus at 15.00/75.00 (real rate: 5.00/25.00).
-// Both fed `billed_cost_usd` at a 1.5x markup. Do not reintroduce a local price table.
 
 async function _logTrackedCall(opts: {
   task: string;
@@ -173,9 +145,6 @@ async function _logTrackedCall(opts: {
       // never claimed to succeed is not evidence that it failed. This chokepoint set it
       // nowhere, so every model call it logged was invisible to the one probe that exists
       // to notice a provider refusing all of them.
-      //
-      // Derived from `errorMessage`, which the row above already uses to choose its
-      // action, rather than accepted as a separate argument that could contradict it.
       metadata: {
         success: !opts.errorMessage,
         error: opts.errorMessage ?? null,
@@ -190,18 +159,6 @@ async function _logTrackedCall(opts: {
 /**
  * The billing record for a call that is priced PER UNIT rather than per token — every image
  * and every video this client produces (#363 `EE-2`).
- *
- * Before this, `generateImageWithGemini`, `generateMultiImageWithGemini`, `generateVideoWithVeo`,
- * `generateVideoWithKling`, `generateImageWithGrok` and `editImageWithGrok` all called the
- * provider and returned bytes without writing an `ai_usage_logs` row at all. The spend was real
- * and the ledger did not know it happened, so every per-workspace cost view, the cost dashboard
- * and any budget built on them under-reported by the whole value of image and video generation.
- * The text paths had been logging since they were written; nothing made the image paths visibly
- * different, which is why the gap survived — a missing row looks exactly like an unused feature.
- *
- * An unpriced model logs with `raw_cost_usd = null` and warns, matching `_logTrackedCall`: a
- * null cost is a gap in `ai_model_pricing` that `ops.silent_zero` can surface, whereas a 0 is a
- * claim that the call was free. Veo has no row today and must not be given a guessed one.
  */
 async function _logUnitCall(opts: {
   task: string;
@@ -261,8 +218,6 @@ async function _logUnitCall(opts: {
 // bootstrapped into Deno.env inside the request handler are reflected in apiKey.
 // Existing call sites (`google(modelId)`, `google.image(modelId)`, `anthropic(modelId)`,
 // `klingai.video(modelId)`) are unchanged — the Proxy makes lazy construction invisible.
-// KlingAIProvider is an object, not a function — it must be reached through the
-// `get` trap (`.video()` / `.videoModel()`). The `apply` trap below would throw for it.
 
 let _google: ReturnType<typeof createGoogleGenerativeAI> | null = null;
 let _anthropic: ReturnType<typeof createAnthropic> | null = null;
@@ -317,15 +272,6 @@ const DEFAULT_CLAUDE_MODEL = 'claude-opus-5';
 // ── Billing identity for the per-unit models ───────────────────────────────
 // `generation_models.id` values, NOT the provider strings this file passes to the SDKs. They
 // differ, and that is the whole reason these constants exist rather than reusing `modelId`:
-// the KlingAI SDK wants 'kling-v3.0-i2v', Veo's raw API wants 'veo-2.0-generate-001', and
-// xAI's endpoint wants the slug 'grok-imagine-image-quality' — none of which is a key the
-// pricing table knows. The registry maps id → pricing_key → rate; passing the provider string
-// straight through would resolve to no row and silently log every image and video at null cost,
-// which is the same shape as the bug this replaces. The Gemini image models are the exception:
-// their provider id and registry id are the same string, so they pass `modelId` directly.
-// Ceiling for a provider-returned video download. A Veo clip is single-digit MB; this leaves
-// generous headroom while keeping the read bounded well inside the isolate's 256 MB, with room
-// for the base64 copy that follows it.
 const MAX_VIDEO_DOWNLOAD_BYTES = 48 * 1024 * 1024;
 
 const VEO_PRICING_MODEL_ID = 'veo-2';
@@ -352,17 +298,6 @@ export interface AIGenerateConfig {
   /**
    * WHO the spend belongs to. Both optional, both should be passed whenever the call is made on
    * behalf of somebody.
-   *
-   * Every row this client wrote carried `user_id = NULL` and `workspace_id = NULL` — 1233
-   * health checks, 473 reranks, 605 expense extractions and more, all attributed to nobody.
-   * Two things failed silently as a result. No per-tenant cost view could see any of it, so
-   * "what is this workspace costing us" answered with a fraction of the truth. And the RLS
-   * policy on `ai_usage_logs` is `auth.uid() = user_id OR is_workspace_admin(workspace_id)` —
-   * with both columns null, neither branch can ever match, so these rows were invisible to
-   * every non-platform-admin in the product, including the people paying for them.
-   *
-   * Genuinely unattributed calls exist and must stay null: `anthropic_health_check` runs on a
-   * timer for nobody. Null here means "no owner", never "we had one and did not pass it".
    */
   userId?: string;
   workspaceId?: string;
@@ -598,20 +533,7 @@ export async function generateStructuredWithGemini<T>(
   }
 }
 
-/**
- * Name a structured-output failure for what it is.
- *
- * Gemini counts THINKING tokens against `maxOutputTokens`. When a reasoning model runs out
- * of budget mid-JSON the API returns `finishReason: MAX_TOKENS` with a partial body, and
- * the AI SDK surfaces that as `AI_NoObjectGeneratedError: No object generated: could not
- * parse the response.` — indistinguishable, to anyone reading a log or an `error_message`
- * column, from a model that answered badly. `seo_plan` sat broken behind exactly that
- * sentence: 3,929 reasoning tokens and 151 of JSON against a 4,096 cap, reported as an
- * unparseable answer for as long as the stage existed.
- *
- * So: when the cause is the budget, SAY it is the budget, and carry the token split into
- * `ai_usage_logs` rather than the 0/0 the old catch wrote.
- */
+/** Name a structured-output failure for what it is. */
 function _describeStructuredFailure(err: unknown): {
   error: unknown;
   message: string;
@@ -820,31 +742,7 @@ export async function generateStructuredWithClaude<T>(
 }
 
 // ── Claude: the raw Messages API, through the chokepoint ─────────────────────
-/**
- * The Messages API verbatim, with the two things a hand-rolled `fetch` keeps forgetting.
- *
- * The AI SDK wrappers above cover a one-shot text or structured turn. They do NOT cover forced
- * `tool_use` against a hand-written tool schema, or an image block in the user turn — and those
- * are not exotic here: invariant 9 REQUIRES forced tool_use for any classifier whose verdict
- * drives a spend or a write, and `image-edit-gate` classifies an actual image. So fifteen call
- * sites reached past this file to `fetch('https://api.anthropic.com/v1/messages')`, which is not
- * fifteen people ignoring a rule — it is a rule with a hole in it.
- *
- * What they lost by going around:
- *   1. Cost. Ten re-implemented logging by hand; five (flow-engine, stock-api,
- *      xml-import-orchestrator, image-edit-gate, next-steps) logged NOTHING, so that Anthropic
- *      spend reached no cost view at all. A plausible zero that nothing raises.
- *   2. The key. Three read `Deno.env.get('ANTHROPIC_API_KEY')` directly. `Deno.env.set` throws on
- *      Supabase edge, so the platform_secrets bootstrap is a no-op — a key an admin set in the DB
- *      and never in env is invisible to those three, and the call just fails.
- *
- * Both come free here. `body` is passed to Anthropic unchanged, so a migrating call site keeps
- * its own tools, tool_choice, system blocks and image content exactly as they were.
- *
- * THROWS on a missing key, a non-2xx, or a network failure — always after logging the attempt.
- * Every site this replaced already had a try/catch around its fetch and a separate `!res.ok`
- * branch that did the same thing as the catch, so a throw preserves their behaviour.
- */
+/** The Messages API verbatim, with the two things a hand-rolled `fetch` keeps forgetting. */
 export interface ClaudeMessagesResponse {
   id?: string;
   stop_reason?: string;
@@ -1059,12 +957,6 @@ async function generateMultiImageWithGemini(
       return { inlineData: { mimeType, data: base64 } };
     }
     // URL — fetch and inline, through the shared SSRF guard (invariant 7, #363 `EE-4`).
-    // These URLs arrive from tool calls and stored product/moodboard rows, so this runtime
-    // resolves and fetches a URL on somebody else's say-so. The bare `fetch(img)` this
-    // replaces followed redirects, so a public URL could 302 to 169.254.169.254, and read
-    // the whole body with `arrayBuffer()` before anything looked at its size. The guard is
-    // https-only, refuses redirects, rejects private/link-local targets, and caps the read
-    // against bytes actually delivered rather than the Content-Length claim.
     const { bytes, mimeType } = await fetchImageGuarded(img);
     return { inlineData: { mimeType, data: toBase64(bytes) } };
   };
@@ -1149,7 +1041,6 @@ async function generateMultiImageWithGemini(
     // deterministic per prompt: measured 0 images in 13 attempts for a flat,
     // repeating fabric macro, on both flash and pro, with and without a source
     // image. Retrying does not help; the prompt has to change. Reporting only
-    // "no image in response" sent every one of those to Sentry as a mystery.
     const cand = result.candidates?.[0];
     const reason = cand?.finishReason ?? 'unknown';
     const blocked = result.promptFeedback?.blockReason;
@@ -1361,12 +1252,6 @@ async function generateVideoWithVeoRaw(
         // API in response to our authenticated request, so there is no user-influenced host
         // to validate, and the guard's `redirect: 'error'` would break the download outright
         // — these endpoints 302 to a storage CDN as a matter of course.
-        //
-        // The half that DOES apply is the cap. `await vidRes.arrayBuffer()` read a video of
-        // unbounded length into a 256 MB isolate and then base64-encoded it, adding another
-        // third on top, with nothing between the response and OOM. `readCapped` is the same
-        // metering `fetchBinaryGuarded` uses, aborting the read the moment it overruns
-        // rather than checking a Content-Length the server is free to omit or lie about.
         const vidRes = await fetch(videoFetchUrl);
         if (!vidRes.ok) throw new Error(`Veo: failed to download video (${vidRes.status}): ${await vidRes.text()}`);
         const vidBytes = await readCapped(vidRes, MAX_VIDEO_DOWNLOAD_BYTES);
@@ -1463,33 +1348,6 @@ export async function generateVideoWithKling(
 }
 
 // ── Wan3.0 (Alibaba) ───────────────────────────────────────────────────────
-//
-// Through `@ai-sdk/alibaba@1` (major 1 for spec v3, same rule as Kling/Seedance).
-// This replaced a hand-written DashScope REST client on 2026-08-29, and the rewrite
-// corrected three things the hand-written version had wrong — none of which could have
-// surfaced as a test failure, because no call had ever been verified against a funded key:
-//
-//   1. THE MODEL ID. It sent `wan3.0-video-prime`, which does not appear on Alibaba's own
-//      model page. The documented id is `wan3.0-video`.
-//   2. THE BODY SHAPE. It sent `input.img_url` / `input.ref_images` / `parameters.size`.
-//      The documented shape — and the one the provider builds — is `input.media[]` with a
-//      `type` per entry (`first_frame`, `last_frame`, `reference_image`, ...) plus
-//      `parameters.ratio`.
-//   3. THE PRICE. It was priced at $0.068/$0.14/$0.28 per second; QwenCloud's list rate
-//      for wan3.0-video is $0.05/$0.10/$0.20. We were over-stating our own cost, which is
-//      the safe direction to be wrong in but still wrong — the credit prices derived from
-//      it were ~35% higher than the arithmetic supports.
-//
-// What Wan buys over the rest of the roster: 30 seconds against Veo's 8 and Kling's 10,
-// audio generated with the picture in the same pass, and reference media held consistent
-// across the clip — which is the one that matters for a materials platform, because a
-// generated room that does not preserve the ACTUAL product is not a sales asset.
-//
-// FRAMES AND REFERENCES ARE MUTUALLY EXCLUSIVE on wan3 (the same constraint H3 Max
-// has). A first/last frame and a reference image cannot travel in the same `media` array;
-// the provider passes an explicit array through verbatim, so nothing local complains and
-// the REJECTION arrives from DashScope. This function decides — frames win — and reports
-// what it dropped rather than letting the references evaporate.
 const WAN_MODEL_ID = 'wan3.0-video';
 
 export type WanResolution = '480P' | '720P' | '1080P';
@@ -1675,23 +1533,6 @@ export async function generateVideoWithWan(
 }
 
 // ── Seedance 2.5 (ByteDance, via BytePlus ModelArk) ────────────────────────
-//
-// Through the AI SDK, unlike Wan: `@ai-sdk/bytedance` exists, so the rule applies as
-// written — an edge function never reaches a provider directly, and this file uses the
-// SDK wherever there IS one.
-//
-// What Seedance buys over the existing roster: a 30-second clip generated in ONE pass
-// (Wan reaches 30s too, Veo stops at 8 and Kling at 10), native audio, and reference
-// inputs that carry an explicit ROLE — first frame, last frame, reference image — rather
-// than an undifferentiated bag of pictures. For a materials platform the role is the
-// point: "this exact tile, in this room, for the whole clip" is a different instruction
-// from "something like these".
-//
-// ARK IS TWO CONSOLES AND THE IDS ARE NOT INTERCHANGEABLE. BytePlus ModelArk
-// (international, USD, ark.ap-southeast.bytepluses.com) takes `dreamina-seedance-2-5-*`;
-// Volcano Engine Ark (mainland China, RMB, ark.cn-beijing.volces.com) takes
-// `doubao-seedance-2.5`. Crossing them fails as an AUTH error, which reads like a bad key
-// rather than a wrong endpoint, so both halves are pinned here together.
 const SEEDANCE_BASE_URL = 'https://ark.ap-southeast.bytepluses.com/api/v3';
 const SEEDANCE_MODEL_ID = 'dreamina-seedance-2-5-260628';
 
@@ -1749,13 +1590,6 @@ export async function generateVideoWithSeedance(
     /**
      * Write the `ai_usage_logs` row from here. Default true, and every direct caller
      * should leave it there.
-     *
-     * `false` exists for callers that write a RICHER row themselves — the video edge
-     * functions attach `credits_debited` and `video_type`, which this logger has no
-     * access to. Those callers log unconditionally, so without this flag the row would
-     * be written TWICE and every cost view would read double. That is not hypothetical:
-     * it is what the Veo, Kling and Wan branches of `generate-interior-video-v2` do
-     * today, because `generateVideoWith*` grew its own logging after they had theirs.
      */
     logUsage?: boolean;
   },
@@ -1859,27 +1693,6 @@ export async function generateVideoWithSeedance(
 }
 
 // ── Luma Ray3.2 (video) ────────────────────────────────────────────────────
-//
-// Raw REST, and this one is NOT the Wan situation. `@ai-sdk/luma` exists and is
-// useless to us: it exposes exactly two model ids, `photon-1` and `photon-flash-1`,
-// and Luma's own model page says Photon "no longer exists as a separate product".
-// It has no video model at all, so Ray has never been reachable through it. Ray2 is
-// reachable through `@ai-sdk/fal` — but Ray2 is the DEPRECATED generation, which is
-// the trap: an SDK path exists, it is just to the wrong model.
-//
-// Ray3.2 (June 2026) is the current one. Sequence, because the numbers do not sort:
-// Ray3 -> Ray3.14 (January) -> Ray3.2 (June). 3.2 is the LATEST despite reading
-// smaller than 3.14 — Luma's own LLM-facing page states it outright, which is the
-// only reason we can be sure.
-//
-// PRICING IS NOT LINEAR IN DURATION and that matters more than it looks: a 10s clip
-// costs THREE times a 5s clip, not two. Luma's rate card is per clip (720p: 100
-// credits/5s, 300 credits/10s, at $0.003 a credit = $0.30 and $0.90). Every video
-// model in this platform is priced per SECOND, so these rows carry the WORST-CASE
-// per-second rate — the 10-second one. A 5s clip is then over-reported by a third,
-// which is the safe direction: over-stating a cost can only make a sale look less
-// profitable than it is, while the linear-looking 5s rate would under-report the
-// full-length clip we actually let people buy.
 const LUMA_BASE_URL = 'https://agents.lumalabs.ai/v1';
 const LUMA_MODEL_ID = 'ray-3.2';
 
@@ -2017,35 +1830,6 @@ export async function generateVideoWithRay(
 }
 
 // ── H3 Max (video) — fal Research's post-train of MiniMax H3 ───────────────
-//
-// Replaced `minimax-h3` on 2026-08-30 (#396). Same lineage, different vendor and a very
-// different bill: fal post-trained H3 and optimised inference for it, so a 5-second clip
-// renders in about three seconds where the official endpoint takes minutes, and 768P costs
-// $0.08/s against the $0.13/s MiniMax charges for the 2K its API will only ever serve.
-//
-// WHY THIS IS RAW REST AND NOT `@ai-sdk/fal`. The provider package exists and exposes
-// `video()`, and it CANNOT ADDRESS THIS ENDPOINT. It builds every request as
-// `https://queue.fal.run/fal-ai/${id}`, with the `fal-ai/` owner prefix hardcoded and a
-// leading one stripped off whatever id you hand it — but H3 Max is published under the
-// `minimax` owner, at `https://queue.fal.run/minimax/h3-max/image-to-video`. On top of
-// that it sends `duration` as the string `"15s"` where this endpoint's schema requires an
-// integer, and it knows nothing of `prompt_expansion_mode`, which is REQUIRED. Three
-// overrides deep it maps nothing we want, so it would be a dependency and a pin trap
-// (`@ai-sdk/fal@3` is spec v4 against the v3 `npm:ai@6` carries) bought for nothing. Raw
-// REST for the same reason `generateVideoWithRay` above is.
-//
-// TWO CONSTRAINTS, both the model's rather than ours:
-//   1. There is NO reference-image input. Standard H3 accepted up to nine and dropped them
-//      silently whenever a frame was present; H3 Max has no such field at all. Callers
-//      still pass them, so this REPORTS `referencesDropped` rather than letting them
-//      evaporate — the same contract H3 had, for the same reason.
-//   2. The aspect ratio comes from the FRAME. This endpoint has no `aspect_ratio` field at
-//      all, so a vertical reel needs a vertical source image. (The text-to-video endpoint
-//      does take one; we do not use it — every caller here animates a room photo.)
-//
-// `prompt_expansion_mode` stays 'balanced' deliberately. 'quality' spends up to ~30s
-// rewriting the prompt BEFORE generation starts, which would spend the entire speed
-// advantage this model was chosen for.
 const FAL_QUEUE_BASE = 'https://queue.fal.run';
 /** The fal endpoint id. NO `fal-ai/` prefix — H3 Max sits under the `minimax` owner. */
 const H3MAX_ENDPOINT = 'minimax/h3-max/image-to-video';
@@ -2211,14 +1995,6 @@ export async function generateVideoWithH3Max(
 }
 
 // ── QwenCloud: research with the provider's own web search ─────────────────
-//
-// The CHALLENGER half of the B2B research validation lane (#394). Not a model swap:
-// Anthropic's `web_search_20260209` and Qwen's `enable_search` are different search
-// backends as well as different models, so this compares research END TO END, which
-// is the only comparison worth having — a model is only as good as what it can find.
-//
-// OpenAI-compatible endpoint, so `extra_body` fields from their Python examples are
-// simply top-level body fields here.
 
 // Singapore by default — an EEA transfer. Alibaba runs an EU deployment scope in
 // Frankfurt whose hosts look like `{workspaceId}.eu-central-1.maas.aliyuncs.com`, and
@@ -2243,19 +2019,7 @@ export interface QwenResearchResult<T> {
   searchResults: unknown[];
 }
 
-/**
- * Run a forced-function research call on QwenCloud and return the parsed arguments.
- *
- * THE STRUCTURED-OUTPUT DIFFERENCE, WHICH IS THE WHOLE RISK HERE. Anthropic's forced
- * `tool_choice` hands back `input` as a parsed object. OpenAI-compatible hands back
- * `arguments` as a STRING that this function must parse.
- *
- * So a malformed reply is possible here in a way it is not on the Anthropic path, and
- * the rule is the one the vision pipeline learned the hard way: a parse failure is a
- * FAILED RUN. It is never repaired, never salvaged, never partially recovered. A
- * repaired research payload is worse than none, because it becomes rows that look
- * exactly like verified ones.
- */
+/** Run a forced-function research call on QwenCloud and return the parsed arguments. */
 export async function researchWithQwen<T = unknown>(
   opts: UnitBillingConfig & {
     model?: string;

@@ -6,39 +6,14 @@ export const corsHeaders = {
   'Access-Control-Max-Age': '86400',
 };
 
-/**
- * Per-key CORS for the embed SDK (#321 M1).
- *
- * `corsHeaders` above answers `*` to everyone, which is right for the ~134 functions that sit
- * behind a JWT — CORS is not their access control. It is wrong for an embed key, whose entire
- * point is "this key works on my site and not on yours". That allowlist column
- * (`material_kai_keys.allowed_origins`) existed for a year and meant nothing, because there was
- * no code that could echo an origin. This is that code; the wildcard export is left untouched.
- *
- * **What an origin allowlist can and cannot do.** It is enforced by the browser, so it binds
- * browsers only: it stops another site from mounting your widget with your key, and it does not
- * stop `curl`. That is the same bargain every publishable key makes (Stripe, Google Maps), and it
- * is why the allowlist is not the only control — the quota and the storefront-published gate on
- * what is served are the ones that hold for a non-browser caller.
- */
+/** Per-key CORS for the embed SDK (#321 M1). */
 
 /** Lowercase, drop a trailing slash. `HTTPS://Foo.com/` and `https://foo.com` are one origin. */
 function normalizeOrigin(value: string): string {
   return value.trim().toLowerCase().replace(/\/+$/, '');
 }
 
-/**
- * Does `origin` satisfy one `allowed_origins` entry?
- *
- * Accepted entry forms:
- *   - `*`                      → any origin
- *   - `https://shop.acme.com`  → that exact origin
- *   - `https://*.acme.com`     → any SUBDOMAIN of acme.com (not the apex)
- *   - `acme.com`               → host-only, any scheme (people type it this way)
- *
- * The subdomain form matches on a leading `.` deliberately. `endsWith('acme.com')` — the obvious
- * spelling — also accepts `https://evil-acme.com`, which is an origin the tenant does not own.
- */
+/** Does `origin` satisfy one `allowed_origins` entry? */
 function matchesOriginPattern(origin: string, pattern: string): boolean {
   const pat = normalizeOrigin(pattern);
   if (!pat) return false;
@@ -87,18 +62,7 @@ export function isOriginAllowed(origin: string | null | undefined, allowed: stri
   return allowed.some((pattern) => typeof pattern === 'string' && matchesOriginPattern(normalized, pattern));
 }
 
-/**
- * CORS headers to answer an embed request with, or `null` when this origin may not use this key.
- *
- * `null` means "refuse" — return a 403 WITHOUT permissive CORS headers, so the browser blocks the
- * read rather than the page merely seeing an error body.
- *
- * A request with no `Origin` header (curl, a server-side fetch, a native app) returns the wildcard:
- * there is no browser to protect and nothing to leak that publication did not already make public.
- *
- * `Vary: Origin` is not optional. Without it any cache in front of the function can hand tenant B's
- * browser the `Access-Control-Allow-Origin` minted for tenant A.
- */
+/** CORS headers to answer an embed request with, or `null` when this origin may not use this key. */
 export function embedCorsHeaders(
   req: Request,
   allowed: string[] | null | undefined,

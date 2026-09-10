@@ -1,32 +1,4 @@
-/**
- * Guards against dead schema: a table that exists, is secured, and is reachable from nothing.
- *
- * WHY THIS EXISTS
- * ---------------
- * `validation_rules` (rule_definition jsonb, rule_type, severity, priority, is_active, auto_fix,
- * fix_action, workspace_id) and its FK'd `validation_results` log shipped with RLS and four
- * policies each, and then sat at 0 rows with 0 code references and 0 function references for
- * their entire life. Both were dropped on 2026-08-16.
- *
- * Nothing could have told us. `ops.silent_zero` — the platform's main defence against a metric
- * stuck at zero — probes for "activity happened in the window and the metric it should have
- * produced is zero", plus endpoints and crons under a 5% success rate. All three shapes require
- * the feature to have STARTED. Zero rules evaluated zero times is no activity at all, so the
- * probe reports clean and the schema keeps implying a capability that does not exist. That is
- * strictly worse than an absent table: the next person reads the columns and concludes
- * validation is handled.
- *
- * A runtime probe is the wrong instrument for this. On a database whose catalogue is still small
- * every legitimately-new table reads as empty too, so an "empty table" probe is mostly noise.
- * Reachability, on the other hand, is a static fact and does not care how much data exists yet.
- *
- * WHAT IT CANNOT SEE
- * ------------------
- * A table read only by a SQL function is invisible to a source scan, which is why DB_ONLY exists
- * and each entry names the function. And matching is by name, so a table whose name is also a
- * COLUMN name somewhere reads as referenced. Both are false negatives — this test narrows the
- * gap, it does not close it.
- */
+/** Guards against dead schema: a table that exists, is secured, and is reachable from nothing. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, extname, relative } from 'node:path';
@@ -137,20 +109,7 @@ function sourceHaystack(): string {
   return chunks.join('\n');
 }
 
-/**
- * How many source files each root actually contributed.
- *
- * An ABSENT root is indistinguishable, to the scan, from a root that references nothing — and
- * this check's whole verdict is "nothing references it". That is not hypothetical: `walk()`
- * swallows a missing directory, `mivaa-pdf-extractor` is a git submodule, and CI checked out the
- * parent repo without it. So `mivaa-pdf-extractor/app` was EMPTY in CI and populated on every dev
- * box, and the scan declared 39 live tables dead — every table MIVAA owns. Four of them had been
- * written by the daily job-search cron that same morning. The suite was green locally and red in
- * CI, and unlike the `docLinks` case (where CI was right and the dev box was lying), here the dev
- * box was right and CI was blind.
- *
- * A scanner that cannot see its haystack must SAY SO rather than convict everything in it.
- */
+/** How many source files each root actually contributed. */
 function rootFileCounts(): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const root of SOURCE_ROOTS) {
@@ -231,20 +190,7 @@ describe('dead schema', () => {
     }
   });
 
-  /**
-   * #378 N9/D2 — two abandoned systems whose SCHEMA was the thing that read as live.
-   *
-   * `proposals` (dropped 2026-08-30) was a complete-looking second quoting API over a table that
-   * never held a row; `shopping_carts` / `cart_items` were the rest of it; `designer_projects` had
-   * one reader in the entire codebase — a `count` on a Profile tile, which could therefore render
-   * nothing but 0 beside real numbers.
-   *
-   * Named individually rather than left to the general check above, because the general check
-   * only convicts a table NOTHING mentions — and each of these survived it at some point by being
-   * mentioned. `cart_items` was held up by a COMMENT (`.from('quote_items') // Changed from
-   * cart_items`), and `proposals` by the three routes `quotes-api` was still serving. A mention is
-   * not a use, and re-adding any of these is a decision someone has to argue for.
-   */
+  /** #378 N9/D2 — two abandoned systems whose SCHEMA was the thing that read as live. */
   it('the abandoned cart / proposal / designer-project tables stay dropped', () => {
     for (const gone of ['proposals', 'shopping_carts', 'cart_items', 'designer_projects']) {
       expect(

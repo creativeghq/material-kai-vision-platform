@@ -1,24 +1,4 @@
-/**
- * Runtime smoke test for the agent-chat dependency set.
- *
- * `deno check` cannot see this class of failure and neither can vitest. On 2026-08-21 a
- * regenerated `agent-chat/deno.lock` pinned `@langchain/langgraph` against `zod@3.24.0`, whose
- * package.json exports only `.`, `./package.json` and `./locales/*` — while langgraph's
- * `dist/graph/graph.js` does `import ... from "zod/v4"`. Every JARVIS turn 500'd in production
- * with:
- *
- *   ERR_PACKAGE_PATH_NOT_EXPORTED: Package subpath './v4' is not defined by "exports"
- *
- * It typechecked clean, every unit test passed, and the API tests that were run answered from
- * the previous deploy. It was found by a person opening the app.
- *
- * This script does the one thing that catches it: it actually EXECUTES the imports and builds
- * the same objects agent-chat builds on a real turn — a zod tool schema, a bound ChatAnthropic,
- * a compiled StateGraph — and drives one turn against a local stub of the Anthropic API. No
- * network, no key, no database. If the module graph cannot resolve, this exits non-zero.
- *
- * Run:  deno run -A --config supabase/functions/agent-chat/deno.json scripts/smoke-agent-chat-runtime.ts
- */
+/** Runtime smoke test for the agent-chat dependency set. */
 
 const PORT = 8799;
 let captured: Record<string, unknown> | null = null;

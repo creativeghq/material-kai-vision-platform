@@ -234,20 +234,6 @@ function finish(document: unknown, report: FillReport): BuiltDocument {
 /**
  * Overlay a caller-supplied document onto the one WE built, taking the caller's value ONLY for
  * template keys we could not fill ourselves (#354 HR-1).
- *
- * The preview → complete → submit workflow is real: `unfilled` exists precisely so an operator can
- * supply the Ergani-specific codes no convention can derive. What was NOT acceptable is that a
- * supplied `document` bypassed the builder entirely, so the identity and money in the filing came
- * from the request body while the audit row described the employee named by `employee_id`. An
- * audit trail that can be made to disagree with what was filed is worse than none, because it is
- * believed: file Bob's ΑΦΜ and €2,400 under Alice's id and `hr_ergani_submissions` says Alice.
- *
- * So: everything the server knows (ΑΦΜ, ΑΜΚΑ, name, salary, dates) is server-owned and cannot be
- * overridden from the body; everything it could not recognise stays the operator's to complete.
- * Both lists come back so the response can say exactly which keys the caller supplied.
- *
- * Structure is taken from the BUILT document throughout — the supplied one is only ever read at a
- * matching path, so a caller cannot add rows, add keys, or reshape the envelope.
  */
 export interface MergeReport {
   /** Unfilled keys the caller supplied a value for. */

@@ -1,25 +1,4 @@
-/**
- * Run-progress guard — the canvas has to say what the agent is DOING, for every toolkit.
- *
- * Before this surface existed, the canvas — the biggest thing on the screen — held its
- * welcome copy ("When the agent produces something…") for the whole length of a turn, and
- * for a direct-run quick-start that emits no artifact it held it forever, under a chat that
- * said "done". Eight of the forty-eight toolkits had a hand-written pipeline; the rest had
- * nothing.
- *
- * The fix is a DERIVATION, not forty more hand-written pipelines: agent-chat already emits
- * `tool_call` / `tool_progress` / `tool_result` / `tool_error` for every tool on every turn,
- * so a run is read off the stream. That is what makes coverage total, and it is why these
- * are the things worth pinning:
- *
- *   1. The derivation's verdicts. A failed call must not read as a zero; a step nobody
- *      reported on must not read as done. Both are the silent-zero shape (anti-regression
- *      rule 2/3), and both are a valid-looking card when they go wrong.
- *   2. The wiring. A derivation nothing feeds is the same blank canvas with more code, so
- *      the stream loop must hand it EVERY chunk and every send must open a run.
- *   3. Coverage. No toolkit list anywhere in the run module — the moment one appears, a
- *      toolkit can be left off it silently.
- */
+/** Run-progress guard — the canvas has to say what the agent is DOING, for every toolkit. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

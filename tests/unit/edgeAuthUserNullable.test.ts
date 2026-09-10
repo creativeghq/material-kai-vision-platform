@@ -1,33 +1,4 @@
-/**
- * `authenticate()` succeeding does NOT mean there is a user.
- *
- * `_shared/auth.ts` has five success paths and only ONE of them populates `user`:
- *
- * | level      | user   | userId                    |
- * |------------|--------|---------------------------|
- * | `secret`   | `null` | `null`  (service role / admin secret) |
- * | `anon`     | `null` | `null`                    |
- * | `api_key`  | `null` | **set** (partner `kai_` keys) |
- * | `user`     | set    | set                       |
- *
- * `requireUser` defaults to **false**, and `allowedRoles` is applied inside `validateUserToken`
- * — i.e. only to user tokens — so neither keeps a secret- or api_key-level caller out. A handler
- * that then writes `created_by: user.id` throws `Cannot read properties of null`, and the
- * request 500s for exactly the callers the auth helper exists to support.
- *
- * Six handlers were live in that state (2026-08-30): crm-api's address-units, companies and
- * stripe handlers, stripe-api's checkout, and recommendations-api. None was visible as a
- * *behavioural* failure, because the platform's own traffic is all user-level — it is the
- * partner-key and service-role paths that were broken, and those are the quiet ones.
- *
- * Note `api_key` is the sharp case: `userId` IS set, so the author was available at every one of
- * those sites. The fix is `auth.userId`, not a non-null assertion on `auth.user`.
- *
- * Three forms are accepted here, because all three are correct:
- *   1. `authenticate(req, { requireUser: true })` — narrowed by the helper.
- *   2. An explicit `if (!auth.user)` / `if (!user)` early return.
- *   3. Optional chaining (`auth.user?.email`) where an absent user is genuinely tolerable.
- */
+/** `authenticate()` succeeding does NOT mean there is a user. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';

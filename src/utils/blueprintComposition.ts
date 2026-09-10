@@ -1,49 +1,7 @@
 // GENERATED MIRROR of supabase/functions/_shared/blueprint/composition.ts — do not edit here.
 // Regenerate: npm run blueprint:mirror. Behaviour parity is enforced by
 // tests/unit/blueprintComposition.test.ts, which runs one corpus through both copies.
-/**
- * Blueprint COMPOSITION — the one place a configured set of zones becomes metres, counts and money.
- *
- * WHY THIS EXISTS
- * ---------------
- * A blueprint used to describe a kitchen as three scalars (`run_length`, `wall_run_length`,
- * `worktop_length`) and price everything as `€/m × one of them`. That cannot say "four base units:
- * two 80cm doubles, one 60cm drawer bank with Blum runners, one 90cm sink base", so the starter
- * faked it with three hardcoded option groups — "Drawer unit 1", "Drawer unit 2", "Drawer unit 3" —
- * the same list copy-pasted three times. A kitchen could therefore have 0–3 drawer banks and never
- * four, wall units had no count, no material and no size of their own, and an island did not exist.
- *
- * A composition replaces the typed scalars with ZONES. A zone carries GLOBALS shared by everything
- * in it (height, depth, door model) and a list of MODULE ROWS (kind × width × how many). Its length
- * and counts are then DERIVED and published as formula variables under the same names the scalars
- * used — so every existing per-metre task line keeps resolving unchanged, now fed by a real
- * composition instead of a number somebody typed.
- *
- * TWO PRICING MODES, chosen per module type by whoever writes the blueprint:
- *   per_m      — width × the zone's rate (from its door-model global), the shape the existing
- *                price list is already in (Ecoline 74/m … Fenix 275/m). Nothing gets re-keyed.
- *   per_piece  — a flat price on the module type, for things that do not scale with width.
- * Both then add per-piece module OPTIONS (the drawer/runner set, a soft-close upgrade) as their own
- * transparent lines, because that is how a kitchen quote actually reads.
- *
- * ABSORPTION is the rule that stops double counting. An option_group bound to a zone global stops
- * being a priced line of its own: its money now flows through the zone's derived lines, and the
- * zone owns the selection. That also lets two zones (bottom and top units) bind the SAME price list
- * with INDEPENDENT selections — dark bottom, light top — without duplicating twelve rows.
- *
- * APPLIANCES are the third thing a kitchen is made of and they are not cabinets. An appliance zone
- * holds rows that each say WHAT it is, WHO SUPPLIES IT (us, or the customer already owns one),
- * WHERE IT GOES (tall unit / highboard / under the worktop) and WHAT IT NEEDS (a socket, water in,
- * waste out, gas, a duct to outside). Supply decides the MONEY and nothing else: an appliance the
- * customer already owns is priced at nothing and still books its aperture and every one of its
- * connections, because the cabinetmaker and the electrician do not care who paid for the fridge.
- * Placement is CHECKED against the configured units — putting the fridge in a tall unit when the
- * layout has no tall housing raises an issue rather than quietly inserting a cabinet nobody chose.
- *
- * Every number here goes through `computeLinePricing`, the same function the flat task lines use.
- * There is no second pricing path. `src/utils/blueprintComposition.ts` mirrors this file for the
- * anonymous tool's optimistic preview and is held identical by tests/unit/blueprintComposition.test.ts.
- */
+/** Blueprint COMPOSITION — the one place a configured set of zones becomes metres, counts and money. */
 
 import { computeLinePricing, round2 } from './blueprintFormula';
 
@@ -602,17 +560,7 @@ function addYields(into: Record<string, number>, src: Yields | undefined, times:
   }
 }
 
-/**
- * Every schedule key this SCHEMA can produce, whether or not the current configuration does.
- *
- * A formula reading `total_socket` on a kitchen that happens to have no sockets is the trap this
- * closes. `addYields` skips zeros, so the key never reaches the totals, so the variable is
- * undefined, so `evaluateFormula` fails closed and the line silently falls back to its stored
- * default quantity — a wrong number wearing the face of a right one. It is the same reason a
- * switched-off zone publishes an explicit 0 rather than nothing.
- *
- * `hinges` is included wherever doors are, because the zone synthesises it rather than declaring it.
- */
+/** Every schedule key this SCHEMA can produce, whether or not the current configuration does. */
 export function declaredYieldKeys(schema: ZoneDef[]): string[] {
   const keys = new Set<string>();
   const add = (y: Yields | undefined) => {
@@ -1137,18 +1085,7 @@ export function deriveComposition(
   };
 }
 
-/**
- * `opt_<option_key> = 1 | 0` for every option_group member carrying a stable key.
- *
- * This is what makes a line CONDITIONAL ON A CHOICE, which the flat scope could not express: gola
- * needs four lines on at once (horizontal profile, verticals, end caps, joiners) and an option_group
- * is pick-one, so they cannot be members of it. They are ordinary lines multiplied by `opt_gola`
- * instead — `= opt_gola * total_run_length` — and switching to standard handles zeroes all four
- * together, rather than leaving the top units with no profile because somebody forgot a switch.
- *
- * Keyed off `option_key` rather than the label because renaming "Gola (handleless)" must not
- * silently zero every gola line in every plan.
- */
+/** `opt_<option_key> = 1 | 0` for every option_group member carrying a stable key. */
 export function optionFlags(items: Array<{ option_key?: string | null; is_selected?: boolean }>): Record<string, number> {
   const flags: Record<string, number> = {};
   for (const it of items) {

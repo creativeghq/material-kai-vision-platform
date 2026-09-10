@@ -4,10 +4,6 @@
  *   • Attach a payment that was already recorded (money went out earlier, unallocated).
  *   • Record a new payment for it — the SAME RecordPaymentDialog used everywhere else, opened with
  *     this expense preset. There is deliberately no bespoke "pay this bill" form here.
- *
- * An expense IS a `supplier_bills` row and `payment_allocations` is its settlement ledger, so
- * this dialog only ever reads/writes allocations — what is still due is never recomputed here,
- * it comes from the bill row the triggers maintain.
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/core/ui/dialog';

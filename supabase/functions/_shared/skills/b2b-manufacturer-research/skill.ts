@@ -2,10 +2,7 @@
 // Kept as .ts (not .md) because the Supabase Edge Runtime does not support
 // `with { type: 'text' }` imports. The companion SKILL.md mirrors this for
 // human/PR review — keep the two in sync when editing.
-//
-// Generated from SKILL.md — edit the markdown, not this file.
-// A plain template literal, not String.raw: String.raw keeps the backslash of an escaped
-// backtick, so the text the model reads comes out as \`tool_name\` rather than `tool_name`.
+// DO NOT EDIT — generated from SKILL.md by scripts/gen-skill-ts.mjs. Edit the markdown.
 
 export default `---
 name: B2B Manufacturer Research

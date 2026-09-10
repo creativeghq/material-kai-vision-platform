@@ -1,34 +1,4 @@
-/**
- * Guard: the schema-writer lint still sees what it claims to see.
- *
- * `scripts/schema-writers.mjs` compares this checkout's column references against the LIVE schema,
- * so the check itself can only run where a service key exists (the `db.schema-writers` smoke check,
- * or `npm run schema:writers` after a migration). What runs HERE is the half that needs no
- * database: the parser.
- *
- * That half is where the danger is. Every defect this file pins was real, and every one of them was
- * found by watching the guard's output rather than by reading it — a scanner is either noisy enough
- * to be ignored or blind enough to be pointless, and both failure modes report a number that looks
- * fine:
- *
- *   embedded relations   `products ( name, sku )` counted `products` as a column of quote_items,
- *                        which flagged essentially every join in the codebase
- *   ternaries            `col: a ? b : c` read `b` as a second key, because `b` is an identifier
- *                        followed by a colon
- *   window bleed         a 600-char forward window swallowed the NEXT statement, blaming
- *                        `user_websites.update({page_count})` on a table 40 lines above it
- *   template literals    the first version skipped any object containing `${`, which is most
- *                        inserts in the repo — including the fixture that was writing a generated
- *                        column, sitting directly in front of it, producing nothing
- *   comments             an apostrophe in a comment inside an object literal opened a string that
- *                        never closed and swallowed the real keys below it
- *   truncated bodies     an object literal with a long comment ran past the window, `balanced()`
- *                        never found its closing brace, and the whole insert was written off as
- *                        "unparseable"
- *
- * Four of those six make the guard SILENTLY WEAKER rather than louder. That is the shape this repo
- * keeps finding, and it is why the skip count is printed on every run and asserted here.
- */
+/** Guard: the schema-writer lint still sees what it claims to see. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

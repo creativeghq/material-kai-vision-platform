@@ -2,14 +2,6 @@
 // The ONLY writer of persisted plan-line prices, plan versions, and plan→quote items.
 // The frontend may edit plan_items directly (RLS-gated) for labels/quantities, then calls
 // this function to (re)compute authoritative money. Actions:
-//   create-from-blueprint  {project_id?, blueprint_id, dimensions?, composition?, title?} -> {plan, items}
-//   rescale                {plan_id, dimensions?, composition?}            -> {plan, items}
-//   reprice                {plan_id}                                        -> {plan, items}
-//   save-version           {plan_id, note?}                                 -> {version}
-//   restore-version        {plan_id, version}                              -> {plan, items}
-//   create-quote-from-plan {plan_id}                                        -> {quote_id}
-// Auth: user JWT (or service role). Every write is bound to the caller's workspace via
-// userCanAccessWorkspace — the service-role client bypasses RLS, so we re-check membership.
 
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { jsonResponse as json } from '../_shared/http.ts';
@@ -390,15 +382,6 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
       const { project_id, blueprint_id, dimensions, title } = body;
       if (!blueprint_id) throw new HttpError(400, 'blueprint_id required');
       // WHO THE PLAN BELONGS TO, when nobody is signed in (#382 Phase 4).
-      //
-      // `project_plans.user_id` is NOT NULL, and the embed's configurator is used by an anonymous
-      // visitor on a merchant's website — there is no caller to attribute it to. The embed surface
-      // resolves the workspace OWNER and passes it here, the same path `generate-interior-gemini`
-      // already exposes for exactly this shape.
-      //
-      // Honoured ONLY for a service-role caller. Accepting it from a JWT would let any signed-in
-      // user create a plan owned by somebody else, which is the body-supplied-identity mistake
-      // invariant 1 exists to prevent.
       const bodyUserId = isService && typeof body?.user_id === 'string' ? body.user_id : null;
       const { data: bp, error: bpErr } = await supabase.from('blueprints').select('*').eq('id', blueprint_id).maybeSingle();
       if (bpErr) throw new HttpError(400, bpErr.message);

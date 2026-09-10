@@ -1,32 +1,4 @@
-/**
- * Does what the order says it cost agree with what has actually been booked against it?
- *
- * An order records a cost in TWO independent places and nothing has ever compared them:
- *
- *   • `order_items.unit_cost` — what the goods cost. This is the ONLY input to the order's margin.
- *   • `supplier_bills` attached to the order — what a supplier has billed us. This is the payable.
- *
- * Both are legitimate and they are not duplicates of each other in general: the first is a costing,
- * the second is an obligation, and one supplier invoice can be an instalment against one line.
- * But nothing reconciled them, so three different wrong states all looked completely normal:
- *
- *   1. The same cost entered twice — once on the line, once as an expense — leaves a payable that
- *      has already been paid through the other copy. Pay it again and the money is gone. Two €328
- *      KEROS bills on ORD-2026-0001 sat in exactly that state; the unpaid one read as a live debt.
- *   2. A cost booked ONLY as an expense (freight, customs, an installer) never reaches the margin,
- *      because margin reads lines and nothing else. The order reports what it made and is wrong by
- *      the whole amount, with every figure on the screen internally consistent.
- *   3. A line left with no cost is treated as costing nothing, so it reports 100% margin. The
- *      party screen warns about this; the order screen — where the money is actually taken — does not.
- *
- * None of the three can be caught downstream: a wrong cost is a valid cost, so no typecheck, no
- * constraint and no integrity probe can see it. It has to be compared here, at the point where both
- * numbers are in scope.
- *
- * This module is PURE and holds no opinion about presentation. It is the single place the rules
- * live, so the order panel and its guard test read the same answers.
- * Guarded by tests/unit/orderCostAudit.test.ts.
- */
+/** Does what the order says it cost agree with what has actually been booked against it? */
 
 // Cent rounding is declared once, in `@/utils/decimal`. A local copy is how two money figures
 // that should agree start disagreeing in the last digit.

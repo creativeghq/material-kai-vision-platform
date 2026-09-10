@@ -2,20 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { edgeError } from '@/utils/edgeError';
 import { normalizeTaricInput, formatTaricCode } from '@/lib/taric';
 
-/**
- * EU TARIC commodity codes — search, validation and classification.
- *
- * The single client-side entry point for anything customs-code shaped. Search and validation go
- * straight to `search_taric_codes` (reference data, readable by any authenticated user);
- * classification goes through the `taric-classify` edge function because it spends credits and
- * needs the service role to reconcile ownership.
- *
- * Why validation matters here rather than at the border: since 1 July 2026 a low-value import
- * (including IOSS consignments) is charged €3 of duty per tariff sub-heading, and only a
- * declarable line — TARIC product line suffix 80 — may appear on the declaration. A 6-digit HS
- * code or an intermediate line is rejected, so a free-text box that accepts anything is a
- * compliance problem, not a UX one.
- */
+/** EU TARIC commodity codes — search, validation and classification. */
 
 export interface TaricCode {
   code: string;

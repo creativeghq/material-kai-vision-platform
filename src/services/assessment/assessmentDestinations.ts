@@ -1,14 +1,4 @@
-/**
- * Turning an assessment destination into a URL.
- *
- * Separate from `assessmentVocabulary.ts` because that file is byte-mirrored to Deno and must
- * stay import-free, and this needs `FINANCE_BASE` — the module that exists precisely because six
- * call sites each computed the finance base themselves and every one of them resolved to the
- * 404 catch-all.
- *
- * Naming a place is linking to it: an action that says "check the unmatched bank lines" without
- * a link is the dead end `appDestinations.ts` exists to close, one layer down.
- */
+/** Turning an assessment destination into a URL. */
 import { FINANCE_BASE } from '@/modules/finance/routes';
 import {
   ASSESSMENT_DESTINATIONS,

@@ -1,45 +1,6 @@
-/**
- * Content brief — normalize at the boundary, never dereference raw.
- *
- * `content_brief` reaches every stage through a tool schema of `z.any()`, so whatever the
- * model decided a brief looks like arrives intact. `ContentBrief` is a TypeScript interface,
- * which means it constrains nothing at runtime: the prompt builders read
- * `brief.audience.painPoints.join(', ')` and `brief.brandVoice.toneAttributes.join(', ')`
- * directly, sixteen dereferences deep across plan / write / analyze.
- *
- * On 2026-09-06 the marketing agent sent a perfectly sensible brief of its own design —
- * `{ market, audience: "<prose>", language, mustCover: [...], brandVoice: "<prose>",
- * businessContext, provenance }` — and `buildPlanningSystemPrompt` threw
- * `Cannot read properties of undefined (reading 'join')` on `brief.audience.painPoints`,
- * AFTER the credits were debited. Article 8b8d7383 died at 30% with that message, and the
- * user saw a pipeline that simply stopped.
- *
- * This is the same lesson `article-plan-guard.ts` carries for `article_plan` and `plan.ts`
- * already carries for `keyword_research` — presence is not shape — applied to the one field
- * that had not learned it. The remedy differs though, and deliberately:
- *
- *   - `keyword_research` is REQUIRED and load-bearing, so a wrong shape is REJECTED (400).
- *   - `content_brief` is OPTIONAL and purely additive prompt context. Rejecting it would
- *     fail a run over something that only ever makes the article better, so it is
- *     NORMALIZED instead. This function never throws and never returns a partial shape.
- *
- * The second defect it closes is quieter: the builders only read the keys they know, so
- * every key the caller invented was dropped on the floor. That brief's `mustCover`,
- * `businessContext` and `market` — the only workspace-specific information in the whole
- * request — would have reached the model nowhere even if the run had survived. Unknown
- * keys now survive as labelled prose in `extraContext`.
- */
+/** Content brief — normalize at the boundary, never dereference raw. */
 
-/**
- * `ContentBrief`'s shape with every field PRESENT, and every value allowed to be absent.
- *
- * Deliberately not `extends ContentBrief`: that interface types a brief somebody filled in
- * completely, so its scalars are non-nullable. A normalized brief is the opposite premise —
- * whatever arrived, made safe to read — and "the caller did not say" is its normal state.
- * Widening here is what lets every consumer drop its own guard: the arrays are always
- * arrays and the nested objects are always objects, so only the scalars need a fallback,
- * and `briefValue` / `briefList` supply it.
- */
+/** `ContentBrief`'s shape with every field PRESENT, and every value allowed to be absent. */
 export interface NormalizedBrief {
   businessObjective: string | null;
   conversionGoal: string | null;
@@ -148,11 +109,6 @@ function humanizeKey(key: string): string {
  * Flatten a value into prose, one nesting level at a time. Returns null when there is
  * nothing to say — an empty array or an object of nulls must not become `Market: ` with a
  * blank after it.
- *
- * `depth` exists because the first version stopped at scalars and one-level objects, so an
- * unknown key holding structure — `{ competitors: [{ name, url }] }`, the shape a model
- * reaches for constantly — flattened to nothing and was dropped. Dropping a structured
- * value is the same defect as dropping an unknown key, one level down.
  */
 function renderValue(value: unknown, depth = 0): string | null {
   if (Array.isArray(value)) {

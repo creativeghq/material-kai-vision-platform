@@ -9,8 +9,6 @@ import { useToast } from '@/hooks/use-toast';
  *  - money OUT → a payment voucher (απόδειξη πληρωμής) for the SUPPLIER: "Paid to".
  * Email it to the counterparty, copy a shareable link, and download the PDF. It's a
  * proof-of-payment acknowledgment — NOT a fiscal document and NEVER transmitted to myDATA/AADE.
- * The PDF renderer titles it "Received from" vs "Paid to" off the payment direction. Drop it into
- * any payment row so every list stays consistent (order detail, CRM ledger, global Payments tab).
  */
 export const PaymentReceiptActions: React.FC<{
   paymentId: string;

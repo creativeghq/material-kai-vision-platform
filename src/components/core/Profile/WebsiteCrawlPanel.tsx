@@ -10,20 +10,7 @@ import { timeAgo } from '@/utils/datetime';
 import { userWebsitesService, type CrawlIssueDetail, type CrawlReport, type UserWebsite } from '@/services/userWebsitesService';
 import { compact } from './seo/seoMetrics';
 
-/**
- * Websites → Site Health → the full crawl.
- *
- * The audit beside this one reads ONE page. Broken links, redirect chains,
- * duplicate titles and pages told not to index are properties of the SET of pages
- * — none of them is visible one page at a time, which is why a single-page audit
- * always reads as thin no matter how many checks it runs.
- *
- * The rule this panel keeps: **a section that failed is UNKNOWN, never clean.**
- * The crawler pulls each issue class separately, and any of those pulls can fail
- * on its own. Printing "0 broken links" because the broken-links call errored is
- * the same defect as reporting 0 backlinks for a failed fetch — a confident number
- * that reassures the reader about a check that never ran.
- */
+/** Websites → Site Health → the full crawl. */
 
 const SEVERITY_ORDER: Array<'error' | 'warning' | 'notice'> = ['error', 'warning', 'notice'];
 

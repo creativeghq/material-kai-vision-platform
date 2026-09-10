@@ -1,21 +1,4 @@
-/**
- * Inventory every prompt the edge functions send to a model (#347 phase 3P).
- *
- * DRIVEN BY THE CALL SITES, not by what the text looks like. Two earlier attempts got the count
- * badly wrong in opposite directions and both are worth remembering:
- *
- *   * A regex for `` `...{250,}` `` reported 82. The `[^`]` class stops at backticks, but a file
- *     with 52 template literals has long backtick-free runs of ORDINARY CODE between distant
- *     literals, and those matched. b2b-tools.ts "had" 17 prompts; it has one.
- *   * An AST sweep filtered template literals on instruction-shaped keywords ("you are",
- *     "classify", ...) and reported 11 — dropping that same b2b prompt, which opens
- *     "Find B2B manufacturers of ${category}".
- *
- * Prompts do not reliably look like anything. What is reliable is where they GO: the `system`,
- * `prompt`, `messages[].content` and `contents` arguments of a model call. So this finds the
- * calls, then walks back to whatever expression supplies those arguments, resolving
- * single-assignment identifiers within the file.
- */
+/** Inventory every prompt the edge functions send to a model (#347 phase 3P). */
 import ts from 'typescript';
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';

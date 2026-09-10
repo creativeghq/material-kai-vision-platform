@@ -5,11 +5,6 @@
  * render ONE element. The only differentiator is `people` — who this record can
  * email / add as meeting attendees (a contact = itself; a company = its inbox +
  * attached contacts).
- *
- * Quick-action buttons elsewhere on the page (sidebar / details field) open the
- * composer via the imperative `composeEmail()` handle — render this with
- * `forceMount` on the tab so the ref (and its portalled dialog) stay reachable
- * from any tab.
  */
 import React, { forwardRef, useImperativeHandle, useMemo, useState } from 'react';
 import { CrmActivityTimeline, type TimelinePerson } from './CrmActivityTimeline';

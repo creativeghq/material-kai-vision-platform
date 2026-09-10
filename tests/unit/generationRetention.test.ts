@@ -1,29 +1,4 @@
-/**
- * Saving a generated design to a moodboard KEEPS it (#378 N7).
- *
- * THE DEFECT
- * ----------
- * `job-cleanup-cron` deletes a `generation_3d` row 15 days after it was made unless
- * `saved_to_moodboard_at` is set. The only writer of that column — `moodboardAPI.markGenerationSaved`
- * — HAD NO CALLER, and the actual save path (`MoodboardSavePopover`) takes a media URL with no
- * generation id, so it could not have called it.
- *
- * Measured on the live database while fixing this: 17 generations, **0** ever marked, and the
- * oldest sitting exactly on the 15-day boundary. Saving a design to a moodboard put the image on
- * the board and let the generation behind it be reaped on schedule — the segments, the crops and
- * the model results with it.
- *
- * Nothing could have reported this. The cron deletes successfully, so no error surfaces; the
- * moodboard still shows the picture, so no user notices until they open something that needs the
- * generation. `ops.silent_zero` cannot see it either: a flag that has never once been written is
- * not a metric that dropped, it is a feature that never started.
- *
- * WHAT IS PINNED
- * --------------
- * The wiring, end to end — the popover must ACCEPT a generation id, the surface that has one must
- * PASS it, and the writer must set the retention flag AND the moodboard id together. Any one of
- * the three missing puts it back exactly where it was.
- */
+/** Saving a generated design to a moodboard KEEPS it (#378 N7). */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

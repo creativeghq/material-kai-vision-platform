@@ -66,20 +66,7 @@ export interface UnifiedSearchRequest {
 /**
  * Search result from Python backend
  */
-/**
- * One row from `/api/rag/search`.
- *
- * The `multi_vector` strategy returns **product-shaped** rows — `rag_service.multi_vector_search`
- * fuses visual/chunk/product/keyword channels, maps chunks back to products via
- * `chunk_product_relationships`, and emits `{id: <product_id>, product_name, description, metadata,
- * score, ...}`. It does NOT emit `chunk_id`, `document_name`, `page_number` or `content`.
- *
- * This interface used to declare those four as REQUIRED, which is how the Discover smart-search UI
- * came to map `id: result.chunk_id` — reading a field the backend never sends. `undefined` then
- * flowed into every consumer: the click handler looked up a product by `undefined` and silently
- * matched nothing. Fields the backend may or may not send are optional here on purpose, so the
- * compiler forces callers to handle their absence instead of trusting a shape nothing returns.
- */
+/** One row from `/api/rag/search`. */
 export interface SearchResult {
   /** The PRODUCT id for `multi_vector`. This is the field to key off. */
   id: string;

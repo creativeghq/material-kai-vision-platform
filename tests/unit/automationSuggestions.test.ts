@@ -1,25 +1,4 @@
-/**
- * A suggestion may never quietly become an action.
- *
- * This surface reads a user's own behaviour and offers to build them an automation. Two
- * properties make that acceptable rather than alarming, and both are one character from being
- * lost:
- *
- *  1. "Set it up" writes a DRAFT. `p_activate: false` is the whole difference between proposing
- *     a flow and switching on something that mails a customer. Flipping it to `true` breaks
- *     nothing, throws nothing and passes every other gate — the flow just starts running. That
- *     is the same shape as every silent defect in this codebase: a valid value, no error.
- *
- *  2. Every suggestion states the count it rests on. The feature was asked for as "based on the
- *     usual actions you take, here is how to improve this workflow", and the failure mode of that
- *     sentence is a horoscope — advice with nothing behind it. A number the reader can check
- *     against their own bell is what makes it a suggestion instead. So the evidence line must
- *     interpolate the real figures, and an empty result must SAY it has nothing rather than
- *     reaching for a vague one.
- *
- * Also pinned: no second trigger-label map. FlowsPage already keeps a local 11-entry one beside
- * the palette's 133, and a third copy is how one trigger ends up named two things on two screens.
- */
+/** A suggestion may never quietly become an action. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

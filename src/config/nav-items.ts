@@ -160,7 +160,6 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // by RLS and the editor draws the workspace's own catalogue. No `hub` on purpose, same reason as
   // Templates below: a blueprint is a reusable starting point that prices a project, a quote or an
   // order, so it cuts across Studio, Sales and Finance rather than belonging to any one of them —
-  // which puts it in the launcher's catch-all "More" group.
   { id: 'blueprints', label: 'Blueprints', path: '/blueprints', icon: DraftingCompass, surface: 'app', description: 'Reusable room and scope templates that price a project in one click.' },
   // Catalogs — agent-driven builder (Pepper); the create/extract tools self-gate to admin/owner.
   { id: 'catalogs', label: 'Catalogs', path: '/agent-hub?capability=catalog', icon: BookOpen, requireCapability: 'agent.use', moduleSlug: 'presentation-catalogs', surface: 'app', hub: 'studio', description: 'Build branded product catalogs — in the AI studio.' },
@@ -201,23 +200,9 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // question this surface answers, and a supplier's order desk is rarely the workspace owner. An
   // admin gate would have hidden it from the staff who actually confirm and ship, while showing it
   // to the admin of every buyer-only workspace on the platform — wrong on both sides.
-  //
-  // A supplier workspace that has not finished its claim lands on the page's own "claim your
-  // identity" empty state, which is the correct next step for them rather than a dead end.
   { id: 'supplier-portal', label: 'Supplier Portal', path: '/supplier-portal', icon: Store, requireSupplierWorkspace: true, surface: 'app', hub: 'finance', description: 'Purchase orders sent to you as a claimed supplier — confirm and mark shipped.' },
   // Page Monitoring (#331) — watch a page you do NOT control and report the diff. Shipped with NO
   // surface linking it at all; the route existed and the only way in was typing the URL.
-  //
-  // It sat in Marketing until 2026-08-31, next to Social and SEO, because "watches a web page"
-  // reads as a marketing verb. It is not one here: the default category is `supplier_terms`, and
-  // what this actually watches is a supplier's payment terms, MOQ and price list — the same
-  // relationship Payables and the Supplier Portal are about. Whoever deals with that supplier is
-  // who needs to hear the terms changed, and they do not open the Marketing hub.
-  //
-  // Deliberately NO moduleSlug even though `page-monitoring` is a real, enabled `modules` row:
-  // the launcher hides a tile whose module a workspace is not entitled to, and this needs no
-  // entitlement — it is a workspace-scoped tool like the other ungated ones. The page itself
-  // reads the module flag and says so when an operator has switched it off.
   { id: 'page-monitoring', label: 'Page Monitoring', path: '/monitoring/pages', icon: FileSearch, surface: 'app', hub: 'finance', description: 'Watch a page you do not control — a supplier price list, a competitor spec — and see what changed.' },
   // Contracts & e-signature — agent-driven (Trinity); the send-for-signature is confirm-gated.
   { id: 'contracts', label: 'Contracts', path: '/agent-hub?capability=contract', icon: FileSignature, requireCapability: 'agent.use', moduleSlug: 'contracts', surface: 'app', hub: 'finance', description: 'List contracts and send drafts for e-signature — in the AI studio.' },
@@ -286,8 +271,6 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // menu. Deliberately NO `hub` — it is the management/setup half of SEO, not the agent tile that
   // already sits in Marketing ('seo'), so it belongs in the catch-all "More" group beside Templates
   // and Blueprints. No moduleSlug and no capability either: the tab itself is ungated (any signed-in
-  // member can connect a site), and gating the tile on `seo-toolkit` would hide a surface the page
-  // still lets them open — and list it as an add-on to buy for something already free.
   {
     id: 'seo-websites',
     label: 'SEO Module',
@@ -351,17 +334,7 @@ export function filterNavItems(
   });
 }
 
-/**
- * Importance ranking that decides which destinations get a cell in the mobile BOTTOM BAR.
- * MobileBottomNav sorts every gated item by this list and the first BAR_SLOTS (4) entitled entries
- * fill the bar; everything else is reached through the fifth cell, Apps, which opens the mobile
- * Apps panel (MobileAppsMenu). That panel is grouped by Hub exactly like the desktop launcher and
- * does NOT read this list, so ranking only matters for who makes the bar. IDs not listed here fall
- * back after these, in raw SIDEBAR_NAV_ITEMS order — keep it complete anyway, so an entitled tile
- * never loses a bar slot to one ranked below it by accident.
- * This is the ONE place to re-rank mobile importance; it does NOT affect the desktop nav/launcher.
- * Grouped by how central each surface is to running the business day-to-day.
- */
+/** Importance ranking that decides which destinations get a cell in the mobile BOTTOM BAR. */
 export const BOTTOM_NAV_PRIORITY: readonly string[] = [
   // Everyday drivers — these fill the visible bottom bar (top 4 entitled)
   'dashboard',

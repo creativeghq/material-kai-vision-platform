@@ -1,16 +1,4 @@
-/**
- * Request-time SEO prerender for public Knowledge Base articles.
- *
- * Vercel rewrites `/knowledge-base/:slug` here (see vercel.json). We fetch the
- * article from Supabase, take the SPA's static index.html, and replace the
- * <!--SEO-->…<!--/SEO--> block in its <head> with the article's real title,
- * description, canonical, OpenGraph/Twitter tags, and schema.org JSON-LD.
- *
- * The same index.html is returned, so the React SPA still boots and renders the
- * article normally for humans — but non-JS scrapers (social unfurlers, crawlers)
- * now see correct, per-article metadata in the initial HTML. Always fresh (read
- * at request time), no cloaking (every visitor gets the same response).
- */
+/** Request-time SEO prerender for public Knowledge Base articles. */
 
 import { escapeHtml } from './_shared/html.js';
 

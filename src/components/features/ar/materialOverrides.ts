@@ -1,23 +1,4 @@
-/**
- * Applying configurator choices to a loaded glTF (#321 M2, #260 Phase 1).
- *
- * React-free on purpose, like `modelTransform.ts` — the in-app configurator uses it today and the
- * #258 embed bundle can use the same function rather than a second copy.
- *
- * TWO THINGS HERE ARE LOAD-BEARING.
- *
- * 1. **We never touch the loaded materials.** `useGLTF` caches by URL, and `Object3D.clone()`
- *    copies the node tree but keeps material references SHARED. So recolouring "the model" in a
- *    configurator would recolour the cached original, and every other view of that product — the
- *    AR preview, a second configurator on the same page, the next visitor to reuse the cache —
- *    would silently inherit it. `cloneSceneWithOwnMaterials` gives this instance its own copies
- *    first, so a swap can never escape the component that made it.
- *
- * 2. **A target name that matches nothing is reported, not ignored.** An author who types
- *    `Fabric` when the glTF material is `Fabric_Navy` gets an option that changes nothing, with no
- *    error anywhere — the exact silent-zero shape this codebase keeps rediscovering. `applyMaterialOverrides`
- *    returns per-target hit counts so the UI can say "this option matches no material in the model".
- */
+/** Applying configurator choices to a loaded glTF (#321 M2, #260 Phase 1). */
 import {
   Color, RepeatWrapping, SRGBColorSpace, TextureLoader,
   type Material, type Mesh, type Object3D, type Texture,

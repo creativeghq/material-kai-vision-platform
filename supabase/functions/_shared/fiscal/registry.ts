@@ -1,17 +1,4 @@
 // Connector registry + per-workspace resolution.
-// MASTER-KEY model: the Novus key belongs to the OPERATOR (master), under their
-// Novus subscription. A Novus account authorizes many issuer VAT numbers, so every
-// sub-tenant transmits THROUGH the master key with their OWN VAT as issuer.vatNumber
-// (the issuer identity comes from the submitting workspace's finance_settings, built
-// in invoice-builder.ts). The master's credit balance is debited for everyone; we
-// meter/bill sub-tenants via our own credit system.
-// resolveWorkspaceConnector therefore:
-//   - reads the SUBMITTING workspace's binding for the capability (C3 — is this
-//     tenant enabled for e-invoicing, and via which connector),
-//   - resolves the KEY from the MASTER: env NOVUS_API_KEY first, else the ROOT
-//     workspace's credential row (admin-configurable without a redeploy).
-// When no master key is configured yet, isConfigured=false — the caller surfaces a
-// clear "add the master key" message instead of calling with an empty key.
 
 import { novusConnector, novusBaseUrl } from './novus.ts';
 import { resolveSecret } from '../secrets.ts';

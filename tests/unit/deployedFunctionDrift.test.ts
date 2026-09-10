@@ -3,22 +3,7 @@ import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-/**
- * The deployed-vs-repo drift check (#345).
- *
- * Thirteen edge functions were running in production with no source in this repo — three
- * throwaway experiments, five superseded crons, a replaced webhook, two probes, a seeder, and
- * `generate-pbr-maps`, which CLAUDE.md recorded as deleted while v54 of it was still live. None
- * could be read, reviewed, fixed or redeployed. They accumulated because the deploy workflow
- * only ever asked which repo functions need shipping, never which deployed functions have no
- * source.
- *
- * These cases cannot reach the Management API, so they do not check for drift. They check the
- * three things that would make the drift check itself worthless:
- *   1. nothing runs it,
- *   2. it passes when it cannot actually run,
- *   3. its idea of "a function" differs from the deploy workflow's.
- */
+/** The deployed-vs-repo drift check (#345). */
 
 const ROOT = join(__dirname, '..', '..');
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');

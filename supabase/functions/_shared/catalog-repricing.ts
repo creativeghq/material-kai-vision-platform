@@ -1,28 +1,4 @@
-/**
- * Catalog line arithmetic — ONE derivation, in one place (#352 A13).
- *
- * A catalog line prints three figures the reader can add up: a unit `price`, a `discount`, and a
- * `net`. `adjust_catalog_pricing` used to scale all three INDEPENDENTLY by the same factor, each
- * rounded to 2dp on its own, and they stopped reconciling. The audit's worked case:
- *
- *     before   price 33.33  x qty 3  −  discount 10.00  =  net  89.99
- *     retarget to net 100
- *     after    price 37.04  x qty 3  −  discount 11.11  =  net 100.01   (stored: 100.00)
- *
- * Every one of those is a valid number, so nothing raises and no typecheck can see it. The
- * customer's document simply does not add up — the rule 1c failure, "every figure the reader can
- * add up must add up".
- *
- * WHY THIS IS A SEPARATE MODULE. It was inline in a tool closure, which is why it could be wrong
- * for as long as it was: there was nowhere to put the worked example. This file is import-free
- * and pure, so `tests/unit/catalogRepricing.test.ts` runs the exact numbers above. Money
- * arithmetic that no test can reach is money arithmetic nobody has checked.
- *
- * NOT a competitor to `get_order_settlements` and the SQL-derives rule. A catalog body is a JSON
- * document, not a set of ledger rows — there is no SQL source to derive from. What the rule
- * demands here is the part that IS applicable: one independent figure per line, everything else
- * derived from it, never three parallel numbers kept in step by hand.
- */
+/** Catalog line arithmetic — ONE derivation, in one place (#352 A13). */
 
 /** Round to cents. Money is never carried at full float precision between steps. */
 export const r2 = (n: number): number => Math.round(n * 100) / 100;

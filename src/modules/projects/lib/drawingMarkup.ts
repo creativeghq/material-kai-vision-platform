@@ -1,16 +1,4 @@
-/**
- * Drawing markup geometry and scale — the arithmetic, on its own, testable without a canvas.
- *
- * ONE RULE holds the whole thing up: coordinates are normalised 0–1 against the page, never
- * pixels. A pixel coordinate is meaningless the moment anybody opens the drawing at a different
- * zoom, on a different screen, or at a different render DPI — the cloud lands somewhere else on
- * the sheet, still looking like a perfectly good markup, and the person reading it queries the
- * wrong detail. Nothing raises: a wrong coordinate is a valid coordinate.
- *
- * The second rule is about the scale. It is set by drawing a line of KNOWN length, never read off
- * the title block: a sheet printed "1:50" survives being photocopied at 90%, and the drawing does
- * not. An uncalibrated sheet measures NOTHING — never zero.
- */
+/** Drawing markup geometry and scale — the arithmetic, on its own, testable without a canvas. */
 
 export interface NormPoint {
   /** 0–1 across the page width. */
@@ -58,17 +46,7 @@ export function isCompleteGeometry(kind: MarkupKind, g: MarkupGeometry | null | 
   return !!g && Array.isArray(g.points) && g.points.length >= MIN_POINTS[kind];
 }
 
-/**
- * The calibration: how many real-world units one unit of normalised page WIDTH represents.
- *
- * Width, not height — the two normalised axes have different pixel lengths unless the page is
- * square, so a factor derived from one and applied to the other measures a vertical line wrong by
- * the aspect ratio. Every length below is computed in width units and scaled once.
- *
- * Returns null rather than a number when the inputs cannot produce one. A calibration of zero, or
- * from a zero-length drag, would make every measurement on the sheet zero — which is the silent
- * zero, in a takeoff, where a zero is a plausible quantity.
- */
+/** The calibration: how many real-world units one unit of normalised page WIDTH represents. */
 export function calibrationFactor(
   a: NormPoint, b: NormPoint, knownLength: number, pageAspect: number,
 ): number | null {

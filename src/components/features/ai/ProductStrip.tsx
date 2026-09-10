@@ -21,17 +21,6 @@ interface ProductStripProps {
   /**
    * Per-product actions. All optional; each renders a control only when it is passed, so a
    * surface that cannot do the thing does not offer it.
-   *
-   * `onReplaceInImage` and `onPinMaterial` were declared here and NEVER DESTRUCTURED — the
-   * canvas has been passing both for as long as it has drawn this component, and neither has
-   * ever done anything. A prop a component accepts and ignores is the offered-vs-bound shape:
-   * the call site reads as wired, the button is simply absent, and nothing fails.
-   *
-   * The three generate actions came back with the artifact modal. They lived only in
-   * `DemoAgentResults`, which the chat stream rendered when the canvas pane was HIDDEN — i.e.
-   * almost never, since the pane was open by default — so a materials search has effectively
-   * never offered them. Collapsing the stream onto one renderer made that permanent, which is
-   * what surfaced it.
    */
   onReplaceInImage?: (product: Product) => void;
   onPinMaterial?: (product: { id: string; name: string; imageUrl?: string }) => void;

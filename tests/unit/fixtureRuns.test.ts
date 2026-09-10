@@ -1,15 +1,4 @@
-/**
- * Run geometry — pipe / cable / circuit lengths.
- *
- * A run length becomes a cable order, a pipe cut list and (in Phase 4) a voltage
- * drop. The dangerous failure is not a crash but a confident wrong number, so
- * these tests concentrate on:
- *
- *   • length returning null, never 0, when the backdrop carries no scale
- *   • vertices actually lengthening the path (a run around a corner is longer
- *     than the straight line, and billing the straight line under-orders cable)
- *   • orphaned runs being pruned rather than silently skipped forever
- */
+/** Run geometry — pipe / cable / circuit lengths. */
 import { describe, it, expect } from 'vitest';
 import {
   runLengthMm,

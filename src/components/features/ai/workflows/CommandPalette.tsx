@@ -1,19 +1,4 @@
-/**
- * CommandPalette — slash-trigger overlay above the chat input.
- *
- * Trigger: user types `/` at the start of an empty (or trimmed) input. Renders
- * a floating list of:
- *   - Multi-step workflows (from workflowRegistry) — the primary affordance
- *   - Individual tools (from agentToolsCatalog) — for power users
- *   - Recent runs (TODO: localStorage / DB)
- *
- * Keyboard: arrow up/down to navigate, Enter to launch, Esc to close.
- *
- * On launch:
- *   - Workflow → calls onLaunchWorkflow(workflowId, exampleIndex). Parent
- *     either bootstraps the tracker locally OR injects an example prompt.
- *   - Tool → calls onUseToolPrompt(prompt). Parent fills the chat input.
- */
+/** CommandPalette — slash-trigger overlay above the chat input. */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Sparkles, Wrench, ArrowRight, Lock, AlertCircle, ListChecks } from 'lucide-react';
 import { cn } from '@/lib/utils';

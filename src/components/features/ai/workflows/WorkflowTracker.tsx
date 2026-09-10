@@ -2,12 +2,6 @@
  * WorkflowTracker — pinned card at the top of the chat showing live progress
  * of a multi-step workflow. Replaces the "type-and-pray" UX with a visible
  * checklist of every step the agent will run.
- *
- * Each step is a numbered node:
- *   ◯ pending  ⟳ running  ✎ awaiting_input  ✓ done  ✕ failed  ↷ skipped
- *
- * Click a step to expand its panel: shows status_line, input snapshot,
- * output preview, and per-step actions (re-run, skip, edit input).
  */
 import React, { useMemo, useState } from 'react';
 import {

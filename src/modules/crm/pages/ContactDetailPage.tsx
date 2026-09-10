@@ -361,15 +361,6 @@ export const ContactDetailPage: React.FC = () => {
   /**
    * Refresh this person's business data — the same ΑΑΔΕ → ΓΕΜΗ → web-research chain the company
    * record uses ([[researchCompany]]), routed to whichever identity actually carries a business:
-   *
-   *   1. the contact's OWN Greek ΑΦΜ (sole trader / freelancer) → registries + web research,
-   *      written onto the contact (only the columns crm_contacts has — no ΚΑΔ/ΓΕΜΗ JSON);
-   *   2. otherwise the linked company → full research on the company record (that is where a
-   *      business's registry data belongs), then both records are reloaded;
-   *   3. otherwise the typed employer name → web research only, onto the contact.
-   *
-   * A contact id is NEVER passed as companyId — the registry edge functions cache onto
-   * `crm_companies`, so handing them a contact id would write to the wrong table.
    */
   const runResearch = async () => {
     if (!contact || isNew || !id) return;

@@ -31,8 +31,6 @@ async function enforceLeadRateLimit(supabase: any, req: Request, action: string,
   //     whether the caller is over budget, so we must refuse. Failing open here hands an
   //     attacker an unlimited channel the moment they can induce an error in this query,
   //     which is exactly what a flood would do.
-  //   - The INSERT is bookkeeping. Losing one row costs a little accuracy on a later
-  //     window and must never block a legitimate submission.
   let ipHash: string;
   try {
     const ipRaw = getTrustedClientIp(req);
@@ -346,11 +344,6 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
     // knew (or enumerated) a workspace uuid could inject attacker-controlled contacts into a
     // stranger's CRM and push a bell + email to their owners: a spam/phishing channel into
     // another tenant, no account required.
-    // The rest of this function derives everything from an opaque token; this action cannot,
-    // because the valuation widget is rendered before any listing is chosen. So instead we require
-    // the target workspace to actually BE a public agency — it must expose at least one public
-    // listing. That is precisely the population that can legitimately host the widget, and it
-    // makes a bare uuid useless against any workspace with no public presence.
     const { count: publicListings } = await supabase
       .from('properties')
       .select('id', { count: 'exact', head: true })
@@ -391,13 +384,6 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
     }
 
     // Capture the seller lead (crm_contact + real-estate extension). property_id/workspace are server-set.
-    // The error MUST be checked. This used to destructure only `data`, so a
-    // failed insert left `contact` null, skipped the property_contacts_ext upsert AND the
-    // crm_contact_created event, and still returned 200 with the estimate — while
-    // ValuationWidget flips to its success screen on any resolved promise. The seller saw
-    // "Thanks, we'll be in touch", the row was never written, no alert fired, and nothing logged
-    // it (withApiLogging only reports thrown errors). This is the module's headline lead magnet.
-    // `inquire`, in this same file, has always done it correctly.
     const { data: contact, error: contactErr } = await supabase.from('crm_contacts').insert({
       workspace_id: workspaceId, name, email, phone: String(body?.phone ?? '').slice(0, 40) || null,
       contact_type: 'seller', lead_source: 'valuation_request', lead_status: 'new',

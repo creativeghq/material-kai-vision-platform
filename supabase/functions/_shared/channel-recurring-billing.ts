@@ -1,23 +1,4 @@
-/**
- * Bill the recurring line the platform records and never charged for: rented phone numbers.
- *
- * A number is a real monthly cost Zernio puts on the operator's card, tied to one workspace, and
- * it was being absorbed in full.
- *
- * Connected CHANNELS are deliberately NOT billed (2026-08-24). Zernio charges per account past
- * the free two and the platform absorbs it: a workspace onboards as many accounts as it wants
- * rather than meeting a wall while setting up. The count still reaches the operator cost view, so
- * the absorbed total is visible per tenant instead of arriving as one unattributed invoice line —
- * measuring a cost and charging for it are separate decisions, and only the second was reversed.
- *
- * Charged in CREDITS, not as Stripe subscription items: a credit debit lands in the same ledger as
- * every other kind of spend, so it appears beside the message and image charges instead of in a
- * parallel system nobody reconciles.
- *
- * Idempotency is the UNIQUE (workspace, type, month) constraint, not a flag or a timestamp
- * comparison: the cron can fire twice, or be re-run by hand after a partial failure, and the
- * second attempt collides instead of billing again.
- */
+/** Bill the recurring line the platform records and never charged for: rented phone numbers. */
 import { CREDIT_SALE_PRICE_USD, MARKUP_MULTIPLIER } from './pricing-constants.ts';
 
 // deno-lint-ignore no-explicit-any

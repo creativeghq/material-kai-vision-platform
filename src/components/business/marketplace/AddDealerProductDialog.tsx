@@ -107,12 +107,6 @@ export const AddDealerProductDialog: React.FC<{
 
   // The full set of attribute keys shown: everything the registry says applies to this
   // category (global + category-scoped) plus whatever custom keys the user added.
-  //
-  // There used to be a hardcoded COMMON_FACET_KEYS list here, unioned on top. It was a
-  // second copy of registry knowledge that drifted from it: it named `finish` and `style`
-  // as universal when the registry scopes them to 8 and 2 categories, and it omitted
-  // `application_areas`, which the registry marks global and canonicalizable. One registry,
-  // one read — #347 phase 3.4.
   const attrKeys = useMemo(() => {
     const keys = new Set<string>(categoryFields.map((f) => f.field_name));
     Object.keys(attrs).forEach((k) => keys.add(k));

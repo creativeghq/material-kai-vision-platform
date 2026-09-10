@@ -1,20 +1,4 @@
-/**
- * Product embed readiness (#341 join 5).
- *
- * "What does this product still need before the SDK can carry it" — derived in SQL by
- * `get_product_embed_readiness`, formatted here. Nothing in this file decides whether a
- * requirement is met; it reads the answer and turns it into sentences.
- *
- * WHY IT IS NOT A SCORE. Every requirement below is needed by a DIFFERENT downstream stage, and a
- * product missing all of them still sells: the spec builder quotes it as a request and the AI draws
- * an impression. So this reports what is missing and what that costs — never "you may not publish
- * this". The only hard gate the platform actually has is a published price, and it is marked as
- * such.
- *
- * THE SCOPE QUESTION IS NOT ANSWERED HERE. "Which of my keys can serve this product" is decided by
- * `embed_scope_covers_product`, the same SQL function `products-3d-api` gates on — so this panel
- * cannot promise a merchant something the endpoint then 404s.
- */
+/** Product embed readiness (#341 join 5). */
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ProductEmbedReadiness {

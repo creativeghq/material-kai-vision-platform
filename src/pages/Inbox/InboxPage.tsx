@@ -278,10 +278,6 @@ const InboxPage: React.FC = () => {
   // channel and then separates same-channel sources client-side. The rest are matched
   // client-side against the loaded page. Assignee options come off the loaded threads, so the
   // group def depends on them too.
-  //
-  // The bag lives in `?f=` so a filtered mailbox is a link: `/profile?tab=inbox` (a whole second
-  // inbox until this merge) is now just this list pinned to `source: public_profile`, and the
-  // redirect that replaced it hands over exactly that URL.
   const filterGroups = useMemo(() => buildInboxFilters(wsLabels, threads, myUserId ?? undefined), [wsLabels, threads, myUserId]);
   const { values: filterValues, setValues: setFilterValues, filtered: matchedThreads, previewCount } =
     useFilters<InboxThread>(threads, filterGroups, { urlKey: 'f' });
@@ -390,17 +386,6 @@ const InboxPage: React.FC = () => {
   /**
    * `silent` is the difference between "the operator asked for a different list" and "something
    * happened in the background", and it is not cosmetic.
-   *
-   * Every refresh used to raise the spinner, and the mailbox list is subscribed to `*` on
-   * `inbox_threads` — so sending a message bumped `last_message_at`, the UPDATE came straight
-   * back over the socket, and the entire list you were looking at was replaced by a centred
-   * spinner and then redrawn. You send a message; the sidebar blinks. Same on an incoming
-   * message, on an agent reply, on a label change, on read state.
-   *
-   * A background refresh keeps the rows on screen and swaps the data underneath them — the list
-   * is keyed by thread id, so nothing remounts and the only visible change is the one that
-   * actually happened. The spinner is now only for a list we do not have yet: first paint, or a
-   * filter change, where there is genuinely nothing correct to show meanwhile.
    */
   const loadThreads = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoadingThreads(true);
@@ -425,20 +410,7 @@ const InboxPage: React.FC = () => {
 
   useEffect(() => { void loadThreads(); }, [loadThreads]);
 
-  /**
-   * Go and get the profile photos, once, when some thread is missing one.
-   *
-   * Not a button the operator has to know about: nobody opens an inbox thinking "the avatars need
-   * synchronising". WhatsApp does not push a photo — `participantPicture` is optional on the
-   * webhook and was absent on every real payload — so somebody has to ask
-   * `GET /inbox/conversations` for it, and the honest place to do that is the moment we can see
-   * that a photo is missing.
-   *
-   * Once per mount, guarded by a ref: the thread list refreshes on every realtime event, and a
-   * fetch-per-render would page the whole conversation list on each new message. A thread that
-   * genuinely has no photo just stays without one until the next visit, which is the right cost
-   * for a decoration.
-   */
+  /** Go and get the profile photos, once, when some thread is missing one. */
   const avatarSyncDone = useRef(false);
   useEffect(() => {
     if (avatarSyncDone.current || !activeWorkspaceId || !threads.length) return;
@@ -518,19 +490,7 @@ const InboxPage: React.FC = () => {
           profMap[p.user_id] = p;
         }
       }
-      /**
-       * OUR side's photo.
-       *
-       * A member's avatar comes from `user_profiles.avatar_url`, and on a WhatsApp thread that is
-       * the wrong place to stop: the operator already has a photo — the one their customers see
-       * beside every message — and it lives on the WhatsApp Business profile, not on our upload
-       * form. Asking them to upload a second copy of a picture they already published is the
-       * platform failing to look where the answer is.
-       *
-       * So: uploaded photo first (an explicit choice always wins), the number's business photo
-       * second. Fetched by messaging-api `sync-avatars`; null here simply means it has not run
-       * yet, and initials are the honest fallback for that.
-       */
+      /** OUR side's photo. */
       let channelAvatarUrl: string | null = null;
       const threadChannelId = (thread.metadata as Record<string, unknown> | undefined)?.channel_id;
       if (typeof threadChannelId === 'string' && threadChannelId) {
@@ -640,23 +600,7 @@ const InboxPage: React.FC = () => {
     return () => { supabase.removeChannel(ch); };
   }, [loadThreads]);
 
-  /**
-   * Opening a conversation lands at the BOTTOM. Every time, without animating there.
-   *
-   * This was one `scrollIntoView({behavior:'smooth'})` keyed on `messages`, which fails a thread
-   * three separate ways:
-   *
-   *   - smooth ANIMATES from the top of the history, so opening a long chat scrolls visibly
-   *     through months of it, and any wheel touch during the animation cancels it half way;
-   *   - it fires when `messages` changes, which is BEFORE images, PDFs and video have laid out.
-   *     The target is computed against a short document, then the attachments load, the document
-   *     grows underneath, and you are left in the middle;
-   *   - `scrollIntoView` walks every scrollable ancestor, so it can move the page as well as
-   *     the message pane.
-   *
-   * So: set `scrollTop` on the pane itself, instantly, on open — and keep re-pinning while the
-   * content is still growing, which is what a ResizeObserver is for.
-   */
+  /** Opening a conversation lands at the BOTTOM. Every time, without animating there. */
   const listRef = useRef<HTMLDivElement>(null);
   /** False once the reader scrolls up deliberately — see the handler below. */
   const stickToBottom = useRef(true);
@@ -698,16 +642,6 @@ const InboxPage: React.FC = () => {
   const send = useCallback(async () => {
     if (!activeId || (!draft.trim() && !attachment && pendingCards.length === 0)) return;
     // Re-entrancy guard, on a ref rather than the `sending` state.
-    //
-    // The send button is disabled while in flight, but the textarea's Enter handler was not — and
-    // `send` itself only checked that there was something to send. A second Enter inside the ~1s
-    // round trip therefore ran the whole function again on a draft that had not been cleared yet.
-    // Verified on the operator's own thread: "Thank you very much, appreciated it a lot." went out
-    // TWICE, 1.2 seconds apart, two distinct wamids, both delivered and read. The customer got it
-    // twice and nothing anywhere looked wrong.
-    //
-    // A ref, because `sending` read from this closure is the value at the time the callback was
-    // created — exactly the stale read that lets the second call through.
     if (sendInFlight.current) return;
     sendInFlight.current = true;
     setSending(true);
@@ -917,15 +851,6 @@ const InboxPage: React.FC = () => {
   /**
    * How many conversations each source is carrying — the number that makes the Sources nav
    * worth having rather than a second copy of the filter modal.
-   *
-   * It counts the LOADED page, and that page is not always the whole mailbox: `list_threads`
-   * caps at 200, and picking a source pushes that source's channel into the request (which is
-   * the point — trimming 200 rows client-side is wrong past 200 rows). So while a source is
-   * pinned the server has already thrown the others away, and counting them here would print a
-   * confident `0` next to WhatsApp for someone with a hundred WhatsApp threads.
-   *
-   * A count that is only sometimes true is worse than no count, so it is withheld instead:
-   * `null` renders nothing. Same reason `threadTotal` says `200+` at the cap rather than `200`.
    */
   const sourceCounts = useMemo(() => {
     if (sourceFilter) return null;
@@ -1974,22 +1899,7 @@ const InboxPage: React.FC = () => {
 // Message bubble
 // ──────────────────────────────────────────────────────────────────────────
 
-/**
- * A message body, with its links as links — and as the page they point at.
- *
- * The bubble rendered `{m.body}` into a `whitespace-pre-wrap` div, so a customer sending a
- * product URL got 180 characters of percent-encoded Greek slug, as inert text, that could not
- * even be clicked. The question they were actually asking ("is your decking like this one?")
- * has its answer in that page's own photograph.
- *
- * Two separate jobs, and both are needed. The link is the FLOOR: it works with no network call,
- * for every URL, immediately. The card is the answer, and it is allowed to be absent — a page
- * that states no metadata, one we could not read, and one the SSRF guard refused all render as
- * a plain link, which is exactly what they are.
- *
- * No `dangerouslySetInnerHTML` anywhere in here (invariant 11): the body is customer-written
- * text, and it is segmented into JSX text and anchor nodes, never assembled as HTML.
- */
+/** A message body, with its links as links — and as the page they point at. */
 const MessageBody: React.FC<{ body: string; threadId: string | null }> = ({ body, threadId }) => {
   const segments = useMemo(() => splitMessageLinks(body), [body]);
   // The FIRST link only. A card per URL turns a message with five links into a wall nobody
@@ -2077,17 +1987,7 @@ const MessageBody: React.FC<{ body: string; threadId: string | null }> = ({ body
   );
 };
 
-/**
- * Where does this message go?
- *
- * A list of the conversations already loaded rather than a search over every thread that has ever
- * existed: forwarding is "send this to the other person I am talking to", and the mailbox in
- * front of the operator is that set. Archived threads are excluded by the same list.
- *
- * The destination is picked and then SENT — no second confirm step. The action is one message
- * into one conversation, it is visible immediately in that thread, and it can be removed there;
- * a confirmation dialog on top of a picker is a dialog on a dialog.
- */
+/** Where does this message go? */
 const ForwardDialog: React.FC<{
   message: InboxMessage | null;
   threads: InboxThread[];
@@ -2179,20 +2079,7 @@ const ForwardDialog: React.FC<{
   );
 };
 
-/**
- * Did the customer actually GET it?
- *
- * Nothing in this UI answered that, and the answer was routinely no. Measured 2026-08-24 on the
- * first connected WhatsApp number: 27 outbound messages, all 27 accepted by Meta with a message
- * id returned — and 23 of them reported FAILED a second later. The operator saw 27 ordinary sent
- * bubbles. That is the precise reason "we are not sending messages to WhatsApp" was the
- * reasonable conclusion: we send them correctly, and the platform's own report that they did not
- * arrive was written to a metadata key with no reader.
- *
- * `failed` is deliberately loud and carries Meta's reason. The commonest one is the 24-hour
- * service window having closed, which is not a bug and is fixable by the operator — but only if
- * they are told.
- */
+/** Did the customer actually GET it? */
 const DeliveryState: React.FC<{ meta: Record<string, unknown> }> = ({ meta }) => {
   const status = typeof meta.delivery_status === 'string' ? meta.delivery_status : null;
   if (!status) return null;
@@ -2253,18 +2140,7 @@ const DeliveryState: React.FC<{ meta: Record<string, unknown> }> = ({ meta }) =>
  * looking at attachments on their phone instead. Download stays available, because sometimes you
  * genuinely do want the file.
  */
-/**
- * A thread's counterparty avatar, wherever one is drawn.
- *
- * There are FIVE places the inbox draws this face — the conversation list, the conversation
- * header, the message bubbles, the profile drawer and the details rail — and the first version of
- * the stored-picture work wired exactly one of them. So the picture could be fetched, stored and
- * signed correctly and the operator would still see "DD" in the list, which is the only place they
- * look before opening anything.
- *
- * One component, so a sixth site cannot be added without it, and so "does this thread have a
- * picture" is answered in one place rather than five.
- */
+/** A thread's counterparty avatar, wherever one is drawn. */
 /**
  * The public URL of the character assigned to `seed`.
  *
@@ -2312,35 +2188,13 @@ const ThreadAvatar: React.FC<{
    * profile picture on any endpoint that declares the field (measured 0/100 conversations,
    * 0/516 contacts). So this is not a placeholder waiting for something better — it is the
    * avatar, and it should look like it was designed rather than like a missing image.
-   *
-   * WHICH character comes from `counterparty_avatar_slot`, which inbox-api derived from the
-   * participant id (who) and their name (which half of the cast) — once, for all five places
-   * this face is drawn. Re-deriving it per screen is not a shortcut: this component is handed
-   * four different name strings depending on where it is mounted, and the first version of this
-   * feature already shipped the same class of bug one input over, seeding the header on the
-   * THREAD id while the message rows below seeded on the SENDER participant, so one man was
-   * drawn as a woman at the top of his own conversation.
-   *
-   * `castSeedForThreadCounterparty` remains the floor for a thread the server answered null for
-   * — an internal thread, or an older deploy — and it agrees with `castSeedForSender` by
-   * construction.
    */
   const generated = useMemo(
     () => castAvatarSrc(castSeedForThreadCounterparty(thread, name), thread?.counterparty_avatar_slot),
     [thread?.counterparty_participant_id, thread?.counterparty_avatar_slot, thread?.id, name],
   );
 
-  /*
-   * The mood the conversation was last read as, worn by the face.
-   *
-   * A ring plus a small face, NOT a different character: the cast is 24 rendered people and
-   * swapping someone's face when they get annoyed would read as a different person replying.
-   * The ring is the state; the character is the identity, and those must not be the same channel.
-   *
-   * Only rendered where it was asked for. On every avatar at once — the list, the header, the
-   * drawer, each message row — a thread would carry six copies of the same fact and the signal
-   * stops meaning anything.
-   */
+  /* The mood the conversation was last read as, worn by the face. */
   const mood = showMood
     ? (((thread?.metadata as Record<string, unknown> | undefined)?.sentiment ?? null) as
         Record<string, unknown> | null)
@@ -2638,18 +2492,6 @@ const MessageActions: React.FC<{
        * respectively, i.e. on top of the avatar in both cases. On an incoming message that put
        * three 14px buttons over the sender's face and their name, which is why the actions read
        * as "ours only": on our side they landed over blank gutter and looked deliberate.
-       *
-       * A message you REPLY to or REACT to is almost always the other person's, so that is the
-       * side that had to be right.
-       *
-       * ── It must stay on while its OWN popover is open ──
-       * The reaction picker is a Radix Popover, so its content is PORTALLED to the body: the
-       * moment it opens, focus moves into the portal and the pointer follows it, so neither
-       * `group-hover/msg` nor `group-focus-within/msg` holds any more and this bar computed to
-       * `hidden`. That does not merely hide it — the trigger IS the popover's anchor, and a
-       * `display:none` anchor measures 0×0 at the origin, so the emoji row flew to the corner of
-       * the screen the instant you clicked it. `pickingEmoji` pins the bar open for exactly as
-       * long as the thing it anchors.
        */
       className={`absolute -top-3 ${ours ? 'left-2' : 'right-2'} z-20 items-center gap-0.5
                   rounded-full border border-hairline bg-card px-1 py-0.5 shadow-overlay
@@ -3028,14 +2870,6 @@ const AttachmentView: React.FC<{
     : 'file';
 
   // NOT RETRIEVED: the row still holds the provider's own URL rather than a path in our storage.
-  //
-  // That URL is an authenticated API endpoint — `zernio.com/api/v1/whatsapp/media/{id}` needs a
-  // bearer token the browser does not have — so rendering it as an <img> produces a broken-image
-  // icon with the word "attachment" beside it. Which is exactly what shipped: recognising the type
-  // turned a harmless paperclip link into a visibly broken picture.
-  //
-  // A message filed before the download path existed is in this state permanently until it is
-  // re-fetched, so this offers the re-fetch rather than describing the problem.
   const notRetrieved = (att as { fetch_failed?: boolean }).fetch_failed
     || (!att.storage_object_path && !!att.url);
   if (notRetrieved) {
@@ -3237,18 +3071,7 @@ const MessageBubble: React.FC<{
     ? (info?.kind === 'member' || info?.kind === 'agent')
     : (info?.userId != null && info.userId === myUserId);
 
-  /*
-   * Bubbles carry weight now: a solid accent fill on our side, a clean raised card on theirs.
-   *
-   * The previous pair were both 10% tints of the same accent, which made "us" and "them" nearly
-   * the same object — the one thing a transcript has to answer at a glance is who said what, and
-   * a 10% wash against a 10% wash does not answer it. Chat is also the one surface in the
-   * platform where a large radius and a soft shadow are right: these are speech, they float over
-   * the page, and the design system reserves shadow for exactly that.
-   *
-   * The accent is spent HERE and nowhere else in the thread, which is why the composer, the
-   * toolbar and the hover actions stay quiet.
-   */
+  /* Bubbles carry weight now: a solid accent fill on our side, a clean raised card on theirs. */
   const bubbleClass = isNote
     ? 'bg-amber-bg/60 border border-amber/30 rounded-2xl rounded-tl-md'
     : isAgent
@@ -3270,21 +3093,7 @@ const MessageBubble: React.FC<{
   const moodStyleForMessage = (!ours && mood && mood !== 'neutral') ? moodStyle(mood) : null;
 
   return (
-    /*
-     * `w-fit`, and it is load-bearing rather than tidiness.
-     *
-     * A `div` with `flex` is a BLOCK-level flex container, so this row was 82% of the pane wide
-     * on every message — a five-character "χαχαχ" occupied the same box as a paragraph. Nothing
-     * looked wrong, because the bubble inside is content-sized and sits at the correct end.
-     *
-     * What it broke is the hover bar, which is `absolute right-2` against THIS box: it anchored
-     * to 82% of the pane instead of to the message, so on a short reply it floated hundreds of
-     * pixels out in the blank gutter with nothing under it. `w-fit` shrinks the row to the
-     * bubble, which is what `left-2`/`right-2` were always describing.
-     *
-     * Long messages are unchanged: `fit-content` still resolves to the available width and
-     * `max-w-[82%]` still caps it.
-     */
+    /* `w-fit`, and it is load-bearing rather than tidiness. */
     <div
       id={`inbox-msg-${m.id}`}
       className={`group/msg relative flex w-fit gap-2.5 max-w-[82%] ${ours ? 'ml-auto flex-row-reverse' : ''}`}
@@ -3671,27 +3480,7 @@ const IntakeProductPicker: React.FC<{
   );
 };
 
-/**
- * The per-line editor (#342 §4).
- *
- * `update_intake_items` and `search_intake_products` shipped with the rest of the intake and had
- * no caller — a handler nothing renders, which left a reviewer with only two moves: accept the
- * model's whole reading, or dismiss it. One wrong line meant dismissing four right ones.
- *
- * Two rules the shape of this follows from:
- *
- *  • **A price the member did not type is never sent back.** Supplying `unit_price` is exactly
- *    what stamps `unit_price_source='manual'`, and a line silently flipped to manual stops
- *    re-pricing when the customer is assigned — which is the one thing assigning a customer is
- *    for. So the payload carries a price only for a field that was actually touched.
- *  • **`line_no` is the server's handle on the previous reading**, not a display order. An
- *    existing line keeps its ORIGINAL number even after reordering or deletion above it; the
- *    server renumbers on save. A member-added line sends none, so it inherits nothing.
- *
- * The arithmetic here is display only. `update_intake_items` re-resolves every price server-side
- * and `recompute_order_totals` has the last word once the order exists — nothing computed in this
- * component is ever stored.
- */
+/** The per-line editor (#342 §4). */
 const IntakeLineEditor: React.FC<{
   threadId: string;
   intake: OrderIntake;
@@ -4088,31 +3877,8 @@ const OrderIntakePanel: React.FC<{
   );
 };
 
-/**
- * What the CHANNEL knows about the person, as opposed to what our CRM knows.
- *
- * These are different questions and the drawer used to answer only the second one, so a WhatsApp
- * thread showed a CRM card for a contact that was itself created from the conversation — a
- * tautology, and on the numbers imported on 2026-08-24 a contact literally named
- * "8613360315779". The facts that decide what you may DO here (can we message them outside the
- * 24-hour window, have they sent STOP, which of our numbers did they reach) lived nowhere.
- *
- * Everything shown is something we hold or can derive. Nothing is inferred, and where WhatsApp
- * gives us nothing the panel says so rather than rendering an empty field — an empty field reads
- * as "this person has no company", not as "Meta does not tell us".
- */
-/**
- * What the conversation reads like right now, and what to say back.
- *
- * On demand, not on open. Reading a thread costs a model call, most threads are opened to look
- * something up rather than to reply, and a panel that bills every glance is one people learn to
- * avoid. The answer is cached against the last message id, so re-opening is free until the
- * customer actually says something new.
- *
- * The SAME verdict is handed to the assistant before it drafts a reply — see `analyze_sentiment`
- * in inbox-api. Two reads would let the screen say "frustrated" while the assistant answers as
- * though nothing were wrong, and the operator would trust whichever agreed with them.
- */
+/** What the CHANNEL knows about the person, as opposed to what our CRM knows. */
+/** What the conversation reads like right now, and what to say back. */
 const ConversationMoodPanel: React.FC<{ thread: InboxThread; isMember: boolean }> = ({ thread, isMember }) => {
   const { toast } = useToast();
   const cached = ((thread.metadata as Record<string, unknown> | undefined)?.sentiment ?? null) as
@@ -5227,21 +4993,7 @@ const LabelManagerPopover: React.FC<{
   );
 };
 
-/**
- * "Bring this back on Thursday" — and, if you want, "chase them if they have not replied by then".
- *
- * ── Why the two are one control ──
- * A reminder and an automatic chase are the same row: a follow-up with a message and a follow-up
- * without one. Splitting them into two features would mean two dates, two cancel buttons and two
- * ways for a customer's reply to fail to call the whole thing off. The reply cancels it in the
- * database, on the message insert, so it works whatever channel they answer on.
- *
- * ── The offsets are calendar days, not 24-hour blocks ──
- * `setDate(getDate() + n)` rather than `Date.now() + n * 86400000`: a DST day is 23 or 25 hours,
- * and "in a week" landing an hour early twice a year is the kind of wrong nobody reports and
- * everybody notices. Computed here rather than server-side for the same reason — this is the only
- * runtime that knows the operator's timezone; the database session is UTC.
- */
+/** "Bring this back on Thursday" — and, if you want, "chase them if they have not replied by then". */
 const FOLLOW_UP_PRESETS: Array<{ label: string; days: number }> = [
   { label: 'Tomorrow', days: 1 },
   { label: 'In 3 days', days: 3 },

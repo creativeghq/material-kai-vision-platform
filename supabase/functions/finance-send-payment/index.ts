@@ -1,25 +1,4 @@
-/**
- * Send a payment — the ONE money-out entry the UI calls, whichever rail it goes out on.
- *
- * Until now "actually move the money" existed only inside `revolut-api`, reachable only from a
- * supplier bill, and only for Revolut. So paying anyone the platform did not already hold a bill
- * for had no path at all, and a workspace whose money sits in Viva had no path ever. This function
- * takes the account the operator picked in OUR books, derives the rail from it, and hands the work
- * to the shared executor in `_shared/payments/payout.ts` — which is also what `revolut-api`'s own
- * `send-payment` action now calls, so there is one implementation and not one per screen.
- *
- * Body: {
- *   workspace_id, source_bank_account_id, crm_bank_account_id,
- *   amount, currency, reference, mode: 'draft' | 'payment',
- *   request_id (idempotency, minted when the dialog opens), supplier_bill_id?
- * }
- *
- * Auth: finance manager of the TARGET workspace, checked under the caller's own RLS before the
- * service client is used for anything (invariant 1). Ownership mismatch answers 404, never 403.
- *
- * NOTE ON WHAT IT WRITES: an instruction, never a `payments` row. See the header of
- * `_shared/payments/payout.ts` — the bank feed is the one thing allowed to say the money moved.
- */
+/** Send a payment — the ONE money-out entry the UI calls, whichever rail it goes out on. */
 
 // deno-lint-ignore-file no-explicit-any
 

@@ -165,18 +165,7 @@ export const timeTrackingService = {
     vatRate: number,
   ): Promise<string> {
     if (entryIds.length === 0) throw new Error('No entries selected');
-    /**
-     * ONE transaction (#351 S4).
-     *
-     * This used to be four round trips — allocate a number, insert the invoice, insert the
-     * lines, stamp the entries. A failure on the last one left an invoice that exists beside
-     * entries that still read unbilled, and the natural retry billed the same hours twice.
-     *
-     * The RPC also applies the two filters this function's own doc comment claimed and its
-     * query never did (#351 S2): `is_billable`, and a refusal when a selected entry is logged
-     * against a DIFFERENT customer than the one being invoiced. The tab happens to filter both
-     * today; the next caller of this service would not have.
-     */
+    /** ONE transaction (#351 S4). */
     const { data, error } = await supabase.rpc('bill_time_entries_to_invoice', {
       p_workspace_id: workspaceId,
       p_customer_company_id: customer?.type === 'company' ? customer.id : null,

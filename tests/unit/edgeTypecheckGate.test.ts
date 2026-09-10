@@ -1,18 +1,4 @@
-/**
- * Edge-function typecheck gate guard.
- *
- * `.github/workflows/edge-typecheck.yml` + `scripts/check-edge-functions.mjs` close the blind
- * spot left by `tsconfig.json` excluding `supabase/**` — until 2026-07-30 nothing typechecked
- * the edge functions, and `npm run typecheck` reported success while never looking at them.
- *
- * This test guards the GATE, not the functions. It runs in the unit tier so a gate that has
- * been quietly defanged fails in seconds instead of looking green in CI. The precedent is
- * tests/unit/semgrepRuleset.test.ts: that gate enforced nothing for months because a `|| true`
- * hid an invalid config, and only a unit-tier assertion would have caught it.
- *
- * Deliberately does NOT run deno — that belongs in CI. It asserts the gate is still wired,
- * still blocking, and still baseline-complete.
- */
+/** Edge-function typecheck gate guard. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -98,21 +84,7 @@ describe('edge-function typecheck gate', () => {
     expect(bad, 'baseline contains non-integer or negative counts').toEqual([]);
   });
 
-  /**
-   * The coverage cap must stay EMPTY.
-   *
-   * `agent-chat/index.ts` used to be the one entry, on the grounds that langgraph's generics
-   * instantiated a type graph too large for any runner. It is now checked like everything else
-   * — clean, in about five seconds — after the LangChain packages were brought up to date
-   * (core 1.2.9 swapped its exported Zod types for structural interfaces to stop exactly this)
-   * and the blanket `let X: any` runtime singletons were given real types.
-   *
-   * That exclusion was not free while it lasted: it was the only compiler that could have seen
-   * agent-chat, and during it the model call passed `{ system, cache_control }` as call options
-   * that ChatAnthropic drops on the floor — so no agent turn carried its system prompt and no
-   * turn was ever cached. An entry here is a function nobody is checking. Adding one back needs
-   * a measurement, not a memory.
-   */
+  /** The coverage cap must stay EMPTY. */
   it('no edge function is excluded from typechecking', () => {
     const base = JSON.parse(readFileSync(BASELINE, 'utf8')) as { uncheckable?: Record<string, string> };
     const excluded = base.uncheckable ?? {};

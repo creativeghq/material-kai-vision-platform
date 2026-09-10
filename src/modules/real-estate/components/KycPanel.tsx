@@ -10,14 +10,6 @@ import { formatDate } from '@/utils/datetime';
 /**
  * The AML/KYC verdicts held against one buyer, and what is still missing before their offer can be
  * accepted.
- *
- * Accepting an offer is the module's point of no return — it rejects every competing offer, moves
- * the listing to under_offer and cancels its future viewings. `accept-offer` refuses with a 422 and
- * a list of the missing checks when the workspace has the gate on, so this panel exists to make that
- * list actionable rather than a surprise at the worst moment.
- *
- * Recording a verdict is broker-only: an agent signing off their own buyer is the conflict of
- * interest the check exists to manage. The API enforces it; this hides the buttons.
  */
 export const KycPanel: React.FC<{ ws: string | null; contactId: string | null; canManage: boolean }> = ({ ws, contactId, canManage }) => {
   const { toast } = useToast();

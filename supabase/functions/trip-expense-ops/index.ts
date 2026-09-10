@@ -1,20 +1,4 @@
-/**
- * trip-expense-ops
- *
- * Consolidated server-side operations for sales-team Trip Cards that need the
- * service role (receipts live in the private pdf-documents bucket, and finance —
- * a different user than the rep — must be able to read them). Three actions:
- *
- *   - upload_receipt : { item_id, filename, content_type, data_base64 }
- *                      → uploads to pdf-documents/trip-expenses/{report}/{item}-{ts}.{ext},
- *                        stamps receipt_* columns on the line, returns a 7d signed URL.
- *   - sign_receipt   : { item_id } → fresh 7d signed URL for an existing receipt.
- *   - generate_pdf   : { report_id } → renders the report to A4 PDF, returns a signed URL.
- *
- * Access is enforced by reading the row under the CALLER's JWT (RLS): the line/report
- * is only visible to its owner or a workspace finance manager. Uploads additionally
- * require the caller to be the owner while the card is draft, or a finance manager.
- */
+/** trip-expense-ops */
 import { createClient } from '@supabase/supabase-js';
 import { formatMoney } from '../_shared/money.ts';
 import { PDFDocument, rgb } from 'pdf-lib';

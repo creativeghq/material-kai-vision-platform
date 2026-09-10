@@ -1,27 +1,4 @@
-/**
- * Platform-tier notification event bus.
- *
- * Lives in `_system/`, NOT under `src/modules/`. Reason: every module
- * that needs to deliver a notification (Email, Messaging, In-App
- * Notifications, Quotes, etc.) publishes/subscribes through this bus.
- * If the bus itself were in a module, disabling that module would
- * break notification routing for every other module.
- *
- * Why not just have `NotificationService` import `emailService` and
- * `messagingService` directly (the previous design): when those move
- * into modules and a module is disabled, the import chain breaks at
- * runtime. The bus pattern decouples publishers from subscribers, so
- * a disabled module just means its subscriber doesn't run — every
- * other path still works.
- *
- * Type-safety contract:
- *   - Each event type is a literal string key
- *   - Each payload type is declared in `NotificationEvents`
- *   - Subscribers receive correctly-typed payloads via overloads
- *
- * No external dependency (mitt, eventemitter3, etc.) — keeps the
- * platform tier free of optional packages.
- */
+/** Platform-tier notification event bus. */
 
 export interface NotificationEvents {
   /** Send a transactional or campaign email through the Email module. */

@@ -1,16 +1,4 @@
-/**
- * Free text (and photos) → a catalog `product_id`. Issue #342 §3 / §3a.
- *
- * Three methods, same ladder the rest of the platform uses:
- *   `mivaa`  — semantic search, `/api/rag/search?strategy=multi_vector` (results carry product_id)
- *   `ilike`  — a direct DB fallback when MIVAA is unavailable or returns nothing
- *   `visual` — the customer sent a photo instead of a name ("2 boxes of this"), matched through
- *              the SAME MIVAA multi_vector call with the image attached
- *
- * Nothing here auto-accepts a weak match. Below `CONFIDENT_SCORE` the line keeps its candidates
- * and is flagged `needs_review`, because a confidently wrong product is worse than an unmatched
- * line a human fixes in five seconds.
- */
+/** Free text (and photos) → a catalog `product_id`. Issue #342 §3 / §3a. */
 
 import type { DbClient } from '../supabase-client.ts';
 import { assertSafeUrl } from '../ssrf-guard.ts';

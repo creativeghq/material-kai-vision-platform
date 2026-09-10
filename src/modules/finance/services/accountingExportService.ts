@@ -3,11 +3,6 @@
  * download every fiscal document over a date range as a flat journal the accountant imports
  * into their accounting suite (Epsilon / Softone / Megasoft all ingest CSV with a column map),
  * plus a myDATA-classification summary for the VAT return.
- *
- * Pure client-side aggregation over RLS-readable finance tables — the invited `accountant`
- * persona reaches it through Finance → Reports with no extra grant. No edge function,
- * no migration: the data already lives in invoices / credit_notes / supplier_bills /
- * supplier_credit_notes.
  */
 import { supabase } from '@/integrations/supabase/client';
 import { round2 } from '@/utils/decimal';

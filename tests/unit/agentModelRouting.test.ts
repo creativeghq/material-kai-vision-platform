@@ -3,31 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { stripComments } from '../helpers/stripComments';
 
-/**
- * Which model an agent turn runs on, and how that is decided.
- *
- * The router used to tier by the LENGTH of the last user message — over 80 characters went to
- * Opus, under it went to Haiku, with side conditions on '@', a quote character and turn count.
- * Length is not complexity, and the side conditions were arbitrary: "who are our top
- * suppliers?" is 25 characters and needs several tool calls, while "what's our stock?" reached
- * the better model only because it contains an apostrophe.
- *
- * Measured 2026-08-22 over 31 completed turns (6 judgement cases x 3 models x 2 repeats,
- * driven through the deployed function with `model_override`):
- *
- *   model            punted to a form   substantive answer   tool calls/run
- *   haiku-4-5             6 of 12            5 of 12              1.7
- *   opus-4-8              4 of 11            7 of 11              1.7
- *   opus-5                1 of 8             7 of 8               3.8
- *
- * Haiku ended half its turns with "I need a couple of details — the form is on screen",
- * once without calling a single tool — the precise failure the operating doctrine exists to
- * prevent. On the same prompt Opus 5 ran three search phrasings and then separated an empty
- * catalog from a broken index.
- *
- * This test exists because the heuristic is easy to reintroduce as an "optimisation": it looks
- * thrifty, it breaks nothing, and the only symptom is an agent that asks instead of answering.
- */
+/** Which model an agent turn runs on, and how that is decided. */
 
 const ROOT = join(__dirname, '..', '..');
 /**

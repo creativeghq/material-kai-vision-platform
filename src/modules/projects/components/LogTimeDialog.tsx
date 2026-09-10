@@ -1,19 +1,4 @@
-/**
- * Log hours against a job — from the job (#378 C6).
- *
- * Labour was enterable in exactly one place: Finance → Time & Billing, which does have a project
- * selector. But the person who knows the hours is on the project, not in the finance hub, so the
- * job's labour cost arrived by goodwill; `get_project_pnl` reads it and quietly reported whatever
- * happened to have been entered.
- *
- * `time_entries.task_id` had **no writer anywhere in the codebase**. The column exists and a DB
- * trigger enforces that it requires its project, so per-task actuals were designed for and never
- * enterable. The task picker here is that writer.
- *
- * The rate is the operator's to state, and it is NOT the employee's payroll cost — those are two
- * different numbers that this platform does not reconcile (#378 N1). Nothing here pretends
- * otherwise; the field says what it is.
- */
+/** Log hours against a job — from the job (#378 C6). */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Loader2, Clock } from 'lucide-react';
 import {

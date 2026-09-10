@@ -1,25 +1,4 @@
-/**
- * A deterministic provider failure must carry the reason it happened.
- *
- * `b2b-tools` and `web-research-tools` both read Anthropic's error body, logged it with
- * `console.error`, and returned the bare string `Web search failed: 400`. Console output in an
- * edge worker is not somewhere anyone looks, and `agent_tool_call_logs` records the RETURNED
- * error — so seven 400s between 2026-08-18 and 2026-08-22 sit in the log with no cause, and the
- * only way to learn why is to reproduce them.
- *
- * The distinction the helper draws is the whole point:
- *
- *   429 / 529 / 5xx   transient. The status IS the story: wait and retry. A body adds nothing
- *                     the agent can act on, and the existing "upstream is busy" guidance is
- *                     better advice than whatever prose the provider returned.
- *   400 / 401 / 403 / 404 / 422
- *                     deterministic. It will recur identically until the REQUEST changes, and
- *                     the body is the only thing that says which part of the request is wrong —
- *                     an unknown tool version, `max_tokens` over the ceiling, a bad tool schema.
- *
- * This is the platform's own "a metric is a VALUE or a stated REASON there is no value" rule,
- * applied to an error string.
- */
+/** A deterministic provider failure must carry the reason it happened. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

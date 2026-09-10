@@ -95,7 +95,6 @@ export const UnifiedProcessingMonitor: React.FC = () => {
         // platform records a scrape session any more, so "pages crawled" is not a number we
         // have. Reported as 0 rather than sourced from a failing query, because a count that
         // silently reads 0 because the table is missing is indistinguishable from a real zero.
-        // (audit #270)
         const totalScrapedPages = 0;
         const [
           { count: totalScrapedImages },

@@ -1,30 +1,5 @@
 /**
  * Record links — turning an id in an agent tool payload into somewhere the reader can GO.
- *
- * Every agent result card renders through `AgentResultCard`, and that card deliberately HID every
- * uuid it was handed (`isPlumbing`) because a raw id is not information. True, and it threw away
- * the only thing that could have made the card interactive: a list of six expenses was a dead
- * table, the supplier each row is about survived only as a fragment of a `notes` string, and the
- * one place in the product that knows where a company lives — the ⌘K palette — was never asked.
- *
- * So this module answers three questions for ANY payload, which is what makes it work for every
- * tool at once rather than for the one that prompted it:
- *
- *   1. `recordKindForIdKey('supplier_company_id')` → `'company'`   — what does this id point AT?
- *   2. `labelKeyForIdKey('supplier_company_id', row)` → `'supplier_name'` — which cell is its NAME?
- *   3. `recordRoute('company', id, ctx)` → `/crm/companies/:id`   — where does it OPEN?
- *
- * **The routes are not written here.** `GLOBAL_SEARCH_KINDS` (globalSearchService) already declares
- * where each kind opens AND the capability/module gates that must match the guard on that route —
- * written by reading the router, and guarded by `globalSearchKinds.test.ts`. A second copy of that
- * table is exactly the drift this codebase keeps paying for, so the shared kinds are DERIVED from
- * it and only the kinds the palette does not search (`EXTRA_RECORD_KINDS`) are declared below.
- *
- * A kind with no page of its own — an expense, a payment, a contract — is not a gap: those live in
- * the peek dialog (`get_record_peek`), and their `listRoute` is the honest secondary destination.
- * Offering "open the record" for a URL that opens a list is the "button whose whole effect is to
- * name a place" failure, so the two are different fields and the UI labels them differently.
- *
  * @see tests/unit/recordLinks.test.ts
  */
 import { Receipt, Banknote, FileSignature, Inbox, type LucideIcon } from 'lucide-react';

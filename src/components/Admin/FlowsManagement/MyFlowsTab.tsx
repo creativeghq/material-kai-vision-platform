@@ -493,9 +493,6 @@ export const MyFlowsTab: React.FC<MyFlowsTabProps> = ({
   // which left an owner no way to stop it. Turning this on lists the flow under Automations →
   // Platform defaults for every workspace, where an owner may switch it off or silence one of its
   // channels. It never exposes the graph and never lets a tenant edit it.
-  // Leave it OFF for the operator's own business, for an alarm about the platform failing a legal
-  // or delivery obligation, and for delivery of a document to a CUSTOMER — silencing one of those
-  // hides breakage rather than noise.
   const handleToggleTenantConfigurable = async (flow: Flow) => {
     const next = !flow.tenant_configurable;
     if (next && !flow.is_global) {

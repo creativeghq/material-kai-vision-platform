@@ -4,18 +4,6 @@ import { hasCreds, serviceClient, createUser, teardown, runId, SUPABASE_URL, typ
 
 // Public "Hire me" contact form (PublicProfilePage → HireMeModal → inbox-api `profile_contact`).
 // Called with the ANON key only — exactly what a logged-out visitor's browser sends.
-//
-// Two shapes are pinned here, and both are things this path has actually been:
-//
-//  1. INERT. It began as a direct client insert into `profile_contact_requests`, which is
-//     authenticated-only, so every anonymous submission failed with 42501 while the modal
-//     rendered happily on a public page. Moving it server-side fixed that; these assertions keep
-//     the guards that made the move necessary observable.
-//  2. A SECOND INBOX. The message then landed in a private table with its own screen, no reply
-//     path (the only action was a mailto: link) and a delete button that deleted nothing — the
-//     table had no DELETE policy. It is now an ordinary `inbox_threads` row tagged
-//     `metadata.source = 'public_profile'`, which is what makes reply/assign/label/archive work.
-//     `profile_contact_requests` is GONE; a query against it here would be a false green.
 const suite = hasCreds ? describe : describe.skip;
 
 const ANON_KEY = process.env.SUPABASE_ANON_KEY || '';

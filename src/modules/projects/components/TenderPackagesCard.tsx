@@ -1,18 +1,4 @@
-/**
- * Tender packages — the enquiry, the bids, and the comparison that picks one.
- *
- * The comparison is the point. A package line shows every bidder's rate side by side with the
- * lowest PRICED one marked; a line somebody left blank is never "lowest", because a bid that wins
- * on what it omitted is the classic way a subcontract goes wrong.
- *
- * The totals row is what decides most awards, and it is deliberately per-bidder rather than a
- * single "cheapest" verdict: the lowest total often belongs to the bid with the most exclusions,
- * which is why `notes` sits beside it.
- *
- * AWARDING CALLS ONE RPC. The purchase order, its lines, the recomputed totals, the package stamp
- * and the losing bids all move together — never a sequence of writes from here, which is the
- * create-then-stamp pair that lets the same package twice when the second write fails.
- */
+/** Tender packages — the enquiry, the bids, and the comparison that picks one. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, Plus, Trash2, Gavel, Send, Check } from 'lucide-react';
 

@@ -1,36 +1,4 @@
-/**
- * company-enrich
- *
- * Web-search + Apollo.io business-info enrichment for a CRM company.
- * Called after a VIES / ΑΑΔΕ VAT lookup to auto-fill the *soft* identity fields
- * that a VAT registry never carries — website, socials, phone, email, a one-line
- * description, industry, employee band, and (best-effort) city/state.
- *
- *   POST /functions/v1/company-enrich
- *     body: { name: string, country_code?: string, vat_number?: string,
- *             workspace_id?: string, company_id?: string }
- *
- *   Returns: { ok, fields: { website, email, phone, linkedin, facebook, twitter,
- *              description, industry, employee_count, city, state, country },
- *              sources: string[], skipped: string[] }
- *
- * Data sources (merged; web search wins for website/socials/description, Apollo
- * fills the structured blanks + industry/employee band):
- *   1. Anthropic web_search (always available — uses ANTHROPIC_API_KEY)
- *   2. Apollo.io org search (only when APOLLO_API_KEY is configured)
- *
- * Credit model (invariant #10): reserve an affordability ceiling BEFORE any
- * upstream spend, refund it, then each provider debits its own actual cost.
- * A provider that finds nothing / errors never blocks the other — we always
- * return whatever we could gather, plus the list of sources that came back empty.
- *
- * If company_id is provided AND the caller owns the row (or is admin), any field
- * still EMPTY on that row is cached back onto crm_companies (never overwrites
- * operator-entered values).
- *
- * Auth: self-authenticates via the caller's JWT (deployed with --no-verify-jwt like
- * every function in this repo).
- */
+/** company-enrich */
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 // Invariant 1 — tenancy comes from membership, never from the request body.
@@ -49,21 +17,7 @@ const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
 // module load here.
 const ANTHROPIC_API_KEY = () => Deno.env.get('ANTHROPIC_API_KEY') || '';
 const APOLLO_API_KEY = () => Deno.env.get('APOLLO_API_KEY') || '';
-/**
- * `GOOGLE_GENERATIVE_AI_API_KEY`, not `GEMINI_API_KEY`.
- *
- * This read `GEMINI_API_KEY`, which is set NOWHERE — empty on the MIVAA host, no value in
- * platform_secrets, and absent from the edge env. Every Gemini call that has ever succeeded on
- * this platform (generate-interior-gemini, _shared/ai-client.ts) reads
- * GOOGLE_GENERATIVE_AI_API_KEY. So `findCompetitorsViaGemini` returned null on its first line
- * every time and the chain fell silently through to Anthropic — a provider that was ordered
- * FIRST, documented as "the broadest live index", and never once executed.
- *
- * Proven from production on 2026-08-15: forcing provider=gemini against the deployed function
- * returned `skipped: ["gemini (no GEMINI_API_KEY)"]` and zero competitors in 0.8s.
- *
- * `generate-social-image` reads the same dead name and has likewise never logged a call.
- */
+/** `GOOGLE_GENERATIVE_AI_API_KEY`, not `GEMINI_API_KEY`. */
 const GEMINI_API_KEY = () => Deno.env.get('GOOGLE_GENERATIVE_AI_API_KEY') || '';
 /**
  * One constant, used for the endpoint URL, the price lookup and the logged `model_name`, so
@@ -140,16 +94,6 @@ interface CallPrice {
  * Price one provider call. Token rates come from `ai_model_pricing` via `resolveTokenPrice`,
  * and the per-query search/grounding surcharge from the same table via `getServicePricing` —
  * NEVER from a constant in this file.
- *
- * This file used to carry its own: `0.80/4.00` for Haiku 4.5 (the table says 1.00/5.00, so
- * every enrichment since it shipped under-billed by 20%) and `0.10/0.40` for Gemini. That is
- * the second-price-table bug `ai-logger.ts` documents — ai-client.ts kept one for months and
- * priced Gemini 3.5 Flash at a third of its real rate. A wrong price is a valid number, so
- * neither typecheck nor an integrity probe can see it.
- *
- * Returns null when the model has no price row. We do NOT fall back to a guess: an unpriced
- * call is logged with an explicit marker and left undebited, which is loud, rather than
- * charged a made-up number, which is silent.
  */
 async function priceCall(
   admin: any, model: string, inTok: number, outTok: number,
@@ -262,24 +206,7 @@ async function enrichViaWebSearch(
     const toolUse = (extract.content as any[])?.find((b) => b.type === 'tool_use');
     fields = (toolUse?.input as Partial<EnrichFields>) ?? {};
   } catch (e) {
-    /**
-     * NO SALVAGE PARSER (#353 CRM-8, security invariant 9).
-     *
-     * This used to fall back to `extractJson(researchText)` — parsing a JSON object straight out
-     * of the WEB RESEARCH TEXT. That text is whatever the open internet said about a company
-     * name, so a page that ranks for that name and embeds
-     * `{"website":"…","email":"…","phone":"…"}` could write attacker-chosen contact details into
-     * a CRM record, every time the primary extraction happened to throw. The forced
-     * `tools` + `tool_choice` above exists precisely so the model cannot be talked into a
-     * different shape; a fallback that reads the raw page undoes it on the one path nobody
-     * watches.
-     *
-     * Invariant 9 is explicit: a classifier whose verdict drives a DB write MUST use
-     * `tools=[...]` + `tool_choice`, "not free-form JSON + a salvage parser". The competitor
-     * path in this same file already gets this right — it returns `[]` on exception. Enrichment
-     * now does the same: no fields is a correct, honest answer, and the caller reports which
-     * ones are missing.
-     */
+    /** NO SALVAGE PARSER (#353 CRM-8, security invariant 9). */
     console.warn('[company-enrich] structured extraction failed; returning no fields rather than parsing the research text:', e);
     fields = {};
   }
@@ -894,20 +821,7 @@ Deno.serve(withApiLogging('company-enrich', async (req: Request) => {
 
     const admin = createClient(supabaseUrl, supabaseServiceKey);
 
-    /**
-     * The workspace this call is BILLED and AUDITED against (#353 CRM-9, invariant 1).
-     *
-     * It arrives in the request body, and it was used unverified: for `reserveCredits`, for the
-     * `p_workspace_id` on every provider debit, and for the `ai_usage_logs` rows. So a caller
-     * could bill an enrichment to a tenant they have nothing to do with, and that tenant's cost
-     * view would show spend it never authorised — a wrong number in someone else's ledger, which
-     * nothing raises because it is a perfectly valid uuid.
-     *
-     * Not rejected outright when it fails: enrichment is a legitimate action for a user with no
-     * workspace context, and the fallback (bill the person, not a tenant) is exactly what
-     * `reserveCredits` does with an undefined workspace. Dropping it is therefore the safe
-     * degradation, and it is logged so a genuine misconfiguration is visible.
-     */
+    /** The workspace this call is BILLED and AUDITED against (#353 CRM-9, invariant 1). */
     const workspaceId = requestedWorkspaceId
       && await userCanAccessWorkspace(admin, user.id, requestedWorkspaceId)
       ? requestedWorkspaceId
@@ -955,17 +869,6 @@ Deno.serve(withApiLogging('company-enrich', async (req: Request) => {
         /**
          * TENANCY FIRST (#353 CRM-6, invariant 1). This is a service-role client writing to a
          * row identified by a body-supplied id, and it had no workspace check at all.
-         *
-         * `created_by === user.id` is not a tenancy check: a user who created a company in a
-         * workspace they have since LEFT still satisfies it, and could keep writing website,
-         * email, phone, socials, description, industry and address into that tenant's record.
-         * Neither is the account-tier fallback below — `public.roles` is the GLOBAL tier, true
-         * in every workspace at once, so a platform `admin` could write to any tenant's company.
-         *
-         * Membership is the boundary; the creator/tier test below stays as the within-tenant
-         * rule about WHO may cache-write. Silent skip rather than an error: this is an
-         * opportunistic cache of fields that are already being returned to the caller, so
-         * failing the whole enrichment over it would be worse than not caching.
          */
         const sameTenant = await userCanAccessWorkspace(admin, user.id, (company as any).workspace_id);
         let canWrite = sameTenant && company.created_by === user.id;

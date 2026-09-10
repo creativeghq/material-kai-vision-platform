@@ -1,25 +1,4 @@
-/**
- * Value vocabularies — the edge-side reader for `public.reference_vocabularies` (issue #370).
- *
- * WHY THIS EXISTS. The 30 sourcing markets were a module-local const (`B2B_REGIONS`) used only to
- * interpolate a string into a web-search query. The model could not read it — not from the prompt,
- * not from the tool schema (`country`/`region` were bare `z.string()`), not from the tool
- * description, not from the KB. Asked to "search the countries list we have in place", the agent
- * searched the Knowledge Base three times, found nothing, then INVENTED a list and presented it as
- * the platform's, with Bulgaria in the wrong region and 13 markets missing. Nothing could catch
- * that: a wrong country list is a valid country list.
- *
- * The rule is the same one CLAUDE.md already states for prompts and the field registry — an
- * enumerable vocabulary is DATA. It must be editable without a deploy, and it must reach the tool
- * schema, the tool description and the picker form from ONE place. The frontend twin is
- * src/services/vocabularies.ts; both read this table and neither restates its contents.
- *
- * FAILURE MODE. `loadVocabulary` THROWS when the store is unreachable and returns an empty list
- * only when the vocabulary genuinely has no active rows. Those are different facts and callers
- * must be able to tell them apart — the whole defect above came from a missing list being
- * indistinguishable from an unreadable one. Never add a hardcoded fallback: a fallback is
- * invisible when it fires, and an admin's edit would then save and change nothing forever.
- */
+/** Value vocabularies — the edge-side reader for `public.reference_vocabularies` (issue #370). */
 
 // deno-lint-ignore-file no-explicit-any
 
@@ -129,24 +108,7 @@ function marketKey(s: string): string {
     .replace(/ /g, '');
 }
 
-/**
- * The market row a country STRING refers to, or null when it is not one of ours.
- *
- * `country` is deliberately a free string on the search tool — any country is searchable, not only
- * the markets we sweep — so what arrives is whatever the model typed. Matching it against `value`
- * alone meant `Czechia` matched NOTHING: the search still ran, still said "in Czechia", and
- * silently dropped the native-language clause that is the entire reason the row carries a
- * language. A country that resolves to no row looks exactly like one that genuinely has no
- * language, so nothing raised — the silent-zero shape, one layer down from the list itself.
- *
- * The alternative names are DATA (`metadata.aliases`), never a constant here, for the same reason
- * the markets are: a table of country names in a source file is another copy of the country list,
- * which is the thing tests/unit/vocabularyRegistry.test.ts exists to stop. An admin adding a
- * market adds its exonyms and ISO codes on the same row, with no deploy.
- *
- * Canonical names are matched in full BEFORE any alias, so one market's alias can never shadow
- * another market's real name.
- */
+/** The market row a country STRING refers to, or null when it is not one of ours. */
 export function resolveMarket(
   terms: VocabularyTerm[],
   country: string | null | undefined,
@@ -169,13 +131,6 @@ export function resolveMarket(
 /**
  * The geographic scope clause for a manufacturer-search query — ONE derivation, two readers
  * (`_shared/tools/b2b-tools.ts` and `flow-engine`).
- *
- * They had three different answers between them. b2b-tools expanded a region to its member
- * countries and named all 30 markets for a bare sweep; flow-engine emitted the raw region KEY
- * (`in the cee region` — meaningless to a web search) and, with nothing set, the vague
- * `across Europe and major global manufacturing hubs`. Same tool, same DB prompt, different
- * geography — so the same request answered differently depending on which caller ran it, and
- * neither was wrong in a way anything could detect.
  */
 export function buildMarketScope(
   terms: VocabularyTerm[],

@@ -1,21 +1,4 @@
-/**
- * Supplier per-product pricing + supply mode.
- *
- * The price set here is the BASE the cascade resolver reads:
- *  - root operator → the catalog base price every downstream tier inherits;
- *  - a dealer on their OWN product → their sell price to the tier below.
- *
- * Writes product_prices (UNIQUE workspace_id,product_id,variant_key → upsert) + products.supply_mode.
- *
- * #374: a price is per VARIANT. `variant_key = null` is the row that applies to any variant —
- * the only row this card could write before — and a specific variant gets its own row beside it.
- * That is why the read below MUST filter on variant_key: with two rows present, an unfiltered
- * `.maybeSingle()` raises rather than picking one, so enabling variant prices without this would
- * have broken the card the first time anyone used the feature.
- * Only rendered for the price-owner (root, or the product's owning workspace) and only to
- * a supplier-capable user. For an operator-catalog product seen by a downstream dealer the
- * read-only WorkspaceCostBadge already shows their resolved cost, so this card stays hidden.
- */
+/** Supplier per-product pricing + supply mode. */
 import React, { useEffect, useState } from 'react';
 import { Loader2, Save, Tag } from 'lucide-react';
 import { Label } from '@/components/core/ui/label';

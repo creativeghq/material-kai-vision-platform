@@ -1,16 +1,4 @@
-/**
- * Short-let iCal guard.
- *
- * Channel sync is the feature, and a mis-parsed date is not a cosmetic bug — it is a double booking
- * or a phantom one. Two specific things have to hold:
- *
- *  1. **DTEND is exclusive.** For an all-day iCal event DTEND is the morning of departure, which is
- *     exactly our half-open `check_out`. Reading it as the last night is the classic off-by-one, and
- *     it manufactures an overlap on every back-to-back changeover — the database exclusion constraint
- *     would then reject a perfectly legal booking.
- *  2. **The outbound feed carries no guest identity.** That URL is a bearer capability handed to
- *     third parties; who is staying where is not theirs to have.
- */
+/** Short-let iCal guard. */
 import { describe, it, expect } from 'vitest';
 import { parseIcal, buildIcal } from '../../supabase/functions/_shared/real-estate-ical';
 

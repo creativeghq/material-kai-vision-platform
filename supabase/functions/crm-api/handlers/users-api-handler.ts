@@ -191,18 +191,7 @@ export async function handleUsers(req: Request): Promise<Response> {
         );
       }
 
-      /**
-       * Resolve the page of auth users to return.
-       *
-       * The `search` param was accepted by the client and then DISCARDED here (#366 BU-8):
-       * UserSearchDropdown sent it, this handler never read it, and the component filtered the
-       * first 20 of up to 1000 in the browser. So user #21 onward was unfindable through that
-       * control no matter what was typed — an empty dropdown that reads as "no such user".
-       *
-       * `auth.admin.listUsers` cannot filter, so a real search has to walk it. That is bounded:
-       * `MAX_SCAN_PAGES` pages of 1000, and `truncated` is REPORTED rather than swallowed — a
-       * silently short list is the defect being fixed, not an acceptable version of it.
-       */
+      /** Resolve the page of auth users to return. */
       const PER_PAGE = 1000;
       const MAX_SCAN_PAGES = 10;
       const nameById = new Map<string, string>();
@@ -466,7 +455,6 @@ export async function handleUsers(req: Request): Promise<Response> {
       //    jobs, notifications, preferences, reseller applications, …) and SET NULL on
       //    shared/business records they merely authored (catalog products/documents, KB docs,
       //    CRM, finance). AFTER DELETE storage triggers fire during this cascade for
-      //    entity-keyed outputs (moodboard sheets, quote / catalog / client-view PDFs).
       const { error: authDeleteError } = await supabase.auth.admin.deleteUser(targetUserId);
       if (authDeleteError) {
         // Surface the real failure — do NOT report success on a failed delete.

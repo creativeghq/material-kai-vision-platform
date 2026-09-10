@@ -264,20 +264,7 @@ export const CompanyDetailPage: React.FC = () => {
       navigate(`/crm/companies/${response.data.id}`, { replace: true });
     } catch (error) {
       console.error('Error creating company:', error);
-      /**
-       * A DUPLICATE IS NOT A FAILURE — offer the row we found (#353 CRM-3).
-       *
-       * `crm-api` refuses a create whose folded name already exists in the workspace and returns
-       * the existing company precisely so the caller can offer it; `CreateCompanyError` carries
-       * it, and its own comment says "so the caller can offer it instead of just reporting a
-       * failure". This page discarded both and showed "Failed to create company", which is a
-       * dead end: the operator has typed a full record, cannot save it, and is not told that the
-       * business already exists or where.
-       *
-       * `QuickAddCompanyDialog` already handles this properly. This is the path reached from
-       * AddCompanyModal, which does no probe of its own, so it is the one where the refusal is
-       * the FIRST time anybody mentions a duplicate.
-       */
+      /** A DUPLICATE IS NOT A FAILURE — offer the row we found (#353 CRM-3). */
       const dup = error as CreateCompanyError;
       if (dup?.code === 'duplicate_company' && dup.existing) {
         const existing = dup.existing;
@@ -394,14 +381,6 @@ export const CompanyDetailPage: React.FC = () => {
    * form, status) → web/Apollo business research (website, phone, socials, industry). One shared
    * routine ([[researchCompany]]) drives every surface that researches a party, so the Tax-tab
    * buttons, the header refresh, Add Company and the Expenses inbox all produce the same result.
-   *
-   * Manual by design: the operator controls when the ΑΑΔΕ TAXISnet notification fires. Passing
-   * companyId lets the edge functions cache their raw payloads server-side; we mirror the patch
-   * into local state through patchInline so the form updates instantly.
-   *
-   * Counterparty lookup is legitimate here: we only research businesses we have a real
-   * relationship with (a CRM customer/supplier we invoice or are invoiced by).
-   *
    * @param opts.silentSkip suppress the "needs a VAT number" error — used by the header refresh,
    *   which falls back to name-only web research when there is no Greek ΑΦΜ.
    */

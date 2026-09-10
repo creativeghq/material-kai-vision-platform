@@ -1,24 +1,4 @@
-/**
- * A presentation sheet's images are the sheet's own, and revoking the link revokes them (#392).
- *
- * THE DEFECT. A sheet's layout stored absolute URLs into `generation-images`, a PUBLIC bucket.
- * `share_expires_at` therefore expired the PDF and nothing else: whoever kept an image URL kept
- * the image, and anyone who learned a path could construct one. A client whose access "ended"
- * still held every render, every product photo and every plan the sheet showed.
- *
- * THE FIX has three halves and each one is silent on its own:
- *
- *   1. The sheet SNAPSHOTS its images into a private `sheet-assets/<sheet_id>/` at creation, and
- *      again after a save that adds one. Miss this and the layout still names the public copy.
- *   2. Reads RESOLVE `sheet-asset://` refs to signed URLs at the four service boundaries. Miss
- *      one and that surface renders nothing, with no error anywhere.
- *   3. The write boundary FOLDS THEM BACK. Miss this and the canvas persists the one-hour signed
- *      URL it was rendering — the sheet looks perfect all afternoon and is a page of dead images
- *      tomorrow, long after the save that broke it.
- *
- * Every one of the three is a wrong-but-valid string: a URL where a ref belongs typechecks, saves
- * and renders. So they are checked here rather than trusted.
- */
+/** A presentation sheet's images are the sheet's own, and revoking the link revokes them (#392). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';

@@ -1,14 +1,4 @@
-/**
- * Project drawing / document register with revisions — WS6 (#285).
- *
- * Files live in the PRIVATE `pdf-documents` bucket. Bucket + object path are stored and a signed
- * URL is minted per read; a signed URL is never persisted, because it expires and re-deriving it
- * is free (pipeline convention 7). Every revision — current and superseded — is registered in
- * `build_storage_reference_set()`, so history survives the orphan cron.
- *
- * "Exactly one current revision" is enforced by a partial unique index plus a BEFORE trigger that
- * demotes the previous one, not by this service remembering to do it in the right order.
- */
+/** Project drawing / document register with revisions — WS6 (#285). */
 import { supabase } from '@/integrations/supabase/client';
 import type { DocumentKind, DrawingPurpose } from '../drawingVocabulary';
 

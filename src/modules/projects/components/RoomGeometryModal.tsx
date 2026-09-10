@@ -16,17 +16,7 @@ import { PlanCalibrationCanvas } from '@/components/features/plans/PlanCalibrati
 import { isCalibrated, type PlanGeometry } from '@/utils/planGeometry';
 import { projectsService, type ProjectRoom } from '../services/projectsService';
 
-/**
- * Size and scale for one room.
- *
- * Two independent things live here on purpose:
- *   • typed dimensions — exact, and enough on their own for a rectangular room;
- *   • a calibrated plan backdrop — needed when the room isn't a plain rectangle,
- *     and the only trustworthy way to measure an uploaded or AI-generated plan.
- *
- * Either can be filled without the other. Typed dimensions also give the
- * calibration something to be sanity-checked against.
- */
+/** Size and scale for one room. */
 
 interface RoomGeometryModalProps {
   room: ProjectRoom | null;

@@ -54,12 +54,6 @@ serve(withApiLogging('auto-recovery-cron', async (req) => {
     console.log('[AutoRecoveryCron] Starting stuck job detection...');
 
     // Audit fix (this PR): sweep terminally-exhausted PDF jobs first.
-    // detect_stuck_pdf_jobs filters on recovery_attempts_after_genuine_failure
-    // < max_attempts, so a row that has already burned its 3-attempt budget
-    // is invisible to the recovery loop AND invisible to a future cron tick —
-    // it just sits at status='processing' forever. fail_exhausted_pdf_jobs
-    // RPC handles exactly this case: status='processing' AND attempts >= cap
-    // AND heartbeat stale. Was previously defined but never invoked.
     let exhaustedFailed = 0;
     try {
       const { data: failedCount, error: failExhaustedErr } = await supabase.rpc(
@@ -81,16 +75,6 @@ serve(withApiLogging('auto-recovery-cron', async (req) => {
     }
 
     // Reap agent_runs orphaned by an isolate kill.
-    //
-    // `background-agent-runner` runs the whole agent loop inside ONE edge invocation, so when the
-    // platform terminates that isolate none of our code writes the terminal state — the row stays
-    // 'processing' and the user, told "results will post back to this thread", waits forever.
-    // This database held a 'pending' run from 2026-07-31 that nothing had ever touched.
-    //
-    // Deliberately separate from detectAllStuckJobs: that covers `background_jobs`, which is a
-    // different table with a different recovery story (re-dispatch). An orphaned agent_run is not
-    // re-dispatchable — its credits were already reserved and settled — so the honest outcome is
-    // to mark it failed and let the user see that, not to silently retry paid work.
     let orphanedAgentRuns = 0;
     try {
       const { data, error } = await supabase.rpc('reap_orphaned_agent_runs', { p_stuck_minutes: 15 });
@@ -165,11 +149,6 @@ async function detectAllStuckJobs(supabase: any): Promise<StuckJob[]> {
   // EXIST and has no successor — neither `scraping_sessions` nor `web_scraping_sessions` is in
   // pg_class. Every 5-minute tick queried it, PostgREST rejected the call, the error was
   // console.error'd and the branch returned [], so the cron reported success forever.
-  //
-  // It was visible once: job_monitor_service logged the same failure 4,494 times into
-  // system_logs between 2026-07-03 and 07-06 before that emitter was changed. These edge
-  // functions log to the function console instead, which is why it went quiet without being
-  // fixed. Removed rather than repointed — there is nothing to point it at. (audit #270)
   const [pdfJobs, xmlJobs, agentRunJobs] = await Promise.all([
     detectStuckPdfJobs(supabase),
     detectStuckXmlJobs(supabase),
@@ -268,26 +247,7 @@ async function detectStuckPdfJobs(supabase: any): Promise<StuckJob[]> {
 }
 
 
-/**
- * Stuck XML imports.
- *
- * Liveness is decided by `last_heartbeat` and `current_slow_operation` — NOT by `updated_at`
- * (#363 `EE-10`/`EE-12`). `updated_at` answers "when did any column last change", which for a
- * job that is running steadily without writing progress is simply the time it started. The old
- * filter therefore judged a healthy long import stale at 30 minutes, and because
- * `recoverXmlJob` resets `progress: 0` and restarts from scratch (XML import has no checkpoint
- * resume), a live job was restarted underneath its own worker — twice more on the next two
- * ticks, and then written off as `failed` by `markAsFailed`, which fed a wrong number into
- * every downstream count and alert. The PDF path next door has always read the heartbeat and
- * honoured the slow-op marker; XML was the one that did not, which is the same defect confirmed
- * in the MIVAA recovery service (creativeghq/mivaa-pdf-extractor#12).
- *
- * `updated_at` survives only as the fallback for a job with no heartbeat at all — an import
- * that died before its first beat, or one queued by an older writer. `coalesce`-style fallback
- * in SQL would be cleaner than the two-query shape below, but PostgREST cannot express
- * "coalesce(last_heartbeat, updated_at) < X" as a filter, so the null case is a second query
- * rather than a silent omission.
- */
+/** Stuck XML imports. */
 async function detectStuckXmlJobs(supabase: any): Promise<StuckJob[]> {
   const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
 
@@ -547,14 +507,6 @@ async function recoverPdfJob(supabase: any, job: StuckJob): Promise<boolean> {
   // Actively re-dispatch the PDF job to MIVAA. Previously the
   // RPC just flipped status='pending' and we relied on the orchestrator
   // restart hook to pick it up — which only fires on full service restart.
-  // Now we POST to MIVAA's /api/rag/documents/job/{job_id}/resume so recovery
-  // is immediate. If the POST fails we MUST NOT leave the row at 'pending'
-  // forever — detect_stuck_pdf_jobs filters on status IN ('processing',
-  // 'interrupted'), so a 'pending' row with no orchestrator becomes a zombie
-  // that no future cron tick reclaims. Audit fix (this PR): on dispatch
-  // failure we revert status back to 'interrupted' so the next cron tick can
-  // re-attempt. The recovery_attempts counter stays bumped (already debited
-  // by the SQL RPC) so a persistently-failing MIVAA still hits the cap.
   const mivaaBaseUrl = Deno.env.get('MIVAA_BASE_URL') || 'https://v1api.materialshub.gr';
   const cronSecret = () => Deno.env.get('CRON_SECRET') || '';
   let dispatchOk = false;
@@ -709,8 +661,6 @@ async function markAsFailed(supabase: any, job: StuckJob): Promise<void> {
   // and the PipelineErrorsPanel summary chip would render an empty "Recovery
   // (N/N ok)" stub. Same anti-pattern as the post-2026-05-01 audit principle
   // ("explicit failure markers, not empty returns").
-  // append_recovery_history writes to background_jobs.recovery_history,
-  // so it only makes sense for non-agent_run / non-scraping jobs.
   if (table === 'background_jobs') {
     const resolvedFromStage = await resolveLastCheckpointStage(supabase, job);
     try {

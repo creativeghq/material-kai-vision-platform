@@ -1,15 +1,4 @@
-/**
- * Stripe balance transactions → the unified bank feed (#315).
- *
- * Pulls the TENANT's own Connect balance history (charges, payouts, fees, refunds) so
- * the Finance → Bank feed shows Stripe money next to Revolut and Viva. Rows are
- * INFORMATIONAL: their settlement already happened through stripe-webhooks →
- * record-payment, so they land as match_status 'ignored' and the auto-matchers skip
- * every non-revolut provider — nothing here can double-book.
- *
- * Only runs for workspaces with a LIVE Connect account (platform-collect money is the
- * operator's, not the tenant's, and has no place in their feed).
- */
+/** Stripe balance transactions → the unified bank feed (#315). */
 
 // deno-lint-ignore-file no-explicit-any
 

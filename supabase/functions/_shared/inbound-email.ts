@@ -1,15 +1,4 @@
-/**
- * Inbound email → the unified Inbox. Issue #342 §1–§2.
- *
- * Everything the Cloudflare Email Worker is forbidden to do lives here: recipient resolution,
- * tenancy binding, the auth/loop/dupe gates, and the three correlation ladders (workspace,
- * thread, customer). The Worker holds no database credential and resolves nothing — see
- * `cloudflare/email-worker/src/index.ts`.
- *
- * The invariant that matters (#1): `workspace_id` is derived from the RECIPIENT ADDRESS via
- * `user_email_addresses`, never from anything in the message. A sender can assert any From, any
- * Reply-To and any header they like; none of it selects a tenant.
- */
+/** Inbound email → the unified Inbox. Issue #342 §1–§2. */
 
 // Mapped in supabase/functions/deno.json, like @supabase/supabase-js. MIME parsing has no
 // business being hand-rolled: encoded-words, folded headers, nested multiparts and
@@ -23,27 +12,7 @@ import { runInBackground } from './background.ts';
 
 /** Private bucket for the raw `.eml`. Registered in `build_storage_reference_set()`. */
 export const RAW_EMAIL_BUCKET = 'pdf-documents';
-/**
- * Where an INBOUND attachment lands — the PRIVATE bucket (#357 AE-9).
- *
- * It used to be `generation-images`, which is `public: true`. Anyone who can send an email to the
- * inbound address could therefore put a file at a public URL under this platform's domain, with
- * its own chosen `content-type` — usable for malware distribution or for phishing that inherits
- * the domain's reputation. Inbound mail is the one surface where "anyone" is literal.
- *
- * MEASURING IT TURNED UP A SECOND, LOUDER BUG. `generation-images` carries an
- * `allowed_mime_types` allowlist of eight image/video/3D types, so Storage was already refusing
- * `text/html` — the filed attack was mostly blocked. But it was equally refusing
- * `application/pdf`, `application/zip` and everything else a customer actually emails, and
- * `storeAttachments` logged a `console.warn` and moved on. A customer emailing an order as a PDF
- * had the attachment silently dropped, and the message arrived looking like they forgot to
- * attach it.
- *
- * The private bucket fixes both: nothing is publicly addressable, and no MIME allowlist discards
- * real business documents. Reads already mint signed URLs from the recorded
- * `storage_bucket` + `storage_object_path` pair, so existing rows keep resolving from wherever
- * they were written.
- */
+/** Where an INBOUND attachment lands — the PRIVATE bucket (#357 AE-9). */
 export const ATTACHMENT_BUCKET = 'pdf-documents';
 
 /** Cap per attachment. Cloudflare caps the whole message at 25 MiB; this bounds one part. */
@@ -121,15 +90,6 @@ export type AddressAllocation =
 /**
  * Get-or-create this user's inbound address. Local parts are GLOBALLY unique because every tenant
  * shares one receiving domain.
- *
- * **No suffixes of any kind.** An auto-generated `basilis.kanonidis2@` is an address its owner has
- * to explain every time they say it out loud, handed to whichever of two identical names signed up
- * second. When the derived handle is taken we allocate NOTHING and return `taken` with the handle
- * we tried, so the user chooses their own (`args.localPart`). Two people with the same full name on
- * one platform is rare enough to be worth one question.
- *
- * No random suffix either: this is an address you print on a business card. What protects it is
- * `setReject()` on unknown recipients, the DKIM gate and per-sender limits — not obscurity.
  */
 export async function allocateUserEmailAddress(
   db: DbClient,
@@ -535,17 +495,7 @@ export async function storeAttachments(
       .from(ATTACHMENT_BUCKET)
       .upload(path, bytes, { contentType: att.mimeType, upsert: false });
     if (error) {
-      /**
-       * AN EXPLICIT FAILURE MARKER, not a silent skip (pipeline convention 1, #357 AE-9).
-       *
-       * This used to `continue`, so a failed upload produced a message with one fewer attachment
-       * and nothing anywhere saying so — the reader cannot tell "they didn't attach anything"
-       * from "we lost it". That is how the mime-allowlist rejection above went unnoticed: every
-       * PDF a customer emailed vanished into a console.warn.
-       *
-       * The row is still recorded, with no path and a reason, so the Inbox can say "an
-       * attachment could not be stored" instead of showing nothing at all.
-       */
+      /** AN EXPLICIT FAILURE MARKER, not a silent skip (pipeline convention 1, #357 AE-9). */
       console.error(`[inbound-email] attachment "${att.filename}" (${att.mimeType}) failed to store:`, error.message);
       out.push({
         storage_bucket: null,

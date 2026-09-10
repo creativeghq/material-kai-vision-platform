@@ -16,22 +16,7 @@ import {
 import { insertFaqEntry } from '../../supabase/functions/seo-api/handlers/faq-insert.ts';
 import { outputLanguageBlock } from '../../supabase/functions/seo-api/handlers/output-language.ts';
 
-/**
- * An article written in Greek came out with two English headings in the middle of it.
- *
- * Both live articles read `## Frequently Asked Questions` and `## Conclusion` while every other
- * heading was Greek — because three writer prompt rows named those two sections as literal English
- * strings ("H2 heading exactly: ..."), and a specific instruction beats "write every word in
- * Greek". The PLANNER had it right the whole time: its own outline said
- * `Συχνές Ερωτήσεις (FAQ) για πλακάκια μπάνιου Θεσσαλονίκη`, and the writer overrode it.
- *
- * The prompt half of the fix lives in the `prompts` table and cannot be pinned from here. This
- * pins the half that made it safe: every reader of those two sections used to key off the English
- * string, so fixing the prompt alone would have (a) removed the FAQ accordion from every
- * non-English article, (b) made `analyze` report "FAQ section not found but planned" against an
- * article that has one, and (c) had the FAQ-insert path write a fresh English heading back in.
- * None of those raise — a regex that matches nothing is a valid regex.
- */
+/** An article written in Greek came out with two English headings in the middle of it. */
 
 const ROOT = process.cwd();
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf-8');

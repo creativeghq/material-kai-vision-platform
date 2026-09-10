@@ -35,17 +35,7 @@ import { isContractContext } from '../_shared/contractVocabulary.generated.ts';
 // second copy here is how the hash would come to cover something a user can change without it
 // (#356 `RC-1`).
 const WRITABLE = SIGNED_FIELDS;
-/**
- * Statuses after which a contract's TERMS are settled (#356 `RC-1`).
- *
- * `update` had no status gate at all, so `value`, `body_markdown`, the dates and the
- * counterparty stayed editable after signature — and since the PDF re-rendered from live data
- * onto a fixed path, editing a signed contract silently replaced the signed artifact with new
- * terms carrying the old signature block. Nobody could answer "what was signed?".
- *
- * `expired` is deliberately NOT here: an expiry is a date passing, not an agreement, so a
- * lapsed draft may still be corrected and re-sent.
- */
+/** Statuses after which a contract's TERMS are settled (#356 `RC-1`). */
 const IMMUTABLE_STATUSES = ['signed', 'void'] as const;
 
 const SUBJECT_COLS = ['hr_employee_id', 'customer_company_id', 'supplier_company_id', 'order_id', 'quote_id', 'project_id', 'property_id'] as const;
@@ -131,13 +121,6 @@ Deno.serve(withApiLogging('contracts-api', async (req: Request) => {
     const signedHash = await contractContentHash(c as unknown as Record<string, unknown>);
 
     // ONE TRANSACTION, with the status flip as the CLAIM.
-    //
-    // This used to insert the signature and then stamp the contract as two statements. The insert
-    // commits on its own, so a failed stamp left the contract `sent` with a signature already
-    // against it — and the counterparty, still looking at a page that offers to sign, signed
-    // again. The check meant to stop them read `c.status`, the very column that failed to be
-    // written (CLAUDE.md rule 4: a duplicate guard reads the record written on the SUCCESS path).
-    // Two signature rows for one legal document, each with its own content hash.
     const { data: signResult, error: signErr } = await service.rpc('sign_contract', {
       p_token: token,
       p_signer_name: signerName,
@@ -199,14 +182,6 @@ Deno.serve(withApiLogging('contracts-api', async (req: Request) => {
   if (!ent.ok) return ent.response;
 
   // Writes go through the USER client so context-branched RLS is the enforcement.
-  //
-  // Taken from `authenticate()` rather than rebuilt here (#197 item 4): this file was one of five
-  // that hand-rolled the same anon-key + Authorization-header client, each slightly differently.
-  // Identical construction, so no behaviour change — the point is that there is now one definition
-  // to keep correct instead of five that can drift apart.
-  //
-  // The local build stays as the fallback for the case where SUPABASE_ANON_KEY is unset, which is
-  // exactly the case the old line already handled (badly — with an empty key).
   const authHeader = req.headers.get('Authorization') ?? '';
   const asUser = auth.supabaseAsUser
     ?? createClient(SUPABASE_URL, ANON_KEY, { global: { headers: { Authorization: authHeader } }, auth: { persistSession: false } });

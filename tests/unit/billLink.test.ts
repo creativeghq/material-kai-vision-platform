@@ -1,18 +1,4 @@
-/**
- * "What is this cost for?", re-answered on an expense that already exists (#378 L1).
- *
- * WHY THIS FILE EXISTS, rather than another rule in `orderLinkTargets.test.ts`: that suite proves
- * a call site handles a kind by searching its source for the kind. When `linkToColumns` was
- * deliberately broken to watch the guard fire, it did not fire — `linkKey`, sitting in the same
- * file, switching on the same `.kind`, carrying the same `case` labels, satisfied the search on
- * behalf of the handler that no longer worked. A text guard cannot distinguish a handler from a
- * same-shaped helper, and exhaustiveness over a discriminated union is a behavioural property.
- * So this one CALLS the mapping.
- *
- * What it protects: an expense pointed at an order, a job, a building or a trip, where the wrong
- * column — or a second column left set from the previous answer — is a perfectly valid uuid that
- * nothing raises about, and that quietly moves money onto the wrong job's P&L.
- */
+/** "What is this cost for?", re-answered on an expense that already exists (#378 L1). */
 import { describe, it, expect } from 'vitest';
 import {
   linkToColumns, linkKey, linkSubject, EMPTY_LINK, BILL_LINK_COLUMNS,

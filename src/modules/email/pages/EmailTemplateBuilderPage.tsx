@@ -85,10 +85,6 @@ const FLOW_EVENT_TAG_GROUPS: Array<{ title: string; tags: Array<{ tag: string; l
 // platform from PDF extraction and supplier XML — untrusted by CLAUDE.md's own reckoning. The
 // result is PERSISTED as a template and later mailed, so an injection here is stored and
 // delivered rather than merely rendered.
-//
-// Two different jobs, both needed. `escapeHtml` stops a value breaking OUT of its attribute;
-// `safeHref` / `safeImageSrc` stop it being a live `javascript:` URL that is already inside the
-// quotes and perfectly well-formed.
 function cardHtml(imageUrl: string, title: string, subtitle: string, linkUrl = '#') {
   const imgSrc = safeImageSrc(imageUrl);
   const img = imgSrc
@@ -247,12 +243,6 @@ function injectPreheader(html: string, text: string): string {
 // ── MH custom blocks for GrapesJS ──────────────────────────────────────────
 // Async: fetches material categories from DB to populate the category trait.
 // Visibility tiers:
-//   • Operator-only blocks carry the platform's own MaterialsHub / Material Kai
-//     branding (the "MH · Brand" group). These are gated on `isPlatformOperator`
-//     so tenant/dealer workspaces — whose emails go only to their own workspace
-//     members from their own BYOK sender — never expose the operator's branding.
-//   • Workspace blocks (materials, inspiration, generic content) are available to
-//     every workspace user regardless of tier.
 async function addMhBlocks(editor: GrapesEditor, isPlatformOperator: boolean) {
 
   // SVG line icon helper — matches GrapesJS panel style

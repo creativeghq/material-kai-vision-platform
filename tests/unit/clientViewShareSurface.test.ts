@@ -1,27 +1,6 @@
 /**
  * The client-view share link is an ANONYMOUS surface that both reads private files and accepts a
  * write. Two things were wrong with it.
- *
- * ── 1. Snag photos pointed at a bucket the files are not in ──────────────────────────────
- * #358 PQ-9 moved snag and site-log photos out of the public `generation-images` bucket into the
- * PRIVATE `pdf-documents` under `project-site/…`, read through signed URLs — because a defect photo
- * of the inside of a client's home was openable by anyone holding the URL. Every internal reader
- * moved with it. `moodboard-sheet-share` — the CLIENT-facing handover list — kept building
- * `getPublicUrl()` against the old bucket, so it emitted URLs for a file that is not there. Not a
- * leak any more: just every snag photo on a client view silently broken, with the list still
- * rendering around the gaps.
- *
- * ── 2. The anonymous feedback write had no rate limit ────────────────────────────────────
- * A share link is MEANT to be forwarded; it travels by email and group chat, and possession of it
- * says nothing about who is holding it. Every accepted feedback row also emits
- * `client_view_feedback_received`, which notifies and can email the deliverable's owner. So one
- * leaked link was an unbounded write into somebody's storage and inbox, from a URL they handed to
- * a client themselves.
- *
- * The budget is counted on `client_view_feedback` itself — no second store to keep consistent —
- * with a per-view cap (bounds the flood at all) and a per-caller cap keyed on a HASHED IP (targets
- * the one abusing it without locking out an honest client on the same link). Both counts fail
- * closed, per tests/unit/rateLimitFailsClosed.test.ts.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';

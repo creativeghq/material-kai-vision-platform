@@ -1,15 +1,4 @@
-/**
- * External Service Credit Utilities for Supabase Edge Functions
- *
- * Shared credit debit helper for all external (non-AI) per-unit services:
- * Zernio (WhatsApp), Apollo, Hunter.io, ZeroBounce, Firecrawl, FLUX, Kling, Wan2.1, Runway, xAI Aurora, etc.
- *
- * Pricing source: ai_model_pricing table where category='external_service' and billing_type='per_unit'.
- * Admins manage these via the AIModelPricingTab; this module reads the live values via Supabase
- * and caches the result for 5 minutes to avoid hitting the DB on every credit debit.
- *
- * Uses the shared debit_credits/refund_credits router (workspace pool → personal) and ai_usage_logs.
- */
+/** External Service Credit Utilities for Supabase Edge Functions */
 
 import type { DbClient } from './supabase-client.ts';
 import { SupabaseClient } from '@supabase/supabase-js';
@@ -32,18 +21,7 @@ interface ServicePricing {
   credits: number | null;
 }
 
-/**
- * Credits for one unit of a service, by its billing mode.
- *
- *  - `ai_markup`    cost x markup x 100 — our own compute. Effective 12.75x raw once the credit
- *                   is sold, which is right when nobody can price-compare a generated image.
- *  - `passthrough`  cost x markup / credit sale price — somebody else's network. The tenant pays
- *                   about cost x 1.5 in REAL money instead of 12.75x, because they can read
- *                   Meta's or a carrier's published rate.
- *  - `flat_credits` the stated price, for something that costs us nothing but is not free to
- *                   offer. Stating it beats back-solving a fake cost that produces the number —
- *                   a fabricated cost is a wrong number wearing the shape of a valid one.
- */
+/** Credits for one unit of a service, by its billing mode. */
 export function creditsForUnit(pricing: ServicePricing, units: number): number {
   if (pricing.billing_mode === 'flat_credits') {
     return Math.round((pricing.credits ?? 0) * units * 100) / 100;
@@ -162,17 +140,7 @@ export interface CreditDebitResult {
   new_balance?: number;
   transaction_id?: string;
   error?: string;
-  /**
-   * The `ai_usage_logs` row this debit wrote, when it wrote one.
-   *
-   * The debit happens BEFORE the upstream call (invariant 10), so at insert time the outcome is
-   * unknowable and `metadata.success` cannot be set. `ops.silent_zero`'s provider-failure arm
-   * reads exactly that key and skips a row without it — correctly, since a row that never
-   * learned its outcome cannot be judged. The consequence is that every flat-rate provider
-   * debited this way is INVISIBLE to the probe that exists to catch a provider failing on
-   * essentially every attempt. Handing the id back lets a caller stamp the outcome once it has
-   * one; see `recordExternalServiceOutcome`.
-   */
+  /** The `ai_usage_logs` row this debit wrote, when it wrote one. */
   usage_log_id?: string | null;
 }
 
@@ -185,18 +153,7 @@ export interface CreditDebitResult {
  * 4. Calls the debit_credits router RPC (pools when a workspaceId is passed + funded)
  * 5. Inserts a row into ai_usage_logs for tracking
  */
-/**
- * Optional provenance for the `ai_usage_logs` row this debit writes.
- *
- * `ai_usage_logs` carries `job_id` and `module_slug` columns and this writer set NEITHER, which is
- * why 5,192 rows — the majority of the table — carry no module and no job. The columns were not
- * missing; the signature had nowhere to put them, exactly like the `workspace_id` gap fixed on
- * 2026-08-12 and `AICallLogData` in `ai-logger.ts` (#365 `AD-15`). A caller with the ids in scope
- * four lines above the debit still had no way to pass them.
- *
- * Both stay OPTIONAL because plenty of spend genuinely has no job: an interactive tool call is not
- * a background job, and inventing an id would be worse than a null.
- */
+/** Optional provenance for the `ai_usage_logs` row this debit writes. */
 export interface UsageProvenance {
   /** `background_jobs.id` when this spend belongs to one. NOT a conversation id. */
   jobId?: string | null;
@@ -261,7 +218,6 @@ export async function debitExternalServiceCredits(
       // and every scrape was free AND unlogged, because this early return sits BEFORE the
       // ai_usage_logs insert below. The two cases are indistinguishable from here, so say so
       // rather than pass silently: a free call that should have cost money leaves a trace, and
-      // a genuinely free one leaves a harmless line.
       console.warn(
         `[credit-utils] ${serviceName} priced at 0 — charging nothing and writing no usage row. ` +
         `If this service is not actually free, its ai_model_pricing row is misconfigured ` +
@@ -411,9 +367,6 @@ export async function getExternalServiceNames(supabase: DbClient): Promise<strin
 // a flat fee per turn ON TOP of the underlying tool/AI usage. This matches
 // the pattern in mention_cost_logger.MENTION_OP_CREDIT_COST.
 // 10 credits = $0.10 raw equivalent (1 credit = $0.01). Adjustable per-agent.
-// Refund on hard pre-execution failure (e.g. agent crashed before producing
-// a single chunk). NO refund once the agent has started streaming — the
-// underlying Anthropic + tool spend has already happened.
 const AGENT_CHAT_TURN_CREDIT_COST: Record<string, number> = {
   kai: 10,
   'interior-designer': 10,
@@ -518,19 +471,6 @@ export async function debitAgentChatTurn(
  * Refund a previously-debited agent turn when the agent failed before
  * producing any output (hard pre-stream error). NOT called once streaming
  * has started — by then the spend is irrecoverable.
- *
- * IDEMPOTENT (#363 `EE-7`), and only because `debitTransactionId` is passed. The refund names
- * the debit it reverses in `refunds_transaction_id`, and a partial unique index on
- * `credit_transactions` (`credit_transactions_one_refund_per_debit_idx`) rejects a second
- * refund for the same debit. Previously nothing tied a refund to its debit, so two error paths
- * reaching the same turn credited the balance twice, and a double refund looks exactly like a
- * legitimate one — a positive amount on a valid row.
- *
- * The rejection surfaces as a unique-violation error from the RPC, which is logged, not thrown:
- * "this turn was already refunded" is the correct outcome, not a failure the caller must handle.
- * `debitTransactionId` is nullable because `debit_credits` can return a null id on the pooled
- * path; with no id there is nothing to key on and the old non-idempotent behaviour applies, so
- * callers must still not invoke this twice on that path.
  */
 export async function refundAgentChatTurn(
   supabase: DbClient,
@@ -576,45 +516,8 @@ export function invalidatePricingCache(): void {
   _pricingCache = null;
 }
 
-/**
- * Debit BEFORE the paid upstream call, and REFUSE the work when the debit fails.
- *
- * This exists because `debitExternalServiceCredits` returns `{success:false}` rather than throwing,
- * and 22 call sites did `await debit(...)` with the result discarded — after the upstream call had
- * already run. A debit whose result nobody reads is not a debit, it is a log line: an exhausted
- * workspace still sent every WhatsApp and still ran every Opus call, and we had already paid the
- * provider by the time we found out we could not bill for it. (CLAUDE.md invariant 10, audit #312)
- *
- * Returns `null` when the caller may proceed, or a ready-to-return JSON refusal when it may not —
- * so the guard is one line at the call site and the failure cannot be ignored by accident:
- *
- *     const refusal = await debitOrRefuse(supabase, userId, 'firecrawl-scrape', 'scrape', 1, { url }, wsId);
- *     if (refusal) return refusal;
- *     // ...only now call the paid API
- *
- * Shaped for the agent-tool callers, which signal failure by RETURNING `JSON.stringify({success:false})`
- * rather than throwing. For handlers that return a `Response`, read `.success` off
- * `debitExternalServiceCredits` directly and reply 402.
- *
- * When the unit count is only known AFTER the call (a batch whose size the provider decides), the
- * order cannot be fixed — use `checkCreditBalance` as a preflight first, then debit the real count.
- */
-/**
- * Stamp the OUTCOME of an external-service call onto the `ai_usage_logs` row its debit wrote.
- *
- * The debit runs before the call (invariant 10), so the row is born not knowing whether the work
- * succeeded. `ops.silent_zero`'s provider-failure arm reads `metadata.success` and skips a row
- * without it — correctly, because a row that never learned its outcome cannot be judged. The
- * effect is that a flat-rate provider debited this way can fail on every single attempt and the
- * probe that exists to catch exactly that will never see it. `sonar` was caught only because
- * MIVAA's logger records the outcome; the edge-side ones are not so lucky.
- *
- * Best-effort and never throws: telemetry must not fail the work it describes.
- *
- * Read-modify-write rather than a jsonb merge, because PostgREST has no `||` operator here. The
- * race that would normally make that unsafe does not exist — nothing else writes this row's
- * metadata after the insert.
- */
+/** Debit BEFORE the paid upstream call, and REFUSE the work when the debit fails. */
+/** Stamp the OUTCOME of an external-service call onto the `ai_usage_logs` row its debit wrote. */
 export async function recordExternalServiceOutcome(
   supabase: DbClient,
   usageLogId: string | null | undefined,

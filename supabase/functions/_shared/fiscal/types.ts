@@ -44,26 +44,7 @@ export function isUnnamedLineName(desc: string | null | undefined): boolean {
   return UNNAMED_LINE_SENTINELS.has(String(desc ?? '').trim().toLowerCase());
 }
 
-/**
- * Units that exist in our catalogue but have NO AADE `measurement_unit` code.
- *
- * `mydata_reference` category `measurement_unit` holds exactly six codes (pieces, kg, litres,
- * metres, m², m³). Everything below is a packaging or labour unit we let operators pick because
- * it is how the trade actually talks — a tile order is placed in boxes and pallets — and it must
- * be converted to a coded unit before a line reaches myDATA. `src/lib/units.ts` says so in the
- * comment on `mydataCode: null`; nothing enforced it, so 'pallet' could be transmitted verbatim
- * as the measurement unit of an AADE-registered legal document.
- *
- * **Twin of the `mydataCode === null` entries in [src/lib/units.ts](../../../../src/lib/units.ts).**
- * An edge function cannot import from `src/`, so the set is restated here and held equal by
- * [tests/unit/fiscalUnitParity.test.ts](../../../../tests/unit/fiscalUnitParity.test.ts) — the same
- * arrangement `escapeHtml` uses across its three runtimes, and for the same reason: the last time
- * a value like this was hand-copied without a test, the copies drifted.
- *
- * Deliberately an explicit set rather than "anything not in the coded six": historical rows carry
- * aliases ('sqm', 'm²', 'τεμ', 'item') that normalise to a coded unit, and blocking those would
- * refuse transmissions that are perfectly valid today.
- */
+/** Units that exist in our catalogue but have NO AADE `measurement_unit` code. */
 export const UNCODED_MYDATA_UNITS = new Set([
   'box', 'pallet', 'set', 'hour', 'day', 'job', 'point', 'room', 'bath',
 ]);
@@ -73,23 +54,7 @@ export function isUncodedMydataUnit(unit: string | null | undefined): boolean {
   return UNCODED_MYDATA_UNITS.has(String(unit ?? '').trim().toLowerCase());
 }
 
-/**
- * AADE `measurement_unit` code → our canonical unit key.
- *
- * The inverse of the `mydataCode` field on `src/lib/units.ts`, and the OTHER direction of the
- * same twin: `UNCODED_MYDATA_UNITS` above stops an uncoded unit going OUT to AADE, this stops us
- * ignoring a coded unit coming IN. myDATA states the unit on the line it delivers, so on an
- * inbound document this code IS the unit — `src/lib/units.ts` says so in as many words ("never
- * infer the unit from a product description instead") and the intake queue writer inferred it
- * anyway, from a Haiku reading of the description, for every line it has ever queued. Measured
- * 2026-08-20: 2,022 of 3,643 inbound lines carry the code; 82 queued rows ended up as a
- * fractional quantity of `pcs`, which is not a thing that can be in a warehouse.
- *
- * **Twin of the `mydataCode` values in [src/lib/units.ts](../../../../src/lib/units.ts)**, held
- * equal by [tests/unit/fiscalUnitParity.test.ts](../../../../tests/unit/fiscalUnitParity.test.ts).
- * An edge function cannot import from `src/`; a hand-copied map with no test is how the six unit
- * lists that preceded `units.ts` drifted apart.
- */
+/** AADE `measurement_unit` code → our canonical unit key. */
 export const MYDATA_UNIT_BY_CODE: Record<number, string> = {
   1: 'pcs', 2: 'kg', 3: 'lt', 4: 'm', 5: 'm2', 6: 'm3',
   // 7 = "Pieces_Other Cases" (AADE Appendix §9). AADE codes SEVEN units, not six; this row
@@ -98,18 +63,7 @@ export const MYDATA_UNIT_BY_CODE: Record<number, string> = {
   7: 'pcs_other',
 };
 
-/**
- * The OTHER direction: a unit label or canonical key → the AADE `measurementUnit` CODE.
- *
- * A movement document (9.3) is the one family where the numeric code is MANDATORY per line —
- * "measurementUnit for this invoice type is mandatory for invoice detail N", error 230 — while
- * every value-bearing type is happy with the label alone. So this is not a nicety: without it a
- * delivery note cannot be transmitted at all.
- *
- * Deliberately NOT a guess. An unrecognised unit returns null and the caller refuses the
- * transmission, the same stance `UNCODED_MYDATA_UNITS` takes going out: a wrong unit on a
- * document AADE has registered is not recoverable, and a refusal is.
- */
+/** The OTHER direction: a unit label or canonical key → the AADE `measurementUnit` CODE. */
 const MYDATA_UNIT_ALIASES: Record<string, number> = {
   pc: 1, piece: 1, pieces: 1, item: 1, items: 1, unit: 1, τεμ: 1, 'τεμ.': 1, τμχ: 1, τεμαχια: 1,
   kgs: 2, kilo: 2, kilos: 2, kilogram: 2, kilograms: 2, κγ: 2, κιλ: 2, κιλα: 2,
@@ -208,11 +162,6 @@ export interface FiscalLine {
    * 1 = third-party sales clearance, 2 = fee from third-party sales. A 1.5 document
    * ("Clearance of Sales on Behalf of Third Parties – Fees from Sales on Behalf of Third
    * Parties") carries both kinds at once, and this is what tells them apart.
-   *
-   * The Novus dev doc (p.9) glosses this as "self-billing remark" — a loose rendering of
-   * «Επισήμανση Αυτοτιμολόγησης» — but the two values above are its ONLY allowed values, so
-   * it belongs to the sale-on-behalf-of-third-parties family, NOT to self-billing
-   * (αυτοτιμολόγηση). Self-billing is the header flag `header.selfPricing`. See issue #278.
    */
   invoiceDetailType?: number;
   /**
@@ -221,26 +170,11 @@ export interface FiscalLine {
    * goods line that happens to have `otherTaxesAmount` hanging off it. A recycling or eco-fee
    * charged to the customer is exactly that, and until this existed it could only ride on a
    * product line, which states a different fact to AADE.
-   *
-   * The other three values are separate features with their own machinery — 2 is a totals-line
-   * marker, 6 a gift certificate, 7 the negative-sign flag valid ONLY on 17.3–17.6 — so they
-   * are refused rather than offered. Emitting a code we cannot honour end to end is how
-   * `movePurpose` came to file unclassified movements as sales.
    */
   recType?: number;
 }
 
-/**
- * One row of myDATA `taxesTotals` — a tax declared at DOCUMENT level instead of on a line.
- *
- * This is the alternative myDATA offers to the per-line tax fields, and it is the only one of
- * the two that can express what a Greek levy actually looks like: a line carries exactly ONE
- * category per bucket, while a document routinely charges the SAME AADE code (fees 17,
- * recycling) at a different rate per ΑΗΗΕ appliance class. Each row names its own category and
- * carries a free-text `label`, which is where "Φόρος Ανακύκλωσης ΑΗΗΕ-5Γ01" goes.
- *
- * The two are mutually exclusive per document. Declaring a tax in both places files it twice.
- */
+/** One row of myDATA `taxesTotals` — a tax declared at DOCUMENT level instead of on a line. */
 export interface FiscalTaxTotal {
   /** AADE Appendix §23: 1 withheld · 2 fees · 3 other taxes · 4 stamp duty · 5 deductions. */
   taxType: number;
@@ -405,15 +339,6 @@ export interface FiscalSubmissionResult {
   /**
    * The provider refused this transmission because a document with the same identity
    * (issuer + series + AA) is ALREADY FILED — and told us which one.
-   *
-   * This is the recovery handle for the one genuinely dangerous case: the first send reached
-   * AADE but its response never came back, so nothing was recorded locally and the retry looks
-   * like a refusal. The document exists; only our copy of the MARK is missing.
-   *
-   * DO NOT ADOPT THIS MARK WITHOUT CHECKING. The identical error is what a numbering collision
-   * produces — two different documents issued under one series+AA — and adopting it there would
-   * stamp one document with another's legal number. Confirm the filed document is this one
-   * (`fetchTransmitted` and compare the totals) before writing it down.
    */
   duplicateOf?: { mark: string; authenticationCode?: string };
   /** Set when a 228 was RESOLVED: the filed document was fetched, proved to be this one

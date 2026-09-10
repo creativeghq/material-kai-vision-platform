@@ -1,24 +1,4 @@
-/**
- * Say what was actually on a document that arrived without lines.
- *
- * Two thirds of the received documents in this workspace (1,161 of 1,769) carry lines with a
- * value and no name — every `14.x` foreign purchase by construction, and most `2.x` Greek service
- * billing besides. AADE has the money; nobody transmitted the detail. So every consumer that keys
- * on `lines[].item_description` — warehouse receive, AI product extraction, catalog products, the
- * markup ladder — correctly skips them, and the purchase never reaches stock.
- *
- * The document has no lines. The TRANSACTION did, and the operator knows what they ordered.
- *
- * Design, and the reason it is safe:
- *   - `total_net` is the ANCHOR. Transmitted, carries a MARK, not editable, and the typed lines
- *     must foot to it. Without that rule the document would state two different amounts for one
- *     purchase, both of them valid numbers.
- *   - Paste, don't fill in. `parseSupplierLine` already reads "AMALFI GRIS 80X80 A' -3 -1" into an
- *     80×80 tile at €16.51/m², so the operator pastes what the supplier's PDF says and corrects
- *     the odd field, rather than filling a form per line.
- *   - Offered on `lines_source='none'` and nowhere else. A `1.1`'s lines came under the supplier's
- *     own MARK; rewriting those would make our records diverge from the tax record.
- */
+/** Say what was actually on a document that arrived without lines. */
 import React, { useMemo, useState } from 'react';
 import { Loader2, Plus, Trash2, Wand2 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';

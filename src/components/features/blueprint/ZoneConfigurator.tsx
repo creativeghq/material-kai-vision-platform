@@ -1,22 +1,4 @@
-/**
- * The zone configurator — where a kitchen is described as what it actually is.
- *
- * ONE renderer, used by the anonymous calculator (/tools/kitchen-cost) and by the project Plan
- * tab, so a visitor and a salesperson configure the same kitchen through the same controls and
- * arrive at the same number. Presentational: every edit is emitted through `onChange`, and the
- * money shown per row comes from the passed-in `derived` result — this file never prices anything
- * itself, because a second pricing path is how a configurator starts disagreeing with the quote.
- *
- * What a zone shows, top to bottom: its GLOBALS (height, depth, door model — the things true of
- * every unit in it), then its MODULE ROWS (kind × width × how many, plus per-module choices like
- * the drawer/runner set). A `surface` zone (worktop) has no modules — just its material and a
- * length that follows the run it sits on unless you override it.
- *
- * An `appliances` zone asks a different question per row, and the important one is not the price:
- * WHO SUPPLIES IT. "I already have a fridge-freezer" is the commonest answer on a kitchen survey
- * and it changes the money to zero while changing nothing at all about the aperture, the socket or
- * the tall housing it still has to go in — so the row keeps showing what it needs either way.
- */
+/** The zone configurator — where a kitchen is described as what it actually is. */
 
 import React from 'react';
 import { Minus, Plus, Ruler, Trash2 } from 'lucide-react';

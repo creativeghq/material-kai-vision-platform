@@ -191,8 +191,6 @@ Deno.serve(withApiLogging(
 // reads `GET /service/circabc/spaces/{id}/children`, and that endpoint honours `guest=true` for
 // public libraries — so the folder tree can be walked without credentials and the current
 // month resolved on every run.
-// (`/api/-default-/public/alfresco/…` answers 401 and `/api/nodes/…` 404s; this is the path the
-// product actually uses.)
 
 const CIRCABC_BASE = 'https://circabc.europa.eu';
 const CIRCABC_MAX_DEPTH = 4;
@@ -201,12 +199,6 @@ const DEFAULT_LANGUAGE = 'EN';
 /**
  * Every outbound fetch in this function goes through here: SSRF-guarded, size-capped, and
  * redirect-aware.
- *
- * Redirects are followed BY HAND, re-running the SSRF guard on each hop. `redirect: 'follow'`
- * would let the first hop send us anywhere; `redirect: 'manual'` — the previous behaviour —
- * yields an opaque response whose body cannot be read at all, which surfaced as
- * "error reading a body from connection" the moment the CIRCABC listing endpoint redirected.
- * Neither is right on its own.
  */
 /**
  * Drain a response body through the stream reader rather than `.text()` / `.arrayBuffer()`.
@@ -374,17 +366,6 @@ const circabcDownloadUrl = (fileId: string, name: string) =>
  * Minimal xlsx reader: enough of the format to turn the published TARIC extraction into a grid,
  * and nothing more. No formulas, no styles, no dates-as-serial-numbers (the extraction writes
  * dates as text).
- *
- * Two subtleties, both of which silently corrupt this file rather than failing:
- *
- * 1. **Cells are placed by their `r="H1234"` reference, never by stream position.** Positional
- *    reading shifts every later column when a cell is missing.
- * 2. **An empty cell is written self-closing — `<c r="C536" t="inlineStr" />`.** A pattern that
- *    demands a closing `</c>` does not merely skip it, it swallows the NEXT cell along with it:
- *    the following cell's value gets attributed to the empty cell's column. That put `EL` in the
- *    End-date column and pushed each description into the Indent column, where a description
- *    like "…κλάσεων 0801 μέχρι και 0806" reduced to the digits 8010806 and overflowed a
- *    smallint mid-import. Both forms are matched below.
  */
 async function parseXlsx(bytes: Uint8Array): Promise<string[][]> {
   const { unzipSync, strFromU8 } = await import('npm:fflate@0.8.2');
@@ -607,12 +588,6 @@ async function importGrid(
     // Both halves must be split BEFORE normalising: the concatenated digits are 12 long and
     // `normalizeCode` — correctly — rejects that, so splitting afterwards would have skipped
     // every row in the file.
-    // The suffix is not cosmetic. 80 is a declarable line; 10 is an intermediate one that exists
-    // only to carry the hierarchy and is rejected on a customs declaration. Defaulting it to 80
-    // would publish thousands of unusable codes into the picker as if they were valid.
-    // Split ONLY when the part before the trailing pair is itself a full 10-digit code, which is
-    // the published form. Without that guard a hand-spaced code — "6907 21 00 90" — loses its
-    // last pair to the suffix and silently imports as heading 6907210000.
     const rawCode = (at(r, 'code') ?? '').trim();
     const split = /^([0-9\s]+?)\s+(\d{2})$/.exec(rawCode);
     const splitCodeDigits = split ? split[1].replace(/[^0-9]/g, '') : '';
@@ -662,14 +637,6 @@ async function importGrid(
   }
 
   // Completeness is recorded SEPARATELY from progress (#361 `EG-19`).
-  //
-  // `taric_upsert_batch` stamps `imported_at` on every row it writes, so after twelve of
-  // twenty-five batches the newest `imported_at` in the table is seconds old — and the
-  // staleness probe, which read `max(imported_at)`, went quiet while the nomenclature was half
-  // old and half new with stale parent links. The partial failure REPAIRED the signal that
-  // existed to catch it. So this run opens as `running`, and only reaches `completed` after
-  // every batch AND the parent rebuild have succeeded; anything else lands as `failed`, with
-  // the reason, where an admin can see it.
   const { data: runRow } = await supabase
     .from('taric_import_runs')
     .insert({

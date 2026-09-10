@@ -1,19 +1,4 @@
-/**
- * Voltage-drop parity between the frontend engine and the PDF builder.
- *
- * The calculation exists TWICE and that is a deliberate, uncomfortable
- * compromise: `src/utils/mepCalculations.ts` runs in the browser, and the PDF is
- * rendered by a Deno edge function that cannot import from `src/`. Same shape as
- * the escapeHtml frontend/edge split.
- *
- * Two copies of a derived quantity is precisely what the one-derivation rule in
- * CLAUDE.md exists to prevent, and the failure mode is nasty: the canvas would
- * tell the user 4.2% PASS while the drawing they hand to an electrician says
- * 8.4% OVER, or worse the reverse. Nothing would error.
- *
- * So the constants that drive the two implementations are pinned against each
- * other here. If either side is edited alone, this fails.
- */
+/** Voltage-drop parity between the frontend engine and the PDF builder. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

@@ -3,17 +3,6 @@
  * customer/supplier statement can be acted on (Finance → Parties drill-down, the CRM
  * party page, the Sales portal):
  *   • Email    — email the statement to the party (errors clearly when no email on file)
- *   • Download — generate the statement PDF (dry-run) and open it
- *   • Share    — mint/copy a public /statement/{token} link the party unlocks with VAT+email
- *   • View CRM — open the party's CRM record (hidden when already on it)
- *
- * Rendered as compact icon buttons by default (`variant="icons"`), or labelled buttons.
- *
- * A surface that puts these in an "Actions" menu instead of a button row calls
- * `usePartyStatementActions` and renders its own menu items — the WORK stays here so a menu
- * and a button row can never drift into two different email/share behaviours. The hook must be
- * called by the component that OWNS the menu, never inside `DropdownMenuContent`: Radix unmounts
- * that subtree on close, which would take the Connect-email modal down with it mid-flow.
  */
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';

@@ -1,21 +1,4 @@
-/**
- * "Release to income" — stop holding a customer's leftover on-account money.
- *
- * A customer's on-account balance is money of theirs we are sitting on: unallocated cash-in. Once
- * their job is done and everything they owed is settled, whatever is left is ours. Until now there
- * was no way to say so — the only exits were "apply it to another order" and "refund it", so a
- * leftover €400 stayed a liability on their account forever.
- *
- * What this does and does NOT do:
- *  - The CASH DOES NOT MOVE. It stays in whichever account it landed in and is free to spend.
- *  - The customer's on-account balance drops by the released amount and it leaves their statement.
- *  - It books as income under the category picked here, so it shows up as profit in the P&L.
- *  - NOTHING is issued to the customer and NOTHING is transmitted to myDATA. This is an internal
- *    reclassification, not a sale. If the retained amount is consideration for a supply, invoice
- *    it instead — that is a different act and a different form.
- *
- * Reversible: `financeService.reverseCreditRelease(id)` puts the credit back exactly as it was.
- */
+/** "Release to income" — stop holding a customer's leftover on-account money. */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';

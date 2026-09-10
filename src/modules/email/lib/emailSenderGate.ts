@@ -1,13 +1,4 @@
-/**
- * Shared "no workspace email configured" gate helpers.
- *
- * Tenant business mail (quotes, invoices, statements, catalog, CRM sends, POs, campaigns) MUST
- * go out from the workspace's OWN Resend BYOK sender — never the shared platform domain. The
- * backend enforces this (`requireWorkspaceSender` → 503 `workspace_sender_required`). These
- * helpers give the frontend a single, reusable way to react when a send is blocked:
- *   1. surface the Connect-email modal (see ConnectEmailModal / useConnectEmailGate), and
- *   2. raise a bell notification for the workspace's admins with a link to set it up.
- */
+/** Shared "no workspace email configured" gate helpers. */
 
 import { flowEventService } from '@/services/flows/flowEventService';
 import { supabase } from '@/integrations/supabase/client';

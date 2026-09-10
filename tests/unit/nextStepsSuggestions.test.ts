@@ -1,21 +1,4 @@
-/**
- * The per-turn "what next?" suggestions (`_shared/next-steps.ts`).
- *
- * This path has all three shapes this codebase has been burned by before, in one file:
- *
- *  1. A PROMPT IN CODE. The suggestion prompt lives in `prompts` and the loader throws when the
- *     row is missing. The tempting "fix" for a missing row is to inline the prompt — which is
- *     exactly how `segmentation_service` ended up running a 9,119-char constant while an admin's
- *     edits saved and changed nothing, forever, with every health signal green.
- *  2. A SALVAGE PARSER. Structure comes from a forced `tool_use` block. Fishing JSON out of a
- *     text block is what security invariant 9 forbids, and it fails silently and intermittently
- *     rather than loudly.
- *  3. UNFENCED UNTRUSTED CONTENT. The tool result fed in here can be a scraped page, supplier
- *     XML or a customer's email body. It goes in wrapped and labelled as DATA (invariant 9).
- *
- * None of the three fails a typecheck, a lint, or a smoke test — they just quietly change what
- * the model is asked. So they are pinned here.
- */
+/** The per-turn "what next?" suggestions (`_shared/next-steps.ts`). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

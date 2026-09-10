@@ -2,30 +2,7 @@
 // Regenerate: npm run vocab:mirror (part of gen:all). Freshness is enforced by
 // tests/unit/vocabularyMirrors.test.ts, which fails the build on any drift.
 
-/**
- * AI Assessment vocabulary — the closed value-sets three runtimes have to agree on.
- *
- * SQL DERIVES the verdict, the dimension scores and every signal's status; the edge tool
- * constrains the model to these same words through a `z.enum`; the client only formats them.
- * That is three consumers of one fact, which is exactly the shape the mirror system exists for
- * (CLAUDE.md — "a closed value-set that BOTH runtimes need is declared ONCE and mirrored").
- *
- * IMPORT-FREE ON PURPOSE. `npm run vocab:mirror` copies this file byte-for-byte to
- * `supabase/functions/_shared/assessmentVocabulary.generated.ts`; Vite resolves `@/` and Deno
- * resolves by URL, so a single import here makes the copy unbuildable on the other side. That is
- * also why the destination→route RESOLVER is not here (it needs `FINANCE_BASE`) and lives in
- * `assessmentDestinations.ts` instead — this file owns the closed sets, that one owns the URLs.
- *
- * The DB CHECK constraints on `assessments` / `assessment_actions` are the enforcer. Widen a set
- * here without widening the constraint and the write fails with a raw 23514; narrow it and a
- * stored row renders as nothing.
- *
- * NOTE ON WEIGHTS. The severity→penalty weights are deliberately NOT here. They live in
- * `score_assessment()` alone, because a score is a derived number and this platform has one rule
- * about those: SQL derives, TypeScript formats. A second copy of the weights would be a second
- * derivation of the same quantity — the shape that let a fully-paid order show an outstanding
- * balance.
- */
+/** AI Assessment vocabulary — the closed value-sets three runtimes have to agree on. */
 
 /**
  * WHAT is being assessed. One system, three subjects — not three copies of the machinery.
@@ -145,13 +122,6 @@ export type SignalSeverity = (typeof SIGNAL_SEVERITIES)[number];
 /**
  * A signal is a VALUE or a stated REASON there is no value — never a hidden row, never a 0
  * (CLAUDE.md anti-regression rule 3). These four are that rule as a vocabulary:
- *
- *  - `ok`              measured, and fine.
- *  - `attention`       measured, and a problem. The only status that costs score.
- *  - `no_data`         the thing this measures has never been recorded. Carries a `reason`.
- *  - `not_applicable`  the thing cannot apply here — no tenancy, module not entitled. Carries a
- *                      `reason` too, and is EXCLUDED from the denominator rather than scored as
- *                      a pass, so "we could not judge this" never reads as "this is fine".
  */
 export const SIGNAL_STATUSES = ['ok', 'attention', 'no_data', 'not_applicable'] as const;
 export type SignalStatus = (typeof SIGNAL_STATUSES)[number];

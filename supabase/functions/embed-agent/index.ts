@@ -1,33 +1,4 @@
-/**
- * The public agent surface — a merchant's visitor reaching the platform's tools (#382 Phase 2/3).
- *
- * Anonymous, keyed by a publishable `mk_embed_…` value, exactly like `products-3d-api`:
- * `authenticateEmbedKey` resolves the key to ONE workspace and that workspace is the only thing
- * this request can ever see. Nothing here reads a workspace, user or owner from the body.
- *
- * WHY IT IS NOT `agent-chat`. That function is JWT + RBAC, and `load_toolkit` can widen its bound
- * tool set at runtime — both correct for a signed-in member and both wrong for a stranger. This
- * surface binds a CONSTANT list from `_shared/embed-agent-tools.ts`; there is no path by which a
- * request, a prompt, or a model can add to it.
- *
- * THE BUTTONS COST NOTHING, AND THAT IS THE POINT. `action=run` invokes one allowlisted tool
- * directly with the caller's arguments — no model turn, no tokens, no Anthropic spend. A visitor's
- * first interaction with the widget returns real data from the merchant's own catalogue for free.
- * A blinking cursor would have been the same emptiness as the facet wizard in a different shape,
- * and it would have billed the merchant per keystroke for the privilege.
- *
- * THE ONE MODEL TURN. `action=ask` explains a result the buttons already produced, in two
- * sentences, with NO TOOLS — it cannot search, price or write. That is what makes a public text
- * box safe here: the worst a crafted question achieves is prose nobody asked for, because there is
- * nothing behind the model to reach. It is also not a second agent loop, because there is no loop.
- * Gated on a per-key DAILY DOLLAR ceiling rather than a turn count, since a real turn ranges
- * $0.0045 to $4.88 and "20 a day" is therefore a budget between four cents and ninety dollars.
- *
- * Actions:
- *   • capabilities → which quick-starts this key may run
- *   • run          → one allowlisted tool, deterministically, no model turn
- *   • ask          → one model turn explaining a result; no tools, dollar-capped
- */
+/** The public agent surface — a merchant's visitor reaching the platform's tools (#382 Phase 2/3). */
 import { serviceClient } from '../_shared/supabase-client.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { captureException } from '../_shared/sentry.ts';
@@ -132,13 +103,6 @@ Deno.serve(withApiLogging((req) => {
       .maybeSingle();
 
     // THE REFERRAL CODE, so every link this widget renders back to us carries it.
-    //
-    // Attribution here is deliberately TWO records that are not the same fact. The LEAD belongs to
-    // this key's workspace and always has — that is what `raise_quote_request` writes and it cannot
-    // be redirected. This is the other half: a visitor who follows a link from the embedder's site
-    // and later signs up becomes a workspace UNDER them, through the referral path that already
-    // exists (`/auth?mode=signup&ref=`). Null when the workspace has never minted one; the widget
-    // then links plainly rather than inventing a code.
     const { data: ws } = await supabase
       .from('workspaces')
       .select('referral_code, referral_enabled')
@@ -269,16 +233,6 @@ Deno.serve(withApiLogging((req) => {
   }
 
   // ── The one model turn this surface makes ────────────────────────────────────────────────────
-  //
-  // NOT AN AGENT, and the distinction is the whole design. The model is given the result the
-  // deterministic buttons already produced and asked to explain it in two sentences. It has NO
-  // TOOLS: it cannot search, cannot price, cannot write. So the injection surface that worried me
-  // about a public chat box does not exist here — the worst a crafted question achieves is prose
-  // nobody asked for, because there is nothing behind the model to reach.
-  //
-  // It is also why this does not violate "never build a second agent loop": there is no loop.
-  // One turn, through `generateWithClaude`, which is the sanctioned chokepoint for exactly that
-  // and books the tokens to `ai_usage_logs` on the way past.
   if (action === 'ask') {
     const { data: keyRow } = await supabase
       .from('material_kai_keys')

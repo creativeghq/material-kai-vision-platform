@@ -1,25 +1,4 @@
-/**
- * Which platform events a TENANT may subscribe an outbound webhook to (#330).
- *
- * A deliberate subset of the Flows `TriggerType` union, not the whole thing. Two filters:
- *
- *  1. **Is it the tenant's own business fact?** "My invoice was issued", "my order shipped",
- *     "my legal document was refused" — yes. Platform-internal events (role upgrades, module
- *     access, agent failures) describe OUR operations, not theirs.
- *  2. **Is one delivery per occurrence sane?** `email_opened` / `email_clicked` fire per
- *     recipient per open. Subscribing an endpoint to those turns one campaign into thousands of
- *     signed POSTs, and the first thing it does is take the tenant's own server down.
- *
- * `fiscal_credits_low` is excluded specifically: it is about the OPERATOR's provider credit
- * pool, not any tenant's business, and it happens to be emitted into the root workspace — which
- * would make it subscribable by exactly one workspace and confusing for everyone.
- *
- * Every value MUST exist in the `TriggerType` union in `src/services/flows/types.ts`. A value
- * that does not is a subscription nothing will ever fire, which looks identical to a broken
- * endpoint from the tenant's side. Held by tests/unit/webhookEventVocabulary.test.ts — the
- * two files cannot import each other across the Deno/Vite boundary, so a test is the only
- * thing that can enforce it.
- */
+/** Which platform events a TENANT may subscribe an outbound webhook to (#330). */
 export const SUBSCRIBABLE_EVENT_TYPES: string[] = [
   // Money in and out
   'invoice_issued',

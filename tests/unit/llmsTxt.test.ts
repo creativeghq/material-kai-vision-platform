@@ -1,16 +1,4 @@
-/**
- * Guard: the generated `llms.txt` advertises only pages that exist, and invents nothing.
- *
- * This file is published on a CUSTOMER's domain under the customer's name, which changes
- * what a bug costs. Two failure modes matter more than formatting:
- *
- *   - advertising a dead link, which destroys the only thing the file is for — an agent
- *     being able to trust every URL in it;
- *   - writing a description for a page nobody read, which is the exact fabrication an
- *     `llms.txt` exists to prevent, attributed to them rather than to us.
- *
- * Both are silent: the file is valid markdown either way.
- */
+/** Guard: the generated `llms.txt` advertises only pages that exist, and invents nothing. */
 import { describe, expect, it } from 'vitest';
 import { buildLlmsTxt, type LlmsTxtPage } from '../../src/utils/llmsTxt';
 

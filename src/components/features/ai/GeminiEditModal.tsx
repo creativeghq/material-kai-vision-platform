@@ -1,14 +1,4 @@
-/**
- * GeminiEditModal
- *
- * 3-step structured modal for targeted image edits.
- *   Step 1 — Category (Colors, Lighting, Flooring, Walls, Plants, Style, Furniture, Region, Custom)
- *   Step 2 — Category-specific options that build a detailed prompt automatically
- *   Step 3 — Surface targeting + model selection + editable prompt preview → Apply
- *
- * On confirm, calls onApply({ prompt, modelTier }) which triggers generation directly.
- * The modal closes and the edit is submitted without user needing to press Send.
- */
+/** GeminiEditModal */
 
 import React, { useState, useEffect } from 'react';
 import {

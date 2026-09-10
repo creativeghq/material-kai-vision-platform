@@ -1,33 +1,4 @@
-/**
- * Guard: one guarded, bounded way to fetch an image from a URL (invariant 7).
- *
- * There were SIX implementations across the edge functions, at three strengths, and
- * the differences were invisible because every one of them returned plausible bytes:
- *
- *   _shared/pdf/branding.ts        no guard · redirect:'follow' · cap AFTER arrayBuffer
- *   generate-quote-pdf/data-…      byte-identical twin of that one
- *   generate-moodboard-…/layout    no guard · follows redirects · no cap
- *   generate-virtual-staging       no guard · follows redirects · no cap
- *   generate-region-edit           guarded  · redirect:'error'  · no cap
- *   generate-interior-gemini       guarded  · redirect:'error'  · no cap
- *
- * The first four are the reachable end of audit #352 `A8` — `image_url` on a catalog
- * material is model-supplied, and `redirect: 'follow'` means a public URL can 302 to
- * 169.254.169.254 and be followed. The last two were guarded and still unbounded.
- *
- * The audit named one of these. The `generate-quote-pdf` twin was found by the sweep
- * at the bottom of this file on its first run, which is the argument for the sweep:
- * a list of known sites is a list of the sites somebody already looked at.
- *
- * A seventh implementation lives in the other repo (mivaa-pdf-extractor
- * image_download_service.py) and was fixed there. A new runtime gets a new CALLER of
- * the shared helper, never a new copy — the same rule invariant 11 applies to
- * escapeHtml, for the same reason: copies drift to different strengths.
- *
- * Static, over source text. A runtime test would need a live DNS resolver and a server
- * willing to send more bytes than it admits to, so this pins the SHAPE: that the call
- * sites delegate, and that the helper still does the three things that matter.
- */
+/** Guard: one guarded, bounded way to fetch an image from a URL (invariant 7). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -144,11 +115,6 @@ describe('every server-side image fetch goes through it', () => {
   // for `fetchImage*` reported the codebase clean while a raw, redirect-following, uncapped
   // `fetch(it.design_image_url)` sat in it (#361 `EG-18`). A list of the names somebody already
   // thought of is not coverage.
-  //
-  // So this one keys on where the URL CAME FROM instead. `fetch(mivaaUrl)` is this runtime
-  // calling a service it chose; `fetch(item.design_image_url)` is this runtime resolving a host
-  // out of a database row that a model, a supplier feed or a user put there. Only the second is
-  // invariant 7, and a property access ending in url/href/src is what distinguishes them.
   it('no edge function fetches a stored URL field directly', () => {
     // `x.image_url`, `row.design_image_url`, `c.href`, `p.src` — but not a local `mivaaUrl`.
     const STORED_URL_FIELD = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*\.(?:\w*_)?(?:url|uri|href|src)$/i;

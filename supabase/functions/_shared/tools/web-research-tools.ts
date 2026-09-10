@@ -1,30 +1,4 @@
-/**
- * Web research tools: createWebSearchTool, createWebFetchTool
- *
- * The two things every research-shaped request needs and this platform did not have.
- *
- * Before these existed, an agent's only reach onto the open web was `company_website_scrape` and
- * `scrape_materials_from_url` — both of which run a page through an LLM extractor tuned for one
- * specific job (profile a company / list its materials) and return the extractor's OPINION, never
- * the page. Anthropic's `web_search` server tool did exist, but only sealed inside
- * `b2b_manufacturer_search` and `track_tech_radar`, where its results come back shaped as
- * manufacturers or as radar findings and as nothing else.
- *
- * So "list the brands on this competitor's site and tell me who represents each one in Greece"
- * — an ordinary question for this business — was structurally unanswerable. On 2026-08-25 an
- * agent tried it, got 2 000 characters of a 100-entry sitemap back from the company profiler,
- * spent its whole iteration budget inventing workarounds (Wayback CDX, the WordPress REST API,
- * `site:` queries it had no tool to run) and returned an apology. Every workaround it reached for
- * is something `web_fetch` does in one call.
- *
- *   web_search  — the open web, through Anthropic's server-side search tool. Returns the model's
- *                 synthesis AND the raw source list, read straight off the result blocks.
- *   web_fetch   — ONE url, returned as text. No model in the path, so no summarisation, no
- *                 opinion, and no invisible truncation: what is cut is declared and pageable.
- *
- * Invariants: #7 (SSRF guard on the user-supplied URL), #9 (fetched content is fenced as DATA
- * before it can reach a model), #10 (credits debited before the upstream call, never after).
- */
+/** Web research tools: createWebSearchTool, createWebFetchTool */
 
 // `tool` is typed non-generically ON PURPOSE — see the note in b2b-tools.ts. Inferring it drags
 // @langchain/core's generic graph into every module that defines a tool, and that instantiation
@@ -61,18 +35,7 @@ const SEARCH_MODEL = 'claude-opus-5';
 /** Per-search-use surcharge Anthropic charges for the server-side web_search tool. */
 const WEB_SEARCH_USE_USD = 0.01;
 
-/**
- * Reserve ceiling for one web_search turn, in credits (1 credit = $0.01 billed).
- *
- * MEASURED, not guessed: a real 4-search sourcing question ("who distributes Del Conca in
- * Greece?") pulled 42,203 input / 1,248 output tokens and settled at 42.33 credits — because a
- * server-side search turn carries every fetched result back through the context. The first value
- * here was 40, which the very first live call exceeded. `settleCredits` charges the overage, so
- * an under-set ceiling is not a lost charge; it is a gate that lets through a caller who cannot
- * actually afford the call, which is the thing the gate exists to stop.
- *
- * 80 covers the measured case at the default budget with room for a 15-search sweep.
- */
+/** Reserve ceiling for one web_search turn, in credits (1 credit = $0.01 billed). */
 const SEARCH_CEILING = 80;
 
 /**
@@ -391,17 +354,7 @@ async function settleSearchCost(
 // web_fetch
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * web_fetch — return ONE url as text, with no model in the path.
- *
- * Deliberately not an "understand this page" tool. Its whole value is that it does not understand
- * anything: an agent asking for `pwb-brand-sitemap.xml` wants the 100 URLs in it, and any pass
- * that summarises, ranks or extracts is a pass that can lose 71 of them.
- *
- * Where it is cut, it says where, and `offset` continues from there. The bug this replaces was
- * not truncation — 30 000 characters is a truncation too — it was truncation that did not
- * announce itself, so the reader could not tell a short document from a clipped one.
- */
+/** web_fetch — return ONE url as text, with no model in the path. */
 export const createWebFetchTool = (
   userId: string,
   _workspaceId: string | null,
@@ -543,33 +496,7 @@ export const createWebFetchTool = (
   );
 };
 
-/**
- * Web Research Tool: second-source validation (issue #394)
- *
- * The "pro" rung of the research ladder, and deliberately the THIRD rung rather than
- * the second. The ladder is:
- *
- *   normal        one provider, 6 searches        — the default, and right for the
- *                                                   single-answer lookups that make up
- *                                                   most web_search traffic
- *   deep          one provider, up to 15          — already exists as `max_searches`;
- *                                                   searching harder helps every
- *                                                   question at a fraction of the cost
- *                                                   of a second provider
- *   second-source two providers, sources compared — THIS, and only worth it on
- *                                                   COVERAGE questions
- *
- * A second provider confirming that Greek VAT is 24% is not "pro", it is paying twice
- * for an answer one search already had. What a second provider actually buys is a
- * different search INDEX, and that only matters when the question is "find me all of
- * X" rather than "what is X".
- *
- * WHAT IS COMPARED. Not the prose — two paragraphs cannot be scored objectively, and
- * an LLM judge would tell us which model writes better, not which one found more. The
- * SOURCES are compared: which hosts each cited, how many resolve, where they overlap.
- * Weaker than the b2b lane's domain check, and worth saying so — a live source proves
- * the citation is real, not that the claim it supports is true.
- */
+/** Web Research Tool: second-source validation (issue #394) */
 export const createWebResearchValidateTool = (
   userId: string,
   workspaceId: string | null,

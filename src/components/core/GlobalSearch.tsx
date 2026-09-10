@@ -1,15 +1,5 @@
 // Mac-Spotlight-style global search. Lives at the end of the top bar (after the App
 // Launcher) as a click-to-open search field, and opens app-wide on ⌘K / Ctrl+K.
-//
-// It is a GENERAL search: people, CRM parties, deals, products, projects, quotes, orders,
-// invoices and properties come back from one `global_search` round trip (RLS-scoped), alongside
-// navigation to any page the active persona can reach.
-//
-// Order in this list is not cosmetic. cmdk highlights the first item, so whatever renders first
-// is what Enter opens. Real results therefore come FIRST, best match at the top, and the deep
-// material search is an explicitly-labelled action pinned to the BOTTOM. It used to be the only
-// item in the palette for any query that was not a product name — so searching for a colleague
-// silently ran a material search and dropped you in the product catalogue.
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Sparkles, User, Package, CornerDownLeft } from 'lucide-react';
@@ -173,17 +163,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ variant = 'bar' }) =
     return groups;
   }, [navItems, query]);
 
-  /**
-   * What Enter opens — driven from the DATA, not left to cmdk.
-   *
-   * Source order alone is not enough, and this is the original bug's last hiding place. Results
-   * arrive AFTER the 220 ms debounce, so for a moment the only rendered item is the Actions group;
-   * cmdk selects it, and it KEEPS that selection when the results prepend. Measured in the real
-   * app: searching "tsatsos" left the highlight on "Ask the agent" with the person sitting two
-   * rows above it, so Enter still did not open the thing the user typed. Re-pointing the selection
-   * whenever the top row changes is the fix; the escalation action is the target only when there
-   * is genuinely nothing else.
-   */
+  /** What Enter opens — driven from the DATA, not left to cmdk. */
   const topValue = useMemo(() => {
     const firstHit = groups[0]?.hits[0];
     if (firstHit) return `${groups[0].spec.kind}-${firstHit.id}`;

@@ -2,11 +2,6 @@
  * per-workspace payout routing. When a workspace connects its own Stripe
  * account (Express, via Connect), invoice payments are routed there as destination
  * charges; otherwise the platform collects.
- *
- * Mounted in Finance → Settings → Payments AND in Profile → Keys → Finance & Tax, because
- * "connect our Stripe account" is asked from both places. Both mounts are the same component
- * on purpose — the Keys entry used to be a status chip linking to `/finance`, which lands on
- * the Finance dashboard and offers nothing to click.
  */
 import React, { useEffect, useState } from 'react';
 import { Loader2, CreditCard, ExternalLink, CheckCircle2, RefreshCw } from 'lucide-react';

@@ -20,16 +20,6 @@ const subscribers = new Set<(m: Record<string, string>) => void>();
  * headers in the document-type picker. ONE map — a second hardcoded copy is how family 6
  * came to be labelled "Self-billing" in the picker while the codes under it read
  * "Self-Delivery Record" / "Self-Supply Record".
- *
- * Labels for 1–11 are taken verbatim from the bundled `Appendix.pdf` Par.1 (the
- * "Domestic/Foreign Issuer Mirrored Accounting Source Documents" table). 13–15 are NOT in
- * that table and are unverified against the AADE spec — they are also unreachable today
- * (`mydata_reference` carries no 13.x/14.x/15.x row), so they only ever serve as a fallback
- * label for a code we don't recognise. Verify against Par.1 before trusting one.
- *
- * Family 6 is Self-Delivery (6.1) / Self-Supply (6.2) — goods taken for own use. It is NOT
- * self-billing (αυτοτιμολόγηση, issue #278): that is the header flag `invoices.self_pricing`
- * on an ordinary 1.x/2.x document, not a document family of its own.
  */
 export const MYDATA_TYPE_FAMILY: Record<string, string> = {
   '1': 'Sales invoice', '2': 'Service rendered invoice', '3': 'Proof of expenditure', '5': 'Credit invoice',

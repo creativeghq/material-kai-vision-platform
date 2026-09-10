@@ -143,17 +143,7 @@ export const PlanningTab: React.FC<Props> = ({ workspaceId }) => {
     return buckets;
   }, [filtered]);
 
-  /**
-   * One set of totals PER CURRENCY, never one number (#351 D5).
-   *
-   * The rows each carry their own currency and print it, and creation offers EUR/USD/GBP — but
-   * these three tiles summed every row into one figure and handed it to `formatMoney` with no
-   * currency, which labels it EUR. A dollar payable and a euro payable were added together and
-   * stamped with the wrong symbol under the words "Planned out". A cross-currency sum is a
-   * confident figure in no currency at all, and nothing about it looks wrong.
-   *
-   * Same shape as `CreditReleasesCard`, which had the identical defect.
-   */
+  /** One set of totals PER CURRENCY, never one number (#351 D5). */
   const totals = useMemo(() => {
     const byCurrency = new Map<string, { inSum: number; outSum: number }>();
     for (const r of filtered) {

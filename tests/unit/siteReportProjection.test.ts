@@ -2,24 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-/**
- * The site-report card must show FINDINGS, not how the site is configured.
- *
- * `seo_site_report kind:'overview'` rendered, in order: "website is active true", "website
- * max pages 6000", "website is default true", "website page count 353", "website display
- * name Materials Hub", then a few counts — and stopped at its ten-stat cap. So four of ten
- * slots restated configuration for a site the card already names in its own footer, and the
- * payload's most useful field never rendered at all: `articles.by_status` is nested two
- * levels deep and the flattener only ever tested one.
- *
- * That field is the breakdown of how many articles are drafts, completed or failed — which
- * is exactly what the user was trying to find when the model reached for this tool. The
- * data was in the response and the card threw it away to make room for "is default: true".
- *
- * The projection is a private helper in a Deno module, so it is exercised here through a
- * transcription pinned to the source rather than imported. The transcription is checked
- * against the real file below, which is what stops it drifting into a test of itself.
- */
+/** The site-report card must show FINDINGS, not how the site is configured. */
 
 const SRC = join(process.cwd(), 'supabase/functions/_shared/tools/seo-agent-tools.ts');
 const src = readFileSync(SRC, 'utf-8');

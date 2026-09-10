@@ -48,17 +48,6 @@ export function bootstrapSecretsFromDb(supabase: { from: (t: string) => any }): 
           // read through `Deno.env.get()` came back undefined for ever, with nothing logged.
           // #342 lost an hour to it: email-webhooks reported INBOUND_WEBHOOK_SECRET unset on a
           // COLD boot, which memoisation could not explain.
-          // Log ONCE per worker — one line is the difference between a five-minute diagnosis and
-          // an hour; one line per key on every boot is noise that gets muted.
-          //
-          // At INFO, not WARNING. On the Supabase edge runtime this throw is the DOCUMENTED,
-          // universal behaviour — it fires on every cold boot of every function, so as a WARNING
-          // it was the single most frequent warning in the platform's logs and it is not
-          // actionable: `resolveSecret()` already reads the table directly and everything works.
-          // A warning that fires on 100% of boots trains the reader to skim past warnings, which
-          // is how a real one gets missed. (`SupabaseLoggingHandler` never drops WARNING+ from
-          // any logger, so this was also writing a DB row per boot.) The other runtimes where
-          // env.set genuinely works never reach this branch at all.
           if (!warnedEnvSetUnsupported) {
             warnedEnvSetUnsupported = true;
             console.info(
@@ -93,12 +82,6 @@ export function resetSecretsBootstrap(): void {
  * One-liner for edge functions that DON'T call _shared/auth.ts → authenticate() (crons,
  * webhooks, public AI endpoints). Constructs an admin client internally so callers don't have
  * to plumb one through. Call as the first await in the request handler.
- *
- * Example:
- *   Deno.serve(async (req) => {
- *     await bootstrapForFunction();
- *     // … rest of handler can now rely on Deno.env.get() seeing platform_secrets DB values
- *   });
  */
 export async function bootstrapForFunction(): Promise<void> {
   if (bootstrapped) return bootstrapped;

@@ -1,15 +1,4 @@
-/**
- * Presentation Sheet Tool — generate_presentation_sheet
- *
- * Thin agent-facing wrapper. The actual create pipeline (ownership, auto-enhance,
- * credit debit, insert, render-or-canvas) lives in the `generate-moodboard-sheet-pdf`
- * edge function (action:'create') so the SAME path serves both the agent AND the
- * SheetWizardModal — no duplicated credit/auto-extract logic. This tool only:
- *   - handles the re-edit shortcut (sheet_id → re-open the canvas, no charge),
- *   - calls the edge function to create, and
- *   - translates the response into chat chunks (sheet_created / sheet_canvas_open
- *     / sheet_pdf_ready) so AgentHub mounts the right widget.
- */
+/** Presentation Sheet Tool — generate_presentation_sheet */
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what

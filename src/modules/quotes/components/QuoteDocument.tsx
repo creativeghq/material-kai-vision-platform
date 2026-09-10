@@ -1,15 +1,4 @@
-/**
- * QuoteDocument — high-resolution HTML renderer
- *
- * Pages render at 4961 × 3508 px (A3 landscape @ 300 DPI).
- * Each page has a full-bleed background image with content overlaid on top.
- * Used for both on-screen preview (via CSS zoom) and PDF via window.print().
- *
- * Page structure:
- *  1. Cover page      — background image + client info line at bottom
- *  2+. Items pages    — background image + transparent items table
- *  Last. Back page    — pure background image
- */
+/** QuoteDocument — high-resolution HTML renderer */
 
 import React, { forwardRef } from 'react';
 import { QuoteDocumentData, QuoteDocumentItem } from '../hooks/useQuoteDocument';

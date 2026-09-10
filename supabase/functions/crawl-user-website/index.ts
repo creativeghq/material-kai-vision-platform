@@ -73,20 +73,7 @@ async function getUserIdFromJwt(req: Request): Promise<string | null> {
   return data.user.id;
 }
 
-/**
- * Embed one page, or null if the embedder is unavailable.
- *
- * This was a hand-rolled second copy of `generateStandardEmbedding` — same voyage-4 call,
- * same 1024-dim check, and the same wrong URL: it POSTed the SUPABASE EDGE proxy's request
- * shape (`{action}` to `/api/mivaa/gateway`) at the MIVAA host, which does not serve that
- * path. It 404'd on every page ever crawled, and because every failure funnels into `null`
- * here, the only symptom was `user_website_pages.embedding` being null forever while the
- * crawl reported success. Calling the shared helper fixes the path and removes the copy.
- *
- * Still returns null rather than throwing — a page without a vector is a degraded row, not a
- * failed crawl — but it LOGS now. A swallowed embedder outage is indistinguishable from a
- * site with nothing worth embedding.
- */
+/** Embed one page, or null if the embedder is unavailable. */
 async function embedDocument(text: string, workspaceId: string | null): Promise<number[] | null> {
   if (!MIVAA_API_KEY()) {
     console.warn('[crawl-user-website] MIVAA_API_KEY unset — pages indexed without embeddings');
@@ -658,7 +645,6 @@ Deno.serve(withApiLogging('crawl-user-website', async (req) => {
   // owner's PERSONAL balance (user_websites is user-scoped — no workspace, so
   // chargeCronUser, not chargeCronWorkspace). NOTE: 'seo-website-crawl' must be
   // registered in the cron cost registry for the cron charge to take effect;
-  // chargeCronUser fails OPEN (charges 0, still runs) until it is.
   const WEBSITE_CRAWL_CREDIT_COST = mode === 'preview' ? 1 : 5;
   let billedUserId: string | null = null;
   let billedAmount = 0;

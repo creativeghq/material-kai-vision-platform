@@ -1,54 +1,4 @@
-/**
- * Toolkit coverage guard — sourced from the generated tool manifest (issue #266).
- *
- * The agent's tools are defined ONCE, in the backend:
- *     tool(fn, { name, description, schema: z.object({...}) })   // _shared/tools/*.ts
- * and every surface that exposes them used to be a hand-maintained mirror:
- *   • agentToolsCatalog.TOOLKITS  → the ToolkitPickerModal (what a user can enable)
- *   • agent-chat SERVER_TOOLKITS  → what `load_toolkit` can bind mid-chat
- *   • each quick-start's `form`   → which of a tool's options a user can actually pick
- *
- * Nothing held those together, so the catalog drifted in four dimensions:
- *
- *   1. COVERAGE      — a tool ships in no cluster: chat-only, invisible in the picker.
- *   2. REACHABILITY  — a tool is fully defined but its factory is never instantiated,
- *                      so no agent can call it at all (generate_video shipped like this).
- *   3. MIRROR        — SERVER_TOOLKITS ⇄ TOOLKITS disagree (bindable but un-enableable,
- *                      or offered in the picker and unbindable).
- *   4. OPTIONS       — a tool's `z.enum` choices never become form fields, or a
- *                      hand-written `select` drifts from the enum it mirrors.
- *   5. BINDING       — the factory IS instantiated behind `config.tools.includes('x')`,
- *                      and no agent config lists 'x'. Both binding paths read that list,
- *                      so the tool is as unreachable as in 2 — but 2's check passes,
- *                      because the binder does mention it. `price_my_spec` (#337) and
- *                      `generate_video` were both live in this state; generate_video's
- *                      own fix for 2 stopped at the push site and left it in 5.
- *
- * 1, 2, 4 and 5 are checked below. 3 no longer CAN drift: agent-chat's cluster map is
- * generated from TOOLKITS (`toolkitClusters.generated.ts`) rather than typed out a
- * second time, so the tests for it check that the projection is fresh and that no
- * second copy has reappeared — not that two copies happen to agree today.
- *
- * The escape hatches are gone. `KNOWN_UNCLUSTERED` and `KNOWN_UNBOUND` were emptied
- * and then DELETED, so 1 and 2 now fail outright rather than growing a list.
- * `OPTIONS_EXEMPT` survives because some tools genuinely have no form surface (an id
- * only a prior result can supply, a guided wizard) — every entry carries its reason,
- * and it is shrink-only.
- *
- * WHY THE MANIFEST. This file used to extract tools with /name: '([a-z][a-z0-9_]+)',/.
- * That regex was wrong in both directions and nothing could tell:
- *   • it MISSED 8 real camelCase tools (queryDatabase, checkJobStatus, getStageDetails,
- *     getRelationshipCounts, getDocumentEntities, getMetadataExtraction, querySentry,
- *     checkServerHealth) — the character class stops at the first capital;
- *   • it INVENTED two phantoms — `submit_findings` (an Anthropic structured-output
- *     schema) and `web_search` (Anthropic's SERVER-side tool block, `{ type:
- *     'web_search_20250305', name: 'web_search' }`) — neither is a tool of ours, and
- *     `web_search` sat in the coverage-debt list as a tool someone was expected to
- *     cluster one day.
- * scripts/gen-tool-manifest.mjs AST-parses the `tool(...)` CALL EXPRESSIONS, which is
- * immune to both. The manifest is committed, and the first test here fails if it is
- * stale — so a tool added in the backend cannot quietly skip every check below.
- */
+/** Toolkit coverage guard — sourced from the generated tool manifest (issue #266). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -115,24 +65,7 @@ function iconMapKeys(relPath: string): Set<string> {
 // Genuinely not user-facing: runtime meta-tools the agent drives itself.
 // `submit_findings` used to be listed here purely to silence the old regex's
 // phantom; the AST parser never emits it, so it is gone.
-/**
- * Tools that reach an agent WITHOUT a cluster, because agent-chat binds them directly.
- *
- * Every entry must have a real binding path in `agent-chat/index.ts`:
- *   - `load_toolkit`, `request_input` — `META_TOOLS`, bound every non-customer turn;
- *   - `load_skill` — injected on its own whenever the agent has at least one skill.
- *
- * FOUR tools used to sit here on an intent that the mechanism could not honour:
- * `check_generation_status` plus the three ops diagnostics, exempted as "bound only by an
- * explicit agent config, never by a toolkit". The startup filter keeps
- * `config.tools.filter((t) => toolkitToolIds.has(t))` for every non-curated agent, so an
- * unclustered tool is stripped even when an agent lists it — and no agent listed them anyway.
- * They were unreachable twice over, and this exemption is what let that pass: an entry here
- * skips the cluster check, and the "listed by an agent" check below only walks CLUSTERED tools,
- * so nothing looked at them at all.
- *
- * The test below now closes that: membership here is not a licence to be unreachable.
- */
+/** Tools that reach an agent WITHOUT a cluster, because agent-chat binds them directly. */
 const INTERNAL_TOOLS = new Set([
   'load_toolkit', 'load_skill', 'request_input',
 ]);
@@ -149,18 +82,6 @@ const INTERNAL_TOOL_BINDINGS: Record<string, RegExp> = {
 // tool is instantiated somewhere. The escape hatches were deleted rather than left
 // empty on purpose: an empty allowlist is an invitation to add one entry "just for
 // now", and the two tests below now fail outright instead.
-//
-// What emptied them (issue #266, Phase 3/4):
-//   • generate_gemini + virtual_staging → the `generation` cluster. They were always
-//     instantiated by its `generate_3d` branch; only the listing was missing.
-//   • the two HVAC calculators → the new alwaysOn `calculators` cluster, replacing
-//     agent-chat's hardcoded CORE_ALWAYS_TOOLS re-add.
-//   • estimate_cost → DELETED. Listed by no agent, and it multiplied
-//     products.metadata.price by .quantity — a second derivation of a money quantity
-//     that bypasses get_product_price_for_workspace.
-//   • the 5 database-tools diagnostics → DELETED. Never instantiated since they were
-//     written, service-role reads keyed by a caller-supplied id (invariant 1), and
-//     getRelationshipCounts filtered a chunk id by a document id.
 
 // Tools whose z.enum options reach NO form field anywhere — the choices exist only in
 // the schema, so a user can pick one solely by naming it in prose. SHRINK by adding a
@@ -209,17 +130,7 @@ const quickStarts = TOOLKITS.flatMap((tk) =>
 );
 const runQuickStarts = quickStarts.filter((x) => x.qs.run?.tool);
 
-/**
- * The enum param a select field mirrors, or null when it mirrors none.
- *
- * For a `run` quick-start the target tool is known outright. For a prompt-driven one
- * (the interior generation flows, where the agent reads the rendered sentence) there
- * is no declared target, so the field key is matched against the enum params of the
- * tools in the SAME cluster. When two of them declare the same param name —
- * generate_video.model and generate_vr_world.model both do — the tie is broken by
- * which enum actually contains the offered values, and an unresolvable tie is SKIPPED
- * rather than guessed at.
- */
+/** The enum param a select field mirrors, or null when it mirrors none. */
 function mirroredEnumParam(
   toolIds: string[],
   runTool: string | undefined,
@@ -369,14 +280,6 @@ describe('toolkit coverage', () => {
     // weak, and two tools proved it: `price_my_spec` (#337) and `generate_video` — each had a
     // real `if (config.tools.includes('x')) tools.push(...)` line, so the binder mentioned them
     // and this file passed, while NEITHER could ever be called by anyone.
-    //
-    // Both binding paths gate on AGENT_CONFIGS[agentId].tools:
-    //   • startup      — registerTools(new Set(config.tools))
-    //   • load_toolkit — def.tool_ids.filter(t => agentFullToolIds.has(t)), and that set IS
-    //                    AGENT_CONFIGS[agentId].tools
-    // So a tool absent from every agent's list is unreachable no matter how correct its push
-    // site, its cluster entry and its manifest row look. Nothing else in the build can see it:
-    // the tool exists, typechecks, and simply never appears.
     const src = read(AGENT_CHAT);
     const start = src.indexOf('const AGENT_CONFIGS');
     expect(start, 'AGENT_CONFIGS not found in agent-chat — this guard is reading the wrong file').toBeGreaterThan(-1);
@@ -592,8 +495,6 @@ describe('quick-start agent resolution', () => {
   // cosmetic: the specialist's system prompt carries the tool doctrine, `forceToolCall`
   // is keyed to its id, and the Haiku cost-router exempts it. On 2026-08-21 "Design a
   // room" was launched from Vision, ran as kai on Haiku, and called `generate_gemini`
-  // alone — one image where the interior prompt's rule would have produced the grid.
-  // Nothing failed. The user just silently got the cheaper tool.
   const AgentHubSrc = readFileSync(
     join(process.cwd(), 'src/components/features/ai/AgentHub.tsx'),
     'utf8',
@@ -619,10 +520,6 @@ describe('quick-start agent resolution', () => {
    * the picker's "Other" group beside `core` and `admin-misc`, and with no owning agent the picker
    * cannot scope it to Edith, so selecting her hid it entirely. A whole feature reachable only by
    * someone already scrolling past the group it should have been in.
-   *
-   * Both maps are hand-kept lists keyed by toolkit id, which is exactly the shape that rots when
-   * a cluster is added. The four listed below are deliberately hub-less (see TOOLKIT_HUB's own
-   * comment); everything else must be placed.
    */
   it('every business toolkit is placed in a hub and owned by an agent', () => {
     // Genuinely hub-less, each for a stated reason — not a dumping ground. `docs` joins the
@@ -657,21 +554,7 @@ describe('quick-start agent resolution', () => {
     ).toEqual([]);
   });
 
-  /**
-   * A cluster is the unit the picker offers, so an owner binds all of it or is not an owner.
-   *
-   * `TOOLKIT_AGENTS` says who owns a cluster; `AGENT_CONFIGS` says what each agent binds. Nothing
-   * held the two together, and eight pairs had drifted into partial ownership — ten quick-starts
-   * offered on an agent that does not have the tool they run. The click resolves to that agent
-   * (`resolveToolkitAgent` keeps the current one when it owns the cluster), the tool is not in its
-   * set, and the deterministic run answers `Tool "add_task" is not available for this agent or
-   * your role.` Nothing throws: that message is the honest report of a state nothing forbade.
-   *
-   * Measured 2026-09-01, before the fix: projects→erp missing 3, knowledge-graph→erp missing 6,
-   * knowledge-graph→product-business missing 4, sub-agents missing 2 on each of its two owners,
-   * admin-misc missing 5 on marketing and 4 on product-business, generation→interior-designer
-   * missing 1.
-   */
+  /** A cluster is the unit the picker offers, so an owner binds all of it or is not an owner. */
   it('a declared owner binds every tool in the cluster it owns', () => {
     const agentTools = parseAgentConfigTools();
     const offenders: string[] = [];
@@ -708,25 +591,7 @@ describe('quick-start agent resolution', () => {
     ).toEqual([]);
   });
 
-  /**
-   * Picking an agent from the composer dropdown must change the canvas empty state.
-   *
-   * It did not. `renderAgentStarters` built its card from `activeToolkits`, and the only
-   * thing the agent-switch effect does to that list is PRUNE it — nothing has ever seeded
-   * the newly-picked agent's clusters. On the default set (the three always-on: Core, Web
-   * Research, Calculators) Vision, Trinity, Edith, Hermes and Estate all rendered the SAME
-   * nine starters: the hero above the card swapped avatar, name and description, and the
-   * menu under it did not move. Nothing failed — a menu that describes the toolbox is a
-   * valid menu, it just was not answering the question the user had asked.
-   *
-   * Two halves, and each is silent on its own:
-   *   • the empty state must be derived from the SELECTED AGENT (AgentHub half);
-   *   • a pickable specialist must OWN at least one cluster, or there is nothing to derive
-   *     (catalog half). Estate owned none until 2026-09-01 — `real-estate` and
-   *     `appointments` are bound by `property-advisor` in agent-chat and were declared by
-   *     no one, so the picker, the command palette AND this menu all scoped her down to the
-   *     three clusters every agent carries.
-   */
+  /** Picking an agent from the composer dropdown must change the canvas empty state. */
   it('every pickable specialist owns at least one toolkit of its own', () => {
     // The composer dropdown's roster, minus the two routers. `orchestrator` and `kai` own
     // all 45 clusters, so a signature set is meaningless for them by design (see
@@ -868,20 +733,6 @@ describe('toolkit cluster projection (agent-chat ← TOOLKITS)', () => {
 /**
  * What the CHAT says when a quick-start fires, and whether a hand-written
  * deep-link still points at one.
- *
- * A `run` quick-start is deterministic: it invokes the tool directly, no LLM turn.
- * So its `prompt` is never sent anywhere — which is exactly why it rotted. The chat
- * bubble was built from `qs.label` instead, and a label is a BUTTON CAPTION sized to
- * sit under its toolkit ("This week" under Appointments, "My templates" under Email
- * Marketing). Alone in a conversation it says nothing: the user clicked "This week"
- * in the App menu and their own message read "▶ This week". Every quick-start already
- * carries the sentence — `prompt` / `promptTemplate`, authored, reviewed, and free to
- * show since a direct run spends no tokens on it.
- *
- * The deep-link check is the other half: `?quickstart=<toolkitId>:<label>` matches a
- * quick-start by its label STRING, and AgentHub's miss branch is a console.warn. So a
- * renamed label turns every hand-written launcher link into a click that opens the
- * agent and does nothing at all — no error, no toast, no clue.
  */
 describe('quick-start → chat sentence', () => {
   const words = (s: string) => s.split(/\s+/).filter(Boolean).length;
@@ -1009,15 +860,7 @@ describe('quick-start → chat sentence', () => {
   });
 });
 
-/**
- * The bound-toolkit hint. agent-chat injects "[CONTEXT] Toolkits already loaded for this turn:
- * …" so the agent does not spend a tool call and a model round trip re-loading a cluster it can
- * already call. The list was built from what the USER SELECTED, while a curated specialist binds
- * its WHOLE kit regardless of the selection — so the hint told Pepper that `b2b` was not loaded
- * while it was holding every tool in it. It called `load_toolkit('b2b')` (a 2ms no-op) and
- * offered the user a "load the toolkit" next step that cost a second full turn to answer the
- * same question again. Conversation 96da9fc8, 2026-08-18.
- */
+/** The bound-toolkit hint. agent-chat injects "[CONTEXT] Toolkits already loaded for this turn: */
 describe('bound-toolkit hint', () => {
   const src = read(AGENT_CHAT);
 
@@ -1078,16 +921,7 @@ describe('bound-toolkit hint', () => {
   });
 });
 
-/**
- * `request_input` — the agent's structured question channel (issue #370, Class D).
- *
- * The mechanism was half-built: b2b-research's `search` step declares `awaits_user_input: true`
- * with an `input_schema`, AgentHub HANDLES `workflow_step_input_request` and RENDERS a form from
- * it — and nothing in supabase/functions/ ever emitted it. `createWorkflowEmitter` had plan(),
- * step() and finished() and no input request, so the form only appeared via the frontend-local
- * boot path when the picker launched a workflow. An agent answering a free-form message had no
- * structured channel at all, and every follow-up degraded to a wall of markdown.
- */
+/** `request_input` — the agent's structured question channel (issue #370, Class D). */
 describe('the agent can ask a structured question', () => {
   const agentChat = read(AGENT_CHAT);
 
@@ -1129,7 +963,10 @@ describe('the agent can ask a structured question', () => {
     // The dismiss control must never be disabled: a required field must not be able to trap the
     // user in a question the agent could have answered itself. That is the whole distinction
     // between this card and the confirmation gate.
-    const dismissBlock = card.slice(card.indexOf('Decide for me') - 600, card.indexOf('Decide for me'));
+    const labelAt = card.indexOf('Decide for me');
+    const openAt = card.lastIndexOf('<Button', labelAt);
+    expect(openAt, 'the dismiss label must sit inside a <Button>').toBeGreaterThan(-1);
+    const dismissBlock = card.slice(openAt, labelAt);
     expect(
       /disabled/.test(dismissBlock),
       'the dismiss control must not be disabled by anything — it is what makes this an offer',
@@ -1157,16 +994,7 @@ describe('the agent can ask a structured question', () => {
   });
 });
 
-/**
- * Routing has to be VISIBLE (issue #370).
- *
- * JARVIS routes a turn to a specialist and the turn runs as that specialist — but every avatar in
- * the thread rendered `currentAgent`, i.e. whatever the picker says, so Pepper's replies wore
- * JARVIS's face. The `agent_routed` chunk only pushed a reasoning step, and reasoning is cleared
- * between turns, so once the answer landed nothing on screen said a handoff had happened at all.
- * The message has carried the correct agent id since the routing fix; this pins the half that
- * reads it.
- */
+/** Routing has to be VISIBLE (issue #370). */
 describe('a routed turn shows which specialist answered', () => {
   const hub = read(join(ROOT, 'src/components/features/ai/AgentHub.tsx'));
 
@@ -1196,9 +1024,6 @@ describe('a routed turn shows which specialist answered', () => {
      * ends. The agent selector two inches below it went on reading "JARVIS · Auto-assign" the
      * whole time, so an operator watching Vision generate an image had nothing near the input
      * saying Vision was doing it.
-     *
-     * Asserted on the TRIGGER specifically, because the avatar alone already passed the tests
-     * above while the badge beside it still said Auto-assign.
      */
     const from = hub.indexOf('title="Switch agent"');
     // Searched FORWARD from the trigger: the first 'DropdownMenuContent' in the file is the
@@ -1242,39 +1067,8 @@ describe('a routed turn shows which specialist answered', () => {
   });
 });
 
-/**
- * A `run:` quick-start renders what its tool emits.
- *
- * A quick-start with `run:` is a DETERMINISTIC direct tool call: agent-chat performs no model
- * turn, so nothing ever writes prose about the result. The frontend substitutes the
- * quick-start's own `done` copy and the tool's data arrives separately, as an onChunk chunk.
- * If AgentHub does not RENDER that chunk, the user gets a confident "Done! <done copy>" with
- * the payload thrown away — the tool ran, the data came back, and the screen stays empty.
- *
- * This shipped three times over: "My flows" (`flows_list`), "Which job boards?"
- * (`job_sites_list`) and "Browse the radar" (`tech_radar_list`) each emitted their list into a
- * `console.debug` branch commented "the agent's text reply summarizes the change" — true when
- * a model is in the loop, and false for every one of these, because `run:` means there is no
- * model in the loop. CLAUDE.md carries the same warning for the `my_hr_*` chunks; a comment is
- * not an enforcement mechanism, so here is the check.
- *
- * Note what does NOT satisfy this test: a `chunk.type === 'x'` branch that only logs. That is
- * the defect itself, so "a handler exists" is the wrong question — "something reaches the
- * screen" is the right one.
- */
-/**
- * Direct-run tools that put NOTHING on screen — measured 2026-09-04, and SHRINK-ONLY.
- *
- * Each of these is called by a quick-start deterministically, with no model turn, and emits no
- * display chunk: the user presses the button, reads the quick-start's `done` copy and sees no
- * data at all. It is the same defect the construction tools shipped with, and the reason the
- * check above exists.
- *
- * They are listed rather than fixed here because fixing twenty-one tools across nine files is a
- * different piece of work from the one that found them. The list is what stops a TWENTY-SECOND
- * arriving, and the test below fails when an entry is fixed — so it can only ever get shorter.
- * Do not add to it.
- */
+/** A `run:` quick-start renders what its tool emits. */
+/** Direct-run tools that put NOTHING on screen — measured 2026-09-04, and SHRINK-ONLY. */
 const SILENT_DIRECT_RUNS = new Set([
   'add_task', 'analytics_analysis', 'assess_finance', 'assess_project', 'assess_property',
   'business_analysis', 'company_enrichment', 'contact_discovery', 'find_project',

@@ -1,30 +1,5 @@
 #!/usr/bin/env node
-/**
- * Accessibility ratchet.
- *
- * WHY THIS EXISTS
- * ---------------
- * `eslint-plugin-jsx-a11y` has been a dependency and a registered plugin for a long time, with
- * every rule set to `'off'` under a comment reading "Accessibility - off for now". Audit #302
- * found the predictable result: 1,325 unlabelled inputs, 280 unnamed icon buttons, 72 mouse-only
- * handlers — and **every one of them was added after the plugin was installed**. Nothing stopped
- * the counts rising, so they rose.
- *
- * Turning the rules straight to `error` would fail the build on 413 pre-existing warnings and be
- * switched off again within a day. So this does what the edge-function gate does: record today's
- * counts and fail only when one RISES. An unbounded backlog becomes a monotonically shrinking
- * one, and the build stays green today.
- *
- * PER-RULE, NOT PER-FILE
- * ----------------------
- * Deliberately coarser than `check-edge-functions.mjs`. A per-file baseline for 413 warnings
- * across ~200 files churns on every rename and refactor, and a baseline that churns gets
- * regenerated reflexively — which silently launders new violations in with the noise. Per-rule
- * counts are stable under refactoring and still let you drive one rule at a time to zero, then
- * promote it from `warn` to `error` in eslint.config.js and delete its baseline entry.
- *
- * Regenerate:  node scripts/check-a11y.mjs --write-baseline
- */
+/** Accessibility ratchet. */
 import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';

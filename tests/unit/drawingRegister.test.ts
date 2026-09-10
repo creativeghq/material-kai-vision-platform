@@ -1,17 +1,4 @@
-/**
- * The drawing register — its vocabularies, and the rules the scanner must not break.
- *
- * The vocabulary half exists because `scan-drawing-title-block` snaps a model's free text onto the
- * same lists the register's pickers offer. A model asked for an issue status answers
- * "FOR CONSTRUCTION", "Construction Issue" and "Issued for Construction" for one thing, and a
- * register that stores all three cannot be filtered — so `snapToVocabulary` is the join, and it
- * has to be right in both directions: it must place the obvious variants, and it must refuse to
- * place something it does not recognise rather than guessing.
- *
- * The scanner half guards the two rules that are invisible when broken: a defaulted issue date
- * shows a late drawing as on time, and a scanner that writes turns a whole drawing set into
- * register rows nobody checked.
- */
+/** The drawing register — its vocabularies, and the rules the scanner must not break. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -91,8 +78,8 @@ describe('the title-block scanner', () => {
   });
 
   it('debits before the model call, through the helper whose result cannot be dropped', () => {
-    const debitAt = EDGE.indexOf('debitOrRefuse');
-    const callAt = EDGE.indexOf('callClaudeMessages');
+    const debitAt = EDGE.indexOf('await debitOrRefuse(');
+    const callAt = EDGE.indexOf('await callClaudeMessages(');
     expect(debitAt).toBeGreaterThan(-1);
     expect(callAt).toBeGreaterThan(-1);
     // Order is the assertion: a debit after the call is not a debit, it is a log line.

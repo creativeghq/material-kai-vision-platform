@@ -1,14 +1,4 @@
-/**
- * Project plan estimator (/tools/project-plan) — anonymous lead-gen tool.
- *
- * Value-first AND editable: pick a project type → the full scope of works shows
- * immediately, priced; then edit every row, add tasks, add whole sections from the
- * library, and tweak measurements — exactly like the backend Plan tab, but fully
- * client-side (no DB, no captcha, no quota). "Save & create free account" stashes
- * the edited plan and imports it into the user's library after signup.
- *
- * Only Full Home Renovation runs free here; the other types unlock after sign-up.
- */
+/** Project plan estimator (/tools/project-plan) — anonymous lead-gen tool. */
 
 import { useEffect, useMemo, useState } from 'react';
 import { ClipboardList, Loader2, Sparkles, Lock } from 'lucide-react';

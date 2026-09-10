@@ -1,14 +1,4 @@
-/**
- * Per-workspace Revolut Business BYOK configuration client (#315).
- *
- * Same asymmetry as vivaConfigService, for the same reason:
- *   - WRITES of the non-secret fields (client_id, environment, enabled) go straight to
- *     `workspace_revolut_config` (RLS: is_workspace_finance_manager).
- *   - READS go through `get_workspace_revolut_config_status` — the table has NO select
- *     policy for `authenticated`, so the private key and tokens can never reach the browser.
- *   - Everything involving key material or the Revolut API goes through the `revolut-api`
- *     edge function (keypair minting, OAuth exchange, webhook registration, sync, mapping).
- */
+/** Per-workspace Revolut Business BYOK configuration client (#315). */
 import { supabase } from '@/integrations/supabase/client';
 
 export type RevolutEnvironment = 'sandbox' | 'production';
@@ -68,24 +58,7 @@ export interface RevolutConfigInput {
   revtag?: string;
 }
 
-/**
- * Save the non-secret fields. Blank means "leave the stored value alone".
- *
- * THIS IS AN RPC AND NOT AN UPSERT, and the difference is why the Revolut connection kept
- * losing its client_id.
- *
- * The table has three policies — insert, update, delete — and deliberately NO select policy, so a
- * stored private key can never reach the browser. `INSERT ... ON CONFLICT DO UPDATE` cannot run
- * without reading the conflicting row, so with no select policy every save against an existing row
- * failed with `new row violates row-level security policy` — while a plain UPDATE and a plain
- * INSERT both worked, which is why this never looked like a policy problem. The row is created by
- * `revolut-api?action=init` under the service role, so the browser's FIRST save already took the
- * conflict path. The client_id was never once stored.
- *
- * The RPC also fixes what the upsert let through: the policy authorises the ROW, not the columns,
- * so a finance manager could PATCH `private_key` or `refresh_token` straight through PostgREST.
- * `save_workspace_revolut_config` takes one explicit parameter per field the UI owns (invariant 8).
- */
+/** Save the non-secret fields. Blank means "leave the stored value alone". */
 export async function saveRevolutConfig(workspaceId: string, input: RevolutConfigInput): Promise<void> {
   const blank = (v: string | undefined) => (v === undefined || v.trim() === '' ? null : v);
   const { error } = await supabase.rpc('save_workspace_revolut_config', {

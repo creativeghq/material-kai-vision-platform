@@ -1,14 +1,4 @@
-/**
- * ToolkitOnboardingCard — the "now what?" card.
- *
- * Renders the moment a toolkit is enabled (either by the picker or by the
- * agent's load_toolkit call), and re-renders as the empty state of any chat
- * that has toolkits active but no messages yet. Shows 1–4 starter actions
- * per active toolkit so the user always has a concrete next click.
- *
- * Without this card, enabling Catalogs (or any toolkit) drops the user into
- * a blank chat with no idea what to type.
- */
+/** ToolkitOnboardingCard — the "now what?" card. */
 import React from 'react';
 import {
   Sparkles, Compass, BookOpen, Megaphone, LayoutTemplate, Search, Globe, Link2,
@@ -117,16 +107,7 @@ export const ToolkitOnboardingCard: React.FC<Props> = ({ toolkits, mode, agentNa
   );
 };
 
-/**
- * The toolkit strip.
- *
- * Underline tabs come from `[role="tab"]` in index.css, platform-wide — Radix `TabsList`
- * inherits the house treatment, so this must NOT restyle them into pills (a filled pill is
- * the silhouette of a primary button, so "where I am" and "what to press" stop being
- * distinguishable). The strip scrolls horizontally on its own: with eleven toolkits it is
- * wider than the canvas rail, and `<main>` is `overflow-x-hidden`, so without this the last
- * tabs are clipped with no scrollbar and no swipe.
- */
+/** The toolkit strip. */
 const ToolkitTabs: React.FC<{
   toolkits: ToolkitDefinition[];
   onLaunch: (prompt: string, qs: ToolkitQuickStart, tk: ToolkitDefinition) => void;

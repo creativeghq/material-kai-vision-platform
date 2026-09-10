@@ -1,22 +1,4 @@
-/**
- * Invoice Provider Registry
- *
- * The platform supports multiple invoice providers (built-in via the Payments
- * module, plus ERP integrations like Xero / QuickBooks / SAP). Only
- * ONE provider is active at any time.
- *
- * Discovery is **manifest-driven**: each ERP module declares
- *   `"provides": { "invoicing": true }` in its `manifest.json`.
- * The registry intersects the in-memory module list with the workspace's
- * enabled-modules set; the first match wins. Otherwise the built-in
- * Payments provider is active.
- *
- * To add a new ERP integration:
- *   1. Build the module as normal (folder under `src/modules/<slug>/`)
- *   2. In its `manifest.json`, set `"provides": { "invoicing": true }`
- *   3. Done — `useInvoiceProvider()` picks it up automatically when enabled.
- *      No SQL migration, no provider-list update, no IssueInvoiceButton edit.
- */
+/** Invoice Provider Registry */
 
 import { useMemo } from 'react';
 import { registeredModules, useEnabledModules } from '@/modules/_core';
@@ -40,17 +22,6 @@ export const BUILT_IN_PROVIDER: InvoiceProvider = {
 /**
  * Resolve the active invoice provider from a given set of enabled slugs.
  * Pure function — easy to unit test, no React or DB.
- *
- * NO MODULE DECLARES `provides.invoicing` TODAY, so this always returns BUILT_IN_PROVIDER and
- * `isErp` is currently always false. That is a live extension point awaiting its first
- * consumer, NOT a broken branch: the only modules declaring `provides` are payments-stripe and
- * payments-viva and payments-revolut, all `{ payments: true }`, and `myaade` is an ΑΦΜ lookup rather than an
- * invoicer. The first real ERP integration (Novus e-invoicing is the planned one) sets
- * `provides.invoicing: true` in its manifest and every gated surface lights up — the banner in
- * InvoicingPanel, the hidden Issue button in IssueInvoiceButton, the disabled numbering card.
- *
- * This looks unreachable, and is kept deliberately: the
- * mechanism is correct, so deleting it would remove working plumbing rather than dead code.
  */
 export function resolveInvoiceProvider(enabledSlugs: ReadonlySet<string>): InvoiceProvider {
   const erpCandidates = registeredModules
@@ -92,13 +63,10 @@ export function invalidateInvoiceProviderCache(): void {
   // no-op — see JSDoc above
 }
 
-// =====================================================
 // PAYMENT PROVIDERS — multi-provider registry
-// =====================================================
 // Different from invoicing: multiple payment providers can coexist (an
 // operator may take Stripe AND PayPal AND bank-transfer simultaneously and
 // offer the customer a choice at checkout). So the API returns an array, not
-// a single winner.
 
 export interface PaymentProvider {
   /** Module slug. */
@@ -107,24 +75,7 @@ export interface PaymentProvider {
   name: string;
 }
 
-/**
- * Resolve the payment providers available to the ACTIVE WORKSPACE.
- *
- * TWO gates, both required — this is the same intersection
- * `useWorkspaceModuleNav` applies, and the same one the server-side
- * `_shared/payments/registry.ts` enforces:
- *
- *   1. `publishedSlugs` — `modules.enabled`, the operator's platform-wide
- *      catalog/kill-switch. Lets us pull a broken provider for everyone.
- *   2. `entitledSlugs`  — the workspace's own grant (`workspace_module_entitlements`,
- *      written when the owner clicks Enable).
- *
- * BOTH must be checked. Check only (1) and any tenant seeing a provider means EVERY
- * tenant sees it, because `modules.enabled` is global. On a payments surface that is a
- * tenant-isolation break, not a cosmetic bug.
- *
- * Pure function — easy to unit test. Sorted by slug for deterministic ordering.
- */
+/** Resolve the payment providers available to the ACTIVE WORKSPACE. */
 export function resolvePaymentProviders(
   publishedSlugs: ReadonlySet<string>,
   entitledSlugs: ReadonlySet<string>,
@@ -138,18 +89,7 @@ export function resolvePaymentProviders(
     .sort((a, b) => a.slug.localeCompare(b.slug));
 }
 
-/**
- * React hook: the payment providers the active workspace may actually offer.
- *
- * Returns an empty array while loading or when none is enabled — call sites should
- * treat empty as "no checkout possible; the owner must enable a provider in
- * Finance → Settings → Payments".
- *
- * NOTE this answers "is this provider ENABLED for the tenant", not "is it CONNECTED".
- * Credential readiness is provider-specific and resolved server-side; a customer-facing
- * surface must additionally require `configured` from the edge function rather than
- * offering a method that cannot charge.
- */
+/** React hook: the payment providers the active workspace may actually offer. */
 export function useActivePaymentProviders(): PaymentProvider[] {
   const { rows } = useEnabledModules();
   const { availableSlugs, loading } = useEntitlements();

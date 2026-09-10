@@ -1,16 +1,6 @@
 /**
  * RefreshResearchButton — drop-in "Refresh research" control for any surface that shows a CRM
  * company but isn't the company record page (Finance → Parties, and anywhere else that grows one).
- *
- * It owns the whole interaction: load the row, run the shared [[researchCompany]] chain
- * (ΑΑΔΕ → ΓΕΜΗ → business research), write the patch back, and report what happened — including
- * the legs that were SKIPPED. That reporting is the point: `ok` is true when ANY leg works, so a
- * run where Apollo is unconfigured and web search returns one URL used to read as a clean success
- * and leave a company with no phone or industry and no explanation.
- *
- * Deliberately a component, not a copied handler: the company/contact record pages already carry
- * their own runResearch (they additionally patch inline state and log a CRM activity), and a
- * third hand-rolled copy is exactly how the chain drifted before.
  */
 import React, { useState } from 'react';
 import { RefreshCw, Loader2 } from 'lucide-react';

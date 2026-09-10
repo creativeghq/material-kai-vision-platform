@@ -5,10 +5,6 @@
  *                   refused outright whenever the classifier cannot run (observed 2026-08-22)
  *   - too broad   → the gate switches off for user-supplied images, which is the exact input
  *                   it exists to inspect (credentials, identity documents, financial instruments)
- *
- * The bug it replaces was the narrow kind: a lone `/\/generation-images\/.*\/gen\//` regex that
- * matches only the per-session layout, while the multi-model grid always lands on the legacy
- * `gemini/` prefix because MIVAA calls the edge function with no conversation id.
  */
 import { describe, it, expect } from 'vitest';
 import {

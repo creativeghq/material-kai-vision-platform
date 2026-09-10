@@ -1,25 +1,4 @@
-/**
- * transliterate.ts — deterministic Cyrillic/Greek → Latin transliteration.
- *
- * WHY THIS EXISTS: VIES is a proxy over each member state's own VAT register and returns the
- * company name in whatever script that register stores — Cyrillic for BG, Greek for EL/CY. There
- * is no language parameter (verified 2026-08-03 against the REST and SOAP endpoints, and against
- * `Accept-Language`, `lang`, `locale` and `language` — all ignored). So a Latin rendering has to
- * be derived on our side.
- *
- * WHAT THIS IS NOT: this produces a TRANSLITERATION, not a translation and not a trading name.
- * `Виваком България - ЕАД` becomes `Vivakom Bulgaria - EAD`, while the company actually trades
- * as "Vivacom". Treat the output as a readability aid for Latin-script users. The original string
- * stays authoritative — it is what has to appear on an invoice for VAT purposes.
- *
- * STANDARDS:
- *  - Bulgarian: the Transliteration Act (Закон за транслитерацията, 2009), incl. its two named
- *    exceptions — word-final "ия" → "ia", and "България" → "Bulgaria".
- *  - Greek: ELOT 743 / ISO 843 (the system used for Greek passports), incl. the αυ/ευ/ηυ voicing
- *    rule and the γ- and μπ- digraphs.
- *
- * Pure and dependency-free so it can be unit-tested outside Deno.
- */
+/** transliterate.ts — deterministic Cyrillic/Greek → Latin transliteration. */
 
 export type DetectedScript = 'cyrillic' | 'greek' | 'latin' | 'none';
 

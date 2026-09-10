@@ -1,11 +1,4 @@
 // Unified CRM API — REST resource routing.
-//   POST /crm-api/companies/...   → handleCompanies
-//   POST /crm-api/contacts/...    → handleContacts
-//   POST /crm-api/users/...       → handleUsers
-//   POST /crm-api/stripe/...      → handleCrmStripe
-//   POST /crm-api/google-business → handleGoogleBusiness
-// HTTP method (POST/GET/PUT/DELETE) and remaining path segments are preserved.
-// Each handler does its own auth + RLS.
 
 import { corsHeaders } from '../_shared/cors.ts';
 import { handleCompanies } from './handlers/companies-api-handler.ts';

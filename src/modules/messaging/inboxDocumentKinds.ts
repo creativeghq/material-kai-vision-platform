@@ -1,22 +1,4 @@
-/**
- * What kind of business document an inbox attachment is — written ONCE.
- *
- * An emailed supplier invoice or a WhatsApp photo of a delivery note used to land in the inbox
- * as a bare file: the thread showed a paperclip, the assistant was told it "cannot open it", and
- * the document reached Expenses only if a person recognised it and re-keyed it. The classifier
- * in `_shared/inbox-attachment-intelligence.ts` reads the file and stamps one of these kinds on
- * the attachment, with a confidence and a one-line reason (a value or a stated reason, never a
- * hidden row).
- *
- * The EDGE needs this list for the forced tool's enum; the CLIENT needs it for the tag and for
- * deciding which kinds get an "Add as expense" link. Two runtimes, one declaration — mirrored by
- * `npm run vocab:mirror` (tests/unit/vocabularyMirrors.test.ts holds the copy to this source).
- *
- * `unknown` is a real verdict ("I read it and it is none of these"), distinct from the
- * classification having FAILED or been SKIPPED, which are statuses on the envelope, not kinds.
- *
- * THIS FILE IS IMPORT-FREE, ON PURPOSE — it is byte-mirrored to the edge.
- */
+/** What kind of business document an inbox attachment is — written ONCE. */
 
 export const INBOX_DOCUMENT_KINDS = [
   'invoice',

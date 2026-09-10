@@ -496,17 +496,7 @@ export class MessagingService {
     return data;
   }
 
-  /**
-   * Download the profile photos WhatsApp will give us.
-   *
-   * A photo is not pushed: `conversation.participantPicture` is optional on a webhook and was
-   * absent on every real payload we measured, which is why every thread showed initials. It IS a
-   * documented field on `GET /v1/inbox/conversations`, so this goes and reads it — the same
-   * fetch-the-bytes rule that makes inbound attachments work.
-   *
-   * The counts come back separated on purpose: a run that finds no photos and a run that finds
-   * photos it already had are the same "0 stored" and completely different problems.
-   */
+  /** Download the profile photos WhatsApp will give us. */
   async syncAvatars(workspaceId: string, threadId?: string): Promise<{
     conversations: number;
     with_picture: number;
@@ -783,20 +773,7 @@ export class MessagingService {
   // Opt-out Management (Compliance)
   // =====================================================
 
-  /**
-   * Has this number opted out of this channel, for this workspace? (#359 CM-1)
-   *
-   * The previous version was true for almost everybody. Its filter was
-   * `.or('phone_number.eq.X, channel_type.eq.whatsapp, channel_type.eq.all')` — three OR'd
-   * conditions, so ANY whatsapp opt-out anywhere on the platform satisfied it regardless of the
-   * number asked about. The phone was also interpolated into a PostgREST filter unescaped, so a
-   * value containing a comma or a parenthesis rewrote the query.
-   *
-   * And it returned FALSE on error: a compliance check that answers "go ahead" when it cannot run.
-   *
-   * All three are gone: one SQL verdict, normalized on both sides, workspace-scoped, and a thrown
-   * error rather than a cheerful false.
-   */
+  /** Has this number opted out of this channel, for this workspace? (#359 CM-1) */
   async checkOptOut(
     workspaceId: string,
     phoneNumber: string,

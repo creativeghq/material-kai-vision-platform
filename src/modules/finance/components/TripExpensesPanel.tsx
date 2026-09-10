@@ -256,21 +256,7 @@ const TripCardDetail: React.FC<{
     catch (err: any) { toast({ title: 'Delete failed', description: err?.message, variant: 'destructive' }); }
   };
 
-  /**
-   * Photograph N receipts, get N draft lines (#379).
-   *
-   * The order matters and it is not the obvious one. Each file is SCANNED first, then the line is
-   * created from what came back, then the image is attached to that line. Creating the line first
-   * would mean a failed scan leaves an empty row the rep has to find and delete; scanning first
-   * means a failure costs nothing but the credit that was already spent reading it.
-   *
-   * One file at a time, deliberately. A phone camera roll of twelve receipts fired at the model in
-   * parallel is twelve concurrent vision calls against a per-workspace credit balance, and a
-   * mid-batch refusal would leave an arbitrary subset created. Sequential also lets the button
-   * report "4 of 12" rather than freezing.
-   *
-   * Every line lands with `needs_review`, whatever the confidence. The rep confirms.
-   */
+  /** Photograph N receipts, get N draft lines (#379). */
   const scanReceipts = async (files: FileList) => {
     if (!report) return;
     const list = Array.from(files);

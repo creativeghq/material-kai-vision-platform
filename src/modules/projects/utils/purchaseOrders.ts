@@ -61,21 +61,7 @@ export interface SkippedPurchaseItem {
   reason: string;
 }
 
-/**
- * WHICH items can become purchase orders, and how they group.
- *
- * Three refusals, each RETURNED with its reason rather than dropped:
- *   · already on an order — raising again orders the same door twice
- *   · no supplier        — there is nobody to send a purchase order to
- *   · no unit cost       — it would reach a supplier's order priced at zero
- *
- * `unit_cost: 0` is a price, not a missing one: a warranty replacement or a sample is legitimately
- * free. Only `null` means nobody has priced it. Conflating the two either blocks a real order or
- * sends one out at nothing.
- *
- * Grouping is by supplier AND currency. One order carries one currency, and converting silently is
- * precisely the money bug this platform keeps finding.
- */
+/** WHICH items can become purchase orders, and how they group. */
 export function planPurchaseOrders<T extends PurchaseItemForOrder>(items: T[]): {
   groups: Array<PurchaseOrderGroup<T>>;
   skipped: SkippedPurchaseItem[];

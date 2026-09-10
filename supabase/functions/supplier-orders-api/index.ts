@@ -1,18 +1,4 @@
-/**
- * supplier-orders-api — ERP outbound
- *
- * Partner API for a claimed supplier's own ERP system. Authenticated with a
- * `kai_*` api_key (Authorization: Bearer kai_...), the same flow price/mention/job
- * partners use. The key's workspace must have an APPROVED supplier-identity claim;
- * the endpoint then exposes the purchase orders sent to that identity across all
- * buyer workspaces and lets the ERP post acknowledge/ship/ETA back.
- *
- *   GET  /supplier-orders-api            → { orders: [...] }
- *   POST /supplier-orders-api { action:'list_orders' }                 → { orders }
- *   POST /supplier-orders-api { action:'update_order', order_id, status?, eta?, note? } → { ok }
- *
- * Visibility contract: only PO header + lines + buyer name (no buyer catalog/margins).
- */
+/** supplier-orders-api — ERP outbound */
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate } from '../_shared/auth.ts';

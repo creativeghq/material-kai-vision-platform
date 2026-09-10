@@ -1,16 +1,4 @@
-/**
- * What is filed is what the record says, and it is filed once (#354 HR-1…HR-14).
- *
- * The HR module has never run — all 20 tables are empty — so none of this is an incident list. It
- * is the state the first real payroll run and the first real ΕΡΓΑΝΗ filing would have met, in a
- * domain where the first attempt is a legal declaration and a bank transfer.
- *
- * `mergeUnfilledKeys` is exercised for real: `_shared/ergani/document.ts` is import-free by
- * design, so the rule "the caller may complete what we could not fill, never overwrite what we
- * did" is checked as behaviour rather than asserted about. The rest is source-level, and the SQL
- * half — the `hr_time_punches` sequence guard — lives in `pg_proc` where no repo-file test can see
- * it; it was verified against the live database with a rolled-back fixture.
- */
+/** What is filed is what the record says, and it is filed once (#354 HR-1…HR-14). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -283,32 +271,7 @@ describe('#354 HR-14 — the source tree holds source', () => {
   });
 });
 
-/**
- * Posting a payroll run to Finance — 2026-08-30.
- *
- * `post-payroll-to-finance` inserts one planned payment per employee's net wages, plus one for
- * income tax and one for EFKA, and only THEN stamps `hr_payroll_runs.posted_finance_ref`. Each
- * insert is a separate call over the wire, so if any one fails — or the connection drops before the
- * stamp — the payments exist and the stamp does not. The guard was
- *
- *     if (run.posted_finance_ref) return 409 'already posted'
- *
- * reading the very column that can be missing. The operator is holding an error for a posting that
- * partly happened and the screen offers one thing: Post again. That schedules a second payment for
- * every employee's salary, a second ΦΜΥ remittance and a second EFKA remittance.
- *
- * CLAUDE.md rule 4, the clause this file already asserts elsewhere: a duplicate guard reads the
- * record written on the SUCCESS path, never a status column written after it. Here the success-path
- * record is the payments — and nothing connected them to the run, the only link being the period
- * interpolated into `title`. `planned_payments.payroll_run_id` is that link (the third of its kind
- * next to `supplier_bill_id` and `invoice_id`), which is also what makes "Reverse the posting
- * before re-opening it" — an error this same file raises one screen earlier — mean anything.
- *
- * Separately: the posting recorded `totals.net` from `run.total_net`, a CACHED column maintained by
- * two other actions, while the three figures beside it were summed from the rows that actually
- * produced the payments. It also counts lines this loop skips (`net <= 0`). So the audit record of
- * a posting could disagree with the payments it describes. One derivation per money quantity.
- */
+/** Posting a payroll run to Finance — 2026-08-30. */
 describe('posting payroll to Finance cannot pay everyone twice', () => {
   /**
    * The handler body, bounded by the next `case` rather than a fixed character count. A magic

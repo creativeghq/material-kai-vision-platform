@@ -111,19 +111,7 @@ export const NewDeliveryNoteDialog: React.FC<{
         try {
           await deliveryNotesService.issue(id);
         } catch (issErr: any) {
-          /**
-           * The draft EXISTS (#351 C4).
-           *
-           * Create and issue are two awaits with no transaction between them, and the old catch
-           * said only "Failed" and left the form armed — so the header that had just been written
-           * was invisible, and saving again cut a second one. `issue_delivery_note` allocates the
-           * legal number and moves stock, so it is the half that can genuinely fail (a line with
-           * no catalog product, a closed period, an RLS rejection) long after the note is saved.
-           *
-           * Say which half succeeded, refresh the list so the draft is visible, and close —
-           * issuing it again belongs on that row, where the operator can see what they are
-           * issuing. Re-arming this form would only offer to duplicate it.
-           */
+          /** The draft EXISTS (#351 C4). */
           onCreated();
           onOpenChange(false);
           toast({

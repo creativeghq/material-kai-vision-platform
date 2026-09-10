@@ -1,22 +1,4 @@
-/**
- * "Allocate as profit" — take what an order made off the order and record it as taken.
- *
- * A sales order that has been paid and whose costs are on it has an amount left over: its margin.
- * Until now that number existed only on reports, with no way to say "that is mine, I have taken
- * it" — so it stayed an observation rather than a decision.
- *
- * What this does and does NOT do:
- *  - The CASH DOES NOT MOVE. It stays in whichever account it landed in and is free to spend.
- *  - The order records that its margin has been claimed: the amount, the day, a category, a note.
- *  - It is capped at what the order actually made LESS anything already taken, so the same euro
- *    cannot be taken twice. The cap is re-read by the RPC — this dialog's number can be stale.
- *  - It does NOT add income to the P&L a second time. The order's revenue and its cost of goods
- *    are already in there and already net to this figure; booking it again would double it. This
- *    is the record of the decision, not a second earning of the same money.
- *  - NOTHING is issued to anyone and NOTHING is transmitted to myDATA.
- *
- * Reversible: `financeService.reverseProfitAllocation(id)`.
- */
+/** "Allocate as profit" — take what an order made off the order and record it as taken. */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';

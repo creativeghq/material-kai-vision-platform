@@ -13,19 +13,7 @@ import { isModuleEnabled, moduleSupabaseClient } from '../_shared/modules/regist
  */
 const CRON_SECRET = () => Deno.env.get('CRON_SECRET') || '';
 
-/**
- * Unified monitoring cron dispatcher.
- *
- * Replaces the 5 near-identical monitoring cron functions (price-monitoring-cron,
- * mention-monitoring-cron, llm-mention-probe-cron, job-research-cron,
- * job-research-digest-cron) — each was the same boilerplate (cron-secret check →
- * module gate → POST to a MIVAA cron endpoint), differing only in module slug +
- * endpoint. pg_cron passes `?task=<task>`; each task gates on its module then
- * delegates to MIVAA (which fetches due rows + processes in batch).
- *
- * External API consumers (api_key_id IS NOT NULL) are intentionally NOT touched by
- * the refresh tasks — they pay per call and control their own cadence.
- */
+/** Unified monitoring cron dispatcher. */
 
 interface TaskSpec {
   module: string;
@@ -89,11 +77,6 @@ Deno.serve(withApiLogging(
   // Answers success:false, NOT success:true. Report a deliberate no-op and a completed
   // refresh with the same response and a switched-off module reports healthy every hour,
   // indefinitely.
-  // Deliberately still HTTP 200: a skip is not a server error and must not burn the error
-  // budget, and 204 is not available because it forbids a response body. The status is not
-  // the signal here — `success:false` plus the per-task request_path above is, and
-  // `ops.monitoring_disabled_with_subjects` catches the case that actually matters, a module
-  // switched off while subjects are still tracked.
   if (!(await isModuleEnabled(moduleSupabaseClient(), spec.module))) {
     console.log(`⏸️ ${spec.module} disabled — skipping ${task}`);
     return json({ success: false, task, skipped: 'module_disabled', module: spec.module,

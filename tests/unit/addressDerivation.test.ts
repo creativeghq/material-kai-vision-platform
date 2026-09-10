@@ -1,22 +1,4 @@
-/**
- * ONE address derivation, and ONE way to build a Google Maps link.
- *
- * THE SHAPE THIS EXISTS TO STOP. An address is stored as loose parts and every surface that
- * shows one has to put them back together. There were already four hand-rolled versions of
- * that join when this landed — `crm.service.formatAddressLine`, the CRM address-unit row, the
- * finance Establishments row (which joined with spaces and no commas, so "Ermou 15 10563
- * Athens" ran together), and the invoice party builder — and each one made a different call
- * about where the street number goes. A wrong address is a valid string: nothing throws, no
- * typecheck fails, and the two renderings of one address sit on the same screen looking equally
- * authoritative.
- *
- * The map link is the same shape one step further on. `https://google.com/maps/...?query=` is
- * easy enough to type inline that it will be typed inline, and the copy that forgets
- * `encodeURIComponent` breaks on the first Greek street name — which is most of them here.
- *
- * So: the derivation is `src/utils/address.ts`, and the scan at the bottom fails when a second
- * copy appears.
- */
+/** ONE address derivation, and ONE way to build a Google Maps link. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';

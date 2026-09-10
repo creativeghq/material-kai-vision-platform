@@ -1,27 +1,4 @@
-/**
- * Health Check Edge Function
- *
- * Runs server-side checks (no CORS, real HTTP status codes) for all services:
- *
- * AI providers (key validity):
- *   - Claude:      GET /v1/models          — no tokens consumed
- *   - SLIG (Modal): GET /health            — SigLIP2 visual embeddings endpoint
- *   - Voyage AI:   POST /v1/embeddings     — minimal single-word embedding
- *
- * Python backend services:
- *   - Embeddings:  GET /api/embeddings/health
- *   - AI Services: GET /api/v1/ai-services/health
- *
- * External third-party APIs (reachability — any HTTP response = UP, only timeout = DOWN):
- *   - Twilio, Apollo, Hunter.io, ZeroBounce, Firecrawl, WorldLabs, Stripe
- *
- * Cloudflare (three surfaces, three different methods, because they fail differently):
- *   - Turnstile:      POST siteverify with a junk token — grades OUR SECRET, not just reachability
- *   - Email Routing:  MX lookup over DoH + delivery outcomes from the DB. The inbound Worker has
- *                     no fetch handler, so it cannot be pinged; its health is its output.
- *   - Workers:        Cloudflare API — token valid + the inbound Worker actually deployed.
- *                     UNKNOWN without a token; an unconfigured check has measured nothing.
- */
+/** Health Check Edge Function */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
@@ -38,18 +15,7 @@ const SUPABASE_URL        = Deno.env.get('SUPABASE_URL')        || '';
 const SUPABASE_ANON_KEY   = Deno.env.get('SUPABASE_ANON_KEY')   || '';
 const SUPABASE_SERVICE_ROLE_KEY = () => Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
-/**
- * Cloudflare configuration. Resolved with `resolveSecret`, never `Deno.env.get`.
- *
- * `Deno.env.set` throws on the Supabase edge runtime, so `bootstrapSecretsFromDb` cannot actually
- * populate env there — a `Deno.env.get` on an admin-editable key comes back undefined for ever
- * with nothing logged. Three of these four keys exist ONLY in `platform_secrets` (an operator adds
- * them from Profile → Keys, no redeploy), so reading env would have made this whole panel report
- * "not configured" permanently no matter what the admin saved. `resolveSecret` is env-first and
- * then reads the table, which is the behaviour both halves need.
- *
- * `platform_secrets` is service-role-only, hence the admin client below.
- */
+/** Cloudflare configuration. Resolved with `resolveSecret`, never `Deno.env.get`. */
 const CLOUDFLARE_SECRET_KEYS = [
   'TURNSTILE_SECRET_KEY',
   'INBOUND_EMAIL_DOMAIN',
@@ -233,21 +199,7 @@ const MODULE_SERVICES: Record<string, { name: string; url: string; category: str
 // Three independent surfaces, deliberately checked three different ways, because they fail
 // differently and only one of them can be pinged.
 
-/**
- * Turnstile — the bot gate on every public form (/tools estimator, kitchen lead, careers).
- *
- * Reachability alone is not the check worth having: the failure that actually happens is a
- * ROTATED OR WRONG SECRET, and its symptom is that every real visitor's submission is rejected
- * while the endpoint stays perfectly up. So probe with a deliberately-invalid token and read which
- * error Cloudflare returns — it grades our secret for us:
- *
- *   invalid-input-response → the secret was accepted, only the token was junk. Working.
- *   invalid-input-secret   → OUR key is wrong. Every public form is silently refusing people.
- *   success: true          → a Cloudflare TESTING secret is in production. The gate passes
- *                            everything, and looks perfect from every other angle.
- *
- * All three verified against the live endpoint rather than assumed from the docs.
- */
+/** Turnstile — the bot gate on every public form (/tools estimator, kitchen lead, careers). */
 async function checkTurnstile(cfg: CloudflareConfig): Promise<CloudflareCheck> {
   const secret = cfg.turnstileSecret;
   if (!secret) {
@@ -372,9 +324,6 @@ async function checkCloudflareWorkers(cfg: CloudflareConfig): Promise<Cloudflare
     // the user endpoint reports a perfectly good account token as REJECTED — a health check
     // inventing an outage, which is the same class of lie as reporting a green light that measures
     // nothing. Confirmed against a live cfat_ token: /user/... says invalid while the account
-    // endpoint says "valid and active" and the Workers list answers fine.
-    //
-    // Try the account endpoint first when we have an account id, because that is the newer shape.
     const verifyUrls = accountId
       ? [`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/tokens/verify`,
          'https://api.cloudflare.com/client/v4/user/tokens/verify']
@@ -460,10 +409,6 @@ function worstCloudflareStatus(parts: CloudflareCheck[]): CloudflareCheck['statu
  * `{ status: 'healthy', message: 'Platform operational' }` — a health indicator that was green
  * whether Vercel was up or down (#365 `AD-1`). A HEAD against the app's own origin is the check
  * that light was always claiming to be.
- *
- * Any HTTP response means the deployment is serving. Only a network-level failure — DNS, TLS,
- * timeout, a Vercel outage — is unhealthy. A 5xx is reported as degraded rather than healthy,
- * because the edge answered but the app did not.
  */
 async function checkVercel(): Promise<ExternalResult & { message?: string }> {
   const url = (Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr').replace(/\/+$/, '');

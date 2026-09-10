@@ -1,16 +1,4 @@
-/**
- * Social Media — edge-tier module manifest.
- *
- * Declares the agents + LLM tool factories this module contributes when
- * `public.modules.slug = 'social-media'` is enabled. Consumed by:
- *   - the background-agent runner (gates agents via getRunnerGated)
- *   - the KAI agent edge function (when it builds its tool list, if/when
- *     it adopts dynamic module-tool merging)
- *
- * Adding a new social capability: extend the `manage_social` tool in
- * `_shared/tools/social-tools.ts` and its SERVER_TOOLKITS / client TOOLKITS entries.
- * Do NOT add tool factories here — nothing consumes them.
- */
+/** Social Media — edge-tier module manifest. */
 
 import type { EdgeModuleManifest } from '../registry.ts';
 

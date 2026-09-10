@@ -1,15 +1,4 @@
-/**
- * PriceAlertPreferences — module-gated alert opt-in card.
- *
- * Renders only when the `price-monitoring-notifications` module is enabled.
- * Lets the user toggle the three alert types (price drop / new retailer /
- * promo started) and pick which channels deliver them (bell / email /
- * webhook). Each channel has its own credit cost surfaced inline.
- *
- * Used inside ProductMonitorTab (per catalog product). The same shape can
- * be reused on the external-API tracked-queries detail page in a future
- * PR — the columns are mirrored on both tables.
- */
+/** PriceAlertPreferences — module-gated alert opt-in card. */
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { BellRing, Mail, Webhook, Loader2, Lock } from 'lucide-react';

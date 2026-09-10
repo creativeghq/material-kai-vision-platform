@@ -1,16 +1,4 @@
-/**
- * Pipeline Strategy Metrics panel.
- *
- * Reads from `pipeline_strategy_metrics` — the per-stage distribution log
- * the pipeline-strategy audit added. Surfaces:
- *   - chunking strategy distribution (which path actually fired per product:
- *     product_layout_regions_cache vs document_layout_cache vs text_fallback)
- *   - Stage 1.5 failed-page count aggregated from `notes.stage_1_5_failed_pages`
- *
- * Operators need this to spot regressions where Stage 1.5 starts silently
- * failing and the chunker falls back to text-only — quality drops in search
- * results before anyone notices, because the pipeline keeps "succeeding".
- */
+/** Pipeline Strategy Metrics panel. */
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { Activity, AlertTriangle, BarChart3, Loader2 } from 'lucide-react';
@@ -109,7 +97,6 @@ export const PipelineStrategyMetricsPanel: React.FC = () => {
   // get to "how many page-level failures happened in this window" without
   // double-counting (Stage 1.5 runs once per document, so the same failure
   // count is reported by every product on that document).
-  // To approximate uniqueness, group by document_id and take max per doc.
   const stage15FailureByDoc = useMemo(() => {
     const byDoc: Record<string, { failures: number; total: number; products: number }> = {};
     rows

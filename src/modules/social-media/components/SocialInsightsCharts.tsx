@@ -1,17 +1,6 @@
 /**
  * The derived analytics Zernio computes and nothing here ever asked for: daily reach over time,
  * how engagement accumulates after publishing, and how cadence relates to engagement per platform.
- *
- * All three are PASS-THROUGH reads. Zernio does the derivation; we render it. Nothing is stored,
- * because a stored rollup is a second derivation of the same quantity and drifts the moment
- * either side changes.
- *
- * Charts follow the platform's `--chart-N` tokens in fixed order and stop at TWO series. The
- * palette was run through the colour validator: slots 1+2 pass CVD separation in both themes,
- * where 2+3 (blue↔purple) collide at ΔE 3.8 for deuteranopia — so a four-line chart using the
- * ramp in order would be unreadable for a red-green colourblind reader. Everything plotted is
- * also present as a number in a table below it, which is the required relief for the light
- * theme's contrast warning on chart-1.
  */
 import React from 'react';
 import {
@@ -70,19 +59,7 @@ const tooltipStyle = {
 
 const num = (v: number | null | undefined) => (v == null ? '—' : formatNumber(v));
 
-/**
- * A panel still waiting on Zernio.
- *
- * These three read a third party over four sequential hops, while the tables above them come
- * from a local query that finishes in milliseconds. Holding the whole tab behind one spinner
- * made a fast screen feel like a broken one, and swapping the spinner for an empty state the
- * moment it clears is worse — "still loading" and "there is nothing here" are opposite facts and
- * were rendering identically.
- *
- * An OVERLAY rather than a replacement, so the panel keeps its height and the page does not
- * jump as each one lands. `aria-busy` is on the region for the same reason it is visible: a
- * screen reader gets told to wait rather than told the panel is empty.
- */
+/** A panel still waiting on Zernio. */
 const LoadingOverlay: React.FC = () => (
   <div
     className="absolute inset-0 z-10 flex items-center justify-center rounded-sm bg-card/80 backdrop-blur-[1px]"

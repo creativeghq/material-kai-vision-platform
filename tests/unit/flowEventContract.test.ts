@@ -3,29 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
-/**
- * Every emitted flow event must exist in the `TriggerType` union (#263 item 4).
- *
- * The union is what a flow can LISTEN for. An emitter firing a string that is not in it is
- * unreachable by construction: `flow-engine` matches zero flows, returns `{triggered: 0}`, and
- * nothing anywhere reports a problem — the emit succeeded, the delivery just never existed.
- *
- * This is not hypothetical. `contracts-api` emitted **`contract_signed`** while the union carried
- * **`contract_created`** (#272): the emitter was unreachable AND the union entry unemitted, one
- * character class apart, for as long as both existed. It is fixed now; this is what stops the next
- * one, because nothing else can.
- *
- * WHY TYPESCRIPT CANNOT DO THIS:
- *   • `emitFlowEvent` / `flowEventService.emit` take a `string` — they must, since events cross
- *     the Deno/Vite boundary and edge functions cannot import `src/services/flows/types.ts`.
- *   • The icon and label maps ARE `Record<TriggerType, …>`, so tsc already guarantees those are
- *     exhaustive. Re-testing them here would add nothing. The gap is the emit side.
- *
- * Direction matters and only one direction is an error. An emitted string missing from the union
- * is a BUG (nothing can listen). A union member with no emitter is NOT — plenty are emitted from
- * SQL triggers, and `manual`/`scheduled`/`webhook` are entry points rather than events. So this
- * asserts one way and reports the other as information.
- */
+/** Every emitted flow event must exist in the `TriggerType` union (#263 item 4). */
 const UNION_FILE = 'src/services/flows/types.ts';
 const SCAN_ROOTS = ['src', 'supabase/functions'];
 
@@ -68,17 +46,6 @@ function collectEmits(): Emit[] {
   // Only a STRING LITERAL event name. A variable (`emitFlowEvent(evt, …)`) cannot be checked
   // statically and is skipped rather than guessed at — a guard that invents findings is worse
   // than one with a known blind spot, and this one's blind spot is narrow and deliberate.
-  //
-  // TWO call shapes, because the event name is not always the first argument:
-  //   emitFlowEvent('x', …)                              — name first
-  //   flowEventService.emit('x', …)                      — name first
-  //   emitFlowEventToWorkspaceRoles(ws, roles, 'x', …)   — name THIRD
-  //   flowEventService.emitToWorkspaceRoles(ws, roles, 'x', …)
-  //
-  // The role-fanout form was invisible here until #342. That is why `order_created` — emitted by
-  // `ordersService.create` since the orders module shipped — was reported as having no in-repo
-  // emitter: the guard could not see the call. A blind spot in the check that exists to find
-  // blind spots is worth more than the finding it hid.
   const RE_FIRST = /(?:emitFlowEvent|flowEventService\.emit)\(\s*'([a-zA-Z0-9_.]+)'/g;
   const RE_THIRD =
     /(?:emitFlowEventToWorkspaceRoles|flowEventService\.emitToWorkspaceRoles)\(\s*[^,]+,\s*\[[^\]]*\]\s*,\s*'([a-zA-Z0-9_.]+)'/g;
@@ -108,11 +75,6 @@ describe('flow event contract', () => {
     // Both halves must be non-trivial. If the union regex or the emit regex ever stops matching —
     // a refactor to an enum, a rename of emitFlowEvent — every assertion below would pass by
     // scanning nothing, which is the exact failure this whole test file exists to prevent.
-    // Floor sits just under the real member count (103 today), not near zero. The first version
-    // of this parser truncated the union to ~half and a `> 50` floor waved it straight through,
-    // so ~70 valid events were reported as orphans while the sanity check said everything was
-    // fine. Note 103 is the TriggerType declaration alone — `types.ts` contains other unions, so
-    // grepping `| '…'` across the whole file gives 148 and is the wrong number to calibrate on.
     expect(union.size, 'TriggerType union parsed short — the declaration format changed').toBeGreaterThan(90);
     expect(emits.length, 'no emitFlowEvent/emit call sites found — the call shape changed').toBeGreaterThan(30);
   });
@@ -138,15 +100,6 @@ describe('flow event contract', () => {
      * event fires and no flow can listen. This catches a trigger that fires, HAS a union entry,
      * icon and label, and is still unbuildable because `paletteItems` never listed it: the
      * builder's palette is the only place a person can pick one from.
-     *
-     * `email_sender_not_configured` was in exactly that state — union member, icon in
-     * `MyFlowsTab` and `TriggerNode`, emitted by `emailSenderGate`, seeded default flow, and
-     * absent from the palette. Nothing reported a problem; the trigger simply could not be used.
-     *
-     * Scoped to triggers with an IN-REPO EMITTER on purpose. The union also holds entry points
-     * (`manual`, `scheduled`, `webhook`) and events raised from SQL triggers, and demanding a
-     * palette entry for those would make this red for correct code — the surest way to get a
-     * guard deleted rather than fixed.
      */
     const PALETTE = 'src/components/Admin/FlowsManagement/utils/paletteItems.ts';
     const palette = stripComments(readFileSync(PALETTE, 'utf8'));
@@ -178,26 +131,7 @@ describe('flow event contract', () => {
   });
 });
 
-/**
- * The tenant flow vocabulary was THREE copies, and the one nobody had listed was the enforcer.
- *
- * `TENANT_TRIGGERS` / `TENANT_ACTIONS` in flow-tools.ts become the zod enum handed to the LLM —
- * what a user is OFFERED. `create_simple_flow`'s `v_allowed_*` gate the agent's create path. But
- * the REAL floor is `enforce_tenant_flow_allowlist`, a BEFORE INSERT OR UPDATE trigger on `flows`
- * that every write path crosses, and it had its own third array.
- *
- * That is not hypothetical, and this comment used to describe it in the past tense while it was
- * still live. `payment_sent` was added to the first two when the drift was "fixed"; the table
- * trigger never got it, so "notify me when a payment goes out" still passed zod, still passed the
- * RPC, and still died on a raw `42501` one layer further down. Offered, accepted, impossible —
- * exactly as before, one level below where anyone had looked.
- *
- * Fixed structurally 2026-08-24: both SQL halves now read `tenant_flow_allowed_triggers()` /
- * `tenant_flow_allowed_actions()`, so there is ONE list in the database and one mirror in
- * TypeScript. The pin below is that mirror. A unit test cannot read pg_proc, so it cannot verify
- * the database side — what it CAN do is refuse to let the TypeScript half move quietly, turning a
- * silent drift into a deliberate one.
- */
+/** The tenant flow vocabulary was THREE copies, and the one nobody had listed was the enforcer. */
 describe('tenant flow vocabulary', () => {
   const TOOL_FILE = 'supabase/functions/_shared/tools/flow-tools.ts';
 
@@ -214,15 +148,6 @@ describe('tenant flow vocabulary', () => {
   };
 
   // Must equal tenant_flow_allowed_triggers() / tenant_flow_allowed_actions(), verbatim.
-  //
-  // Widened 2026-08-27 from 8 entries to 56. It was 8 because `forkable` — offered on the
-  // Automations page as "Reuse" — is derived from this list, and only 4 of 87 tenant-governable
-  // platform defaults qualified. The narrowness was never about operator-vs-tenant (that is
-  // `tenant_configurable`, a separate flag): a FORK is `is_global=false`, and flow-engine matches
-  // such a row only as `and(is_global.eq.false, workspace_id.eq.<ws>)`, so the admission rule is
-  // "does this trigger's emitter stamp workspace_id". Every entry below was verified against the
-  // payload actually posted to flow-engine — see the emitter test at the bottom of this block.
-  // `appointment_booked` was REMOVED: `appointments` has no workspace_id column at all.
   const RPC_TRIGGERS = [
     'manual', 'scheduled',
     'invoice_paid', 'payment_received', 'payment_sent', 'payment_reversed',
@@ -313,19 +238,7 @@ describe('tenant flow vocabulary', () => {
     // it — drop it and the New automation button starts raising 42501.
     const ENTRY_POINTS = new Set(['scheduled', 'manual']);
 
-    /**
-     * The admission rule, and it is stricter than "something emits it".
-     *
-     * flow-engine matches a tenant flow ONLY as `and(is_global.eq.false, workspace_id.eq.<ws>)`;
-     * an event it cannot attribute to a workspace falls back to `eq('is_global', true)`. So a
-     * trigger whose emitter omits workspace_id admits a tenant automation that saves, activates,
-     * appears in the list — and never once fires. Worse through Reuse, which switches the platform
-     * default OFF in the same transaction: the owner ends up with FEWER notifications than they
-     * started with, and no error is raised anywhere. `appointment_booked` shipped in exactly that
-     * state (the `appointments` table has no workspace_id column at all).
-     *
-     * Checking presence alone would have passed it, which is why this reads the payload.
-     */
+    /** The admission rule, and it is stricter than "something emits it". */
     // BOTH emit shapes, for the reason collectEmits documents: the role-fanout form takes the
     // event name THIRD, and a scan that only knows the name-first form reported `order_created`
     // — live since the orders module shipped — as unemitted. Here it would have been worse than a
@@ -394,11 +307,6 @@ describe('tenant flow vocabulary', () => {
      * Emitters this file structurally cannot see, each verified by hand against the payload that
      * actually reaches flow-engine. Named individually rather than loosening the scan into
      * guesswork — an exemption with a citation is auditable; a wider regex is not.
-     *
-     * Two shapes:
-     *  • a TypeScript emitter whose event name is a VARIABLE (collectEmits only reads string
-     *    literals, by deliberate design — see its comment).
-     *  • a SQL emitter in pg_proc, which no repo test can read at all.
      */
     const VERIFIED_ELSEWHERE: Record<string, string> = {
       quote_approved:        "ternary eventName, src/modules/quotes/services/QuotesService.ts — payload carries workspace_id: quote.workspace_id",
@@ -465,23 +373,7 @@ describe('tenant flow vocabulary', () => {
   });
 });
 
-/**
- * Global (operator) flows are visible to the OPERATOR ONLY — never to a tenant, anywhere.
- *
- * `is_global = true` rows are the platform's own automations. A platform admin edits them in one
- * place (/admin → Flows) and they apply to every workspace at once: flow-engine matches
- * `is_global.eq.true` for EVERY workspace, so all 100+ of them genuinely execute inside tenant
- * workspaces. That is what makes this boundary easy to breach by accident — the rows are live in
- * a tenant's world, they are just not the tenant's to see.
- *
- * The database enforces it (`flows_tenant_select` requires `is_global = false`; `flow_runs`
- * likewise; create/toggle/delete_simple_flow all guard it; flow-engine's on-demand run demands a
- * platform admin for a global flow). This guards the layer RLS cannot: a tenant-facing query that
- * runs under the SERVICE ROLE, where RLS does not apply at all. `manage_flows` is exactly that —
- * callerClient() falls back to service role for partner `kai_` keys and admin-secret paths — so
- * its filter is the only thing standing there, and a "redundant, RLS has it" cleanup would be a
- * silent full disclosure of the operator's automation set.
- */
+/** Global (operator) flows are visible to the OPERATOR ONLY — never to a tenant, anywhere. */
 describe('operator flows never reach a tenant surface', () => {
   // Surfaces a non-operator can reach. Engine internals (flow-engine, flow-scheduler-cron,
   // flow-webhook, _shared/flow-events.ts) are deliberately absent: matching global flows is their

@@ -1,17 +1,4 @@
-/**
- * Cron credit metering (client side of public.cron_charge_workspace).
- *
- * A workspace-scoped cron calls chargeCronWorkspace() per UNIT OF WORK (a monitoring refresh, one
- * statement, one campaign, one sync). It charges the workspace owner (pool → personal) the registry
- * cost (default 3 credits) and returns whether to PROCEED:
- *   - allowed=true  → do the work.
- *   - allowed=false → skip (owner out of credits). The per-(workspace,cron) state is set to
- *                     `paused_insufficient_credits`; the NEXT tick re-charges and auto-resumes the
- *                     moment the owner tops up — no separate signal needed.
- *
- * Fails OPEN on any RPC/infra error (never block scheduled work because metering itself failed).
- * Maintenance/cleanup crons don't call this at all — only registered, metered cron keys do.
- */
+/** Cron credit metering (client side of public.cron_charge_workspace). */
 // deno-lint-ignore no-explicit-any
 type SupabaseLike = any;
 

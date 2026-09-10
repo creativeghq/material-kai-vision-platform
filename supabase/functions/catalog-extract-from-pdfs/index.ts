@@ -149,11 +149,6 @@ Deno.serve(withApiLogging('catalog-extract-from-pdfs', async (req) => {
     // service-role load bypasses RLS. Without this, any authenticated user could pass
     // another tenant's source_pdf_ids and exfiltrate their private catalog PDFs. Bind
     // the caller to every referenced PDF's workspace before downloading any bytes.
-    // "Act on behalf of": agent-chat invokes this server-to-server with the platform
-    // service key, so authenticate() resolves to level 'secret' with userId=null — the
-    // real acting user rides in body.caller_user_id. Honor it ONLY at secret level (a
-    // direct user call must bind to its own verified JWT, never a body-supplied id —
-    // tenancy invariant #8). This mirrors agent-chat's own body.user_id handling.
     const effectiveUserId = auth.level === 'secret' && body.caller_user_id
       ? body.caller_user_id
       : auth.userId;
@@ -360,22 +355,7 @@ Deno.serve(withApiLogging('catalog-extract-from-pdfs', async (req) => {
   }
 }));
 
-/**
- * Advance a source PDF through its own state machine.
- *
- * `catalog_source_pdfs.status` is typed `'uploaded' | 'processing' | 'ready' | 'failed'`
- * (CatalogSourcePdf in src/services/catalogsService.ts) and read back by the agent's
- * catalog `attach` step (_shared/tools/catalog-tools.ts). Until 2026-08-13 NOTHING in the
- * repo ever wrote it after the insert: every row sat at 'uploaded' with an empty
- * status_message and `updated_at == created_at` forever, so a 403, a download failure and
- * a clean run that found nothing were all indistinguishable from "just uploaded". Three
- * rows had been stuck that way since 14–15 July while this function was 403-ing 7 of 11
- * calls (audit 2026-08-13).
- *
- * Best-effort by design: a bookkeeping write must never fail the extraction that
- * succeeded, so this logs and swallows. It is the ONLY swallowed write here — every
- * outcome path calls it, which is what makes the silence meaningful.
- */
+/** Advance a source PDF through its own state machine. */
 async function markPdfStatus(
   supabase: any,
   sourcePdfId: string,

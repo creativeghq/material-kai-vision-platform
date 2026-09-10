@@ -1,29 +1,6 @@
 /**
  * Guard: "did this tool call produce anything" is answered by COUNTING EVERY RESULT ARRAY,
  * not by the first key that happens to be an array.
- *
- * WHAT WENT WRONG
- * ---------------
- * `shapeToolResult` checked candidate keys as an `else if` ladder with `products` ahead of
- * `articles`. `knowledge_base_search` returns four arrays at once and always initialises
- * `products: []` whether or not a product matched — so the ladder stopped on an empty array
- * every time and the `articles` branch beneath it was unreachable code. A KB search that
- * returned five document sections was recorded as `result_count: 0, zero_result: true`.
- *
- * Proved against production before the fix: `system_logs` recorded
- *   "✅ Knowledge base search complete: 5 results in 22.27s"
- * for a query `agent_tool_call_logs` stored as 0 (2026-08-18, workspace ffafc28b).
- *
- * WHY IT MATTERED MORE THAN THE DASHBOARD
- * ---------------------------------------
- * `turnProducedWork()` shares this one derivation — deliberately, that is the module's whole
- * reason to exist. So the memory promotion gate saw a successful, KB-grounded turn as having
- * produced nothing and declined to distil it. The agents could not form long-term memory from
- * the one retrieval path that actually works against this platform's data.
- *
- * A wrong count is a valid number: nothing threw, nothing typechecked wrong, and the telemetry
- * table read as a permanently broken knowledge base. Only a query against MIVAA's own log line
- * disagreed with it. Hence this file.
  */
 import { describe, it, expect } from 'vitest';
 import {

@@ -1,22 +1,4 @@
-/**
- * Guard for the generation model registry (issue #4 Phase 1).
- *
- * WHY THIS TEST EXISTS.
- * Every generation defect in #4 is the same shape: a model id written down in one place and not
- * another. A 404 model stayed selectable at 12 credits for months. Five models had no price row
- * and fell through to a flat $0.01 default. `replicateConfig.ts` drifted from the MIVAA roster in
- * both directions. The same Kling model is spelled `kling-3.0`, `kling-v3.0` and `kling-1.6-pro`
- * across three files, and two hand-written identity maps exist purely to bridge spellings.
- *
- * None of that is catchable by the other gates. A wrong price is a valid `number`, so typecheck
- * cannot see it. The data is internally consistent, so no integrity probe can either. That is the
- * "silent zero" shape from CLAUDE.md, and an enforced cross-reference is the only thing that
- * catches it. Hence: a model id offered or billed in code MUST have a registry row.
- *
- * The registry is read from the committed projection (src/config/generationModels.generated.ts),
- * not from the database, so this runs in CI. Regenerate with `npm run models:generate` after any
- * change to public.generation_models — a stale projection is a red build, by design.
- */
+/** Guard for the generation model registry (issue #4 Phase 1). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -175,28 +157,6 @@ describe('generation model registry', () => {
     expect(unpriced).toEqual(
       [
         // EMPTY as of 2026-08-17 — every registered model resolves to an ai_model_pricing row.
-        //
-        // How each of the five got here, because "priced" does not mean the same thing for all
-        // of them and the difference matters when someone reads a margin report:
-        //   veo-2                    $0.35/s   — published Gemini Developer API rate.
-        //   marble-1.1               $1.264    — DERIVED, not guessed: vrWorldService.ts has
-        //                                        recorded 1,580 WL credits at $1 = 1,250 WL
-        //                                        credits since it was written.
-        //   marble-1.0-draft         retired   — the tier no longer exists; 1.1 is the only one.
-        //   proplabs-virtual-staging $0.134    — DELIBERATE PLACEHOLDER, see below.
-        //   flux-depth-pro           $0.134    — DELIBERATE PLACEHOLDER, see below.
-        //
-        // The two placeholders are set to the highest per-image cost the platform pays anywhere
-        // (gemini-3-pro-image) because neither provider publishes a figure. That is a knowing
-        // over-estimate, chosen because over-stating a cost can only make a sale look LESS
-        // profitable than it is — it can never hide a loss, which is the failure this whole
-        // family of checks exists to prevent. They are marked in the database by
-        // `last_verified_at IS NULL`; a verified row always carries a date. Do not read their
-        // margin figures as fact.
-        //
-        // This list is SHRINK-ONLY. An entry leaves when a real figure is obtained. One may be
-        // ADDED only for a model whose rate genuinely cannot be established even conservatively
-        // — and "I could not find it quickly" is not that.
       ].sort(),
     );
   });
@@ -229,19 +189,6 @@ describe('generation model registry', () => {
 
   it('has not been hand-edited — the rows still match the fingerprint the generator wrote', async () => {
     // THE HALF CI CAN ACTUALLY CHECK.
-    //
-    // Two directions of drift exist for this file and each needs its own guard, because neither
-    // side can see the other:
-    //
-    //   database moves, file not regenerated → caught nightly by
-    //     `dic_detect__generation_registry_projection_stale`, which compares what the generator
-    //     RECORDED against the live table. It never sees this file.
-    //   file edited by hand                  → caught here. CI cannot compare against the table
-    //     (`generation_models` is authenticated-only and no workflow carries a service-role key),
-    //     so the file carries its own checksum instead.
-    //
-    // Recomputed with the GENERATOR's own function, imported rather than copied — a second
-    // definition of "how the fingerprint is formed" is exactly how the two would drift apart.
     const { fingerprintRows } = await import('../../scripts/lib/projectionFingerprint.mjs');
     const picked = GENERATION_MODELS.map((m) => ({
       id: m.id,

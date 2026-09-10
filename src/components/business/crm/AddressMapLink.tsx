@@ -20,18 +20,7 @@ interface Props {
   className?: string;
 }
 
-/**
- * "Show this address on Google Maps."
- *
- * Rendered as a real `<a target="_blank">` rather than a button with an onClick:
- * middle-click, ⌘-click and "copy link address" all have to work, and a JS
- * `window.open` breaks every one of them.
- *
- * Returns NOTHING when there is nothing to point at — no listing id, no
- * coordinates, and no more of an address than a country name. A pin that opens a
- * map of Greece reads as a working link and is worse than no pin at all, so
- * `googleMapsUrl` decides and the caller never has to guard the address itself.
- */
+/** "Show this address on Google Maps." */
 export const AddressMapLink: React.FC<Props> = ({
   address, placeId, cid, lat, lng, variant = 'icon', label = 'Map', className,
 }) => {

@@ -376,13 +376,6 @@ interface DetailProps {
  * One party's whole finance position, as a document with TABS rather than a scroll of stacked
  * tables: with real data those lists are hundreds of rows each and the ledger below them is
  * unreachable.
- *
- * Two rules this surface holds to:
- *  • Every document NUMBER is a link when a target exists — an invoice/credit note opens its
- *    page, a supplier bill (which has no page) opens the same settlement dialog Payables opens,
- *    the party name opens its CRM record. A number you cannot follow is a dead end.
- *  • Every action lives in ONE "Actions" menu in the header. The work behind them stays in
- *    `usePartyStatementActions` / `useCompanyResearch`, shared with the button-row surfaces.
  */
 const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose, statementsEnabled, financeBase }) => {
   const { toast } = useToast();
@@ -510,19 +503,7 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
   const totalDebit = ledgerWithBalance.length ? ledgerWithBalance[ledgerWithBalance.length - 1].progrDebit : 0;
   const totalCredit = ledgerWithBalance.length ? ledgerWithBalance[ledgerWithBalance.length - 1].progrCredit : 0;
   const ledgerClosing = opening + totalDebit - totalCredit;
-  /**
-   * A running balance across currencies is not a balance (#351 D5).
-   *
-   * Every figure below — the progressive totals, the closing, the printed Kartela — was summed
-   * across whatever currencies the party's documents happened to carry, and then formatted with
-   * the currency of the FIRST row that had one. Adding dollars to euros produces a confident
-   * number in no currency at all, and the one artefact this screen exports is handed to the
-   * counterparty as a statement of their account.
-   *
-   * So a mixed ledger states the reason instead of the number: the per-row amounts still print in
-   * their own currency (which they always should have), the derived columns show nothing, and the
-   * export is refused rather than issued wrong.
-   */
+  /** A running balance across currencies is not a balance (#351 D5). */
   const ledgerCurrencies = useMemo(
     () => [...new Set(ledger.map((r) => r.currency).filter(Boolean) as string[])].sort(),
     [ledger],
@@ -585,19 +566,7 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
         <td class="r g">${m(r.progrCredit)}</td>
         <td class="r b">${m(r.balance)}</td>
       </tr>`).join('');
-    /**
-     * The closing line is an ACCOUNT BALANCE, not an accusation.
-     *
-     * It used to read "Χρεωστικό υπόλοιπο (οφείλει) / owes us" — the same number the neutral tiles
-     * print, restated as a debt claim, on the one artefact that gets handed to the counterparty.
-     * The direction word comes from `netPositionDirection`, the same helper the on-screen balance
-     * uses, so the two cannot drift apart again. Greek keeps the accounting pair
-     * (Χρεωστικό/Πιστωτικό υπόλοιπο) minus the οφείλει/οφείλουμε gloss, which was the accusatory
-     * half.
-     *
-     * The sign convention is uniform across both sides: positive is due to us (a customer who has
-     * not paid, or a supplier we have overpaid), negative sits in their favour.
-     */
+    /** The closing line is an ACCOUNT BALANCE, not an accusation. */
     const closingEl = ledgerClosing > 0 ? 'Χρεωστικό υπόλοιπο'
       : ledgerClosing < 0 ? 'Πιστωτικό υπόλοιπο' : 'Μηδενικό υπόλοιπο';
     const closingLabel = `${closingEl} / ${netPositionDirection(ledgerClosing)}`;

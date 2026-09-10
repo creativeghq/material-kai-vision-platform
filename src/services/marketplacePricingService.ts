@@ -80,9 +80,6 @@ export const marketplacePricingService = {
       // RPC, `get_product_price_for_workspace` resolves discount from the CUSTOMER only
       // (crm_contacts/crm_companies override → pricing_level_discounts → workspace level) and
       // never reads this column, returning discount_source 'none' when only this is set.
-      // `discount_price` is no longer written here or anywhere: it is GENERATED ALWAYS from
-      // list_price + discount_percent, so the pair can no longer go inconsistent and sending
-      // the column raises 428C9.
       ...(opts.discountPercent !== undefined ? { discount_percent: opts.discountPercent } : {}),
       confirmed_at: new Date().toISOString(),
     }, { onConflict: 'workspace_id,product_id,variant_key' });

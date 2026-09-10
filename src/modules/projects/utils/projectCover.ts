@@ -1,20 +1,4 @@
-/**
- * Project cover resolution — the ladder every surface that shows a project picture walks.
- *
- *   1. `projects.cover_image_url`  — set by the owner (upload, a moodboard image, or an AI render)
- *   2. a moodboard image           — `project_cover_candidates()` (newest board, first image)
- *   3. a LIBRARY cover             — chosen from what the project is ABOUT: its name, description,
- *                                    category and rooms. "Kitchen — Kavouri" gets the kitchen.
- *
- * The library half is pure and lives here so the grid, the detail page and the cover picker all
- * agree on which picture a project gets before anyone has chosen one. The assets are static app
- * files under public/covers/projects/ (16:9 WebP), so a derived cover costs no request beyond the
- * image itself and never touches storage or credits. Guarded by tests/unit/projectCover.test.ts,
- * which also checks every concept below has its file on disk.
- *
- * Import-free on purpose (no React, no services): it has to be loadable by a plain unit test and
- * by the picker's "what would automatic pick" preview alike.
- */
+/** Project cover resolution — the ladder every surface that shows a project picture walks. */
 
 export type ProjectCoverConcept =
   | 'kitchen' | 'bathroom' | 'bedroom' | 'living' | 'dining' | 'office' | 'outdoor' | 'hallway'
@@ -76,11 +60,6 @@ interface Rule { concept: ProjectCoverConcept; pattern: RegExp }
  * ("Villa Kavouri — kitchen" is a kitchen job); a venue beats a dwelling; a dwelling beats the
  * kind of work. Within a tier the concept mentioned EARLIEST in the text wins, because people
  * lead with the subject.
- *
- * Greek stems are accent-free (see normalizeCoverText) and matched as SUBSTRINGS: JavaScript's
- * `\b` only knows ASCII word characters, so it cannot bound a Greek word. That is why each stem
- * is long enough to be unambiguous — `αυλ` (yard) is also inside Παύλος, `εισοδ` (entrance) is
- * also inside εισόδημα (income), `διαδρομ` (corridor) is also διαδρομή (a route). Keep them out.
  */
 const RULE_TIERS: readonly (readonly Rule[])[] = [
   // Rooms

@@ -1,28 +1,4 @@
-/**
- * A configuration survives the quote, and the document says what was chosen (#375).
- *
- * `add_configuration_to_quote` turned a saved configuration into a QUOTE line. Everything after
- * that dropped it, in four ways that share one property: none of them errors.
- *
- *  1. The choices were written into `quote_items.selected_attributes` — the column that means
- *     VARIANT IDENTITY everywhere else. `_variant_key()` turns `{"Frame colour":"Black"}` into
- *     `frame colour=black`, and `_resolve_warehouse_item` and `get_product_price_for_workspace`
- *     both take that for a real variant. So a configured line asked the warehouse for stock of a
- *     variant that does not exist — and the resolver's `p_create` path would have minted the row
- *     rather than fail.
- *  2. `product_configuration_id` lived only on `quote_items`, so the order and the invoice born
- *     from that quote could not name the configuration or re-price it.
- *  3. `update_warehouse` defaults true, so accepting the quote reserved warehouse stock for a
- *     made-to-order assembly.
- *  4. The option labels lived in `quote_items.notes`, which the conversion does not copy. The
- *     order, the invoice and the customer's PDF said only the product name while the price
- *     included the deltas — a document whose total the reader cannot account for (rule 1c).
- *
- * The SQL half of this is verified by a rolled-back probe against the live database (quote →
- * order → invoice, asserting each carries the snapshot and that the order line is not
- * stock-moving); SQL in this project is never committed, so this file guards the TypeScript half:
- * the pricing branch that must not fall through, and the two renderers that must print it.
- */
+/** A configuration survives the quote, and the document says what was chosen (#375). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

@@ -1,24 +1,4 @@
-/**
- * Universal entity templates (#322) — registry guard.
- *
- * Two failure shapes this feature is exposed to, neither of which TypeScript can see:
- *
- *  1. **Two-copy drift.** The list of template types lives in `schema.ts` AND in the DB CHECK
- *     `entity_templates_entity_type_check`. Add a type to one only and it fails at the worst
- *     moment: the UI happily offers "Save as template" and the INSERT throws a CHECK violation
- *     when the user presses Save. This is the same shape that made every `sales` /
- *     `realestate_agent` invite fail at redemption (see workspaceRoles.test.ts).
- *
- *  2. **A leaky allowlist.** A payload is a snapshot of a real record. The moment an adapter
- *     captures the wrong column, the template quietly carries something it must not: a myDATA
- *     `fiscal_mark` (cloning a *legal* document), a `public_share_token` (a stranger inherits
- *     access to the new record), or a derived `total` (a second derivation of a money quantity —
- *     the exact bug moneyDerivation.test.ts exists to stop). None of those are type errors; every
- *     one of them is a valid string.
- *
- * The declarative half of the registry (`schema.ts`) imports nothing but types precisely so this
- * test can inspect the allowlists directly instead of regexing source.
- */
+/** Universal entity templates (#322) — registry guard. */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -118,13 +98,6 @@ describe('capture allowlists carry no identity, fiscal or derived-money field', 
       // A synthetic key is how an adapter stores a value under a name that is NOT a column — the
       // expense adapter keeps a bill's amount as `default_amount` precisely so no payload key is
       // ever called `subtotal_net`. That only works while the two namespaces stay disjoint.
-      //
-      // The key is also checked with its prefix STRIPPED (#385 FN-4). `default_vat_amount`
-      // passed this test for months: the forbidden list holds `vat_amount`, the key was
-      // spelled `default_vat_amount`, and the adapter selected the real column and
-      // prefilled it into the expense form. The rename hid it from the check rather than
-      // from a reader — the file's own comment said as much — so the check has to see
-      // through the rename.
       const SYNTHETIC_PREFIXES = ['default_', 'initial_', 'suggested_'];
       for (const f of SYNTHETIC_PAYLOAD_FIELDS[type] ?? []) {
         expect(schema.captureFields, `${type}: "${f.key}" is both synthetic and captured`).not.toContain(f.key);
@@ -160,11 +133,6 @@ describe('adapters never mass-assign a stored payload', () => {
     // `capture()` and stored the result under synthetic names, so both the allowlist and
     // any name-based check were bypassed — the guard was well-built for the path it
     // inspected, and the code took a different one.
-    //
-    // This reads what the adapters actually ASK the database for.
-    // Scoped to `capture()` bodies. Selecting `id` elsewhere is ordinary — `filterVisibleIds`
-    // does it to check what the caller may see — and flagging that would make this a
-    // checker people mute rather than one they act on.
     const offenders: string[] = [];
     for (const m of ADAPTERS.matchAll(/async capture\s*\([\s\S]*?\n {2}\},/g)) {
       for (const sel of [...m[0].matchAll(/\.select\(\s*'([^']+)'/g)].map((x) => x[1])) {

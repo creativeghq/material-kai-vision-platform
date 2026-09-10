@@ -40,19 +40,7 @@ const ALL_TAB = 'all';
 const MINE_TAB = 'mine';
 const LIBRARIES_TAB = 'libraries';
 
-/**
- * Template Library (issue #322) — the one place that answers "what can I start from?".
- *
- * Generalizes what /blueprints does for scope-of-works to every record type: your saved templates
- * and the platform's starter examples, filtered by type, plus link-outs to the template systems
- * that already have their own manager (blueprints, email, WhatsApp, catalog designs…). Reached
- * from the App Launcher's "More" group.
- *
- * The type filter is a VERTICAL tab rail (the HR / Finance / Stock idiom), not a row of chips:
- * ten types plus the external libraries wrapped to two or three rows of buttons and pushed the
- * grid below the fold. Below `lg` the same list collapses into a horizontal scroll strip via
- * `.section-rail` in index.css.
- */
+/** Template Library (issue #322) — the one place that answers "what can I start from?". */
 export const TemplateLibraryPage: React.FC = () => {
   const { toast } = useToast();
   const navigate = useNavigate();

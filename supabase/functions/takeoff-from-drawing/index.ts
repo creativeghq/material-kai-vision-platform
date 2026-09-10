@@ -1,35 +1,4 @@
-/**
- * takeoff-from-drawing — a drawing's own printed schedules become proposed bill-of-quantities lines.
- *
- * WHAT THIS IS NOT. It is not measurement. A model asked how many square metres of screed are on a
- * plan will answer with a number, and that number is indistinguishable from a correct one: it is a
- * plausible quantity somebody orders materials against, and nothing downstream can tell a measured
- * figure from an invented one. The prompt bans it explicitly and the tool schema gives it nowhere
- * to put a measured value — every quantity has to arrive with the `source` that names the printed
- * row it was read from.
- *
- * What it IS: transcription. A door schedule, a window schedule, a room schedule are numbers the
- * design team AUTHORED and printed on the sheet. Typing those into a BoQ by hand is an afternoon
- * per drawing set, and it is the reason the first sheet gets typed and the rest do not.
- *
- * IT WRITES NOTHING. The proposal comes back for a person to confirm, exactly as
- * `scan-drawing-title-block` hands back register fields rather than creating documents. A takeoff
- * that wrote straight into a priced schedule would put two hundred lines into a tender off a
- * model's reading, and a wrong quantity stays invisible until the materials arrive.
- *
- * INVARIANTS, none optional on this path:
- *   1  Tenancy — the workspace comes from the PROJECT the revision belongs to, never the body, and
- *      the caller is checked against it. A revision in someone else's workspace reports as not
- *      found rather than forbidden, so this cannot enumerate ids.
- *   7  The file is fetched from OUR storage by bucket + object path taken from the revision row —
- *      never from a URL in the request body, which would make this an SSRF gadget.
- *   9  The sheet is untrusted ingested content: anyone can print an instruction on a drawing. The
- *      prompt states the DATA boundary and the call uses real `tools` with forced `tool_choice`.
- *  10  Credits are debited BEFORE the model call, through `debitOrRefuse`.
- *
- * The prompt lives in the database (`prompts.category = 'drawing_takeoff'`) and this RAISES when
- * the row is missing. No code fallback — a fallback is invisible when it fires.
- */
+/** takeoff-from-drawing — a drawing's own printed schedules become proposed bill-of-quantities lines. */
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';

@@ -226,9 +226,6 @@ interface InlineMultiSelectProps {
  * the value. Click anywhere on the chip row to open the searchable list; the chevron fades
  * in on hover exactly like InlineSelect. The popover stays open while toggling (unlike the
  * single-select, where picking is terminal), and each chip keeps an × for one-click removal.
- *
- * The trigger is a div, not a button: the chips carry their own × buttons and a button
- * cannot nest a button. role/tabIndex/Enter-Space restore the keyboard behaviour.
  */
 export const InlineMultiSelect: React.FC<InlineMultiSelectProps> = ({
   values, options, onToggle, label, hint, placeholder = 'Not set', saving, readOnly,
@@ -372,7 +369,6 @@ interface InlineSelectProps {
  * lists stay a plain click-list. In view mode the trigger is borderless and reads
  * like text, with the chevron fading in on hover; `alwaysEdit` (create form) shows
  * a normal bordered control. Picking is a single closure (no reliance on cmdk's
- * lowercased value) so labels can be rich ReactNodes.
  */
 export const InlineSelect: React.FC<InlineSelectProps> = ({
   value, onSave, options, label, hint, placeholder = 'Not set', displayValue, copyValue, alwaysEdit, searchThreshold = 6,

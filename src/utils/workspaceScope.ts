@@ -1,18 +1,4 @@
-/**
- * Two ids that are each individually valid, never checked against each other.
- *
- * This is a confirmed defect class on this platform, found four times in three modules: `CRM-5`
- * (#353), `RE-4` (#356) and twice in projects (`PQ-4`, #358) — a picker that can bind a record to
- * a CRM party from a DIFFERENT workspace, and a service that stores the pair without proving they
- * belong together. Nothing raises: both rows exist, both are readable by a multi-workspace user,
- * and RLS is satisfied because the caller genuinely is a member of both tenants.
- *
- * `assertSameWorkspace` is the shared check. It is a CLIENT-side check and gives the operator a
- * sentence they can act on; the enforcement is the matching DB trigger
- * (`_assert_project_client_same_workspace`), which is what actually stops a hand-made request.
- * Use both: the trigger so it cannot happen, this so it does not look like a server error when a
- * picker offers something it should not have.
- */
+/** Two ids that are each individually valid, never checked against each other. */
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ScopedRef {

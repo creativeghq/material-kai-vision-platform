@@ -1,17 +1,4 @@
-/**
- * PROJECT CARD — one project on the /projects grid.
- *
- * Anatomy, top to bottom: the COVER (what the job looks like — set by the owner, borrowed
- * from a moodboard, or suggested from the project's own name), then WHO it is for and WHAT it
- * is called, then HOW the money is going, then a sunken footer with the counts and the one
- * date that matters. Before this the card was a name, three badges fighting for the same row,
- * and a progress bar, at whatever height its contents happened to reach.
- *
- * The whole card is a real link (`<Link>`), so it middle-clicks and ⌘-clicks like any other
- * row in this platform. It does not move on hover — the border darkens and the picture eases in
- * by a few percent, which is the `panel-interactive` treatment plus one honest cue that the
- * picture is part of the target.
- */
+/** PROJECT CARD — one project on the /projects grid. */
 import React from 'react';
 import { Link } from 'react-router-dom';
 import {

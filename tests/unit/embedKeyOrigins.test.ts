@@ -1,22 +1,4 @@
-/**
- * Origin allowlist guard for embed keys (#321 M1, #258).
- *
- * `material_kai_keys.allowed_origins` existed for a year with no code that read it, and a default
- * of `['*']`. Now that it is enforced, it is the whole of the browser-side access control on a
- * PUBLISHABLE key — so the matcher has to be exactly right, and "exactly right" here is mostly
- * about what it must REFUSE.
- *
- * The failure this test is really guarding is the suffix bug: `origin.endsWith('acme.com')` is the
- * obvious spelling of a subdomain wildcard and it also accepts `https://evil-acme.com`, a domain
- * anyone can register. That one is asserted from both directions, and it is why the matcher
- * compares against a leading dot.
- *
- * The second half asserts PARITY between the two halves of the feature that a user experiences as
- * one: what `normalizeOriginList` (frontend, what the tenant types into Profile → Keys) produces
- * must be a pattern `isOriginAllowed` (edge, what actually gates the request) accepts. Those live
- * in different runtimes and cannot import each other, which is the same setup that let the three
- * escapeHtml copies drift.
- */
+/** Origin allowlist guard for embed keys (#321 M1, #258). */
 import { describe, it, expect } from 'vitest';
 import { isOriginAllowed, embedCorsHeaders } from '../../supabase/functions/_shared/cors';
 import { intersectIdFilters } from '../../supabase/functions/_shared/embed-key';

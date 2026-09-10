@@ -1,15 +1,4 @@
-/**
- * The bell's read-time repair of `action_url`.
- *
- * `user_notifications.action_url` is a free string written by four runtimes that cannot see the
- * router, and rows outlive every one of them. The bell used to call `navigate(n.action_url)`, and
- * `navigate()` reads ANY string as a PATH — so `https://app.materialshub.gr/agent-hub?…`, which is
- * what MIVAA stamped on every job-research digest, became the path
- * `/https://app.materialshub.gr/agent-hub` and landed on the 404 catch-all.
- *
- * Producers are fixed and guarded separately (deepLinkTargets.test.ts). This covers the half a
- * producer fix cannot reach: what the bell does with the rows already in the table.
- */
+/** The bell's read-time repair of `action_url`. */
 import { describe, it, expect } from 'vitest';
 import { resolveNotificationTarget } from '../../src/utils/notificationLink';
 

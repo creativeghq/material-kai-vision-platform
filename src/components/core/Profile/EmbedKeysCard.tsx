@@ -67,26 +67,7 @@ function scopeLabel(key: EmbedKey): string {
   return 'Everything published';
 }
 
-/**
- * The snippet a tenant copies into their own site.
- *
- * ONE tag for the catalogue (#341 entry point 2): `<materialkai-builder>` is the entry and naming
- * a product is a MODE of it, not a second component — the builder already mounts
- * `<materialkai-product>` internally, both on a match and on the deep-link path. The platform used
- * to hand out two snippets, which made a merchant choose between them before they understood
- * either, and the one that captures demand for things the catalogue cannot satisfy was the one
- * nothing offered. `<materialkai-product>` is still exported and still works for anyone using it.
- *
- * BUT THE SNIPPET HAS TO MATCH THE KEY IT IS COPIED FROM. Three kinds of key now exist and the
- * builder tag serves exactly one of them: a `tools` key serves NO catalogue, so a builder tag on
- * it renders nothing at all, and a key scoped to configurators sees no products for the same
- * reason. Handing all three the same snippet meant two of them copied something that could only
- * fail — silently, on their own site, with nothing in the platform saying why (#382 shipped
- * `<materialkai-configurator>` and `<materialkai-assistant>`; this did not follow them).
- *
- * A blueprint-scoped key pastes with a REAL id when it is scoped to exactly one, because that is
- * the difference between a snippet that works and a snippet with a placeholder to go and look up.
- */
+/** The snippet a tenant copies into their own site. */
 function usageSnippet(key: EmbedKey): string {
   const base = window.location.origin;
   const tag = `<script src="${base}/embed/materialkai-product.js" defer></script>`;

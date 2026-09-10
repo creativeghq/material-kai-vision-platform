@@ -1,24 +1,4 @@
-/**
- * "Has this already been asked?" and "which sheet is it about?"
- *
- * Two halves of the same job. An RFI register earns its keep by being the place a question is
- * asked ONCE and answered ONCE; the failure it exists to prevent is two people hitting the same
- * gap in the information a week apart, both writing to the architect, and the job ending up with
- * two answers that do not agree. Nothing about that failure looks wrong on screen — both entries
- * are valid, both were raised in good faith, and the register happily holds them side by side.
- *
- * The rules below are the ones that are silent when broken:
- *
- *  - The check is ADVISORY. A duplicate check that BLOCKS eventually suppresses a real question,
- *    and an unasked RFI costs a great deal more than a duplicate one.
- *  - It cannot cost the write. If the lookup throws, the person still gets to raise the request.
- *  - The citation points at a REVISION. Pointing at the document would silently re-aim every open
- *    RFI at whatever was issued since, with nobody having edited a thing.
- *  - A superseded citation is SAID. An answer given against a superseded sheet may be an answer
- *    about the wrong drawing, and the reader can only know that if the register says so.
- *  - The ranking rule lives in SQL, once. A threshold restated in TypeScript is a second opinion
- *    about what "similar" means, and the two drift.
- */
+/** "Has this already been asked?" and "which sheet is it about?" */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

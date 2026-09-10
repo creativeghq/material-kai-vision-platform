@@ -1,19 +1,4 @@
-/**
- * myDATA book (ΑΑΔΕ) — what the tax authority holds, and nothing else.
- *
- * This is the platform's copy of the taxpayer's own Συνοπτικό Βιβλίο at
- * www1.aade.gr/saadeapps2/bookkeeper-web — month by month, income against expenses,
- * in AADE's own columns and AADE's own arithmetic.
- *
- * It is deliberately NOT reconciled with anything. Every other figure in Finance is
- * derived from our tables; this one is derived from theirs, so putting them side by
- * side is a real check. Merge them, difference them into a single "correct" number,
- * or let one fall back to the other, and the check stops existing — you would be
- * confirming our arithmetic against itself.
- *
- * A month with no figures renders WHY, never a zero: a plausible 0,00 in a tax book
- * is the exact failure this surface is here to catch.
- */
+/** myDATA book (ΑΑΔΕ) — what the tax authority holds, and nothing else. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, BookOpen, Download, Loader2, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';

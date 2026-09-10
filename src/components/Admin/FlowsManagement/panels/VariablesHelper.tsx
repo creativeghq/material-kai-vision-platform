@@ -20,12 +20,6 @@ interface VariablesHelperProps {
  * Shows the `{{trigger.data.*}}` variables available for the current flow's
  * trigger, so an operator knows what they can paste into an action's config
  * fields. Click a token to copy it. Collapsible to stay out of the way.
- *
- * Each one says WHAT KIND OF THING IT IS (#357 AE-14). This used to be ninety undifferentiated
- * `{{…}}` tokens, among them one-click URLs that act on possession, other people's email
- * addresses, and internal UUIDs — indistinguishable on screen from a title or a count. Pasting a
- * keep-active link or an invite URL into a body that goes to somebody else hands them the
- * capability, and this panel is exactly where that happens without anyone meaning it.
  */
 /** One tinted squared tag per class. `plain` renders nothing — most variables are ordinary. */
 const SensitivityBadge: React.FC<{ sensitivity: VariableSensitivity }> = ({ sensitivity }) => {

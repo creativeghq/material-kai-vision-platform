@@ -1,17 +1,4 @@
-/**
- * Deal type & stage management (#311).
- *
- * The point of typing deals is that a tenant can model their own work — "Kitchen Fit-out",
- * "Retrofit", whatever they sell — and give it stages that make sense for it. Without this screen
- * the tables supported that and nobody could reach it, which is the same as not having built it.
- *
- * Platform defaults (`workspace_id IS NULL`) are shown read-only: they are shared across every
- * tenant, so one workspace renaming "Real Estate" would rename it for everyone. A workspace edits
- * only its own.
- *
- * Creation goes through `crm_create_deal_type` rather than two inserts, because a type whose
- * stages failed to write renders a board with no columns and no way to add a deal.
- */
+/** Deal type & stage management (#311). */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Plus, Trash2, Trophy, XCircle, Loader2, ChevronUp, ChevronDown, Lock, Mail } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';

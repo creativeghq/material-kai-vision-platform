@@ -339,14 +339,10 @@ class MoodboardSheetsService {
     return { pdf_url: result.pdf_url, page_count: result.page_count };
   }
 
-  /** Clone a sheet's title + data into a new draft row under the SAME parent.
+  /**
+   * Clone a sheet's title + data into a new draft row under the SAME parent.
    *  Useful for "use this as a template" or A/B variants. Does NOT copy the
    *  PDF; the duplicate is `draft` until the user re-renders it.
-   *
-   *  Both parents are carried over: a project-owned technical plan has a null
-   *  moodboard_id, so copying only that field would produce a row with no parent
-   *  at all — rejected by sheets_has_a_parent, and correctly so. room_id comes
-   *  along too, since the copy documents the same room.
    */
   async duplicate(sheetId: string, newTitle?: string): Promise<PresentationSheet> {
     const original = await this.get(sheetId);

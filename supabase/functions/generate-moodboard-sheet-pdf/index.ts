@@ -15,10 +15,6 @@ const corsHeaders = {
 //   - The service role key (server-to-server from agent-chat / presentation-sheet-tool),
 //     in which case ownership is verified upstream when the row is inserted.
 //   - A user JWT, in which case the row's `created_by` MUST equal the JWT user.
-// This closes a previously-open hole where the function blindly trusted any
-// sheet_id, allowing a logged-in user to re-render someone else's sheet by
-// passing the UUID. Sheet UUIDs leak through DB exports / shared screenshots
-// / the React-Query cache, so "guessing is impractical" wasn't actually true.
 async function authenticate(req: Request): Promise<{ success: boolean; userId?: string; isService?: boolean; error?: string }> {
   const authHeader = req.headers.get('Authorization') || '';
   const token = authHeader.replace(/^Bearer\s+/i, '').trim();
@@ -186,14 +182,6 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
     }
 
     // Copy any still-external image into the sheet's private folder (#392).
-    //
-    // Separate from `create` because a sheet acquires images AFTER it exists: a canvas save can
-    // drag in a chip that still points at the public bucket, and the client cannot copy it there
-    // itself — writes to `sheet-assets` are service-role only, which is exactly what stops one
-    // person putting a file behind someone else's share boundary.
-    //
-    // Ownership is checked here rather than borrowed from the block below, because that block
-    // renders. This returns before it.
     if (body.action === 'snapshot_assets') {
       const { data: row } = await supabase
         .from('moodboard_presentation_sheets')
@@ -268,14 +256,6 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
     // Refuse to render an empty/no-content PDF. Same content rules as the
     // agent tool's validator. Marks the row as failed and returns 422 instead
     // of uploading a trash file to storage. Required content per type:
-    //   material_board       — at least one product_id
-    //   color_palette        — at least one swatch with hex
-    //   concept_board        — at least one image in layout
-    //   ffe_schedule         — quote_id or items[]
-    //   full_deck            — included_sheet_ids[] + cover.title
-    //   lighting_plan        — backdrop AND at least one symbol (canvas filled in)
-    //   annotated_render     — backdrop_image_url AND at least one annotation
-    //   elevation_render_pair— elevation_image_url AND at least one dimension OR tile_callout
     const contentError = validatePdfContent(sheet.sheet_type, sheet.data);
     if (contentError) {
       await supabase
@@ -584,18 +564,6 @@ async function buildClientViewPdf(
     const sheetIds: string[] = Array.isArray(view.sheet_ids) ? view.sheet_ids : [];
 
     // ── Tenancy binding for everything the deck embeds (#361 `EG-11`) ──────────────────────
-    //
-    // The single-sheet path above threads a caller scope into every embedded fetch; this one
-    // called `fetchSheets` / `fetchProductChips` / `fetchQuoteFfeItems` with no scope at all,
-    // on the service role. `sheet_ids` and the sheets' own `product_ids` / `quote_id` are just
-    // ids on a row — a view pointing at another tenant's sheet rendered it, with that tenant's
-    // products and quote FF&E prices, into a CLIENT-FACING deck.
-    //
-    // Scope to the deck's OWNER rather than to the caller, because that is the invariant that
-    // holds for every entry point: this function is also invoked service-role by
-    // `moodboard-sheet-share` on behalf of an anonymous link holder, where there is no caller
-    // identity to scope by and the artifact is at its most exposed. A deck may contain its
-    // owner's material and nothing else.
     const ownerId = view.created_by || project?.user_id;
     let ownerWorkspaceIds: string[] = [];
     if (ownerId) {

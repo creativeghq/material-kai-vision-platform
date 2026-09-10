@@ -1,37 +1,4 @@
-/**
- * Edge-request surface guard.
- *
- * Vercel bills CDN Requests (shown as "Edge Requests") for EVERY request the CDN
- * processes — cache hits included. A 97.5% hit rate reduces bandwidth and origin
- * transfer and reduces the request count by exactly zero. So the only two levers
- * are: how many files a cold visit fetches, and how many requests reach the CDN
- * at all. This file guards one of each.
- *
- * 1. manualChunks pins (the eager payload).
- *    A `manualChunks` entry does not "organise" a dependency, it PINS it: the named
- *    chunk becomes a STATIC import of the entry, so index.html emits a
- *    <link rel="modulepreload"> for it and every anonymous visitor downloads it on
- *    first paint. Audit #308 found recharts pinned this way — 362,395 bytes of
- *    charting library shipped to landing pages that render no charts — and removed
- *    it. It came back on 2026-08-09 under a comment about forwardRef safety, which
- *    was true and irrelevant: the question is never "is this chunk safe to split",
- *    it is "does every visitor need these bytes". Removing it again dropped the
- *    eager payload 1,853,557 -> 1,508,385 raw (513,125 -> 412,874 gzip) and cut one
- *    request from every cold load.
- *
- *    A comment did not stop the second reintroduction. This test does.
- *
- * 2. The SPA catch-all (how many requests reach the CDN as a 200).
- *    vercel.json rewrites are evaluated AFTER the filesystem check, so this regex
- *    only ever decides what happens to a path with NO matching static file: the
- *    5.5 KB app shell with a 200, or a real 404. Before 2026-08-10 it was the
- *    former for every path in existence, so /wp-login.php, /.env and /.git/config
- *    all answered 200 — a scanner that gets a 200 keeps going.
- *
- *    The two halves of this are in tension: widen the exclusions and a real
- *    client-side route starts 404-ing for real customers; narrow them and the
- *    scanner surface comes back. Both directions are asserted below.
- */
+/** Edge-request surface guard. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

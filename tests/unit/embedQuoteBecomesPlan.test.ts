@@ -52,7 +52,8 @@ describe('the lead survives a plan failure', () => {
   it('never fails the request when the plan cannot be made', () => {
     const code = blankComments(API);
     const block = code.slice(code.indexOf("action: 'create-from-blueprint'"));
-    const tail = block.slice(0, 1600);
+    const nextAction = block.slice(1).search(/if \(action === '/);
+    const tail = nextAction > -1 ? block.slice(0, nextAction + 1) : block;
     // The plan attempt is wrapped and its failure logged, not returned.
     expect(tail).toContain('catch');
     expect(tail).not.toMatch(/return embedJson\(\{ error/);

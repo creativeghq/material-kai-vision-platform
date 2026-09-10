@@ -1,23 +1,4 @@
-/**
- * Revolut Business API client (per-tenant BYOK) — #315.
- *
- * Every workspace connects its OWN Revolut Business account; we never fall back to
- * operator credentials. The trust chain is:
- *
- *   1. `revolut-api?action=init` mints an RSA-2048 keypair SERVER-SIDE. The private key
- *      lands in `workspace_revolut_config.private_key` (service-role-only row) and never
- *      reaches the browser; the PUBLIC key + redirect URI are what the operator pastes
- *      into Revolut dashboard → Settings → API, which hands back a `client_id`.
- *   2. OAuth consent: the operator approves the app at business.revolut.com/app-confirm;
- *      the auth code is exchanged for tokens using a JWT **client assertion** signed with
- *      our private key (RS256, `iss` = the DOMAIN of the redirect URI, `aud` fixed).
- *   3. Access tokens live ~40 minutes; the long-lived refresh token is the durable
- *      credential. Both are cached ON THE CONFIG ROW (not in-process) so the sync cron,
- *      webhooks and interactive calls share one token instead of racing three.
- *
- * Docs: https://developer.revolut.com/docs/api/business
- * NOT the Open Banking API (/docs/api/open-banking) — that one needs an AISP/PISP licence.
- */
+/** Revolut Business API client (per-tenant BYOK) — #315. */
 
 // deno-lint-ignore-file no-explicit-any
 

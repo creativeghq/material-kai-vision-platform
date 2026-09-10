@@ -1,31 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 
-/**
- * The product field registry, read at runtime from `material_metadata_fields` (#368 PD-1/PD-5).
- *
- * WHY RUNTIME AND NOT A COMMITTED PROJECTION.
- * `categoryVocab.generated.ts` is a snapshot because a guard test has to check the category
- * vocabulary in CI, where there is no database. This is the opposite case: what it answers is
- * "which fields does a product in category X have, what is each one called here, and is it
- * safe to show" — 390-odd rows an admin edits from the Fields screen. A snapshot of that is a
- * copy that goes stale the moment somebody edits a label, which is precisely how the 981-line
- * `CATEGORY_DISPLAY_REGISTRY` came to be the SEVENTH copy of this table and to disagree with
- * it. The registry is authenticated-readable, so the client reads the source.
- *
- * WHAT REPLACED WHAT.
- * The hand-written display registry carried two things the DB could not express, so they moved
- * into the DB first (both are now columns): the curated labels — "Wattage (W)", not the
- * auto-titled "Wattage W" — and the fact that a label is per-category, because `body_material`
- * reads "Material" for kitchen and lighting and "Body Material" everywhere else. Same shape and
- * same reason as `description_by_category`.
- *
- * SENSITIVITY. The Details tab is a walker: it renders every key it finds in the product's
- * jsonb, which is where supplier XML and AI extraction write and where they are allowed to
- * invent fields nobody has classified. The registry answers for keys it knows; for keys it has
- * never seen, `internal_product_field_pattern()` is the floor. Both come from the DB — the
- * pattern is fetched, never transcribed, because a regex copied into TypeScript is a copy that
- * drifts silently and the server would keep redacting what the client had started showing.
- */
+/** The product field registry, read at runtime from `material_metadata_fields` (#368 PD-1/PD-5). */
 
 export type FieldSensitivity = 'public' | 'internal';
 

@@ -1,33 +1,4 @@
-/**
- * The client does not get to choose the IP we write down.
- *
- * `x-forwarded-for` is a list and its LEFTMOST entry is whatever the caller prepended. Cloudflare
- * sets `cf-connecting-ip` and overwrites any client-supplied value, so that one is not forgeable.
- * Reading `xff.split(',')[0]` therefore hands the caller a fresh identity on every request.
- *
- * ── Why a repo-wide test rather than per-file cases ────────────────────────────────────────
- * This was fixed once already. #354 HR-12 swept the public surfaces, moved `hr-careers` onto the
- * shared helper, and left a comment saying so — while `hr-kiosk`, the sibling endpoint in the same
- * module, kept its own local copy of the spoofable version under a comment calling it "Trusted-ish
- * client IP from the proxy hop". It survived that way because nothing checked the OTHER files.
- * A partial sweep is how this defect persists, so the guard is the sweep.
- *
- * Found and fixed in this pass, all four reading the leftmost hop:
- *   • `hr-kiosk`         — keyed the per-IP rate limit on it, so rotating the header lifted the
- *                          throttle on ΑΦΜ enumeration and punch spam entirely (invariant 10).
- *   • `_shared/api-logger` — the WIDEST instance: it tried the spoofable header FIRST and only fell
- *                          back to `cf-connecting-ip`. Every edge function is wrapped in this, so
- *                          `api_usage_logs.ip_address` — the column an abuse investigation starts
- *                          from — was caller-controlled platform-wide.
- *   • `catalog-access`   — wrote it into the access log and the view events: evidence about who
- *                          opened a private catalog, reporting what they typed.
- *   • `inbox-api`        — handed it to Turnstile as `remoteip`, degrading the risk signal the
- *                          challenge exists to produce.
- *
- * Not all four are invariant 10 — only a QUOTA key is. The rest are evidence, and the same rule
- * applies for the reason `contracts-api`'s signature IP does: a recorded address chosen by the
- * subject is not a record of anything.
- */
+/** The client does not get to choose the IP we write down. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';

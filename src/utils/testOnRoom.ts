@@ -1,14 +1,4 @@
-/**
- * "Test on a room" deep-link builder.
- *
- * Single source of truth for the product-page → Interior Designer agent
- * hand-off. Both ProductCard and ProductDetailModal use this so the URL
- * contract (parsed in src/pages/AgentHub.tsx) lives in one place.
- *
- * The target page parses `agent` + `pinned_product_*` + `prompt`, pre-pins the
- * material into the Interior agent's tray, and auto-sends the seeded prompt so
- * the agent immediately asks the user to upload a room photo.
- */
+/** "Test on a room" deep-link builder. */
 export function buildTestOnRoomUrl(args: {
   productId: string;
   productName: string;
@@ -28,27 +18,7 @@ export function buildTestOnRoomUrl(args: {
   return `/agent-hub?${params.toString()}`;
 }
 
-/**
- * "Build with this product" deep-link builder.
- *
- * Sibling of `buildTestOnRoomUrl`, and deliberately the same contract — AgentHub
- * already parses `agent`, `pinned_product_*`, `generation_mode` and `prompt`, so this
- * needs no new plumbing on the receiving end.
- *
- * The difference is direction. "Test on a room" takes a MATERIAL and puts it onto the
- * user's room photo. These take the PRODUCT ITSELF and photograph it:
- *
- *   product-shot      the product alone on seamless white — a catalog hero image
- *   product-lifestyle the product staged in a styled room
- *   material-texture  the material as a seamless, tileable swatch
- *
- * All three have existed in generate_gemini since it shipped, each with its own prompt
- * builder, and nothing in the product could reach them — no button, no quick-start.
- *
- * `generation_mode` is pinned rather than left to the agent to infer: the mode decides
- * which prompt builder runs, and "make me a shot of this chair" is not reliably
- * distinguishable in prose from "put this chair in a room".
- */
+/** "Build with this product" deep-link builder. */
 export type ProductStudioMode = 'product-shot' | 'product-lifestyle' | 'material-texture';
 
 export function buildProductStudioUrl(args: {

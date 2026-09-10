@@ -1,21 +1,4 @@
-/**
- * myDATA transmissions — every attempt we made, and what AADE said back.
- *
- * The counterpart to the myDATA Book: the Book is AADE's monthly aggregate, this is our
- * per-document log. `fiscal_submissions` has carried one row per attempt since day one — MARK,
- * authentication code, provider, credits, error code, the lot — and had NO surface at all. The
- * only read anywhere was server-side, pulling an authentication code onto a PDF. So the one
- * question an operator actually has once e-invoicing is live — *did our documents land, and which
- * did not and why* — could only be answered with SQL.
- *
- * ONE ROW PER ATTEMPT, NOT PER DOCUMENT. The accepted row and the three rejections before it are
- * all the record. Collapsing to the current state of each document would hide precisely what is
- * needed when something is not landing.
- *
- * A rejection is shown with its provider error CODE, not just the message: AADE's codes are the
- * thing you can look up and act on (313 is a forbidden classification, 228 is a document already
- * filed, 401 is an unauthorized issuer VAT), and the message alone sends people guessing.
- */
+/** myDATA transmissions — every attempt we made, and what AADE said back. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, Loader2, RefreshCw, Send } from 'lucide-react';

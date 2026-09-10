@@ -22,10 +22,6 @@ const isReceiptDoc = (dt: string | null) => String(dt ?? '').startsWith('11');
 // Each of the three lists (orders / invoices / receipts) is paged independently by the client.
 // Paging is PRESENTATION ONLY: it never touches the scoping, which the RPCs derive from
 // auth.uid() server-side (the caller's own crm_contacts + the companies those contacts link to).
-// The lists come from `my_customer_*` RPCs that do the contact-OR-company union in SQL, so
-// LIMIT/OFFSET are exact and there is no scan cap: we fetch exactly one page of metadata rows
-// (`total_count` rides along on every row) and sign PDF URLs for that page ONLY. Signing is one
-// storage round trip per row, so it's the part that must not be done 200-at-a-time.
 const MAX_PAGE_SIZE = 500;
 const DEFAULT_PAGE_SIZE = 200; // == the previous hard cap, so a caller that sends nothing is unchanged
 const MAX_OFFSET = 1_000_000; // sanity bound only — the union is no longer capped
@@ -168,11 +164,6 @@ Deno.serve(withApiLogging('finance-customer-documents', async (req) => {
         // where this matters: the customer is repeating a quantity that may cross a threshold,
         // and without these the "re-price at today's prices" promise quietly excluded the one
         // discount that depends on how much they are buying.
-        //
-        // Together or not at all — `get_product_price_break` coalesces an unconvertible unit
-        // back to the raw quantity, so a qty without its unit matches the wrong threshold.
-        // Despite its name `order_items.measurement_unit_code` holds our TEXT unit label
-        // ('pcs', 'm2'), not the myDATA integer code — verified against the column's live values.
         const lineQty = Number(it.quantity || 0);
         const lineUnit = (it.measurement_unit_code as string | null) || null;
         const breakArgs = lineUnit && lineQty > 0 ? { p_quantity: lineQty, p_unit: lineUnit } : {};

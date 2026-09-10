@@ -1,22 +1,4 @@
-/**
- * provider-neutral payment ingestion.
- *
- * ONE path writes an inbound customer payment into the books, whatever provider
- * collected it. Extracted verbatim-in-behaviour from `stripe-webhooks`
- * (`handleInvoicePaymentSucceeded` / `handleStatementPaymentSucceeded`) so the Viva
- * webhook — and any future provider — inherits allocation, the seller-branded
- * receipt, and the customer/owner notifications for free instead of re-implementing
- * them and drifting.
- *
- * Two shapes, matching the two things a customer can pay:
- *   - `recordInvoicePayment`   — a specific invoice.
- *   - `recordStatementPayment` — a whole account balance, allocated oldest-first.
- *
- * GUARDRAIL: this module is for CUSTOMER→TENANT commerce payments only. Platform
- * billing (credits, subscriptions, module add-ons) settles to the OPERATOR's own
- * Stripe account and must never route through here — it has no invoice, no tenant
- * BYOK provider, and its own idempotency.
- */
+/** provider-neutral payment ingestion. */
 
 import { emitFlowEvent } from '../flow-events.ts';
 import { runInBackground as sharedRunInBackground } from '../background.ts';
@@ -116,18 +98,7 @@ async function providerBankAccountId(
   return data?.id ?? null;
 }
 
-/**
- * Does this payment already have its allocation rows?
- *
- * The whole point of asking: the payment insert and the allocation insert are two statements, and
- * only the first is protected by a unique index. If the allocation insert failed, the payment row
- * stands and the provider redelivers — but `findExisting` then reported "already recorded" and the
- * allocation was NEVER retried. Money in the bank, invoice `amount_due` stuck at full forever, and
- * the customer chased for an invoice they had paid.
- *
- * A redelivery is the natural moment to repair that, and the provider gives us one for free.
- * (#287 T1-1)
- */
+/** Does this payment already have its allocation rows? */
 async function hasAllocations(supabase: any, paymentId: string): Promise<boolean> {
   const { count, error } = await supabase
     .from('payment_allocations')
@@ -249,9 +220,6 @@ export async function recordInvoicePayment(
   // ISSUED document to `paid`, not a draft. Until this step existed every storefront receipt and
   // every quote pre-invoice paid by card ended as a draft whose row said `paid`: no legal number,
   // no issue date, nothing filed with AADE — while the customer had a payment confirmation.
-  // A part payment (a deposit) legitimately leaves the pre-invoice a draft. If the issue fails
-  // the money is still booked (it is real), the failure is NAMED on the result, and the
-  // `finance.paid_draft_never_issued` probe raises it nightly.
   let issued: RecordResult['issued'] = null;
   let issueError: string | undefined;
   if (inv.status === 'draft' && due > 0 && applied >= due - 0.005) {
@@ -411,9 +379,6 @@ export async function recordStatementPayment(
       // Stripe/Viva, the `payments` row would land, NO payment_allocations rows would land,
       // and the webhook reported success — leaving every invoice open and AR aging wrong,
       // with the only trace an edge-function log line nobody reads.
-      // recordInvoicePayment treats the identical failure as fatal, with the comment "loud,
-      // because it needs a human". Same here. The payment row is already written, so the
-      // caller gets its id back and can retry allocation without double-recording.
       console.error('[payments] statement allocations insert failed', allocErr.message);
       return {
         ok: false,
@@ -459,17 +424,7 @@ export async function recordStatementPayment(
   };
 }
 
-/**
- * Issue a draft that an online payment has just settled in full.
- *
- * `issue_invoice_on_online_payment` (service-role only) re-derives the document type from the
- * buyer and the lines — a business buyer gets an invoice (1.1/2.1), a consumer a retail receipt
- * (11.1/11.2) — stamps the myDATA payment method by NAME, and runs the same numbering core the
- * manual "Issue" button runs. Then the issued/receipt flow fires and the transmission to myDATA
- * is attempted in the background through `finance-issue-invoice` (which reserves the workspace's
- * transmission credits and records the submission); a transmission failure lands on the invoice
- * as `fiscal_error`, exactly as a manual attempt would, and is retried from the invoice page.
- */
+/** Issue a draft that an online payment has just settled in full. */
 async function issueDraftOnFullPayment(
   supabase: any,
   invoiceId: string,

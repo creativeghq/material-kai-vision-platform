@@ -1,27 +1,4 @@
-/**
- * Skills registry guard (#341).
- *
- * A skill is a playbook the agent loads mid-run via `load_skill`. Four things must line up for one
- * to ever be offered, and EVERY failure among them is silent — the skill simply never appears, no
- * error, no log, nothing a typecheck or a deploy can see:
- *
- *   1. REGISTRATION — the directory exists but `SKILL_FILES` in skills-loader.ts does not import
- *      it. The markdown sits in the repo looking finished and reaches nobody.
- *   2. TWIN DRIFT — SKILL.md is the human/PR-review copy; skill.ts is what actually ships (the
- *      Edge Runtime cannot import .md). They are maintained by hand, so the reviewed text and the
- *      served text are free to diverge — and the review passes on the copy nobody runs.
- *   3. AGENT IDS — `agents:` holds agent IDS (kai, erp, interior-designer), NOT display names.
- *      `getSkillsForAgent` does `skill.agents.includes(agentId)`, so a skill listing "trinity" or
- *      "jarvis" — the names those agents actually show in the UI — is offered to no one. This was
- *      nearly shipped with design-to-quote: [kai, jarvis, trinity, interior-designer], of which
- *      exactly one was a real id.
- *   4. FRONTMATTER — `parseSkillFile` throws on malformed frontmatter and the loader CATCHES it
- *      (console.error), so a typo in the `---` block degrades to the skill not existing.
- *
- * Also pinned: no `String.raw`. String.raw preserves the backslash of an escaped backtick, so
- * three of these skills spent their whole life telling the model to call \`material_search\`
- * instead of `material_search` — 206 mangled code spans across the three files.
- */
+/** Skills registry guard (#341). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -140,10 +117,6 @@ describe('skills registry', () => {
     // `agents: [kai]`, but 66 of the 67 real `b2b_manufacturer_search` calls came from
     // `product-business` — the orchestrator routes B2B work to Pepper by design. So the playbook
     // was held by the agent doing 1.5% of the work and absent from the one doing the rest.
-    //
-    // Valid ids and a registered file are not enough: both were correct here. What was wrong was
-    // the PAIRING, and nothing looked at it. A skill whose procedure is built on a tool must be
-    // offered to every agent that binds that tool, or that agent improvises the procedure.
     const src = read(AGENT_CHAT);
     const start = src.indexOf('const AGENT_CONFIGS');
     const block = src.slice(start, src.indexOf('\n};', start) + 3);

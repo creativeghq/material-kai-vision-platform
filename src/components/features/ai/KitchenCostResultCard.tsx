@@ -1,14 +1,4 @@
-/**
- * Inline AgentHub card for the `kitchen_cost` chunk emitted by the calculate_kitchen_cost tool.
- *
- * The shape is declared here rather than imported from a calculator module, because — unlike its
- * two siblings — kitchen pricing has no frontend twin: the rates live in the `kitchen_cabinets`
- * blueprint and the edge tool is the only thing that resolves them.
- *
- * `unmatched` is rendered prominently on purpose. It means the user asked for a finish the price
- * list does not have and the DEFAULT was priced instead, so a total presented without that note
- * is a quote for a spec nobody asked for.
- */
+/** Inline AgentHub card for the `kitchen_cost` chunk emitted by the calculate_kitchen_cost tool. */
 
 import { AlertTriangle, CookingPot } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';

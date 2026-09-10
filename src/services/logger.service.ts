@@ -1,18 +1,8 @@
 /**
  * Centralized Logging Service
- *
- * Provides structured logging with environment-aware behavior:
- * - Development: Logs to console
- * - Production: Can be extended to send to monitoring services (Sentry, LogRocket, etc.)
- *
  * @example
  * ```typescript
  * import { logger } from '@/services/logger.service';
- *
- * logger.info('User logged in', { userId: '123' });
- * logger.error('Failed to fetch data', error, { endpoint: '/api/data' });
- * logger.debug('Processing item', { itemId: 'abc' });
- * ```
  */
 
 import { MIVAA_API_URL } from '@/config/mivaa';

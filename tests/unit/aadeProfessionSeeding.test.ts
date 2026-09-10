@@ -3,11 +3,6 @@
  * `partyFromCrm` copies it onto the myDATA counterpart and the invoice PDF prints it as
  * "Δραστηριότητα". On a contact it is the only home for that value at all —
  * `kad_primary_description` is in COMPANY_ONLY_FIELDS and gets stripped.
- *
- * So the ΑΑΔΕ mapper SEEDS it and then leaves it alone. It used to overwrite unconditionally,
- * which meant an operator who corrected the printed activity had it silently reverted by the
- * next lookup — invisible until a customer read their invoice. The registry's own copy still
- * lands in `kad_primary_description` every time, so nothing is lost by not clobbering.
  */
 import { describe, it, expect, vi } from 'vitest';
 

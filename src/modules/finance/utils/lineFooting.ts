@@ -1,16 +1,4 @@
-/**
- * Do the lines somebody typed add up to what AADE says the document is worth?
- *
- * This is the one rule that makes complete-the-document safe. `total_net` is transmitted, carries
- * a MARK and is not editable; the lines are ours. If they disagree, the document states two
- * different amounts for the same purchase — and both are valid numbers, so nothing downstream
- * can tell which is the real one. Warehouse intake would derive unit costs from the typed side
- * and payables from the AADE side, and the two would quietly part company.
- *
- * `inbound_doc_set_lines` is the AUTHORITY — it re-checks all of this server-side and refuses the
- * write. This module exists so the dialog can say so before the operator presses save, using the
- * same tolerance, so the button is never enabled on something the server will reject.
- */
+/** Do the lines somebody typed add up to what AADE says the document is worth? */
 
 import { round2 } from '@/utils/decimal';
 

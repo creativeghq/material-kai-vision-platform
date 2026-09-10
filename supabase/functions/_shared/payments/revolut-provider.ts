@@ -1,18 +1,4 @@
-/**
- * Revolut Merchant API as a `PaymentProvider` (per-tenant BYOK) — #315.
- *
- * SEPARATE product from the banking-revolut module: this is the checkout side
- * (hosted payment page covering cards, Revolut Pay, Apple/Google Pay, Pay by Bank),
- * authenticated by the workspace's own Merchant **secret API key** — no OAuth, no
- * certificates. Funds settle to the tenant's Revolut Merchant account.
- *
- * Charge flow: create an order → send the buyer to Revolut's hosted checkout_url →
- * ORDER_COMPLETED webhook → `revolut-merchant-webhooks` re-reads the order with the
- * tenant's own key (webhook-as-trigger doctrine) → record-payment.
- *
- * Docs: https://developer.revolut.com/docs/api/merchant — the Api-Version header is
- * mandatory; bump deliberately, never implicitly.
- */
+/** Revolut Merchant API as a `PaymentProvider` (per-tenant BYOK) — #315. */
 
 import type {
   ChargeResult,

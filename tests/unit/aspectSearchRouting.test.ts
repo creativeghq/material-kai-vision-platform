@@ -1,34 +1,4 @@
-/**
- * Aspect-search routing guard (#277).
- *
- * The bug this exists to stop: an `aspect` sent to an endpoint that does not read it.
- *
- * `/api/rag/search` accepts `aspect` on its request model, but only the `multi_vector`
- * branch ever looks at it — that branch re-weights the fusion toward the chosen aspect's
- * channel. The `image` branch ranks on the SLIG visual vector alone. `visual_search`
- * pointed at `strategy=image` and passed `aspect` anyway, so for months every "find
- * materials with a similar TEXTURE to this image" returned plain overall visual
- * similarity: the field was accepted by Pydantic, dropped on the floor, and nothing
- * anywhere raised. A silently ignored parameter is indistinguishable from a working one
- * — the results are plausible, just not aspect-biased.
- *
- * It could not be fixed by passing the flag harder. The per-aspect collections hold no
- * image vectors at all: `image_<aspect>_embeddings` are Voyage embeddings of
- * vision-analysis TEXT, so an image only reaches them by re-running the same
- * analyze → serialize → embed pipeline ingestion ran. `/api/search/by-<aspect>` is the
- * endpoint that does that — it existed, correct and metered, with zero callers.
- *
- * So there are exactly TWO endpoints that honor an aspect, and this fails the build if a
- * caller sends one somewhere else:
- *   - `/api/rag/search?strategy=multi_vector`  → re-weights the fusion
- *   - `/api/search/by-<aspect>`                → queries the collection directly
- *
- * SCOPE — a clean run here does not mean the invariant holds end to end. This scans repo
- * files, so it sees the TypeScript half only. The MIVAA half lives in a separate repo
- * (`creativeghq/mivaa-pdf-extractor`) that CI does not check out as a submodule; its side
- * of this guard — that any strategy other than multi_vector REFUSES an aspect instead of
- * ignoring it — is `mivaa-pdf-extractor/tests/unit/test_aspect_strategy_guard.py`.
- */
+/** Aspect-search routing guard (#277). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

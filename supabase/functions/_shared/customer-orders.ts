@@ -1,18 +1,4 @@
-/**
- * A customer's recent SALES orders with what is still owed — one read, two readers.
- *
- * The Inbox context rail and the customer-audience `list_orders` tool both answer "where is my
- * order / is it paid". Written twice they drifted on the first day (one filtered by contact OR
- * company, the other by contact only), so an order booked under the buyer's company showed on
- * the member's rail while the assistant told the customer they had none.
- *
- * Settlement — `payment_status`, `outstanding` — comes from `get_order_settlements`, the ONE
- * derivation of how much is owed on an order (CLAUDE.md anti-regression rule 1). Nothing here
- * subtracts anything.
- *
- * Sales orders only: on a purchase order this party would be the SUPPLIER, and "where is my
- * order" from a supplier is a different question.
- */
+/** A customer's recent SALES orders with what is still owed — one read, two readers. */
 
 import type { DbClient } from './supabase-client.ts';
 import { partyFilter, type ThreadCustomerParty } from './inbox-customer-party.ts';

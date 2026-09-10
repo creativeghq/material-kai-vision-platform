@@ -1,18 +1,4 @@
-/**
- * Rule-driven customs classification — the properties that must not regress.
- *
- * The classifier originally searched the nomenclature with the product's NAME. That was the
- * wrong axis: a tariff position follows the MATERIAL and the FORM of an article, both of which
- * the category carries and "AMALFI GRIS 80X80" does not. Worse, the size in a product name made
- * the query look like a code lookup, so the shortlist came back empty for most of the catalog —
- * reported forever as "no confident match" rather than as an error.
- *
- * The replacement resolves category (+ material) → heading, then a measured attribute → the
- * declarable code. This file pins the parts of that which are easy to undo by accident.
- *
- * The SQL resolver itself (`resolve_taric_for_product`) is exercised against the live database;
- * what is checked here is the CONTRACT the edge function and the UI must keep.
- */
+/** Rule-driven customs classification — the properties that must not regress. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

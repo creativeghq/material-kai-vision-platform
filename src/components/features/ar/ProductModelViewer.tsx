@@ -1,15 +1,4 @@
-/**
- * Real glTF/GLB product model rendering (#321 asset foundation).
- *
- * `ProductModelStage` is Canvas *content* — drop it inside any R3F Canvas
- * (ARPreviewModal today; configurator and room planner later). It loads the
- * model with drei's `useGLTF` (GLTFLoader ships via three-stdlib, so this all
- * stays inside the existing `vendor-3d` chunk), then centers the scene and
- * normalizes it to a fixed on-screen size: the turntable camera is tuned in
- * scene units, so a 4 m wardrobe and a 20 cm vase should occupy the same
- * frame. True-to-scale rendering is AR's job (USDZ carries real units), not
- * the preview's.
- */
+/** Real glTF/GLB product model rendering (#321 asset foundation). */
 import React, { useEffect, useMemo } from 'react';
 import { useGLTF, OrbitControls } from '@react-three/drei';
 import { PresetLighting, DEFAULT_PRESET } from '@/components/features/lighting/PresetLighting';

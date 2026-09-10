@@ -5,17 +5,7 @@ import {
   type CatalogLine,
 } from '../../supabase/functions/_shared/catalog-repricing';
 
-/**
- * Catalog line arithmetic (#352 A13).
- *
- * `adjust_catalog_pricing` scaled `price`, `net_value` and `discount_value` INDEPENDENTLY by the
- * same factor, each rounded to 2dp on its own, and the three stopped reconciling. Every figure
- * was a valid number, so nothing raised and no typecheck could see it — the customer's document
- * simply did not add up.
- *
- * The arithmetic lived inline in a tool closure, which is why it could be wrong for as long as
- * it was: there was nowhere to put a worked example. This file is that example.
- */
+/** Catalog line arithmetic (#352 A13). */
 
 const line = (over: Partial<CatalogLine> = {}): CatalogLine => ({
   price: 10, quantity: 1, discountPct: 0, discountValue: null, net: 10, ...over,

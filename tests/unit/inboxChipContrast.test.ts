@@ -1,36 +1,6 @@
 /**
  * The Inbox's coloured vocabulary — source tags, label chips, avatar tints — must be legible in
  * ALL FOUR themes, not the one it was written against.
- *
- * What happened: every one of those palettes was authored as a single set of raw Tailwind
- * classes, picked while looking at the dark theme — `bg-amber-500/15 text-amber-300`. The
- * platform has four themes (dark/light × green/blue). A `-300` shade is pale BY DESIGN: it is
- * chosen to sit on plum-black. Composited over the light themes' cream and white cards, the tag
- * that says "Email" measured **1.23:1** — the user reported it as "not readable at all", and
- * 1.23:1 is the arithmetic of that sentence.
- *
- * Nothing could catch it:
- *
- *   • `npm run typecheck` sees a valid `string`.
- *   • The design-system guard next door catches classes that produce NO CSS (an off-scale
- *     opacity step). These produce CSS perfectly well. They are simply the wrong colour.
- *   • Nothing renders these files in a light theme, and the person who adds a source is not
- *     usually the person browsing in light mode.
- *
- * So this measures the thing that actually matters rather than a proxy for it: it reads the
- * real card colour out of each of the four theme blocks in `src/index.css`, composites the
- * chip's own tint over it at the alpha the class declares, and computes the WCAG contrast
- * ratio against the text colour — with both the palette and the theme tokens taken from source,
- * so there is no second copy of either to drift.
- *
- * A shade-band rule was the first version of this test and it was not enough: it passed
- * `text-amber-700`, which measures 4.43:1 on cream — plausible-looking, and under AA. Only the
- * measurement found that.
- *
- * Scope is the palettes registered in PALETTES below. Three are the Inbox ones a new source,
- * label colour or avatar tint gets copy-pasted from, which is how one dark-only shade becomes
- * eight. The fourth is the agent's reasoning trace, added when the same defect surfaced there
- * on 2026-08-25. Point this at a new palette rather than eyeballing one.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -301,7 +271,6 @@ describe('inbox chips are legible in all four themes', () => {
           // same way over anything (`bg-amber-500/15`). Requiring `dark:bg-amber-500/15` beside
           // `bg-amber-500/15` would be duplication asserting nothing, and where a chip really
           // does drop its tint in one theme the ratio test below still measures its text against
-          // the bare card, so nothing escapes by being skipped here.
           if (u.util !== 'text') continue;
           const k = `${u.util}-${u.color}`;
           const e = seen.get(k) ?? { light: [], dark: [] };

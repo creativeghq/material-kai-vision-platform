@@ -1,32 +1,4 @@
-/**
- * Quote Tools — agent-chat surface for the Quotes module.
- *
- * Tools:
- *   - create_quote        — create a REAL quote (quotes + quote_items rows) from a
- *                           list of catalog and/or custom line items, run the same
- *                           pricing + totals engine the web UI uses, then generate the
- *                           branded PDF via the shared `generate-quote-pdf` edge fn and
- *                           open it in the Studio canvas.
- *   - generate_quote_pdf  — (re)generate the PDF for an existing quote by id.
- *   - list_my_quotes      — the user's recent quotes with status + totals.
- *   - raise_quote_request — record an UNPRICED request (quote_requests row) for a spec the
- *                           catalogue could not satisfy, so the lead survives the conversation.
- *                           The counterpart to create_quote: that one prices, this one refuses to.
- *
- * This mirrors `QuotesService` / `QuotePDFService` exactly so a quote the agent
- * builds is a first-class quote — it shows up (and is editable) in the Quotes
- * module UI with the same PDF. Pricing:
- *   - catalog line (product_id, no explicit price) → `get_product_price_for_workspace`
- *     audience 'seller' → suggested_sell / retail / cost_basis (same as addItem).
- *   - explicit unit_price → used verbatim (custom items or price override).
- * Totals replicate `QuotePDFService.saveItemPrices` (subtotal → optional cash
- * discount when paid_upfront → VAT → grand_total).
- *
- * Security: user_id + workspace_id are server-derived from the verified JWT (never
- * from the model), satisfying the tenancy-binding + mass-assignment invariants. The
- * PDF invoke carries the user's JWT so `generate-quote-pdf`'s workspace-membership
- * check passes. Quote DB tools are 0 credits (no AI spend; the PDF is deterministic).
- */
+/** Quote Tools — agent-chat surface for the Quotes module. */
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what
@@ -618,36 +590,7 @@ export const createListMyQuotesTool = (
 
 // ── raise_quote_request (#341 join 1 — the bottom rung, writable from chat) ────────────────────
 
-/**
- * Record "we could not price this, but they still want it" as a real lead.
- *
- * THE RUNG THAT ONLY THE EMBED COULD WRITE. `quote_requests` had exactly one writer —
- * `products-3d-api?action=request_quote` — so a specification designed in conversation died in the
- * transcript while the identical specification typed into a merchant's website became a row an
- * operator could act on. On a catalogue this thin nearly every request lands here (`price_my_spec`
- * answers `none` for almost everything), which makes this the difference between the agent capturing
- * demand and the agent apologising.
- *
- * SAME ROW, SAME RULES AS THE EMBED, and deliberately so:
- *   • NO `total_estimated`. Nothing here has been priced; a number would anchor the negotiation on a
- *     figure nobody derived. `price_my_spec` refuses to estimate for the same reason — this tool
- *     exists precisely for the case where it refused.
- *   • The workspace comes from the session, never from the model (invariant 1).
- *   • The payload is an explicit literal, never a spread of what the model produced (invariant 8).
- *
- * DIFFERENT FROM THE EMBED IN TWO WAYS, both because the caller is known here:
- *   • `user_id` is the signed-in member, so the request carries who was in the room. The embed's
- *     visitor is anonymous and writes NULL.
- *   • No bot gate. The embed needs Turnstile because it mints a CRM contact for a stranger; this
- *     path already required a verified JWT to reach.
- *
- * CONTACT RESOLUTION IS SEARCH-FIRST. A silently-created duplicate contact is how a CRM rots, and
- * this workspace's names are frequently Greek — so an existing contact is looked up by id, then by
- * email, then by name, and a new one is created ONLY when an email was supplied and nothing matched.
- * With neither a contact nor an email the request still lands, attributed to the member who raised
- * it — the CHECK on the table wants a requester, not specifically a contact, and losing the lead to
- * enforce tidier CRM data would be the wrong trade.
- */
+/** Record "we could not price this, but they still want it" as a real lead. */
 export const createRaiseQuoteRequestTool = (
   userId: string,
   workspaceId: string,

@@ -2,20 +2,6 @@
  * The desktop Apps popover and the mobile Apps panel show the SAME tree — hubs, apps, and each
  * app's inner links (sections, create actions, quick-starts, the hub's "Jump to") — and that is
  * only true while both derive it from one place.
- *
- * The derivation is `src/config/launcher-links.ts`. It applies three gates to every link (the
- * workspace's entitlement, the person's capability, workspace-admin), and the failure it prevents
- * is quiet: the desktop used to run all three on a section and only two on a shortcut, and a
- * second surface copying either version by hand would have offered a link that resolves perfectly
- * and lands on an access wall — visible to no typecheck, because a wrong `LauncherSection[]` is a
- * valid `LauncherSection[]`.
- *
- * Three things are pinned here:
- *   1. No file under src/ indexes the LAUNCHER_* tables except the shared derivation. A new
- *      `LAUNCHER_SECTIONS[app.id]` anywhere else is the second copy coming back.
- *   2. Both surfaces read through the hook.
- *   3. The derivation, the URL-ownership rule the mobile panel opens with, and the shared recent
- *      list behave as documented — against the REAL tables, not fixtures.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { readdirSync, statSync } from 'node:fs';

@@ -1,21 +1,4 @@
-/**
- * escapeHtml twin-parity guard (invariant 11).
- *
- * Invariant 11 exists because there were once ~6 hand-rolled escapers at THREE different
- * strengths — the weakest escaped only `& < >`, which is attribute-unsafe, and CLAUDE.md
- * pointed everyone at it. The fix was one canonical implementation per runtime.
- *
- * There are three runtimes that genuinely cannot share a module:
- *   • src/utils/escapeHtml.ts            — Vite bundle (resolves the `@/` alias)
- *   • supabase/functions/_shared/html.ts — Deno edge (resolves by URL)
- *   • api/_shared/html.js                — Vercel Node functions (plain ESM .js, no TS step)
- *
- * Until now the first two were kept identical "by convention", which is precisely the
- * mechanism that failed the first time. This test makes drift impossible instead: all three
- * are imported for real and must agree, character for character, on a corpus that includes
- * every character they special-case plus the attribute-breakout payloads the escaper exists
- * to stop. If someone adds a fourth copy, add it to IMPLS — do not weaken this list.
- */
+/** escapeHtml twin-parity guard (invariant 11). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -96,27 +79,7 @@ describe('escapeHtml — canonical twins agree', () => {
  * would notice if it were deleted or renamed, and kb-prerender would then fall back to a fresh
  * hand-rolled copy. Pin the import so that regression fails here rather than in production HTML.
  */
-/**
- * NOBODY HAND-ROLLS A FIFTH ONE.
- *
- * The guard below this only ever looked at `api/kb-prerender.js`, and only for something NAMED
- * `escapeHtml`. Neither condition caught what was actually there: two moodboard functions
- * assembling HTML and sanitising with an inline
- *
- *     String(title ?? '…').replace(/[<>&]/g, '')
- *
- * — unnamed, so invisible to a name check, in files the old guard never read. And it STRIPPED the
- * characters rather than escaping them, which is both weaker than the canonical set (no `"` or
- * `'`) and lossy in a way users saw: a moodboard called "Kitchen & Bath" reached its owner's
- * dormancy-warning email as "Kitchen  Bath".
- *
- * So this asks the question structurally: a file that BUILDS HTML and sanitises with a character
- * class over `< > &` must be using the canonical escaper.
- *
- * TWO CONTRACTS ARE DELIBERATELY NOT HTML and are exempt by path, each with its reason — the
- * CLAUDE.md rule says as much: "escapeHtml is HTML-only: it is NOT a PostgREST filter sanitizer, a
- * CSV quoter, or an XML escaper (separate contracts — never name them `esc`)".
- */
+/** NOBODY HAND-ROLLS A FIFTH ONE. */
 describe('no hand-rolled HTML escaper anywhere', () => {
   /**
    * Specific tags, and CASE-SENSITIVE. A `<serp_data>` prompt fence must not read as markup,

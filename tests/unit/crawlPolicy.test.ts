@@ -1,27 +1,4 @@
-/**
- * Guard: robots.txt and llms.txt express ONE crawl policy, and it is the intended one.
- *
- * WHY THIS EXISTS
- * ---------------
- * Issue #349 B4. Until 2026-08-22 `public/robots.txt` blocked `OAI-SearchBot`,
- * `ChatGPT-User`, `PerplexityBot` and `Perplexity-User` in the same breath as `GPTBot`
- * and `CCBot` — retrieval agents lumped in with training crawlers. Those four are how
- * an answer engine FETCHES a page to answer a question somebody is asking right now,
- * so the platform's AI-search visibility was zero by configuration.
- *
- * Meanwhile `public/llms.txt` sat there addressed to exactly those agents, describing
- * public surfaces they were forbidden to read. Two files, two contradictory policies,
- * and nothing that could notice: robots.txt has no schema, no build step and no test.
- * You find out by measuring a visibility metric that has been structurally zero the
- * whole time — which reads identically to being genuinely invisible.
- *
- * Three things are pinned here:
- *   1. Every retrieval agent is ALLOWED, and every training crawler is BLOCKED.
- *   2. An allowed agent still cannot reach the tokenised share URLs. Allowing a
- *      crawler is not the same as opening the app, and `/q/{token}` IS a credential.
- *   3. llms.txt names the same allow-set. It is prose, so it cannot be enforced by
- *      construction — but it can be prevented from disagreeing.
- */
+/** Guard: robots.txt and llms.txt express ONE crawl policy, and it is the intended one. */
 
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';

@@ -1,23 +1,4 @@
-/**
- * "Is this buyer a business, and therefore what sales document do they get?" — ONE definition.
- *
- * This question was answered in two places with two different rules. NewInvoiceDialog checked the
- * buyer's VAT number (correct); OrdersPanel checked only whether a CRM *company* was linked
- * (`order.customer_company_id ? 'invoice' : 'receipt'`). They disagree for the very common Greek
- * case of a sole trader (ατομική επιχείρηση) stored as a CONTACT carrying an ΑΦΜ: a business that
- * the order flow labelled retail, so it proposed an ΑΛΠ receipt to someone entitled to a
- * τιμολόγιο. An issued retail receipt is transmitted to myDATA, so unpicking that costs a 5.1
- * credit note plus a reissue — not a delete.
- *
- * The rule lives here, is pure, and is covered by tests/unit/salesDocumentKind.test.ts. Callers
- * resolve the buyer's identity (financeService.getBuyerIdentity) and ask this module; nobody
- * re-derives it from `customer_company_id` alone.
- *
- * Fiscal background: a τιμολόγιο (myDATA 1.1 goods / 2.1 services) is issued to a party with a
- * VAT number and lets them deduct the VAT. An ΑΛΠ retail receipt (11.1 / 11.2) is for consumers
- * and does not. AADE REJECTS an invoice issued to a VAT-less party, so steering a consumer to a
- * receipt is correctness, not presentation.
- */
+/** "Is this buyer a business, and therefore what sales document do they get?" — ONE definition. */
 
 /** What we need to know about a buyer to classify them. Deliberately not a CRM row type — both
  *  a company row and a contact row map onto this. */
@@ -64,22 +45,7 @@ export function salesDocumentKindReason(buyer: BuyerIdentity | null | undefined)
   return 'Contact has no VAT number — a consumer can only be issued a retail receipt (ΑΛΠ).';
 }
 
-// ---------------------------------------------------------------------------
 // The SECOND axis: what is being supplied.
-//
-// The document type is a 2×2, and only the buyer half was ever implemented:
-//
-//                    goods      services
-//   business          1.1         2.1
-//   consumer         11.1        11.2
-//
-// `generate_invoice_from_order` hardcoded the goods column, so every services invoice this
-// platform has issued — a commission, a design fee, an installation, a construction valuation —
-// went to AADE as a SALE OF GOODS. All four codes are valid, the envelope validates and the MARK
-// comes back, so nothing raised: the same shape as a payment-method code in the wrong rotation.
-//
-// The SQL side resolves this through `mydata_sales_document_type`. This is the mirror, so the
-// dialog can propose the code the RPC would pick rather than defaulting to 1.1 and hoping.
 
 /** What a document is supplying. `unknown` is a real answer, not a synonym for goods. */
 export type SupplyKind = 'goods' | 'services' | 'mixed' | 'unknown';

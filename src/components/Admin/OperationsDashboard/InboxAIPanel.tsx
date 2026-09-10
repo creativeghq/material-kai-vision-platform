@@ -8,17 +8,7 @@ import { Label } from '@/components/core/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate, formatTime } from '@/utils/datetime';
 
-/**
- * Operator control over inbox conversation reading, because it bills per call.
- *
- * Three switches rather than one, because the three uses cost very differently and the operator
- * should be able to keep the cheap one while dropping the expensive one. The recurring spend is
- * `auto_on_agent_reply` — that is the one that runs unattended.
- *
- * Reads and writes `system_settings.inbox_sentiment_analysis`, which inbox-api reads on every
- * analysis. A DB row rather than an env var on purpose: the point of a cost switch is being able
- * to throw it DURING the surprise, and a redeploy is the wrong tool for "stop spending, now".
- */
+/** Operator control over inbox conversation reading, because it bills per call. */
 
 interface SentimentSettings {
   enabled: boolean;

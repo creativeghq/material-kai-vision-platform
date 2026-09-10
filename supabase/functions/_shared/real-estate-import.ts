@@ -1,16 +1,6 @@
 import { PROPERTY_TYPES as SHARED_PROPERTY_TYPES } from './realEstateVocabulary.generated.ts';
 // deno-lint-ignore-file no-explicit-any
-/**
- * Listing import — the onboarding path (#281).
- *
- * Syndication is pull-OUT only in all three formats, so an agency arriving with 300 listings had to
- * retype them. That is the practical blocker to selling the module, and nothing else on the backlog
- * matters to a prospect who cannot get their book in.
- *
- * Two shapes, one pipeline: tabular rows (CSV, parsed in the browser) and Kyero XML (the format we
- * already emit, so an agency can round-trip out of a portal feed they already have). Both normalise
- * to the same field set and go through the same validation and the same allowlisted write.
- */
+/** Listing import — the onboarding path (#281). */
 
 /** Field values a row may set. Deliberately a SUBSET of PROPERTY_WRITABLE: an importer should not be
  *  able to reach fields a careful human wouldn't type into a spreadsheet — internal pricing

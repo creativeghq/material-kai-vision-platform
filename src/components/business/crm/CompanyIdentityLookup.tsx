@@ -1,15 +1,6 @@
 // The ONE "who is this business?" control: VAT/ΑΦΜ → ΑΑΔΕ → ΓΕΜΗ → web research (Greek), or
 // VIES → web research (rest of EU), with a live progress line and a verified strip, then the
 // company name it resolved.
-//
-// This exists because the same question was being asked in two very different ways: CRM's
-// "Add company" ran the full research chain and arrived with ~25 populated columns, while the
-// Expenses payee box created a supplier from a typed name and nothing else — same table, same
-// counterparty, a quarter of the record. Any surface that creates a business uses THIS component
-// so the identity we capture does not depend on which screen you happened to be on.
-//
-// It resolves; it never writes. The caller decides what to do with `value.fields` — prefill a
-// review form (CRM) or insert straight away (QuickAddCompanyDialog).
 import React, { useId, useState } from 'react';
 import { Check, Loader2, ShieldCheck } from 'lucide-react';
 

@@ -3,89 +3,6 @@
  * line and queues it here. The operator reviews and ✓ adds it to the warehouse (matched to
  * existing stock or created new, with cost from the invoice and the sale price DERIVED BY THE
  * PRICING LADDER) or ✗ dismisses it.
- *
- * ── What is a FACT and what is a reading ──────────────────────────────────────────────────
- * A myDATA line is not just a description. It states the unit (`measurementUnit`), the
- * supplier's own article code (`itemCode`), the VAT category and the exact net value, and those
- * are facts about the document — they are read straight through, shown as filled chips, and
- * never re-derived. Only the product NAME needs a model, because that genuinely is prose.
- *
- * This distinction is the whole screen. Before it, the writer read three of those six fields
- * and asked Haiku to infer the rest from the description: 4.1 metres of worktop (measurement
- * unit 4) was filed as 4.1 PIECES, article code 11-3331-60-1 was stored as "H3331" because a
- * regex found something code-shaped in the text, and the VAT category the invoice stated was
- * left blank for the operator to retype. `src/lib/units.ts` had said not to do this in as many
- * words — "wherever a code is present it is the authority — never infer the unit from a product
- * description instead" — and `ReceiveToWarehouseDialog`, the OTHER screen that receives a
- * supplier line, had always got it right. The reading is now one shared module
- * (`utils/intakeLine.ts`) that both call, so the two cannot drift apart again.
- *
- * ── Why this is grouped by SUPPLIER ───────────────────────────────────────────────────────
- * The myDATA feed carries EVERY invoice a workspace receives, so the queue is not a short list
- * of deliveries — it is the whole purchase ledger. One week of real data: 929 lines, 360
- * documents, 94 issuers, mixing board and hinges and tiles with supermarket runs and recycling
- * levies. The previous version fetched all 929 rows, rendered a six-control editor for each,
- * and fired one `preview_pending_item_sell_price` round trip PER ROW — re-firing all of them
- * on every debounced cost edit. That is why the tab took the better part of a minute to become
- * usable and stuttered afterwards.
- *
- * Rendering fewer rows would only have made a slow page a fast page with the same impossible
- * job on it. The queue is only finishable if the DECISION is per supplier: 10 issuers cover
- * half these lines, 30 cover 79%. So the card lists issuers, expands one at a time, pages the
- * lines inside it, and offers the three answers an operator actually has — add them all, drop
- * them all, or never queue this issuer again.
- *
- * "Never queue" is applied at SELECTION time (`inbound_docs_needing_extraction`), so an ignored
- * issuer's documents never reach the AI extractor: the rule saves the credit, it does not
- * merely hide what the credit bought.
- *
- * ── What "Add" actually does ──────────────────────────────────────────────────────────────
- * `_approve_pending_item_core` (SQL, one transaction per line): reuse the matched product or
- * CREATE one — and "None of these — create a new product" is now an ANSWER it honours. It used
- * to `coalesce` an explicit null back onto the queue-time guess, which cannot tell "the operator
- * said create a new one" apart from "the caller said nothing", so approval updated the very
- * product the screen said it would not touch. It also refuses to add stock in a unit the target
- * bin does not count in: 4.1 metres added to a counter holding pieces is a valid number that
- * means neither, and nothing downstream could ever notice.
- *
- * The full write: name, the supplier's own article code as `external_sku`, their wording as
- * `description`, cost + `cost_source='supplier_invoice'`, and the details panel's fields — then
- * attach the supplier (`supplier_products`, `products.supplier_company_id`), derive the sale
- * price through the ladder, and post an `in` stock movement into the chosen warehouse.
- *
- * It is NOT the MIVAA ingest core that `ReceiveToWarehouseDialog` and dealer-add use, on any
- * path, single or bulk. Intake records what a supplier delivered and what it cost — a stock and
- * cost event, not catalogue authoring. A Greek invoice line is not the raw material for an
- * embedded, faceted catalogue entry, and minting one per approval would spend a credit a line to
- * manufacture products nobody asked for. Promoting an intake product to a full catalogue entry
- * is a separate, deliberate action on a product that already exists.
- *
- * What approval does instead is write everything the line knows and flag the row
- * (`metadata.facet_canonicalization`, in the catalog's own facet vocabulary) so the nightly facet
- * sweep and the 15-minute embedding-backfill agent can finish the job. Before that flag those
- * products were invisible to the only pass that would ever give them facets.
- *
- * ── Recognising what we already carry ─────────────────────────────────────────────────────
- * The queue-time matcher stores ONE best guess per line, which hides the interesting cases: two
- * plausible candidates, or one just under the floor that a human would recognise instantly.
- * Approving then silently forks the catalogue. So each row can ask
- * `warehouse_intake_match_candidates` for ranked alternatives — this supplier already selling us
- * the product under the same code, a normalised code match, trigram name similarity, the token
- * scorer — and the operator picks one (or "create a new product"), which sets
- * `matched_product_id` and turns the approval into an UPDATE. On demand, per row: 25 lookups a
- * page is the N+1 this screen exists to have removed.
- *
- * "Sellable" does NOT decide whether a product is created. It decides whether a `product_prices`
- * row exists, i.e. whether the thing can be quoted. The product is created either way, because
- * stock has to point at one.
- *
- * The suggested price is never computed here. It used to be — `cost * (1 + margin_pct/100)` in
- * the browser, a second answer to "what margin applies" that disagreed with the `pricing_rules`
- * ladder every other pricing path uses, so the number the operator approved could differ from
- * the number the approval then wrote. It now arrives already derived by `_pricing_markup_ladder`,
- * the SAME ladder `_approve_pending_item_core` runs a moment later (#332 step 4) — computed for
- * a whole page inside `warehouse_intake_lines`, and re-asked for a single row only while the
- * operator is typing a different cost into it.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -158,24 +75,7 @@ interface LineEdit {
 
 const numStr = (n: number | null | undefined) => (n != null ? String(n) : '');
 
-/**
- * Read what the invoice text actually says.
- *
- * `parseSupplierLine` pulls dimensions, grade, the maker, colour, finish and the range out of a
- * line like "AMALFI GRIS 80X80 A' -3 -1". Its own header says it "is the thing that fills the
- * intake form's fields" — and it only ever ran inside ReceiveToWarehouseDialog. Measured on this
- * queue before it ran here: 1,079 lines, ZERO with a manufacturer or a dimension.
- *
- * It is the FALLBACK, never the authority. Where the document states something — the unit, the
- * article code — that is used instead and this is not consulted; the parser's unit inference in
- * particular is a heuristic over the shape of the quantity, which is a reasonable guess for a
- * line that omits the code and simply wrong for one that carries it.
- *
- * It runs here, on read, rather than at queue time in the edge function: it is deterministic and
- * free, so there is nothing to persist and nothing to backfill — every row already queued gets
- * the benefit the moment it is looked at. Everything it returns is a SUGGESTION shown in an
- * editable field with its evidence on screen, which is the contract the parser documents.
- */
+/** Read what the invoice text actually says. */
 const parseLine = (l: IntakeLine, knownManufacturers: string[]): ParsedSupplierLine =>
   parseSupplierLine({
     description: l.raw_description || l.name,
@@ -899,19 +799,7 @@ const IntakeLineList: React.FC<{
     const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n;
   });
 
-  /**
-   * Re-ask the ladder for ONE line, because the operator changed something the ladder reads.
-   *
-   * That is not only the cost. The maker decides the BRAND rung and the material category
-   * decides the CATEGORY rung, and approval writes both onto the product before deriving the
-   * price — so a preview that ignores them answers a different question from the one the
-   * approval will answer a second later. Both were previously hardcoded null all the way down
-   * to `_pricing_markup_explain`, which is why a line that plainly says EGGER on it reported
-   * that no pricing rule matched.
-   *
-   * Debounced, and scoped to the edited row. The old card re-ran every row's preview on every
-   * debounce tick, so typing a digit into one cost field fired 929 requests.
-   */
+  /** Re-ask the ladder for ONE line, because the operator changed something the ladder reads. */
   const repriceTimers = useRef<Record<string, number>>({});
   const repriceOne = (id: string, patch?: Partial<LineEdit>) => {
     window.clearTimeout(repriceTimers.current[id]);
@@ -962,19 +850,7 @@ const IntakeLineList: React.FC<{
     await onChanged();
   };
 
-  /**
-   * Add ONE line.
-   *
-   * This path deliberately does NOT run the MIVAA ingest core. Warehouse intake records what a
-   * supplier delivered and what it cost — it is a stock and cost event, not a catalogue
-   * authoring tool. A Greek invoice line is not the raw material for an embedded, faceted
-   * catalogue entry, and making every approval mint one would spend a credit per line to
-   * manufacture products nobody asked for.
-   *
-   * So: reuse the matched product when there is one, otherwise the SQL RPC creates a plain row
-   * carrying everything the invoice knows. Turning an intake product into a full catalogue entry
-   * is a separate, deliberate action — not a side effect of receiving stock.
-   */
+  /** Add ONE line. */
   const approveOne = async (l: IntakeLine) => {
     setBusy(l.id);
     try {

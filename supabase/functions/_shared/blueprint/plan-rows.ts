@@ -1,28 +1,4 @@
-/**
- * A derived composition → the plan rows that MATERIALIZE it.
- *
- * WHY THIS IS ITS OWN FILE
- * ------------------------
- * It used to live inside `project-plan-engine`, which cannot be imported by a unit test: the
- * module graph pulls in `Deno.serve`, the Supabase client and the api-logger. So the step that
- * decides what a plan — and therefore a QUOTE, a material list and every version — actually says
- * about the configured kitchen had no test at all. It is pure, so it belongs somewhere a test can
- * reach it.
- *
- * Two rules the rows encode:
- *
- *  - Zone lines are regenerated WHOLESALE on every reprice and carry `source='composition'`. A hand
- *    edit to one is expected to be overwritten and the marker is how a reader can tell. The rate
- *    goes into `material_cost` with `margin_pct: 0` because `deriveComposition` already ran it
- *    through `computeLinePricing` with the module's margin — re-applying it charges twice.
- *
- *  - An appliance the customer already owns produces NO priced line, and still has to appear.
- *    "Client's own fridge-freezer, in a tall unit" is scope: it is what tells the fitter to leave
- *    the aperture and the electrician to leave the socket. Dropping it because it costs nothing is
- *    the same €0 blind spot that hid these appliances from the enquiry email — a quote you cannot
- *    fit a kitchen from. It is emitted as a SCHEDULE row, so it is visible everywhere plan lines
- *    are read and can never move the money.
- */
+/** A derived composition → the plan rows that MATERIALIZE it. */
 
 import type { DerivedComposition } from './composition.ts';
 

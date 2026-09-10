@@ -1,19 +1,4 @@
-/**
- * A background agent's `defaultTools` must name only tools it actually BUILDS.
- *
- * `toolkitCoverage.test.ts` enforces exactly this for the chat surface — a tool in no cluster, or
- * with no factory, or listed by no agent, fails the build. The background agents in
- * `_shared/agents/` were outside all of it: they hand-roll their own tool objects and declare
- * their own `defaultTools`, with nothing comparing the two.
- *
- * What that cost, on 2026-08-25: `kai-task-agent` had listed `web_search` in `defaultTools` and in
- * its file header since it was written, and no factory for it existed. So every research task
- * dispatched from chat ran with workspace search only — and when both of those errored, the agent
- * did not stop. It wrote a confident 4,300-token report out of training data, headed
- * "Research date: 2025", for a question about which brands already have a Greek distributor.
- *
- * A declaration with no factory behind it is not a missing feature; it is a fabricated one.
- */
+/** A background agent's `defaultTools` must name only tools it actually BUILDS. */
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -68,18 +53,7 @@ describe('background agent tool declarations', () => {
     expect(agents.length).toBeGreaterThanOrEqual(3);
   });
 
-  /**
-   * Only agents that run a LangGraph TOOL LOOP are checked.
-   *
-   * For those, the `tools` array handed to `runLangGraphAgent` IS the binding, so a name in
-   * `defaultTools` that is not in that array is unreachable — the kai-task defect exactly.
-   *
-   * `tech-radar-agent` is the other shape and legitimately so: it never calls
-   * runLangGraphAgent, it delegates to `runRadarForSubject`, which uses Anthropic's server-side
-   * web_search inside itself. Nothing binds a tool array there, so `defaultTools` is descriptive
-   * rather than load-bearing and there is no gap to open. Scoping the rule to where a binding
-   * exists is the point; widening it to every file would just teach people to delete the check.
-   */
+  /** Only agents that run a LangGraph TOOL LOOP are checked. */
   const loopAgents = agents.filter((a) => a.src.includes('runLangGraphAgent'));
 
   it('checks every agent that runs a tool loop', () => {

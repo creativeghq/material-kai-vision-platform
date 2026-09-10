@@ -15,19 +15,7 @@ export async function fetchSheet(
   return data as SheetRow;
 }
 
-/**
- * The sheet's owning context, from whichever parent it has.
- *
- * A sheet hangs off a moodboard OR a project (technical plans belong to the
- * project — see sheets_has_a_parent). The renderer needs the same three facts
- * either way: a display title for the title block, a description for a deck
- * cover, and the project id that decides which workspace brands the PDF.
- *
- * Resolving this in one place is the point. Calling fetchMoodboard with a null
- * id throws, so a project-owned sheet would fail to render AFTER its status was
- * already flipped to 'generating' — leaving the row stuck there with no PDF and
- * no explanation.
- */
+/** The sheet's owning context, from whichever parent it has. */
 export async function fetchSheetParent(
   supabase: DbClient,
   sheet: Pick<SheetRow, 'moodboard_id' | 'project_id'>,
@@ -293,23 +281,7 @@ export async function fetchQuoteFfeItems(
   }));
 }
 
-/**
- * Pull the scope of works off a PROJECT, as phases.
- *
- * Two rules make this safe to hand to a client, and both are load-bearing:
- *
- *   1. **Only `client_visible` tasks.** `project_tasks.visibility` already separates what the team
- *      tracks from what the client is shown, and the tasks tab has the toggle. Without this filter
- *      a proposal would print "chase the supplier" and "check the margin" to the customer. An empty
- *      sheet is the correct outcome when nothing has been marked visible — and the builder says so
- *      in those words rather than printing a blank page.
- *   2. **Ownership is proven before reading.** Same reason `fetchQuoteFfeItems` does it: an
- *      embedded foreign `project_id` would otherwise leak another tenant's programme.
- *
- * A parent task is a phase and its subtasks are the works within it — the structure the project's
- * task list already uses. A parent with no visible children still prints as a one-line phase, so a
- * flat task list is not silently dropped.
- */
+/** Pull the scope of works off a PROJECT, as phases. */
 export async function fetchProjectScopePhases(
   supabase: DbClient,
   projectId: string,

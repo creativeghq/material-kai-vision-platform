@@ -1,15 +1,4 @@
-/**
- * The variation register — every agreed change to the scope, both directions.
- *
- * Client and supplier variations are shown in ONE register but never added together. A client
- * variation is money in, a supplier variation is money out, and the totals here are stated
- * separately for the same reason `get_order_settlements` keeps money IN and money OUT apart: the
- * platform has already shipped one implementation that netted the two and reported a fully-paid
- * order as owing money.
- *
- * Only APPROVED variations reach the CVR, and the register says which those are rather than
- * showing one total that quietly includes work nobody has agreed to pay for.
- */
+/** The variation register — every agreed change to the scope, both directions. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, Plus, Trash2, Check, X, GitPullRequestArrow } from 'lucide-react';
 

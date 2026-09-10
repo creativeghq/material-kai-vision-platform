@@ -1,14 +1,4 @@
-/**
- * Pinterest Import Edge Function
- *
- * Handles pin URL extraction and import into moodboards (no OAuth required).
- * Uses Pinterest oEmbed API for metadata extraction.
- *
- * Actions:
- *   extract_pin      - Extract pin metadata via oEmbed
- *   import_pin       - Import a single pin into a moodboard
- *   import_pins_bulk - Import multiple pins into a moodboard
- */
+/** Pinterest Import Edge Function */
 
 import type { DbClient } from '../../_shared/supabase-client.ts';
 import { jsonResponse } from '../../_shared/http.ts';
@@ -37,19 +27,7 @@ interface PinData {
  */
 const PINTEREST_HOST = /^(?:[a-z0-9-]+\.)*pinterest\.[a-z.]{2,6}$|^pin\.it$/i;
 
-/**
- * Is this actually a Pinterest pin URL? (#360 CB-10)
- *
- * `extractPinId` matched `/pinterest\.com\/pin\/(\d+)/` ANYWHERE in the string, so
- * `https://attacker.test/?ref=pinterest.com/pin/123` passed as a pin — a substring test standing
- * in for a host test, which is the same mistake as matching a domain with `includes()`.
- *
- * The URL is then handed to Pinterest's oEmbed endpoint, which fetches it server-side. Our own
- * infrastructure is not the target (the fetch is always to pinterest.com, and the image download
- * further down goes through `assertSafeUrl`), but forwarding an arbitrary URL to a third party's
- * fetcher on a caller's say-so is a favour to nobody, and it is what turns this endpoint into a
- * probe. Parse it, check the HOST, and require the pin path.
- */
+/** Is this actually a Pinterest pin URL? (#360 CB-10) */
 function parsePinterestUrl(pinUrl: string): { url: URL; pinId: string | null } | null {
   let url: URL;
   try {

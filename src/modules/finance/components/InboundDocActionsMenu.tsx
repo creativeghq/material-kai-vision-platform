@@ -5,11 +5,6 @@
  *   • Add issuer → CRM supplier (with optional registry + business research when the issuer is
  *     Greek and myDATA returned only a VAT number / no name), deduped by VAT within the workspace.
  *   • Add products → warehouse (reuses the existing ReceiveToWarehouseDialog via callback).
- * Mirrors the InvoiceActionsMenu pattern so it drops into the InboundTable row.
- *
- * The add-to-CRM half is [[AddIssuerToCrmDialog]] — the dedupe probe, the ΑΑΔΕ → ΓΕΜΗ →
- * web/Apollo research chain and the write all live there, so this menu and the
- * Expenses-by-Supplier list offer the same act rather than two spellings of it.
  */
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -66,11 +61,6 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
   // became are the same arrival counted from two rows — nothing links them, so doing both added
   // the stock twice. Once the order exists it owns the receipt (it knows the catalog products,
   // the per-line delivered quantities and the customer allocations waiting on them).
-  // Payroll (17.x) rides in on the same RequestTransmittedDocs call as the foreign purchases —
-  // it is here to be VISIBLE, not to be actioned. It belongs to the HR module, so booking it as
-  // a supplier bill would double-count it against payroll already recorded there (three
-  // documents, EUR 92,539.09 in this workspace). `_inbound_doc_to_supplier_bill_core` refuses it
-  // outright; this stops the offer being made rather than letting the click fail.
   const isPayroll = isPayrollDocument(doc.doc_type);
   // And nothing was delivered, so there is nothing to receive either.
   const canReceive = (doc.status === 'new' || doc.status === 'classified') && !hasOrder && !isPayroll;

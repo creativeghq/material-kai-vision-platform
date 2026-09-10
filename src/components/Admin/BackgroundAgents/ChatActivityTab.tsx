@@ -1,14 +1,4 @@
-/**
- * Chat Agent Activity Tab
- *
- * Surfaces tool calls executed inline by the chat agents (KAI + Interior Designer).
- * These are different from background agents (cron-driven, tracked in agent_runs):
- * chat tool calls live in `agent_tool_call_logs` and run inside the agent-chat
- * edge function as part of a conversation's tool-use loop.
- *
- * Grouped by conversation so admins can see which conversations are doing the
- * heaviest work, with per-tool-call drill-down.
- */
+/** Chat Agent Activity Tab */
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import {

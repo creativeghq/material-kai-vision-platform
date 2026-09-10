@@ -1,39 +1,4 @@
-/**
- * Image-edit source gate — what the image tools are allowed to alter.
- *
- * WHY THIS EXISTS
- * ---------------
- * Security invariant 9 covers untrusted content going INTO a model. It says nothing about what
- * the image tools are allowed to come OUT with, and until this file there was no check at all:
- * `generate_gemini(mode:'image-edit')` took any source image plus any instruction and returned
- * the altered image. A user attached a university graduate certificate and asked to change the
- * name and the date; the agent did it in 13 seconds for 6 credits and wrote the result to a
- * public, unauthenticated storage URL. Nothing in the platform was in a position to object —
- * not the prompt (the request reads as an ordinary text edit), not the tool (a name is a name),
- * not the reviewer (there isn't one).
- *
- * The check has to be on the ARTEFACT, not the instruction. "Change the name to X and the date
- * to August 2026" is a moodboard edit on a moodboard and a forgery on a diploma; the words are
- * identical. So the gate looks at the source image and asks what kind of document it is.
- *
- * WHERE IT SITS
- * -------------
- * In the tools, in front of the upstream call — not in the agent's system prompt. A prompt rule
- * is bypassed by `mode:'direct_tool'`, which fires a tool with structured args and no model turn
- * at all, and by any future caller of these tools. The gate must be on the path the pixels take.
- *
- * WHAT IT COSTS
- * -------------
- * One Haiku vision call (~$0.002) on edits of a USER-SUPPLIED source image. Edits of an image
- * this platform generated a moment ago are exempt: it made that image, it already knows what is
- * in it, and re-classifying every "make it warmer" would tax the normal design loop for nothing.
- *
- * FAIL-CLOSED
- * -----------
- * A classifier that cannot be reached BLOCKS. This is the one place where the codebase's usual
- * "degrade rather than fail" instinct is wrong: a gate that switches itself off when the API is
- * slow is not a gate, it is a delay. Same reasoning as invariant 6 on webhook signatures.
- */
+/** Image-edit source gate — what the image tools are allowed to alter. */
 import type { DbClient } from './supabase-client.ts';
 import { getToolPrompt } from './prompt-utils.ts';
 import { callClaudeMessages, type ClaudeMessagesResponse } from './ai-client.ts';

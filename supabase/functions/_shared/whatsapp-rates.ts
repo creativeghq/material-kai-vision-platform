@@ -1,21 +1,4 @@
-/**
- * What a WhatsApp message actually costs us, and therefore what to bill for it.
- *
- * Two different products wore one price. A reply inside the 24-hour customer-service window costs
- * nothing at all — Zernio does not bill it and neither does Meta. A TEMPLATE message is billed by
- * Meta straight to the WhatsApp Business Account, at a rate that varies by the recipient's country
- * AND the template's category, and never appears on Zernio's invoice or in any cost view here.
- *
- * The platform charged a flat $0.005 against both. On a free reply that is pure margin; on a
- * European marketing template it is roughly a tenth of the real cost, booked as a gain.
- *
- * The rate table is operator-editable data (`whatsapp_template_rates`), because Meta revises its
- * card and a redeploy is the wrong unit of change for a price. There is deliberately NO code
- * fallback list: an unpriced country falls back to the `*` wildcard row, which is set to the high
- * end of the card on purpose. An unknown country must over-charge the tenant slightly rather than
- * quietly eat Meta's bill — the true figure does not arrive until the WABA invoice does, by which
- * time the message is already sent.
- */
+/** What a WhatsApp message actually costs us, and therefore what to bill for it. */
 type SupabaseLike = { from: (t: string) => any };
 
 export type TemplateCategory = 'marketing' | 'utility' | 'authentication' | 'service';

@@ -15,13 +15,6 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
  * FactoryAnalytics). This function does NOT score recommendations — product
  * recommendations are served by the product_edges path
  * (find_similar/complementary_products).
- *
- * Endpoints:
- * - POST /track-interaction - Track user interaction with material
- *
- * Authentication:
- * - Secret key (apikey header): Full admin access
- * - User JWT (Authorization header): User-specific operations
  */
 Deno.serve(withApiLogging('recommendations-api', async (req) => {
   // Handle CORS

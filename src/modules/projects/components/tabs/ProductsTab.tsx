@@ -5,8 +5,6 @@
  * agreed `sold_price` (editable, project-owned) plus a reference price resolved through the
  * role-correct pricing hierarchy (get_product_price_for_workspace) — when no upstream price
  * exists for this workspace's chain the line shows "Ask for a quote".
- *
- * Owner-only (operator/dealer/architect). End-customer collaborators never reach this tab.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { formatMoney } from '@/utils/decimal';

@@ -1,20 +1,5 @@
 #!/usr/bin/env node
-/**
- * build-openapi-edge.mjs
- *
- * Generates public/api/openapi-edge.json — an OpenAPI 3.0.3 spec for the
- * Supabase Edge Functions (the Deno/TypeScript surface that FastAPI's
- * /openapi.json does NOT cover).
- *
- * Source of truth: scripts/edge-endpoints.json (a hand-maintained, code-derived
- * array of function metadata). To update: edit that JSON, then re-run:
- *
- *     node scripts/build-openapi-edge.mjs
- *
- * Why hand-maintained: edge functions are action-based Deno handlers with no
- * runtime schema to introspect, so the metadata is extracted from the code by
- * hand. Keep it in sync when you add/change a function.
- */
+/** build-openapi-edge.mjs */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';

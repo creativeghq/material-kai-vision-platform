@@ -16,19 +16,7 @@ import {
 import { resolveContactBillingSource } from '../crm/party-inheritance.ts';
 import { normalizeVat } from '../crm/vatNormalize.generated.ts';
 
-/**
- * Fail loudly before a fiscal document is built from an unconfirmed line-item read.
- *
- * All three builders below used to destructure `{ data: items }` WITHOUT `error` and
- * then do `(items ?? []).map(...)`. `supabase-js` returns `{data: null, error}` rather
- * than throwing, so any failure — RLS, a renamed column, a transport blip — silently
- * became "this document has no lines": totalNet 0, totalVat 0. `finance-issue-invoice`
- * then TRANSMITTED that to AADE/myDATA as a legally-binding zero-value document.
- *
- * A read we didn't confirm must never become a legal filing. A genuine invoice /
- * credit note / delivery note also cannot have zero lines, so an empty list is treated
- * as a hard error rather than a valid document.
- */
+/** Fail loudly before a fiscal document is built from an unconfirmed line-item read. */
 function assertFiscalLines(items: unknown, err: unknown, subject: string): void {
   if (err) {
     const msg = (err as { message?: string })?.message ?? String(err);
@@ -118,16 +106,7 @@ function correlatedEntitiesFrom(raw: unknown): FiscalInvoiceInput['header']['oth
   return out.length ? out : undefined;
 }
 
-/**
- * The stated purpose of a movement, or a refusal.
- *
- * Both movement builders used to read `move_purpose ? parseInt(...) || 1 : 1`, so an unset or
- * unparseable purpose became **1 = Πώληση**. A movement document filed as a sale when it was a
- * transfer, a return or a repair is a valid document making a false statement, and the code is
- * the field an audit reads first. Refusing is recoverable; a wrong purpose on a registered
- * document is not — the same reasoning as the unnamed-line and uncoded-unit guards in
- * `novus.ts`.
- */
+/** The stated purpose of a movement, or a refusal. */
 function assertMovePurpose(raw: unknown, subject: string): number {
   const n = parseInt(String(raw ?? ''), 10);
   if (!isMydataMovePurpose(n)) {
@@ -196,23 +175,7 @@ function partyFromCrm(c: any): FiscalParty {
   };
 }
 
-/**
- * Resolve the counterparty for a fiscal document (#328).
- *
- * Prefers the snapshot frozen onto the document at issue over the live CRM row. An issued
- * invoice must keep saying who it was addressed to: without this, renaming a customer silently
- * rewrites every past document, and a reprint shows today's identity rather than the one the
- * document was issued under. It is also what lets a disabled workspace's retained documents keep
- * rendering after their customers are re-homed to the operator — the CRM row is then in another
- * workspace and RLS would hand back nothing.
- *
- * Note it re-uses `partyFromCrm` rather than reading the snapshot with its own field logic. The
- * snapshot deliberately stores the same raw field names, so the billing-identity precedence
- * rules exist in exactly one place and cannot drift between "live" and "frozen" documents.
- *
- * Falls back to the live row when there is no snapshot: drafts have not been issued yet, and
- * documents that predate this column never got one.
- */
+/** Resolve the counterparty for a fiscal document (#328). */
 async function resolveCounterparty(
   supabase: any,
   doc: { counterparty_snapshot?: { row?: unknown } | null; customer_company_id?: string | null; customer_contact_id?: string | null },
@@ -269,20 +232,6 @@ async function applyCounterpartAddressUnit(
 /**
  * The VAT number as myDATA wants it: the national number ALONE, because the envelope states the
  * country separately (`issuer.country` / `counterpart.country`).
- *
- * `finance_settings.business_vat` and `crm_companies.vat_number` are free text and Greek
- * businesses write the same number three ways — `802349569`, `EL802349569`, `GR 800 370 260`.
- * The operator workspace stores the EL form, and it was passed to the provider VERBATIM, which
- * answers **HTTP 401** "You don't have the authority to transmit for this vat numbers": the
- * authorization list holds the bare AFM, so the prefixed spelling matches nothing. Every
- * transmission from that workspace failed at the door, and it read as a permissions problem with
- * the account rather than as a stray two letters. Verified against the sandbox 2026-09-06 (#319):
- * `EL802349569` → 401, `802349569` → the document.
- *
- * `normalizeVat` is the platform-wide rule for this and already handles the Greek pair while
- * KEEPING a real foreign prefix (`DE…` and `FR…` are different taxpayers). A foreign prefix that
- * merely repeats the party's own declared country is dropped here too, for the same reason the
- * Greek one is: it is the country field said twice.
  */
 function fiscalVatNumber(vat: string | null | undefined, country?: string | null): string {
   const normalized = normalizeVat(vat) ?? '';
@@ -381,11 +330,6 @@ export async function buildInvoiceInputFromDb(
   // (error 313) and off 2.x (error 331) — so every retail receipt and every service invoice was
   // rejected at the provider while the wholesale invoice beside it succeeded. See
   // `mydataIncomeClassificationType` for the codes and the sandbox evidence (#319).
-  //
-  // The workspace default still applies where it can be right: it is the operator's choice of
-  // WHICH wholesale-goods classification to use (E3_561_005 for an intra-community seller, say),
-  // so it is honoured only on the families whose derived answer is that baseline pair. It cannot
-  // override the derivation for retail or services, because AADE would refuse the result.
   const derivedIncType = mydataIncomeClassificationType(docTypeForClassification);
   const derivedIncCat = mydataIncomeClassificationCategory(docTypeForClassification);
   const incType = overrides.incomeClassificationType
@@ -608,14 +552,6 @@ export async function buildInvoiceInputFromDb(
  * Build a credit-note FiscalInvoiceInput from a credit_notes row. The issuer is the
  * workspace; the counterpart + correlated MARK come from the original invoice. Lines come
  * from credit_note_items.
- *
- * THE TYPE FOLLOWS THE DOCUMENT BEING CORRECTED. A retail receipt (11.x) is reversed by
- * **11.4** (Πιστωτικό Στοιχείο Λιανικής); only a wholesale invoice takes 5.1 (correlated,
- * when the original carries a MARK) or 5.2. Filing a 5.x against an 11.x is a mis-typed
- * document at AADE, and it was all this could produce — while `buildInvoiceInputFromDb`
- * emits 11.1 for every counterparty with no VAT number, which is every register and
- * storefront sale. `issue_credit_note` stamps the same type at creation; this recomputes it
- * so a row written before that fix still transmits correctly.
  */
 export async function buildCreditNoteInputFromDb(
   supabase: any,
@@ -682,16 +618,6 @@ export async function buildCreditNoteInputFromDb(
   // (`issue_credit_note` copies it), so the retail/wholesale split the invoice made — product
   // retail codes included — carries over without being re-derived here. These are only the
   // fallback for a whole-amount credit that has no source line.
-  // Same derivation as the invoice path, keyed on the CREDIT note's own type: an 11.4 reverses
-  // a retail receipt and must classify as retail, and the flat wholesale pair was refused there
-  // for exactly the reason it was refused on 11.1.
-  // The TYPE axis (retail vs wholesale) comes from the credit note, which knows it — an 11.4
-  // reverses a retail receipt. The CATEGORY axis (goods vs services) cannot: 5.1 and 11.4 say
-  // nothing about what was sold, so both derive to `category1_1` and a whole-amount credit
-  // against a service invoice would be filed under Commodity Sale Income while the original sits
-  // under Provision of Services Income. Both codes are valid, so AADE accepts the pair and the
-  // two documents disagree on the E3 form forever. The credited INVOICE is the thing that knows,
-  // so the category is derived from its type.
   const derivedCnType = mydataIncomeClassificationType(creditDocType);
   const derivedCnCat = mydataIncomeClassificationCategory(String(inv.document_type ?? creditDocType));
   const defaultIncType = derivedCnType === 'E3_561_001'

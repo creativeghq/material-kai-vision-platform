@@ -1,14 +1,4 @@
-/**
- * Job Research API client.
- *
- * Wraps MIVAA's `/api/v1/job-research/*` endpoints. Internal flow only —
- * external (api_key) consumers call MIVAA directly with a Bearer kai_* token.
- *
- * Cron-driven background discovery; user receives ONE consolidated email per
- * day at digest_hour_utc covering all of their tracked job searches. The KAI
- * agent emits `job_search_created` / `job_search_updated` / `job_searches_list`
- * / `job_listings_feed` / `job_digest_preview` chunks consumed by AgentHub.
- */
+/** Job Research API client. */
 
 import { supabase } from '@/integrations/supabase/client';
 
@@ -37,10 +27,6 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 // job_research_sites. Fire-and-forget; if it fails the KB doc body lags by
 // the next refresh tick. We swallow errors silently — the source of truth is
 // the table, not the doc body.
-// Takes NO argument on purpose: `/sites/_resync` has no body and no query string, and the
-// backend re-syncs ALL sections. It previously accepted a `_siteType` it never used, which
-// cost deleteSite an entire pre-delete round-trip to produce — and, worse, gated the resync
-// on that read succeeding.
 async function _kickSitesKbSync(): Promise<void> {
   try {
     await api('/api/v1/job-research/sites/_resync', { method: 'POST' });
@@ -322,9 +308,6 @@ export const jobResearchService = {
   //    already enforces "authenticated read, admin-only write". MIVAA was
   //    adding a redundant JWT-validation hop that was returning 401 in the
   //    user's browser session.
-  //  - Faster (skips a network hop) and works regardless of MIVAA auth state.
-  //  - KB-doc sync still happens — kick it via the kb-doc-sync edge function
-  //    after each CRUD (fire-and-forget; doc body lags by a few seconds at most).
 
   async listSites(siteType?: JobSiteType): Promise<JobSite[]> {
     let q = supabase.from('job_research_sites').select('*').order('site_type').order('url_or_domain');

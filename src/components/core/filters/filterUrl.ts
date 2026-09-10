@@ -1,19 +1,4 @@
-/**
- * How a filtered list view is spelled in a URL. ONE encoder, no React, no imports beyond a type.
- *
- * `useFilterValues` writes and reads this param; `filterUrl` is how any OTHER surface authors a
- * link into an already-filtered list. Both halves must agree byte-for-byte, which is why they are
- * the same function rather than two conventions that look alike.
- *
- * The failure this prevents is silent by construction: a hand-written `/finance?tab=doc_orders&
- * status=draft` is a perfectly valid URL that every route resolves and no list surface reads, so
- * it opens the right tab showing EVERYTHING and looks exactly like it worked. That is the same
- * shape as the dashboard's "View details" links, which pointed at `/finance` and landed on
- * whatever tab happened to be default.
- *
- * Dependency-free on purpose: the link registries that build deep links (and the guard test that
- * checks them) import this without dragging in React or the filter widgets.
- */
+/** How a filtered list view is spelled in a URL. ONE encoder, no React, no imports beyond a type. */
 import type { FilterValues } from './types';
 
 /** Drop cleared keys so the URL (and the active-filter count) never carry empty noise. */

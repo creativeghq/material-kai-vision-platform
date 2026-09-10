@@ -1,25 +1,5 @@
 #!/usr/bin/env node
-/**
- * Run the golden cases as ONE batch with repeats, then read the batch honestly.
- *
- *   node scripts/run-agent-eval-batch.mjs --user <uuid> --workspace <uuid> [--repeats 5]
- *        [--case seo.own_rankings]... [--model claude-sonnet-5] [--json]
- *
- * Needs SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in the environment — the service key lives
- * only on the MIVAA host, so this runs there (see docs/agent-evaluation.md for the one-liner
- * that exports them from the systemd unit).
- *
- * WHY REPEATS. One run per case has no spread, so a difference between two batches has no noise
- * floor under it and is not a result. Five is the minimum (AGENT_EVAL_MIN_REPEATS); the summary
- * flags a case below it. Each repeat is a real agent turn and costs what a turn costs — an Opus
- * turn is 30–60 credits — so `--model claude-sonnet-5` is the cheap sweep that still finds every
- * STRUCTURAL gap (a missing tool is missing on every model).
- *
- * WHAT IT PRINTS. Per case: attempts, pass rate, tool-set agreement across repeats, the failure
- * classes hit, harness failures beside agent failures. A case that produced nothing is printed
- * with zero attempts, never dropped. Read the failure column before calling anything unstable:
- * `transport` is the network, not the agent.
- */
+/** Run the golden cases as ONE batch with repeats, then read the batch honestly. */
 
 import { randomUUID } from 'node:crypto';
 

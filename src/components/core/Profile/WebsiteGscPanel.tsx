@@ -17,18 +17,7 @@ import {
 
 const fmt = (n: number) => formatNumber((n ?? 0));
 
-/**
- * Search Console figures are a VALUE or a stated REASON (CLAUDE.md rule 3).
- *
- * These four were `t?.clicks ?? 0`, `(t?.position ?? 0).toFixed(1)` and so on, and
- * `get_gsc_summary` coalesced to zero underneath them — so a site that had never synced showed
- * `0 clicks · 0 impressions · 0.0% CTR · Avg position 0.0`. The last one is the worst: position
- * 1 is the best result there is, so 0.0 reads as better than first place while meaning "we have
- * no idea", on the panel a site owner trusts most.
- *
- * The RPC now returns the verdict and this only formats it, through the same vocabulary every
- * other SEO surface uses — which fails closed on a status it does not recognise.
- */
+/** Search Console figures are a VALUE or a stated REASON (CLAUDE.md rule 3). */
 function GscMetric({ label, value, status }: { label: string; value: string; status: string | undefined }) {
   const p = sourceStatusPresentation(status === 'ok' ? null : status);
   if (!p) return <Metric label={label} value={value} />;

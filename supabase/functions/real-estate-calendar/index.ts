@@ -1,19 +1,4 @@
-/**
- * real-estate-calendar — pushes viewings into the agent's own Google Calendar.
- *
- * Viewings already sync to the platform calendar (`crm_meetings`); what an agent actually lives in is
- * Google Calendar on their phone, and a viewing they cannot see there is a viewing they miss.
- *
- * Reuses the platform's existing GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET and the token/refresh shape
- * already proven in `gsc-api`, so an operator configures Google once rather than once per feature.
- *
- * SECURITY:
- *  • The connection is per USER — it holds one person's OAuth tokens, and its RLS is owner-only.
- *    Workspace membership deliberately grants nothing.
- *  • `state` is signed with the service key and carries the user + workspace, so the callback cannot
- *    be replayed to attach someone else's Google account to your row.
- *  • Every viewing push re-checks that the caller may see the viewing before writing to a calendar.
- */
+/** real-estate-calendar — pushes viewings into the agent's own Google Calendar. */
 import { createClient } from '@supabase/supabase-js';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';

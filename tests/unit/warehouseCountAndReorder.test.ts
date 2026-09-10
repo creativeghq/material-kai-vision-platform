@@ -4,25 +4,7 @@ import { join } from 'node:path';
 
 import { stripComments } from '../helpers/stripComments';
 
-/**
- * Warehouse audit #355 — the three findings the SQL layer cannot see.
- *
- * #355's headline is that this is the best-defended module audited, because it puts its
- * invariants in SQL: `receive_order_into_warehouse` takes `quantity - quantity_shipped` and
- * skips when that is ≤ 0, so a repeat receive cannot double stock; `post_stock_count` refuses a
- * second post; `cancel_stock_count` refuses to cancel a posted one. The double-submit class that
- * is dangerous elsewhere is largely ABSORBED here.
- *
- * These three survived precisely because they are invisible from the database:
- *
- *  • WH-1 — a count posted with quantities that were never saved. `post_stock_count` correctly
- *    refuses a second post, but it cannot know the FIRST one carried stale data.
- *  • WH-2 — stock created with no movement behind it. The balance is valid; the ledger simply
- *    cannot explain it. Fixed with a trigger, so this file only asserts the client is not
- *    reimplementing it.
- *  • WH-3 — two DISTINCT purchase orders. Both are legitimate rows, so no idempotency guard
- *    anywhere can absorb them.
- */
+/** Warehouse audit #355 — the three findings the SQL layer cannot see. */
 
 const ROOT = join(__dirname, '..', '..');
 const read = (p: string) => stripComments(readFileSync(join(ROOT, p), 'utf8').replace(/\r\n/g, '\n'));

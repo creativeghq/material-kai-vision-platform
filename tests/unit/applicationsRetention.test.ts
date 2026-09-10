@@ -149,24 +149,7 @@ describe('the applications card', () => {
   });
 });
 
-/**
- * Issuing an invoice from a valuation.
- *
- * The question this settles had been sitting open as "is a Greek progress valuation a fiscal
- * document, and when?" — and the codebase had already answered it for orders:
- * `generate_invoice_from_order` says an order "is a commercial document and declares nothing", and
- * generating the invoice "is the step that turns the rate into a fiscal claim". An application is
- * the same kind of thing, so no status transition mints a document; somebody issues one.
- *
- * Two rules, both silent when broken:
- *
- *  - It is ONE call. The invoice takes a fiscal NUMBER the moment it exists, so a second press
- *    after a dropped connection takes a second number for one valuation — and unpicking a
- *    transmitted document costs a credit note, not a delete.
- *  - The amount is READ from the derivation. An application is cumulative: invoicing the gross
- *    claim instead of the movement bills the whole job again every month, and both figures are
- *    valid numbers.
- */
+/** Issuing an invoice from a valuation. */
 describe('a valuation becomes an invoice by an explicit act', () => {
   it('goes through the RPC that creates and stamps together', () => {
     const code = stripComments(SERVICE);

@@ -1,24 +1,4 @@
-/**
- * "Which template does this workspace want its invoice / quote email to use?"
- *
- * Invoice and quote emails compose their subject + HTML inline in the sending function. That is
- * the DEFAULT, and it stays: it carries the pay link, the Viva RF bank-transfer code and the
- * myDATA MARK/QR, and it must keep working for every workspace that never touches this.
- *
- * A workspace can override the body by assigning one of its own email templates to a document
- * kind (`workspace_document_email_templates`). This resolves that assignment to the slug
- * email-api addresses templates by.
- *
- * Two rules the callers depend on:
- *
- *  1. **Resolution failure is not an override.** Any error here returns null and the built-in
- *     body sends. An invoice that does not go out because a template lookup hiccuped is a worse
- *     outcome than one that goes out looking plain.
- *  2. **Every documented variable is always supplied, even as ''.** `renderTemplateWithVariables`
- *     leaves an unknown `{{key}}` in the output verbatim — so a template that references
- *     `{{pay_url}}` on an invoice that has no pay link would mail the literal text "{{pay_url}}"
- *     to the customer. `withAllVars` below fills the gaps.
- */
+/** "Which template does this workspace want its invoice / quote email to use?" */
 
 import type { DbClient } from './supabase-client.ts';
 
@@ -42,16 +22,7 @@ export const DOCUMENT_EMAIL_VARIABLES: Record<DocumentEmailKind, readonly string
 } as const;
 
 
-/**
- * The slug of the template assigned to (workspace, kind), or null to use the built-in body.
- *
- * One RPC, deliberately. The Supabase client here is untyped (`createClient as any` in the app,
- * and no generated types on the edge side either), so a wrong column name or a mis-shaped
- * PostgREST embed result would not be a compile error and is not reachable from a unit test —
- * whereas `resolve_document_email_template` is one SQL function that can be probed directly.
- * It also re-checks `is_active`, so an assignment whose template was deactivated after the fact
- * resolves to null instead of to a slug email-api would 404 on mid-send.
- */
+/** The slug of the template assigned to (workspace, kind), or null to use the built-in body. */
 export async function resolveDocumentEmailTemplate(
   supabase: DbClient,
   workspaceId: string | null | undefined,

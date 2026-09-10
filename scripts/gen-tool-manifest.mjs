@@ -1,50 +1,4 @@
-/**
- * Tool manifest generator (issue #266, Phase 0).
- *
- * NOTE: deliberately no `#!` shebang — tests/unit/toolkitCoverage.test.ts imports this
- * module through Vite's transform pipeline, which treats a leading `#!` as a syntax
- * error. It is always run as `node scripts/gen-tool-manifest.mjs` anyway.
- *
- * Agent tools are defined ONCE, in the backend:
- *
- *     tool(async (args) => {...}, {
- *       name: 'generate_video',
- *       description: '...',
- *       schema: z.object({ video_type: z.enum([...]).describe('...'), ... }),
- *     })
- *
- * …and every UI surface that exposes them (agentToolsCatalog → ToolkitPickerModal,
- * ToolkitFormModal) was a HAND-MAINTAINED mirror. Nothing kept the two in sync, so
- * tools shipped into no toolkit cluster and `z.enum` options never became form
- * fields. This script emits the machine-readable projection both the guard test and
- * the auto-field builder read:
- *
- *     src/components/features/ai/toolManifest.generated.ts
- *
- * …and, in the other direction, projects the catalog's cluster map down to the edge
- * function so the two are no longer separate hand-written copies:
- *
- *     supabase/functions/_shared/toolkitClusters.generated.ts
- *
- * WHY A STATIC AST PARSE and not runtime introspection: the tool factories build
- * Supabase clients at call time, and the modules are Deno with `npm:` specifiers +
- * top-level await — importing them from Node needs a Deno runtime plus env and has
- * side effects. Parsing is deterministic, env-free, and runs in the existing
- * vitest/node toolchain.
- *
- * TWO TRAPS this deliberately avoids (both hit while building the earlier guards):
- *  1. PHANTOM TOOLS. `tech-radar-tools.ts` holds SUBMIT_FINDINGS_TOOL — an Anthropic
- *     `tool_choice` structured-output schema with a `name:` and an `input_schema:`.
- *     A `name: '...'` regex cannot tell it apart from a real tool. Anchoring on the
- *     `tool(...)` CALL EXPRESSION excludes it structurally.
- *  2. A SILENTLY-SHORT MANIFEST. A parser that quietly skips shapes it does not
- *     understand yields a green build that checks nothing. Every unparsed schema is
- *     collected and the run FAILS LOUDLY, plus floor asserts on the totals.
- *
- * Usage:  node scripts/gen-tool-manifest.mjs [--check]
- *   (no flag) rewrite the generated files
- *   --check   exit 1 if either committed file is stale (used by CI / the guard test)
- */
+/** Tool manifest generator (issue #266, Phase 0). */
 import ts from 'typescript';
 import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, dirname, resolve } from 'node:path';
@@ -107,15 +61,6 @@ const isZodRoot = (n) =>
 /**
  * Module-level `const X = ['a','b'] as const` arrays, so `z.enum(RING_VALUES)`
  * resolves to its values instead of degrading to an option-less enum.
- *
- * IMPORTED arrays count too, and that is not a nicety. A vocabulary shared by both runtimes has
- * to live in ONE module and be imported (or byte-mirrored) — that is the whole point of
- * `npm run vocab:mirror`. Resolving only same-file consts silently punishes exactly that
- * structure: `z.enum(TENANT_TRIGGERS)` degrades to `type: 'string'`, the manifest loses all 56
- * options, `autoFields` renders a free-text box where a select belongs, and the toolkitCoverage
- * assertion that a quick-start offers only values the enum accepts quietly has nothing to check.
- * Every gate stays green while the form gets worse. Caught on 2026-08-27, when flow-tools.ts
- * stopped declaring its own copy of the tenant vocabulary.
  */
 function constArrays(sourceFile, depth = 0) {
   const out = new Map();
@@ -273,24 +218,7 @@ function summarize(desc) {
   return out.length > 220 ? `${out.slice(0, 217)}…` : out;
 }
 
-/**
- * Tool modules that are NOT part of the agent tool surface, and must not enter the manifest.
- *
- * The manifest exists to answer "which tools can an agent be given, and are they all reachable" —
- * `toolkitCoverage.test.ts` reads it and fails the build for any tool that is in no cluster or
- * that no agent lists. That check has no escape hatch by design (`KNOWN_UNCLUSTERED` was deleted,
- * not emptied), and it is right not to.
- *
- * `customer-account-tools.ts` is not in that surface. Its three tools are bound only by
- * agent-chat's customer-audience path, only when an Inbox thread has resolved to a real CRM
- * contact and the workspace allows account answers. Putting them in a cluster would make them
- * selectable in an operator chat, where they are a strictly worse copy of the finance tools — and
- * an entry in the manifest without a cluster is a red build. So the file is excluded HERE, once,
- * with the reason, rather than by weakening the coverage rule for everyone.
- *
- * A new entry needs the same argument: bound outside `registerTools`, and unreachable by
- * selection. If a module does not clear that bar, cluster it instead.
- */
+/** Tool modules that are NOT part of the agent tool surface, and must not enter the manifest. */
 const NON_AGENT_TOOL_MODULES = new Set([
   'customer-account-tools.ts',
 ]);
@@ -461,18 +389,7 @@ export function generate() {
   return { tools, source: renderManifest(tools), problems: fatal, enumTools };
 }
 
-// ─────────────────────────────────────────────────────────────────────
 // Toolkit clusters — agentToolsCatalog.TOOLKITS → the edge function's map
-//
-// agent-chat used to hold its OWN copy of cluster → tool_ids, commented "mirrored
-// from agentToolsCatalog.ts". Only the frontend copy drove the picker; only the
-// server copy drove what `load_toolkit` could bind. They drifted by four whole
-// clusters (flows / knowledge-graph / social / tech-radar were bindable mid-chat and
-// impossible to enable from the picker) and by two tools inside `projects`.
-//
-// A test could only ever report that drift after the fact. Projecting the map out of
-// the catalog removes the second copy, so there is nothing left to disagree.
-// ─────────────────────────────────────────────────────────────────────
 
 /** The `[...]` initializer of `export const TOOLKITS ... = [...]`. */
 function toolkitsArray(sf) {

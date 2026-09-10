@@ -1,45 +1,4 @@
-/**
- * myDATA aggregate book — a READ-ONLY MIRROR of what AADE holds.
- *
- * This is the same table the taxpayer sees at
- *   www1.aade.gr/saadeapps2/bookkeeper-web/bookkeeper/#!/bookAggregate
- * (Συνοπτικό Βιβλίο): one row per month per direction, carrying AADE's own net /
- * VAT / withheld / other-taxes / digital-fee / fees / deductions / third-party
- * figures.
- *
- * It exists to CONFIRM the platform's numbers, never to feed them. Nothing here
- * writes to `invoices`, `supplier_bills` or `inbound_documents`, and no platform
- * report reads `mydata_book_months`. Merging the two would destroy the only thing
- * the mirror is for: being an independent second opinion.
- *
- * ── Why three calls and not one ───────────────────────────────────────────────
- * `RequestMyIncome` / `RequestMyExpenses` return the book itself, pre-aggregated
- * into `<bookInfo>` rows — but a bookInfo row is keyed on `counterVatNumber`, so
- * the families that HAVE no counterparty are simply absent from it:
- *
- *   11.x  retail documents we issued          missing from RequestMyIncome
- *   13.x  retail purchases we self-report     missing from RequestMyExpenses
- *
- * Measured against this workspace's own book for 01/01–30/08/2026:
- * `RequestMyIncome` alone reports EUR 42,658.42 where AADE's page says
- * EUR 54,329.85 — short by 21%, because two February 11.1 receipts (23,310.60)
- * and their 11.4 credit note (11,655.30) are invisible to it. Nothing errors; the
- * short number is a perfectly valid number. So the missing half is read off
- * `RequestTransmittedDocs` and signed here.
- *
- * With the supplement, all eight months and every column tie to AADE to the cent.
- *
- * ── Rate limiting ─────────────────────────────────────────────────────────────
- * AADE throttles these endpoints hard and answers 429 with a retry-after of
- * ~150 seconds — longer than an edge function may live. So a 429 is NOT retried
- * in-request: it is recorded as `collector_failed` with the retry window, the
- * last good figures are left exactly as they were, and the UI says when to try
- * again. A 429 body also parses as valid XML with zero rows, which is precisely
- * how a rate limit turns into a confident "you had no income in March" — every
- * response is status-checked before it is counted.
- *
- * Cron: invoke with header `x-cron-secret: <CRON_SECRET>`.
- */
+/** myDATA aggregate book — a READ-ONLY MIRROR of what AADE holds. */
 import { createClient } from '@supabase/supabase-js';
 import { resolveSecret } from '../_shared/secrets.ts';
 import { authenticate, listUserWorkspaceIds } from '../_shared/auth.ts';
@@ -72,17 +31,6 @@ function toAadeDate(iso: unknown): string | null {
 /**
  * The 11.x / 13.x subtypes that REDUCE the book, and the complete set of subtypes
  * we know about at all.
- *
- * `mydata_reference` carries 11.1–11.5 but no 13.x row, so this cannot be derived
- * from the DB the way a document LABEL is. It is therefore pinned here and verified
- * against live data: February's 11.1 pair less the 11.4 credit reproduces AADE's
- * income to the cent, and July's 13.1 pair less the 13.31 credit reproduces its
- * expenses. Note 11.5 ("on behalf of third parties") and 13.30 ("as recorded by the
- * entity itself") are SALES/PURCHASES despite sitting next to the credit codes —
- * treating either as a credit silently halves the month it appears in.
- *
- * An unrecognised subtype is counted at face value AND named in `source_errors`,
- * so a new AADE code shows up as a stated caveat rather than a wrong total.
  */
 const CREDIT_SUBTYPES = new Set(['11.4', '13.31']);
 const KNOWN_SUBTYPES = new Set(['11.1', '11.2', '11.3', '11.4', '11.5', '13.1', '13.2', '13.3', '13.4', '13.30', '13.31']);

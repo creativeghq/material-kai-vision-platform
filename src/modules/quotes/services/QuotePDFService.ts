@@ -103,16 +103,6 @@ class QuotePDFService {
     //  - finding 19: the first failing item `return`ed mid-loop, leaving earlier lines
     //    repriced, later lines stale, and the quotes totals row untouched. No transaction,
     //    no rollback, and the operator could not tell how far it got.
-    //  - finding 17: this was one of THREE independent implementations of the same money
-    //    chain and the only one that persisted. It rounded differently from the one the PDF
-    //    renders with, so `priceAfterDiscount + vat` and `final` could disagree by a cent.
-    //    It also resolved the cash-discount rule with a second copy of the query in
-    //    financeService.getActiveCashDiscountPct, and folded in no extras at all.
-    // reprice_quote_items applies every line or none, then restamps the quote from
-    // get_quote_totals() — the single SQL source. TypeScript no longer derives any of it.
-    //  - #358 PQ-6: it still SENT `line_total`, so the server stored the number the browser had
-    //    computed. `quote_items.line_total` is now a generated column and the payload carries
-    //    only the two prices the operator actually typed.
     const { data, error } = await supabase.rpc('reprice_quote_items', {
       p_quote_id: quoteId,
       p_items: items.map((i) => ({

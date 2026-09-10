@@ -24,21 +24,7 @@ import {
   type SeoMetric,
 } from './seo/seoMetrics';
 
-/**
- * Websites → Overview.
- *
- * The one screen that answers "how is this site doing in search", built to the
- * density of the tools people already read: a strip of headline numbers, each
- * with its movement and its own trend, then the position distribution, then the
- * feeds behind them (Search Console, technical health, AI assistants).
- *
- * What makes it different from those tools, and the reason it exists: **it never
- * hides a metric it could not fetch.** Every tile in the grid is always present.
- * A number we have is a number; a number we could not get says so, and says why.
- * The panel this replaces rendered four tiles when it had four and eight when it
- * had eight, so a backlink collector that has never once succeeded looked exactly
- * like a site with no backlinks.
- */
+/** Websites → Overview. */
 
 /** How stale is too stale to present as "current". */
 const STALE_DAYS = 14;

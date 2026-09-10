@@ -1,22 +1,4 @@
-/**
- * send-quote-email
- *
- * Emails a quote to a recipient. Authorized for the quote OWNER or an admin.
- *
- * POST { quote_id, to?, message? }
- *   - to:      recipient email. If omitted, resolved from the quote's customer
- *              (crm company/contact) and finally the quote owner's profile.
- *   - message: optional free-text note included above the quote summary.
- *
- * Flow:
- *   1. Auth + owner/admin check.
- *   2. Ensure the public share link is enabled (mints a token if needed) so the
- *      email can deep-link to /q/:token — viewable without logging in.
- *   3. Compose the built-in HTML, or render the workspace's assigned quote template when it
- *      has one (Email Marketing → Templates → Use for → Quote emails), + dispatch via email-api.
- *
- * Sender (from:) is resolved by email-api from email_settings.
- */
+/** send-quote-email */
 import { createClient } from '@supabase/supabase-js';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { escapeHtml } from '../_shared/html.ts';

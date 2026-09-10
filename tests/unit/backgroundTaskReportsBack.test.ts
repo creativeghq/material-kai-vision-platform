@@ -1,40 +1,6 @@
 /**
  * A dispatched background task reports back to the CHAT it was dispatched from — on every way
  * it can end.
- *
- * THE FAILURE THIS PREVENTS
- * -------------------------
- * `dispatch_background_task` tells the user, in the chat, "I'll post the results back here in
- * this conversation". Three separate things had to be true for that sentence to be honest, and
- * only one of them was:
- *
- *   1. The run has to CARRY a conversation. It was stamped straight from the turn's
- *      `conversation_id`, so a dispatch that arrived without one (a direct API call, a probe)
- *      produced a full report reachable only through the admin monitoring list.
- *   2. The runner has to POST there. Only `result.success` did. A failed or cancelled run wrote
- *      `error_message` to a row and posted nothing.
- *   3. Somebody has to be TOLD. The runner's owner alert is guarded by
- *      `if (agentConfig.workspace_id)`, and the KAI system agent has `workspace_id` NULL **by
- *      design** — it serves every tenant — so that branch is unreachable for precisely the runs
- *      a person is sitting and waiting on. The completion trigger fired only on 'completed'.
- *
- * So a failed chat dispatch went quiet forever. Run `fa735825` died on a 500 in 491 ms and
- * produced zero notifications and zero messages; nothing raised, nothing logged that a human
- * reads, and the row said `failed` in an admin list nobody was looking at. Silent zero, in the
- * one place the user was actually watching.
- *
- * WHY A SOURCE SCAN
- * -----------------
- * Every defect here is a MISSING call on a branch. There is no wrong value to assert on — the
- * thing that regressed is a line that is not there, on a path that is only taken when something
- * else has already gone wrong. A behavioural test would have to provoke a runner failure against
- * a live Supabase to see it.
- *
- * BLIND SPOT: the notification itself is written by `fn_notify_agent_completed`, a plpgsql
- * trigger. A repo scan cannot see pg_proc, so the "notified on failure and cancellation" half is
- * held by the migration `notify_dispatcher_on_every_terminal_state` and was verified by
- * live-firing both branches inside a rolled-back DO block. If that trigger is narrowed back to
- * 'completed', nothing in this file will notice.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';

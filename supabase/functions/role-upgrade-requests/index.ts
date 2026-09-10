@@ -1,28 +1,4 @@
-/**
- * role-upgrade-requests
- *
- * Single edge function for the supplier/architect promotion workflow:
- *
- *   POST /submit   (any authed user)
- *     body: { requested_role: 'supplier' | 'architect', justification?: string }
- *     - Validates the caller is a Business entity via `user_business_identity()` — the explicit
- *       profile link if there is one, ELSE a workspace they own or administer that already invoices
- *       as a company. Materialises the CRM company row here when only the latter exists.
- *     - Resolves requested_role → role_id.
- *     - Inserts a role_upgrade_requests row (partial unique index prevents duplicates).
- *     - Fans out: bell notification + email (template role_upgrade_request.submitted) to every admin.
- *
- *   POST /approve  (admin only)
- *     body: { request_id: string, admin_note?: string }
- *     - Flips the request to approved + sets reviewed_by/reviewed_at.
- *     - Updates user_profiles.role_id to the requested role.
- *     - Emails the user (template role_upgrade_request.approved).
- *
- *   POST /reject   (admin only)
- *     body: { request_id: string, admin_note?: string }
- *     - Flips the request to rejected.
- *     - Emails the user (template role_upgrade_request.rejected).
- */
+/** role-upgrade-requests */
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';

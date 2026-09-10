@@ -1,21 +1,4 @@
-/**
- * Applications for payment, and the retention they carry.
- *
- * CUMULATIVE, NOT INCREMENTAL — the one thing that has to be right. An application states the
- * value of work done TO DATE; the money due is the difference from what was certified before it.
- * Treating each as "this month's work" double-counts the moment anybody revises an earlier
- * valuation, and every individual number still looks reasonable while it happens.
- *
- * This service stores the CLAIM (`gross_valuation`) and the ANSWER (`certified_amount`) and
- * derives nothing. Retention, previously-certified, net due and the variance all come from
- * `get_project_applications`, so the screen cannot disagree with the report.
- *
- * THE FISCAL BOUNDARY IS `invoice_id` AND NOTHING ELSE. An application is a commercial claim; a
- * myDATA document is a fiscal act with a sequential number. How Greek progress billing on an έργο
- * maps to myDATA document types is an open question for an accountant, so it is confined to one
- * nullable column and one explicit transition — a small change when the answer arrives rather
- * than a rebuild.
- */
+/** Applications for payment, and the retention they carry. */
 import { supabase } from '@/integrations/supabase/client';
 
 export {
@@ -206,17 +189,7 @@ export const applicationsService = {
     if (error) throw readable(error);
   },
 
-  /**
-   * Turn a certified valuation into an invoice. Returns the invoice id.
-   *
-   * An application is a COMMERCIAL document — it declares nothing to AADE, exactly as an order
-   * does not until `generate_invoice_from_order` runs. Issuing is a separate, explicit act, which
-   * is why no status transition does it silently.
-   *
-   * ONE call: the invoice takes a fiscal number the moment it exists, so a second press after a
-   * dropped connection would take a second number for one valuation — and unpicking that costs a
-   * credit note, not a delete. The RPC replays the stored invoice instead.
-   */
+  /** Turn a certified valuation into an invoice. Returns the invoice id. */
   async issueInvoice(applicationId: string): Promise<string> {
     const { data, error } = await (supabase as any)
       .rpc('issue_invoice_from_application', { p_application_id: applicationId });

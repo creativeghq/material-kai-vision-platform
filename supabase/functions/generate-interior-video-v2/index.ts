@@ -1,32 +1,4 @@
-/**
- * generate-interior-video-v2
- *
- * Multi-model interior design video generation.
- * Routes to the best model based on video_type or explicit model override.
- *
- * Models:
- *   veo-2           → 50 credits (Google, cinematic walkthroughs)
- *   kling-v3.0      → 20 credits (native SDK, cinematic + audio)
- *   runway-gen4-turbo → 40 credits (Replicate, premium quality)
- *   wan-3.0-480p/720p/1080p → 30/55/110 credits (Alibaba, via @ai-sdk/alibaba). Reaches
- *     30 seconds and returns the clip SCORED, with up to 5 reference items held consistent
- *     across it — though not alongside a source frame. Issue #394.
- *   seedance-2.5-480p/720p → 60/125 credits (ByteDance, via BytePlus ModelArk). Also 30
- *     seconds with audio, but generated in ONE pass and with references that carry an
- *     explicit ROLE (first frame / last frame / reference image) rather than an
- *     undifferentiated set — which is what keeps THIS tile in frame rather than one like it.
- *   h3-max-768p/480p → 25/15 credits (H3 Max, fal's post-train of MiniMax H3).
- *     5-15s with stereo audio, rendered in seconds rather than minutes — the reel
- *     format, at well under half the credits of a 30-second clip. Default for
- *     `social_reel`. Takes a first and last frame; has no reference-image input.
- *   ray-3.2-720p/1080p → 20/70 credits (Luma Ray3.2). 5 or 10 seconds, first-to-last
- *     frame interpolation — the one model here that takes you from THIS room to THAT
- *     room rather than wherever the camera drifts. Silent.
- *
- * Async handling: Replicate models can take 3-5 min. If polling times out
- * (55s), stores prediction_id in generation_videos and returns job_id for
- * frontend polling (same pattern as 3D generation).
- */
+/** generate-interior-video-v2 */
 
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
@@ -68,52 +40,6 @@ type AspectRatio = '16:9' | '9:16' | '1:1';
 
 // Every price here must cover the provider bill for a MAX-LENGTH clip of that model, because
 // MAX_DURATION_SECONDS below is what the caller can actually ask for and the fee is flat.
-//
-// The arithmetic, using the rates in `ai_model_pricing` and the platform's declared 1.5x markup,
-// against the WORST credit price we sell (the premium pack, ~$0.085/credit — a credit bought
-// cheaper still has to cover the same bill):
-//
-//   veo-2              8s x $0.35/s = $2.80 -> x1.5 = $4.20 -> >= 50 credits
-//   kling-v3.0        10s x $0.10/s = $1.00 -> x1.5 = $1.50 -> >= 18 credits (20 charged)
-//   runway-gen4-turbo 10s x $0.15/s = $1.50 -> x1.5 = $2.25 -> >= 27 credits (40 charged)
-//   wan-3.0-480p      30s x $0.05/s  = $1.50 -> x1.5 = $2.25  -> >= 27 credits (30 charged)
-//   wan-3.0-720p      30s x $0.10/s  = $3.00 -> x1.5 = $4.50  -> >= 53 credits (55 charged)
-//   wan-3.0-1080p     30s x $0.20/s  = $6.00 -> x1.5 = $9.00  -> >= 106 credits (110 charged)
-//   seedance-2.5-480p 30s x $0.104/s = $3.12 -> x1.5 = $4.68  -> >= 56 credits (60 charged)
-//   seedance-2.5-720p 30s x $0.231/s = $6.93 -> x1.5 = $10.40 -> >= 123 credits (125 charged)
-//   h3-max-768p       15s x $0.08/s  = $1.20 -> x1.5 = $1.80  -> >= 22 credits (25 charged)
-//   h3-max-480p       15s x $0.05/s  = $0.75 -> x1.5 = $1.13  -> >= 14 credits (15 charged)
-//   ray-3.2-720p      10s x $0.09/s  = $0.90 -> x1.5 = $1.35  -> >= 16 credits (20 charged)
-//   ray-3.2-1080p     10s x $0.36/s  = $3.60 -> x1.5 = $5.40  -> >= 64 credits (70 charged)
-//
-// Ray's per-second rates are the TEN-second ones on purpose: Luma prices per clip and a
-// 10s clip costs 3x a 5s clip, not 2x, so the 5s rate would under-price exactly the
-// full-length clip these fees have to cover.
-//
-// H3 Max is the cheapest CLIP here twice over: its ceiling is 15 seconds, which is the
-// length of a reel rather than a limit, and fal's post-trained inference bills $0.08/s
-// where MiniMax's own H3 API charges $0.13/s for the 2K it will only ever serve. It
-// caps at 768P, which is the right buy for a reel: Instagram and TikTok recompress to
-// ~1080x1920 at low bitrate, so 2K is spent on pixels the platform discards. That is
-// why `social_reel` routes here. (#396 — replaced `minimax-h3` 2026-08-30.)
-//
-// Seedance's rate is DERIVED, not quoted: BytePlus bills it by token at $10.70/M with no
-// video input, and tokens are width x height x fps x seconds / 1024. At 24fps that is
-// 9,608 tokens/s for 480p and 21,600 tokens/s for 720p — $0.104 and $0.231. It is roughly
-// 1.7x Wan per second, which is the price of one-pass 30s with role-tagged references.
-//
-// Wan's three prices came DOWN on 2026-08-29 (40/80/155 -> 30/55/110) and no negotiation was
-// involved: the old figures were derived from $0.068/$0.14/$0.28, the rate for
-// `wan3.0-video-prime` — an id absent from Alibaba's own model page. The documented model
-// `wan3.0-video` lists $0.05/$0.10/$0.20. Same arithmetic, corrected input, which is exactly
-// what this block is for: the numbers moved with the rate rather than sitting at a margin
-// nobody had chosen. The tiers stay separate entries so the 30-second option is reachable at
-// 30 credits and not only at 110.
-//
-// veo-2 was 30. A full 8-second clip cost $2.80 and earned about $2.70, so the platform paid
-// customers to use its most expensive model — and nothing surfaced it, because a flat fee is a
-// valid number and the provider cost was not in `ai_usage_logs` at all until #363 `EE-2` put it
-// there. Pinned by tests/unit/videoCreditFloor.test.ts.
 const CREDIT_COSTS: Record<VideoModel, number> = {
   'veo-2':              50,
   'kling-v3.0':         20,
@@ -130,14 +56,6 @@ const CREDIT_COSTS: Record<VideoModel, number> = {
 };
 
 // Longest clip each model will produce.
-//
-// `duration_seconds` arrives from the request body and the Replicate branch passed it STRAIGHT to
-// the provider unclamped, while CREDIT_COSTS above charges a FLAT per-model price. So
-// `duration_seconds: 60` cost the caller exactly what `5` did and we paid the difference — and
-// `ai_usage_logs` priced the same models per SECOND, so the logged cost and the charged cost
-// disagreed by however long the clip was. The Veo and Kling branches each clamped in-branch;
-// Replicate did not. Clamped once here, at the input, which is also what makes the flat credit
-// price defensible: it is the price of a bounded clip. (audit #312)
 const MAX_DURATION_SECONDS: Record<VideoModel, number> = {
   'veo-2':              8,
   'kling-v3.0':         10,
@@ -382,15 +300,6 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
   }
 
   // The clip's LAST frame, and the one place `before_image_url` becomes real.
-  //
-  // It was documented on the tool ("Required only for before_after type"), validated above,
-  // and then read by exactly one branch — Replicate's, which sets `image_end`. Every native
-  // branch reads `last_frame_url` instead, so from the moment `before_after` stopped routing
-  // to Replicate, the before image was accepted, SSRF-checked, and dropped. The caller got a
-  // generic clip with no transition and nothing said otherwise.
-  //
-  // Direction follows what the Replicate branch already did: the source image is the design
-  // and the "before" is where the clip ENDS.
   const endFrameUrl: string | undefined =
     last_frame_url || (video_type === 'before_after' ? before_image_url : undefined) || undefined;
 

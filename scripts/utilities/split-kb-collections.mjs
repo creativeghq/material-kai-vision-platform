@@ -1,21 +1,4 @@
-/**
- * Split the two collection documents into one page per entry.
- *
- * "Biases" and "Thinking" are catalogues, not articles: each holds an index list
- * followed by 48 biases / 22 mental models, every one of them a self-contained
- * entry with its own examples and takeaways. As single documents they are
- * unreadable and retrieval returns "Biases › Biases" for every question.
- *
- * Entry boundaries are `### Name` in both files. That heading level is ALSO used
- * for subsections, so the split list is taken from each document's own index (the
- * bullet list in its intro) rather than from the heading level alone — otherwise
- * "No-brainer" and "Big choice", which are options INSIDE "Hard choice model",
- * become top-level pages.
- *
- * Heading levels inside an entry are repaired on the way out. The exporter wrote
- * subsections as `# **How to use it**` — an H1 nested under nothing — so each page
- * would otherwise carry several H1s competing with its own title.
- */
+/** Split the two collection documents into one page per entry. */
 import fs from 'node:fs';
 import path from 'node:path';
 

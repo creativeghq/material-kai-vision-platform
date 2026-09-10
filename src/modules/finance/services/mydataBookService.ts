@@ -1,27 +1,10 @@
-/**
- * The AADE myDATA aggregate book (Συνοπτικό Βιβλίο) — a READ-ONLY MIRROR.
- *
- * Everything this service returns comes from AADE and from nowhere else. It is not
- * merged with, reconciled against, or written back into any platform finance table:
- * the point is to have an independent second opinion to hold our own numbers up to.
- * The moment it is folded into `invoices` / `supplier_bills` / `inbound_documents`
- * it stops being able to disagree with them, which is the only thing it is for.
- *
- * Collected by the `finance-mydata-book` edge function. See that file for why the
- * book feed alone is not the whole book.
- */
+/** The AADE myDATA aggregate book (Συνοπτικό Βιβλίο) — a READ-ONLY MIRROR. */
 import { supabase } from '@/integrations/supabase/client';
 import { edgeError } from '@/utils/edgeError';
 
 /**
  * Why a figure is or is not there. SQL decides this, never the client — a tile and a
  * report reading the same RPC then cannot disagree about whether a number is real.
- *
- *   ok                AADE answered and there were figures
- *   no_data           AADE answered and that month was genuinely empty
- *   collector_failed  the last refresh could not reach AADE — UNKNOWN, not zero
- *   not_collected     nobody has ever asked AADE about this month
- *   not_connected     this workspace has no ΑΑΔΕ credentials configured
  */
 export type BookStatus = 'ok' | 'no_data' | 'collector_failed' | 'not_collected' | 'not_connected';
 

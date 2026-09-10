@@ -49,24 +49,7 @@ export function parseAuthResults(headerValue: string | null | undefined): AuthRe
   return { spf: pick('spf'), dkim: pick('dkim'), dmarc: pick('dmarc'), dkimDomains };
 }
 
-/**
- * Is there a passing DKIM signature FOR THE DOMAIN THE MESSAGE CLAIMS TO BE FROM (#357 AE-5)?
- *
- * `dkim=pass` on its own means "a signature verified", and an attacker can always obtain one for
- * a domain they control. Signing as `attacker.test`, setting `From: ceo@bigcustomer.test` and
- * letting DMARC fail produced a `dkim=pass` that rescued the message from the spoofing gate —
- * and inbound email is the most attacker-friendly surface here, because anyone can send one and
- * every header is theirs to choose. The signature domain is the one thing that is not.
- *
- * ALIGNMENT IS THE CHECK, and it is DMARC's own rule rather than something invented here: the
- * signing domain must match the From domain, or be a parent or subdomain of it (relaxed
- * alignment). `mail.example.com` signing for `@example.com` is the ordinary case for anyone on a
- * sending service; `attacker.test` signing for `@example.com` is not.
- *
- * Deliberately NOT a public-suffix lookup. Exact alignment needs the PSL, and without it a naive
- * suffix rule would treat `evil.co.uk` as aligned with `@bbc.co.uk`. Requiring a DOT-DELIMITED
- * suffix refuses that: those two never match each other, only a genuine parent/child pair does.
- */
+/** Is there a passing DKIM signature FOR THE DOMAIN THE MESSAGE CLAIMS TO BE FROM (#357 AE-5)? */
 export function dkimAlignedWith(fromAddress: string | null | undefined, auth: AuthResults): boolean {
   const from = String(fromAddress || '').toLowerCase();
   const at = from.lastIndexOf('@');

@@ -1,23 +1,4 @@
-/**
- * Out of credits — the top-up flow, wherever you hit it.
- *
- * This is the credit twin of `ModuleTabGate`: running out is not a failure the user made, it is
- * the moment to sell them more, so every surface that can be refused for credits opens THIS
- * instead of printing the refusal. Before it, each one answered differently — a destructive toast
- * in Assessment, Resupply and the invoice dialog; in the agent, a card that could never render
- * because its detector tested for a space in a code that has an underscore, so what actually
- * reached the user was the raw JSON body of a 402.
- *
- * It is a DIALOG, not a route. The refusal always happens mid-task — a half-written article, a
- * quote you were about to issue — and navigating to /billing/credits throws that away to buy the
- * thing that would have finished it. Checkout is the one navigation, and it happens on the user's
- * own click, to Stripe.
- *
- * Pricing and the tier ladder come from `calculateCreditsForAmount` (stripe.service), the same
- * source Profile → Credits and the workspace pool card quote from. There is no second price list
- * here — a top-up that costs a different amount depending on which screen refused you is worse
- * than no top-up at all.
- */
+/** Out of credits — the top-up flow, wherever you hit it. */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Coins, Loader2, ShoppingCart, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';

@@ -1,16 +1,4 @@
-/**
- * Guard for image-generation provider/price routing (#321).
- *
- * The bug this exists for: credits and the model label were two independent ternary
- * chains in generate-interior-gemini. `product-shot` consulted the tier when picking
- * the PRICE but not when picking the CALL, so asking for Grok billed 15 credits and
- * ran Gemini. Both numbers were valid, both types were right, and no integrity probe
- * could see it — the stored row said grok-aurora and the money said grok-aurora; only
- * the actual HTTP call disagreed.
- *
- * So the invariant under test is not "these are the prices" but "the model you are
- * billed for is the model that runs".
- */
+/** Guard for image-generation provider/price routing (#321). */
 import { describe, it, expect } from 'vitest';
 import {
   resolveGenerationRouting,

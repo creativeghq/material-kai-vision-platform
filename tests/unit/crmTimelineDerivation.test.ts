@@ -1,20 +1,4 @@
-/**
- * CRM record-timeline derivation guard.
- *
- * The bug this exists to stop: the contact/company Activity feed as a WRITE-LOG. Trigger-
- * inserted `crm_activities` rows cover only the events someone remembered to write a trigger
- * for, so orders, payments in and out, supplier bills, credit notes and shipments never reach
- * a party's record even though all of them are stored correctly — and the rows that are
- * written go stale, pointing at documents that have since been deleted.
- *
- * A log of events that already exist as documents is a duplicate derivation. `crm_record_timeline`
- * is the single one: business events come from the documents, and `crm_activities` / `crm_notes` /
- * `crm_meetings` are left to carry only the things that have no document (notes, calls, emails
- * sent, lead status changes). Nothing to backfill, nothing to drift.
- *
- * This test fails the build if the feed is re-assembled in TypeScript, or if a new business
- * event starts being hand-logged into `crm_activities` instead of derived.
- */
+/** CRM record-timeline derivation guard. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

@@ -1,27 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-/**
- * Running one AI assessment — the shared body behind every entry point and every subject.
- *
- * Three subjects (project / finance / real_estate), three paid modules, three prompts — and ONE
- * implementation of the thing that actually happens. Copying this per module would have produced
- * three claim implementations, three ways to validate an action and three places to get the
- * reserve/settle order wrong; the SQL side is generalised for the same reason (`assessments`
- * carries a `subject_type`, not one table per domain).
- *
- * THE SPLIT. `get_assessment_snapshot` derives every factual claim in SQL: the signals, the six
- * dimension scores, and the verdict. The model turn below writes only the headline, the narrative
- * and the ranked actions. It never counts, never scores and never decides the verdict — a wrong
- * number is a valid number, so the arithmetic stays where it can be tested and where the existing
- * money derivations (`get_project_pnl`, `vw_ar_aging`, `get_order_settlements`,
- * `get_property_performance`) already live.
- *
- * ORDER (invariant 10): reserve → start → model → claim → settle. The reservation happens before
- * the upstream call; failure refunds the ceiling and marks the run `failed` WITH THE REASON, so a
- * half-written report is never mistaken for a verdict.
- *
- * Callers own the two gates that differ per entry point: tenancy binding (an edge function's
- * `userCanAccessWorkspace`, a tool's subject resolver) and module entitlement.
- */
+/** Running one AI assessment — the shared body behind every entry point and every subject. */
 import type { DbClient } from './supabase-client.ts';
 import { callClaudeMessages } from './ai-client.ts';
 import { creditsForTokens } from './ai-logger.ts';

@@ -1,19 +1,4 @@
-/**
- * "Is this product ready to sell through the SDK?" — the checklist, and the snippet (#341 join 5).
- *
- * An empty catalogue is not a content problem, it is a missing checklist. Everything the 3D program
- * built is a consequence of one product having a model, a price and some attributes, and nothing
- * anywhere told a merchant that — which is why there is exactly one model in the database. It is
- * not hard to upload one. Nothing asked.
- *
- * DOES NOT GATE. A product missing every line below still sells: the spec builder captures it as a
- * quote request and the AI draws an impression. So this says what is missing and what it costs,
- * never "you may not publish this". Only the published price is marked as a hard gate, because it
- * is the only one the endpoint actually refuses to serve without.
- *
- * The payoff is the snippet at the bottom — readiness is not a score for its own sake, it is the
- * path to being embeddable, which is the point of the whole program.
- */
+/** "Is this product ready to sell through the SDK?" — the checklist, and the snippet (#341 join 5). */
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Check, Copy, Circle, ExternalLink } from 'lucide-react';

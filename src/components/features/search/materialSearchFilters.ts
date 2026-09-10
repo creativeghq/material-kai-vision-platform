@@ -1,16 +1,4 @@
-/**
- * Filter definitions for the material search surface (/search).
- *
- * What comes back from the 7-vector fusion search is a retrieval CHUNK, not a catalog row —
- * it has no price, stock or durability column to match on. So the descriptive vocabularies
- * below (which are pre-existing product decisions, kept verbatim) are matched against the
- * returned title + content, and each option is derived from the current result set so it
- * carries a real count and never offers a term that would return nothing.
- *
- * Deliberately absent: price range and durability rating. A chunk carries neither, and a
- * control that cannot change the result set is worse than no control. `suppliers` is wired
- * as the honest thing it can actually be: the source document the match came from.
- */
+/** Filter definitions for the material search surface (/search). */
 import { Building2, FileText, Hash, Layers } from 'lucide-react';
 import { optionsFromRows, type FilterField, type FilterGroupDef } from '@/components/core/filters';
 

@@ -191,28 +191,6 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
     console.log(`[seo-analyze] Initial score: ${analysis.overallScore}/100, ${analysis.fixes.length} issues`);
 
     // Auto-fix loop.
-    //
-    // Gated on `reachableScore`, not `overallScore`: some fixes are not auto-fixable
-    // (meta-tag lengths are plan-level, intent mismatch needs a human re-plan, and the
-    // two helpful-content checks are answered by configuring the brief). Those penalties
-    // are still in the score, but the loop cannot remove them — so measuring progress
-    // against the raw score meant an article whose only remaining problems were
-    // unfixable never reached 70 and burned every paid iteration (5 credits each)
-    // re-editing prose that was already done. Compare against the best score the loop
-    // could actually achieve instead.
-    // Gate on the score the reader sees, not on `reachableScore`.
-    //
-    // `reachableScore` is `overallScore + the penalties of the UNFIXABLE fixes`, and the gate
-    // was `reachableScore < 70`. That inverts: the more unfixable problems an article has,
-    // the higher its reachable score climbs, and the less likely the fixer is to touch the
-    // problems it CAN fix. Measured on the first article this pipeline produced — 66/100,
-    // five auto-fixable issues, `auto_fix: true` — the loop declined to run at all and
-    // returned `fix_iterations: 0`.
-    //
-    // The incident the old gate was reaching for is real (burning paid iterations re-editing
-    // prose whose only remaining faults are unfixable) and is still prevented, by the two
-    // breaks below: nothing auto-fixable left, or an iteration that did not move the score.
-    // Those stop the loop on evidence rather than on a prediction made before it starts.
     if (autoFix && analysis.overallScore < MIN_ACCEPTABLE_SCORE) {
       for (let i = 0; i < maxIterations; i++) {
         const autoFixableFixes = analysis.fixes.filter(
@@ -348,18 +326,7 @@ function reachableScore(analysis: ContentAnalysisResult): number {
   return Math.min(100, analysis.overallScore + totalPenalty(unfixable));
 }
 
-/**
- * When was this content last written or reviewed?
- *
- * `article_id` -> the derived `content_dated_at` on `seo_article_freshness`, which is
- * `last_reviewed_at` falling back to `completed_at`. Never `updated_at`: any write
- * touches that, so it reports a stale article as fresh the moment anything saves.
- *
- * Ownership is checked before the read even though the row carries no secrets — the
- * service-role client is in hand, and "it's only a date" is how a BOLA hole starts
- * (invariant 1). An article we cannot resolve returns undefined, which scores as an
- * unpublished draft rather than as stale.
- */
+/** When was this content last written or reviewed? */
 async function resolveContentDate(
   supabase: any, userId: string, body: any,
 ): Promise<string | undefined> {
@@ -396,13 +363,6 @@ export function analyzeContent(
   const primaryKw = plan.primaryKeyword.toLowerCase();
 
   // Does the article have an FAQ section, and what does it CALL it?
-  //
-  // Was `content.includes('faq') || content.includes('frequently asked')`, written out twice —
-  // and wrong in both directions at once. It says NO for a Greek article headed
-  // `## Συχνές Ερωτήσεις`, which raises a high-severity "FAQ section not found but planned" fix
-  // against an article that has one and docks the AEO score for a section sitting right there;
-  // and it says YES for an article that merely uses the word "FAQ" in a sentence. A heading is
-  // the thing being asked about, so a heading is what gets tested.
   const faqSection = findFaqSection(markdown);
 
   // Extract headings
@@ -428,15 +388,6 @@ export function analyzeContent(
   // ASYMMETRIC ON PURPOSE. Keyword density has not been a positive ranking signal
   // for many years, but stuffing is still a penalty, so the two directions are not
   // mirror images:
-  //   - too LOW  → informational only (`low`, NOT auto-fixable). It used to be
-  //     `high` + auto-fixable, which sent the Gemini fix loop back into the prose to
-  //     inject repetitions of the keyword purely to move a number — the
-  //     search-engine-first writing Google's helpful-content guidance penalizes, at
-  //     the cost of the readability the same analyzer scores two checks later.
-  //     Placement (checks 3/4/5: first 100 words, H1, an H2) is what actually
-  //     matters and is still enforced.
-  //   - too HIGH → still `medium` + auto-fixable. Removing stuffing improves the
-  //     prose and the ranking at the same time; there is no tension to resolve.
   if (primaryDensity < 0.4) {
     fixes.push({
       category: 'keyword_density',
@@ -912,13 +863,7 @@ export function analyzeContent(
     }
   }
 
-  // ════════════════════════════════════════════════════════════════
   // HELPFUL-CONTENT CHECKS (Google "Who / How / Why" self-assessment)
-  // ════════════════════════════════════════════════════════════════
-  // Neither is auto-fixable: both are answered by configuring the content brief,
-  // not by rewriting the draft. An LLM told to "add first-hand experience" or
-  // "add an author" invents both, which is the failure mode these checks exist to
-  // prevent — so they surface in the report and stop there.
 
   // ── Check 22: Provenance — who wrote this, and is the automation disclosed ──
   const prov = brief?.provenance;
@@ -1062,13 +1007,6 @@ function analyzeGEO(markdown: string, plan: ArticlePlan, contentDatedAt?: string
   if (quoteCount < 2) recommendations.push('Add expert quotes or attributed statements for authority signals');
 
   // 5. FAQ Q&A pairs (10 pts)
-  //
-  // Both halves used to assume English. The presence test was a substring of the whole document,
-  // so a Greek article headed `## Συχνές Ερωτήσεις` scored as having no FAQ; and the pair count
-  // was every `?` in the file, while Greek ends a question with `;` — so the same article counted
-  // ZERO questions and took half the available points, with nothing to show for it but a lower
-  // number. Counting question-shaped HEADINGS is what this metric was always trying to say
-  // ("Q&A pairs"), and it is the version that does not depend on the alphabet.
   const faqPresent = findFaqSection(markdown) !== null;
   const questionCount = headingTexts.filter(isQuestionHeading).length;
   const faqCoverage = faqPresent
@@ -1102,16 +1040,6 @@ function analyzeGEO(markdown: string, plan: ArticlePlan, contentDatedAt?: string
   if (directAnswerCount < 2) recommendations.push('Add concise 40-60 word answer paragraphs after questions for featured snippet targeting');
 
   // 9. Claim attribution (5 pts) — penalize confident claims with nobody behind them.
-  //
-  // This signal used to penalize HEDGING ("might", "maybe", "perhaps"), which scored an
-  // article higher the more flatly it asserted things it could not support — and the
-  // auto-fix loop acted on it, stripping qualifiers out of claims that genuinely varied
-  // by case. Combined with LLM-generated `[SOURCE:]` markers nobody verifies, that
-  // manufactured exactly the "easily verified factual error" Google's helpful-content
-  // guidance penalizes, and it was worst on the YMYL topics where it matters most.
-  //
-  // The real authority problem is the opposite one: the appeal to an unnamed authority.
-  // "Studies show" with no study is a weaker signal than "this varies by substrate".
   const vagueAuthorityPatterns =
     /\bstudies show\b|\bresearch shows\b|\bexperts (say|agree|recommend)\b|\bit is (widely )?(believed|known|considered)\b|\bmany (believe|say|argue)\b|\bsome (say|argue|believe)\b|\bit'?s no secret\b|\bstatistics show\b/gi;
   const vagueCount = (markdown.match(vagueAuthorityPatterns) || []).length;
@@ -1134,15 +1062,6 @@ function analyzeGEO(markdown: string, plan: ArticlePlan, contentDatedAt?: string
   if (goodParagraphs.length < contentParagraphs.length * 0.6) recommendations.push('Ensure each paragraph is self-contained (20-100 words) with a complete claim');
 
   // 11. Freshness (10 pts) — how long since this content was last written or reviewed.
-  //
-  // A page does not break when it goes stale. It keeps ranking, keeps reading well, and
-  // simply stops being the thing an answer engine reaches for; nothing in the platform
-  // could see that, because every other signal here is computed from the text and the
-  // text has not changed.
-  //
-  // No date means a DRAFT that has never been published — full marks, because penalising
-  // an unpublished article for having no publication date would push the auto-fix loop
-  // at a problem it cannot fix by rewriting.
   const freshness = scoreFreshness(contentDatedAt, recommendations);
 
   const overall = statisticsWithAttribution + namedEntities + structuredDefinitions +

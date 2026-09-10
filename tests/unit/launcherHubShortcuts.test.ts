@@ -2,19 +2,6 @@
  * The App Launcher's "Jump to" rail follows the Hub selected on the left. Two ways that goes wrong,
  * and neither is visible to TypeScript — a `LauncherSection[]` is a valid `LauncherSection[]` in
  * both cases:
- *
- *   • A hub with no set of its own silently falls back to the global trio, so the rail is stable
- *     again for exactly that hub and nobody notices which one. Adding a Hub to `HUBS` is the moment
- *     it happens, and adding a Hub is a one-line change in a different file.
- *   • A shortcut that repeats something the CENTRE column already offers. The centre renders every
- *     app in the hub with all of its sections and create actions, so a rail entry pointing at one of
- *     those is a second copy of a link that is already on screen, three inches to the left. That is
- *     the duplication the promoted-apps rule in AppLauncher exists to avoid, and the rail's whole
- *     justification is offering what the cards cannot reach.
- *
- * `?tab=` values are resolved against the real page by deepLinkTargets.test.ts — this file does not
- * repeat that. What neither can tell you is whether a destination is USEFUL; that stays a judgement
- * call made when the entry is written.
  */
 import { describe, it, expect } from 'vitest';
 import { HUBS, SIDEBAR_NAV_ITEMS, type HubId } from '@/config/nav-items';

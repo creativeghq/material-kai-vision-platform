@@ -1,31 +1,4 @@
-/**
- * The Account tab of a CRM party record (company or person), behind ONE tab strip.
- *
- * WHY TABS AND NOT A STACK
- * ------------------------
- * These sections were rendered one under the other: Orders, then Payments, then (for a supplier)
- * the myDATA Invoices they filed against us, then the customer-only repeat-buy and payment-rule
- * cards. Each one is a paginated table with its own header and its own toolbar, so an active
- * party's Account tab was four to six card headers and several hundred rows in a single scroll —
- * the reader has to travel past the whole of Orders to find out whether a payment came in.
- *
- * This is the same call `PartyWorkTab` already made for the Work tab next door, for the same
- * reason. It uses a rail because its sections are a dozen short derived lists; the sections here
- * are five wide money tables, and a 14rem rail is 14rem taken off the columns that carry the
- * figures. So: a horizontal underline strip, which is the platform tab treatment (index.css,
- * `[role="tab"]`) and costs the tables nothing.
- *
- * WHAT STAYS PINNED
- * -----------------
- * The account overview — the balance, the aging, what is on account — is NOT a tab. It is the
- * answer to "how do we stand with this party", and switching from Orders to Payments must not
- * take it off the screen.
- *
- * ONE COMPONENT, BOTH RECORDS
- * ---------------------------
- * The company and the contact page mounted the identical stack from two places, which is how two
- * pages showing the same account start to disagree about what it contains. They now mount this.
- */
+/** The Account tab of a CRM party record (company or person), behind ONE tab strip. */
 import React from 'react';
 import { Banknote, Inbox as InboxIcon, ShieldCheck, ShoppingBag, ShoppingCart, type LucideIcon } from 'lucide-react';
 

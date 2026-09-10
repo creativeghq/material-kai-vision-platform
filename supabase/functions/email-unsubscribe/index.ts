@@ -1,18 +1,4 @@
-/**
- * email-unsubscribe — PUBLIC one-click opt-out for marketing email (Email#1 compliance).
- *
- * Every marketing send (email-api, emailType='marketing') injects an {{unsubscribeUrl}} pointing
- * here AND sets a `List-Unsubscribe` / `List-Unsubscribe-Post` header pointing here, so Gmail/Apple
- * Mail show a native one-click unsubscribe. The link carries `?w=<workspace>&e=<email>&t=<token>`
- * where the token is an HMAC-SHA256 of `workspace:lower(email)` under CRON_SECRET — no token table.
- *
- *   • GET  → renders a human confirmation page with a POST button (so mail-client link *prefetch*
- *            can't unsubscribe someone by accident).
- *   • POST → RFC 8058 one-click path (mail client posts `List-Unsubscribe=One-Click`) OR the form
- *            button. Verifies the token, records the opt-out, renders a success page.
- *
- * No JWT (public). Registered with verify_jwt = false in config.toml.
- */
+/** email-unsubscribe — PUBLIC one-click opt-out for marketing email (Email#1 compliance). */
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';

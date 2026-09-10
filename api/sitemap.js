@@ -1,21 +1,6 @@
 /**
  * Dynamic sitemap for the platform's PUBLIC surfaces.
  * Served at /sitemap.xml (see vercel.json rewrite).
- *
- * Lists, in order: static entry points → KB categories → KB articles →
- * company job boards → individual job postings.
- *
- * Data comes from the `public_sitemap_entries()` RPC rather than direct table reads.
- * Reason: this function runs with the ANON key, and while public KB docs are
- * anon-readable, OPEN JOB POSTINGS ARE NOT (hr_job_postings only has a
- * workspace-membership SELECT policy). A direct anon read therefore returned zero
- * job rows, so the job pages — which already emit JobPosting JSON-LD — could never
- * be listed. The RPC returns only the URL projection and re-implements the same
- * visibility rules (published+public+public-category for KB; open and not past
- * closes_at for jobs).
- *
- * Deliberately NOT listed: token share links (/q, /cv, /sign, /i, /sheets/share) —
- * private single-purpose URLs that must never be advertised to crawlers.
  */
 
 const SUPABASE_URL = process.env.SUPABASE_URL || '';

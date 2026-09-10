@@ -1,25 +1,6 @@
 /**
  * A company can be a vendor, a buyer, a landlord or a tenant — on the SCREEN, not just in the
  * schema (#376).
- *
- * Phase 0 of #376 gave the real-estate counterparties their `*_company_id` twins with a
- * `num_nonnulls(...) <= 1` check, and then nothing wrote them: every picker on screen was
- * `ContactSearchDropdown`, which searches `crm_contacts` only. The model was symmetric and the
- * surface was not, which is the same shape as an `alwaysOn` toolkit whose tools are all
- * admin-gated — a capability that exists and cannot be reached.
- *
- * It is silent in both directions:
- *
- *  • **Offered but not stored.** A column absent from `PROPERTY_WRITABLE` or from a `pick()`
- *    allowlist is dropped on write with no error. The picker works, the save succeeds, and the
- *    field is NULL — indistinguishable from "nobody filled it in".
- *  • **Set but not cleared.** Writing a company onto a field that already held a contact leaves
- *    both set, and the CHECK rejects it with a raw 23514 the operator cannot act on. So the pair
- *    moves together or not at all, which is what `partyColumns` exists to make unavoidable.
- *
- * The database half is verified by a rolled-back probe (a company vendor, a company tenant with a
- * person landlord, a company buyer, and both-halves-at-once refused by the CHECK). This guards the
- * TypeScript half.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';

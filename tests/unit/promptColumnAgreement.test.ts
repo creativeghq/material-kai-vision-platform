@@ -1,32 +1,4 @@
-/**
- * Guard: the prompt WRITER follows the prompt READER.
- *
- * `prompts` carries the text in two columns and each loader picks one:
- *
- *   getAgentSystemPrompt        prompt_type='agent'   .select('system_prompt')          ← system only
- *   getSharedOperatingDoctrine  prompt_type='system'  .select('system_prompt')          ← system only
- *   getToolPrompt               prompt_type='tool'    .select('prompt_text, system_prompt')
- *   loadPrompt / getGenerationPrompt  any type        .select('prompt_text, system_prompt')
- *
- * `update_prompt_with_history` — the ONE write path /admin/ai-configs uses — has to write whichever
- * column the reader for that type will actually read. When it does not, the edit is a silent no-op:
- * the RPC succeeds, `prompt_history` records the change, the toast says "updated successfully", and
- * the model keeps serving the old text forever. That is not hypothetical twice over:
- *
- *   - it shipped that way for `prompt_type='tool'`. The RPC wrote system_prompt for
- *     ('agent','tool'), but the tool loaders read `prompt_text` FIRST and all 34 active tool rows
- *     carry a non-empty prompt_text — so every admin edit to every tool prompt went to a column
- *     nobody reads (found 2026-08-23);
- *   - and the fix for that briefly recreated it for `prompt_type='system'`, by narrowing the set to
- *     ('agent') and forgetting `getSharedOperatingDoctrine` — one row, and it is the doctrine
- *     appended to EVERY agent's system prompt.
- *
- * SCOPE — read this before trusting a green run. The RPC lives in `pg_proc`, applied through the
- * Supabase MCP, and is invisible to a repo test (CLAUDE.md: repo-file guards cannot see pg_proc
- * SQL). So this test cannot assert what the function does. What it CAN do is watch the input to
- * that decision: the set of prompt types read from `system_prompt` alone. If that set changes, the
- * RPC must change with it, and this test is what says so.
- */
+/** Guard: the prompt WRITER follows the prompt READER. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

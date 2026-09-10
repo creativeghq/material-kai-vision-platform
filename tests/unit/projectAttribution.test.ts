@@ -1,27 +1,4 @@
-/**
- * A job link must be RE-ANSWERABLE, from the document's own side (#378 Phase 2).
- *
- * `get_project_pnl` builds a job's whole P&L out of five `project_id` columns:
- *
- *   contracted revenue  quotes.project_id           (accepted)
- *   billed revenue      invoices.project_id
- *   supplier cost       supplier_bills.project_id
- *   labour              time_entries.project_id
- *   committed cost      orders.project_id           (purchase, uninvoiced)
- *
- * Every one of them was WRITABLE at birth and, for three of the five, nowhere else — so a quote
- * raised before its project existed (the normal order of events), an invoice that arrived from an
- * order, or a cost that landed a week after its goods could never join the job. The number that
- * results is not an error: it is a smaller, entirely plausible P&L, and nothing raises about it.
- *
- * This asserts each of the five has a write path on the DOCUMENT side that can both SET and CLEAR.
- * Clearing matters as much as setting: a truthiness guard on the write makes a link one-way —
- * attachable, never removable — which is how a cost stays on the wrong job forever.
- *
- * It is text-based and therefore weaker than calling the code; see billLink.test.ts for the half
- * that is behavioural. What this catches is the shape that actually happened: a service that has
- * no key for the column at all.
- */
+/** A job link must be RE-ANSWERABLE, from the document's own side (#378 Phase 2). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

@@ -1,43 +1,4 @@
-/**
- * Material metadata registry (#347 phase 3, #368 PD-5) — one registry, no second copy.
- *
- * `material_metadata_fields` + `material_categories` are meant to be THE answer to "which
- * categories exist, which fields does a product in category X have, and what is each one
- * called". That answer was also written down in TypeScript, in Python, and in a hardcoded
- * facet list — and the copies drifted.
- *
- * Four failure shapes, none of them visible to the typechecker:
- *
- *  1. **A second copy of the facet list.** `dealerProductsService` exported
- *     `COMMON_FACET_KEYS = ['color','available_colors','finish','material','style','application','room']`.
- *     The registry disagreed with it on three of the seven: `finish` and `style` are scoped
- *     (8 and 2 categories), not universal, and `application_areas` is global + canonicalizable
- *     and was missing entirely. A hardcoded array of field names is always a copy of this table.
- *
- *  2. **Two conventions for "applies everywhere".** The registry has `is_global`. The consumer
- *     ignored it and inferred universality from an EMPTY `applies_to_categories` instead. The
- *     seed then shipped 16 rows that were neither global nor scoped, so sanitary's `bowl_shape`
- *     and `flush_type` were offered on tiles products and `wood_type` / `weave` / `upholstery`
- *     on lighting. Nine of those 16 are `role='identity'` — the field set Phase 5/6 keys
- *     warehouse stock on, so a wrong scope does not stay cosmetic.
- *
- *  3. **A drifting category vocabulary.** The categories are a closed set in the DB, and the
- *     `UploadCategory` union restated them. `building_materials` was live in the DB and absent
- *     from the union, so a product classified `door` or `window` resolved to `general_materials`
- *     and rendered under the wrong heading. The union is now derived from the projection.
- *
- *  4. **A whole display registry (#368 PD-5).** `CATEGORY_DISPLAY_REGISTRY` was 900 lines
- *     naming which sections each category shows, which fields sit in each, and what all 250 of
- *     them are called — the seventh copy of this table. 124 of its labels disagreed with the
- *     registry's, 14 fields are named differently per category (which the registry could not
- *     express until `label_by_category`), and six fields it displayed were not registry rows
- *     at all. The sections and labels are read at runtime now; this test fails if a copy
- *     reappears in source.
- *
- * SCOPE. This is the TypeScript half. The DB half — "no row is left neither global nor scoped" —
- * cannot be seen from here and is watched instead by the `ops.registry_field_unreachable` probe,
- * which is a migration, not a file. A green run here says nothing about that.
- */
+/** Material metadata registry (#347 phase 3, #368 PD-5) — one registry, no second copy. */
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';

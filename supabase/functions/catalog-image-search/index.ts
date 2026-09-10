@@ -1,14 +1,4 @@
-/**
- * catalog-image-search
- *
- * Find candidate images for a catalog material that doesn't have one.
- * 1. Search platform DB first (MIVAA /api/rag/search images endpoint).
- * 2. Fall back to web image search (DataForSEO Images SERP).
- *
- * Returns up to N candidates, each with thumb_url + source ('db'|'web') +
- * source_metadata (product_id / source domain). The admin UI shows them as
- * an approval grid; the user clicks ✓ to attach one to the material.
- */
+/** catalog-image-search */
 import { createClient } from '@supabase/supabase-js';
 import { resolveSecret } from '../_shared/secrets.ts';
 import { jsonResponse } from '../_shared/http.ts';

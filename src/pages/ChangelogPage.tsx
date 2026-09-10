@@ -1,18 +1,4 @@
-/**
- * Public changelog — /changelog.
- *
- * Registered OUTSIDE <AuthGuard> in App.tsx: a changelog you have to log in to read is useless for
- * the two audiences that need it most — prospects deciding whether the platform is alive, and API
- * consumers who need a linkable record of a breaking change.
- *
- * Reads published `changelog_entries` through the shared changelogService, the same reader the
- * in-app Profile → Subscription tab uses, so the two can never disagree about what is published.
- * Anonymous access is enforced server-side by an RLS policy scoped to `published_at IS NOT NULL`;
- * drafts are not reachable from here even by a crafted request.
- *
- * Self-contained (no Layout / no workspace machinery) so it renders for anonymous visitors and
- * crawlers, mirroring HomePage.
- */
+/** Public changelog — /changelog. */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';

@@ -19,27 +19,7 @@ import {
 import { Sparkline } from './seo/Sparkline';
 import { compact } from './seo/seoMetrics';
 
-/**
- * Websites → Rankings.
- *
- * The keywords YOU chose, followed day by day. Everything else in this module
- * answers "what does this domain rank for" — discovery. This answers "did the
- * things I care about move", which is the only question that makes a rank tracker
- * worth opening on a Tuesday.
- *
- * Three rules the arithmetic keeps, all of them the same rule wearing different
- * clothes:
- *
- *  - **Not ranking is not position 101.** A keyword outside the top 100 stores NULL
- *    and is excluded from the average. Give it a sentinel rank and it gets averaged
- *    and charted as though it were real — and dropping your worst keyword would
- *    then look like an improvement.
- *  - **A failed check is unknown, not lost.** It is excluded from every figure and
- *    counted separately, because announcing "you fell out of the top 10" over a
- *    timed-out request is worse than saying nothing.
- *  - **Up is good.** Position 3 beats position 30, so the change column is inverted
- *    from the raw delta and coloured by meaning rather than by sign.
- */
+/** Websites → Rankings. */
 
 /**
  * SERP blocks worth reporting on. `present` is whether the block is on the page at

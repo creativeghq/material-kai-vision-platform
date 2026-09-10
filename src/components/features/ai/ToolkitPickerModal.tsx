@@ -1,26 +1,4 @@
-/**
- * ToolkitPickerModal — visual card picker for enabling tool clusters.
- *
- * A single screen of big toolkit cards. Each card represents a CLUSTER of related
- * tools (Catalogs / SEO Research / B2B / etc.) — toggling a card flips the entire
- * cluster on/off.
- *
- * What the card layout buys over a flat checkbox list:
- *   • Visible token cost per toolkit + a live total in the footer.
- *   • Always-on `core` toolkit means the agent has sane defaults without the
- *     user having to know what to load.
- *   • Active toolkits show as removable chips both INSIDE this modal and on
- *     the chat input toolbar — always visible.
- *   • The agent can also call the `load_toolkit` meta-tool mid-conversation
- *     to request more tools, so the user never gets stuck.
- *
- * Token math (visible to the user in the footer):
- *   ~250 input tokens per tool definition × N tools across active toolkits.
- *   With everything OFF (core only, ~4 tools) = ~1k tokens.
- *   With every toolkit ON = ~12k tokens.
- *   Old default (all 50+ KAI tools bound) = ~12-15k tokens. Same cost only
- *   if the user actively asks for it.
- */
+/** ToolkitPickerModal — visual card picker for enabling tool clusters. */
 import React, { useMemo, useRef, useState } from 'react';
 import {
   X, Check, Sparkles, Compass, BookOpen, Megaphone, LayoutTemplate, Search, Globe,

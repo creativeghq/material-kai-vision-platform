@@ -13,11 +13,6 @@ import {
  * and nothing typechecked it — the first thing to notice a half-built plan was
  * `plan.primaryKeyword.toLowerCase()` throwing, which surfaced as a 500 on what was
  * really a malformed request.
- *
- * The two properties that matter here:
- *   1. a plan missing a hard-dereferenced field is REJECTED (or the 500 comes back), and
- *   2. a plan that works today is still ACCEPTED (a guard that rejects valid requests is
- *      worse than the crash it replaced).
  */
 
 const VALID_PLAN = {

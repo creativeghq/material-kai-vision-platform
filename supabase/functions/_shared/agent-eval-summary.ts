@@ -1,23 +1,4 @@
-/**
- * A batch of golden-case runs, read the way a comparison stays honest.
- *
- * Pure: no I/O, no Deno APIs, so tests/unit/agentEvalSummary.test.ts can run it on fixtures.
- *
- * The rules it encodes (see docs/agent-evaluation.md, "Reading a batch"):
- *
- *   - The denominator is FIXED: every attempt in the batch counts, and a case that never ran is
- *     listed with zero attempts rather than dropped. A pipeline must not raise its own average
- *     by crashing on the hard cases.
- *   - Harness failures (`transport`, `invalid_case`) are reported BESIDE agent failures, never
- *     folded into them. Eight rate-limited turns out of a hundred read, in aggregate, as a
- *     flaky agent; read apart they are a quota problem.
- *   - Stability is measured without ground truth: `tools_agreement` is the share of a case's
- *     runs that called the modal SET of tools. It says "the same thing happened each time" and
- *     nothing about whether that thing was right — so it is printed next to the pass rate and
- *     the completeness of the reply, never alone. Stability alone rewards silence.
- *   - Fewer than `minRepeats` attempts is flagged: without spread there is no noise floor, and a
- *     difference between two batches is not a result.
- */
+/** A batch of golden-case runs, read the way a comparison stays honest. */
 
 import {
   AGENT_EVAL_FAILURE_CLASSES,

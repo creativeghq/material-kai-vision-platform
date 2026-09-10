@@ -1,14 +1,4 @@
-/**
- * Packaging facts + the unit ladder they derive.
- *
- * Fill in what the supplier told you — how many pieces to a box, how many boxes to a pallet —
- * and everything else is computed: area per piece from the product's own dimensions, pieces per
- * pallet, m² per pallet. Nothing derivable is editable, because a second place to type 2.88 m²
- * is a second place for it to be wrong.
- *
- * This is what lets a supplier line of "288 m²" become 100 boards on the stock row, and a
- * "€450 per pallet" price break become €9.00 per board on a quote.
- */
+/** Packaging facts + the unit ladder they derive. */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Loader2, Save, Boxes, AlertTriangle } from 'lucide-react';
 import { Label } from '@/components/core/ui/label';

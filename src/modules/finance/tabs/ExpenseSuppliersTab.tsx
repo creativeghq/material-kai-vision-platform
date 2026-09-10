@@ -1,35 +1,4 @@
-/**
- * Finance → Expenses by Supplier. The myDATA expenses inbox seen from the SUPPLIER end.
- *
- * This used to be a panel bolted on top of the Expenses list, where it was the first thing on the
- * screen and pushed the actual documents — the ones an operator opens that tab to read — below the
- * fold. Two lists answering two different questions do not share a surface: Expenses is "what
- * arrived", this is "who sends it and what have we decided about them".
- *
- * Three things happen here, and each is the reason the grouping exists:
- *
- *  1. FILING. 1,866 documents arrived and every one sits in the generic myAADE bucket
- *     `finance-inbound-sync` stamps on arrival. One at a time that is 1,866 decisions; by issuer
- *     it is 241, and the largest 45 carry 71% of the pile. Filing a supplier is permanent —
- *     `remember_inbound_issuer_category` records it and every later arrival files itself.
- *  2. IDENTITY. A supplier who is already a CRM company is LINKED, so their documents, their
- *     registry identity and their orders are one record rather than an ΑΦΜ on a screen. Matched on
- *     the normalised VAT key in SQL (#353 CRM-4); 37 of 241 issuers resolve today, and the other
- *     204 carry the way to fix that in the same cell. It opens [[AddIssuerToCrmDialog]] — a
- *     duplicate probe on the normalised ΑΦΜ, then the ΑΑΔΕ → ΓΕΜΗ → web research chain — never a
- *     silent create, because the ΑΑΔΕ leg writes an audit entry into the issuer's own TAXISnet
- *     inbox and that is the operator's call to make.
- *  3. HISTORY. Opening a row shows that supplier's whole run of documents in a MODAL — the same
- *     table, menu and dialogs as their CRM record ([[SupplierInboundDocs]]). Modal and not an
- *     expanding row because both lists are long (241 suppliers, up to 206 documents each), so
- *     inline the expansion pushed the rest of the queue off screen. Opening a document stacks a
- *     third layer and leaves this one MOUNTED, which is the point: read it, book it, receive it,
- *     pay it, come back to the same page of the same list.
- *
- * Every number in the table is derived by `inbound_issuers_summary`, including the counts that
- * decide what is offered. Counting the loaded page instead would be a different number on every
- * surface that showed it.
- */
+/** Finance → Expenses by Supplier. The myDATA expenses inbox seen from the SUPPLIER end. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Loader2, Inbox, Check, Building2, ChevronRight, ExternalLink, UserPlus, Users, CalendarDays, Coins, Wallet } from 'lucide-react';
@@ -162,10 +131,6 @@ export const ExpenseSuppliersTab: React.FC<{
    * and the operator lost the row they were working. It also stays MOUNTED while a document opens
    * on top of it, which is what keeps the page, the scroll and any half-finished form alive
    * across the whole errand.
-   *
-   * The KEY is held, not the row: the modal header states counts, and booking a document inside
-   * it changes them. Looking the row up on every render means the header cannot go on saying
-   * "None in Books" about a document the operator just booked.
    */
   const [openVat, setOpenVat] = useState<string | null>(null);
   const [choice, setChoice] = useState<Record<string, string>>({});

@@ -1,19 +1,4 @@
-/**
- * Profile → Ambassador.
- *
- * WHAT THIS REPLACED. A "Preferred Brands" card that stored `[{name}]` on the profile and
- * rendered it as a grid of grey boxes. It could say that somebody likes Harmony. It could not
- * say what they promote Harmony FOR, since when, or in what capacity — and "who do you use for
- * sanitary?" is the question a visitor actually arrives with.
- *
- * NOBODY APPROVES ANY OF THIS. Being on the platform's supplier list is the whole condition:
- * pick a brand, say which categories you promote it in, and it is live on your profile. The only
- * thing the brand gets in return is visibility — a supplier workspace that has claimed its
- * identity sees who promotes it, in its own Supplier Portal.
- *
- * Categories come from `material_categories` through the generated projection; brands come from
- * `search_platform_brands`. Neither list is written down here.
- */
+/** Profile → Ambassador. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {

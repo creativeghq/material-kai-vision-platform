@@ -1,15 +1,4 @@
-/**
- * Inspections — the checklist somebody walks the site with.
- *
- * The three things this screen exists to get right:
- *
- *  1. **The verdict comes from SQL.** `get_project_inspections` derives it; nothing here decides
- *     whether an inspection passed. A tile and a report reading the same RPC cannot then disagree.
- *  2. **An unanswered item is not a pass.** It renders as unanswered, and the header says how many
- *     are still to check rather than folding them into a clean-looking count.
- *  3. **A failure nobody actioned is SAID.** `open_failures` is the silent-zero case wearing a hat:
- *     a recorded defect with no snag against it looks exactly like a finished inspection.
- */
+/** Inspections — the checklist somebody walks the site with. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle, Check, ClipboardCheck, Loader2, Minus, Plus, Trash2, X,

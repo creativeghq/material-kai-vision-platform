@@ -1,30 +1,4 @@
-/**
- * AI-usage attribution guard.
- *
- * The bug this exists to stop: `ai_usage_logs` has a `workspace_id` column and an RLS policy that
- * reads it — `auth.uid() = user_id OR is_workspace_admin(workspace_id)` — and 19 of the 31 edge
- * insert sites never set it. The credits were always debited correctly; only the reporting was
- * blind, in two ways that both look like nothing:
- *
- *   • no per-tenant cost view could see the spend, so "what is this workspace costing us"
- *     answered with a fraction of the truth and looked like a complete answer;
- *   • neither RLS branch can match when both columns are null, so a workspace admin who was not
- *     personally the billed user saw NONE of their own workspace's AI usage — the rows existed,
- *     were correct, and were invisible to the people paying for them.
- *
- * Nothing raises. A missing column in an insert is valid TypeScript, a valid insert, and a
- * perfectly consistent row. It was found by counting, not by anything failing.
- *
- * WHY A TEST AND NOT A CONVENTION. The 19 sites did not drift in one bad week — they accumulated,
- * each one written by someone who had `workspace_id` in a variable four lines above the insert.
- * A rule with no enforcement is exactly the prose CLAUDE.md warns does not survive contact with a
- * large codebase.
- *
- * SCOPE. This scans the edge functions only. MIVAA (`mivaa-pdf-extractor`) is a separate
- * repository with its own writers — its `log_ai_call` and `CostAttribution` both already accept a
- * workspace and its embedding service does not pass one, which is not visible from here. A green
- * run says nothing about that half.
- */
+/** AI-usage attribution guard. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';

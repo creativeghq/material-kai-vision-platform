@@ -1,18 +1,4 @@
-/**
- * Drawings / documents register (WS6 #285).
- *
- * A document is a named slot; revisions stack under it and exactly one is current. Clients see
- * only the current revision of `client_visible` documents — enforced by RLS, not by this UI.
- *
- * What makes it a REGISTER rather than a file list is the drawing number (the sheet's own
- * identity, unique per project) and, per revision, the issue date and the purpose it was issued
- * for. `for_construction` is the only status somebody may build from, so a current revision that
- * is anything else is called out here rather than left for the reader to notice.
- *
- * The title-block scanner PREFILLS this form and writes nothing. A scanner that also created the
- * register entry would file a whole drawing set off a model's reading, and a wrong drawing number
- * stays invisible until somebody builds from the wrong sheet.
- */
+/** Drawings / documents register (WS6 #285). */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Loader2, Plus, FileStack, Download, Trash2, Eye, EyeOff, Upload, History, FileText, ScanLine,

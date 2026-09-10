@@ -13,10 +13,6 @@ import { emitFlowEvent } from '../_shared/flow-events.ts';
 // Replaces the standalone finance-send-digest function. Invoked via:
 //   - The 'Finance digest' flows row (cron='5 * * * *', single run_edge_function node) → mode='cron'
 //   - The Finance Settings 'Run now' / 'Send test' buttons → mode='now' (admin-auth)
-// Renders a flat variable bag (string-only — including pre-rendered HTML
-// fragments for sections that need looping) and calls email-api with
-// templateSlug='finance.digest'. The HTML layout lives in the
-// email_templates row, editable via the GrapesJS builder.
 
 interface CronBody { mode: 'cron'; job?: 'digest' | 'followups' }
 interface NowBody {
@@ -295,13 +291,11 @@ async function dispatchDigest(
   return { ok: delivered > 0, delivered, attempted: recipients.length, errors };
 }
 
-// ───────────────────────────────────────────────────────────
 // Follow-up bell-notification dispatcher (folded in from finance-followup-cron).
 // Scans the follow-up queue and emits a bell to the quote owner for:
 //   1. Submitted/quoted quotes idle for STALE_THRESHOLD_DAYS without a logged activity
 //   2. Activities whose scheduled_for is due now and not yet completed
 // Dedupe via a `reminder_dispatched` quote_activities row within 24h.
-// ───────────────────────────────────────────────────────────
 async function dispatchFollowUps(supabase: any): Promise<{ dispatched: number; skipped: number; queue_size: number }> {
   const { data: queue, error: queueErr } = await supabase
     .from('vw_quote_followup_queue')

@@ -1,16 +1,4 @@
-/**
- * Docs module agent tool: search_workspace_docs.
- *
- * Reads the workspace's internal documentation via Postgres full-text search
- * (search_workspace_docs_fts RPC) — NO embeddings, no vector store, no MIVAA.
- *
- * TENANCY: the sole barrier is that `workspaceId` is SERVER-DERIVED by agent-chat
- * (from workspace_members / the partner key — never from the model or request body),
- * so the agent can only ever be handed its own workspace's id. The RPC's
- * `assert_workspace_member` check is a no-op on this path because a service-role call
- * has no `auth.uid()` — do NOT rely on it here; never pass a caller-influenced
- * workspaceId into this tool.
- */
+/** Docs module agent tool: search_workspace_docs. */
 
 import { emitFlowEvent, emitFlowEventToWorkspaceRoles } from '../flow-events.ts';
 
@@ -115,16 +103,7 @@ export const createManageDocsTool = (userId: string, workspaceId: string, onChun
 
         if (action === 'suggest_edit') {
           if (!doc_id || !proposed_content) return JSON.stringify({ success: false, error: 'suggest_edit needs doc_id and proposed_content.' });
-          /**
-           * The doc has to be in THIS workspace (#395).
-           *
-           * `doc_id` is a model-supplied argument written into a service-role insert, and the
-           * suggestion carried the SESSION's workspace_id — so a suggestion could be attached to
-           * another tenant's doc, and the notification below then read that doc's title and
-           * `created_by` and mailed a stranger about an edit proposed inside a workspace they are
-           * not in. Checked before the write, and reported as "not found" rather than as a
-           * permission error, so an id cannot be probed (invariant 1).
-           */
+          /** The doc has to be in THIS workspace (#395). */
           const { data: target } = await supabase.from('workspace_docs')
             .select('id').eq('id', String(doc_id)).eq('workspace_id', workspaceId).maybeSingle();
           if (!target) return JSON.stringify({ success: false, error: 'That doc was not found in this workspace.' });

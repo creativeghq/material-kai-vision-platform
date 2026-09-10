@@ -1,21 +1,4 @@
-/**
- * The questions a bid's own numbers raise — derived, not generated.
- *
- * Every question here names a line the analysis flagged, and there is no path to a question
- * without one. That is the same rule the AI assessment work runs on: a model may write ABOUT
- * findings, never invent them. A generated "have you allowed for scaffolding?" that no figure
- * supports is worse than silence — it teaches the reader that the list is padding, and the two
- * questions that actually matter get skimmed with the rest.
- *
- * It imports nothing but the canonical money formatter — a leaf module with no imports of its own
- * — so the derivation stays testable without a Supabase client. A local `money` helper was the
- * first draft and `moneyPrimitives.test.ts` rejected it: a second `Intl.NumberFormat` is exactly
- * the drift that guard exists to prevent, and a clarification printing €1850.00 next to a table
- * printing €1,850 reads as two different figures.
- *
- * What it deliberately does NOT do: rank bidders, recommend one, or decide anything. The ranking
- * is `comparable_total` and it comes from SQL.
- */
+/** The questions a bid's own numbers raise — derived, not generated. */
 import { formatMoney } from '@/utils/decimal';
 
 /** The shape `get_tender_bid_analysis` returns. Restated structurally so this file imports nothing. */

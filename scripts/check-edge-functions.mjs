@@ -1,50 +1,5 @@
 #!/usr/bin/env node
-/**
- * Typecheck every Supabase edge function with `deno check`.
- *
- * WHY THIS EXISTS
- * ---------------
- * `tsconfig.json` excludes `supabase/**`, so until 2026-07-30 nothing typechecked the
- * 107 edge functions. `npm run typecheck` reported success while never looking at them.
- * That blind spot hid, among others: token/cost logging that always wrote 0 (AI SDK v4
- * field names against a v6 pin), a Kling provider called as a function so every video
- * generation threw, a refund path that threw ReferenceError inside its own catch, and
- * a tenancy binding reading a field that does not exist on AuthResult.
- *
- * COVERAGE IS ASSERTED, NOT ASSUMED
- * ---------------------------------
- * While building this, three separate sweep attempts reported success without having
- * checked anything: one exited 0 on an unresolved npm import, one crashed with a V8
- * out-of-memory partway through a batch, and one used the wrong import maps. An exit
- * code alone is not evidence that the work happened — the same lesson as
- * `ops.silent_zero` and `ops.test_artifacts_accumulating`.
- *
- * So every entrypoint must be positively accounted for before a baseline is written. A
- * `Check <file>` line is the primary evidence, but it is not sufficient on its own:
- * deno prints NOTHING on a cache hit, so a warm cache makes a fully-checked tree look
- * entirely unchecked. Silence therefore triggers a per-file re-run whose EXIT STATUS
- * settles it — 0 means checked and clean, non-zero must come with a parseable error.
- * A file that is silent, non-zero, and mute about why fails the build.
- *
- * Do not weaken that to "no news is good news", and do not add `|| true` in the
- * workflow (see .github/workflows/semgrep.yml for what happened the last time a gate
- * here was allowed to swallow its own failure).
- *
- * PER-FUNCTION IMPORT MAPS
- * ------------------------
- * 31 of the functions ship their own `deno.json` with extra import mappings; the rest use
- * `supabase/functions/deno.json`. Checking everything against one config produces bogus
- * "not a dependency" errors. Functions are therefore grouped by config and each group is
- * checked with its own.
- *
- * BASELINE
- * --------
- * The tree is not error-free yet (mostly strict-null-check findings that need individual
- * judgement). `.github/edge-typecheck-baseline.json` records the per-function count, and
- * this gate fails when a count goes UP or a new file starts erroring. That blocks new
- * breakage today instead of waiting for a big-bang cleanup. Lower the numbers as you fix
- * things: `node scripts/check-edge-functions.mjs --write-baseline`.
- */
+/** Typecheck every Supabase edge function with `deno check`. */
 import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -56,34 +11,12 @@ const BASELINE = join(ROOT, '.github', 'edge-typecheck-baseline.json');
 const BATCH = 6;
 const WRITE = process.argv.includes('--write-baseline');
 
-/**
- * Functions that cannot be checked on any machine we have, with the reason.
- *
- * This is a CAP ON COVERAGE, so it is reported loudly on every run and written into the
- * baseline — never silently skipped. Adding an entry needs a reason and a way out.
- *
- * EMPTY, and it should stay that way. `agent-chat/index.ts` lived here on the grounds that
- * langgraph's generics instantiated a type graph that would not fit in 12 GB. That was true
- * when it was written and is not true now: on Deno 2.9 / TypeScript 6 with the LangChain
- * packages upgraded (core 1.2.9 — whose 1.1.35 release replaced its exported Zod type
- * references with structural interfaces precisely to stop this), the file checks CLEAN in
- * about 5 seconds. Re-measure before ever adding an entry back; the exclusion cost us the
- * only compiler that could see the platform's largest edge function, and while it was in
- * force a `{ system, cache_control }` options object that ChatAnthropic silently discards sat
- * in the hot path of every agent turn.
- */
+/** Functions that cannot be checked on any machine we have, with the reason. */
 const UNCHECKABLE = new Map([]);
 
 /**
  * Entrypoints: supabase/functions/<name>/index.ts, skipping _shared and friends —
  * PLUS every _shared/tools/*.ts module, checked in its own right.
- *
- * The tools are not deployable entrypoints; they are here because the only function that
- * imports them is `agent-chat`, and agent-chat is the one file this gate cannot check at any
- * heap. That left ~40 modules — every agent tool body in the platform — with no compiler over
- * them at all: tsconfig excludes supabase/**, and the transitive path died with agent-chat.
- * Checking them directly costs ~20s and immediately found a duplicate key in a zod schema, an
- * always-true comparison, and `.catch()` on a thenable that has none.
  */
 function entrypoints() {
   const fns = readdirSync(FN_DIR)
@@ -150,18 +83,7 @@ function main() {
   }
   console.log('');
 
-/**
- * Heap sizes, in order of escalation.
- *
- * Nearly every edge function checks comfortably in 4 GB. ONE (agent-chat) pulls
- * `@langchain/{anthropic,langgraph,core}` + zod, and langgraph's generics instantiate into a type
- * graph that does not fit in 8 GB even checked alone — `skipLibCheck` does not help, because the
- * cost is instantiating those types, not error-checking their `.d.ts` files.
- *
- * Running everything at the size that one function needs made the whole sweep expensive. So the
- * ceiling is paid only where it is actually required: a batch starts at 4 GB, and a LONE file that
- * OOMs is retried at the high mark before being declared a failure.
- */
+/** Heap sizes, in order of escalation. */
 const HEAP_MB = [4096, 12288];
 
 /**
@@ -254,11 +176,6 @@ const HEAP_MB = [4096, 12288];
   // identical, fully-checked code. That is not a theoretical edge — it made a local run report
   // "20 entrypoints never reported" while every one of them was checked and clean, which is the
   // precise false alarm this assertion exists to avoid raising.
-  // So silence is not a verdict, it is a question, and it gets answered rather than guessed:
-  // re-run the quiet file on its own and read its exit status. 0 means deno validated the graph
-  // (cached or not) and found nothing; non-zero means it has errors, which harvest() then records.
-  // Either way the file is accounted for. Only a file that stays silent AND exits non-zero AND
-  // yields no parseable error is genuinely unexplained — and that is a hard failure.
   const expected = files.map((f) => rel(f).replace(/^supabase\/functions\//, ''));
   const quiet = expected.filter((e) => !checked.has(e));
 

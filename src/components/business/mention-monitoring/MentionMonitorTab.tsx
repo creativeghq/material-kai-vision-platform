@@ -1,22 +1,4 @@
-/**
- * MentionMonitorTab — one tracked subject's mention monitoring view.
- *
- * Takes a `MentionSubjectRef`, not a product id. `tracked_mentions` holds two kinds of
- * row — a product enrolment and a free brand/keyword subject — and this screen only ever
- * spoke the first, while every real row on this platform is the second. So the component
- * rendered nothing openable: the admin list showed 17 subjects and could open none of
- * them, and 636 probe rows across 50 runs had no screen at all.
- *
- * Everything below the `tracked` lookup was already ref-agnostic (it works off
- * `tracked.id`); only the six readers were product-shaped, and they are now one set that
- * takes the ref.
- *
- * Layout (top → bottom):
- *   1. Header with Enable toggle + Admin "Refresh now" + alert prefs
- *   2. KPI strip: 7d count, 30d count, sentiment avg, top outlet
- *   3. Tabs: Feed | Sentiment | Outlets | LLM Visibility
- *   4. Footer: cadence + last refresh
- */
+/** MentionMonitorTab — one tracked subject's mention monitoring view. */
 
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';

@@ -72,18 +72,7 @@ const InvoiceDetailPage: React.FC = () => {
       toast({ title: 'Failed to update the project', description: (e as Error).message, variant: 'destructive' });
     } finally { setProjectSaving(false); }
   };
-  /**
-   * Consume `?action=` from InvoiceActionsMenu.
-   *
-   * Those menu items — "Record payment", "Issue credit note" — used to run the identical
-   * navigation as "View", so choosing one landed on this page with nothing open and the menu
-   * advertised four capabilities where there was one. They deep-link now; this opens the matching
-   * dialog once the invoice has loaded, then strips the param so a refresh or a back-navigation
-   * does not reopen it.
-   *
-   * Guarded on the same rule as the buttons: a draft must not open either dialog via a URL any
-   * more than via a click.
-   */
+  /** Consume `?action=` from InvoiceActionsMenu. */
   const [searchParams, setSearchParams] = useSearchParams();
   useEffect(() => {
     const action = searchParams.get('action');

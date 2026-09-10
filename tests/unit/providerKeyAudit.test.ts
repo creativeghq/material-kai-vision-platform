@@ -1,21 +1,4 @@
-/**
- * "Never probed" and "we have no key for them" are different sentences, and only one is useful.
- *
- * The model-health agent probes Replicate and nothing else — the other providers each need their
- * own auth and submit shape, and a half-probe reporting "unknown" would be worse than an honest
- * absence because it would look like coverage. That is a deliberate choice and this test does not
- * argue with it.
- *
- * What it pins is the free half. Whether this deployment holds a credential for a provider is
- * knowable with no upstream call at all, and it is the single most likely reason that provider
- * would fail. Eight providers carried NO verdict of any kind, and an empty status column reads as
- * "fine" to anyone not specifically hunting the difference — the same reading failure that had
- * `xai:auth` standing for weeks on a key that could not be entered at all until today.
- *
- * The dangerous property, and the reason this file exists: an audit that writes a verdict it did
- * not earn is worse than no audit. So it may only ever write `not_configured`, only over a row
- * that has no verdict or already holds that one, and never over a real probe result.
- */
+/** "Never probed" and "we have no key for them" are different sentences, and only one is useful. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

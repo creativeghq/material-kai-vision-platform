@@ -1,17 +1,4 @@
-/**
- * What has already been kept as income off this party's account — the other half of "release".
- *
- * `release_customer_credit` and `reverse_credit_release` both shipped working, and both were
- * unreachable: the release was one-way from the UI and the amount survived only as an
- * indistinguishable slice of a P&L-by-category total. So the operator could turn a customer's
- * leftover €400 into profit and then have no way to see that they had, which is precisely the
- * kind of action that must stay visible — it moves money out of a party's account without any
- * document being issued to them.
- *
- * The Undo is the RPC's own reversal: the release row is deleted, its allocations cascade away,
- * and the credit reappears on the party's account exactly as it was. Nothing is issued and
- * nothing is transmitted either way, so a mistaken release costs nothing but a click.
- */
+/** What has already been kept as income off this party's account — the other half of "release". */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';

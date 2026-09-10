@@ -5,24 +5,7 @@ import { join } from 'node:path';
 import { stripComments } from '../helpers/stripComments';
 import { TOOLKIT_CLUSTERS } from '../../supabase/functions/_shared/toolkitClusters.generated';
 
-/**
- * `load_toolkit` must only offer what the agent can actually load (#380).
- *
- * Measured over 90 days: `load_toolkit` was called 14 times and REFUSED 5 — a 36% failure
- * rate. Every refusal was a specialist reaching for a cluster its own `AGENT_CONFIGS` entry
- * does not list (`erp`→`stock`; `product-business`→`my-hr`, `hr`, `stock`,
- * `company-assets`). None was a discovery failure, which is why #380 declined Anthropic tool
- * search: a better search over the same menu would have fixed none of the five.
- *
- * The menu was simply wrong. `availableToolkitIds` was every non-`alwaysOn` cluster,
- * unfiltered by the agent's permitted set, and it goes into BOTH the tool description and the
- * schema's `.describe()` — so the model was handed entries it could only ever be refused on.
- * `kai` went 3 for 3 because it owns nearly everything, so its menu happened to be accurate.
- *
- * Then the refusal itself forbade the only true answer: `manage_stock`, `manage_hr`,
- * `manage_my_hr` and `manage_company_assets` are listed by the GENERALIST and by no
- * specialist, while the message ended "never suggest switching to a 'KAI' agent".
- */
+/** `load_toolkit` must only offer what the agent can actually load (#380). */
 
 const ROOT = join(__dirname, '..', '..');
 const AGENT_CHAT = 'supabase/functions/agent-chat/index.ts';

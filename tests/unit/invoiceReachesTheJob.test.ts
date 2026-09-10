@@ -1,20 +1,4 @@
-/**
- * An invoice can be attached to a job FROM the invoice (#378 L2).
- *
- * `invoices.project_id` was written only from INSIDE a project. The invoice itself and
- * `NewInvoiceDialog` mentioned no project at all, so an invoice raised before the job existed —
- * which is the normal order of events — could never join it.
- *
- * `get_project_pnl` reads a job's revenue off exactly that column. The consequence is not a wrong
- * number: it is an ABSENT one, on a job that still shows its costs. A job with costs and no
- * revenue reads as a loss, and the fix ("open the project and add it from there") is only
- * discoverable by someone who already knows the column exists.
- *
- * Only the PROJECT arm of the picker is offered here. An invoice already knows its customer, and
- * offering merge or "cost of" would answer a question this document does not ask — every one of
- * those arms writes a different column, and the picker's own contract says a caller that turns an
- * arm on must handle its `kind`.
- */
+/** An invoice can be attached to a job FROM the invoice (#378 L2). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

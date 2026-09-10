@@ -1,14 +1,4 @@
-/**
- * 3D model management for one product (#321 asset foundation).
- *
- * Upload/replace/remove the product's real 3D assets: glb/gltf drives the web
- * viewer (ARPreviewModal), AR on Android, the configurator and the planner. iOS
- * Quick Look (usdz) was dropped 2026-08-11 — nothing here can produce one. Also captures the
- * real-world footprint in meters — AR true-to-scale and the future room
- * planner read it; the free-form `metadata.dimensions` string cannot serve
- * that. The caller gates this on own-workspace product ownership; RLS
- * enforces workspace membership regardless.
- */
+/** 3D model management for one product (#321 asset foundation). */
 import React, { useEffect, useRef, useState } from 'react';
 import { Box, Trash2, Upload, Ruler } from 'lucide-react';
 import { Link } from 'react-router-dom';

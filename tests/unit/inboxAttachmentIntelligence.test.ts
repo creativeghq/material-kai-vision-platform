@@ -1,25 +1,4 @@
-/**
- * Guard: a voice note is HEARD and a document is READ, on the way in, honestly.
- *
- * The defect this pins: 96 inbox messages carried attachments (77 documents or photos, one voice
- * note) and nothing read any of them. The assistant was told the customer "sent something with
- * no text" for a voice note and "CANNOT open" an emailed invoice; the invoice reached Expenses
- * only by a person re-keying it.
- *
- * The properties that make the fix a fix, each of which can rot silently:
- *
- *   1. BOTH inbound writers call the reader, and the WhatsApp one calls it BEFORE the agent
- *      hand-off — otherwise the assistant reads a thread with no transcript in it.
- *   2. The verdict is a FORCED tool call (invariant 9) and the prompts come from the database
- *      (no fallback string) — a free-form JSON classifier with a salvage parser is the shape
- *      the platform's rules exist to keep out.
- *   3. Credits are reserved BEFORE the upstream call (invariant 10), for both readers.
- *   4. Every outcome is a STATUS on the row — ok, failed, skipped — never a silent skip, and an
- *      out-of-enum kind is a failure to record, never coerced into a valid-looking value.
- *   5. The enum the tool offers IS the mirrored vocabulary, so the tag cannot show a kind the
- *      classifier cannot return.
- *   6. What the assistant is told comes from the same derivation that wrote the row.
- */
+/** Guard: a voice note is HEARD and a document is READ, on the way in, honestly. */
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';

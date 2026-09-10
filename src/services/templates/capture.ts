@@ -2,18 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { parentSelect, pickDeclared } from './coerce';
 import type { TemplateAdapter, TemplateChildSpec } from './types';
 
-/**
- * The generic capture side of the template engine (issue #322).
- *
- * Every adapter declares WHICH columns it wants; this reads exactly those and nothing else, so a
- * new adapter cannot accidentally hoover up an id, a fiscal mark, a share token or a derived
- * total. The allowlist is also what tests/unit/templateRegistry.test.ts inspects — declaring the
- * fields as data rather than writing a bespoke `.select('a, b, c')` per adapter is what makes the
- * rule testable at all.
- *
- * Reads run under the caller's RLS, so you can only turn a record you can already see into a
- * template.
- */
+/** The generic capture side of the template engine (issue #322). */
 
 /** A captured child row: the allowlisted columns plus a structural pointer that is NOT an id. */
 export type CapturedChild = Record<string, unknown> & {

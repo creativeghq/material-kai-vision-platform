@@ -124,24 +124,7 @@ export function handleFromIdentity(fullName: string | null, email: string | null
   return /^[a-z0-9]/.test(slug) ? slug : `user${Math.floor(Math.random() * 9000 + 1000)}`;
 }
 
-/**
- * Local parts nobody may claim on the shared receiving domain.
- *
- * Two different reasons, both load-bearing. The RFC 2142 role names and our operational ones
- * (`postmaster`, `abuse`, `security`) are addresses the outside world assumes belong to whoever
- * runs the domain — handing one to a tenant lets them answer mail meant for us. The rest
- * (`sales`, `support`, `billing`, `info`) would let one workspace's user appear to speak for the
- * platform, because every tenant shares this domain.
- *
- * `no-reply` and friends are also on the sender-side suppression list in `inbound-email.ts`: an
- * address we would never auto-reply TO is not one we should let a person receive ON.
- *
- * `find` is the third reason and the sharpest: it is the platform's own FROM address
- * (`email_settings.default_from_email`), so every platform email the outside world receives
- * appears to come from it. Letting a tenant claim the handle would hand them the mailbox our
- * whole user base replies to — and any of our mail that carries no Reply-To would land in their
- * private Inbox. If the platform sender is ever changed, move this entry with it.
- */
+/** Local parts nobody may claim on the shared receiving domain. */
 export const RESERVED_LOCAL_PARTS: ReadonlySet<string> = new Set([
   'postmaster', 'abuse', 'hostmaster', 'webmaster', 'security', 'root', 'admin', 'administrator',
   'mailer-daemon', 'daemon', 'no-reply', 'noreply', 'do-not-reply', 'donotreply', 'bounce',

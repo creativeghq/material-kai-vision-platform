@@ -1,16 +1,4 @@
-/**
- * Regression guards for the edge-function audit (#363).
- *
- * Every case here is a defect that was live, produced no error, and could not be seen by
- * typecheck, RLS or any integrity probe — the recurring shape in this codebase. They are
- * grouped by what makes each one invisible, because that is what decides whether a source scan
- * is the right guard or a poor substitute for one.
- *
- * WHY SOURCE SCANS. Four of these (EE-2, EE-5, EE-10, EE-13) are "a correct value that is never
- * computed" or "the wrong one of two helpers". Nothing throws, so a behavioural test would need
- * to assert on a number nobody produces. The thing that actually regressed in each case was a
- * line of code, and a line of code is what this checks.
- */
+/** Regression guards for the edge-function audit (#363). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';

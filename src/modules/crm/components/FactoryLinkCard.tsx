@@ -12,11 +12,6 @@ import { Button } from '@/components/core/ui/button';
  * (the maker names that come off products.metadata.factory_name). This is the
  * explicit relation that replaces the fragile supplier-name ILIKE match — once
  * pinned, SupplierProductsTab and the "View products" deep-link key off the pin.
- *
- * The candidate list is the set of distinct maker names actually present in the
- * catalog (via the shared getManufacturer accessor, so it matches how Discover
- * buckets factories). A pre-fill suggestion is offered when a maker name matches
- * the supplier's own name.
  */
 export const FactoryLinkCard: React.FC<{
   value: string[];

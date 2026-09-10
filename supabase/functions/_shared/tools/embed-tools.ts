@@ -1,33 +1,4 @@
-/**
- * Website-embed tools — the agent's view of the SDK a merchant can put on their own site.
- *
- * WHY THIS FILE EXISTS. Every other half of the embed program had an agent path already: the
- * `design-to-quote` skill walks a customer through the same four stages the widget does,
- * `price_my_spec` calls the same `resolve_product_spec` RPC, `raise_quote_request` writes the same
- * `quote_requests` row. What no tool knew was that the WIDGET EXISTS. An agent could take a
- * customer all the way to a quote and had no way to tell the merchant that the identical walk was
- * available on their own website — so the feature was discoverable only by reading the API
- * documentation page, which is a fair description of a feature that is switched off.
- *
- * TWO TOOLS, ONE ANSWER EACH:
- *   • `embed_readiness`  — can this product be carried by the embed, and if so, the snippet
- *   • `embed_overview`   — is the embed live for this workspace at all, and what does it cost
- *
- * NOTHING HERE DECIDES ANYTHING. Readiness comes from `get_product_embed_readiness` and coverage
- * from the `covering_key_ids` it returns — both derived by the SAME SQL that `products-3d-api`
- * gates on (`embed_scope_covers_product`). A second opinion here would let the agent promise a
- * merchant a product the endpoint then 404s, which is precisely the drift the readiness panel was
- * built to avoid. These tools read the answer and turn it into sentences.
- *
- * THE KEY IS PUBLISHABLE, WHICH IS WHY THE SNIPPET MAY BE SPOKEN. `mk_embed_…` values are designed
- * to sit in a merchant's page source; the controls that protect them are the origin allowlist, the
- * per-minute quota and the fact that only storefront-published rows are served. Returning one into
- * a chat the workspace's own member is holding reveals nothing that viewing the page source would
- * not. `workspaceId` is the session's, never the model's (invariant 1), so the agent cannot ask
- * about a tenant it is not in.
- *
- * Cost discipline: both tools are 0 credits — DB reads only.
- */
+/** Website-embed tools — the agent's view of the SDK a merchant can put on their own site. */
 
 // Typed non-generically for the same reason as graph-tools.ts: inferring `tool` pulls
 // @langchain/core's generic graph into the module and blows the edge typecheck's memory ceiling.

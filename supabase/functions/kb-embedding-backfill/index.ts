@@ -1,19 +1,4 @@
-/**
- * KB Embedding Backfill
- *
- * Drains kb_docs that have no usable text_embedding yet — i.e. rows left
- * `pending` (never embedded) or `failed` (MIVAA was overloaded during a bulk
- * import: 502 / TLS handshake EOF / connection closed). Without an embedding a
- * doc is invisible to agent KB search (kb_match_docs is vector-based), so this
- * closes the gap left by the fire-and-forget on-create embedding.
- *
- * Processes a small batch SEQUENTIALLY per invocation so we never hammer the
- * MIVAA embedding endpoint the way the original bulk import did. A pg_cron
- * job calls this every couple of minutes to drain the backlog gradually; it's
- * idempotent and early-returns when nothing is left.
- *
- * Auth: service-role bearer (cron / internal) or an admin JWT.
- */
+/** KB Embedding Backfill */
 
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';

@@ -1,41 +1,4 @@
-/**
- * A received document offers the SAME actions wherever it is shown.
- *
- * THE DEFECT THIS EXISTS FOR
- * --------------------------
- * `InboundDocActionsMenu` gates several of its entries on the HANDLER being supplied:
- *
- *     const canAddDetail = needsDetail && … && !!onAddLineDetail && …;
- *     {canAddDetail && <DropdownMenuItem onClick={onAddLineDetail}>Add line detail</…>}
- *
- * So a surface that renders the menu without passing `onAddLineDetail` does not get a disabled
- * entry, or an error, or a type failure — the entry is simply NOT THERE. The menu looks complete,
- * every other action works, and nothing anywhere reports it.
- *
- * That is what happened. Two tables render inbound documents — the Expenses inbox and the shared
- * supplier document table (CRM company card + the Expenses-by-Supplier modal) — and each spelled
- * the menu's props out for itself. One passed `onAddLineDetail`, the other never had, so "say what
- * was actually on this document" was unreachable from two of the three surfaces. Two thirds of
- * this workspace's received documents (1,161 of 1,769) carry value-only lines, and until one is
- * completed, warehouse receive, product extraction, the catalog and the markup ladder all skip it.
- * Found by a person opening the modal and asking where the option had gone.
- *
- * WHAT IS ENFORCED, AND WHY IT CHANGED SHAPE
- * ------------------------------------------
- * The first version of this test checked that EVERY call site passed every gating prop. That was
- * the right check while there were two call sites. The fix went further and deleted the second
- * one: `useInboundDocActions` now owns the state, the wiring and the dialogs, and each table
- * renders `actions.renderActions(doc)` plus `actions.dialogs`. So the invariant is stronger and
- * simpler — the menu is CONSTRUCTED IN ONE PLACE, and that place passes everything.
- *
- * Both halves are asserted, because either one alone is defeatable: "one call site" without the
- * prop check permits the single site to drop a handler, and the prop check without "one call site"
- * permits a new table to hand-roll its own menu again.
- *
- * Source-text on purpose. The props are optional in TypeScript and must stay that way — the menu
- * is built to degrade — so the type system cannot see the omission, and a render test would need
- * every host wired up to prove a NEGATIVE about a dropdown that is closed.
- */
+/** A received document offers the SAME actions wherever it is shown. */
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';

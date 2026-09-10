@@ -2,23 +2,6 @@
  * Toolkit meta-tool — lets the agent dynamically pull in more capabilities
  * mid-conversation when the user's request needs tools that aren't currently
  * bound.
- *
- * load_toolkit: takes a toolkit_id and calls the host-supplied `applyToolkit`
- * loader, which instantiates that cluster's tools and appends them to the LIVE
- * tool list for THIS run. Because the agent graph re-binds tools on every
- * iteration, the freshly-loaded tools are usable in the SAME turn — there is no
- * longer a two-turn "please re-send" dance. The tool still emits a
- * `toolkit_loaded` chunk so the frontend can persist the toolkit onto the
- * conversation for future turns.
- *
- * RBAC + per-agent ownership are enforced inside the loader (admin-only clusters never bind
- * for non-admins; a toolkit a given agent doesn't own is rejected with a message that NAMES
- * the agent which does own it, derived from AGENT_CONFIGS). The toolkit→tool mapping lives in
- * agent-chat's SERVER_TOOLKITS — this file no longer keeps its own copy.
- *
- * `availableToolkitIds` MUST already be filtered to what this agent can load — it reaches the
- * model through both the description and the schema `.describe()`, so anything extra is a menu
- * entry that can only produce a refusal (#380: 5 of 14 calls, all of them that shape).
  */
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic

@@ -17,14 +17,6 @@ import { CONTRACT_CONTEXTS } from '@/services/contracts/contractVocabulary';
 /**
  * Native template adapters (issue #322) — the executable half of the registry; the allowlists and
  * labels live in `schema.ts`. Three rules, all enforced by tests/unit/templateRegistry.test.ts:
- *
- *  1. `captureFields` is an allowlist — no ids, no tokens, no fiscal marks, no derived totals.
- *  2. `apply()` builds an EXPLICIT object literal. The payload is stored jsonb, i.e. untrusted
- *     input; spreading it into `.insert()` is the mass-assignment bug of security invariant 8.
- *  3. Money documents return `{ kind: 'prefill' }` rather than inserting. Same argument
- *     `ordersService.reorderPrefill` already makes for re-orders: a row inserted behind the
- *     operator's back skips numbering, buyer-risk checks, myDATA classification and the
- *     notifications the real form fires.
  */
 
 // ---------------------------------------------------------------------------
@@ -443,13 +435,11 @@ export async function buildOrderPrefill(payload: OrderTemplatePayload): Promise<
   };
 }
 
-// ---------------------------------------------------------------------------
 // Contract — prefill. A template supplies the WORDS, never the party, and
 // `contracts_subject_ck` requires a subject on every row: an hr contract needs an
 // employee, a project contract a project, a finance contract at least a
 // counterparty name. So there is no honest "create it from the template alone" —
 // the terms fill the real form, which already knows what it is mounted under.
-// ---------------------------------------------------------------------------
 
 export interface ContractTemplatePayload {
   context?: string | null;
@@ -497,28 +487,7 @@ export interface ExpenseTemplatePayload {
   currency?: string | null;
   notes?: string | null;
   category_id?: string | null;
-  /**
-   * NO MONEY DEFAULT (#385 FN-4).
-   *
-   * This carried `default_amount` and `default_vat_amount`, populated by the adapter's
-   * own `.select('subtotal_net, vat_amount')`. BOTH of those columns are on
-   * FORBIDDEN_CAPTURE_FIELDS under "derived money — recomputed by the create path, never
-   * stored", and the synthetic names are what let them through: the guard checked the
-   * declared `captureFields` array, where neither key ever appeared, so it passed on 56
-   * tests while the adapter read the columns directly and prefilled them into the new
-   * expense form.
-   *
-   * The comment that used to sit here said the rename existed because a key called
-   * `subtotal_net` "would be indistinguishable from the stored-total mistake the test
-   * exists to catch". That is the finding written down: it was not indistinguishable
-   * from the mistake, it WAS the mistake, and the rename hid it from the check rather
-   * than from a reader.
-   *
-   * Nothing is lost that should be kept. An expense template returns `{kind:'prefill'}`,
-   * so the operator is looking at the actual bill when they fill the amount in — and
-   * last quarter's electricity is not this quarter's. What a template is for here is the
-   * category, the supplier and the notes, which are stable; the money is not.
-   */
+  /** NO MONEY DEFAULT (#385 FN-4). */
 }
 
 export interface ExpensePrefill {
@@ -617,16 +586,11 @@ export const hrOnboardingAdapter: TemplateAdapter<HrOnboardingTemplatePayload> =
   },
 };
 
-// ---------------------------------------------------------------------------
 // Property listing — created as a DRAFT, like the ordinary "New listing" button
 // (`RealEstatePage.createDraft`), just with the template's defaults instead of a
 // bare placeholder. A draft listing is private (`listing_status: 'draft'`,
 // `is_public: false`) and publishing stays a separate, gated decision, so there
 // is nothing here that needs the operator's sign-off first.
-//
-// The template is the KIND of listing and the copy you always start from; the
-// address, the price and the vendor belong to one property and are never captured.
-// ---------------------------------------------------------------------------
 
 export interface PropertyListingTemplatePayload {
   property_type?: string | null;
@@ -691,15 +655,7 @@ export const propertyListingAdapter: TemplateAdapter<PropertyListingTemplatePayl
   },
 };
 
-// ---------------------------------------------------------------------------
 // Customer terms — the one type that UPDATES rather than creates.
-//
-// A CRM party is found or created through the duplicate search (Greek script and
-// Latin stems both), never conjured by a template: a silently-created company is
-// precisely the failure that search exists to prevent. So what a company template
-// usefully carries is the COMMERCIAL TERMS — pricing level, discount, credit,
-// payment days — applied to a company you already have.
-// ---------------------------------------------------------------------------
 
 export interface CrmCompanyTemplatePayload {
   is_customer?: boolean | null;
@@ -786,18 +742,7 @@ export interface InspectionTemplatePayload {
   notes?: string | null;
 }
 
-/**
- * An inspection template — the checklist you walk the site with, run again on every plot.
- *
- * What it carries is the QUESTIONS. What it must never carry is the ANSWERS: `result`, `note`,
- * `photo_paths`, `snag_id`, `signed_off_*`. A checklist that arrives pre-ticked is not a
- * checklist, it is a record claiming a stage was inspected when nobody walked it — and unlike a
- * wrong figure, it is the kind of claim somebody builds over.
- *
- * The header and its items are created by ONE RPC. Two calls would leave a header with no items
- * on a dropped connection, and an inspection with no items derives as `empty` — which reads on a
- * list as a stage that was checked and found clean.
- */
+/** An inspection template — the checklist you walk the site with, run again on every plot. */
 export const inspectionAdapter: TemplateAdapter<InspectionTemplatePayload> = {
   type: 'inspection',
   icon: ClipboardCheck,

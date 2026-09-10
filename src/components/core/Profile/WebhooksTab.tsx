@@ -1,14 +1,4 @@
-/**
- * Profile → Webhooks (#330). A workspace points its own systems at platform events.
- *
- * Two things drive the whole design:
- *   1. **The signing secret is shown exactly once.** It cannot be read back — the column is
- *      revoked from `authenticated` — so the reveal has to be unmissable and copyable, and
- *      "lost it" has to have an obvious answer (rotate).
- *   2. **Event types are an explicit opt-in list, never "all".** An endpoint that silently
- *      starts receiving newly-added event types leaks data by default, so there is no
- *      select-all shortcut here on purpose.
- */
+/** Profile → Webhooks (#330). A workspace points its own systems at platform events. */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';

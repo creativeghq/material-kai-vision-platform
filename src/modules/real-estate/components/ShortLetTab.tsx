@@ -16,17 +16,7 @@ import {
 const money = (n: number | null | undefined, ccy: string) => formatMoney(n ?? 0, ccy || 'EUR', { decimals: 0 });
 const nights = (b: Booking) => Math.round((new Date(b.check_out).getTime() - new Date(b.check_in).getTime()) / 864e5);
 
-/**
- * Short-let operations: the booking calendar, the changeover work, and the channel links.
- *
- * A short-let property is not a tenancy — it is a stream of stays, each with a guest and a cleaning
- * turnaround — so it gets its own surface rather than being forced through the Lettings tab.
- *
- * Dates are half-open. `check_out` is the morning of departure, so a back-to-back changeover is two
- * touching bookings and not a clash; the database enforces that with a GiST exclusion constraint
- * rather than a check here, because two channel syncs land concurrently and a read-then-write would
- * accept both.
- */
+/** Short-let operations: the booking calendar, the changeover work, and the channel links. */
 export const ShortLetTab: React.FC<{ ws: string | null; propertyId: string; icalToken: string | null; canManage: boolean; onChanged: () => void }> = ({ ws, propertyId, icalToken, canManage, onChanged }) => {
   const { toast } = useToast();
   const [bookings, setBookings] = useState<Booking[] | null>(null);

@@ -1,14 +1,4 @@
-/**
- * Stripe configuration panel — mounted on /admin/modules/payments-stripe/settings.
- *
- * The Keys tab (auto-mounted by the generic ModuleSettingsPage) already shows
- * the Stripe API key + webhook secret via SecretsManagerCard — they're scoped
- * to this module via `platform_secrets.primary_module_slug='payments-stripe'`.
- *
- * This panel surfaces the non-secret config: webhook URL operators paste into
- * the Stripe Dashboard, quick links to Dashboard surfaces, and the env-var
- * names that hold product/price IDs.
- */
+/** Stripe configuration panel — mounted on /admin/modules/payments-stripe/settings. */
 import React from 'react';
 import { Copy, ExternalLink, CreditCard } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';

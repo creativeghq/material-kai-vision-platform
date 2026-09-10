@@ -1,18 +1,4 @@
-/**
- * Price Monitoring Tools — agent-chat surface for competitive price tracking.
- *
- * Mirrors mention-tools.ts (same MIVAA family, same auth). The internal product
- * price flow is UNMETERED (the platform absorbs the upstream Perplexity/DataForSEO/
- * Firecrawl cost, exactly as the /finance Price Monitor tab does), so these agent
- * tools are 0 credits — no debit/refund path.
- *
- * Tools:
- *   - track_product_prices  — start/stop competitor price tracking on a product
- *                             (start also runs the first discovery refresh)
- *   - get_price_summary     — the denormalized current price + discovered retailers
- *
- * Module-gated: every tool verifies `price-monitoring` is enabled first.
- */
+/** Price Monitoring Tools — agent-chat surface for competitive price tracking. */
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what

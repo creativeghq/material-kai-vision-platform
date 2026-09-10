@@ -1,16 +1,4 @@
-/**
- * Room planner geometry guard (#321 M3, #259 Phase 1).
- *
- * Everything here fails *silently and plausibly*. A sofa clamped against the wrong wall, or a
- * rotated item whose footprint was computed unrotated so it hangs through a wall it visually
- * clears — all of those render as a perfectly normal-looking plan. There is no exception, no type
- * error, and no stored-data inconsistency for an integrity probe to find. The only way to know is
- * to assert the arithmetic.
- *
- * The rotation cases are the ones that matter. A 1.8 x 0.9 m sofa turned 90° occupies 0.9 x 1.8 m
- * of floor; clamping it against its unrotated width is how "it fitted on the plan" becomes "it does
- * not fit in the room".
- */
+/** Room planner geometry guard (#321 M3, #259 Phase 1). */
 import { describe, it, expect } from 'vitest';
 import {
   snapToGrid, rotatedExtent, clampToRoom, boundsOf, overlaps, overlappingPairs,

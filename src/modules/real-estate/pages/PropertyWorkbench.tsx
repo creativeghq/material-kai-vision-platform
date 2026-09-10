@@ -1700,19 +1700,7 @@ const OffersTab: React.FC<{ ws: string | null; propertyId: string; canManage: bo
   );
 };
 
-/**
- * Transaction documents — Memorandum of Sale, agency and reservation agreements.
- *
- * This was a hand-rolled SECOND contracts panel: its own list, its own create form, its own three
- * type options, casting `as any` to pass `property_id` because the shared panel's subject type had
- * never been widened for it. It was thinner in every direction — no templates, no filters, no
- * void/decline, no download, and an empty state that offered nothing — and it drifted on its own
- * schedule. Replaced by the shared `ContractsSection` (#378 L4), which carries the same three
- * `realestate` types it declared.
- *
- * The edit gate is preserved: anyone who may manage the listing SEES the transaction file, and
- * only an editor may add to it.
- */
+/** Transaction documents — Memorandum of Sale, agency and reservation agreements. */
 const TransactionTab: React.FC<{ ws: string | null; propertyId: string; canEdit: boolean }> = ({ ws, propertyId, canEdit }) => {
   if (!ws) return null;
   return (

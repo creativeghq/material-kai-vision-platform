@@ -1,19 +1,6 @@
 /**
  * Background-result primitive (rail-4 async) — the ONE sanctioned way an async / delegated
  * agent task reports completion back into the originating chat.
- *
- * How it works: the task inserts an assistant message into `agent_chat_messages` tagged
- * `metadata.background_task = true`. The Agent Hub client subscribes to
- * `background-results:{conversation_id}` (postgres_changes INSERT on agent_chat_messages) and
- * injects the message into the live conversation — no client polling. This module makes that
- * contract explicit and reusable so any future long-running tool (fiscal submission, catalog
- * render, batch job) emits completion the same way instead of hand-rolling the insert.
- *
- * Optionally carry `resultData` (an AgentResultCard-shaped `{ title, data, resultType }`) so the
- * completion renders as a proper canvas card (with the rail-3 "Open in {Hub}" handoff) instead of
- * plain text. Omit it for a text-only report.
- *
- * Fire-and-forget: never throws — a failed completion notice must not fail the task.
  */
 
 export interface BackgroundResultInput {

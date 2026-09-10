@@ -1,13 +1,4 @@
-/**
- * XML Import Job Card Component
- *
- * Displays detailed information about an XML import job including:
- * - Job status and progress
- * - Product counts (total, processed, failed)
- * - Source information
- * - Error details
- * - Actions (retry, view details, cancel)
- */
+/** XML Import Job Card Component */
 
 import React from 'react';
 import { formatDate as formatDateValue } from '@/utils/datetime';

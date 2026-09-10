@@ -1,25 +1,4 @@
-/**
- * AI Assessment toolkit — the agent surface for all three assessment modules.
- *
- *   assess_project / assess_finance / assess_property   run one (PAID: reserve → settle)
- *   get_*_assessment                                    the latest report (0 credits, DB read)
- *   list_assessment_actions                             what is outstanding, across every
- *                                                       assessment module the workspace owns
- *   apply_assessment_action                             turn one action into a real project task
- *
- * THREE PAID TOOLS, ONE BODY. Each `assess_*` is a different product with its own module and its
- * own prompt, so each is its own tool — the model should not have to pick a subject enum to spend
- * somebody's credits, and the catalog needs one `moduleSlug` per entry. Everything underneath is
- * `_shared/assessment.ts`.
- *
- * WHAT THE MODEL IS NOT DOING. Every number in a report is derived by `get_assessment_snapshot`
- * in SQL. The paid tools spend a credit on the WRITE-UP, not on the arithmetic. The readers spend
- * nothing at all, which is the point: "what should I do next" should not cost money to ask twice.
- *
- * Every tool emits a chunk registered in `AGENT_RESULT_TITLES`. A quick-start with `run:` calls
- * these deterministically with no model turn, so an unrendered chunk is not "the agent will
- * summarise it" — it is a blank screen under a cheerful "done".
- */
+/** AI Assessment toolkit — the agent surface for all three assessment modules. */
 
 // `tool` is typed non-generically ON PURPOSE — see the note in project-tools.ts. Inferring it
 // pulls @langchain/core's generic graph into every module that defines a tool, and that

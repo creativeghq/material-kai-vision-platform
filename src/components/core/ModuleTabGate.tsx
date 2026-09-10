@@ -2,18 +2,6 @@
  * Inline module gate for CROSS-MODULE surfaces — a tab/panel belonging to module X rendered
  * inside a record the user already owns (e.g. a "Real Estate" tab on a CRM contact, a "Finance"
  * panel on a project, a "Monitoring" tab on a product).
- *
- * The record stays visible; only THIS surface gates. When the active workspace lacks the module,
- * it renders a compact upsell (owner → Buy, member → request) instead of the children — never a
- * full-page wall (that's EntitlementGuard's job, for whole routes). Both share `useModuleUpsell`,
- * so there is exactly ONE buy/request/price implementation on the frontend.
- *
- *   <ModuleTabGate moduleSlug="real-estate" moduleName="Real Estate">
- *     <RealEstateContactPanel contactId={id} />
- *   </ModuleTabGate>
- *
- * The edge function behind the panel MUST still call `assertEntitled(...)` — this is UX, not the
- * security boundary. A 402 `not_entitled` from that call maps back to this same upsell.
  */
 import React from 'react';
 import { Lock, Sparkles, Loader2 } from 'lucide-react';

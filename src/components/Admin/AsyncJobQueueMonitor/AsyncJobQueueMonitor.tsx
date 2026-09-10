@@ -889,15 +889,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
    * which:
    *   - resolves products by source_job_id, source_document_id, AND product_processing_status (covers PDF/XML/scraping)
    *   - cleans every product-side child table (layout_regions, tables, enrichments, image_product_associations)
-   *   - cleans every image-side child table (chunk_image_relationships, image_metafield_values, image_validations)
-   *   - deletes embeddings from VECS collections
-   *   - deletes Supabase Storage files (PDFs + extracted images) — impossible from the browser
-   *   - deletes server-side temp files in /tmp
-   *   - deletes the document and the job row last
-   *
-   * Auth: passes the user's session JWT so RLS / admin role checks on the
-   * backend can authorize. The previous direct-Supabase implementation
-   * leaked storage files because the browser cannot reach the server FS.
    */
   const deleteJobWithAllData = async (jobId: string): Promise<{ success: boolean; stats: Record<string, number> }> => {
     try {
@@ -1006,18 +997,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   /**
    * Cancel + purge. Two guards, because this deletes products, chunks, images and files and
    * cannot be undone (#365 AD-10).
-   *
-   * 1. LATCH BEFORE THE PROMPT, not after. The old order was confirm → setCancellingJob, and the
-   *    button's `disabled` only reacts to that state — so a double-click opened two dialogs while
-   *    the button was still enabled, and confirming both ran the purge twice. The ref is checked
-   *    and set synchronously, so the second click returns before it can prompt; React state alone
-   *    cannot do this because the re-render has not happened yet.
-   *
-   * 2. THE STATUS TRANSITION IS THE LOCK. The update is conditioned on the job still being in a
-   *    cancellable state and returns the rows it changed. Zero rows means the job finished (or
-   *    someone else cancelled it) between the operator reading the screen and pressing the button
-   *    — and the old code would have gone on to delete a COMPLETED job's products anyway, because
-   *    it wrote `status: 'cancelled'` unconditionally and never looked at the result.
    */
   const [jobAiSpend, setJobAiSpend] = useState<JobSpendRow[] | null>(null);
   const cancelInFlight = React.useRef<Set<string>>(new Set());
@@ -1397,15 +1376,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
    * Regenerate ALL image embeddings for a document — fills in any missing
    * vectors across the 6 image-embedding collections (visual SLIG, color,
    * texture, style, material, understanding).
-   *
-   * `force_regenerate: true` is intentional. Without it, the backend skips
-   * any image whose visual_768 already exists in `image_slig_embeddings` —
-   * which is exactly the wrong behavior for "fix incomplete embeddings",
-   * because the most common partial state is "has visual SLIG but missing
-   * the 4 specialized SLIG and/or the understanding embedding". Forcing
-   * regenerate is idempotent (VECS upserts overwrite at the same image_id),
-   * costs one extra SLIG call per image, and is the simplest way to bring
-   * any image up to the full 7-vector spec.
    */
   const handleRegenerateImageEmbeddings = async (job: typeof selectedJob) => {
     if (!job?.document_id) return;
@@ -2870,13 +2840,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   //   1. process-alive  — `last_heartbeat` freshness (the
                   //      orchestrator writes this every ~30s as long as it's
                   //      running; staleness >2min = process likely dead).
-                  //   2. visible-activity — latest stage_history event
-                  //      timestamp (silent post-processing phases like
-                  //      vision-analysis catchup don't emit stage events,
-                  //      so this can be old without the job being stuck).
-                  // The previous single-flag approach treated silent
-                  // post-processing as "stuck" and produced false-positive
-                  // "no heartbeat for 8m" warnings.
                   const now = Date.now();
                   const lastHeartbeat = selectedJob.last_heartbeat ? new Date(selectedJob.last_heartbeat).getTime() : 0;
                   const heartbeatStaleMin = lastHeartbeat ? Math.floor((now - lastHeartbeat) / 60000) : 0;
@@ -3335,8 +3298,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   // which emits an in_progress event before completed) renders as
                   // done and the "current stage" indicator jumps ahead to the
                   // next stage. Marker checkpoints are written with status
-                  // 'completed' (checkpoint_recovery_service), so they are
-                  // unaffected; entries with no status default to completed.
                   const latestStatusByStage: Record<string, string> = {};
                   jobCheckpoints.forEach(cp => {
                     if (cp.stage) {

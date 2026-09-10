@@ -2,16 +2,13 @@
 // Regenerate: npm run finance:mirror (part of gen:all). Freshness is enforced by
 // tests/unit/financeMirrors.test.ts, which fails the build on any drift.
 
-/** myDATA VAT-exemption categories (ΑΑΔΕ "Κατηγορία Αιτίας Εξαίρεσης ΦΠΑ"), codes
+/**
+ * myDATA VAT-exemption categories (ΑΑΔΕ "Κατηγορία Αιτίας Εξαίρεσης ΦΠΑ"), codes
  * 1–31. Required by myDATA on every 0%/exempt invoice line (vatCategory 7/8) —
  * see `vatExemptionCategory` in
  * [_shared/fiscal/types.ts](supabase/functions/_shared/fiscal/types.ts) and the
  * line mapping in `invoice-builder.ts`.
- *
- * On a CRM party this is stored on `vat_exemption_reason` (text) as the **numeric
- * code**, and pre-fills the exemption category on that customer's 0%-VAT invoice
- * lines. Labels carry the governing article so the operator picks the correct one;
- * the Code is the load-bearing value sent to myDATA. */
+ */
 export interface MydataExemptionCategory {
   /** myDATA exemption code 1–31, stored as text on the party. */
   code: number;

@@ -1,39 +1,4 @@
-/**
- * Compare the DEPLOYED edge functions against the ones with source in this repo.
- *
- * WHY THIS EXISTS. The deploy workflow has always asked one direction of the question — which
- * repo functions need shipping — and never the other. By 2026-08-11 that had let **thirteen**
- * functions accumulate in production with no directory under `supabase/functions/`: three
- * throwaway `tmp-*`/`demo-*` experiments, five crons superseded by `monitoring-cron`, a
- * `ses-webhook` replaced by `email-webhooks`, two diagnostic probes, a one-off seeder, and
- * `generate-pbr-maps` — which CLAUDE.md recorded as *deleted* while version 54 of it was still
- * live. None could be read, reviewed, fixed or redeployed; they could only be invoked or
- * deleted. That is issue #345, and its own conclusion was that the check is the part worth
- * doing "regardless of what happens to the thirteen: without it this recurs".
- *
- * IT IS A RATCHET, NOT A WALL. A known orphan is recorded in
- * `.github/deployed-function-orphans.json` with a reason, and the list may only shrink. That
- * shape is deliberate and matches `edge-typecheck-baseline.json`:
- *   - failing outright on every orphan would block deploys on something you often cannot fix in
- *     the same commit (deleting a deployed function needs a management token, not a merge), and
- *     a red gate nobody can act on trains people to ignore red gates;
- *   - reporting without failing is what allowed thirteen to pile up in the first place.
- * So a NEW orphan is a hard failure and a recorded one is not.
- *
- * IT ALSO ASKS THE REVERSE. A function with source that is NOT deployed is the silent-zero
- * shape from CLAUDE.md: nothing errors, the code simply never runs. That is always a failure —
- * there is no baseline for it, because it has never been true and must not become true.
- *
- * FAIL CLOSED ON A MISSING TOKEN. Skipping when the credentials are absent would make the
- * check pass hardest exactly when it is not running, which is the failure mode it exists to
- * catch. In CI the token is always present; locally you are expected not to run this.
- *
- * Usage:
- *   node scripts/check-deployed-functions.mjs
- *   node scripts/check-deployed-functions.mjs --write-baseline
- *
- * Env: SUPABASE_ACCESS_TOKEN, and PROJECT_REF (or SUPABASE_PROJECT_ID).
- */
+/** Compare the DEPLOYED edge functions against the ones with source in this repo. */
 import { readdirSync, existsSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -43,16 +8,7 @@ const FN_DIR = join(ROOT, 'supabase', 'functions');
 const BASELINE = join(ROOT, '.github', 'deployed-function-orphans.json');
 const WRITE = process.argv.includes('--write-baseline');
 
-/**
- * The functions this repo can deploy.
- *
- * `index.ts` is REQUIRED, not just a directory. The deploy workflow's own list is every
- * directory except `_shared`, which is correct for a clean checkout and wrong the moment
- * anything creates a stray directory there — `deno check --node-modules-dir=auto` drops a
- * `supabase/functions/node_modules/` in exactly that spot, and `supabase functions deploy
- * node_modules` fails the whole job. Requiring the entrypoint costs nothing and cannot be
- * wrong: a directory with no `index.ts` is not a function by any definition the CLI accepts.
- */
+/** The functions this repo can deploy. */
 export function repoFunctions() {
   return readdirSync(FN_DIR)
     .filter((n) => n !== '_shared')

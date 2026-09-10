@@ -260,16 +260,7 @@ export interface DomainIntel {
   top_keywords: DomainKeyword[];
 }
 
-/**
- * The derived overview behind the Websites → Overview strip.
- *
- * Every field here is produced by `get_website_search_metrics` /
- * `seo_website_health_summary` / `seo_website_gsc_summary` and is only FORMATTED
- * on the client. In particular the `status` on each metric is the SQL's verdict
- * on whether the number can be trusted — the UI never re-decides that, so a tile
- * and a report reading the same RPC cannot disagree about whether a figure is
- * real. See `components/core/Profile/seo/seoMetrics.ts`.
- */
+/** The derived overview behind the Websites → Overview strip. */
 export interface SeoOverview {
   website: {
     id: string;
@@ -631,17 +622,7 @@ export interface GscSummary {
   days: number;
   from: string;
   to: string;
-  /**
-   * The SQL's verdict on whether `totals` means anything (CLAUDE.md rule 3).
-   *
-   * `ok` — rows were stored for this window, so the figures are real, zeros included.
-   * `no_data` — the sync works and this period genuinely had nothing.
-   * `not_collected` — nothing has ever been stored for this site.
-   *
-   * `totals` still coalesces to zero for back-compat, which is exactly why this exists: a
-   * never-synced site and a real week of nothing both produced `0 clicks · 0 impressions ·
-   * 0.0% CTR · position 0.0`, and position 0.0 reads as better than first place.
-   */
+  /** The SQL's verdict on whether `totals` means anything (CLAUDE.md rule 3). */
   status?: 'ok' | 'no_data' | 'not_collected' | string;
   /** Source rows behind the window — the evidence for `status`. */
   rows?: number;
@@ -820,18 +801,7 @@ export const userWebsitesService = {
     if (error) throw error;
   },
 
-  /**
-   * Delete an article.
-   *
-   * RLS is the boundary: `seo_articles_owner` lets the person who generated it delete, and
-   * `seo_articles_ws_delete` extends that to the workspace the website belongs to — a website is
-   * the workspace's, so an article written for it should not outlive the colleague who left.
-   *
-   * The deleted row is SELECTED back rather than trusted. supabase-js resolves on a policy
-   * refusal instead of throwing, so `await delete()` with no check reports success for a delete
-   * that removed nothing — the row stays on screen until the next reload and the operator is
-   * told it went. That is the one failure this method exists to make impossible.
-   */
+  /** Delete an article. */
   async deleteArticle(articleId: string): Promise<void> {
     const { data, error } = await supabase
       .from('seo_articles')
@@ -958,7 +928,6 @@ export const userWebsitesService = {
    * form is how a competitor ends up filed under the wrong site. Locale matches
    * the rank tracker's (Greek results). Idempotent — the table is unique on
    * user + domain + country, so a second click hands back the existing row and,
-   * if that row was created from the admin toolkit without a website, attaches it.
    */
   async trackOwnDomain(website: UserWebsite, countryCode = 'GR', languageCode = 'el'): Promise<SeoTrackedDomainRow> {
     const { data: userData } = await supabase.auth.getUser();
@@ -1074,23 +1043,7 @@ export const userWebsitesService = {
     return (data as DomainIntel) ?? null;
   },
 
-  /**
-   * The derived search-metric strip.
-   *
-   * Named `get_website_search_metrics`, NOT `get_website_seo_overview` — that
-   * name was already taken by `overview()` above, which returns aggregate record
-   * counts. Adding a `(uuid, integer DEFAULT 180)` overload to it did not merely
-   * read confusingly, it broke the original outright: a defaulted second argument
-   * makes the one-argument call match both candidates, and Postgres refuses with
-   * `42725 function ... is not unique` rather than picking. Keep the two names
-   * distinct.
-   *
-   * `as any` on the RPC name is deliberate and unavoidable: `types.ts` is
-   * generated from the remote schema and neither CI nor this checkout can
-   * regenerate it (no Supabase access token), so a freshly-applied RPC is absent
-   * from the generated union until someone with a token refreshes it. Casting the
-   * NAME keeps the payload typed.
-   */
+  /** The derived search-metric strip. */
   async seoOverview(websiteId: string, days = 180): Promise<SeoOverview | null> {
     const { data, error } = await supabase.rpc(
       'get_website_search_metrics' as any,

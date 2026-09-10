@@ -1,45 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-/**
- * agent-eval — run ONE golden question through agent-chat and score what came back.
- *
- * WHY THIS EXISTS
- * ---------------
- * Conversation 9225f61f (2026-09-05) asked which keywords materialshub.gr ranks for. The reply
- * came from a third-party index — two keywords, SERPs crawled seven weeks earlier — while the
- * workspace's own rank tracker had checked 129 keywords 35 minutes before and Search Console was
- * connected. Three defects at once (no tool over the data, a tool that existed but was named for a
- * niche, a reply format that hid the date), every one found by a person reading one transcript.
- * Hand-testing replies finds these one at a time and only after they ship.
- *
- * A golden case pins the expectation instead: for THIS question, THESE tools must be the source,
- * the reply must contain THESE facts, must not hedge, must not wear the analysis framework on a
- * factual question, and must cost less than THIS. One row per run in `agent_eval_runs`, so a
- * regression is a diff, not a feeling. The turn is persisted as a real conversation
- * (`/agent-hub?conversation=<id>`) so the operator can open every eval reply and read it.
- *
- * SCOPE
- * -----
- * One case per invocation: a turn is 20–60 s and the edge limit is 150 s. A batch is the caller
- * looping with the same `batch_id`. Operator-only: the service-role bearer with body
- * `user_id`/`workspace_id` (the eval runs AS that user, against that workspace's data), or a
- * platform-admin JWT (runs as the admin, in a workspace they belong to).
- *
- * The turn itself is a normal agent-chat turn — same router, same tools, same model — with one
- * flag, `eval_run: true`, which agent-chat honours only at secret level to skip long-term memory
- * promotion and next-step chips. An eval question must never become a durable "fact" about the
- * user (#370's poisoned memories), and the chips are spend nobody reads here.
- *
- * READING A RUN
- * -------------
- * A failed run carries WHICH WAY it failed: `failure_class` (the first by precedence) and
- * `failure_classes` (every one), from the closed list in `agentEvalVocabulary`. A transport
- * failure and a hedge both score zero and are two different findings; averaged together the
- * information is gone. `action: 'summary'` reads a whole batch that way — fixed denominator,
- * harness failures beside agent failures, tool-set agreement across repeats — and
- * `scripts/run-agent-eval-batch.mjs` runs the repeats that give it a noise floor.
- *
- * Process doc: docs/agent-evaluation.md.
- */
+/** agent-eval — run ONE golden question through agent-chat and score what came back. */
 import { corsHeaders } from '../_shared/cors.ts';
 import { jsonResponse } from '../_shared/http.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
@@ -111,17 +71,7 @@ function pushUnique(arr: string[], v: string) {
   if (v && !arr.includes(v)) arr.push(v);
 }
 
-/**
- * Drive one agent-chat turn and fold its stream into an outcome.
- *
- * `authorization` is the caller's OWN bearer when the caller is a signed-in operator, and the
- * service key only on the service-role path. This matters more than it looks: agent-chat threads
- * the caller's user JWT into ~30 user-scoped tools (`find_records`, `manage_deal`,
- * `manage_finance`, `manage_flows`, the mention and job-research tools…), and on the service-role
- * path that JWT is EMPTY, so every one of them fails with "Empty JWT" / "No active session". The
- * first sweep (batch 20260905-…0001) scored `records.find` as a PASS on a reply that told the user
- * to sign in. A faithful run is a real user turn; the service-role path is for smoke only.
- */
+/** Drive one agent-chat turn and fold its stream into an outcome. */
 async function runTurn(input: {
   supabaseUrl: string;
   authorization: string;

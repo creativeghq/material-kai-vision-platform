@@ -95,11 +95,6 @@ Deno.serve(withApiLogging('crm-lead-score', async (req) => {
       // `.map` / `.filter` / `.length` read off `{data, error, count, status, statusText}`.
       // `.map` is undefined there, so the line threw `interests.map is not a function` straight
       // into the `catch` below, which warns and moves on.
-      //
-      // The consequence is the whole reason this block exists: every property lead has been
-      // scored with NO inquiries, interests, viewings, offer flag, budget or pre-approval —
-      // silently, with the feature reading as working. `inq` kept working by accident, because
-      // `count` genuinely does live on the response rather than on `data`.
       const [{ count: inquiryCount }, { data: interests }, { data: viewings }, { data: ext }] = await Promise.all([
         supabase.from('property_inquiries').select('id', { count: 'exact', head: true }).eq('crm_contact_id', contactId).eq('workspace_id', workspaceId),
         supabase.from('property_interests').select('interest_type').eq('crm_contact_id', contactId).eq('workspace_id', workspaceId),

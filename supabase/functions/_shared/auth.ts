@@ -15,14 +15,6 @@ const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
 /**
  * A client that RLS ACTUALLY APPLIES TO — the anon key plus the caller's own JWT, so Postgres sees
  * the real `auth.uid()` and every policy runs. This is what `supabase` is not.
- *
- * The pattern was already hand-rolled in at least five functions (contracts-api,
- * generate-purchase-sheet-pdf, health-check, finance-customer-documents, company-enrich), each
- * building it slightly differently. One definition here means one thing to get right, and it is
- * available to all ~370 `authenticate()` call sites instead of the five that thought of it.
- *
- * Returns null when SUPABASE_ANON_KEY is unset — callers must treat null as "cannot verify" and
- * fall back to their own workspace filtering rather than silently proceeding unguarded.
  */
 function rlsBoundClient(token: string | null): DbClient | null {
   if (!supabaseAnonKey) return null;
@@ -57,44 +49,12 @@ export interface AuthResult {
    * of a user.
    */
   supabase: DbClient;
-  /**
-   * The same connection with RLS ENFORCED as the calling user (#197 item 4).
-   *
-   * Non-null only at `user` and `anon` levels — `secret` and `api_key` are server-to-server and
-   * have no user to bind to. Null also when SUPABASE_ANON_KEY is unset.
-   *
-   * Use this for reads of tenant data: it makes a missed workspace filter return nothing instead
-   * of everything. Keep `supabase` for writes that legitimately need to cross a policy (job rows,
-   * audit logs, service bookkeeping) — swapping wholesale would break those, which is why this is
-   * additive and adopted per function rather than flipped globally.
-   */
+  /** The same connection with RLS ENFORCED as the calling user (#197 item 4). */
   supabaseAsUser?: DbClient | null;
   apiKey?: ApiKeyContext | null;
 }
 
-/**
- * Unified authentication handler for Supabase Edge Functions
- *
- * Supports:
- * - Secret keys (sb_secret_... or custom) via apikey header → Full admin access
- * - Publishable keys (sb_publishable_... or anon JWT) via apikey header → Client access
- * - User JWT via Authorization header → User-specific access
- *
- * Usage:
- * ```typescript
- * const auth = await authenticate(req);
- * if (!auth.success) {
- *   return new Response(JSON.stringify({ error: auth.error }), { status: 401 });
- * }
- *
- * // Check auth level
- * if (auth.level === 'secret') {
- *   // Full admin access - server-to-server calls
- * } else if (auth.level === 'user') {
- *   // User-specific access - use auth.user and auth.userId
- * }
- * ```
- */
+/** Unified authentication handler for Supabase Edge Functions */
 export async function authenticate(
   req: Request,
   options: {
@@ -132,13 +92,6 @@ export async function authenticate(
     }
 
     // Service-role / admin-secret on the Authorization BEARER (internal server-to-server).
-    // After the new-API-key migration the injected SUPABASE_SERVICE_ROLE_KEY is the opaque
-    // sb_secret_ key. Internal callers (MIVAA, agent-chat, other edge fns) send it as
-    // `Bearer <key>` WITHOUT an apikey header, so the apikey-secret path below misses it and
-    // they fall through to validateUserToken(getUser) → 401. Accept the service key (or the
-    // configured API_SECRET_KEY) here as full secret access — mirrors the inline
-    // `token === SUPABASE_SERVICE_ROLE_KEY` bypass already used by generate-interior-gemini /
-    // generate-catalog-pdf, and matches how the apikey-secret branch grants 'secret' level.
     if ((supabaseServiceKey && token === supabaseServiceKey) ||
         (supabaseSecretKey && token === supabaseSecretKey)) {
       return {
@@ -200,17 +153,6 @@ export async function authenticate(
         // An anonymous caller gets an ANON-KEY client, so RLS genuinely applies with no user
         // context — which is what the original comment here claimed was already true of the
         // service-role client. It was not: service-role bypasses RLS unconditionally.
-        //
-        // Safe to change rather than merely document, because `allowAnon` is passed by ZERO
-        // callers today — this branch is unreachable. Fixing it means the option is correct the
-        // first time someone reaches for it, instead of handing an anonymous request a key that
-        // ignores every policy.
-        //
-        // A missing SUPABASE_ANON_KEY FAILS the request (#363 `EE-8`). The previous
-        // `?? adminClient` kept the branch working when the key was unset, at the cost of
-        // quietly handing an anonymous caller full service-role authority — a misconfiguration
-        // silently converting into the most privileged outcome available. There is no correct
-        // way to serve an anonymous request without the anon key, so say so.
         const anonClient = rlsBoundClient(null);
         if (!anonClient) {
           return {
@@ -286,14 +228,6 @@ async function validateUserToken(
     }
 
     // Check roles if specified.
-    // Reconcile edge auth with the frontend persona model. Authority comes from
-    // TWO sources that must agree: the GLOBAL role (`user_profiles.role_id → roles`) AND
-    // the WORKSPACE role (`workspace_members.role`). A dealer/architect who OWNS a
-    // workspace can hold global role 'user' yet must be allowed business ops — the
-    // frontend already treats them as owner/admin via WorkspaceContext, so the edge must
-    // too. We grant if EITHER source matches `allowedRoles` (additive — never removes
-    // access). Workspace roles are only owner/admin/member/client/finance/accountant, so
-    // a `super_admin`-only gate is unaffected (no membership row ever holds it).
     if (allowedRoles && allowedRoles.length > 0) {
       const [{ data: userProfile }, { data: roles }, { data: memberships }] = await Promise.all([
         adminClient.from('user_profiles').select('role_id').eq('user_id', user.id).single(),
@@ -358,9 +292,6 @@ async function validatePartnerApiKey(
     // Python, in four edge functions and in the browser — five implementations of "hash
     // it the same way" is five chances to disagree about encoding, and disagreeing here
     // is a total auth failure, or worse a silent mismatch on one runtime only.
-    //
-    // The RPC returns metadata only. `is_active` / `expires_at` / `allowed_endpoints`
-    // are still checked HERE: it answers "which key is this", not "may it do that".
     const { data: rows, error } = await adminClient.rpc('verify_api_key', { p_key: token });
     const row = Array.isArray(rows) ? rows[0] : rows;
 
@@ -514,20 +445,7 @@ export function getUserId(auth: AuthResult): string | null {
   return auth.userId;
 }
 
-/**
- * Server-side workspace authorization for edge functions that run under the service role.
- *
- * `authenticate({ allowedRoles })` only proves the caller holds a finance-ish role in
- * SOME workspace — it is an admission gate, NOT authorization for a specific document.
- * Functions that then read/transmit a row by id under the service-role client (which
- * bypasses RLS) MUST additionally bind the caller to that row's workspace, or any tenant's
- * finance user can reach another tenant's documents by iterating ids (cross-tenant IDOR).
- *
- * Returns true when `userId` is an ACTIVE member of `workspaceId`, or holds a global
- * platform-operator role (admin/super_admin). Global operators may act across workspaces;
- * everyone else is bound to their own. auth.uid() is unavailable under service role, so we
- * resolve membership + global role by `userId` directly.
- */
+/** Server-side workspace authorization for edge functions that run under the service role. */
 export async function userCanAccessWorkspace(
   adminClient: DbClient,
   userId: string | null,
@@ -558,12 +476,6 @@ export async function userCanAccessWorkspace(
  * roles.name` in ('admin', 'super_admin'). This is the account tier, which per CLAUDE.md is
  * true in EVERY workspace; it is the only thing in this codebase that means "operates the
  * platform".
- *
- * It is NOT `workspace_members.role = 'admin'`. That is a per-workspace business role held
- * by every tenant's own administrator, and `authenticate({ allowedRoles: ['admin'] })`
- * matches it in ANY workspace. `reset-platform` used that as its operator gate, which meant
- * every customer's admin could globally wipe all tenants' data (#362). Any function whose
- * blast radius crosses tenants must gate on THIS, or on isServiceRoleRequest.
  */
 export async function isPlatformOperator(
   adminClient: DbClient,

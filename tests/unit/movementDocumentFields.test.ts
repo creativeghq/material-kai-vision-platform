@@ -1,25 +1,4 @@
-/**
- * What a myDATA movement document (9.3, or an invoice carrying transport details) has to say.
- *
- * The platform offered SEVEN move purposes, hand-written in four places — the invoice dialog,
- * the delivery-note dialog, the admin detail page and the transmitter's own label map. All four
- * agreed with each other, and all four were wrong from code 6 onwards:
- *
- *   - `6` was labelled "Movement between premises". AADE 6 is **Φύλαξη / Storage**; the actual
- *     Ενδοδιακίνηση is **8**, which was not offered at all. A transfer between two of the
- *     operator's own warehouses was therefore filed as a storage movement.
- *   - `7` was labelled "Consignment". AADE 7 is **Επεξεργασία / Συναρμολόγηση**.
- *   - `9`–`20` did not exist here at all.
- *
- * Alongside that, three things the envelope could not express and one it could get wrong:
- * `startShippingBranch`/`completeShippingBranch` were HARDCODED to 0 while
- * `finance_branches.branch_code` sat unused; `otherMovePurposeTitle` (mandatory on purpose 19)
- * and `otherCorrelatedEntities` (the drop-ship third party) had nowhere to come from; and an
- * unset purpose silently became **1 = Sale**.
- *
- * Every one of those produces a valid document making a false statement, which is why they are
- * pinned here rather than left to a type or a constraint.
- */
+/** What a myDATA movement document (9.3, or an invoice carrying transport details) has to say. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

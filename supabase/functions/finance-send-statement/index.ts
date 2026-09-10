@@ -27,13 +27,6 @@ import { recordPageEvent } from '../_shared/document-events.ts';
 // identity, period, currency), an opening-balance carry-forward line (Προηγούμενα
 // Σύνολα), one row per transaction with debit/credit + progressive (running)
 // debit/credit totals + running balance, and a totals/closing-balance footer.
-// Mailed via the platform email-api edge function.
-// Two modes:
-//   • Single (default): { party_type, party_id, email?, dry_run?, side?, from?, to?, lang? }
-//     — user/role auth, scoped to the party's workspace.
-//   • Cron batch: { mode:'cron_batch' } with header x-cron-secret — iterates every
-//     workspace whose finance_settings.auto_statement_enabled is on and whose schedule
-//     is due, and emails each eligible party their statement. Off by default.
 
 const PAGE_W = 595.28; // A4 portrait
 const PAGE_H = 841.89;

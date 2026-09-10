@@ -1,25 +1,4 @@
-/**
- * Guards the ontology layer against the one failure it was itself an instance of.
- *
- * Phase 1 shipped on 2026-08-26: two tables, six functions, a domain-enforcing trigger, two
- * integrity probes, thirteen passing lifecycle assertions. Five days and 237 commits later it was
- * called by **nothing** — not one TypeScript file, not one SQL function. Its only reference in the
- * whole repository was its own documentation.
- *
- * That is the defect class this codebase is organised around, committed by the person who had
- * just spent a week writing the guards for it. A layer that is correct, probe-guarded and
- * unreachable is indistinguishable at runtime from a layer that was never built, and every green
- * check kept saying it was fine.
- *
- * So these tests do not check that the ontology WORKS — SQL probes do that, and they run against
- * the live functions this repo never commits. They check that it is REACHED.
- *
- * SCOPE — read before trusting a green run.
- * These scan repo files. `ontology_concept_types`, `ontology_bindings`, the validation trigger and
- * every `ontology_*` function live only in `pg_proc` / `pg_constraint` (CLAUDE.md: SQL is applied
- * through the MCP and never committed). The runtime half is watched by
- * `ontology.duplicate_alias_home` and `ontology.candidates_unreviewed`.
- */
+/** Guards the ontology layer against the one failure it was itself an instance of. */
 import { describe, it, expect } from 'vitest';
 import { readSource, strippedSource, sourceIndex } from '../helpers/sourceIndex';
 
@@ -143,18 +122,7 @@ describe('the ontology vocabulary stays single-homed', () => {
     );
   });
 
-  /**
-   * The anti-duplication contract, in the half a repo scan can see.
-   *
-   * Terminology→concept mapping already existed in FOUR places before this layer —
-   * `material_categories.vocab_aliases`, `.controlled_vocab`, `material_category_aliases` and
-   * `facet_canonical_values` — none of which knew about the others. `facet_canonical_values` owns
-   * canonical facet values, with aliases and embeddings and a pipeline behind it; adding
-   * `facet_value` as a concept type would make this layer the fifth copy it was built to prevent.
-   *
-   * The DB half is `ontology.duplicate_alias_home`, which fires when a term is confirmed in two
-   * homes at once.
-   */
+  /** The anti-duplication contract, in the half a repo scan can see. */
   it('facet_value never becomes a concept type', () => {
     const offenders: string[] = [];
     for (const [file, src] of INDEX.stripped()) {

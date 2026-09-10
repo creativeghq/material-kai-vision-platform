@@ -1,20 +1,6 @@
 /**
  * Tenant webhook management (#330) — register / update / rotate / delete an outbound endpoint,
  * and read its delivery log.
- *
- * Why this is an edge function rather than direct PostgREST writes: three things have to happen
- * server-side and cannot be trusted to a client.
- *   - The **signing secret** is generated here and returned exactly once. `secret` is
- *     column-level revoked from `authenticated`, so nothing can read it back afterwards; losing
- *     it means rotating it.
- *   - The **URL is SSRF-checked before it is ever stored**, so a hostile endpoint never even
- *     reaches the deliveries table. (The dispatcher re-checks at delivery — DNS moves.)
- *   - The **event types are validated against a fixed allowlist**, so a subscription cannot be
- *     created for an event the platform does not emit and then quietly never fire.
- *
- * Tenancy: `workspace_id` is always reconciled against the caller's JWT via
- * `userCanAccessWorkspace`. A body-supplied workspace is never trusted, and a mismatch returns
- * 404 rather than 403 so endpoint ids cannot be enumerated.
  */
 import { createClient } from '@supabase/supabase-js';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';

@@ -1,14 +1,4 @@
-/**
- * KB Generate Embedding Edge Function
- *
- * Generates a text embedding for a KB document using the shared MIVAA
- * embedding infrastructure (Voyage AI, 1024D — model is whatever MIVAA's
- * `voyage_model` setting resolves to, currently voyage-4). Updates kb_docs
- * with the resulting vector + embedding_model, and sets embedding_status.
- * Query embeddings MUST use the same model as stored docs — a
- * cross-generation mismatch (e.g. voyage-3.5 doc vs voyage-4 query) yields
- * near-zero cosine and silently returns 0 search results.
- */
+/** KB Generate Embedding Edge Function */
 
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -205,9 +195,6 @@ Deno.serve(withApiLogging('kb-generate-embedding', async (req: Request) => {
     // `failed` on a doc that had embedded perfectly well moments earlier. The vector
     // survived (nothing clears it), so the row stayed searchable while reporting
     // failure forever: the backfill skips it (it selects on `text_embedding IS
-    // NULL`), so nothing ever corrected the label. 33 of 145 rows landed in that
-    // state on the 2026-08-26 re-import. `.is('text_embedding', null)` makes the
-    // write conditional on the row genuinely having nothing.
     if (doc_id) {
       try {
         const { error: markError } = await supabaseAdmin

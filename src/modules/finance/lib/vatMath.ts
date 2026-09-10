@@ -1,19 +1,4 @@
-/**
- * VAT / currency math — the pure, hermetic core of the finance module.
- *
- * These functions are money- and compliance-sensitive (they decide the myDATA VAT
- * category stamped on every invoice / credit note / expense line), so they live in
- * one dependency-free module that `tests/unit/vatMath.test.ts` guards directly. No
- * supabase import, no I/O — importing this file must never touch the network or env.
- *
- * `financeService.ts` re-exports `round2` / `extractNet` from here (back-compat for the
- * components that import them from the service) and uses `vatCategory` for the credit-note
- * rate→category mapping, so this module is the SINGLE source of truth on the frontend.
- *
- * NOTE — deliberate cross-runtime mirror: `supabase/functions/_shared/fiscal/invoice-builder.ts`
- * carries its own copy of the same map (`VAT_PCT_TO_CATEGORY`) because it runs on Deno and
- * cannot import a Vite/node module. Keep the two maps identical when either changes.
- */
+/** VAT / currency math — the pure, hermetic core of the finance module. */
 
 /**
  * Round to 2 decimals (currency). Canonical implementation lives in `@/utils/decimal` — money is

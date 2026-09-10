@@ -1,29 +1,4 @@
-/**
- * find_records — the agent's cross-entity record lookup.
- *
- * The agent had 171 tools and not one of them answered "find the record called X". Every lookup
- * it owned was either content/material (`material_search`, `visual_search`,
- * `knowledge_base_search`), external (`seo_*`, `web_search`, `company_registry_lookup`), a
- * per-entity lister (`list_my_projects`), or `search_crm_by_kad` — CRM by ACTIVITY CODE, not by
- * name. So "find tsatsos" had nothing to fire.
- *
- * This wraps `public.global_search`, the SAME derivation the ⌘K palette uses (issue: one
- * question, one answer). Adding a searchable record type means adding a CTE there and an entry in
- * `GLOBAL_SEARCH_KINDS` — never a second lookup here.
- *
- * TENANCY — read before changing the client:
- * `global_search` is SECURITY INVOKER **on purpose**: each table's own RLS (`user_can_read_invoice`,
- * `_user_is_active_project_collaborator`, per-creator quote reads, own-rows-only agent chats) is
- * what scopes the answer. Calling it with the SERVICE-ROLE client would bypass every one of those
- * and hand the model rows the human it is acting for cannot see — the exact "service-role client +
- * trust" shape the security invariants exist to prevent. It would ALSO silently return no people
- * at all, because `search_workspace_people` self-guards on `auth.uid()`, which a service-role call
- * does not have.
- *
- * So this tool calls it as the USER, with their JWT, and **fails closed** when there is no JWT
- * (partner `kai_` keys, cron): it returns an explicit error rather than falling back to a client
- * that would answer too much.
- */
+/** find_records — the agent's cross-entity record lookup. */
 
 // `tool` is typed non-generically ON PURPOSE — see the note in docs-tools.ts. Inferring it pulls
 // @langchain/core's generic graph into every module that defines a tool, which is what makes

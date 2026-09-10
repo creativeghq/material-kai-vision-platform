@@ -1,16 +1,4 @@
-/**
- * The three Channels billing tables, on screen.
- *
- * `whatsapp_cost_reconciliation`, `channel_recurring_charges` and the held numbers were all
- * written on a schedule and rendered nowhere — the same shape as the leak this subsystem was built
- * to close: a number sitting somewhere no one looks. A held number's only trace was a console
- * warning.
- *
- * The jobs strip is the part that stops this screen lying. Every table here can be empty for two
- * opposite reasons — nothing happened, or the job that records it stopped — and they look
- * identical. So the last run of each cron sits above the tables, and an empty table says which
- * kind of empty it is instead of leaving the reader to assume the happy one.
- */
+/** The three Channels billing tables, on screen. */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Receipt, RefreshCw, Loader2, PauseCircle, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';

@@ -1,13 +1,4 @@
-/**
- * Email Marketing service — workspace-scoped campaigns + templates for the tenant module.
- *
- * All reads/writes carry the active workspace_id; RLS (is_workspace_member) enforces tenancy.
- * Audience resolution and recipient materialization go through resolve_campaign_audience /
- * campaign_materialize_recipients — the single SQL derivation of "who does this campaign go to".
- * SQL derives, this file formats; do not rebuild the union/dedupe here.
- * Sends are driven by the campaign-processor cron via email-api with strict BYOK — nothing here
- * calls Resend directly.
- */
+/** Email Marketing service — workspace-scoped campaigns + templates for the tenant module. */
 import { supabase } from '@/integrations/supabase/client';
 import type { ConsentBasis } from '../consentBasis';
 import type { Json } from '@/integrations/supabase/types';

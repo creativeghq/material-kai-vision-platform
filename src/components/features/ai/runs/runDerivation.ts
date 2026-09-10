@@ -1,14 +1,4 @@
-/**
- * runDerivation — the run is DERIVED from the stream, never restated by hand.
- *
- * agent-chat already emits `tool_call` / `tool_progress` / `tool_result` / `tool_error`
- * for every tool on every turn, and `workflow_*` for the eight planned pipelines. This
- * module is the only place that reads them into an `AgentRunState`, so a toolkit gets a
- * live progress surface by existing — not by someone remembering to write one.
- *
- * Pure and framework-free on purpose: every rule below is a unit test in
- * tests/unit/agentRunProgress.test.ts rather than something you have to run the app to see.
- */
+/** runDerivation — the run is DERIVED from the stream, never restated by hand. */
 import { findTool, TOOLKITS } from '../agentToolsCatalog';
 import { getWorkflow } from '../workflows/workflowRegistry';
 import type { WorkflowRuntimeState } from '../workflows/types';

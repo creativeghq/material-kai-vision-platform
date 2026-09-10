@@ -71,7 +71,6 @@ export interface ContentLandscapeSummary {
  * pipeline (plan / write / analyze) can read AI Overview text, featured-
  * snippet targets, PAA answers, related searches, video / news / shopping
  * carousels, knowledge-graph presence, and paid competition straight off
- * the research blob — no extra calls, no extra credits.
  */
 export interface MentionOpportunity {
   type: string;
@@ -288,20 +287,7 @@ export interface ContentFix {
   affectedSection: string | null;
   autoFixable: boolean;
   applied: boolean;
-  /**
-   * What this fix can actually be applied TO.
-   *
-   *  - `section` — one located block, carried verbatim in `anchor`. Applying it rewrites
-   *    that block and nothing else, so a bad edit can only damage the paragraph it touched.
-   *  - `document` — a property of the article as a whole (keyword density, depth, entity
-   *    coverage). There is no single paragraph to rewrite.
-   *  - `config` — not in the body at all. Meta tags come from the plan; provenance and
-   *    firsthand experience come from the content brief. Rewriting prose cannot fix these,
-   *    which is why they are the ones that keep the score down no matter how often the
-   *    fixer runs.
-   *
-   * Absent means `document`, so an unclassified fix is never offered a targeted apply.
-   */
+  /** What this fix can actually be applied TO. */
   scope?: 'section' | 'document' | 'config';
   /**
    * The exact block this fix is about, VERBATIM, when `scope` is `section`.
@@ -352,11 +338,6 @@ export interface GEOScore {
      * materially more often than the same page left to age, and nothing in this
      * analyzer had any notion of age at all — a three-year-old article and one
      * written this morning scored identically.
-     *
-     * Fed by `content_dated_at` on the request (the article's `last_reviewed_at`,
-     * falling back to `completed_at`). ABSENT for a draft being analysed before it
-     * has ever been published, which is not the same as stale: an unpublished draft
-     * scores full marks rather than being penalised for a date it cannot have.
      */
     freshness: number;
   };
@@ -405,16 +386,7 @@ export interface MissingTopic {
    * time they get here and neither is a number to rank decisions by.
    */
   searchVolume: number | null;
-  /**
-   * How many ranked competitors cover it — counted over their titles AND section headings.
-   *
-   * NULL when it cannot be measured, which today is always: `CompetitorData.headings` is declared
-   * and the SERP client never populates it, and a page's TITLE is its marketing headline, not its
-   * coverage. Counting from titles alone returns 0 for every multi-word keyword, which is a
-   * confident "no competitor covers this" built from no evidence — the fake constant this rewrite
-   * removed, wearing a different hat. A stated "not measured" is the honest answer until headings
-   * are collected.
-   */
+  /** How many ranked competitors cover it — counted over their titles AND section headings. */
   competitorCount: number | null;
   /** 0-1, from the keyword's opportunity score where research computed one. */
   relevanceScore: number;

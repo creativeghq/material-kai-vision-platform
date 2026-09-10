@@ -4,12 +4,6 @@
  *   - WorkflowTracker  → resolve step metadata when a chunk arrives
  *   - CommandPalette   → list available workflows + launch a fresh one
  *   - WorkflowInlineForm → render input forms when a step asks for user input
- *
- * Adding a new workflow:
- *   1. Append a new WorkflowDefinition to WORKFLOWS below.
- *   2. Update the agent (prompt + tools) to emit workflow_plan / step_progress
- *      chunks for each step.
- *   3. Optional: add starter examples for the command palette.
  */
 import type { WorkflowDefinition } from './types';
 

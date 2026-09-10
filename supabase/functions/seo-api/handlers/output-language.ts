@@ -1,17 +1,4 @@
-/**
- * The language the ARTICLE is written in.
- *
- * `language_code` used to reach the research stage only — it is a DataForSEO parameter, and
- * that is all it was ever wired to. So a run could research Greek SERPs and then plan and
- * write in English, because nothing downstream of research was ever told. It mostly did not
- * show: a Greek keyword and Greek competitor headings drag the model into Greek on their
- * own. "Mostly" is the problem — the output language was an emergent property of the
- * research, not an instruction, so it was correct until the day it was not.
- *
- * A prompt directive rather than a schema field on purpose. The plan and write prompts are
- * loaded from `prompts` (admin-editable, no code fallback), so the language has to be
- * appended as context by the caller rather than baked into a prompt row per language.
- */
+/** The language the ARTICLE is written in. */
 
 /**
  * "el" / "el-GR" → "Greek". Falls back to the raw code, which is still a usable

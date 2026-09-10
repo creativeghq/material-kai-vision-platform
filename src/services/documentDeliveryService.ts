@@ -4,20 +4,6 @@ import { emptyTrail, type DeliveryTrail, type DocumentEntityType, type EmailStat
 /**
  * Delivery trail — "was this document emailed, did it arrive, did they open it,
  * and did they look at the public page?"
- *
- * ONE derivation, in SQL (`get_document_delivery`). This module fetches and
- * FORMATS; it never re-derives. Specifically: do not compute `emailStatus` from
- * a timestamp pair, do not add `viewCount` up from raw events, and do not read
- * the legacy per-row counters (`properties.view_count`,
- * `moodboard_presentation_sheets.share_view_count`, …) — those are cached copies
- * kept only for existing UI, and a nightly drift check compares them to this.
- *
- * See CLAUDE.md, "One derivation per money quantity" — the same rule applied to a
- * delivery quantity, for the same reason: a wrong count is a valid number, so
- * nothing raises when a second implementation disagrees.
- *
- * The vocabulary (entity types, statuses, the trail shape) lives in
- * ./documentDeliveryTypes so the registry guard can read it without a client.
  */
 
 export { DOCUMENT_ENTITY_TYPES, emptyTrail } from './documentDeliveryTypes';

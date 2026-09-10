@@ -1,13 +1,6 @@
 /**
  * Create Campaign Modal
  * Form to create a new email campaign.
- *
- * The audience radio is a WRITER for the one canonical audience shape (`CampaignAudience`); the
- * resolve and the recipient insert both happen in SQL. This page used to store its own
- * `{ type, emails, recipients }` variant in the same jsonb column and materialize recipients with a
- * private copy of the logic — so a campaign created here resolved to zero recipients everywhere
- * else, its "estimate" counted rows the send would not use, an address held by both a user and a
- * contact was emailed twice, and no recipient ever got merge vars.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -211,18 +204,7 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
     }
   };
 
-  /**
-   * Synchronous in-flight latch (#357 AE-17).
-   *
-   * `loading` is React state, so it cannot stop a submit that is already queued — a double-click
-   * or a double Enter fires the handler twice before the first `setLoading(true)` has rendered,
-   * and `disabled={loading}` on the button is the same state one render behind. A campaign
-   * created twice is two campaigns to the SAME audience, and `campaign-processor` will
-   * cheerfully send both: they are distinct rows, so the per-recipient claim added in AE-4
-   * cannot absorb them — exactly the distinction #355 WH-3 records about duplicate POs.
-   *
-   * A ref is set and read in the same synchronous turn. State is not.
-   */
+  /** Synchronous in-flight latch (#357 AE-17). */
   const submitting = React.useRef(false);
 
   const handleSubmit = async (e: React.FormEvent) => {

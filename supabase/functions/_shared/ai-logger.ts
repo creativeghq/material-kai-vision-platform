@@ -1,13 +1,4 @@
-/**
- * AI Call Logger for Supabase Edge Functions
- * 
- * Universal logging service for tracking all AI API calls with:
- * - Cost calculation
- * - Latency tracking
- * - Confidence scoring
- * - Fallback decision tracking
- * - Request/response data storage
- */
+/** AI Call Logger for Supabase Edge Functions */
 
 import type { DbClient } from './supabase-client.ts';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
@@ -59,23 +50,6 @@ async function getDbTokenPricing(supabase: DbClient): Promise<Record<string, Tok
  * THE token-price derivation for the edge runtime. Every caller that needs to turn
  * (model, tokens) into USD goes through this — `AICallLogger.calculateCost` below and
  * `_logTrackedCall` in `_shared/ai-client.ts`.
- *
- * `ai_model_pricing` or NOTHING. There is no literal fallback table any more (#365 `AD-17`).
- *
- * There used to be one, sitting directly above this function, and its own docstring warned
- * against exactly what it was: "Do NOT add a second price table anywhere. ai-client.ts carried
- * one for months and it silently priced Gemini 3.5 Flash at a third of the real rate and Opus at
- * three times it." That warning was true and the table underneath it was the same hazard — it
- * still carried Opus and Haiku rates, and `text-embedding-3-*` entries for OpenAI models this
- * platform removed and no longer calls.
- *
- * A fallback price is worse than no price for the reason a fallback embedder is worse than no
- * vector: it is invisible when it fires. The DB being unreachable is a condition the caller must
- * be able to see, and `null` is how it sees it. A plausible number instead means the cost is
- * wrong and the row looks fine.
- *
- * Returns the per-row `markup` too, so callers never re-apply a global constant that has drifted
- * from the table.
  */
 export async function resolveTokenPrice(
   supabase: DbClient,
@@ -105,18 +79,7 @@ export async function resolveTokenPrice(
   return null;
 }
 
-/**
- * (model, tokens) → CREDITS, through the one price derivation.
- *
- * Every reserve/settle site was hand-rolling these four lines — `real-estate-api/ai.ts` and
- * `b2b-tools.ts` each carry their own copy, and one of those copies spent months multiplying by a
- * hardcoded 15.00/75.00 while the row it wrote named a model priced at 5.00/25.00. Same shape as
- * every other duplicated derivation here: a valid number, disagreeing.
- *
- * Returns `null` when the model has no `ai_model_pricing` row. That is NOT zero and must not be
- * settled as zero — an unpriced model is a gap in the price table, and charging nothing for it is
- * the silent-zero mistake with the sign flipped. Callers keep their reserved ceiling and say so.
- */
+/** (model, tokens) → CREDITS, through the one price derivation. */
 export async function creditsForTokens(
   supabase: DbClient,
   model: string,
@@ -144,12 +107,6 @@ export async function creditsForTokens(
 // second of output, which is why `resolveTokenPrice` above has nothing to say about them and
 // why every image/video call went to the provider without an `ai_usage_logs` row (#363 `EE-2`).
 // Same table, same markup column, different `billing_type`.
-//
-// There is deliberately NO hardcoded fallback table here. A token model with no row can fall
-// back to a published list price that changes slowly; a per-unit price is a number somebody
-// has to verify against the provider's page, and guessing one writes a plausible wrong cost
-// into the billing record. `null` means "not priced yet" and the caller logs the spend with a
-// null cost plus a warning, so `ops.silent_zero` can see the gap instead of a confident zero.
 export interface UnitPrice { perUnit: number; unitLabel: string; markup: number }
 let _dbUnitPriceCache: { data: Record<string, UnitPrice>; expiresAt: number } | null = null;
 let _dbUnitPriceFetch: Promise<Record<string, UnitPrice>> | null = null;
@@ -234,21 +191,7 @@ async function getGenerationModelPricingKeys(supabase: DbClient): Promise<Record
   return _genModelPricingKeyFetch;
 }
 
-/**
- * THE per-unit price derivation for the edge runtime — images and video seconds.
- *
- * Resolution goes through `generation_models.pricing_key`, which is the FK that already exists
- * precisely so routing and money stay separate: the registry says which model to call, the
- * pricing table says what it costs, and neither restates the other. `pricing_key = null` is a
- * deliberate statement ("no verified cost for this model") and returns null here rather than
- * falling through to a name-similar row — `veo-2` carries exactly that today.
- *
- * Only if the caller's string is not a registry id/slug do we try it as an `ai_model_pricing`
- * key directly, for the per-unit rows that have no generation_models entry at all (the Anthropic
- * vision and third-party service rows). Matching is EXACT at both steps: the per-unit keys are
- * near-identical to each other (`kling-3.0` vs `kling-1.6-pro`, `gemini-3-pro-image` vs
- * `gemini-3.1-flash-image`) and a substring hit across them bills one model at another's rate.
- */
+/** THE per-unit price derivation for the edge runtime — images and video seconds. */
 export async function resolveUnitPrice(
   supabase: DbClient,
   modelKey: string,
@@ -412,17 +355,7 @@ export class AICallLogger {
     }
   }
 
-  /**
-   * Log a call that FAILED or timed out (#365 `AD-16`).
-   *
-   * Every helper on this class reads `response.usage`, so it can only describe a call that came
-   * back. A provider call that 500s, times out or is refused for quota still cost latency, still
-   * may have cost money upstream, and is the single most useful row to have when a metric goes to
-   * zero — and there was no way to write it. MIVAA had the same gap and closed it in `a85f8a5`.
-   *
-   * `unbilled_reason` is set so the row is self-describing: a zero cost here means "the call
-   * failed", never "the call was free".
-   */
+  /** Log a call that FAILED or timed out (#365 `AD-16`). */
   async logFailedCall(
     task: string,
     model: string,

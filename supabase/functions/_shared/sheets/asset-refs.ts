@@ -1,30 +1,4 @@
-/**
- * A presentation sheet owns PRIVATE COPIES of the images it shows (#392).
- *
- * THE PROBLEM. A sheet's layout stored absolute URLs into `generation-images`, a public bucket.
- * Revoking the client-view token therefore revoked nothing: whoever kept a URL kept the image,
- * and anyone who learned the path could construct one. The first remedy proposed — store
- * `{bucket, path}` and resolve at render — changes what sits in the layout and nothing about who
- * can fetch the file, because on a public bucket the resolved URL is the same URL.
- *
- * THE SECOND TRAP, which is why this copies rather than re-points. A sheet's images come from two
- * places: an upload the operator made for this sheet, and an image belonging to a moodboard item
- * (a product photo, a generated render) that the rest of the platform hotlinks from the same
- * public bucket. Moving only the uploads would put the minority of a sheet's assets behind the
- * share boundary and leave the rest exactly where they were — a partial fix that reads like a
- * complete one.
- *
- * So the sheet SNAPSHOTS every image it references, into `sheet-assets/<sheet_id>/`. That buys a
- * second thing worth having on its own: the sheet stops changing when the moodboard does. A sheet
- * handed to a client is a DOCUMENT, and this platform already has that rule written down for the
- * other one — an invoice prints from `counterparty_snapshot`, frozen at issue, precisely so that
- * editing the customer later does not rewrite a document somebody already holds.
- *
- * THE REFERENCE IS A STRING, deliberately. `sheet-asset://<path>` goes exactly where the URL went,
- * so every payload shape, every validator and all ~30 render sites keep working unchanged, and
- * resolution happens at two boundaries instead of thirty (`fetchImageBytes` server-side,
- * `moodboardSheetsService.get/list` client-side).
- */
+/** A presentation sheet owns PRIVATE COPIES of the images it shows (#392). */
 
 export {
   SHEET_ASSET_BUCKET,
@@ -62,13 +36,6 @@ export interface SnapshotReport {
 /**
  * Copy every image the payload references into the sheet's private folder and rewrite the value
  * to a `sheet-asset://` ref.
- *
- * A source that cannot be fetched is LEFT AS IT WAS rather than dropped or blanked. A sheet whose
- * hero image silently vanished because one fetch 404'd is worse than one still pointing at a
- * public URL, and the report says which — the caller decides what to tell the operator.
- *
- * Already-snapshotted refs pass through untouched, so re-running this on an existing payload (an
- * edit, a re-render) is free and idempotent.
  */
 export async function snapshotSheetAssets(
   supabase: { storage: { from: (b: string) => any } },

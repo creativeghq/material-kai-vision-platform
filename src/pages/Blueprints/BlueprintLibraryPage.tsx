@@ -27,10 +27,6 @@ import { BlueprintScope } from '@/components/features/blueprint/BlueprintScope';
  * only stable one this record has. `project_type` looks like the obvious grouping and is not: it is
  * free text (PlanTab writes the plan's own title into it), so a rail built from it would be a
  * different rail in every workspace and would rename itself whenever someone renamed a plan.
- *
- * `status: 'archived'` is deliberately NOT a tab either. Nothing in the UI ever sets it — `remove()`
- * is a hard delete — so the tab would be permanently empty, which is the inert-UI shape the nav
- * guard exists to prevent elsewhere. Give it a tab when something can actually archive.
  */
 const MINE_TAB = 'mine';
 

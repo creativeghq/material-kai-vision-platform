@@ -1,20 +1,4 @@
-/**
- * Webhooks Panel
- *
- * Admin-only view of webhook health, mirroring CronJobsPanel. Two sections:
- *  - Inbound flow webhooks: every flow with trigger_type='webhook' + its last
- *    run / 24h stats from flow_runs ("did this webhook fire properly last time?").
- *  - Outbound webhook endpoints: configured delivery targets (webhook_endpoints)
- *    + their delivery health from webhook_calls.
- *
- * Mounted inside SystemHealthMonitor on /admin → Operations → System Health,
- * directly below the Cron Jobs panel.
- *
- * Data sources (admin-gated SECURITY DEFINER RPCs):
- *   public.get_webhook_inbound_status()
- *   public.get_webhook_outbound_status()
- *   public.get_webhook_inbound_history(flow_id, limit)
- */
+/** Webhooks Panel */
 
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';

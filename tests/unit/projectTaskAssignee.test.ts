@@ -1,20 +1,4 @@
-/**
- * Who is doing this (#378 N2).
- *
- * `project_tasks.assignee_id` referenced `auth.users`, so work could only be given to somebody with
- * a platform LOGIN — while `hr_employees` is the roster that knows who actually works here, and a
- * fitter or a subcontractor without an account is exactly who a site task is for. The column, its
- * FK and `CreateTaskInput.assignee_id` all existed; **the tasks UI rendered no assignee at all**,
- * so the schedule could not answer "who" and crew planning happened off-platform.
- *
- * The failure mode this guards is the one that shipped last time in a different costume: a control
- * that renders and writes nothing. Three ways that happens here, each with a test:
- *
- *   1. the picker is populated by nothing        → an empty dropdown, forever
- *   2. picking somebody writes neither column    → a Select that changes no data
- *   3. one column is set without clearing the other → the DB CHECK rejects the write, or worse,
- *      a task ends up with two owners and the row means nothing
- */
+/** Who is doing this (#378 N2). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

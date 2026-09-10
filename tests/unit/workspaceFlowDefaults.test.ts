@@ -2,26 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { stripComments } from '../helpers/stripComments';
 
-/**
- * Platform defaults — the workspace owner's off switch over the OPERATOR's seeded flows.
- *
- * The seeded `system-default` flows are `is_global` with `workspace_id IS NULL`, and flow-engine
- * matches `is_global.eq.true` for EVERY workspace. They therefore run inside a tenant's workspace,
- * raising its bells and mailing its members, while being invisible on every tenant surface. The
- * measured state before this shipped: 115 flows, ALL global, ZERO workspace-owned — so the tenant
- * Automations page was structurally empty for every workspace that has ever existed, and
- * "stop emailing me on every WhatsApp reply" had no answer in the product at all.
- *
- * The fix is an OVERLAY (`workspace_flow_preferences`), never a per-workspace COPY of the defaults.
- * That choice is the thing worth guarding: copies would drift the moment the operator fixed a
- * default, and this repo has paid for that shape repeatedly.
- *
- * WHAT THIS FILE CAN AND CANNOT SEE. The RPCs live in `pg_proc`, which a repo-file test cannot
- * read — so the SQL half (admin gate, tenant_configurable filter, channel narrowing) is enforced
- * by the functions themselves and probed by hand, not here. What IS checkable from the repo is the
- * client/engine half, and each case below is a failure that would be SILENT: the switch renders and
- * does nothing, or the surface quietly stops existing again.
- */
+/** Platform defaults — the workspace owner's off switch over the OPERATOR's seeded flows. */
 
 const SECTION = 'src/modules/flows-toolkit/components/PlatformDefaultsSection.tsx';
 const PAGE = 'src/modules/flows-toolkit/pages/FlowsPage.tsx';
@@ -36,18 +17,7 @@ const ENGINE = 'supabase/functions/flow-engine/index.ts';
  */
 const readCode = (p: string) => stripComments(readFileSync(p, 'utf8'));
 
-/**
- * The body of a top-level `async function`, by name.
- *
- * Written out because both obvious one-liners are quietly broken on these signatures:
- *   • `indexOf('async function', start)` returns **-1** for the last such declaration in the file,
- *     and `slice(start, -1)` is not "empty" — it is the whole rest of the source, so the assertion
- *     passes on text from anywhere below. That is how a guard goes green while pointing at nothing.
- *   • brace-matching from the first `{` lands inside the SIGNATURE, not the body:
- *     `handleTriggerEvent(…, body: { event_type: string … })` opens one in a parameter type, and
- *     `executeAction(…): Promise<{ output: … }>` opens one in the return type.
- * So: match the parameter parens, then take the first `{` at angle-bracket depth zero.
- */
+/** The body of a top-level `async function`, by name. */
 function functionBody(src: string, name: string): string {
   const start = src.indexOf(`async function ${name}(`);
   expect(start, `could not find ${name} in the source`).toBeGreaterThan(-1);
@@ -130,7 +100,6 @@ describe('platform defaults — tenant surface', () => {
     // rule, and it fails in the quietest possible way: mute the only channel of an in-app-only
     // default and the row keeps its switch ON while the notification can no longer deliver
     // anything. A wrong switch position is a valid switch position — nothing raises, and it looks
-    // correct again after a reload, which is how it stayed unnoticed the first time.
     const src = readCode(SECTION);
     const save = src.slice(src.indexOf('const save = async'), src.indexOf('const toggleChannel'));
     expect(save.length, 'could not find the save() writer').toBeGreaterThan(0);
@@ -220,10 +189,6 @@ describe('platform defaults — engine', () => {
     // walk and the loop-node body, which fans an action out per item — so a check placed at either
     // call site alone lets the other through. A looped send_email that ignores the mute is worse
     // than no mute at all: the owner switched it off and got MORE mail than a normal run.
-    // Sliced to the PREAMBLE — declaration up to the `switch (actionType)` that dispatches — rather
-    // than brace-matched: executeAction's body is full of `{{template}}` placeholders inside string
-    // literals, and a brace counter that cannot tell code from text gives up on it. The preamble is
-    // also the stricter claim: the mute has to be decided before the dispatch, not somewhere in it.
     const engine = readCode(ENGINE);
     const start = engine.indexOf('async function executeAction(');
     expect(start, 'could not find executeAction in flow-engine').toBeGreaterThan(-1);

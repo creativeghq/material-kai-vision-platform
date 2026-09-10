@@ -1,20 +1,4 @@
-/**
- * Deal pipeline board (#311) — one board for every deal type.
- *
- * Lifted out of Real Estate, which was only ever its first consumer. The stage columns come from
- * `crm_deal_stages` for the SELECTED TYPE, never from a constant in this file: the property stage
- * set ends `conveyancing → exchanged → completed`, and a construction deal must never land in one
- * of those. The database enforces the pairing (composite FK on `(deal_type_id, stage)`), so a bug
- * here fails loudly instead of writing a nonsense stage.
- *
- * A deal moves stage by DRAG, by the per-card <Select>, or from the drawer. All three go through
- * `dealsService.moveToStage`, so a winning stage wins the deal whichever route was taken. The
- * Select is not a leftover: drag-and-drop is unusable with a keyboard or a screen reader, and on a
- * touch device a horizontal board that also drags horizontally fights the user's scroll.
- *
- * `lockedTypeKey` pins the board to one type and hides the type switcher; Real Estate passes
- * 'real_estate' so its tab is unchanged, while /crm shows all types with the switcher.
- */
+/** Deal pipeline board (#311) — one board for every deal type. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -581,25 +565,7 @@ const DealTasks: React.FC<{ ws: string; dealId: string; canManage: boolean; onCh
 
 interface SubjectOption { id: string; label: string }
 
-/**
- * Create or edit a deal.
- *
- * ── Type comes FIRST ────────────────────────────────────────────────────────────────────────
- * The dialog used to inherit its type silently from whichever board tab happened to be selected,
- * and open straight onto a "Property" picker. From inside the dialog there was no way to see what
- * kind of deal was being created, and no way to change it — so picking a property was the first
- * question asked about a deal whose type nobody had been asked about.
- *
- * Type is now the first field, and everything downstream follows from it: the stage list, and
- * whether the subject picker offers properties, projects or nothing at all. Changing it resets
- * both, which is not a nicety — `crm_deals` has a composite FK on `(deal_type_id, stage)`, so
- * carrying the old stage across would be rejected by the database, and carrying the old
- * property_id across would attach a listing to a construction deal.
- *
- * On an EDIT the type is fixed and shown read-only. Retyping a live deal would have to move it to
- * a stage in the new type's set and silently drop its subject; that is a different operation from
- * editing, and doing it behind an innocuous-looking dropdown is how a deal loses its history.
- */
+/** Create or edit a deal. */
 const DealDialog: React.FC<{
   ws: string;
   types: DealType[];

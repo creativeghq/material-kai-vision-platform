@@ -4,41 +4,7 @@ import { join } from 'path';
 
 import { stripComments } from '../helpers/stripComments';
 
-/**
- * No database write in `src/` discards its result (#389).
- *
- * This is not "missing error handling". The reason is written in the codebase already,
- * next to the fix that prompted it, in `PriceLookupDrawer`:
- *
- *   > The error MUST be destructured and thrown. supabase-js RESOLVES on an RLS denial
- *   > rather than throwing, so discarding it let a rejected write flow straight into the
- *   > "Price confirmed" toast below and close the drawer — the user saw a price they
- *   > believed was saved, the catalog was unchanged, and no second signal existed
- *   > anywhere. The enclosing try/catch could not help: nothing threw.
- *
- * So an unbound write that RLS denies is COMPLETELY silent. A surrounding try/catch does
- * not catch it, because nothing was thrown, and the UI proceeds as though it succeeded.
- * It is the same family as every silent-zero defect in this platform: a plausible
- * outcome, no signal, and a number or a row that is simply wrong afterwards.
- *
- * WHY ZERO AND NOT A RATCHET
- * ---------------------------
- * The population was 27 and every one had a decision available — check it, or say in a
- * comment that it is deliberately fire-and-forget. Both are cheap, so there is no honest
- * reason for a tolerated remainder. A ratchet is the right tool when the debt cannot be
- * paid in one change; here it could.
- *
- * If a genuinely fire-and-forget write appears, bind the error and ignore it explicitly
- * (`const { error } = ...` with a comment). That reads as a decision. An unbound await
- * reads as an oversight, and after enough of them nobody can tell which is which — which
- * is the actual thing this test protects.
- *
- * THE MATCHER STOPS AT THE STATEMENT
- * -----------------------------------
- * `[^;]*?` matters. A looser version that scanned forward N characters attributed a
- * LATER statement's `.insert(` to an earlier `await supabase.rpc(...)`, which put five
- * false positives in the first count of this sweep.
- */
+/** No database write in `src/` discards its result (#389). */
 
 const ROOT = join(__dirname, '..', '..');
 const SRC = join(ROOT, 'src');

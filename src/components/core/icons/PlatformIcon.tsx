@@ -1,17 +1,4 @@
-/**
- * The social networks' own marks, in one registry.
- *
- * Profile → Social Accounts used to label every network with an emoji — a camera for Instagram,
- * two silhouettes for Facebook, a briefcase for LinkedIn, a musical note for TikTok. None of them
- * is the network's mark, they render differently on every OS, and three separate components each
- * kept their own copy of the map, so the camera and the briefcase had to be got right three times.
- *
- * Paths are the official single-colour marks from simple-icons (CC0), inlined rather than pulled
- * in as a dependency: nine glyphs do not justify a package, and an inline path cannot drift with a
- * version bump. Marks whose brand colour is black or white (X, Threads, TikTok) carry `color: null`
- * and inherit the surface foreground instead — a black-on-plum-black logo is an invisible logo, and
- * every surface here must work in all four themes.
- */
+/** The social networks' own marks, in one registry. */
 import React from 'react';
 import { Link2 } from 'lucide-react';
 

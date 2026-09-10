@@ -561,13 +561,6 @@ export const NewOrderModal: React.FC<{
   /**
    * Seed the form from a document that already describes the order — today a myDATA received
    * document, whose lines ARE what the supplier says we bought.
-   *
-   * With `fromDocument`, the figures are the supplier's and the form stops pretending otherwise:
-   * quantity, price, unit and VAT are read-only and lines can be neither added nor removed —
-   * composing a different order here would just make the order disagree with the document that
-   * is its own evidence. The ONE edit that stays is linking a line to a catalog product, because
-   * `product_id` is what lets the goods reach the warehouse: `receive_order_into_warehouse`
-   * cannot stock a line without one.
    */
   prefill?: {
     currency?: string | null;
@@ -915,16 +908,7 @@ export const NewOrderModal: React.FC<{
     } catch { /* pricing is best-effort — line still works with manual cost/price */ }
   };
 
-  /**
-   * Reprice catalog lines when the QUANTITY or UNIT changes — not only when a product is picked.
-   *
-   * `product_price_breaks` is unit-aware and threshold-based ("from 5 pallets, 15% off"), so the
-   * price is a function of quantity. Resolving once at pick time meant a break could only ever
-   * fire if the operator happened to type the quantity first, which nobody does. Debounced so it
-   * settles on a committed value instead of firing per keystroke, and restricted to lines whose
-   * price we filled — `price_auto` — so a figure someone typed is never overwritten underneath
-   * them. Purchase lines are skipped: their price is cost, and there is no buy-side break model.
-   */
+  /** Reprice catalog lines when the QUANTITY or UNIT changes — not only when a product is picked. */
   const repriceKey = items.map((l) => `${l.product_id ?? ''}:${l.quantity}:${l.unit_code}:${l.price_auto ? 1 : 0}`).join('|');
   useEffect(() => {
     if (locked || orderType === 'purchase') return;
@@ -1184,12 +1168,6 @@ export const NewOrderModal: React.FC<{
           const billId = await linkOrderToDocument({ id: prefill.inboundDocumentId }, orderId);
           if (paidNow && status !== 'draft') {
             // Pay what the BILL says, not what this form recomputed.
-            // The bill is created from the DOCUMENT by inbound_doc_to_supplier_bill, while
-            // `grossTotal` is recomputed from the form's lines — and orderLinesFromDoc rounds
-            // net/qty per line and defaults vat_code to 24% when myDATA omits vat_category, so the
-            // two disagree. When the form total came out higher, record_payment_fx raised
-            // 'over-allocation' and the error was reported INSIDE a success-titled 'Order created'
-            // toast; when lower, the bill was left permanently part-paid.
             const { data: billRow } = await supabase.from('supplier_bills')
               .select('amount_due, total').eq('id', billId).maybeSingle();
             const payable = Number((billRow as any)?.amount_due ?? (billRow as any)?.total ?? grossTotal);
@@ -2061,25 +2039,6 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   /**
    * The tabs, in reading order. EVERY tab an order of this type can have is offered, whether or
    * not it holds anything — each says so itself when empty.
-   *
-   * The order's own body (classification, lines, totals, cash) is `details`, the first tab and the
-   * default. Only the record's identity and the controls that act on the whole order — party,
-   * status, Actions — stay above the strip, because they are true of every tab rather than the
-   * contents of one.
-   *
-   * They used to appear only once they had content, which made the tab strip change shape under
-   * the operator: the same order showed three tabs, then four once an invoice was issued, and
-   * "there is no Payments tab" was indistinguishable from "no payment has been recorded". An empty
-   * tab is an answer; a missing one is a question about the UI.
-   *
-   * The two type gates are NOT emptiness gates and stay:
-   *   • Suppliers is sales-only. `create()` stamps every PURCHASE line with the order's own
-   *     supplier, so on a purchase order the block re-derives the order's OWN payable with a
-   *     different formula (getOrderSupplierExposure, not get_order_settlements) — 'owe X' beside a
-   *     differently-derived Outstanding — and its Pay button opens NewExpenseDialog, booking a
-   *     SECOND supplier bill that double-counts the cost in P&L. It answers what a SALE costs us.
-   *   • 3-Way Match is purchase-only: there is no PO cost × goods received × supplier bill to
-   *     compare on a sale.
    */
   const orderTabs = useMemo(() => {
     if (!order) return [] as string[];
@@ -2127,17 +2086,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
     return () => { cancelled = true; };
   }, [order?.id, order?.covers_order_id]);
 
-  /**
-   * What this SALE still owes a supplier — the one rule, used everywhere the figure appears.
-   *
-   * `getOrderSupplierExposure` only sees cash tagged to THIS order, so when a purchase order was
-   * raised to buy the goods (its bill and its payment carry the PURCHASE's order_id) the sale kept
-   * claiming the full cost was outstanding after the supplier had been paid in full. The answer for
-   * those goods is already derived on the purchase order by `get_order_settlements`; this defers to
-   * it rather than re-deriving the same money from a second set of rows — the exact habit that put
-   * five disagreeing settlement formulas in this codebase. Returns the covering order too, so the
-   * UI can name where the figure comes from instead of stating it flat.
-   */
+  /** What this SALE still owes a supplier — the one rule, used everywhere the figure appears. */
   const supplierOwedAfterCover = useCallback((s: { supplier_company_id: string; owed: number }) => {
     const po = coveredBy.find((c) => c.supplier_company_id === s.supplier_company_id);
     // An unread settlement falls back to the LINE's own owed figure rather than to `total` — the
@@ -2232,16 +2181,6 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   /**
    * Point this purchase at the customer it was bought for — either an order they already have, or
    * a new one raised from these lines.
-   *
-   * The new order is a MIRROR, never a move: `mirrorLinesForSale` re-prices every catalog line
-   * through the pricing resolver, so the customer is charged their price and not our supplier's.
-   * Ad-hoc lines have nothing to look up and are reported back rather than sold at cost in silence.
-   * The purchase keeps its own lines untouched — a purchase settles on money OUT and a sale on
-   * money IN, and merging the two is the mistake `OrderLinkPicker` exists to make unavailable.
-   *
-   * Prices cross re-derived; the SUPPLIER crosses as-is. Attaching to a sale that already exists
-   * mirrors nothing, so there `stamp_order_line_suppliers_from_cover` stamps the sale's unassigned
-   * lines from the covering purchase instead — same answer, arrived at from the other side.
    */
   const linkToCustomer = async (v: OrderLinkTarget) => {
     if (!order) return;
@@ -2413,10 +2352,6 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   // #3 — edit the order's line items. Lines freeze once a document has been DERIVED FROM them:
   //   · sales    → the invoice is built from these lines, so an invoice freezes them.
   //   · purchase → the supplier's bill is built from these lines too, so a bill freezes them.
-  // An expense attached to a SALES order is the cost side of the sale — transport, the goods
-  // bought in — and copies nothing from the sales lines. Freezing the sale because a cost was
-  // recorded is what stopped an operator adding the item they had forgotten AFTER booking its
-  // cost, which is the exact pairing the "Add expense" action beside it exists to support.
   const derivedDocExists = (fin?.invoices.length ?? 0) > 0
     || (order?.order_type === 'purchase' && (fin?.supplierBills.length ?? 0) > 0);
   const editable = !!order && order.status !== 'cancelled' && order.status !== 'fulfilled'
@@ -2772,36 +2707,14 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   // the SHARED rule — never from `customer_company_id`, which calls a sole trader (a contact
   // carrying an ΑΦΜ) retail and proposes an ΑΛΠ to a business.
   const salesDocKind: SalesDocumentKind = salesDocumentKindFor(buyerIdentity);
-  /**
-   * Every money-in on this order, newest first.
-   *
-   * A payment receipt is issued against ONE PAYMENT — the PDF renders that payment's amount and
-   * date — so on an order that has taken several there is no "the" receipt for a menu to offer.
-   * Printing an amount on the entry was worse than saying nothing: it named one payment as if it
-   * were the answer while more money could still land on the same order, and the operator sets
-   * what a receipt is for from their side, not from whichever row happens to be newest. So the
-   * entry carries no figure, and with more than one money-in it hands the choice to the Payments
-   * tab, where every row issues its own receipt.
-   */
+  /** Every money-in on this order, newest first. */
   const moneyIns = useMemo(
     () => [...(fin?.payments ?? []).filter((p) => p.direction === 'in')].sort((a, b) => (a.paid_at < b.paid_at ? 1 : -1)),
     [fin],
   );
   const latestMoneyIn = moneyIns[0] ?? null;
 
-  /**
-   * The documents an order can produce, offered as a choice rather than as one derived button.
-   *
-   * Three, and they are not the same KIND of thing:
-   *  · τιμολόγιο (1.1) and ΑΛΠ (11.1) are the fiscal SALES documents — one sale gets exactly one
-   *    of them, and both are transmitted to myDATA. Which one the buyer is entitled to is derived
-   *    (salesDocumentKindFor) and marked, because AADE REJECTS a τιμολόγιο issued to a party with
-   *    no ΑΦΜ — so that combination is refused here and again in the RPC. The reverse is legal: a
-   *    business may take a retail receipt, it simply loses the VAT deduction, so it is offered
-   *    with the consequence spelled out instead of being hidden.
-   *  · απόδειξη εισπράξεως is proof that CASH was taken. It is not a sale, goes to nobody at AADE,
-   *    and an order can produce as many as it has payments — hence its own group below the line.
-   */
+  /** The documents an order can produce, offered as a choice rather than as one derived button. */
   const invoiceBlocked = salesDocKind === 'receipt';
   const canIssueSalesDoc = order?.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0;
   const salesDocumentItems = (
@@ -2863,28 +2776,9 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
 
   // Remaining owed per supplier → drives per-line "Mark paid" visibility: once a line's supplier is
   // fully settled, its "Mark paid" button hides (nothing left to pay).
-  //
-  // Deferred to the covering purchase order through `supplierOwedAfterCover`, exactly like the
-  // rollup below. Reading the RAW `s.owed` here was a second answer to one money question: the sale
-  // sees none of the cash that settled a covering PO (that bill and that payment carry the
-  // PURCHASE's order_id), so a line whose supplier had been paid in full still showed a live red
-  // "Mark paid" — and pressing it books a SECOND payable for one delivery, the precise mistake the
-  // rollup's own Pay button was already fixed to stop making.
   const supplierOwedById = new Map(supExposure.map((s) => [s.supplier_company_id, supplierOwedAfterCover(s).owed]));
 
-  /**
-   * Cash paid to suppliers FOR this sale that is tagged to the purchase order raised to cover it.
-   *
-   * The same deferral `supplierOwedAfterCover` makes for what is still owed, applied to what has
-   * already gone out. `fin.paid_out` only sees payments whose `payments.order_id` is this order,
-   * and a covering PO's bill and payment both carry the PURCHASE's id — so a sale whose supplier
-   * had been paid in full showed "Paid to suppliers €0.00" directly under a "Covered by" block
-   * that said the purchase was paid. Two answers to one question, on the same screen.
-   *
-   * `settled` comes from `get_order_settlements` already direction-resolved (a purchase settles on
-   * money OUT). This only ADDS UP answers the derivation gave; it does not re-derive one, and it
-   * cannot double-count — a payment carries a single `order_id`.
-   */
+  /** Cash paid to suppliers FOR this sale that is tagged to the purchase order raised to cover it. */
   /**
    * Cash paid on the covering orders. `null` settlements are EXCLUDED and flagged rather than
    * counted as 0 (#351 A3) — a covering PO whose settlement we could not read would otherwise
@@ -4703,19 +4597,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   );
 };
 
-/**
- * Put one sold line under warranty — the order-side half of the installed base (#343).
- *
- * The cover period is entered as a NUMBER OF MONTHS and the end date is shown as the consequence,
- * because "24 months" is how a warranty is sold and quoted while `ends_on` is how it is enforced.
- * Only one of the two is stored: the date. Months is an input, never a column, so there is no
- * second copy of the period to drift out of step with the date the reminders actually fire on.
- *
- * The prefill comes from `products.default_warranty_months` when the line points at a catalogue
- * product. That is the same number `apply_asset_service_defaults` would have used had the delivery
- * trigger registered this unit, so agreeing with it here keeps one answer to "how long is this
- * covered for" rather than inventing a second at the order.
- */
+/** Put one sold line under warranty — the order-side half of the installed base (#343). */
 const LineWarrantyDialog: React.FC<{
   order: Order;
   item: OrderItem;
@@ -4883,14 +4765,6 @@ const LineWarrantyDialog: React.FC<{
 /**
  * What a line IS, as far as the warehouse is concerned. Two answers, and the operator has to give
  * one of them — nothing in the data can infer it:
- *
- *  · goods we hold  → link (or create) a catalog product, and receiving adds to its stock;
- *  · a service      → mark it off-warehouse, and receiving marks it delivered and stocks nothing.
- *
- * Creating the product from here is offered because refusing to would send someone to the catalog
- * to build the item by hand and come back — but it is a deliberate CLICK, never automatic. Auto-
- * creating a product for every unlinked line would fill the catalog with `Delivery`, `Discount`
- * and typos, each carrying a phantom stock quantity that is far harder to unwind than this dialog.
  */
 /**
  * WHY a line is 0% VAT.

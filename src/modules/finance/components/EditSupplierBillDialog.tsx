@@ -3,23 +3,6 @@
  * issue/due dates, category, notes, and what the cost is FOR. Bills recorded manually from an
  * order usually lack the supplier's own invoice number (myDATA-created ones get `IN-<MARK>`
  * automatically); this dialog is the backfill path from Payables.
- *
- * "What is this for?" is here because until #378 L1 it could only ever be answered at the moment
- * the expense was born: the Inbox's "Add to Expenses" created the order and the bill together,
- * and the general expense form offered the picker only while the form was still open. Anything
- * already booked — a transport invoice that landed a week after the goods, customs, an installer,
- * a second supplier on the same job — had no route onto the order or the project it belonged to
- * except from the ORDER's side, which requires already knowing which order it was. That is the
- * direction an operator looking at an unattributed row in Payables does not have.
- *
- * It is the same `OrderLinkPicker` the creation form uses, so a cost cannot be linked to
- * something the picker considers illegal (appending purchase lines to a customer's sales order,
- * for instance) however this file is later edited. Two of its groups are deliberately off:
- * merging (a bill has no line items to merge) and raising a new customer order (this dialog edits
- * one document; it does not create a second one).
- *
- * Amounts and supplier identity are deliberately NOT here — payments allocate against them,
- * and net/VAT feed the P&L. Correcting a wrong amount is a credit note, not an edit.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';

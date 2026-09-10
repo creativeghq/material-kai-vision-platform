@@ -2,18 +2,6 @@
  * The server decides what a subscription costs, and a Pinterest URL is a Pinterest URL
  * (#360 CB-12 / CB-10) — plus the BYOK panel stops promising a fallback that does not exist
  * (#360 CB-1 / CB-2 / CB-4).
- *
- * CB-12: `price: priceId` took the Stripe price id straight from the request body, so a caller
- * could name any price on the platform's Stripe account. `subscription_plans` already holds the
- * answer and `crm-api`'s handler already reads it that way — same defect as FE-23 in #351.
- *
- * CB-10: `extractPinId` matched `/pinterest\.com\/pin\/(\d+)/` ANYWHERE in the string, so
- * `https://attacker.test/?ref=pinterest.com/pin/123` passed as a pin. A substring test standing
- * in for a host test.
- *
- * CB-1/CB-2: the Keys panel said *"Leave blank to use the platform defaults"* — which both
- * backends contradict in their own comments. A wrong mental model is worse than a silent bug,
- * because the tenant acts on it.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';

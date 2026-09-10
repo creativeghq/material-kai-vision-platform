@@ -1,16 +1,4 @@
-/**
- * Admin-dashboard slot for module-contributed cards.
- *
- * Modules whose `navItems[]` include `location: 'admin-dashboard'`
- * become cards on `/admin`. AdminDashboard reads them through this
- * hook, scoped to whichever modules are currently enabled, and merges
- * them into its existing static `adminSections` map under the
- * declared `adminCategory`.
- *
- * This is the same slot pattern used by other module surfaces
- * (profile-tabs, product-actions, header-actions). Cards from a
- * disabled module disappear automatically.
- */
+/** Admin-dashboard slot for module-contributed cards. */
 
 import { useMemo } from 'react';
 import { registeredModules } from './registry';

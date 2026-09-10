@@ -1,31 +1,4 @@
-/**
- * DataForSEO spend gate — invariant 10 for the SEO agent toolkit (#365 `AD-13`, `AD-14`).
- *
- * Every SEO agent tool reaches DataForSEO through MIVAA using `x-cron-secret`, which is the
- * OPERATOR's credential. Four audits traced the chain looking for the layer that debits before
- * the spend (#352 `A18` in the tool wrappers, #361 `EG-4` in `seo-api`, the MIVAA route check,
- * and `AD-13` in `_shared/dataforseo-client.ts`) and found none — while `seo_site_crawl_start`
- * accepts `max_pages` up to 1000 and a dozen Labs tools accept `limit` up to 1000. DataForSEO
- * was not even present in `ai_model_pricing`, so there was no price to charge.
- *
- * The shape here is reserve → settle (`_shared/credit-reserve.ts`), because the real cost is only
- * known after the call: DataForSEO reports it per response and MIVAA normalises it to `cost_usd`.
- *
- *   1. Reserve a per-op-class CEILING before the fetch. Out of credits → the tool refuses and
- *      NOTHING is spent upstream.
- *   2. Run the call.
- *   3. Settle against the provider's own reported `cost_usd` — surplus refunded, overage charged.
- *
- * The billing unit is deliberately money, not calls: `dataforseo-request` is priced at
- * $0.001/unit, so one unit is a thousandth of a dollar of DataForSEO spend and `units` is just
- * `cost_usd * 1000`. That keeps `ai_model_pricing` the single USD source without anybody having
- * to guess a per-endpoint price (which the platform rule forbids) — the ceiling is a reserve
- * size, and the amount actually billed is the amount actually measured.
- *
- * A response that reports no cost settles at the CEILING, not at zero, and logs an error. Zero is
- * the platform's dominant historical failure (`ops.silent_zero`); a missing cost is a defect to
- * surface, not a discount to grant.
- */
+/** DataForSEO spend gate — invariant 10 for the SEO agent toolkit (#365 `AD-13`, `AD-14`). */
 
 import { createClient } from '@supabase/supabase-js';
 import { getServicePricing, debitOrRefuseTracked, recordExternalServiceOutcome } from '../credit-utils.ts';

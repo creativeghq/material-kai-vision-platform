@@ -1,30 +1,4 @@
-/**
- * Variant coverage guard (#374).
- *
- * The bug this exists to stop: `get_product_price_for_workspace` has been fully variant-aware in
- * SQL since #347 phase 7 — `_pricing_cost`, `_pricing_retail` and `get_product_price_break` all
- * take `p_variant_key` and fall back to the product-wide row when it is null. But only ONE of the
- * seven client call sites passed it. So a Nero surcharge you configured was honoured on the order
- * line and nowhere else: not on the quote the customer reads, not on the invoice, not in the
- * marketplace. Nothing failed. The line just quietly priced the base row.
- *
- * That is the same shape as the five money derivations: a valid number, produced by a correct
- * engine that was asked the wrong question. No typecheck can see it (a wrong price is a valid
- * `number`) and no integrity check can see it (the stored data is perfect).
- *
- * The same applies to the two tables where "which variant" is the row's identity:
- * `product_prices` (two rows for one product are different PRICES, not duplicates) and
- * `warehouse_items` (two rows are different PHYSICAL STOCK). A client write that omits
- * `variant_key` silently means "the row that applies to any variant" — which is right for a
- * product with no variants and wrong for every other one.
- *
- * SCOPE — read before assuming a clean run means the invariant holds.
- * This scans REPO FILES, so it sees the TypeScript half only. This project's SQL is applied via
- * the Supabase MCP and never committed (CLAUDE.md), so a function body lives in `pg_proc` and is
- * invisible here. The SQL half of #374 — every stock writer resolving its row through
- * `_resolve_warehouse_item`, and `mark_invoice_issued` / `generate_order_from_invoice` grouping
- * by variant — is guarded in SQL, not here. A green run says nothing about it.
- */
+/** Variant coverage guard (#374). */
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
@@ -85,16 +59,7 @@ function callPayload(text: string, callIndex: number): string {
   return text.slice(open);
 }
 
-/**
- * The single supabase-js statement beginning at `.from('x')`.
- *
- * Bounded at the next `.from(` or the end of the statement, because a fixed character window
- * spills into whatever comes next — and these files chain several table calls inside one
- * `Promise.all([...])`. A window that reaches the NEXT statement reports a select as an insert
- * and a neighbouring `.maybeSingle()` as this table's, which is a guard that cries wolf and gets
- * deleted. Verified against servicesService / deliveryNotesService / PosPage, where all three of
- * those false positives actually occurred.
- */
+/** The single supabase-js statement beginning at `.from('x')`. */
 function statementAt(text: string, fromIndex: number): string {
   const rest = text.slice(fromIndex + 1, fromIndex + 4000);
   const next = rest.indexOf('.from(');
@@ -265,18 +230,7 @@ describe('availabilityKey — one key per (product, variant) and no collisions',
   });
 });
 
-/**
- * Phase 6 — the customer's copy shows what they chose.
- *
- * Every document renderer built its line detail from `selected_color` + `selected_size`, the two
- * projected columns, so forty-eight other identity axes were chosen, priced, stored and never
- * printed. The fiscal path meanwhile folded the whole attribute map into the name it transmits,
- * so AADE received a more specific description than the customer's own page.
- *
- * These live in `supabase/functions/`, which `npm run typecheck` does not cover (tsconfig excludes
- * it) — so a regression here is invisible to the main typecheck and only `typecheck:edge` or this
- * would see it.
- */
+/** Phase 6 — the customer's copy shows what they chose. */
 describe('#374 Phase 6 — document renderers print the whole variant', () => {
   const RENDERERS = [
     'supabase/functions/generate-quote-pdf/index.ts',
@@ -313,17 +267,7 @@ describe('#374 Phase 6 — document renderers print the whole variant', () => {
   });
 });
 
-/**
- * Phase 7 — a variant is chosen, not guessed.
- *
- * `AddProductsSheet` seeded `sizes[0]` / `colors[0]` on add: the first entry of a list, so a tile
- * that comes in four colours had one picked on the operator's behalf. It then read as a decision —
- * the line printed that colour, priced that variant and reserved its stock.
- *
- * Exactly ONE candidate is a different case: that is a fact about the product, not a choice, which
- * is why `get_line_identity_options` withholds single-option fields from the picker entirely. So
- * the rule is `=== 1`, and `> 0` is the bug.
- */
+/** Phase 7 — a variant is chosen, not guessed. */
 describe('#374 Phase 7 — no first-of-list variant guess', () => {
   it('AddProductsSheet seeds an axis only when the product offers exactly one value', () => {
     const text = blankComments(
@@ -349,17 +293,7 @@ describe('#374 Phase 7 — no first-of-list variant guess', () => {
   });
 });
 
-/**
- * Phase 8 — one derivation of "the image for this line".
- *
- * `image_product_associations` linked an image to a PRODUCT and nothing finer, so a tile stocked
- * in Bianco and Nero had one pool of photos and a customer buying Nero was looking at Bianco.
- *
- * Worse, the two readers disagreed with each other before any of this: QuotesService ordered by
- * `overall_score desc` and generate-quote-pdf did not order at all, so the quote on screen and the
- * quote PDF could already pick different photos for one product. Same shape as the five money
- * derivations, in pixels — which is why both now ask `get_product_variant_images`.
- */
+/** Phase 8 — one derivation of "the image for this line". */
 describe('#374 Phase 8 — the image for a line is derived once', () => {
   const READERS = [
     'src/modules/quotes/services/QuotesService.ts',

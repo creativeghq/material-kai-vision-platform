@@ -1,14 +1,6 @@
 /**
  * Finance → Bank feed (#315): the unified transactions workspace across Revolut,
  * Stripe and Viva. Lives next to Payables — this is operational money data, not settings.
- *
- * Row semantics by provider:
- *   - revolut  — real bank lines; matchable (invoice for money-in, supplier bill for
- *     money-out) via the ⋯ menu or the auto-matcher.
- *   - stripe / viva — informational mirrors of money the provider webhooks already
- *     settled; shown for completeness, never re-matchable (double-booking guard).
- *
- * Status renders as plain colored words (design system: no badge pills for status).
  */
 import React from 'react';
 import { ArrowDownLeft, ArrowUpRight, Landmark, Loader2, MoreHorizontal, RefreshCw, Search } from 'lucide-react';

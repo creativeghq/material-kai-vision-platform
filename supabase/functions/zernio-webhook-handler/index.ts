@@ -1,28 +1,4 @@
-/**
- * Zernio Webhook Handler Edge Function
- *
- * Receives incoming webhooks from Zernio and updates local DB.
- * Validates HMAC-SHA256 signature using ZERNIO_WEBHOOK_SECRET (falls back to
- * the legacy LATE_WEBHOOK_SECRET).
- *
- * Zernio payload shape: { id, event, post|account, timestamp }
- *
- * Supported events:
- *   post.scheduled      → social_posts.status = 'scheduled'
- *   post.published      → social_posts.status = 'published', published_at = now()
- *   post.partial        → social_posts.status = 'published' (best-effort; per-platform errors stored)
- *   post.failed         → social_posts.status = 'failed'
- *   post.cancelled      → social_posts.status = 'cancelled'
- *   account.disconnected → social_accounts.is_active = false
- *   message.received    → capture WhatsApp reply into the unified inbox: inbox_threads
- *                         (thread_type='customer', channel='whatsapp') + inbox_participants
- *                         (channel-customer + assign-on-reply owner) + inbox_messages, STOP/START
- *   message.delivered|read|failed → update messaging_logs / campaign recipient delivery status
- *
- * This is the single Zernio webhook endpoint for BOTH social posts and WhatsApp
- * messaging. Register one webhook in Zernio subscribed to post.* + account.* +
- * message.* events.
- */
+/** Zernio Webhook Handler Edge Function */
 
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../_shared/http.ts';
@@ -97,25 +73,7 @@ function firstPlatformError(post: any): string | undefined {
   return withError?.error;
 }
 
-/**
- * Record one platform's outcome on a post, without touching the post's aggregate status (#384 A).
- *
- * `post.partial` says SOMETHING failed and `firstPlatformError` returns whichever error happens to
- * come first — so a post that reached 3 of 4 networks looked fully published, and the one network
- * that failed was never named. Zernio pushes `post.platform.published` / `post.platform.failed`
- * per leg, carrying the platform and its own error and URL; we subscribed to both, had no branch,
- * answered 200 and binned them.
- *
- * THE LEG AND THE POST ARE DIFFERENT FACTS, so they are written by different events. The aggregate
- * status stays owned by `post.published` / `post.partial` / `post.failed`; this only ever writes
- * under `metadata.platforms[<platform>]`. A per-leg event arriving before or after its aggregate
- * therefore cannot flip the post's status, in either direction — which matters because the two
- * arrive in no guaranteed order.
- *
- * Keyed by platform name rather than appended to a list: the same leg can report twice (a retry,
- * a redelivery), and a list would show one network as two outcomes with no way to tell which is
- * current.
- */
+/** Record one platform's outcome on a post, without touching the post's aggregate status (#384 A). */
 async function recordPlatformLeg(
   // deno-lint-ignore no-explicit-any
   supabase: any,
@@ -181,12 +139,6 @@ const platformLabel = (platform?: string): string =>
 function contactPhoneOf(sender: any): string | undefined {
   // Every shape a WhatsApp sender arrives in, because this function decides whether the message
   // is filed or discarded and it used to accept exactly two of them.
-  //
-  // It required `phoneNumber`, or an `id` of BARE digits. A live webhook happens to satisfy that;
-  // a back-filled conversation does not — Zernio identifies a participant by a JID
-  // (`306948408542@s.whatsapp.net`) or an E.164 string with the plus already on it, and both fail
-  // `/^\d{6,}$/`. 103 replayed messages were dropped for "no resolvable phone" and every one
-  // returned 200, so the import reported success and the inbox stayed empty.
   const candidates = [sender?.phoneNumber, sender?.phone, sender?.wa_id, sender?.id];
   for (const raw of candidates) {
     if (!raw) continue;
@@ -250,18 +202,7 @@ async function resolveWorkspaceOwner(supabase: any, workspaceId: string): Promis
  * user_id NULL — never converts to an app account). Assign-on-first-reply adds the campaign /
  * workspace owner as the `owner` member participant. STOP/START opt-out handling preserved.
  */
-/**
- * What happened to one inbound message.
- *
- * Every drop below used to be a bare `return`, and the handler answered 200 either way — correct
- * as a webhook (Zernio must not retry a message we will never want) and useless to anything
- * asking whether the message landed. The back-fill counted those 200s as imports and reported a
- * full inbox while nothing had been filed.
- *
- * The reason travels with the outcome because the reasons need different fixes: an unresolvable
- * workspace is a wiring problem, a missing phone is a payload-shape problem, and an outbound echo
- * is correct behaviour that should never be reported as a failure.
- */
+/** What happened to one inbound message. */
 export interface InboundOutcome {
   outcome: 'filed' | 'dropped';
   reason?: string;
@@ -275,21 +216,7 @@ export interface InboundOutcome {
  * does not fail: it silently files the message at the wrong end of the thread, and a message
  * dated 1970 or 2087 sorts above or below every real one forever.
  */
-/**
- * The attachments on an inbound message, in OUR shape.
- *
- * This existed as `msg.attachments ?? []`, which assumed one field name and one array shape.
- * Measured 2026-08-24 across 36 inbound WhatsApp/social messages: **zero** carried an
- * attachment — while the assistant's own replies in those same threads read "Sorry, I can't open
- * PDFs or attachments here". So files were arriving and every one of them was discarded. Two of
- * those messages had no text either, which means they rendered in the inbox as an empty bubble:
- * the customer sent a document and the operator saw nothing at all.
- *
- * Zernio's own surface is `GET /inbox/conversations/{id}/messages/{messageId}/attachments/{index}`
- * — attachments are addressed separately from the message — so the inline shape is not something
- * to assume. Every plausible spelling is accepted here rather than picked; being wrong about the
- * field name must not be the same as the customer having sent nothing.
- */
+/** The attachments on an inbound message, in OUR shape. */
 export function normalizeInboundAttachments(msg: Record<string, unknown>): Array<Record<string, unknown>> {
   const out: Array<Record<string, unknown>> = [];
 
@@ -329,22 +256,7 @@ export function normalizeInboundAttachments(msg: Record<string, unknown>): Array
   return out;
 }
 
-/**
- * Is this "text" actually the channel telling us it could not give us the message?
- *
- * Zernio substitutes a bracketed placeholder — `[Unsupported message]` — for media it does not
- * hand over inline. Measured 2026-08-24: 5 inbound messages carry exactly that string, from the
- * first import at 04:20 through to 08:27, and the customer's actual photo or PDF is in none of
- * them.
- *
- * This exists because the first version of the unresolved-media check asked `!msg.text`, which is
- * FALSE for a placeholder — so the diagnostic built to catch precisely this case sat silent
- * through five of them. A placeholder is not text; it is the absence of the message wearing text's
- * clothes, and any check that treats it as content will pass while the file is lost.
- *
- * Matched as an exact, small, case-insensitive set rather than "anything in brackets": a customer
- * writing `[urgent]` is sending a message, not a media placeholder.
- */
+/** Is this "text" actually the channel telling us it could not give us the message? */
 const MEDIA_PLACEHOLDERS = new Set([
   'unsupported message', 'unsupported', 'image', 'photo', 'video', 'audio', 'voice message',
   'document', 'file', 'sticker', 'contact', 'location', 'attachment', 'media',
@@ -374,21 +286,7 @@ export function isReactionPlaceholder(text: unknown): boolean {
 }
 
 
-/**
- * Pull the customer's files off Zernio and into OUR storage.
- *
- * Reading the webhook payload was never going to work: Zernio serves attachments from
- * `/inbox/conversations/{id}/messages/{messageId}/attachments/{index}`, addressed separately from
- * the message. So the file has to be FETCHED, and it has to be fetched now — the vendor's links
- * are short-lived and the customer will not resend a spec sheet because our importer was late.
- *
- * The bytes are stored, never the URL (storage convention #7), and the row records
- * bucket + object path so the frontend mints a signed URL per read.
- *
- * Walks upward from index 0 until the endpoint says there is nothing there, because a message
- * does not reliably declare how many attachments it has. Capped, so a malformed count cannot turn
- * one webhook into an unbounded fetch loop.
- */
+/** Pull the customer's files off Zernio and into OUR storage. */
 async function fetchAndStoreInboundAttachments(
   supabase: any,
   params: { threadId: string; conversationId: string; messageId: string; max?: number },
@@ -466,34 +364,12 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
   const msg = payload.message || {};
 
   // The CONVERSATION object, which we never once read.
-  //
-  // Every inbox webhook carries `conversation` beside `message`, and per Zernio's OpenAPI spec it
-  // holds `participantId`, `participantName`, `participantPicture` and `contactId`. That is the
-  // counterparty's identity and their profile photo, in every single payload, all along — while
-  // this handler was inferring the first from `msg.sender` (which is the BUSINESS on an outgoing
-  // message) and chasing the second through three lookup endpoints that do not return it.
-  //
-  // `participantId` is the counterparty on BOTH directions, which is exactly what an echo needs:
-  // there is no `recipient` field on the message object at all.
   const conv = payload.conversation || {};
   const convParticipantId = typeof conv.participantId === 'string' ? conv.participantId : '';
   const convParticipantName = typeof conv.participantName === 'string' ? conv.participantName : '';
   const convParticipantPicture = typeof conv.participantPicture === 'string' ? conv.participantPicture : '';
 
   // A message the OPERATOR sent, echoed back to us. It is filed, not dropped.
-  //
-  // This used to `return` here, and on a coexistence number that means the Inbox shows half a
-  // conversation. Verified 2026-08-24 against the operator's own phone: their 10:51 "Hello, Good
-  // Morning" and their 11:21 "Can you do a small follow for me, with your sales manager?" are on
-  // WhatsApp and in neither our thread nor anywhere else — because they were typed in the
-  // WhatsApp Business app, and every echo of them was discarded on this line. The customer's
-  // replies landed, so the thread reads as a stranger answering questions nobody asked.
-  //
-  // Coexistence exists precisely so a number can be worked from both the phone and the platform.
-  // A platform that only records its own half is not showing the conversation.
-  //
-  // Not a duplicate risk for a message sent FROM here: the relay stores the wamid Meta returns,
-  // and the echo carries that same wamid, so the dedupe below recognises it as already filed.
   const isOutgoingEcho = !!msg.direction && msg.direction !== 'incoming';
 
   // A reaction's shadow message. The `reaction.received` event carries the real thing — the emoji
@@ -504,13 +380,6 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
   }
 
   // Is this a live message, or history being replayed by the back-fill?
-  //
-  // The back-fill posts through this same handler ON PURPOSE — one importer, so "works live but
-  // not on replay" cannot be built. The cost of that choice is that a replayed message is
-  // indistinguishable from a customer writing in, and on 2026-08-24 the assistant answered 22 of
-  // them across 8 conversations that had finished weeks earlier. This flag is what makes the two
-  // distinguishable, and it only ever REMOVES behaviour (no auto-engage, no agent reply, no
-  // "you were assigned" notification) — so even a forged one cannot cause an action.
   const historical = payload.backfill === true;
 
   // Zernio's inbox covers Instagram, Facebook, X, Bluesky, Reddit and Telegram DMs as well as
@@ -527,17 +396,6 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
   const accountId = accountIdOf(payload.account);
 
   // WHOSE number identifies the conversation.
-  //
-  // On an inbound message that is the sender. On an echo of our own it is the RECIPIENT — the
-  // sender there is our own WABA number, and resolving on it would open a thread with ourselves
-  // and mint a CRM contact for the company's own line.
-  // `conversation.participantId` FIRST, on both directions.
-  //
-  // Per the spec it is the counterparty's platform identifier — for WhatsApp, the phone number
-  // without a leading `+`. It is correct for an echo, where `msg.sender` is our own business
-  // number, and it is correct for an inbound message too, so there is one rule rather than a
-  // direction-dependent guess. `msg.recipient` / `msg.to`, which the previous version reached
-  // for, are not fields that exist on this payload at all.
   let counterparty = contactPhoneOf({ id: convParticipantId })
     ?? (isOutgoingEcho ? undefined : contactPhoneOf(msg.sender));
 
@@ -663,13 +521,6 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
 
   const owner = (await resolveCampaignOwner(supabase, phone)) || (await resolveWorkspaceOwner(supabase, workspaceId));
   // The name of the PERSON WE ARE TALKING TO, which is not the sender on our own message.
-  //
-  // `msg.sender.name` on a `message.sent` echo is the BUSINESS — so filing an echo renamed the
-  // thread to the operator: a conversation with Drosopoulos was relabelled "Basilis Kanonidis",
-  // the name of the person answering it. `conversation.participantName` is the counterparty on
-  // both directions, which is the whole reason to prefer it. The sender fallback is kept for an
-  // inbound message on a payload that carries no conversation block, and is refused outright on
-  // an echo — there is no circumstance where our own name is the thread's name.
   const contactName = convParticipantName
     || (isOutgoingEcho ? null : (msg.sender?.name ?? null));
 
@@ -682,14 +533,6 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
 
   // Contact, thread and participants resolved in ONE transaction, under an advisory lock on this
   // workspace+number.
-  //
-  // This was four separate round trips — find contact, create contact, find thread, create thread
-  // — and every one of them was a check followed by an insert with a gap in between. On
-  // 2026-08-24 two messages from the same person landed ~90ms apart and each webhook walked the
-  // gap: two CRM contacts 69ms apart, then two threads 1.06s apart, because the thread lookup is
-  // keyed on contact_id and each webhook only knew about the contact it had just made itself. One
-  // person, two inboxes, and the operator's reply goes to whichever they happen to open. Nothing
-  // errored — both webhooks returned 200 and both threads looked perfectly normal.
   const { data: resolved, error: resolveErr } = await supabase.rpc('whatsapp_resolve_contact_and_thread', {
     p_workspace_id: workspaceId,
     p_phone: phone,
@@ -732,16 +575,6 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
   // right once and then frozen is a card nobody trusts. Never on an import: back-filling 8
   // conversations would fire 8 profile lookups for chats already on the operator's phone.
   // The counterparty's photo and display name come from the WEBHOOK, not from a lookup.
-  //
-  // `conversation.participantPicture` is OPTIONAL on a webhook — measured absent on four real
-  // `message.received` payloads, which is why nothing had a photo. It is a documented field on
-  // `GET /v1/inbox/conversations`, so the picture is FETCHED there by messaging-api's
-  // `sync-avatars`; this block is the opportunistic path for when a payload does carry one.
-  // Reading it here alone was the bug: waiting for a push that is not guaranteed, on a field the
-  // list endpoint will hand over on request.
-  //
-  // Still downloaded rather than linked: a provider image URL expires, and a card whose photo
-  // becomes a broken square is worse than one that never had a photo.
   if (!historical && (convParticipantPicture || convParticipantName)) {
     const threadMeta = (await supabase.from('inbox_threads').select('metadata').eq('id', threadId).maybeSingle())
       .data?.metadata as Record<string, unknown> | undefined;
@@ -813,8 +646,6 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
   // on the row AND in the log, with the payload's own key names, so the shape we are missing is
   // recoverable from the next real one instead of staying a guess. (Pipeline convention #1:
   // explicit failure markers, never an empty return.)
-  // `[Unsupported message]` counts as no text — see isMediaPlaceholder. Asking `!msg.text` alone
-  // is what let five of these through in silence.
   const hasRealText = !!msg.text && !isMediaPlaceholder(msg.text);
   const unresolvedMedia = !hasRealText && inboundAttachments.length === 0;
   if (unresolvedMedia) {
@@ -1061,17 +892,7 @@ async function handleReaction(supabase: any, payload: any): Promise<void> {
   if (error) console.error('[zernio-webhook] reaction update FAILED', row.id, error.message);
 }
 
-/**
- * review.new / review.updated — a review on a connected profile (Google Business).
- *
- * Reviews PUSH. There is no polling to build: `review.new` on arrival, `review.updated` when the
- * reviewer edits their text or rating, and `review.updated` again when a reply is added —
- * including a reply written directly on Google rather than through us. So the two events are the
- * entire lifecycle and the same upsert serves both.
- *
- * `rating` arrives as an INTEGER 1-5. Zernio has already normalised Google's `ONE`..`FIVE` enum,
- * which is the shape that would otherwise have become a silent zero on every row.
- */
+/** review.new / review.updated — a review on a connected profile (Google Business). */
 async function handleReview(supabase: any, payload: any): Promise<void> {
   const review = payload.review || {};
   const acct = payload.account || {};
@@ -1518,18 +1339,6 @@ async function handleDeliveryStatus(supabase: any, event: string, payload: any):
   const msg = payload.message || {};
 
   // Match on EITHER id, because we cannot prove which one we stored.
-  //
-  // Outbound writes `provider_message_id = data.messageId` from Zernio's conversation-create; the
-  // receipt webhook carries BOTH `platformMessageId` (the WhatsApp wamid) and `id` (Zernio's own).
-  // This used to pick `platformMessageId || msg.id` — so if create returns Zernio's internal id
-  // while the webhook carries a wamid, the lookup silently matched nothing and every outbound
-  // message stayed `sent` forever: no delivery, no read, and a message Meta reported as FAILED
-  // still displayed as sent.
-  //
-  // #286 left this open pending Zernio's response contract. Trying both ids closes it without one:
-  // they are distinct opaque strings from the same vendor, so a row matching either is the row,
-  // and if the contract is ever confirmed this simply stops needing the second candidate. Ordered
-  // platform-id first so the common case is one query.
   const wamidCandidates = [msg.platformMessageId, msg.id]
     .filter((v: unknown): v is string => typeof v === 'string' && v.length > 0)
     .filter((v: string, i: number, a: string[]) => a.indexOf(v) === i);
@@ -1568,12 +1377,6 @@ async function handleDeliveryStatus(supabase: any, event: string, payload: any):
 
   // Outbound inbox messages relayed over WhatsApp carry the wamid in metadata.
   // Goes through an RPC because PostgREST `.update` is a WHOLE-COLUMN ASSIGNMENT, not a merge.
-  // The previous `.update({ metadata: { delivery_status: status } })` wrote that object OVER the
-  // entire column, deleting `wamid`, `channel` and `relay` — so the first receipt (normally
-  // `delivered`) recorded itself AND made the row permanently unmatchable. Every later `read` or
-  // `failed` receipt matched zero rows forever: read receipts never worked, and a message Meta
-  // later reported as FAILED stayed displayed as delivered.
-  // Same either-id treatment: try each candidate until one matches a row.
   let receiptRows: unknown = null;
   let receiptErr: { message: string } | null = null;
   for (const candidate of wamidCandidates) {
@@ -1676,19 +1479,6 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
       await handleMessageSent(supabase, payload);
 
       // ...and then FILE it, because this is how the operator's own replies reach us.
-      //
-      // A reply typed in WhatsApp Web or on the phone comes back as `message.sent`, not as
-      // `message.received` with a direction. So the echo handling added to the inbound path
-      // never ran for the case it was written for, and two live threads showed `outgoing: 0`
-      // while the operator was looking at their own replies on WhatsApp. Verified in the
-      // webhook log:
-      //
-      //   [zernio-webhook] Event: message.sent {"message":{"conversationId":"6a8b3716…"}}
-      //
-      // Routed through the SAME handler as an inbound message, with the direction forced, so
-      // there is one filing path rather than a second that drifts. The wamid dedupe means a
-      // message sent from the platform — which also emits message.sent — is recognised as
-      // already filed instead of appearing twice.
       const echo = {
         ...payload,
         message: { ...(payload.message ?? {}), direction: 'outgoing' },
@@ -1876,7 +1666,6 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
       // to notify on every delivery — so "linkedin connected" arrived again and again for a
       // connection made once. Only a real transition is news: an account we have never seen,
       // or one that was sitting inactive after a disconnect. A repeat delivery still refreshes
-      // the row; it just does not announce itself.
       let isNewConnection = false;
 
       if (!zernioAccountId || !workspaceId) {
@@ -2137,9 +1926,6 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
     // Return 5xx so Zernio retries the delivery; the upsert/find-or-create logic above
     // is idempotent enough for a retry to converge. Status-sync events (post.*, account.*,
     // delivery status) stay 200 to avoid pointless retry loops on best-effort updates.
-    // Anything carrying customer CONTENT is retried; a lost one is unrecoverable because
-    // Zernio does not resend on a 200. Status/lifecycle syncs stay 200 — they are best-effort
-    // and reconverge on the next event or sync, so retrying them just loops.
     if (event === 'message.received' || event === 'message.edited'
         || event === 'message.deleted' || event === 'comment.received'
         // A review is customer CONTENT and Zernio does not resend after a 200, so a transient

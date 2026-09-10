@@ -56,23 +56,6 @@ export interface ModuleManifest {
    * available and route work to the right place. Add new capability flags here
    * as new module integration patterns emerge; the provider-registry pattern
    * (see `useInvoiceProvider`, `useActivePaymentProviders`) reads from this set.
-   *
-   * `invoicing` — this module handles invoice creation end-to-end (typically
-   *   an ERP integration like Xero, QuickBooks). When true and the
-   *   module is enabled, the built-in Payments invoicer defers to it.
-   *   **Single-winner**: only one provider wins at a time (alphabetical sort
-   *   on ties; see `resolveInvoiceProvider`).
-   *
-   * `payments` — this module accepts payments from customers (Stripe today;
-   *   future PayPal / Adyen / bank-transfer / Viva; ERPs that bring native
-   *   payment processing). **Multi-provider**: every enabled module with this
-   *   flag is listed on the parent Payments module's Providers tab; admins
-   *   may operate multiple simultaneously.
-   *
-   * `banking` — this module connects the workspace's own BANK account
-   *   (banking-revolut today; future Wise). Read/reconcile/treasury, not
-   *   customer checkout — listed in the Banking section of the Finance
-   *   settings providers card, never offered as a way for a buyer to pay.
    */
   provides?: {
     invoicing?: boolean;
@@ -110,10 +93,6 @@ export interface ModuleHeaderAction {
  * always present; modules with feature-level settings (PDF templates, sender
  * config, billing defaults, etc.) contribute panels here so admins find
  * every knob for the module in one place.
- *
- * The panel component is mounted with `embedded` prop set to `true` so it
- * can suppress its own PageHeader / outer padding — accept the prop in your
- * component signature: `({ embedded }: { embedded?: boolean })`.
  */
 export interface ModuleSettingsPanel {
   /** Stable id used as the Tabs value + React key. Must be unique per module. */

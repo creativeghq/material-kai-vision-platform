@@ -1,22 +1,6 @@
 /**
  * Inspections — a checklist you walk the site with, and the record that a stage was checked
  * before it was covered up.
- *
- * Four rules, and every one of them fails silently:
- *
- *  1. **The verdict is derived, never stored.** A stored "passed" goes stale the moment an item is
- *     re-answered, and a perfectly valid string then disagrees with the list underneath it.
- *  2. **An unanswered item is not a pass.** `null` is a fourth state, and coalescing it is how a
- *     walk nobody finished reads as a walk that found nothing.
- *  3. **An empty checklist is not a pass either.** A header with no items is a stage nobody
- *     checked wearing the badge of one that was — so `empty` is its own outcome, and creating one
- *     is refused rather than defaulted.
- *  4. **A failure becomes a snag exactly once.** Create-then-stamp is one call, the stamp is the
- *     claim, and a second press replays the stored id instead of raising a second defect.
- *
- * The template half carries its own rule: a template holds the QUESTIONS, never the ANSWERS. A
- * checklist that arrives pre-ticked is a record claiming a stage was inspected when nobody walked
- * it — and unlike a wrong figure, it is the kind of claim somebody builds over.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';

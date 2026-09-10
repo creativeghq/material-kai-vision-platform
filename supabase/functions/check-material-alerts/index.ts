@@ -1,18 +1,4 @@
-/**
- * check-material-alerts
- *
- * Scheduled via pg_cron (e.g. daily at 08:00 UTC):
- *   SELECT cron.schedule('check-material-alerts', '0 8 * * *',
- *     $$SELECT net.http_post(url:='<SUPABASE_URL>/functions/v1/check-material-alerts',
- *       headers:'{"Authorization":"Bearer <SERVICE_KEY>"}'::jsonb, body:'{}'::jsonb)$$);
- *
- * Can also be triggered manually (POST to the function URL).
- *
- * For each saved_search with is_active_for_recommendations=true,
- * finds products created since last_recommendation_sent_at whose
- * name or description matches the saved query. Inserts alert rows
- * into material_alerts (deduped) and user_notifications for the bell.
- */
+/** check-material-alerts */
 
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';

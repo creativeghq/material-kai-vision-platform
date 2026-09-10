@@ -1,37 +1,4 @@
-/**
- * Storage Orphan Cleanup Cron
- *
- * Belt-and-braces companion to the AFTER DELETE triggers on every table that
- * stores a storage URL: scans buckets and deletes objects no live DB row
- * references. Catches anything that leaked before the triggers shipped, plus
- * any future regression where a new code path forgets to clean up.
- *
- * Runs nightly via pg_cron (`storage-orphan-cleanup-nightly`, 04:00 UTC,
- * after the weekly job-cleanup-cron).
- *
- * Detection happens in SQL via `find_orphan_storage_objects(bucket, grace, limit)`
- * — `storage.objects` is too large to stream over the wire.
- *
- * Buckets + grace periods (grace = "do not touch objects newer than this"):
- *
- *   pdf-documents     | 72h   (KB + catalog-source/ + catalog-output/ + quote-output/ + moodboard-output/)
- *   pdf-tiles         | 48h   (extracted/ + catalog-extracted/)
- *   generation-images | 14d   (AI outputs + product-crops/ + 3d/ + designer/ + agent/ + social/)
- *
- * Grace is 72h rather than 24h on pdf-documents, to widen the
- * absorption window for delayed-DB-write paths (admin uploads, scheduled
- * workers that upload to storage minutes before inserting the documents row,
- * background catalog-restore from snapshot). pdf-tiles 24h → 48h for the same
- * reason since tiles are derived but the documents row may not exist when the
- * tile lands. See `verify_storage_orphans` re-check below — that's the
- * race-window fix; grace is the headroom.
- *
- * quote-templates and moodboard-sheet-references are NOT scanned — admin
- * curated, deletion is manual.
- *
- * Logs every pass to public.storage_cleanup_log.
- * Caps each bucket pass at 5000 deletes to bound blast radius.
- */
+/** Storage Orphan Cleanup Cron */
 
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';

@@ -1,16 +1,4 @@
-/**
- * AI Pricing Auto-Updater Edge Function
- *
- * Automatically updates AI model prices weekly from provider sources
- *
- * Supports:
- * - Manual trigger via POST request
- * - Scheduled cron execution (weekly)
- * - Per-model auto_update_enabled flag
- * - Audit logging for all price changes
- *
- * Schedule: Run via cron weekly (Sundays at 00:00 UTC)
- */
+/** AI Pricing Auto-Updater Edge Function */
 
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';

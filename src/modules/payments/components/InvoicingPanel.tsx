@@ -1,14 +1,4 @@
-/**
- * Invoicing settings — built-in invoice provider configuration.
- *
- * Conditionally deactivated: when an ERP module (e.g. a future Xero/QB) is
- * enabled with `provides_invoicing=true`, this panel shows a banner explaining
- * that the ERP is the active provider and these settings are inactive. The
- * settings rows still exist in the DB so toggling the ERP off re-activates
- * everything — no data loss.
- *
- * Manages: numbering format + sequence, invoice template uploads.
- */
+/** Invoicing settings — built-in invoice provider configuration. */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {

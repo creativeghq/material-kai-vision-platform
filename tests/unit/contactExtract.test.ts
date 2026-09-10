@@ -1,25 +1,4 @@
-/**
- * Contact extraction off a scraped company page.
- *
- * The defect this closes: `company_website_scrape` asked Firecrawl for markdown with
- * `onlyMainContent: true`. That flag is a deterministic HTML filter which strips header, nav and
- * FOOTER — and Firecrawl applies it to the `links` array too. The footer and the imprint are
- * precisely where a company publishes its switchboard number, its contact address and its VAT
- * number, so the tool paid to fetch the page, discarded the three most useful fields on it, and
- * then asked an Opus pass to find "contact details" in text they had been removed from. Nothing
- * failed; the fields were simply always absent.
- *
- * The VAT number is the reason this matters beyond phone numbers. `create_company_from_vat`
- * already resolves a VAT to an official ΑΑΔΕ / VIES record, and VIES covers all 27 member states —
- * but discovery could never reach it, because a web search yields a NAME and VIES needs a VAT.
- * The company's own site is the link between the two halves, and it was being thrown away.
- *
- * The fixtures below are REAL text from real manufacturer pages, verified end to end on
- * 2026-08-20: the extracted VAT went to VIES and came back with the official legal name.
- * Casalgrande Padana publishes it prefixed; Iris Ceramica publishes it bare, and resolves to
- * GRANITIFIANDRE SPA — the legal entity behind the brand, which no amount of reading the page
- * would have told you.
- */
+/** Contact extraction off a scraped company page. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

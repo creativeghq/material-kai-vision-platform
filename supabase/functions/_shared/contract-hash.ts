@@ -1,20 +1,4 @@
-/**
- * The one definition of "what was signed" (#356 `RC-1`).
- *
- * `contract_signatures` recorded who signed and when, and nothing at all about WHAT. So a
- * workspace user could edit `value` from €300,000 to €330,000 after signature, regenerate the
- * PDF over the same storage path, and the old signature block would reappear attached to the
- * new terms. Two people downloading "the signed contract" weeks apart received different
- * commercial terms under identical signature metadata, and the system could not answer which
- * one the counterparty had actually agreed to.
- *
- * A hash of the substantive terms, taken at signing time, is what makes that question
- * answerable. It is computed HERE rather than at each call site because it is compared across
- * two functions — `contracts-api` writes it when the counterparty signs, `generate-contract-pdf`
- * recomputes it to decide whether the document it is about to render still matches. Two copies
- * of a canonicalisation are two copies that can disagree, and a hash comparison that disagrees
- * for a formatting reason is worse than no comparison: it cries wolf until somebody removes it.
- */
+/** The one definition of "what was signed" (#356 `RC-1`). */
 
 /**
  * Fields whose change alters what a signatory agreed to.

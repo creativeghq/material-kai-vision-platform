@@ -1,21 +1,4 @@
-/**
- * Guard: every element the embed widget MOUNTS must also be CREATED (#258).
- *
- * This exists because the bug it catches shipped. `violationsEl` was added to the widget's
- * `replaceChildren(...)` call but never assigned in `renderShell`, so the argument was
- * `undefined` — and `Node.replaceChildren` does not throw on that. It stringifies it, so the
- * widget rendered a literal **"undefined"** on the merchant's product page, between the options
- * and the cart button.
- *
- * WHY NOTHING ELSE SAW IT. `typecheck`, 900 unit tests, `deno check` and the bundle build were all
- * green. The field is declared `private violationsEl!: HTMLDivElement` — the `!` definite-assignment
- * assertion tells TypeScript "trust me, this is assigned", which is precisely the check that would
- * have caught it. The assertion is still the right call for a field assigned in `connectedCallback`
- * rather than the constructor; it just means the guarantee has to come from somewhere else. Here.
- *
- * Text-level rather than behavioural on purpose: mounting a custom element that imports three.js
- * needs a real browser, and this bug is fully visible in the source.
- */
+/** Guard: every element the embed widget MOUNTS must also be CREATED (#258). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

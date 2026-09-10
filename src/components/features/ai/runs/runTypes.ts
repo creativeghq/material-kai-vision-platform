@@ -1,23 +1,4 @@
-/**
- * Agent RUN — the one display model for "the agent is working on this right now".
- *
- * A run is one unit of work the user started: a typed message, a quick-start click, a
- * booted workflow. It has steps, and each step has a verdict.
- *
- * There are two PRODUCERS and one RENDERER:
- *   • a workflow run  — steps are PLANNED, from the WorkflowDefinition registry, so the
- *     user sees steps 2..N before they happen (`runFromWorkflow`)
- *   • every other run — steps are DISCOVERED from the `tool_call` / `tool_progress` /
- *     `tool_result` / `tool_error` chunks agent-chat already emits for every tool on
- *     every turn (`applyRunChunk`)
- *
- * Only 8 of 48 toolkits have a hand-written pipeline, and hand-writing the other 40
- * would be a second copy of what the tools already do — it would drift the first time a
- * tool changed. Discovery is a derivation of what actually ran, so it cannot.
- *
- * The step-status vocabulary is the WORKFLOW one, imported rather than restated, plus
- * exactly one value it has no reason to carry (`unreported`, below).
- */
+/** Agent RUN — the one display model for "the agent is working on this right now". */
 import type { WorkflowStepStatus } from '../workflows/types';
 
 /**

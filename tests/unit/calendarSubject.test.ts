@@ -1,29 +1,4 @@
-/**
- * A calendar entry can say what it is ABOUT, on both calendars, for every subject it declares.
- *
- * THE TWO DEFECTS THIS EXISTS FOR (#378 C4, N10)
- * ----------------------------------------------
- * 1. `appointments` gained four subject columns and the UI wrote TWO of them. `deal_id` and
- *    `order_id` were declared in the row type, constrained by `appointments_single_subject_ck`,
- *    handled by `set_appointment_subject` — and reachable from nothing. The comment above the
- *    control even claimed they were "set from those records"; nothing set them. A column with no
- *    writer is the dead-schema shape wearing a feature's clothes, and no runtime probe can see it
- *    because zero rows written zero times is not activity.
- *
- * 2. `crm_meetings` had no subject at all, and the issue recorded N10 as CLOSED because
- *    `appointments` got one. That is the calendar with the invites, the reminders, the reminder
- *    cron and `property_viewings.meeting_id` pointing into it — so the internal calendar could say
- *    WHO a meeting was with and never WHAT it was for.
- *
- * Both are now served by ONE control, so the two surfaces cannot drift into supporting different
- * subjects — which is how they got here.
- *
- * WHY SOURCE TEXT
- * ---------------
- * The claim is "every declared subject is reachable from a UI". That is a statement about wiring,
- * not about behaviour: a render test proves one path works and says nothing about the three that
- * are missing, which is exactly the gap that shipped.
- */
+/** A calendar entry can say what it is ABOUT, on both calendars, for every subject it declares. */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

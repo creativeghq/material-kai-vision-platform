@@ -559,16 +559,6 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         }
       }
       // The bank account the document printed, filed against the supplier that was just chosen.
-      //
-      // This is the only moment both halves are known: the reader had the IBAN and no party, the
-      // operator has just named the party. A one-off `adhoc` payee is skipped — there is no CRM
-      // record to hang it on, and creating one from a petrol-station receipt is the same mistake
-      // the payee prefill deliberately avoids.
-      //
-      // It is a SUGGESTION on the party's card, not a payment destination: `crm_bank_accounts` is
-      // what the payout path sends money to, and this number came off a document. Best-effort and
-      // REPORTED for the same reason as the receipt upload above — the expense is committed, so a
-      // failure here must not read as "nothing happened", and it must not read as "nothing found".
       if (scannedBank && (cpCompanyId || cpContactId)) {
         try {
           const res = await crmBankAccountSuggestionsAPI.record({
@@ -626,21 +616,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     }
   };
 
-  /**
-   * Read a receipt into this form (#379).
-   *
-   * Prefills, never decides. Every field it touches stays editable and the operator is the one who
-   * presses Save — a confident wrong reading is the failure mode of extraction, and the only thing
-   * that catches it is a person looking at the paper.
-   *
-   * Two details that would otherwise be silent bugs:
-   *   • The form's fields are NET and VAT; a receipt prints the GROSS. `splitForForm` derives the
-   *     pair once, in one place — dropping a gross into "Subtotal (net)" books a VAT-bearing cost
-   *     with its tax folded into the net, overstating the P&L cost and losing the recoverable VAT.
-   *   • The date defaults HERE with `todayLocalISO()` when the receipt's own date was unreadable.
-   *     The scanner deliberately returns null rather than a server "today", which is UTC and is
-   *     yesterday for a Greek operator working before 03:00.
-   */
+  /** Read a receipt into this form (#379). */
   const scanReceipt = async (file: File) => {
     setScanning(true);
     setScanNote(null);

@@ -1,31 +1,4 @@
 // The mobile Apps panel — the phone's version of the desktop Apps launcher.
-//
-// A right-side drawer that walks the SAME tree the desktop popover lays out in three columns:
-//
-//   Apps (root)        →  Hub (e.g. Finance Hub)      →  App (e.g. Finance)
-//   · Recent              · every app in the hub         · Open Finance
-//   · Hubs (+ More)         (Open, or ▸ for sections)    · Create: New Invoice, New Order
-//   · Tools / Help /      · Jump to: the hub's           · In Finance: Receivables, Payables, …
-//     Preferences /         cross-cutting shortcuts      · (or the toolkit's quick-starts)
-//     Manage modules
-//   · Install app
-//
-// Each step is pushed on a stack and slides in from the right; Back pops. It replaced a bottom
-// sheet holding a flat 3-column grid of every entitled app (30+ icons for an owner, no grouping, no
-// sub-navigation), so reaching Finance → Bank feed meant finding one icon among thirty and then a
-// tab in a ten-tab strip. Two things matter in the design:
-//
-//   • It is the SAME data. `useLauncherApps` (active + available-to-add, gated exactly like the
-//     desktop) and `useLauncherLinks` (sections, create actions, quick-starts, hub shortcuts — the
-//     one gate). What the phone offers is what the laptop offers; there is no second list to drift.
-//   • It opens WHERE YOU ARE. Tap Apps while inside Finance and the panel opens on Finance's step
-//     with Back leading up to the hub, so the menu doubles as the section switcher for the app you
-//     are in. `matchAppForLocation` decides ownership by pathname AND the query parameters that are
-//     part of an app's identity (`/crm?tab=pipeline` is Deals, `/crm` is CRM).
-//
-// A row that has sections is split: the body opens the app, the trailing ▸ pushes its step. Two
-// targets on one row is deliberate — the commonest action from this menu is "open the app", and a
-// detour through the section list on every open is a tax on exactly that.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {

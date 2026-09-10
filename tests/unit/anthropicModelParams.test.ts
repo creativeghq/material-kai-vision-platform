@@ -1,29 +1,4 @@
-/**
- * Sampling parameters are REMOVED on the current Anthropic models, and passing one is fatal.
- *
- * `temperature`, `top_p` and `top_k` were dropped on Opus 4.7 and everything after it (Opus 4.8,
- * Opus 5, Sonnet 5, Fable 5). The API answers 400, and `@langchain/anthropic` does not even get
- * that far — `validateInvocationParamCompatibility` throws client-side the moment the model is
- * invoked with a non-default value.
- *
- * This is not a style rule. On 2026-08-25 six constructor sites carried a tuned temperature
- * against `claude-opus-4-8`, and every one of them was dead:
- *
- *   • `company_website_scrape` threw on EVERY call for as long as it had been on that model. Its
- *     catch block quietly substituted a 2 000-character preview of the page and still reported
- *     `success: true`, so an agent asked to enumerate ~100 brands out of a sitemap received the
- *     first 29, concluded the scraper truncates, and spent a whole turn working around a bug that
- *     was in the catch block. Eight paid Firecrawl fetches for one useful answer.
- *   • `scrape_materials_from_url` and `suggest_extraction_fields` threw too — behind an unpriced
- *     credit key that was already refusing them first.
- *   • all four `*_analysis` sub-agents threw.
- *
- * Nothing failed loudly, because every site had a catch. The typecheck was clean: `temperature`
- * is a valid property with a valid value. Only the runtime knew, and only in the edge logs.
- *
- * `claude-haiku-4-5` and older models still accept sampling parameters, so the rule is per-model
- * rather than blanket — an exemption list would rot, a model list is checkable.
- */
+/** Sampling parameters are REMOVED on the current Anthropic models, and passing one is fatal. */
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';

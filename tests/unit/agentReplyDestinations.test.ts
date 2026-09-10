@@ -1,24 +1,4 @@
-/**
- * Naming a place must be the same act as linking to it.
- *
- * The Social quick-start ("My accounts") shipped both halves of the same dead end:
- *
- *   • the result card offered "Add account", which asked the AGENT to add one. No tool can —
- *     connecting a social account is an OAuth handshake with Meta/LinkedIn that only exists in
- *     the app UI — so the button's entire effect was a paragraph telling the user to go to
- *     Profile → Social Accounts.
- *   • that paragraph then named the destination in plain text, so the reader still had to go
- *     hunt for a tab among seventeen on the profile page.
- *
- * Both halves now read one registry (`src/config/appDestinations.ts`). This guard fails the
- * build when:
- *   1. a registered destination points at a route or a `?tab=` that does not exist — a link to
- *      nowhere is worse than the mention it replaced;
- *   2. a tool tells the user to go somewhere that is not registered, so the reply would name a
- *      place the UI cannot link to (that is the original bug, re-entering by the back door);
- *   3. the rewrite touches code spans or existing links, or stops being idempotent;
- *   4. the result card goes back to asking the model for something the model cannot do.
- */
+/** Naming a place must be the same act as linking to it. */
 import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';

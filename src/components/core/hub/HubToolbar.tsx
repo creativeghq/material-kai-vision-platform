@@ -17,19 +17,7 @@ interface HubToolbarProps {
   className?: string;
 }
 
-/**
- * TOOLBAR — the band directly above a list: search, filters, view actions.
- *
- * It is a sunken strip, not another panel. That matters: a list screen has a
- * page header, a toolbar and a table, and if all three are cards you get three
- * stacked white boxes with two gutters of dead space between them. Sinking the
- * toolbar and letting it sit flush on top of the table makes the two read as
- * one object — the list and its controls.
- *
- * Filters are LEFT-aligned next to search because they narrow the same result
- * set; actions are right-aligned because they act on it. That split is the
- * whole reason the row is legible without labels.
- */
+/** TOOLBAR — the band directly above a list: search, filters, view actions. */
 export const HubToolbar: React.FC<HubToolbarProps> = ({
   search,
   onSearchChange,
@@ -95,19 +83,7 @@ interface HubFilterSelectProps {
   className?: string;
 }
 
-/**
- * FILTER CHIP — a compact native <select> dressed as a toolbar control.
- *
- * Native rather than a Radix Select on purpose: a filter row can hold six of
- * these, each with a few hundred options (owners, stages, categories), and the
- * native control gets keyboard type-ahead, mobile's own picker and zero popup
- * layout cost for free.
- *
- * When a filter is ACTIVE the chip switches to the accent — border, text and a
- * faint fill. Without that, a list showing 3 of 400 rows looks like a list with
- * 3 rows, and "why is this empty" is the single most common support question a
- * filtered table generates.
- */
+/** FILTER CHIP — a compact native <select> dressed as a toolbar control. */
 export const HubFilterSelect: React.FC<HubFilterSelectProps> = ({
   label,
   value,

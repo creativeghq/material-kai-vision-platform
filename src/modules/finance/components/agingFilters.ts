@@ -78,7 +78,6 @@ export function buildAgingFilters(
           // `due_at` stays null, so a date filter would silently drop exactly the rows the
           // buckets DO age. `isAgingRowOverdue` is the one definition, shared with the summary
           // the dashboard's Overdue figure comes from — so the number and the list it links to
-          // are the same set of rows.
           key: OVERDUE_KEY, type: 'bool', label: 'Past due',
           trueLabel: 'Past due only', falseLabel: 'Not yet due',
           accessor: (r: AgingRow) => isAgingRowOverdue(r),

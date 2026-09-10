@@ -301,24 +301,7 @@ const GEO_SIGNAL_NAMES: Record<string, string> = {
   freshness: 'Freshness',
 };
 
-/**
- * Fold `stages_data.extra` back up to the top level.
- *
- * Most of what this viewer renders is NOT a column on `seo_articles`. The pipeline computes
- * `optimize_data`, `brief_data`, `gaps_gains_data`, `research_tab_data`, `html_content`,
- * `meta_title`, `secondary_keywords`, `schema_markup`, `faq_schema`, `content_analysis` and
- * `overall_score`, and `updateArticle` deliberately diverts every one of them into the
- * `stages_data.extra` jsonb — because naming a non-existent column makes PostgREST reject the
- * WHOLE update, which is how finished articles used to end up with a NULL title and no markdown.
- *
- * So the data is written and this viewer was reading the one place it is not. Every tab
- * rendered its empty state on a completed article. Merging here rather than adding twelve
- * columns keeps the writer's allowlist as the single source of what is a column; a field the
- * pipeline adds later lands in `extra` and shows up without a second list to update.
- *
- * A real column WINS whenever it holds a value — `extra` is the fallback, never an override,
- * or a stale stage copy would mask the finished one.
- */
+/** Fold `stages_data.extra` back up to the top level. */
 function hydrateArticle<T extends Record<string, any>>(row: T): T {
   const extra = (row?.stages_data as any)?.extra;
   if (!extra || typeof extra !== 'object') return row;
@@ -394,22 +377,7 @@ function useAdaptivePolling(
 
 // ─── Score Gauge Component ──────────────────────────────────────
 
-/**
- * Score tones, written as light/dark PAIRS and measured, not chosen.
- *
- * These were the bare 500-weights (green / yellow / red), one set of classes for
- * all four themes. Those shades are picked for the plum-black dark ground, so on the light
- * themes' cream card the headline number of this whole panel rendered at roughly 2:1. The
- * light shades below are the ones `src/utils/statusTone.ts` already holds at 4.5:1 against
- * the real `--card` of all four themes (tests/unit/inboxChipContrast.test.ts) — take a shade
- * from there rather than eyeballing a new one.
- *
- * Written out in full because Tailwind's scanner reads source text: a class assembled from a
- * template literal lands in no stylesheet. That is also why the ring is its own class here
- * and not `color.replace('text-', 'border-')` — `String.replace` with a string pattern swaps
- * only the FIRST match, so that produced `border-emerald-700 dark:text-emerald-400` and the
- * ring silently kept whatever colour it inherited in dark mode.
- */
+/** Score tones, written as light/dark PAIRS and measured, not chosen. */
 const SCORE_TONES = {
   good: {
     text: 'text-emerald-700 dark:text-emerald-400',
@@ -449,22 +417,7 @@ function ScoreGauge({ score, label, size = 'lg' }: { score: number; label: strin
 
 // ─── Applicable fixes ───────────────────────────────────────────
 
-/**
- * The fixes that can be applied to one paragraph, each with its own button.
- *
- * Only `scope: 'section'` fixes get a button. That is the point: the analyzer’s document-wide
- * and config findings still appear in the section breakdown below, but without one, because
- * there is nothing a button could edit — meta tags come from the plan and provenance from the
- * brief, so an Apply on those would promise what it cannot do.
- *
- * What this card must NEVER do is render nothing. It did, and the result was a feature that
- * existed in the database, in the edge function and on the deploy, and nowhere on the screen.
- * A card that states its own emptiness costs one paragraph; one that hides costs the feature.
- *
- * Each row shows the paragraph it will touch. Applying a model rewrite to a customer’s
- * finished article without showing them which words are at stake is asking for a signature
- * on a blank page.
- */
+/** The fixes that can be applied to one paragraph, each with its own button. */
 function ApplicableFixes({ state, applyingAnchor, onApply, canRevert, onRevert, onReanalyze, reanalyzing }: {
   state: FixListState;
   applyingAnchor: string | null;
@@ -544,23 +497,7 @@ function ApplicableFixes({ state, applyingAnchor, onApply, canRevert, onRevert, 
 
 // ─── Search Appearance ──────────────────────────────────────────
 
-/**
- * The meta title and description, ABOVE the article.
- *
- * They were under it, and only rendered `{article.meta_description && …}` — so a missing
- * description was an ABSENT BLOCK, not a stated gap. That is the hidden-row shape this
- * codebase keeps fighting (anti-regression rule 3: a value or a stated reason there is
- * none, never a quietly shorter surface): the one case you need to see is the one that
- * silently disappeared, and the meta title was never shown here at all.
- *
- * Position matters too. These two strings are what a searcher reads before deciding whether
- * to open the page, so they are the first thing to review — putting them below 2,000 words
- * of body copy is putting the headline after the article.
- *
- * Lengths are Google's practical truncation points, and they are stated as guidance rather
- * than enforced: a slightly long description is trimmed in the SERP, not rejected, so this
- * warns and never blocks.
- */
+/** The meta title and description, ABOVE the article. */
 const META_TITLE_MAX = 60;
 const META_DESCRIPTION_MAX = 155;
 
@@ -814,17 +751,7 @@ function OptimizeTab({ data, overallScore }: { data: OptimizeData; overallScore:
 
 // ─── Brief Tab ──────────────────────────────────────────────────
 
-/**
- * Put a new question into the article's FAQ section.
- *
- * The only route in before this was Research → Questions, which appends `## <question>` and a TODO
- * marker to the BOTTOM of the document — below the conclusion, outside the FAQ, and with no answer.
- * For a question that is the wrong place twice over: the viewer renders the FAQ block as an
- * accordion and `faq_schema` is what a FAQPage rich result is built from, and appending broke both.
- *
- * The answer is optional. Typed by hand it is free; left blank it costs 2 credits and Claude writes
- * one in the article's language, matching the length and register of the entries already there.
- */
+/** Put a new question into the article's FAQ section. */
 function AddFaqControl({ onAdd }: {
   onAdd: (question: string, answer: string) => Promise<boolean>;
 }) {
@@ -1000,17 +927,7 @@ const GAP_SOURCE_LABEL: Record<NonNullable<MissingTopic['source']>, string> = {
   competitor_heading: 'Competitor section',
 };
 
-/**
- * What the article does not cover that people search for — and what it already does.
- *
- * This panel used to list competitor PAGE TITLES: `Gap: ΨΑΡΑΔΕΛΛΗΣ | ΠΛΑΚΑΚΙΑ` meant "a rival
- * brand name does not appear in your text", and every row carried the same two hardcoded numbers
- * (3 competitors, 60%). Rows are topics now, each with the real volume behind it — see
- * supabase/functions/seo-api/handlers/gaps.ts.
- *
- * A row written before that change has no `source`, so it is shown for what it is rather than
- * dressed up with numbers that were never measured. Re-analyse rebuilds it.
- */
+/** What the article does not cover that people search for — and what it already does. */
 function GapsGainsTab({ data, labels, onAddToContent, onReanalyze }: {
   labels: SectionLabels;
   data: GapsGainsData;
@@ -1845,14 +1762,6 @@ function extractLead(markdown: string): { lead: string | null; rest: string } {
  * Extract FAQ entries from a contiguous slice of markdown that lives inside the article's FAQ
  * section — whatever that article calls it, in whatever language it is written in. We try several
  * question shapes since the writer model isn't always consistent:
- *
- *   1. `### Question?`        (preferred)
- *   2. `#### Question?`       (one level off)
- *   3. `**Question?**`        (bold paragraph)
- *   4. `**Q:** Question`      (Q-prefixed bold)
- *   5. `Q: Question`          (plain Q prefix)
- *
- * Returns [] if nothing question-shaped is found.
  */
 function extractFaqEntries(sectionLines: string[]): FaqEntry[] {
   const entries: FaqEntry[] = [];
@@ -2445,19 +2354,7 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
     [article?.language_code, article?.markdown_content],
   );
 
-  /**
-   * Take something the Research tab found and put it IN the draft.
-   *
-   * The research tabs were read-only: they told you a term was under-used or that a PAA question
-   * went unanswered and then left you to retype it into the body yourself, which is the point at
-   * which people stop using the panel. A question becomes an H2 with a to-write marker (an empty
-   * heading would score as thin content and read as finished); a key term becomes a line you edit
-   * in place.
-   *
-   * It goes ABOVE the closing section, in the article's own language. Both of those were wrong:
-   * it appended, so every added section landed below the conclusion and its call to action, and
-   * the marker was an English sentence pasted under a Greek heading.
-   */
+  /** Take something the Research tab found and put it IN the draft. */
   const addToContent = useCallback(async (snippet: string): Promise<'inserted' | 'exists' | 'notfound'> => {
     if (!article?.id) return 'notfound';
     const md = article.markdown_content ?? '';

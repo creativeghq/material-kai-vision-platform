@@ -1,18 +1,4 @@
-/**
- * Job Research Tools — agent-chat surface for the job-research module.
- *
- * Tools:
- *   - track_job_search        — create / pause / resume a tracked job search
- *   - list_my_job_searches    — read the user's existing tracked_jobs
- *   - find_jobs               — fetch recent matching listings for a tracked_job
- *   - get_job_digest_preview  — preview today's consolidated digest content
- *
- * Cost discipline: all four are 0-credit (DB reads + a backend round-trip).
- * The expensive part (discovery) runs on the cron tick, not on user demand.
- *
- * Module-gated: every tool first verifies `job-research` is enabled. If not,
- * returns a friendly error chunk without touching credits.
- */
+/** Job Research Tools — agent-chat surface for the job-research module. */
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what
@@ -404,19 +390,9 @@ export const createFindJobsTool = (
 // 4) get_job_digest_preview — what would today's email look like?
 // ───────────────────────────────────────────────────────────────────────────
 
-// ───────────────────────────────────────────────────────────────────────────
 // 5) manage_job_sites — admin tool to curate the platform-wide job-board list
 // Three site types:
 //   - perplexity_domain     → Sonar search_domain_filter (cap 10)
-//   - rss_feed_default      → suggested RSS feeds for new tracked_jobs
-//   - careers_page_default  → suggested career pages for new tracked_jobs
-// Lives in the 'Job Sources' KB category (access_level='agent' — agent reads
-// it, public KB hides it). Writes are admin-gated via RLS at the DB level.
-// When the user asks generically ("add a job site" with no fields), the tool
-// emits a `job_sites_form_open` chunk so AgentHub can render a modal. When
-// they give specifics ("add kariera.gr to the perplexity filter"), the tool
-// just does it.
-// ───────────────────────────────────────────────────────────────────────────
 
 export const createManageJobSitesTool = (
   userId: string,

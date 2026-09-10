@@ -1,20 +1,4 @@
-/**
- * `<materialkai-builder>` — the staged spec builder (#337).
- *
- *   <materialkai-builder api-key="mk_embed_…"></materialkai-builder>
- *
- * The product widget answers "show me THIS product". This answers "I want something like this —
- * what does it cost?", which is a different question with a different ending: a price only when a
- * real product matches, and otherwise a quote request.
- *
- * WHY THE FALLBACK IS THE DEFAULT, not the error case. A configurator bound to one product can
- * only ever sell what somebody already modelled and priced. A builder captures demand for things
- * that are not in the catalog yet, and that demand is the lead. So "nothing matched" is a normal,
- * successful outcome here — it is not a failure to apologise for.
- *
- * NOTHING IS PRICED LOCALLY. The widget sends the spec and renders whatever the server says. It
- * cannot compute a price even in principle: it has no catalog, and it must not appear to have one.
- */
+/** `<materialkai-builder>` — the staged spec builder (#337). */
 
 // Shared with <materialkai-configurator>: Cloudflare's script defines a global, so the page
 // gets exactly one loader (#382).
@@ -139,11 +123,6 @@ export class MaterialKaiBuilder extends HTMLElement {
     // DEEP-LINK MODE (#341 join 6). `<materialkai-builder product-id="…">` is the same entry with
     // the first question already answered — the visitor arrived on a page about one product, so
     // asking "what are you after" would be pretending not to know.
-    //
-    // This exists so a merchant learns ONE tag. `<materialkai-product>` is still exported and still
-    // works (it is what mounts inside here, on a match and on this path), but it is no longer a
-    // second thing to choose between: the builder IS the entry, and naming a product is a mode of
-    // it rather than a different component.
     const deepLink = this.getAttribute('product-id');
     if (deepLink) {
       this.deepLinkProductId = deepLink;
@@ -352,17 +331,7 @@ export class MaterialKaiBuilder extends HTMLElement {
       });
   }
 
-  /**
-   * The viewport — stage 3, "see it", living at the top of the card across every stage.
-   *
-   * Three states, in the order they are worth showing:
-   *   matched   → the real product widget, so the 3D model, the finishes and AR come for free
-   *   generated → an AI image of the spec, for the case the catalog cannot satisfy
-   *   neither   → a prompt to build a spec, not an empty grey box
-   *
-   * The generated image carries a visible label. A picture of something we do not stock, shown
-   * without one, is a promise the merchant cannot keep.
-   */
+  /** The viewport — stage 3, "see it", living at the top of the card across every stage. */
   /** The one-line verdict that sits above the viewport, or null on the stages that have none. */
   private stageHeading(): HTMLElement | null {
     if (this.stage !== 2 || !this.result) return null;
@@ -481,18 +450,6 @@ export class MaterialKaiBuilder extends HTMLElement {
     el.setAttribute('product-id', productId);
     if (this.getAttribute('api-base')) el.setAttribute('api-base', this.getAttribute('api-base')!);
     // THE CART DEFAULT DIFFERS BY MODE, because the two modes sit on different pages.
-    //
-    // After the WIZARD, a match is BUYABLE — that is the whole distinction this widget draws.
-    // "Matched → price and add to cart, no match → request a quote" is the rule, so mounting the
-    // product without its cart button leaves the matched half unfinished: a price you cannot act
-    // on. Default on; opt out with `no-cart` for a merchant who only wants enquiries.
-    //
-    // In DEEP-LINK mode the tag sits on the merchant's own product page, which already has their
-    // buy button, and the merchant may not have wired `materialkai:add-to-cart` at all. So it
-    // follows the product widget's own rule instead (materialkai-product.ts: "a merchant who has
-    // not wired the event should not be shown a button that does nothing") and stays OFF until
-    // `show-add-to-cart` is asked for. Forcing it here is how the snippet the platform hands out
-    // would have shipped a dead button to every merchant who pasted it.
     const cartOn = this.deepLinkProductId
       ? this.hasAttribute('show-add-to-cart')
       : !this.hasAttribute('no-cart');
@@ -673,11 +630,6 @@ export class MaterialKaiBuilder extends HTMLElement {
       // The product widget in the viewport above IS the answer: it carries the name, the price, the
       // finishes and the cart button. This branch adds only the sentence that explains why it is
       // there.
-      //
-      // It deliberately prints NO price of its own. `resolve` returns the base price while the
-      // widget shows the CONFIGURED one, so rendering both would put two numbers from two
-      // derivations on screen at the same time, free to disagree the moment a finish is picked —
-      // the money rule (one derivation per quantity) arriving as a UI bug instead of a SQL one.
       host.appendChild(this.backRow());
       return;
     }
@@ -736,17 +688,6 @@ export class MaterialKaiBuilder extends HTMLElement {
     card.append(mk('Your name', name), mk('Email', email), mk('Message (optional)', msg));
 
     // The bot challenge lives in the LIGHT DOM and is projected in here through a slot.
-    //
-    // Not a style preference — it removes a question I could not otherwise answer. Cloudflare's
-    // automatic mode is a `document.querySelectorAll`, which cannot descend into a shadow root, and
-    // whether the explicit API renders reliably into one is exactly the kind of assumption that is
-    // invisible until it is dead in production. A slot sidesteps it: the element Cloudflare renders
-    // into is an ordinary document child of the host, styled and scripted like any other, and the
-    // shadow tree merely projects it into place.
-    //
-    // It also survives re-renders. The holder is not part of the shadow tree, so rebuilding the
-    // shadow DOM cannot destroy a solved challenge; when no slot is on screen it is simply not
-    // projected, and it comes back intact if the visitor returns to the form.
     if (this.siteKey) {
       const slot = document.createElement('slot');
       slot.name = 'turnstile';

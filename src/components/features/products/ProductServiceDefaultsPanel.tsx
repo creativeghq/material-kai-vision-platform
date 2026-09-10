@@ -19,17 +19,7 @@ interface Props {
   workspaceId: string;
 }
 
-/**
- * Product-level service defaults (#343).
- *
- * This is where "a split AC always needs its filters cleaned every 3 months" is said ONCE.
- * `register_customer_asset` and the delivered-order trigger both copy these onto the new unit,
- * so the schedule exists before anyone thinks to add it — which is the difference between a
- * maintenance register that stays complete and one that quietly rots.
- *
- * `is_serviceable` is the switch that makes auto-registration happen at all: without it, a
- * delivered line creates no asset, and none of these defaults are ever read.
- */
+/** Product-level service defaults (#343). */
 export const ProductServiceDefaultsPanel: React.FC<Props> = ({ productId, workspaceId }) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);

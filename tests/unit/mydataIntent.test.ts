@@ -1,20 +1,4 @@
-/**
- * "Expenses" means our books. The myDATA feed is reached only by naming it.
- *
- * Two sets answer to the same word and they are not the same size: 6 recorded expenses against
- * 1,866 documents ΑΑΔΕ has sent, 1,864 of them never booked. Answering either question with the
- * other set is a valid-looking list that is wrong by three orders of magnitude — the shape that
- * produced "2" for the whole feed, and then, once the feed tool existed, produced the feed for a
- * plain question about our own spending.
- *
- * That second direction was MEASURED, not feared. claude-opus-5, real tool descriptions, one call
- * per prompt: "What expenses do we have?" and "List the last 10 expenses by supplier" fired BOTH
- * tools, and "Give me the first 5 expenses by supplier" fired the feed and never touched the
- * ledger. 6 of 9 prompts routed correctly, which is what a description alone buys you.
- *
- * So the rule is enforced in code and this file holds the vocabulary honest. A description is
- * advice to a model; `mentionsMyDataFeed` is the gate `list_mydata_expenses` fails closed on.
- */
+/** "Expenses" means our books. The myDATA feed is reached only by naming it. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

@@ -25,34 +25,7 @@ interface HubSegmentedProps<T extends string> {
   className?: string;
 }
 
-/**
- * SEGMENTED CONTROL — "which of these two or three am I looking at".
- *
- * A switch between two views of the SAME list: credit notes issued to customers vs received
- * from suppliers, all sourcing vs mine, EN vs GR. Not a tab (a tab changes the section of the
- * page), not a filter chip (a chip narrows a set), and not a button (nothing happens when you
- * press it except that the answer to a question changes).
- *
- * WHY THIS IS A COMPONENT
- * -----------------------
- * It was hand-rolled four times — Documents, Business identity, GSC breakdown, Sourcing — and
- * every copy was `rounded-full`, which the design system reserves for avatars, dots and status
- * pips. Worse, the four tracks disagreed (`border-border/60`, `bg-muted`, `border-border` +
- * `overflow-hidden`) and NONE of them gave the selected segment a radius, so a square accent
- * block sat inside a fully-round outline and the two edges visibly fought. That is what got
- * reported, and it was reported about one of the four.
- *
- * THE SHAPE
- * ---------
- *  - **Squared** (`rounded-sm` track, `rounded-xs` segment), like every other control here. A
- *    pill is the silhouette of nothing else in this platform, which is exactly why it stood out.
- *  - **The segment's radius matches the track's**, inset by the track's own 2px padding. This is
- *    the part all four copies missed.
- *  - **A sunken track**, so the control reads as a groove with something sitting in it rather
- *    than as two buttons that happen to touch.
- *  - **The selected segment keeps the accent fill** the four copies used. It is the clearest
- *    answer to "which one am I on", and this control is never the page's primary action.
- */
+/** SEGMENTED CONTROL — "which of these two or three am I looking at". */
 export function HubSegmented<T extends string>({
   options,
   value,

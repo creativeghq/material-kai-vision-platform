@@ -1,17 +1,4 @@
-/**
- * Pulls structured product facts out of a supplier invoice line.
- *
- * A myDATA line gives us one free-text description, a quantity and a net value — e.g.
- *   "AMALFI GRIS 80X80 A' -3 -1"   qty 17.92   net €295.86
- * and everything a stock item needs (size, unit, grade, maker, cost per unit) is either
- * encoded in that string or derivable from it. This is deterministic parsing, deliberately
- * separate from the Haiku extraction in `_shared/finance/extract-products.ts`: it runs
- * instantly with no credit cost, and it is the thing that fills the intake form's fields.
- * The AI extraction stays the fallback for descriptions this cannot read.
- *
- * Everything returned is a *suggestion* — the intake form shows each value as editable, and
- * `confidence` drives whether it is applied silently or flagged for a look.
- */
+/** Pulls structured product facts out of a supplier invoice line. */
 
 type LengthUnit = 'mm' | 'cm';
 
@@ -74,10 +61,6 @@ const GRADE_RE = /\b([ABΑΒ])['’´]/;
  * lowercase-English canonical form the platform's facet layer expects (see the L0 prompt rule
  * and `facet_whitelist.py` — `color` is a canonicalized facet, so feeding it English here
  * saves the multilingual canonicalizer a round trip).
- *
- * Deliberately a dictionary, not an LLM call: it runs instantly, costs nothing, and is
- * predictable. Anything it misses falls through to the Haiku `attributes` the nightly sync
- * already extracted, and failing that the operator types it.
  */
 const COLOR_WORDS: Record<string, string> = {
   // English

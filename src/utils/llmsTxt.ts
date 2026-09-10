@@ -1,21 +1,4 @@
-/**
- * Build an `llms.txt` for a connected website from its crawled pages (#349 C2).
- *
- * WHAT THIS IS FOR. `llms.txt` is a file a site serves at its own root that tells an
- * answer engine which parts of it are worth reading and what they are. The platform
- * serves a hand-written one for itself; a tenant's has to be DERIVED, because they have
- * hundreds of pages and no appetite for maintaining a second copy of their own sitemap.
- *
- * WHY IT IS A PURE FUNCTION. It produces a document a customer will paste onto their own
- * domain under their own name. That makes it worth testing over hand-built inputs rather
- * than only over whatever the crawler happened to return — and it means the same text is
- * produced for preview, copy and download, instead of three near-copies that drift.
- *
- * WHAT IT WILL NOT DO. It never invents a description. A page whose crawl found no
- * description is listed with its title alone; writing a plausible summary for a page we
- * have not read is exactly the fabrication an `llms.txt` exists to prevent, and it would
- * be published under the customer's name, not ours.
- */
+/** Build an `llms.txt` for a connected website from its crawled pages (#349 C2). */
 
 export interface LlmsTxtPage {
   url: string;

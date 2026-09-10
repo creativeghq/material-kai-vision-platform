@@ -1,17 +1,4 @@
-/**
- * Embed-readiness guard (#341 join 5).
- *
- * The panel's job is to tell a merchant what a product still needs before the SDK can carry it.
- * Two ways that goes wrong, and neither is visible to a typecheck:
- *
- *   1. IT LIES ABOUT REACH. "Covered by an embed key" has to mean the same thing the endpoint
- *      means, or the panel promises a merchant their product is embeddable and `products-3d-api`
- *      404s it. That rule now lives once, in `embed_scope_covers_product`; the tests below fail if
- *      a second opinion reappears in TypeScript.
- *   2. IT NAGS ABOUT THE IMPOSSIBLE. A checklist item nobody can satisfy parks every product below
- *      100% forever, which is how a checklist gets ignored. USDZ was exactly that — nothing here
- *      can produce one — and it was removed with iOS Quick Look on 2026-08-11.
- */
+/** Embed-readiness guard (#341 join 5). */
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

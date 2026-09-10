@@ -2,25 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { hasCreds, serviceClient, createUser, teardown, runId, SUPABASE_URL, type TestUser } from './_harness';
 
-/**
- * `ai-rerank` — contract test for the reranker restored under #310 item 1.
- *
- * The point of this file is the DEGRADATION contract, not the ranking quality.
- *
- * Reranking sits on the hot path of three search tools. Its one hard requirement is that it can
- * never make search worse: whatever happens — too few candidates, a dead model, a reply naming
- * ids that were not sent — the caller must get its results back, in a defined order, with an
- * honest flag saying whether they were actually ranked.
- *
- * That flag is the part worth pinning. An endpoint that silently returns the source order while
- * claiming to have ranked it is the ambiguous-zero shape this platform keeps rediscovering: the
- * caller cannot tell "ranked, and this is the best order" from "reranking is broken". So every
- * assertion below is about `reranked` / `reason` and about results SURVIVING, and none of them is
- * about which result came first.
- *
- * The predecessor of this function was deployed with no source in the repo, unauthenticated, for
- * months. The 401 case is checked first for that reason.
- */
+/** `ai-rerank` — contract test for the reranker restored under #310 item 1. */
 const suite = hasCreds ? describe : describe.skip;
 
 const ANON_KEY = process.env.SUPABASE_ANON_KEY || '';

@@ -1,21 +1,4 @@
-/**
- * Apply ONE fix to ONE block of an article — and put it back.
- *
- * The existing auto-fix path sends the whole article to the model and takes a whole article
- * back. That is the expensive shape, the destructive shape, and it discards the writer's
- * prose everywhere the fix does not apply: a 2,077-word article is ~10,000 tokens in and
- * ~10,000 out to change one paragraph, and every other paragraph comes back re-generated.
- *
- * This sends the anchored block ALONE — measured at 2,000 characters against 23,958 for the
- * same article, a 12× reduction — and splices the result back by exact string replacement.
- * Everything outside the block is byte-identical afterwards, so a bad edit can only damage
- * the paragraph it was asked to edit.
- *
- * The anchor must appear EXACTLY ONCE. Zero means the article has moved on since the
- * analysis and the fix no longer describes it; more than one means the replacement would be
- * ambiguous. Both refuse rather than guess — splicing into the wrong paragraph is precisely
- * the failure this design exists to make impossible.
- */
+/** Apply ONE fix to ONE block of an article — and put it back. */
 
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../../_shared/http.ts';
@@ -37,20 +20,7 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 /** One block, one model turn. A twelfth of the input the whole-article fixer sends. */
 const APPLY_CREDIT_COST = 2;
 
-/**
- * Claude, not the whole-article fixer's Gemini.
- *
- * `write.ts` picks Claude for the article "due to superior prose quality, natural tone, and
- * stronger E-E-A-T experiential signals" — and then the fixer rewrote that prose with Gemini
- * Flash at `thinkingLevel: 'low'`. Nobody had ever compared them: `seo_analyze_revise` had
- * zero rows in `ai_usage_logs`, and there is no eval or doc anywhere that chose it.
- *
- * Measured on a real block from article 88779ba1 (a Greek section, "add structured
- * definitions"): Claude inserted two correct Greek definitions and left every figure and the
- * surrounding prose byte-identical. Keeping the writer's model for edits to the writer's
- * prose is the conservative choice; the whole-article path is left on Gemini until someone
- * measures both on the same input.
- */
+/** Claude, not the whole-article fixer's Gemini. */
 const APPLY_MODEL_MAX_TOKENS = 4000;
 
 export async function handleApplyFix(req: Request, body: any): Promise<Response> {
@@ -159,12 +129,6 @@ export async function handleApplyFix(req: Request, body: any): Promise<Response>
 
     // Re-analyse. `analyzeContent` is pure TypeScript with no model call, so this is free and
     // immediate — there is no reason to hand back a stale answer.
-    //
-    // The whole ANALYSIS is re-derived, not just the score. The fix we just applied rewrote the
-    // paragraph its anchor pointed at, so that anchor no longer occurs in the article: leaving
-    // the stored analysis alone left the applied fix on the list, and pressing it again returned
-    // "that paragraph is no longer in the article". The list has to describe the article as it
-    // is now, and after this edit only this function knows what that is.
     const plan = storedArticlePlan(article) as ArticlePlan | null;
     let score: number | null = null;
     let readability: number | null = null;

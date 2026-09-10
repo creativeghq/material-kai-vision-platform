@@ -1,16 +1,4 @@
-/**
- * LangGraph Core — shared graph utilities
- *
- * Single source of truth for:
- * - extractTextContent  : convert Claude content (string | block[]) → plain text
- * - LangGraphRunOptions : options for the self-contained background agent runner
- * - LangGraphRunOutput  : return shape of runLangGraphAgent
- * - buildLLM            : factory for ChatAnthropic / ChatOpenAI / ChatGoogleGenerativeAI
- * - runLangGraphAgent   : StateGraph runner used by all background agents
- *
- * Import path for _shared/agents/*  → '../langgraph-core.ts'
- * Import path for agent-chat/       → '../_shared/langgraph-core.ts'
- */
+/** LangGraph Core — shared graph utilities */
 
 import type { LogLevel } from './agents/types.ts';
 // Type-only — erased at compile time, so the lazy `npm:` imports below still do the actual
@@ -71,31 +59,8 @@ export interface LangGraphRunOutput {
  * Build an LLM instance based on the model name prefix.
  *  claude-*  → ChatAnthropic
  *  gemini-*  → ChatGoogleGenerativeAI
- *
- * There is no OpenAI branch. It existed until 2026-08-23 and was unreachable the whole
- * time: every model in `agent_usage_logs` and every `background_agents.model` row is a
- * Claude one, and the branch pulled a whole LangChain OpenAI package into the bundle to
- * serve a prefix nothing ever asked for.
- *
- * (The package name is written out here rather than as an import specifier on purpose —
- * `langchainVersionPins` scans this tree for unpinned `@langchain` specifiers and a
- * comment quoting one reads to it exactly like an import.)
  */
-/**
- * NEVER write to `process.env` here — on Supabase edge it is not a shim you can merge into.
- *
- * This used to do `procEnv.ANTHROPIC_API_KEY = anthropicApiKey` on the theory that
- * `globalThis.process.env` is a plain object it could top up. Under Deno's node-compat layer
- * `process.env` is a live proxy backed by `Deno.env`, and `Deno.env.set` is unavailable on this
- * runtime — so the assignment threw `NotSupported: The operation is not supported` and took
- * `buildLLM` with it. EVERY background agent died in ~490 ms, before a single token was spent:
- * `dispatch_background_task` returned `refused_500`, and the chat agent that dispatched it was
- * told (correctly) that nothing was running. `secrets-bootstrap` logs this same constraint on
- * every cold start; this file was the one place that had not read the message.
- *
- * The writes were redundant on top of being fatal: both constructors below take the key as an
- * explicit argument, so nothing ever read the env var they were setting.
- */
+/** NEVER write to `process.env` here — on Supabase edge it is not a shim you can merge into. */
 export async function buildLLM(opts: LangGraphRunOptions): Promise<any> {
   const { model, anthropicApiKey, googleApiKey } = opts;
 
@@ -177,10 +142,6 @@ export async function runLangGraphAgent(opts: LangGraphRunOptions): Promise<Lang
     // `invoke(msgs, { system })`, which is what this used to be, sent the model nothing at
     // all. Every background agent ran without its instructions and still returned plausible
     // text, so nothing ever failed. The same defect was live in agent-chat.
-    //
-    // Anthropic gets the prompt as a cached block (one breakpoint covers tools + system,
-    // which is the whole stable prefix); the other providers get a plain string, because
-    // `cache_control` is an Anthropic-only key and passing it to them is not defined.
     const systemMessage = model.startsWith('claude-')
       ? new SystemMessage({
           content: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
@@ -223,9 +184,6 @@ export async function runLangGraphAgent(opts: LangGraphRunOptions): Promise<Lang
       // 95s router deadline without the router ever being consulted, and the rejecting backstop
       // won the race — losing the graceful wrap-up the deadline exists to reach. Measured, not
       // theoretical: that is exactly what run 517ed569 did.
-      //
-      // The remaining calls get a ToolMessage saying why they did not run, so the wrap-up turn can
-      // report them as outstanding rather than as failures.
       if (outOfTime()) {
         toolMsgs.push(new ToolMessage({
           tool_call_id: tc.id,
@@ -268,32 +226,13 @@ export async function runLangGraphAgent(opts: LangGraphRunOptions): Promise<Lang
     return { messages: toolMsgs, toolResults: results };
   }
 
-  /**
-   * Wall-clock deadline for the TOOL LOOP, leaving room to write the answer.
-   *
-   * The loop used to be bounded only by `maxIterations`, with a 5-minute REJECTING race around
-   * the whole thing. Both are the wrong shape for real research work:
-   *
-   *  - A rejection throws away everything the run learned. The run is marked failed and the
-   *    tool results — which cost real money and minutes — are gone.
-   *  - The rejection frequently never fires at all, because the platform kills the isolate
-   *    first. Then nothing marks the run terminal and it sits in `processing` forever. There is
-   *    a `pending` run in this database from 2026-07-31 that nothing has ever reaped.
-   *
-   * So the deadline is checked in the router instead, and crossing it routes to a wrap-up turn
-   * that reports what was actually found. Same reasoning as agent-chat's `finalize` node, for
-   * the same reason: a partial answer that says it is partial beats a clean failure.
-   */
-  //
+  /** Wall-clock deadline for the TOOL LOOP, leaving room to write the answer. */
   // 95 SECONDS, and the number is measured, not chosen. The first version of this was 3.5 minutes,
   // reasoning from the "400s limit" quoted elsewhere in this repo. That limit is not what governs
   // here: `background-agent-runner` runs the loop SYNCHRONOUSLY inside the request, and the
   // Supabase gateway kills the request at ~150s. Two runs on 2026-08-25 died at 165s and 177s of
   // wall time having never reached a 210s deadline — a graceful exit that cannot be reached is
   // the same as no graceful exit, and both runs orphaned exactly as before.
-  //
-  // The wrap-up turn is a model call over the whole transcript, so it needs real room: 95s of tool
-  // loop leaves 55-85s to write the answer inside the observed window.
   /**
    * A running copy of what the graph has produced, kept OUTSIDE the graph.
    *
@@ -388,27 +327,13 @@ export async function runLangGraphAgent(opts: LangGraphRunOptions): Promise<Lang
   /**
    * Hard deadline. Unlike the router's, this one CANNOT be missed by a node that is already
    * running — and that distinction is the whole point.
-   *
-   * A router deadline only gets a turn between nodes. Measured on run 8cf5f7b4: twelve web
-   * fetches finished at 73s (inside the 95s router deadline, so the loop legitimately continued),
-   * then the next model call ran from 73s to past 140s. The router was never consulted again, the
-   * rejecting backstop won, and twelve pages of retrieved data were thrown away — the third time
-   * the same run lost its work to a deadline that could not reach it.
-   *
-   * So the timer RESOLVES with a sentinel instead of rejecting, and we write the report from the
-   * transcript accumulated so far. `graph.invoke` gives no access to intermediate state, so the
-   * nodes append to `transcript` as they go; that is the copy this path reads.
    */
-  //
   // 75s, not 105s, and the wrap-up's budget is derived from the WALL rather than from this
   // number. The first version computed the remaining window as `HARD_DEADLINE_MS + 25_000 -
   // elapsed`, and since elapsed IS the deadline when this fires, that arithmetic always produced
   // 25 seconds no matter what the deadline was — moving the deadline could never have bought the
   // wrap-up any more room. 25s is not enough to generate a summary over a 20-tool transcript, so
   // it fell to the raw listing every time (run 224dca7c).
-  //
-  // Trading 30s of tool loop for a written answer is the right way round: the loop's results are
-  // preserved either way, but only the wrap-up turns them into something a person can read.
   const HARD_DEADLINE_MS = 75 * 1000;
   /** The gateway kills the request at ~150s; stay inside it with room to write the response. */
   const WALL_MS = 145 * 1000;
@@ -484,30 +409,8 @@ export async function runLangGraphAgent(opts: LangGraphRunOptions): Promise<Lang
       + 'present a partial list as complete, and never fill a gap from your own knowledge.',
     );
 
-    /**
-     * The wrap-up reads a TRIMMED transcript, and that is what makes it reachable at all.
-     *
-     * `web_fetch` returns up to 30 000 characters per call by design — the whole point of the
-     * tool. Twelve of them is ~360 000 characters, roughly 90k tokens, and a model turn that size
-     * cannot land in the seconds left when the deadline fires. Measured: run 8127fc3e fell
-     * through to the deterministic listing for exactly this reason.
-     *
-     * Trimming loses detail the wrap-up would not have used anyway — it is writing a summary, not
-     * re-reading the pages — and the untruncated results are still returned in `toolResults`, so
-     * nothing is actually discarded. Only the model's view is narrowed.
-     */
-    /**
-     * Close any tool call the deadline interrupted, or the wrap-up cannot be sent at all.
-     *
-     * The deadline fires mid-node by design, so the transcript routinely ends with an assistant
-     * `tool_use` whose `tool_result` was never appended. Anthropic rejects that outright —
-     * `400 messages.N: tool_use ids were found without tool_result blocks immediately after` —
-     * which is what made the model summary unreachable on runs 8127fc3e and 7107f31d even after
-     * the transcript was trimmed to fit.
-     *
-     * Answering them with an explicit "did not finish" beats dropping the assistant turn: the
-     * model then knows what it had asked for and can report those as outstanding.
-     */
+    /** The wrap-up reads a TRIMMED transcript, and that is what makes it reachable at all. */
+    /** Close any tool call the deadline interrupted, or the wrap-up cannot be sent at all. */
     const answered = new Set(
       transcript.filter((m: any) => m.tool_call_id).map((m: any) => m.tool_call_id),
     );

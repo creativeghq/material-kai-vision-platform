@@ -1,40 +1,4 @@
-/**
- * Deep-link guard — a link that goes nowhere is a silent zero in the navigation layer.
- *
- * Two link shapes in this app point at a destination by STRING, from a place the destination
- * cannot see:
- *
- *   • `action_url` on a flow event → stored on a `user_notifications` row → the bell → `navigate()`
- *   • `?tab=<key>` deep links into a tabbed page
- *
- * Both fail silently when the destination moves or was never spelled the way the link spells it:
- *
- *   • A tabbed page is one Radix `<Tabs value={searchParams.get('tab') ?? …}>`. Radix renders a
- *     pane only when the value matches a `<TabsContent value=…>`. There is no "unknown tab" branch
- *     and no fallback, so an unknown key renders the sidebar with nothing selected and an EMPTY
- *     body. The route resolves, the page loads, the header draws, and the operator is looking at a
- *     blank panel.
- *   • An `action_url` whose path matches no route lands on the catch-all instead.
- *
- * This is not hypothetical — it is what this file was written for. Every order notification
- * carried `action_url: '/finance?tab=orders'` while the tab has always been keyed `doc_orders`, so
- * clicking an order in the bell landed on a dead Finance page. The same sweep found leave-request
- * notifications pointing at `/hr?tab=absences` (the tab is `timeoff`), campaign notifications at
- * `/email-marketing?tab=campaigns` (the route is `/marketing/email`), follower notifications at
- * `/profile?tab=followers` (no such tab), and five `action_url`s under `/admin/finance` — a prefix
- * that has never been a route at all.
- *
- * Nothing else can see any of it:
- *
- *   • TypeScript sees a string. `'orders'` and `'doc_orders'` are the same type.
- *   • The links are written at a DISTANCE from what they address — in edge functions, in services,
- *     in notification rows stored months earlier. Renaming a tab cannot break its call sites at
- *     compile time when the call sites are string literals in another runtime.
- *   • The notification row is perfectly well-formed either way, so no integrity check sees it.
- *
- * So the check has to be a source scan, and it has to fail LOUDLY when it cannot resolve a
- * destination rather than quietly vouching for it.
- */
+/** Deep-link guard — a link that goes nowhere is a silent zero in the navigation layer. */
 import { describe, it, expect } from 'vitest';
 import { readdirSync, statSync, existsSync } from 'node:fs';
 import { join, dirname, resolve, relative } from 'node:path';
@@ -309,20 +273,7 @@ describe('the route table itself', () => {
     expect(routeExists('/admin/finance')).toBe(false);
   });
 
-  /**
-   * The other half of the same prefix, and the half a URL-literal scan cannot see.
-   *
-   * Six components built their finance links off
-   *     useLocation().pathname.startsWith('/admin') ? '/admin/finance' : '/finance'
-   * to mirror a mount point Finance does not have (CRM does — `/admin/crm/*` is real). Every link
-   * they produced from an admin page resolved to the `path="*"` catch-all: an order opened from a
-   * CRM timeline, a covering purchase order opened from a sale, an invoice opened right after it
-   * was created. The scans below never saw it, because the URL is only a URL at runtime — in the
-   * source it is a template hole.
-   *
-   * So the assertion is on the PREFIX, not on the assembled path: nothing in `src` may name
-   * `/admin/finance` at all. `FINANCE_BASE` (src/modules/finance/routes.ts) is the one answer.
-   */
+  /** The other half of the same prefix, and the half a URL-literal scan cannot see. */
   it('never names the /admin/finance prefix in source — it has never been a route', () => {
     const offenders: string[] = [];
     for (const file of sourceFiles) {
@@ -344,11 +295,6 @@ describe('the route table itself', () => {
    * link worked — for admins. A sales, accountant or hr user following any of the ~30 in-app links
    * into that prefix was bounced off a customer record they can open one URL over, and nothing
    * anywhere reported it: the route resolved, the guard did its job, the page simply refused.
-   *
-   * `/admin/crm/*` is now redirects into `/crm/*`. The exception is `users/:id` — `public.roles` is
-   * the GLOBAL account tier, one value true in every workspace at once, and `crm-api` refuses to
-   * mutate it for anyone who is not a global operator. That is operator tooling and keeps its
-   * address.
    */
   it('links CRM at /crm — the /admin/crm twin is redirects only (except operator users/:id)', () => {
     // The redirect registry and the redirect component must name the old prefix; that is their job.
@@ -371,22 +317,7 @@ describe('the route table itself', () => {
     ).toEqual([]);
   });
 
-  /**
-   * The seven tenant surfaces that were mounted under /admin, and why the prefix mattered.
-   *
-   * `AdminGuard` does not mean "an admin". It is `isPlatformOperator` — owner/admin of the ROOT
-   * workspace — and its own comment says so. Behind it sat pages that configure things belonging
-   * to a WORKSPACE: its messaging channels, its email domain, its catalogs, its connected social
-   * accounts, its tracked mentions, its automations, its quote vocabulary. Every table behind them
-   * carries a workspace_id. So a customer who BOUGHT one of those modules could not open the page
-   * that sets it up — not their owner, not anyone. The module was sold and unusable, and nothing
-   * reported it: the route resolved and the guard did exactly what it says on the tin.
-   *
-   * They now live at their own addresses behind `EntitlementGuard + WorkspaceAdminGuard` (the
-   * workspace owns the module AND you run that workspace), with the old paths kept as redirects
-   * for links that outlived the move. Writing a NEW link to the old prefix would quietly put a
-   * tenant back in front of the operator console, so it fails here instead.
-   */
+  /** The seven tenant surfaces that were mounted under /admin, and why the prefix mattered. */
   it('never links the moved tenant surfaces under /admin', () => {
     const MOVED = [
       '/admin/messaging', '/admin/emails', '/admin/email-templates', '/admin/catalogs',
@@ -436,18 +367,6 @@ describe('notification action_url', () => {
    * The check above matches `action_url: '/…'` — a literal that ALREADY looks like a path. An
    * absolute URL therefore matched nothing and was silently vouched for, which is the failure
    * mode this whole file was written to refuse.
-   *
-   * That hole is not theoretical. `_build_action_url` in MIVAA stamped
-   * `https://app.materialshub.gr/agent-hub?…` onto every job-research digest, and
-   * `projectRequestsService` wrote `${appUrl()}/projects/…` at four sites. The bell hands
-   * `action_url` to react-router's `navigate()`, which reads ANY string as a PATH — so the stored
-   * URL became the path `/https://app.materialshub.gr/agent-hub`, matched no route, and landed on
-   * the 404 catch-all. 19 digests shipped that way before anyone clicked one.
-   *
-   * A literal is all that can be judged from source: `action_url: url` is an identifier and could
-   * legitimately hold either (moodboard dormancy points at a `/functions/v1/…` endpoint that is
-   * genuinely not a route here). Those are caught at read time instead, by
-   * `resolveNotificationTarget` — see src/utils/notificationLink.ts.
    */
   it('no action_url literal is written as an absolute URL', () => {
     const offenders: string[] = [];
@@ -464,21 +383,7 @@ describe('notification action_url', () => {
     ).toEqual([]);
   });
 
-  /**
-   * A seeded prompt becomes the USER'S OWN MESSAGE.
-   *
-   * `?q=` / `?prompt=` on `/agent-hub` is the app-wide handoff for "open the agent already
-   * asking this" — AgentHub renders the value as a chat bubble from the user. So whatever is in
-   * it is text we are putting in someone's mouth, and an internal identifier has no business
-   * there. The job digest seeded
-   * `Show me today's findings for tracked_job_id ff62d59f-b8b9-4d70-9c4a-0a13359b7788`, so
-   * clicking the bell showed the owner a raw uuid attributed to themselves — and cost a full
-   * agent turn re-fetching findings the digest already had.
-   *
-   * This checks the literal shape only (a hand-written `…_id ${x}` in a seed). The runtime half —
-   * an id interpolated from a variable — is answered by not seeding at all: the digest now opens
-   * a conversation and posts the findings card into it, so the link opens the ANSWER.
-   */
+  /** A seeded prompt becomes the USER'S OWN MESSAGE. */
   it('no agent-hub seed prompt hands the user an internal identifier', () => {
     const offenders: string[] = [];
     // Apostrophes are ORDINARY here ("today's findings"), so the terminator set must not include
@@ -555,16 +460,6 @@ describe('?tab= deep links', () => {
 /**
  * The dashboard's My Office blocks — the other half of the same defect, and the half a
  * `?tab=` scan cannot see.
- *
- * All four blocks linked to a page with no `?tab=` at all, so every one of them passed the scan
- * above by having nothing to check. Two of them then landed somewhere that does not contain the
- * records the tile counted: `/finance` opens the Dashboard pane rather than the Orders list, and
- * `/crm` opens **Users** — the platform accounts list — while the block counted `crm_companies`.
- * The route resolved, the page rendered, the operator was simply somewhere else.
- *
- * So the rule is stated positively and checked here: a dashboard figure addresses the records it
- * counted. If the page it lands on has tabs, the link names one; if it narrows to a slice, the
- * filter is spelled the way that list reads it back.
  */
 describe('My Office block destinations', () => {
   const DESTINATIONS: Array<{ what: string; url: string }> = [

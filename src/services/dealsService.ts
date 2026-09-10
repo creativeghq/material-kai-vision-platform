@@ -1,15 +1,4 @@
-/**
- * Deals & pipeline (#311) — the one service over `crm_deals`.
- *
- * The pipeline is a CRM object, not a Real Estate feature: Real Estate is a consumer that filters
- * to the `real_estate` deal type. Everything reads this service, so there is one place that knows
- * how a deal is loaded and one visibility rule (RLS on `crm_deals`, which carries the property
- * agent-scoping so the CRM board cannot show a listing Real Estate would hide).
- *
- * Stages are DATA, not a TypeScript union. Each deal type owns its own stage set and the database
- * enforces the pairing through a composite FK on `(deal_type_id, stage)` — a construction deal
- * physically cannot sit in "Conveyancing". Never hardcode a stage list in a component.
- */
+/** Deals & pipeline (#311) — the one service over `crm_deals`. */
 import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
 import { flowEventService } from '@/services/flows/flowEventService';
@@ -240,12 +229,6 @@ export const dealsService = {
   /**
    * Deals matching a term, ACROSS deal types — for a picker that asks "which deal is this about?"
    * rather than "show me the construction pipeline" (#378 N10).
-   *
-   * Here rather than in the picker because `crm_deals` is read through this service and nowhere
-   * else: a second query path is a second place that has to remember the workspace scope and the
-   * embed hints, which is what `dealPipelineDerivation.test.ts` refuses. Deliberately NOT
-   * `listDeals`, which is board-shaped and requires a deal type — a subject picker has no type to
-   * offer, because a meeting can be about a deal of any kind.
    */
   async searchDeals(workspaceId: string, q: string, limit = 8): Promise<Array<{ id: string; title: string }>> {
     let query = supabase
@@ -482,13 +465,8 @@ export interface DealForecastRow {
   /**
    * What the deals in this set actually BILLED, ex-VAT (#378 C3).
    *
-   * NET on purpose, because `crm_deals.value` is a pipeline figure — what the work is worth, not
-   * what the customer hands over including tax. Summing `invoices.total` here would make every
-   * accuracy reading 24% high at the Greek standard rate, which is the worst kind of wrong: the
-   * right order of magnitude, moving the right way, and flattering.
-   *
-   * This became answerable only once the chain carried `deal_id` onto the order and the invoice;
-   * before that a won deal's paper trail stopped at the quote.
+   * NET on purpose: `crm_deals.value` is a pipeline figure and `invoices.total` is gross, so
+   * summing the gross one reads 24% high at the Greek standard rate — flattering, and wrong.
    */
   invoiced_net: number;
   /** The accuracy pair: `won_value` is what we said, this is what it billed. */
@@ -615,20 +593,7 @@ export async function getDeal(dealId: string): Promise<Deal | null> {
 }
 
 // ── Stage-triggered email ─────────────────────────────────────────────────────────────────────
-/**
- * "Email the contact when a deal reaches this stage" (#311).
- *
- * This is NOT a new delivery path — it writes an ordinary workspace-scoped FLOW, so the automation
- * is visible, editable and pausable under Flows like everything else, and the send goes through
- * the engine's `send_email` action with the workspace's own BYOK sender.
- *
- * Targeting relies on `flows.trigger_config`, which the engine now matches by equality against the
- * event payload — `{ deal_type_key, stage }` means "only this type, only this stage". Before that
- * filter existed a stage-triggered flow fired on EVERY move.
- *
- * `is_global: false` + `workspace_id` is what makes it per-workspace: the engine matches global
- * flows plus this workspace's own, never another tenant's.
- */
+/** "Email the contact when a deal reaches this stage" (#311). */
 const STAGE_EMAIL_TAG = 'deal-stage-email';
 
 export interface StageEmailRule {
@@ -744,9 +709,6 @@ export const stageEmail = {
 // "conversion rate" is how a dashboard ends up disagreeing with itself, and a funnel recomputed
 // in the browser also has to re-derive which stage is further along — which the database already
 // knows from `crm_deal_stages.sort`.
-//
-// Money always arrives grouped BY CURRENCY. A pipeline total is the easiest place in the app to
-// add EUR to GBP by accident and produce a number that is true of nothing.
 
 /** One row per stage, in board order. `conversion_pct` is null on the last stage. */
 export interface DealFunnelRow {

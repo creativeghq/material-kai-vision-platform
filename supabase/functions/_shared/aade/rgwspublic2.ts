@@ -1,17 +1,4 @@
-/**
- * ΑΑΔΕ RgWsPublic2 — the business-lookup operation itself (envelope + basic_rec parse).
- *
- * This lives in `_shared` rather than inside the route because two unrelated callers need the
- * same answer from the same service:
- *   - `myaade-rgwspublic2` — an operator looking a business up by ΑΦΜ.
- *   - `resolve-issuer-names.ts` — the inbound sync filling in a supplier that myDATA identified
- *     by ΑΦΜ alone and that ΓΕΜΗ has never heard of.
- * One derivation, one place to fix when ΑΑΔΕ varies the shape.
- *
- * Cost of a call, which is why every caller gates it and this module never does: a live
- * RgWsPublic2 lookup writes an audit entry into the LOOKED-UP ΑΦΜ's TAXISnet inbox under the
- * caller's identity, and spends that workspace's monthly quota.
- */
+/** ΑΑΔΕ RgWsPublic2 — the business-lookup operation itself (envelope + basic_rec parse). */
 import { pickAllTagBlocks, pickTag, xmlEscape } from './soap.ts';
 
 export const RGWSPUBLIC2_ENDPOINT = 'https://www1.gsis.gr/wsaade/RgWsPublic2/RgWsPublic2';

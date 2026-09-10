@@ -1,20 +1,4 @@
-/**
- * Relative-time formatting.
- *
- * `timeAgo` was declared in eleven files. Five of them produced byte-identical output
- * ("never" / "just now" / "12m ago" / "3h ago" / "5d ago") and differed only in local variable
- * names — those are consolidated here.
- *
- * The other six are NOT the same function and are deliberately left alone:
- *   • InboxPage                — compact, no "ago" ("now" / "5m" / "3h" / "2d")
- *   • WebsiteDomainIntelPanel  — day granularity only ("today" / "yesterday" / "5d ago")
- *   • SocialMediaAccountsPage  — hours upward, never minutes
- *   • SocialAccountsTab        — no "just now" floor
- *   • ProductMonitorTab        — also renders FUTURE times ("in 20m")
- *   • toolsShared              — its own absolute-date helper
- * Collapsing those into an options bag would mean four flags for four callers, which is a worse
- * abstraction than four functions. Duplication is only a defect when the copies are meant to agree.
- */
+/** Relative-time formatting. */
 
 export interface FormatDateOptions {
   /** Rendered when the value is null/undefined/unparseable. "—" by default. */
@@ -25,21 +9,7 @@ export interface FormatDateOptions {
   weekday?: boolean;
 }
 
-/**
- * Absolute date for display.
- *
- * Locale is PINNED, for the same reason `formatMoney`'s is: eleven of these were written by hand
- * and three passed `undefined`, which means the browser's language decides. The same timestamp
- * rendered "Aug 5, 2026" for one user and "5 Αυγ 2026" for another, on the same screen, with no
- * way to tell from the code. English is the platform default for all UI and documents.
- *
- * `en-US` because that is what the majority of the explicit call sites already chose (4 of 5);
- * this keeps the visible change to the three that had specified nothing.
- *
- * Two callers deliberately keep their own and are NOT folded in here:
- *   • QuoteDocument     — `en-GB` dd/mm/yyyy on a printed customer document
- *   • AppointmentsPage  — parses a date-only string as `T00:00:00` to avoid a UTC day-shift
- */
+/** Absolute date for display. */
 export function formatDate(
   value: string | Date | null | undefined,
   opts: FormatDateOptions = {},
@@ -61,14 +31,6 @@ export function formatDate(
 /**
  * Time of day only — for logs, attendance rows and session timestamps where the date is already
  * obvious from context.
- *
- * Added because 7 call sites were doing `new Date(x).toLocaleTimeString()`, which is the same
- * browser-locale problem `formatDate` exists to solve, and there was nowhere to send them: the
- * date formatter has no time-only mode. Same pinned locale, so a time and a date rendered next to
- * each other agree.
- *
- * 24-hour by default. These are operational readouts — a log line at "14:05" is unambiguous, and
- * "2:05 PM" is longer for no gain in a dense table.
  */
 export function formatTime(
   value: string | Date | null | undefined,
@@ -109,26 +71,7 @@ export function timeAgo(iso: string | null | undefined, opts: TimeAgoOptions = {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-/**
- * Today's date in the VIEWER'S calendar, as `YYYY-MM-DD`.
- *
- * The thing this replaces was `new Date().toISOString().slice(0, 10)`, written by hand at 25
- * sites because there was nowhere to send them — this module had only display formatters.
- * `toISOString()` renders in UTC, and this platform serves Greek customers (UTC+2 winter,
- * UTC+3 summer), so between local midnight and 02:00–03:00 every one of those returned
- * YESTERDAY. It produces a perfectly valid `YYYY-MM-DD`, raises nothing, and typechecks —
- * the same shape as a wrong money number, applied to dates.
- *
- * The sites it was wrong at were not cosmetic: the invoice `issueDate` is a fiscal document of
- * record submitted to AADE via myDATA (numbering is sequential by date and the period is
- * classified from it), `paidAt` feeds `get_order_settlements`, and attendance dates feed payroll.
- *
- * "Local" is the browser's zone, which is the operator's own calendar — the frame in which they
- * mean "today" when they click a button labelled today. This is deliberately NOT derived in SQL:
- * the database session runs in UTC, so `current_date` there is the same defect with a longer
- * stack trace. A workspace-pinned business timezone is the real answer for server-side date
- * stamping and is not built.
- */
+/** Today's date in the VIEWER'S calendar, as `YYYY-MM-DD`. */
 export function todayLocalISO(): string {
   return toLocalISODate(new Date());
 }

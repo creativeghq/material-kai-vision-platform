@@ -1,15 +1,4 @@
-/**
- * Messaging Tools — agent-chat surface for WhatsApp (Zernio) messaging.
- *
- * ONE tool, actions:
- *   - list_channels — the workspace's connected WhatsApp channels (senders)
- *   - send          — send a WhatsApp message via a channel (CONFIRM-gated: outbound comms)
- *
- * `send` is a sensitive mutation (a real message to a real person), so it ALWAYS routes through
- * the Approve/Decline card (invariant #9): on confirm!=true it previews + emits action_confirmation;
- * only on approval does it call messaging-api. Module `messaging` + entitlement gated. Runs as the
- * user (JWT) so messaging-api's own auth/BYOK/quota applies.
- */
+/** Messaging Tools — agent-chat surface for WhatsApp (Zernio) messaging. */
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what

@@ -3,9 +3,6 @@
 // only proves the caller holds an admin/factory role in SOME workspace — it is an
 // admission gate, NOT per-row authorization. Without explicit scoping any workspace
 // admin/factory user can list/modify/delete every other tenant's CRM rows (IDOR).
-// This mirrors the `is_workspace_member` RLS on crm_companies / crm_contacts: a user
-// sees CRM rows across the workspaces they are an ACTIVE member of. Global platform
-// operators (secret key, or global role admin/super_admin) act across all workspaces.
 
 import type { DbClient } from '../../_shared/supabase-client.ts';
 import type { SupabaseClient } from '@supabase/supabase-js';

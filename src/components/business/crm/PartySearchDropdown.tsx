@@ -15,27 +15,7 @@ import type { PartyRef } from '@/components/business/crm/partyRef';
 export type { PartyKind, PartyRef } from '@/components/business/crm/partyRef';
 export { partyColumns, partyRefOf } from '@/components/business/crm/partyRef';
 
-/**
- * Pick a CRM party — a COMPANY or a PERSON — for a field that can be either (#376).
- *
- * `ContactSearchDropdown` searches `crm_contacts` only, and it is what every real-estate
- * counterparty field used. Phase 0 of #376 gave `properties`, `property_offers`,
- * `property_sales` and `property_tenancies` their `*_company_id` twins, with a
- * `num_nonnulls(...) <= 1` check so a counterparty is one thing — and then nothing wrote them,
- * because the only picker on screen could not return a company. A vendor, a buyer, a landlord
- * or a tenant that is a firm — which in Greek property is most of them — still could not be
- * recorded. The model was symmetric; the surface was not.
- *
- * ONE PICKER, both tables, because the alternative is two controls side by side and an operator
- * guessing which one to use. The selection is `{ kind, id }`, so the caller sets the correct
- * column of the pair and clears the other — the CHECK constraint then physically prevents a
- * counterparty from being two things at once.
- *
- * Search goes through `CRM_SEARCH_COLUMN` + `foldedLike`, the one way to search a party here: it
- * matches the generated folded/transliterated column, so `Κώστας` finds `ΚΩΣΤΑΣ` and `societe`
- * finds `Société`. A raw `ilike` on `name` is the accent-sensitive bug that
- * tests/unit/crmPartySearch.test.ts exists to keep out.
- */
+/** Pick a CRM party — a COMPANY or a PERSON — for a field that can be either (#376). */
 
 interface Option extends PartyRef { label: string; sub?: string | null }
 

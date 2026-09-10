@@ -1,26 +1,4 @@
-/**
- * generate-interior-gemini
- *
- * Gemini-backed interior design image generation edge function.
- * Handles four modes:
- *   1. text-to-image     — narrative prompt → new room render
- *   2. image-edit        — existing image + instruction → edited image
- *   3. floor-plan-render — floor plan image + style → photorealistic perspective interior render
- *   4. floor-plan-text   — text description → 2D floor plan diagram
- *
- * ...plus `unstage`, which is the inverse of every other mode here: it REMOVES rather than
- * adds. Every restyling model this platform runs — the Replicate interior grid, and
- * `generate-virtual-staging` most explicitly ("Stage an EMPTY room") — assumes the room
- * arrives empty, while the photo a customer or an agent actually has is furnished. Without
- * this the only route from one to the other was RegionEditCanvas, i.e. hand-painting a mask
- * over every object.
- *
- * Models:
- *   - gemini-3.1-flash-image (fast, 6 credits)
- *   - gemini-3-pro-image     (4K quality, 15 credits)
- *
- * Requires: GOOGLE_GENERATIVE_AI_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
- */
+/** generate-interior-gemini */
 
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
@@ -309,17 +287,7 @@ interface GenerateInteriorRequest {
   embed_key_id?: string;
 }
 
-/**
- * Where a generation was triggered from, for `ai_usage_logs.metadata.source`.
- *
- * An ALLOWLIST rather than free text, and honoured only for service-role callers, because this is
- * an attribution field: a value a user-JWT request could set is a value that can lie about who
- * spent the credits. Everything else falls through to no source at all, which reads as "the app",
- * and is the honest answer for a generation a signed-in member started themselves.
- *
- * Adding a value here is deliberate work. That is the point — a column that accepts anything is a
- * column no cost view can group by.
- */
+/** Where a generation was triggered from, for `ai_usage_logs.metadata.source`. */
 const ATTRIBUTION_SOURCES = ['embed'] as const;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -331,17 +299,7 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-/** Fetch a remote image and return as Uint8Array.
- *
- * SSRF-guarded (invariant 7). `url` originates from `body.reference_image_url`, so a raw
- * fetch lets any authenticated user reach cloud metadata (169.254.169.254), loopback or
- * RFC1918. `redirect: 'error'` is required by the guard's contract (a public URL can 302 to
- * a blocked address after the check). The error message must not echo the URL or the upstream
- * status — that makes it a usable response oracle.
- *
- * `reference_image_url` is ALSO passed to Replicate (callFluxDepthPro),
- * which fetches it from Replicate's own network — validate before it leaves here.
- */
+/** Fetch a remote image and return as Uint8Array. */
 async function fetchImageBuffer(url: string): Promise<Uint8Array> {
   const { bytes } = await fetchImageGuarded(url);
   return bytes;
@@ -499,9 +457,6 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
   // workspace they have never belonged to and write generation history and cost rows into it.
   // `debit_credits` already falls back to the personal wallet for a non-member, so this was never
   // credit theft — but the ROWS still landed in the victim's tenant, visible to their admins.
-  // 404, not 403: a distinguishable "not yours" answer turns this into a workspace-id oracle.
-  // Service-role callers are exempt: they are the platform itself (agent-chat, products-3d-api,
-  // MIVAA), they derive the pair server-side, and they could write the rows directly anyway.
   if (!isServiceCall && body.workspace_id
     && !(await userCanAccessWorkspace(supabase, resolvedUserId, body.workspace_id))) {
     return jsonResponse({ success: false, error: 'Not found' }, 404);
@@ -534,17 +489,7 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
   const aspectRatio: ImageAspectRatio = body.aspect_ratio ?? '16:9';
   const mode: GenerationMode = body.mode ?? detectMode(body);
 
-  /**
-   * The shape a TRANSFORMED photo comes back in.
-   *
-   * '16:9' is a fine default for a room invented from words and a bug for a photo the user
-   * supplied: it re-frames and re-crops the picture, so "change only the floor" cannot be true
-   * however the prompt is written. A 1280x1600 kitchen came back 1408x768 (conversation
-   * b520cc11) — and nothing raised, because a landscape image is a valid image.
-   *
-   * An explicit `aspect_ratio` from the caller still wins; the source is only consulted when
-   * nobody asked. Unreadable bytes fall back to the default rather than to a guess.
-   */
+  /** The shape a TRANSFORMED photo comes back in. */
   const aspectRatioForSource = (source: Uint8Array): ImageAspectRatio =>
     body.aspect_ratio ?? aspectRatioOfImage(source, IMAGE_ASPECT_RATIOS) ?? aspectRatio;
 
@@ -570,22 +515,6 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
   // generate_gemini tool, AgentHub's edit modal, projectsService, productMaterialMapsService
   // and generate-vr-world all land here. The gate goes HERE and not in the agent's prompt
   // because three of those five callers never involve a model turn at all.
-  //
-  // Above the debit on purpose: a blocked edit must not cost the user credits.
-  //
-  // Only the modes that transform a SUPPLIED image. text-to-image and floor-plan-text invent
-  // an image from words and have no source to classify.
-  // `unstage` belongs here for the same reason as the rest: it takes a photo somebody
-  // supplied and returns an altered version of it. That the alteration is a deletion
-  // changes nothing — the gate is on the SOURCE ARTEFACT, never on the instruction
-  // (invariant 9b), and "empty this room" is a perfectly ordinary way to ask for the
-  // contents of a document to be wiped out.
-  //
-  // BOTH supplied images, not just the base. The style/material reference is a user-supplied
-  // artefact that this function now sends to the image model as PIXELS (see the image-edit
-  // branch), so leaving it ungated would mean an identity document dropped into the
-  // "Inspiration" slot reaches the generator untouched — and before the slots were corrected
-  // that image WAS the gated one, so gating only the base would have narrowed the check.
   const EDIT_MODES: GenerationMode[] = ['image-edit', 'redesign', 'copy-style', 'floor-plan-render', 'unstage'];
   const gatedSources = EDIT_MODES.includes(mode)
     ? [body.reference_image_url, body.style_reference_url].filter((u): u is string => typeof u === 'string' && !!u)
@@ -594,14 +523,6 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
     // An image this platform generated is exempt — we made it, and re-classifying every
     // "warmer lighting" on our own render would tax the normal design loop for nothing.
     // Recognised by its storage path, not by the caller's word for it.
-    //
-    // This used to be a lone `/\/generation-images\/.*\/gen\//` regex, which matches ONLY the
-    // per-session layout. The multi-model grid never produces that layout: MIVAA calls this
-    // function with no conversation id, so every grid tile lands on the legacy `gemini/` prefix
-    // and was treated as third-party content — paying for a Claude classification on every edit,
-    // and refused outright whenever the classifier could not run. The rule now lives in
-    // storage-paths.ts next to the builder that creates these paths, as an allowlist that
-    // deliberately excludes `reference-images/` (same bucket, user-supplied).
     const isOurs = isPlatformGeneratedImage(gatedSource);
     const gate = await assertEditableSource(
       supabase,
@@ -626,8 +547,6 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
     // (and charged for), and then silently dropped — the user's tile never reaches the model at
     // all, which is the whole defect this file was just fixed for. `multiReference` is the
     // existing mechanism for that: it collapses the tier to Gemini and prices it as Gemini.
-    // copy-style is exempt — it CARRIES two images by definition and its Grok path is written
-    // for exactly that, one-step, in the Aurora template.
     multiReference: (body.material_images?.length ?? 0) > 0
       || (mode === 'image-edit' && !!body.style_reference_url),
   });
@@ -664,10 +583,6 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
     // Debit BEFORE the paid Gemini call (invariant #10): the per-member cap is enforced atomically
     // at debit time, so concurrent over-cap requests can't all run paid compute before a debit lands.
     // Refunded in the catch below if generation fails.
-    // `modelLabel`, not `model`: `model` is only meaningful when the provider IS Gemini, so a
-    // Grok or Flux run wrote a ledger line reading "gemini-3.1-flash-image" beside the Grok
-    // charge. The amount was right and the description named a different model — the same
-    // split the routing module exists to close, one field further down.
     await deductCredits(supabase, resolvedUserId, credits, `Interior design generation (${modelLabel}, ${mode})`, body.workspace_id);
     debited = true;
 
@@ -676,10 +591,6 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
     // ── Provenance for the caller ─────────────────────────────────────────────────────────
     // What this run ACTUALLY edited. The agent never sees the picture it produced — it gets a
     // URL — so with nothing else in the response it can only assert or hedge. It did both:
-    // "the base photo was locked in as the edit source" on a run that had edited a tile swatch,
-    // then, once that was genuinely fixed, "I can't tell you whether the base photo actually got
-    // through this time" on a run that had worked (conversation b520cc11). Neither sentence was
-    // available as a FACT to the thing writing it. These fields are.
     let sourceSize: ImageSize | null = null;
     let outputSize: ImageSize | null = null;
 
@@ -852,20 +763,6 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
         // A reference image on a TARGETED EDIT means "use THIS one" — this tile, this finish,
         // this fabric. So its PIXELS go to the model, next to the room, in the order
         // `IMAGE_LABELS` names them (reference first, room second).
-        //
-        // What was here before: a two-step style transfer. Step 1 described the reference in
-        // words with the `interior_aesthetic_analyst` prompt — which asks a photo for its
-        // FIXTURES, basin, vanity, taps, shower and toilet, because it was written to read a
-        // bathroom inspiration shot, not a 355x355 swatch. Step 2 fed that description, minus the
-        // reference image ("the inspiration image is NOT passed here — only text + room photo"),
-        // into `interior_apply_spec`, which opens "you are performing a cosmetic renovation of
-        // the room" and says "apply every item below" — so the caller's floor-only instruction
-        // arrived UNDER a whole-room restyle order and lost to it. A user asking to swap one
-        // floor tile got a different kitchen (conversation b520cc11, 2026-09-09). The tile they
-        // attached never reached an image model in any form.
-        //
-        // Two-step spec extraction still owns `copy-style`, where the reference IS a room and
-        // paraphrasing it is the point.
         const styleBuffer = await fetchImageBuffer(body.style_reference_url);
         const editWithRefText = renderPromptTemplate(
           await getGenerationPrompt(supabase, 'interior_targeted_edit_with_reference'),
@@ -893,9 +790,6 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
     // "every fixed element ... sink, vanity, toilet, shower, bath" AND the furniture, and
     // only restyle surfaces — the exact opposite instruction. Reusing it and hoping the
     // free-text overrode it is how a mode ends up quietly doing something else.
-    //
-    // Routing keeps this on Gemini whatever tier is asked for (GROK_UNSUPPORTED_MODES), so
-    // there is one branch here and no provider fork to keep in sync.
     else if (mode === 'unstage') {
       if (!body.reference_image_url) {
         return jsonResponse({ success: false, error: 'reference_image_url required for unstage mode' }, 400);
@@ -1101,10 +995,6 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
     // interior_design_generation row carried a NULL raw/billed cost, so image generation
     // was invisible to every USD cost view while still debiting credits.
     // `getServicePricing` reads the same `ai_model_pricing` table as everything else.
-    //
-    // It also logged `model` (always a Gemini id) rather than `modelLabel`, so redesign
-    // and copy-style runs — which actually invoke flux-depth-pro or Grok — were attributed
-    // to Gemini. Cost per model was wrong for exactly the modes that cost the most.
     const pricingKey = routing.pricingKey;
     const imagePricing = await getServicePricing(supabase, pricingKey);
     if (!imagePricing) {
@@ -1114,19 +1004,6 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
     const billedCostUsd = imagePricing ? rawCostUsd! * imagePricing.markup_multiplier : null;
 
     // WHO the spend belongs to, not just who it was billed to.
-    //
-    // `workspace_id` was NULL on every row this function ever wrote, even though the same
-    // `body.workspace_id` had already decided which pool the credits came out of. Two things broke
-    // silently: no per-tenant cost view could see image generation at all, and the
-    // `is_workspace_admin(workspace_id)` RLS policy on this table could never match — so a
-    // workspace admin who was not personally the billed user saw none of their own workspace's AI
-    // spend. The credits were right the whole time; only the reporting was blind.
-    //
-    // `source` + `embed_key_id` answer the follow-up question. Without them an embed generation —
-    // triggered by an anonymous visitor on a merchant's website and charged to that merchant — is
-    // indistinguishable from an operator generating a product shot in-app, because both arrive as
-    // `mode: 'product-shot'`. A merchant cannot ask what their widget cost them, and nobody can ask
-    // which key is burning credits: the daily cap is per-key, but the spend was not.
     const attributedSource = isServiceCall
       && (ATTRIBUTION_SOURCES as readonly string[]).includes(String(body.source ?? ''))
       ? String(body.source)
@@ -1176,16 +1053,6 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
     // `request_type` is CHECK-constrained to exactly 'text_to_image' | 'image_to_image' |
     // 'hybrid'. This used to write the raw `mode` — 'text-to-image', 'image-edit',
     // 'product-shot', or 'materials_selection_board_<board_mode>' — none of which satisfy it.
-    // The insert therefore failed EVERY time, its result was never destructured, and the
-    // function still returned success:true. So the user was charged 6-20 credits, got their
-    // image, and the generation never appeared in history, in ProgressiveImageGrid's job
-    // poll, in MarketTrends, or in the admin cost card; job-cleanup-cron's "unsaved renders"
-    // reaper and moodboardAPI.markGenerationSaved() both operated on a row that did not
-    // exist. Corroborating: ai_usage_logs held interior_design_generation rows while
-    // generation_3d held zero.
-    // MIVAA's writer already gets this right and says so — interior_design_routes.py:698
-    // carries the comment "use underscores to match DB constraint".
-    // The specific mode is NOT lost: it is preserved in models_results below.
     const REQUEST_TYPE_BY_MODE: Record<string, 'text_to_image' | 'image_to_image' | 'hybrid'> = {
       'text-to-image': 'text_to_image',
       'floor-plan-text': 'text_to_image',

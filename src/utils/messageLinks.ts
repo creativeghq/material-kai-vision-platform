@@ -1,14 +1,4 @@
-/**
- * Finding the links in a message, once.
- *
- * A message body renders as text and its links resolve to preview cards, and those are two
- * readers of the same string: a bubble that shows a card for a URL it did not make clickable —
- * or makes a fragment clickable that the card was never fetched for — is one string parsed twice.
- * So it is parsed here, and both consumers read the result.
- *
- * Import-free on purpose: message bodies are also read server-side, and this is the module a
- * second runtime mirrors rather than re-derives.
- */
+/** Finding the links in a message, once. */
 
 export interface TextSegment {
   kind: 'text';

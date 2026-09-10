@@ -1,23 +1,4 @@
-/**
- * The vocabulary for "a metric we may or may not have".
- *
- * ONE RULE, and every SEO surface in the app obeys it: a metric is a VALUE or a
- * stated REASON there is no value. Never a hidden row, and never a 0 standing in
- * for a failed fetch.
- *
- * That distinction is not cosmetic. `gpt-4o-mini` returned HTTP 429 on all 212 of
- * its stored probes; dividing mentions by probes-SENT renders that as "0% AI
- * visibility", which reads as "assistants never mention us" when it means "we
- * never successfully asked". Same shape on the domain side: every stored snapshot
- * has NULL backlinks because the backlinks call is wrapped in `.catch(() => [])`,
- * and the old panel simply hid the row — so a broken collector and a site with no
- * links looked identical.
- *
- * The STATUS IS DERIVED IN SQL (`public.seo_metric`, `get_website_search_metrics`,
- * `get_website_ai_visibility`) and only formatted here. Nothing in this file
- * re-decides whether a number is real — a tile and a report reading the same RPC
- * cannot then disagree about it.
- */
+/** The vocabulary for "a metric we may or may not have". */
 
 /** Mirrors the status literals produced by `public.seo_metric`. */
 export type SeoMetricStatus =
@@ -94,19 +75,7 @@ export function statusPresentation(status: string): SeoStatusPresentation {
 export const isPresent = (m: SeoMetric | null | undefined): boolean =>
   !!m && m.status === 'ok' && m.value != null;
 
-/**
- * The COLLECTOR's verdict words, translated into the same presentation vocabulary.
- *
- * `seo-domain-tracker` writes `seo_domain_snapshots.source_status` per source as
- * `ok` | `no_data` | `failed`, which is nearly this vocabulary but not quite: it says `failed`
- * where a metric says `collector_failed`. Translating that in a panel would put a second
- * mapping next to this one, and the next panel would get it slightly differently — which is
- * exactly how the SEO surfaces ended up disagreeing about whether a figure was real.
- *
- * Returns null when there is nothing to say: the source answered and the value is present, or
- * the snapshot predates the tracker recording a verdict at all. A caller that gets null shows
- * the number, or an em dash for genuinely unknown provenance — it must not invent a reason.
- */
+/** The COLLECTOR's verdict words, translated into the same presentation vocabulary. */
 export function sourceStatusPresentation(status: string | null | undefined): SeoStatusPresentation | null {
   if (!status || status === 'ok') return null;
   return statusPresentation(status === 'failed' ? 'collector_failed' : status);

@@ -4,11 +4,6 @@
 // toggle_simple_flow. The tenant-safe trigger/action vocabulary is enforced SERVER-SIDE in
 // those RPCs — the UI/tool restriction is not the security line.
 // SECURITY:
-//  • Gated on isModuleEnabled('flows-toolkit') [global publish] + is_workspace_entitled
-//    [per-workspace paid grant]. Both fail closed.
-//  • All writes run through a JWT-scoped client so the RPC's assert_workspace_member (auth.uid)
-//    enforces membership and RLS applies — a caller can only touch their own workspace's flows.
-//  • Tenant flows are ALWAYS is_global=false (the RPC never lets a tenant set is_global).
 
 // deno-lint-ignore-file no-explicit-any
 
@@ -93,19 +88,6 @@ export const createManageFlowsTool = (
 
       if (action === 'list') {
         // TENANT SURFACE — workspace flows ONLY, never the global/operator set.
-        //
-        // The `is_global = true` rows (the seeded `system-default` automations) are the
-        // OPERATOR's: only a platform admin may see or edit them, and they are edited in one
-        // place — /admin → Flows — from where they apply to every workspace at once. They are
-        // deliberately not "my flows" for anybody here, the operator included, because this tool
-        // is the tenant-module surface and mixing the two makes the same question return a
-        // different kind of answer depending on who asks.
-        //
-        // The `is_global = false` filter is therefore load-bearing and stays EXPLICIT even though
-        // `flows_tenant_select` enforces the same thing: a disclosure boundary this categorical
-        // should not rest on one RLS policy continuing to be written correctly. (It also must not
-        // rest on RLS at all here — callerClient() falls back to the SERVICE ROLE for the partner
-        // `kai_` key and admin-secret paths, and service role bypasses RLS outright.)
         const { data, error } = await db
           .from('flows')
           .select('id, name, trigger_type, status, created_at')

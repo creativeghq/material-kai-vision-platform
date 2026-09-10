@@ -1,23 +1,4 @@
-/**
- * Profile → Services IS Finance → Settings → Services, and a draft paid online is ISSUED.
- *
- * Two defects this pins, both of the "two records, one fact" / "silent zero" shapes:
- *
- *  1. Services lived twice. `user_profiles.services_detail` (a jsonb blob with a free-text price)
- *     fed the public profile and the Hire form; `products(item_type='service')` + `product_prices`
- *     fed the invoice picker and myDATA. Nothing connected them, so a service a member typed on
- *     their profile could never be put on an invoice, and a service Finance priced never showed on
- *     a profile. The blob is dropped; a profile LISTS a Finance service (`products.profile_user_id`),
- *     every surface reads the one RPC, and `user_profiles.services` is a trigger-derived cache.
- *
- *  2. A draft paid in full online stayed a draft. The storefront receipt and the quote pre-invoice
- *     are born `status='draft'` with a pay token; `recordInvoicePayment` allocated the money and
- *     the allocation trigger set `paid` — on a document with no legal number, no issue date and
- *     nothing filed with AADE. The customer held a payment confirmation for a document that legally
- *     did not exist. `issue_invoice_on_online_payment` now runs BEFORE the allocation, and the
- *     order of those two calls is what this test asserts: a check after the side effect is not a
- *     check (CLAUDE.md anti-regression §4).
- */
+/** Profile → Services IS Finance → Settings → Services, and a draft paid online is ISSUED. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, sep } from 'node:path';

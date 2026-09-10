@@ -1,24 +1,4 @@
-/**
- * Re-score an article that is already written, and store the result.
- *
- * This exists because the applicable-fix list is only as current as the analysis it was
- * derived from, and there was no way to refresh one. Two consequences, both silent:
- *
- *   • An article analysed before per-paragraph anchors shipped has fixes with no `scope` and
- *     no `anchor`, so NOTHING is applicable and the Apply card rendered nothing at all. Every
- *     article in the database was in that state — the feature was live and invisible.
- *   • Applying a fix rewrites the paragraph the analysis anchored to, so that fix's anchor no
- *     longer occurs in the article. The stored list still offered it, and clicking it returned
- *     "that paragraph is no longer in the article". Correct, and a dead end.
- *
- * It is FREE and it is not a model call. `analyzeContent` is pure TypeScript — the writer and
- * the fixer call models, the analyzer counts. So there is no debit here, and nothing to refund:
- * charging for arithmetic we already do on every apply would be charging for nothing.
- *
- * It never touches `markdown_content`. Re-analysing must be safe to press at any time; a
- * button that silently rewrote the article would make the honest answer ("your analysis is
- * stale") too expensive to act on.
- */
+/** Re-score an article that is already written, and store the result. */
 
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../../_shared/http.ts';

@@ -2,18 +2,6 @@
  * ΚΑΔ (Greek activity-code) merge — THE single derivation, shared by `myaade-rgwspublic2` and
  * `mygemi-opendata`. The frontend mirrors it in `src/modules/crm/services/companyResearch.ts`
  * (different runtime, same contract) — change both together.
- *
- * Why this exists: ΑΑΔΕ and ΓΕΜΗ both publish a company's activity codes and they overlap
- * heavily. The previous per-function copies concatenated the two lists and deduped only the flat
- * `kad_codes` string array, leaving `kad_all` — the array the UI actually renders and counts —
- * full of duplicates. A real row had 57 entries for 35 distinct codes and 3 rows flagged
- * `primary` when a company has exactly ONE primary activity.
- *
- * Rules:
- *  - one entry per code (case-insensitive), ΑΑΔΕ wins the duplicate because it is the tax
- *    registry of record; the losing source is recorded in `also_in` so provenance isn't lost;
- *  - a missing description is backfilled from the other source's copy;
- *  - exactly one entry may carry `primary` — ΑΑΔΕ's primary wins, otherwise the first one seen.
  */
 
 /** One entry in the normalized, queryable ΚΑΔ list on `crm_companies.kad_all`. */

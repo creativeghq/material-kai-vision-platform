@@ -102,19 +102,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
     }
   }, [documentId, workspaceId]);
 
-  /**
-   * Which workspace this document is filed under (#365 `AD-42`).
-   *
-   * Was `.from('workspaces').select('id').limit(1).maybeSingle()` — no filter, no ORDER BY, no
-   * reference to the caller. "Whichever workspace Postgres returned first", which for a
-   * multi-workspace operator is not a choice and is not even stable between calls: `LIMIT 1`
-   * without an ORDER BY has no defined winner. A knowledge-base document could be authored into
-   * one tenant and saved into another, and nothing on the screen named either.
-   *
-   * Resolved from the caller's own active membership instead, deterministically ordered — the
-   * same rule the SEO handlers use — and the resolved name is shown so the operator can SEE
-   * which tenant they are writing to rather than infer it.
-   */
+  /** Which workspace this document is filed under (#365 `AD-42`). */
   const loadWorkspace = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();

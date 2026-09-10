@@ -2,30 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
-/**
- * One LangChain version per package, across the whole edge runtime.
- *
- * Two things this guards, both of which have already happened here:
- *
- * 1. **Unversioned `npm:` specifiers.** `_shared/langgraph-core.ts` — the runner behind every
- *    background agent — imported `npm:@langchain/langgraph`, `npm:@langchain/anthropic`,
- *    `npm:@langchain/openai`, `npm:@langchain/google-genai` and `npm:@langchain/core/messages`
- *    with no version at all. Deno re-resolves those on every deploy and `deno.lock` records
- *    none of them, so a breaking release ships to production with no commit and no review. It
- *    had already drifted: `supabase/functions/node_modules/.deno` held core at 1.1.15 AND
- *    1.2.3, anthropic at 1.3.10 AND 1.5.2, while the lockfile knew only the pinned pair.
- *
- * 2. **Two copies of the same package in one isolate.** The version is written inline in ~50
- *    shared tool modules, because they are imported by functions that have no import map of
- *    their own. Kept in agreement by hand, they are one careless edit away from putting two
- *    `@langchain/core` builds in the same deployment — at which point a message class from one
- *    fails `instanceof` against the other, silently. That cross-version hazard is real enough
- *    that upstream patched it deliberately (core 1.1.30 / langgraph 1.2.1 added explicit
- *    `: symbol` annotations to their `Symbol.for()` brands for exactly this reason).
- *
- * Bumping a version is therefore: change `agent-chat/deno.json`, then sed the inline pins to
- * match. This test tells you if you missed one.
- */
+/** One LangChain version per package, across the whole edge runtime. */
 
 const ROOT = join(__dirname, '..', '..');
 const FN_DIR = join(ROOT, 'supabase', 'functions');
@@ -109,18 +86,7 @@ describe('LangChain version pins across the edge runtime', () => {
     ).toEqual([]);
   });
 
-  /**
-   * zod is part of this set, and it is the pin that actually took production down.
-   *
-   * `@langchain/langgraph` imports `zod/v4` (and `zod/v3`, `zod/v4-mini`) from its own dist.
-   * zod 3.24.0 exports only `.`, `./package.json` and `./locales/*` — so a lock that resolves
-   * langgraph against 3.24.0 throws ERR_PACKAGE_PATH_NOT_EXPORTED on the first import, at
-   * runtime, in production. That happened on 2026-08-21: typecheck, lint and 2,200 unit tests
-   * were green and every JARVIS turn 500'd. The subpaths arrived in zod 3.25.0.
-   *
-   * `scripts/smoke-agent-chat-runtime.ts` catches the resolved-lock version of this by actually
-   * running the graph; this catches the source-level version before the lock is even built.
-   */
+  /** zod is part of this set, and it is the pin that actually took production down. */
   it('every pinned zod is new enough to export the subpaths langgraph imports', () => {
     const ZOD = /npm:zod@([0-9][^'"\s)]*)/g;
     const bad: string[] = [];

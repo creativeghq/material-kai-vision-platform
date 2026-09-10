@@ -70,12 +70,6 @@ Deno.serve(withApiLogging('hr-careers', async (req) => {
   // Greenhouse (/v1/boards/{board}/jobs), Lever and Ashby: a plain GET a human can
   // curl and an aggregator / no-code tool can poll. The POST+action envelope those
   // actions use is unusable for those consumers, which is the whole reason this exists.
-  //   GET ?slug=<company>             → { company, count, jobs: [...] }
-  //   GET ?slug=<company>&job=<slug>  → { company, job: {...} }  (adds description/requirements)
-  // Deliberately jobs-only: no turnstile_site_key and no apply_config — those are UI
-  // concerns for our own careers page, noise (and needless surface) for an integrator.
-  // Each job carries `absolute_url` so a consumer can link straight to the posting and
-  // `updated_at` so it can poll incrementally. Same visibility rule as the page: isLive().
   if (req.method === 'GET') {
     const reqUrl = new URL(req.url);
     const boardSlug = String(reqUrl.searchParams.get('slug') ?? '').trim();

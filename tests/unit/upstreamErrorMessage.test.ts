@@ -1,17 +1,4 @@
-/**
- * An upstream error must reach the agent as words, not as `[object Object]`.
- *
- * Nine tool files each carried `String(parsed).slice(0, 200)`, where `parsed` is the JSON-PARSED
- * response body. `String({ error: 'Thread not found' })` is the literal string `[object Object]`,
- * and that was the whole error the agent got — no status, no message, nothing to act on, and
- * every failure identical to every other failure.
- *
- * The 2026-08-26 tool sweep found it live on seven tools at once: manage_inbox, manage_contracts,
- * manage_job_sites, list_my_job_searches, get_price_summary, seo_domain_intersection and
- * seo_onpage_issues. It had never been reported because those tools had never been called.
- *
- * A wrong error message is worse than a missing one — it looks like the tool told you something.
- */
+/** An upstream error must reach the agent as words, not as `[object Object]`. */
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -31,17 +18,7 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-/**
- * Names that unambiguously mean "the parsed response body" in this codebase.
- *
- * Just `parsed` — this codebase's consistent name for the result of `JSON.parse(text)`, and the
- * exact variable all nine offenders stringified.
- *
- * Deliberately NOT `body`, `data`, `payload` or `errBody`. Those name genuine strings all over
- * the tree (a reply's text, a base64 JWT segment, `await res.text()`), and including them flagged
- * four sites that were every one of them correct. A guard with false positives gets weakened or
- * deleted; a narrow one that only fires on the real shape survives to catch the next instance.
- */
+/** Names that unambiguously mean "the parsed response body" in this codebase. */
 const BODY_VARS = ['parsed'];
 
 /** The helper itself legitimately calls String() on a value it has already proven is not an object. */

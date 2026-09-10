@@ -1,28 +1,4 @@
-/**
- * Nothing is sold below cost.
- *
- * `veo-2` was charged at 30 credits for a clip that can run the full 8 seconds. At Google's
- * $0.35/second that clip costs $2.80, and 30 credits earn about $2.70 on the standard pack — so
- * the platform paid its customers to use its most expensive model, on every full-length video.
- *
- * WHY IT SURVIVED. Three separate things had to be true at once, and each looked fine alone:
- *   • the credit price is a hand-typed flat number, and 30 is a perfectly valid number;
- *   • `MAX_DURATION_SECONDS` bounds the clip but lives 15 lines away from the price, so nothing
- *     connects "8 seconds allowed" to "priced for how many seconds?";
- *   • the provider cost was not in `ai_usage_logs` AT ALL until #363 `EE-2` — image and video
- *     calls wrote no billing row — so no cost report could show the loss even in aggregate.
- * Nothing threw, no margin alert existed, and the number was wrong from the day it was typed.
- *
- * WHAT THIS PINS. The floor, not the price. Raising a price is always fine; this fails when a
- * price drops below the provider bill for a MAX-LENGTH clip, or when someone raises a duration
- * cap without revisiting the price — which is the same defect arriving from the other side.
- *
- * ON THE MIRRORED RATES. `PROVIDER_USD_PER_SECOND` restates what lives in `ai_model_pricing`,
- * and a mirror is normally exactly what CLAUDE.md forbids. The alternative here is worse: the
- * unit tier has no database, so the choice is a stated mirror or no check at all, and the thing
- * being guarded is a number a human types into a TypeScript file. Treat a failure as "re-read
- * the pricing table", not as "edit this constant until it passes".
- */
+/** Nothing is sold below cost. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -78,11 +54,6 @@ const MARKUP = 1.5;
  * (`credit_packages`: premium, 1000 for $84.99). Deliberately the cheapest: a credit bought at
  * a discount still has to cover the same provider bill, so the worst case is the one that
  * decides whether a sale loses money.
- *
- * NOTE this is not `CREDITS_PER_USD` (100, i.e. $0.01/credit) from `_shared/pricing-constants.ts`.
- * That constant is the internal cost-accounting rate and disagrees with the retail price by
- * roughly 8.5x. The discrepancy is real and worth resolving, but the question HERE is whether
- * real money in covers real money out, and that is answered by what a credit sells for.
  */
 const USD_PER_CREDIT_WORST_CASE = 84.99 / 1000;
 

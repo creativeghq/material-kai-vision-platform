@@ -1,35 +1,4 @@
-/**
- * Agent-memory guard (#233).
- *
- * The bug this exists to stop: agent memory looked implemented — a typed, scoped table, a
- * write path called on every turn, a read path spliced into every system prompt — and was
- * inert. The promotion gate was three regexes over the user message; the retrieval was
- * `order by created_at desc limit 20`. Measured on real traffic: 801 agent runs, 30
- * conversations, 45 user messages, and ONE promoted memory, whose `style` field was empty.
- *
- * Nothing could see it. The stored data was consistent, so no integrity check fired. A
- * regex that matches nothing is a valid regex, so no typecheck fired. Recency retrieval
- * returns rows, so the prompt always looked populated. The only reason it was ever found
- * was someone counting rows by hand.
- *
- * So this test pins the shape of the fix:
- *   - the promotion gate is an LLM call with FORCED Anthropic tool_use, not pattern matching
- *     and not free-form JSON rescued by a parser
- *   - the turn transcript reaches that call wrapped as DATA (security invariant 9 — memory
- *     is a stored prompt-injection channel: text a user typed once gets replayed into the
- *     system prompt of every later turn)
- *   - retrieval goes through `match_agent_memories`, and recency survives only as a labelled
- *     fallback tier
- *   - a model-supplied `supersedes_id` is checked against ids we actually showed it before it
- *     selects a row for mutation
- *   - no substitute embedder — a failed embedding leaves NULL, never a vector from elsewhere
- *
- * SCOPE. This scans repo files, so it sees the TypeScript half only. The SQL half
- * (`promote_agent_memory`, `match_agent_memories`, `record_agent_memory_recall`) is applied
- * through the Supabase MCP and lives in `pg_proc`, invisible here — it is watched instead by
- * three `ops.silent_zero` probes on this system's OUTPUT: nothing promoted, nothing embedded,
- * nothing ever recalled. A green run here says nothing about those.
- */
+/** Agent-memory guard (#233). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -322,20 +291,7 @@ describe('toVectorLiteral', () => {
   });
 });
 
-/**
- * What counts as "the turn did work".
- *
- * `promote()` refuses to distil a clarifying turn — no tool ran and the reply asks a question —
- * because that turn is the agent saying it does not yet understand the request, and the distiller
- * cannot tell the difference. The gate is `turnDidWork`, and agent-chat computed it as
- * `(finalResult.toolResults?.length ?? 0) > 0`: the COUNT OF CALLS.
- *
- * In conversation 96da9fc8 the agent ran three knowledge_base_search calls that each returned
- * nothing plus a no-op `load_toolkit`, then replied with nothing but questions. Four tool results,
- * so the gate said "this turn did work", stood down, and let the distiller promote the assistant's
- * OWN invented geography as a durable fact about the user. CLAUDE.md's rule for exactly this shape
- * is "check the world, not the exit code".
- */
+/** What counts as "the turn did work". */
 describe('turnProducedWork — work is results, not calls', () => {
   it('a turn of zero-result searches did no work', () => {
     const kbMiss = JSON.stringify({ articles: [] });
@@ -441,20 +397,7 @@ describe('isCapabilityClaim rejects memories about the assistant', () => {
   });
 });
 
-/**
- * The shared operating doctrine (issue #370, Class C).
- *
- * Pepper asked the user to name countries — `b2b_manufacturer_search` treats country and region as
- * optional and sweeps every defined market when both are omitted — and to define a furniture
- * segment, when `category` is satisfied by "furniture". Then it asked the same three questions
- * again on the next turn. Neither answer was a precondition of any tool.
- *
- * Measured across the 15 active agent prompts at the time: 8 carried confirm-first language and
- * only 5 carried any "default / broad / proceed" counterweight — `product-business` and `erp`, the
- * two most action-oriented specialists, had none. The doctrine is appended to EVERY agent prompt
- * from ONE db row rather than pasted into fifteen, because the absence was the defect and fifteen
- * hand-kept copies are how every other mirror in this repo drifted.
- */
+/** The shared operating doctrine (issue #370, Class C). */
 describe('act-then-refine doctrine reaches every agent', () => {
   it('agent-chat appends it to the system prompt', () => {
     expect(
@@ -482,17 +425,7 @@ describe('act-then-refine doctrine reaches every agent', () => {
   });
 });
 
-/**
- * A tool must not report success for work it never confirmed started.
- *
- * On 2026-08-18 `dispatch_background_task` created an agent_runs row, fired the runner
- * fire-and-forget, and returned `success: true` unconditionally. The runner 404'd — its tenancy
- * check compared the run's workspace (the USER's) against the agent's (NULL, because the KAI
- * system agent is deliberately workspace-less), so it could never hold for a chat dispatch. The
- * run died 2 seconds after creation. The agent, reading `success: true`, told the user a sweep of
- * 20+ countries was running and results would "land in this thread". Nothing was running, and it
- * was the only chat-triggered run in the table.
- */
+/** A tool must not report success for work it never confirmed started. */
 describe('background dispatch reports the truth', () => {
   const bgTools = stripComments(
     readFileSync(join(ROOT, 'supabase/functions/_shared/tools/background-tools.ts'), 'utf8'),
@@ -551,16 +484,7 @@ describe('background dispatch reports the truth', () => {
   });
 });
 
-/**
- * A question in prose is converted into a form — mechanically (#370, Class D).
- *
- * Three prompt rules ("if you ask, ask on the canvas", "a menu is a question", "never open with
- * I'd be happy to help") took this from 0% to ~55% and then stopped. Measured over the 2026-08-19
- * suite: quote, SEO, pricing, b2b, moodboard and mentions asked through `request_input`; catalog
- * (4/4 attempts), hiring and stock still wrote numbered questions into the reply. A fourth
- * paragraph was not going to close a plateau three could not — instruction is a suggestion,
- * enforcement is a mechanism. This pins the mechanism.
- */
+/** A question in prose is converted into a form — mechanically (#370, Class D). */
 describe('prose questions are converted to a canvas form', () => {
   it('a turn that asks without working triggers one corrective pass', () => {
     expect(
@@ -608,18 +532,7 @@ describe('prose questions are converted to a canvas form', () => {
   });
 });
 
-/**
- * A dead enrichment provider must not cost the user the save they asked for (#370).
- *
- * "save Nowy Styl and Black Red White to my CRM" spent 190 seconds calling company_enrichment
- * into an Apollo 403, over and over, and never reached save_to_crm. Three things were wrong: the
- * failure read as transient ("Apollo API error: 403" and nothing else), the agent's own playbook
- * presented search→scrape→enrich→contacts→save as a sequential gate, and nothing stopped it
- * retrying a provider that had already said the account was unusable.
- *
- * save_to_crm only ever required `company.name`. Enrichment was never a prerequisite — the agent
- * merely believed it was.
- */
+/** A dead enrichment provider must not cost the user the save they asked for (#370). */
 describe('enrichment is best-effort, never a gate', () => {
   const b2b = stripComments(
     readFileSync(join(ROOT, 'supabase/functions/_shared/tools/b2b-tools.ts'), 'utf8'),
@@ -656,18 +569,7 @@ describe('enrichment is best-effort, never a gate', () => {
   });
 });
 
-/**
- * The agent's CRM save is a SECOND create path, and it was skipping the first one's guarantee.
- *
- * crm-api refuses a create whose folded name already exists in the workspace and hands back the
- * row it found (#366 BU-3) — the QuickAddCompanyDialog probe is only a courtesy on top of that
- * guarantee. `save_to_crm` wrote straight to `crm_companies` with the service-role client, so
- * none of it applied: asking twice produced the company twice. Verified live on 2026-08-19 —
- * "save Nowy Styl to my CRM" inserted with no lookup of any kind.
- *
- * CLAUDE.md says a CRM party must go through the duplicate search first and is never created
- * silently; that is why `crm_company` sits in the entity_templates CHECK deliberately unbuilt.
- */
+/** The agent's CRM save is a SECOND create path, and it was skipping the first one's guarantee. */
 describe('the agent cannot create a duplicate CRM company', () => {
   const b2b = stripComments(
     readFileSync(join(ROOT, 'supabase/functions/_shared/tools/b2b-tools.ts'), 'utf8'),
@@ -710,12 +612,6 @@ describe('the agent cannot create a duplicate CRM company', () => {
   it('a failed lookup does not fall through to the insert', () => {
     // Same reasoning as crm-api: a duplicate is cheap to detect and expensive to unpick, so an
     // unreadable CRM means "save nothing", never "save anyway".
-    //
-    // Checked per PROBE rather than once. The company is now looked up twice — by domain and by
-    // folded name — and an error on either has to abort; asserting on `dupError` alone stopped
-    // covering the guard the moment a second probe appeared beside it.
-    // Everything before the insert STATEMENT — cut at the `const {` that binds its result, not at
-    // `.insert(` itself, or the insert's own error binding reads as a probe that never aborts.
     const insertAt = save.search(/\.insert\(/);
     const beforeWrite = save.slice(0, save.lastIndexOf('const {', insertAt));
     const probes = [...new Set([...beforeWrite.matchAll(/error:\s*(\w+)\s*\}\s*=/g)].map((m) => m[1]))];

@@ -3,11 +3,6 @@
  * its specific lines (full or partial quantity). The note is created against the invoice,
  * nets its balance, and optionally transmits. Falls back to a whole-amount credit for legacy
  * invoices that have no stored line items.
- *
- * The myDATA type FOLLOWS THE CREDITED DOCUMENT and is decided by `issue_credit_note`, not
- * here: 11.4 for a retail receipt (11.x), otherwise 5.1 when the invoice carries a MARK and
- * 5.2 when it does not. The exemption category and the per-line taxes are copied from the
- * credited invoice line by the same RPC — never restated by this form.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';

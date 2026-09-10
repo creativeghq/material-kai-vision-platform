@@ -1,22 +1,4 @@
-/**
- * Per-option material textures (#321 / #260 item 6).
- *
- * The gap this closes: an option value carries `base_color_hex`, `roughness` and `metalness` — three
- * scalars — so a velvet and a linen at the same colour render IDENTICALLY. No amount of tuning
- * numbers fixes that; the difference between two fabrics *is* the weave, which is a texture.
- *
- * Three ways it silently fails, all guarded here:
- *
- *   1. THE OVERRIDE CANNOT CARRY A TEXTURE. If `MaterialOverride` loses `albedoUrl`, the option
- *      still swaps colour and the UI still looks like it worked — it just does nothing visible,
- *      which is the same silent zero as a target name that matches no material.
- *   2. TWO DECLARATIONS OF THE OVERRIDE. The configurator service used to declare its OWN
- *      `MaterialOverride`, so the renderer could learn a field the builder could not produce. One
- *      contract, two copies, free to disagree — the escapeHtml/settlement shape.
- *   3. THE TINT IS LEFT ON. A texture carries its own colour; multiplying a navy tint over a navy
- *      velvet renders navy-times-navy. Switching back to a plain colour has to clear the map, or
- *      the old fabric shows through the new colour.
- */
+/** Per-option material textures (#321 / #260 item 6). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

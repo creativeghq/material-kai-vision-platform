@@ -1,17 +1,4 @@
-/**
- * AADE VAT categories — the cat↔percent table, written ONCE.
- *
- * The pairs MUST match exactly or myDATA rejects the document; categories 4/5/6 are the
- * reduced island rates and were once omitted from two pickers. This used to live inside
- * `financeService.ts`, which imports half the platform and so could not be mirrored to Deno —
- * which is why the edge had no category→rate lookup at all and every server-created line
- * (storefront checkout, and now a hire from a public profile) fell back to the workspace's
- * default rate whatever the service was classified as.
- *
- * THIS FILE IS IMPORT-FREE, ON PURPOSE — byte-mirrored to the edge by `npm run vocab:mirror`
- * (`supabase/functions/_shared/vatVocabulary.generated.ts`). `financeService` re-exports it so
- * every existing importer keeps its path.
- */
+/** AADE VAT categories — the cat↔percent table, written ONCE. */
 
 export interface VatCategory {
   /** AADE category code, as a string (myDATA accepts "1".."8"). */

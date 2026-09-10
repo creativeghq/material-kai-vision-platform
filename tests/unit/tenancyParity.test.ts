@@ -1,17 +1,4 @@
-/**
- * Guards the tenancy-parity detector.
- *
- * `npm run lint:tenancy` is the real gate. This test guards the things that would quietly turn it
- * off while leaving it green:
- *
- *   • the detector losing its ability to detect (its own self-test failing),
- *   • the tenant-table list shrinking, which silently removes tables from scope,
- *   • the baseline being edited upward to absorb a new finding.
- *
- * The detector currently reports ZERO findings. Zero is also what a broken detector reports — this
- * session produced two semgrep rules that loaded fine and matched nothing — so "it found nothing"
- * is only meaningful while the self-test still proves it catches the shape.
- */
+/** Guards the tenancy-parity detector. */
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
@@ -54,12 +41,6 @@ describe('tenancy parity gate', () => {
     // Floor lowered 255 -> 254 on 2026-08-16: 16 of the 38 tables dropped as unreachable schema
     // carried workspace_id, so the list legitimately shrank. Only a DROP may move this number
     // down, and only together with the migration that performed it.
-    //
-    // KNOWN DRIFT: 286 relations actually carry workspace_id; this list has 254. The 32 missing
-    // ones are invisible to `npm run lint:tenancy`, which enforces security invariant 1.
-    // Regenerating is deliberately NOT bundled here — it widens the gate's scope, and the
-    // baseline below is pinned at zero, so any finding it surfaces turns the build red until
-    // fixed. That is a security pass of its own, not a rider on a schema cleanup.
     expect(
       tables.length,
       'The tenant-table list got smaller. Every removed table drops out of the tenancy gate ' +

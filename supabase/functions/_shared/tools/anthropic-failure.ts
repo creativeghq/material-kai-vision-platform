@@ -1,23 +1,4 @@
-/**
- * What to tell the agent when an Anthropic call comes back not-ok.
- *
- * The status alone is enough for a TRANSIENT failure — 429/529/5xx mean the upstream was busy and
- * the right move is to wait, which the caller already says well. It is not enough for a
- * DETERMINISTIC one. A 400 will recur on every identical call until someone changes the request,
- * and Anthropic puts the reason in the response body: an unknown tool version, a `max_tokens`
- * over the model's ceiling, a malformed tool schema.
- *
- * Both `b2b-tools` and `web-research-tools` read that body, logged it to `console.error`, and then
- * returned the bare string `Web search failed: 400`. Console output in an edge worker is not a
- * place anyone looks, and `agent_tool_call_logs` stores the RETURNED error — so seven 400s between
- * 2026-08-18 and 2026-08-22 are recorded with no cause at all, and the only way to learn why is to
- * reproduce them. That is the platform's own rule about a metric being a value or a stated reason,
- * applied to an error string.
- *
- * Kept in one file because the two call sites already carry duplicate copies of
- * `postAnthropicWithRetry`, and a third hand-written copy of the message formatting is how the
- * next divergence starts.
- */
+/** What to tell the agent when an Anthropic call comes back not-ok. */
 
 /** Anthropic's error envelope: `{ type: 'error', error: { type, message } }`. */
 function upstreamMessage(body: string): string | null {

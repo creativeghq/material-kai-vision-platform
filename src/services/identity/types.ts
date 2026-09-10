@@ -1,19 +1,4 @@
-/**
- * Business-identity validation, as a provider interface rather than an `if` (#329).
- *
- * The platform used to decide where to verify a VAT number with a hardcoded branch:
- * Greek ΑΦΜ → ΑΑΔΕ, else in the EU → VIES, else "fill it in manually". That reads as
- * country-neutral until you try to add a country: VIES is EU-only, so every non-EU business is
- * unverifiable by construction, and the branch is duplicated wherever a VAT gets checked.
- *
- * A provider declares which countries it can answer for. Callers ask the registry, never the
- * country. Adding a country's registry becomes one adapter and one line in the registry — no
- * caller changes, and "no provider for XX" becomes a real, explainable answer instead of a
- * fallthrough.
- *
- * `id` doubles as the value written to `crm_companies.vat_validation_source`, so the row records
- * WHICH authority verified it — 'aade' and 'vies' are not interchangeable claims.
- */
+/** Business-identity validation, as a provider interface rather than an `if` (#329). */
 
 export type IdentityProviderId = 'aade' | 'vies';
 

@@ -1,26 +1,4 @@
-/**
- * A job's labour actual is a VALUE or a stated reason there is none — never a zero (#378 N1).
- *
- * THE DEFECT
- * ----------
- * `get_project_labor` costs a job at `minutes / 60 * time_entries.hourly_rate` — a rate somebody
- * typed. The real cost of that hour is `hr_payroll_items.employer_cost`, which reaches Finance
- * through `post-payroll-to-finance` and never reached the job. Nothing compared them, so every
- * job's labour line was an estimate that nothing labelled as one. The roll-up also had NO reader
- * in `src/` at all: derived, typed, and consumed only by `get_project_pnl` inside SQL.
- *
- * WHY THE NULLS ARE THE POINT
- * ---------------------------
- * Payroll is monthly and a job is not, so the actual is an ALLOCATION over the workers who can be
- * costed. A worker with no payroll history contributes NULL, and the roll-up's `variance` is null
- * when nobody could be costed. Coercing either to 0 makes a job look more profitable the more
- * unpayrolled labour it consumed — the class-3 shape this codebase names: a metric is a value or a
- * stated reason there is no value, never a hidden zero.
- *
- * The SQL half is verified by calling it against the live database (rolled back), not by reading
- * it — a text check over a function definition proves the edit was written, not that it works.
- * What is pinned here is the CLIENT boundary, which is where a null gets quietly turned into 0.
- */
+/** A job's labour actual is a VALUE or a stated reason there is none — never a zero (#378 N1). */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -118,9 +96,6 @@ describe('a worker with no login can have hours', () => {
      * carried into the insert — and no form passed it, so the column could never hold a value.
      * That is the dead-column shape the rest of this issue is about, one layer up: the writer
      * looked present because the SERVICE had the parameter.
-     *
-     * The roster offered is `listTaskAssignees`, the same deduped member+employee list the task
-     * picker uses, so the two surfaces cannot disagree about who exists.
      */
     const form = read('src/modules/finance/tabs/TimeBillingTab.tsx');
     expect(form, 'the log-time form must pass employee_id').toMatch(/employee_id: \w+ \|\| null/);

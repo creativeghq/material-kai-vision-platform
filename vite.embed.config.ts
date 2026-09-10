@@ -1,20 +1,4 @@
-/**
- * Build target for the `<materialkai-product>` embed bundle (#321 M1 bullet 3, #258).
- *
- * Separate from `vite.config.ts` on purpose. The app build is a React SPA with code-splitting and
- * a dozen `define`d env values; this is one self-contained IIFE that a merchant drops into their
- * own `<script src>`. Sharing a config would mean the embed inherits React, the Supabase client
- * and every env substitution the app needs — none of which belong on a stranger's product page.
- *
- * Output goes to `public/embed/`, so `vite build` copies it into `dist/` and it is served from the
- * app's own origin at `/embed/materialkai-product.js`. The artifact is gitignored and rebuilt by
- * `npm run build` — a committed build output is a merge conflict waiting to happen and drifts from
- * its source the first time someone forgets.
- *
- * IIFE, not ESM: the tag is `<script src=… defer>` on pages that may be anything from a hand-written
- * HTML file to a Shopify theme. `type="module"` would be one more thing for the merchant to get
- * right, for no benefit to us.
- */
+/** Build target for the `<materialkai-product>` embed bundle (#321 M1 bullet 3, #258). */
 import path from 'path';
 import { defineConfig } from 'vite';
 

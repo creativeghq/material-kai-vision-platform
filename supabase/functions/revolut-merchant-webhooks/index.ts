@@ -1,17 +1,4 @@
-/**
- * Revolut Merchant webhooks (#315, payments-revolut) — settlement for the checkout side.
- *
- * Two surfaces:
- *  - POST (unsigned, user JWT): registers the merchant webhook with the tenant's own
- *    secret key and stores the returned signing secret. The provider stays "not
- *    configured" until this succeeds — settlement depends on it.
- *  - POST ?ws=<id> (Revolut-Signature header present): signed deliveries. HMAC v1.{timestamp}.{body} with the
- *    per-workspace signing secret, 5-minute window, timing-safe compare — the same
- *    doctrine as revolut-webhooks / stripe-webhooks (invariant 6, fail closed).
- *
- * THE WEBHOOK IS A TRIGGER, NEVER DATA: on ORDER_COMPLETED the order is re-read from
- * the Merchant API with the tenant's own key; amount/currency come from that read.
- */
+/** Revolut Merchant webhooks (#315, payments-revolut) — settlement for the checkout side. */
 
 // deno-lint-ignore-file no-explicit-any
 

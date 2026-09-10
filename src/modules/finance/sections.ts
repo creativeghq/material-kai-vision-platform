@@ -1,24 +1,6 @@
 /**
  * Finance's section rail — ONE declaration, read by the page that renders it and by the App
  * Launcher that links into it.
- *
- * It was two. `FinancePage`'s `<TabsList>` held 25 sections; `LAUNCHER_SECTIONS.finance` held a
- * hand-written 10, so the Apps menu offered Receivables, Payables, Bank feed, Orders, Invoices,
- * Payments, Follow-ups, Reports, Customers & Suppliers and Expense Cards — and silently knew
- * nothing about Receipts, Credit Notes, Expenses, By Supplier, Delivery Notes, Cheques, Planning,
- * Assets, Time & Billing, AI Assessment, the myDATA Book, myDATA Transmissions, Sourcing, Settings
- * or the Supplier Portal. Nothing could see it: every link the launcher DID hold resolved
- * perfectly, so `deepLinkTargets.test.ts` passed, and a section that is listed nowhere raises
- * nothing at all — it is simply a part of the app you cannot reach from the menu. The header of
- * `launcher-sections.ts` names this exact failure mode and calls it "a gap, not a break"; this is
- * the half of it that can be closed structurally instead of remembered.
- *
- * So: add a section HERE and both surfaces get it. The rail keeps what only the rail can know —
- * the live counts, the two jump-off buttons above it — and everything that is shared (the key, the
- * label, the icon, the grouping, the accountant gate) lives in this list.
- *
- * Import-free apart from icons and `./routes`, so `src/config/launcher-sections.ts` can read it
- * without dragging the finance service (and through it the Supabase client) into the launcher.
  */
 import {
   PieChart, ArrowDownCircle, ArrowUpCircle, Landmark, Truck, ShoppingCart, FileText, Receipt,

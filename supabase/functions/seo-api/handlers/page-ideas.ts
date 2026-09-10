@@ -1,16 +1,4 @@
-/**
- * seo-api `page_ideas` — keyword ideas for ONE of the site's own pages.
- *
- * The page's title is the keyword its author already chose for it, so it is the
- * seed: two DataForSEO calls (Google Ads expansion + Labs related keywords) in the
- * site's market, merged and sorted by volume. The free half of "what should this
- * page be about" — the queries Search Console already shows the page for — is a
- * plain RPC (`get_page_gsc_queries`) and is not spent on here.
- *
- * Body: { website_id, page }. User JWT only.
- * Order of operations is the order invariant 10 demands: membership → entitlement →
- * reserve credits → the paid call → settle against the provider's reported cost.
- */
+/** seo-api `page_ideas` — keyword ideas for ONE of the site's own pages. */
 
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../../_shared/cors.ts';

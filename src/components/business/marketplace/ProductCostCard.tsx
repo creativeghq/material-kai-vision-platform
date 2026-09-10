@@ -1,15 +1,4 @@
-/**
- * What this product COST and who we bought it from.
- *
- * Read-only. Purchase cost is set by the buying flows that know the real number — warehouse
- * intake from a supplier document, the XML importer, supplier pricing — so an editable field
- * here would be a fifth way to disagree with them. This card is the only place cost is
- * surfaced on the product record.
- *
- * The caller gates this on `pricing.manage` or `sales.team.view` AND own-workspace ownership.
- * Cost is the most sensitive number on a product — it is margin, backwards — and must never
- * reach a project client, an invited employee or a rep without team scope.
- */
+/** What this product COST and who we bought it from. */
 import React, { useEffect, useState } from 'react';
 import { Coins } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';

@@ -5,19 +5,7 @@ import { join } from 'node:path';
 import { stripComments } from '../helpers/stripComments';
 import { AUTO_CATEGORY_KINDS, isHandAssignableKind } from '@/services/crmCategoryKinds';
 
-/**
- * "Who is an employee" is DERIVED, and the write path has to say so (#353 CRM-22).
- *
- * `role` (from `workspace_members.role`) and `employment` (from `hr_employees`) are AUTO kinds:
- * `crm_resync_auto_category_members` derives their membership and only ever deletes rows it
- * wrote itself (`source='auto'`). A MANUAL row in one of those categories is therefore
- * permanent — a category that says "Sales Managers" while holding somebody who is not one, and
- * which the resync will never reclaim.
- *
- * The list page filtered its options through `isHandAssignableKind`. The SERVICE took a raw
- * category id and wrote it. CLAUDE.md's rule for that exact shape: the offer and the gate must
- * read the same answer.
- */
+/** "Who is an employee" is DERIVED, and the write path has to say so (#353 CRM-22). */
 
 const ROOT = join(__dirname, '..', '..');
 const SERVICE = 'src/services/crmCategoriesService.ts';

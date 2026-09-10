@@ -3,16 +3,6 @@
  * gets out of one. There is nothing to approve: a professional who picked the company off the
  * platform's supplier list is already promoting it on their public profile. This says who they
  * are, what they promote it FOR, and how much reach that profile has.
- *
- * TWO PLACES, because a brand is looked at from two directions and both already existed:
- *   - `mode="company"`  — the CRM company record's Market → Demand tab, which is where
- *     per-supplier analytics live (#350). Anyone in the workspace looking at that supplier.
- *   - `mode="supplier"` — the Supplier Portal, where a workspace that has CLAIMED its own
- *     supplier identity looks at its own numbers.
- * Same rendering, two RPCs, so the two views cannot drift into telling different stories.
- *
- * Both RPCs check workspace membership against the JWT and only ever return PUBLIC profiles —
- * a private profile is not promoting anything yet.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';

@@ -143,23 +143,7 @@ interface PayrollBasis {
   monthDays: number;
 }
 
-/**
- * A payroll line's gross, derived ONCE (#354 HR-4).
- *
- * Two concrete wrong results lived here, and the second is the more insidious:
- *
- *  • No proration. `start_date` and `end_date` were never read, so a mid-month joiner or leaver was
- *    paid the full month on the monthly basis and the full month's weekdays on the hourly one.
- *
- *  • Hours rounded BEFORE multiplying. `round2(weekly_hours / 5)` turned 37.33h/week into 7.47h/day
- *    and then multiplied by the rate and the day count: €2,199.17 where the honest figure is
- *    €2,197.99. Same family as the invoice-footing defect in #351 — round at the END, at the
- *    quantity the document actually states.
- *
- * `hours_per_day` is stored UNROUNDED for the same reason: the payslip prints
- * `rate/h × hours_per_day × days`, and a reader must be able to multiply the printed line out and
- * arrive at the printed gross.
- */
+/** A payroll line's gross, derived ONCE (#354 HR-4). */
 function derivePayrollBasis(e: any, period: string): PayrollBasis {
   const monthDays = businessDaysInMonth(period);
   const daysWorked = businessDaysInWindow(period, e.start_date ?? null, e.end_date ?? null);
@@ -892,16 +876,7 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       const id = String(body?.run_id ?? '');
       const status = String(body?.status ?? '');
       if (!id || !['approved', 'paid', 'draft'].includes(status)) return json({ error: 'run_id and a valid status are required' }, 400);
-      /**
-       * `paid` is terminal, and a posted run cannot be re-opened (#354 HR-5).
-       *
-       * Any status could previously be set from any other, so a paid run could be dropped back to
-       * draft, its lines rewritten and its payslips regenerated over the ones the employees already
-       * hold — with nothing recording what was actually paid. Re-opening an APPROVED run is still
-       * allowed, because approval is a review step and correcting a mistake before the money moves
-       * is the point of having one; re-opening a run whose payments are already scheduled in
-       * Finance is not, because those postings would stay behind.
-       */
+      /** `paid` is terminal, and a posted run cannot be re-opened (#354 HR-5). */
       const { data: currentRun } = await supabase.from('hr_payroll_runs')
         .select('status, posted_finance_ref').eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
       if (!currentRun) return json({ error: 'not found' }, 404);
@@ -930,11 +905,6 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
        * The stamp above is written LAST, after every payment insert, so it is exactly the record
        * that can be missing (CLAUDE.md rule 4: a duplicate guard reads the record written on the
        * SUCCESS path, never a status column written after it).
-       *
-       * This posts N+2 payments as N+2 separate calls over the wire. If any one fails, or the
-       * connection drops before the stamp, the payments exist and `posted_finance_ref` does not —
-       * so the guard above waves the retry through and every salary is scheduled twice, along with
-       * a second income-tax and a second EFKA remittance. Ask the payments themselves.
        */
       const { count: alreadyPosted, error: postedErr } = await supabase
         .from('planned_payments')

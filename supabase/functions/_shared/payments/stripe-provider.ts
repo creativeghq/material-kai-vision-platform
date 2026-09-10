@@ -1,16 +1,4 @@
-/**
- * Stripe as a `PaymentProvider`.
- *
- * Wraps the Checkout-session logic that `finance-pay-invoice` has always used, with no
- * behaviour change: the PLATFORM's Stripe key creates the session and the tenant is paid
- * via a Connect `transfer_data.destination`.
- *
- * Note the contrast with Viva, which is BYOK (the tenant's OWN merchant credentials):
- * Stripe's "credentials" here are the platform key plus the tenant's connected-account id.
- * That is why `resolveContext` returns non-null only when the workspace has actually
- * completed Connect onboarding — an unconnected workspace would otherwise be charging
- * money into the operator's account.
- */
+/** Stripe as a `PaymentProvider`. */
 
 import { getStripe } from '../stripe-clients.ts';
 import type {
@@ -38,20 +26,9 @@ export const stripeProvider: PaymentProvider = {
     /**
      * WHERE THE MONEY LANDS IS A DECISION, NOT A FALLBACK (#359 CM-18).
      *
-     * This used to be: connected account when onboarded, otherwise `credentials: {}` — and
-     * `createCharge` then omits `transfer_data`, so the charge is made on the PLATFORM account.
-     * The tenant's customer pays, the money lands in the operator's Stripe balance, and the
-     * operator carries the chargeback liability and has to remit by hand. The comment framed it as
-     * making Stripe offerable everywhere; what it actually did was settle a tenant's revenue into
-     * somebody else's account.
-     *
-     * The audit asked for per-workspace BYOK. That is the wrong prescription — Connect is already
-     * here and is strictly better, because the tenant's secret key never leaves Stripe. What was
-     * missing is the refusal.
-     *
-     * `stripe_charge_routing` gives the verdict, so this and `finance-pay-invoice` cannot disagree
-     * about whose balance a payment settles into. The platform-account charge survives for exactly
-     * one workspace: the operator's own, where the platform account IS the tenant's account.
+     * Deliberately not BYOK, unlike Viva: Connect is already here and is strictly better, because
+     * the tenant's secret key never leaves Stripe. An unconnected workspace is refused, not routed
+     * into the operator's balance.
      */
     const { data: routing, error } = await supabase.rpc('stripe_charge_routing', {
       p_workspace_id: workspaceId,

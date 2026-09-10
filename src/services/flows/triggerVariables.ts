@@ -1,17 +1,4 @@
-/**
- * Trigger variable catalog
- *
- * Single source of truth for the `{{trigger.data.*}}` variables each flow
- * trigger emits. Powers two surfaces:
- *  - The flow builder's "Available variables" helper (click-to-insert into an
- *    action's config fields).
- *  - The email template builder's tag reference (so template authors know which
- *    platform/flow tags they can use).
- *
- * Keep this in sync with the actual `emit()` / `emitFlowEvent()` payloads in the
- * source code. When you add a converted event (see docs/flows-notification-system.md
- * §8), add its variables here too.
- */
+/** Trigger variable catalog */
 
 export interface TriggerVariable {
   /** Field name under trigger.data — referenced as {{trigger.data.<key>}}. */
@@ -27,15 +14,6 @@ export interface TriggerVariable {
 /**
  * What kind of thing a variable holds, so an operator pasting it into an outbound email knows
  * what they are pasting (#357 AE-14).
- *
- * The helper offered ninety variables as one undifferentiated list of `{{…}}` tokens. Among them
- * are one-click URLs that ACT on possession, other people's email addresses, and internal UUIDs —
- * and nothing on the screen distinguished those from a title or a count. Placing a keep-active
- * link or an invite URL into a body that goes to a different recipient hands that recipient the
- * capability, and the flow builder is exactly where somebody does that without meaning to.
- *
- * DERIVED FROM THE KEY, not hand-labelled per variable. Ninety hand-kept flags is the "a rule
- * written N times" shape: the ninety-first variable arrives unlabelled and reads as safe.
  */
 export type VariableSensitivity =
   | 'capability'  // acts on possession — anyone holding it can use it, signed in or not

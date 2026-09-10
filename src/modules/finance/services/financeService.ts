@@ -3,9 +3,6 @@
 // purchase orders, supplier bills, credit notes, quote activities,
 // and report aggregations (AR/AP aging, P&L, cash flow, follow-up queue).
 // Heavy mutations go through Postgres SECURITY DEFINER RPCs so that:
-//   - Sequential number generation stays race-free
-//   - Status transitions are atomic
-//   - The cost-snapshot rule from PR-A is honored end-to-end
 
 import { supabase } from '@/integrations/supabase/client';
 import { edgeError } from '@/utils/edgeError';
@@ -135,12 +132,6 @@ export interface InvoiceWithItems extends Invoice {
 /**
  * The rungs of the markup ladder, in the order `_pricing_markup_ladder` tries them:
  * product → brand → supplier → category → the workspace default.
- *
- * Mirrors `pricing_rules_scope_check`. It is the second copy of that vocabulary, which is the
- * shape that killed the brand rung: the resolver read `scope='brand'` and `BrandMarkupCard`
- * wrote it, but the CHECK only ever allowed ('category','product'), so every brand markup save
- * raised a constraint violation and the rung could never hold a row. Guarded by
- * tests/unit/pricingRuleScopes.test.ts — change the CHECK and this list in the same commit.
  */
 export type PricingRuleScope = 'category' | 'product' | 'brand' | 'supplier';
 
@@ -517,11 +508,6 @@ export interface RecurringExpense {
    * Defaults stamped onto each generated supplier_bill by `run_due_recurring_expenses`.
    * The BILL carries the real link — job costing reads the bill, never this template — so these
    * are a convenience, not a second place the project/order association lives.
-   *
-   * The trip/property pair is here for the same reason and matters MORE on a repeating cost than
-   * on a one-off: a service charge, a utility bill or a cleaning contract on a building is
-   * recurring by nature, and without these the second bill onward arrives unattributed while
-   * looking perfectly correct.
    */
   project_id: string | null;
   order_id: string | null;
@@ -991,17 +977,7 @@ const _financeServiceCore = {
     };
   },
 
-  /**
-   * Per-line COGS for a set of invoices, keyed by invoice_item id.
-   *
-   * `invoice_items.unit_cost_snapshot` — and `line_cost` / `line_margin`, both GENERATED from it —
-   * are not selectable by the browser (#358). `issue_invoice_from_quote` copies the quote line's
-   * cost snapshot onto them, so without this gate the cost that was locked out of `quote_items`
-   * reappeared on the invoice line, readable by every workspace member on every invoice.
-   *
-   * An invoice the caller is not sell-side in contributes no entries; a failed read returns an
-   * empty map. Both mean cost UNKNOWN, never zero.
-   */
+  /** Per-line COGS for a set of invoices, keyed by invoice_item id. */
   async invoiceItemCosts(invoiceIds: string[]): Promise<Map<string, InvoiceLineCost>> {
     const ids = [...new Set(invoiceIds.filter(Boolean))];
     if (ids.length === 0) return new Map();
@@ -1035,17 +1011,7 @@ const _financeServiceCore = {
     return data as { invoice_id: string; invoice: Invoice | null };
   },
 
-  /**
-   * Issue a draft invoice, on the date the operator chose (#351 B3).
-   *
-   * `issuedOn` is a local `YYYY-MM-DD` — the day the operator picked on screen. It is converted
-   * here, on the CLIENT, because that is the only place that knows the operator's calendar day:
-   * the DB session runs in UTC, so deriving it there would be the same defect one layer down
-   * (CLAUDE.md rule 1b). NOON on the chosen day, so no timezone offset or DST transition can push
-   * the instant onto the day before or after.
-   *
-   * Omitted means "now", which is what every existing caller gets and what the RPC did before.
-   */
+  /** Issue a draft invoice, on the date the operator chose (#351 B3). */
   async markInvoiceIssued(invoiceId: string, issuedOn?: string | null): Promise<void> {
     let issuedAt: string | null = null;
     if (issuedOn && /^\d{4}-\d{2}-\d{2}$/.test(issuedOn)) {
@@ -1078,9 +1044,6 @@ const _financeServiceCore = {
      * income. It was writable only from inside the project until now, and an invoice raised from a
      * project-linked order arrives with it already set (#378 Phase 1) — this is how it gets
      * CORRECTED, and how an invoice that predates its project joins one.
-     *
-     * Editable after issue on purpose: the project is internal reporting, not a fiscal field. The
-     * DB's immutability guard still locks everything AADE was told.
      */
     if ('project_id' in patch) allowed.project_id = (patch as any).project_id;
     const { data, error } = await supabase
@@ -1232,27 +1195,11 @@ const _financeServiceCore = {
     // call the sweep existed but nothing invoked it, so cash recorded against no document sat as
     // on-account credit forever next to the very order it had paid for (ORD-2026-0002: €2,854
     // received, €0 allocated, until a migration and a since-removed button placed it by hand).
-    //
-    // Deliberately AFTER the RPC rather than a trigger on `payments`: the sweep places only each
-    // payment's REMAINDER, so it is safe to run at any point and finds nothing on a second pass —
-    // whereas an AFTER INSERT trigger fires before the client's explicit allocations exist and
-    // would swallow the whole payment onto the wrong target.
     await financeService.sweepUnallocated(input.workspaceId);
     return data as string;
   },
 
-  /**
-   * How much of each payment is still unallocated — the ONE derivation, read from SQL.
-   *
-   * `amount − Σ allocations` was open-coded in three TypeScript sites and three SQL functions, and
-   * they disagreed on which column to sum: `amount` is denominated in the TARGET's currency,
-   * `amount_doc_currency` in the PAYMENT's, and a remainder is a payment-currency quantity. They
-   * happen to agree while every allocation is same-currency, which is exactly why the divergence
-   * survived — the data is well-formed and only the arithmetic differs, so nothing could flag it.
-   *
-   * Pass ids to scope it; omit for every payment the caller can see (RLS applies — the function is
-   * SECURITY INVOKER on purpose).
-   */
+  /** How much of each payment is still unallocated — the ONE derivation, read from SQL. */
   async paymentRemainders(paymentIds?: string[]): Promise<Map<string, PaymentRemainder>> {
     if (paymentIds && paymentIds.length === 0) return new Map();
     const { data, error } = await supabase.rpc('get_payment_remainders', {
@@ -1481,17 +1428,7 @@ const _financeServiceCore = {
     return Number(data) || 0;
   },
 
-  /**
-   * The other three DOCUMENT-level discounts (#347 phase 8).
-   *
-   * Same rule as the cash discount above and for the same reason: each reduces the order
-   * subtotal, so none may be folded into `get_product_price_for_workspace` — discounting the
-   * lines AND the total applies it twice.
-   *
-   * Each is resolved in SQL. Do not re-query `pricing_custom_rules` from TypeScript: that is
-   * policy, policy has one home, and pricingRuleTypes.test.ts fails the build on a
-   * `.eq('rule_type', …)` anywhere in the client.
-   */
+  /** The other three DOCUMENT-level discounts (#347 phase 8). */
   async getPaymentTermsDiscountPct(workspaceId: string, terms: string): Promise<number> {
     const { data, error } = await supabase.rpc('get_payment_terms_discount_pct', {
       p_workspace_id: workspaceId, p_terms: terms,
@@ -1640,18 +1577,7 @@ const _financeServiceCore = {
     return data === true;
   },
 
-  /**
-   * Stop holding a party's leftover on-account money: release it to income.
-   *
-   * The cash does not move — it stays in whatever account it landed in and is ours to spend. What
-   * changes is whose money it is: the credit is allocated away, so the party's "on account"
-   * balance (and their statement) drops by it, and it lands in the P&L under `categoryId`.
-   * Nothing is issued to the customer; nothing goes to myDATA.
-   *
-   * `amount` is a CAP, not a promise — the RPC re-reads what is actually unallocated and never
-   * releases more than that, so a stale screen cannot release money that has since been applied
-   * somewhere else. Returns what was actually released. Undo with `reverseCreditRelease`.
-   */
+  /** Stop holding a party's leftover on-account money: release it to income. */
   async releaseCustomerCredit(input: {
     workspaceId: string;
     companyId?: string | null;
@@ -1756,10 +1682,6 @@ const _financeServiceCore = {
    * `orderProfitPositions`, and an aggregation of the very same per-order derivation rather than
    * a second answer to "how much may be taken". Refuses (22000) when the party's orders span more
    * than one currency: a cross-currency sum is a confident number in no currency at all.
-   *
-   * NOT the same quantity as `getCustomerProfitability().profit_unallocated`, which is a P&L view
-   * (invoice lines + uninvoiced orders). This one is the ALLOCATION cap, so it is what the button
-   * beside it must show.
    */
   async getPartyProfitPosition(workspaceId: string, party: { companyId?: string | null; contactId?: string | null }): Promise<PartyProfitPosition> {
     const { data, error } = await (supabase as any).rpc('get_party_profit_position', {
@@ -2198,10 +2120,6 @@ const _financeServiceCore = {
    * invoice supplies (bill #, issue/due dates) plus category and notes. Bills recorded
    * manually from an order usually lack the supplier's own invoice number (myDATA-created
    * ones get `IN-<MARK>` stamped automatically); this is the backfill path.
-   *
-   * Deliberately NOT editable: amounts (net/VAT/total — payments already allocate against
-   * them and the P&L read them), supplier identity, and status/amount_paid (derived from
-   * `payment_allocations` by trigger — writing them here would be a second derivation).
    */
   async updateSupplierBillMeta(supplierBillId: string, patch: {
     supplierBillNumber?: string | null;
@@ -2221,11 +2139,6 @@ const _financeServiceCore = {
      * link could only be written at the moment the expense was born, so a transport invoice that
      * landed a week after the goods, customs, or a second supplier on the same job had no route
      * onto the order or the project it belonged to except from the order's own side.
-     *
-     * The five columns are ONE field and move as a SET, which is why this is a nested object
-     * rather than five optional keys: they are one answer to one question, and a caller able to
-     * set three of them can leave a bill booked to a job AND to somebody else's sales order.
-     * Pass all five, or omit `link` entirely and nothing here is touched.
      */
     link?: {
       projectId: string | null;
@@ -2329,20 +2242,7 @@ const _financeServiceCore = {
       propertyId: input.propertyId ?? null,
     });
 
-    /**
-     * The bill above is COMMITTED (#351 C3).
-     *
-     * Create-bill and record-payment are two writes with no transaction between them. When the
-     * payment leg threw, the whole call rejected, the dialog said `Failed` and left the form
-     * armed — and saving again created a SECOND bill and a second payment for one cost. The
-     * caller could not tell "nothing happened" from "half of it happened", because both arrived
-     * as one rejected promise.
-     *
-     * So a payment failure is REPORTED, not thrown: the bill exists and is settleable from
-     * Payables, which is the same recovery the recurring-template and receipt-upload legs of
-     * this same flow already offer. Throwing here would be the one outcome that cannot be
-     * recovered from without creating a duplicate.
-     */
+    /** The bill above is COMMITTED (#351 C3). */
     let paymentId: string | null = null;
     let paymentError: string | null = null;
     if (input.paidNow && total > 0) {
@@ -2386,11 +2286,6 @@ const _financeServiceCore = {
    * became an order gets linked through its bill, not through a second column. An order holds
    * MANY expenses (no uniqueness on the FK): the supplier's own bill plus every extra cost —
    * transport, customs, an installer — that belongs to the same purchase.
-   *
-   * Both rows must live in the same workspace. RLS scopes the UPDATE to bills the caller can
-   * reach but says nothing about the ORDER id being written into them, so without this check a
-   * caller could file their own expense against another tenant's order and have it show up in
-   * that tenant's cost roll-up and 3-way match.
    */
   async setSupplierBillOrder(supplierBillId: string, orderId: string | null): Promise<void> {
     if (orderId) {
@@ -2452,18 +2347,7 @@ const _financeServiceCore = {
   // method here either writes an allocation or reads one — none of them re-derives "what is
   // still owed" independently.
 
-  /**
-   * Expenses annotated with their Inbox origin (and a resolved payee name), newest first.
-   *
-   * Defaults to what can still take a payment — open, non-void, something still due. Pass
-   * `ids` + `includeSettled` to read specific expenses regardless of state; `getPayableExpense`
-   * is that call, so the party-name / Inbox enrichment below has exactly one implementation.
-   * `inboxOnly` narrows to expenses created from a received document; `unlinkedOnly` narrows to
-   * expenses not yet matched to an order — what the order's "Attach an existing expense" picker
-   * offers, so an already-attached cost can never be double-counted onto a second order. "Matched"
-   * means EITHER link: `order_id` (part of that purchase) or `covers_order_id` (the cost of that
-   * sale).
-   */
+  /** Expenses annotated with their Inbox origin (and a resolved payee name), newest first. */
   async listPayableExpenses(
     workspaceId: string,
     opts: { inboxOnly?: boolean; unlinkedOnly?: boolean; ids?: string[]; includeSettled?: boolean } = {},
@@ -2543,33 +2427,7 @@ const _financeServiceCore = {
     return null;
   },
 
-  /**
-   * Can this order still produce a sales document, and which one? (#378 F1)
-   *
-   * WHY THIS IS A SERVICE CALL AND NOT A PROP
-   * -----------------------------------------
-   * `RecordPaymentDialog` used to take the answer from its host as two independent optionals —
-   * `fiscalDocKind` put the myDATA rows in the picker, `onIssueDoc` performed the filing — so a
-   * caller could offer a document it had no way to issue. Only ONE of seven surfaces passed
-   * either, which meant "take the money and file the document in one step" existed on the order
-   * screen and nowhere else. It could not simply be passed to the other six: on the generic
-   * surfaces the order is chosen INSIDE the dialog, so there is no order for a host to resolve
-   * from.
-   *
-   * The answer therefore has to be derived from the order, wherever the order comes from. One
-   * function, so the offer and the issue can never disagree.
-   *
-   * Returns null when there is nothing to offer, and the reasons are different on purpose:
-   *   - the order does not exist, or is not OURS to invoice (a purchase order issues nothing);
-   *   - it already carries a sales document, and a second from a payment would duplicate the
-   *     filing.
-   *
-   * VOID IS NOT A DOCUMENT. A voided invoice must not block a re-issue — that is precisely the
-   * state an operator gets into after a mistake, and the whole point of voiding it. Note this is
-   * deliberately stricter than `ordersService.invoicedOrderIds`, which answers a different
-   * question ("has this order produced any document at all", used for aging and party position)
-   * and counts void ones.
-   */
+  /** Can this order still produce a sales document, and which one? (#378 F1) */
   async resolveOrderIssueOffer(orderId: string): Promise<{ kind: SalesDocumentKind; reason: string } | null> {
     const { data: order } = await supabase
       .from('orders')
@@ -2593,18 +2451,7 @@ const _financeServiceCore = {
     return { kind: salesDocumentKindFor(buyer), reason: salesDocumentKindReason(buyer) };
   },
 
-  /**
-   * Issue the sales document this order should produce, and return its id.
-   *
-   * Beside `resolveOrderIssueOffer` on purpose: the thing that decides WHETHER to offer and the
-   * thing that DOES it were two independent optional props before (#378 F1), which is how a
-   * surface came to offer "Issue a retail receipt (ΑΛΠ) to myDATA", record the payment, issue
-   * nothing, and show a success toast. One module owns both halves now.
-   *
-   * `p_doc_kind` forwards the operator's pick rather than letting the RPC re-derive it: the buyer
-   * rule is right by default and wrong whenever the operator knows better — a business buying for
-   * private use takes an ΑΛΠ.
-   */
+  /** Issue the sales document this order should produce, and return its id. */
   async issueSalesDocumentForOrder(orderId: string, kind?: SalesDocumentKind): Promise<string | null> {
     const { data, error } = await supabase.rpc('generate_invoice_from_order', {
       p_order: orderId,
@@ -3603,21 +3450,6 @@ const _financeServiceV2 = {
   /**
    * THE billing party of a document, with the business rollup applied — call this, never
    * `resolvePrimaryCompanyId` directly, wherever a document's party is written.
-   *
-   * Exactly ONE of the pair comes back set. `vw_customer_account_summary` /
-   * `vw_supplier_account_summary` UNION a per-contact branch with a per-company branch, so a
-   * document carrying both ids is counted twice in that party's totals — "company OR contact,
-   * never both" is a schema rule, not a style choice.
-   *
-   * The rule was already stated on `resolvePrimaryCompanyId` and five dialogs applied it, but two
-   * ORDER paths ("raise a customer order from this purchase", and OrderLinkPicker's "for this
-   * customer" branch) mapped `party_type` to ids inline and skipped it. An order raised against a
-   * company's contact was stored with a null customer_company_id and then showed up NOWHERE: the
-   * company's Account tab filters on customer_company_id, and the contact's Account tab is not
-   * rendered at all for a company-linked contact — it points back at the company. ORD-2026-0005
-   * sat invisible in both. `bind_party_company()` is the DB backstop that makes a third such site
-   * impossible; this keeps the browser's pricing, document-kind hint and toast agreeing with what
-   * the row will actually say.
    */
   async resolveBillingParty(party: {
     companyId?: string | null;
@@ -3774,17 +3606,7 @@ const _financeServiceV2 = {
     if (error) throw error;
     return (data ?? []) as MyDataReconRow[];
   },
-  /**
-   * customer/supplier running ledger (καρτέλα): chronological debit/credit entries.
-   *
-   * `includeOrders` adds orders that have NOT become an invoice or a supplier bill, so the
-   * commercial position reads correctly: without it, cash taken on an un-invoiced order appears as
-   * a credit with nothing on the debit side and the balance claims we owe the customer. Invoiced
-   * orders are never included — their invoice is already the ledger entry.
-   *
-   * It MUST be passed identically to `getPartyOpeningBalance`, or orders placed before the period
-   * start drop out of the carry-forward while their payments stay in.
-   */
+  /** customer/supplier running ledger (καρτέλα): chronological debit/credit entries. */
   async getPartyLedger(input: {
     workspaceId: string; side: 'customer' | 'supplier';
     companyId?: string | null; contactId?: string | null; from: string; to: string;
@@ -3923,16 +3745,7 @@ const _financeServiceV2 = {
    * P&L on purpose. So a categorised payment could be made and appear in no report that named its
    * category. Rows are per category AND currency — two currencies in one category do not add up.
    */
-  /**
-   * Which currencies this workspace's money is actually in.
-   *
-   * Most finance reports return money with no currency column: they sum across currencies and the
-   * formatter defaults to EUR. Nothing is wrong in a single-currency workspace and everything is
-   * wrong the day it is not — silently, because a mislabelled sum is still a valid number. Reading
-   * this lets a report SAY its totals mix money instead of stating a confident figure in a currency
-   * nobody uses. A failed read returns an empty array, which warns about nothing: the caveat is
-   * worth showing when it is true, never worth inventing when the check itself did not run.
-   */
+  /** Which currencies this workspace's money is actually in. */
   async workspaceMoneyCurrencies(workspaceId: string): Promise<string[]> {
     const { data, error } = await (supabase as any).rpc('workspace_money_currencies', { p_workspace_id: workspaceId });
     if (error) throw error;

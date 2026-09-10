@@ -1,35 +1,4 @@
-/**
- * Money-derivation guard.
- *
- * The bug this exists to stop: "how much is still owed on this order" was implemented FIVE times
- * — twice in SQL (`recompute_order_payment_status`, `dic_detect__finance_order_over_settled`) and
- * three times in TypeScript (`settledByOrder` + OrdersPanel, `listUninvoicedOutstanding`,
- * `orderSettled`). Four applied the rule "a sales order settles on money IN, a purchase order on
- * money OUT" correctly; one netted the two directions. The result was an order row showing
- * `Payment: Paid` next to `Outstanding: €945` — the exact amount we had paid our supplier —
- * with the DB perfectly consistent the whole time.
- *
- * No stored-data integrity check can see that, because nothing was wrong with the stored data.
- * No typecheck can see it, because a wrong number is a valid `number`. The only durable fix is to
- * have ONE derivation, in SQL, and let TypeScript format the answer.
- *
- * So: `get_order_settlements` returns `settled` / `outstanding` / `payment_status` already
- * derived, and this test fails the build if the finance client-side code starts doing the
- * arithmetic again.
- *
- * SCOPE — read this before assuming a clean run means the invariant holds.
- * These tests scan REPO FILES, so they can only ever see the TypeScript half. This project's SQL
- * is applied through the Supabase MCP and never committed as a file (CLAUDE.md), so a function
- * body exists only in `pg_proc` and is invisible here. That is not hypothetical: audit #271 item 3
- * was a violation in `issue_invoice_from_quote`, which built an invoice from the quote's stale
- * `grand_total` while every TypeScript path correctly read the derivation — these tests passed
- * throughout, and a second copy of the same bug sat in `create_project_progress_invoice`.
- *
- * The SQL half is guarded in SQL, by the `finance.money_fn_bypasses_derivation` integrity check
- * (`dic_detect__finance_money_fn_bypasses_derivation`), plus `finance.derived_doc_drift` comparing
- * each invoice to its source quote's DERIVED total. Adding a money derivation to SQL means adding
- * it there — a green `npm test` says nothing about it.
- */
+/** Money-derivation guard. */
 import { describe, it, expect } from 'vitest';
 import { readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
@@ -95,10 +64,6 @@ describe('order settlement has exactly one derivation', () => {
     // The old pattern ended `[-−]\s*(settled|paid|net)\b`, requiring the word to start right
     // after the minus. A live reintroduction at OrdersPanel.tsx:1778 read
     //     Math.max(0, Math.round((Number(order.total) - orderSettled()) * 100) / 100)
-    // and sailed straight through, because `\bsettled` does not match inside the identifier
-    // `orderSettled`. A text-pattern rule is only ever as strong as the names people happen to
-    // pick — and whoever wrote the sixth derivation naturally named the helper after the thing
-    // it returned. No leading \b now, so orderSettled / totalPaid / netSettled all count.
     const RE = /\btotal\b[^\n]{0,40}[-−]\s*[A-Za-z_$.]*(settled|paid|net)/i;
     for (const f of files) {
       const src = strippedSource(f);
@@ -113,18 +78,7 @@ describe('order settlement has exactly one derivation', () => {
     ).toEqual([]);
   });
 
-  /**
-   * The structural half, which carries the real weight.
-   *
-   * The pattern rule above can always be dodged by a name nobody predicted — that is how the
-   * sixth derivation got in. This one makes a claim naming cannot escape: `outstanding` is a
-   * value you READ from the derivation, never one you ASSIGN from arithmetic. Any
-   * `const outstanding = <expression containing an operator>` is a re-derivation regardless of
-   * what the operands are called.
-   *
-   * Allowed: `= fin.outstanding`, `= balances.get(id)?.outstanding ?? 0`, `= row.outstanding`.
-   * Rejected: `= Math.max(0, total - anythingAtAll)`.
-   */
+  /** The structural half, which carries the real weight. */
   it('assigns `outstanding` only by reading it, never by arithmetic', () => {
     const offenders: string[] = [];
     // `const outstanding[: type] = ...` up to the end of the line.
@@ -170,21 +124,7 @@ describe('order settlement has exactly one derivation', () => {
     ).toEqual([]);
   });
 
-  /**
-   * The DISPLAY half of the same invariant, and the one that kept slipping.
-   *
-   * `orders.payment_status` is a CACHE of what `get_order_settlements` derives, maintained by
-   * `recompute_order_payment_status`. Reading it is not arithmetic, so none of the rules above can
-   * see it — and every rule above passed while three different screens rendered it. The orders LIST
-   * was fixed to read the derivation ("Paid" was appearing beside a non-zero Outstanding); the order
-   * DETAIL header and the finance dashboard's Recent-orders card were not, so the same order read
-   * one way in the table and another way one click deeper.
-   *
-   * The claim: every site that indexes the label map must consult the derivation. Falling back to
-   * the cached column when the balance has not loaded yet is fine — leading with it is not.
-   * Scanned across all of `src`, not just the finance dirs: two of the three offenders lived
-   * outside them, which is why a finance-scoped scan reported this clean.
-   */
+  /** The DISPLAY half of the same invariant, and the one that kept slipping. */
   it('renders the order payment badge from the derivation, never the cached column', () => {
     const offenders: string[] = [];
     // The index expression is the whole question — `ORDER_PAYMENT_LABEL[s]` in a filter-options
@@ -221,11 +161,6 @@ describe('order settlement has exactly one derivation', () => {
  * `final` could disagree by a cent — and none of them folded in `extras_total`, so a customer
  * accepting a EUR 500 upsell signed a document reading Price 1000 / Extras 500 / VAT 240 /
  * Final 1240 and was never billed for the upsell.
- *
- * `public.get_quote_totals(uuid[])` is now the single source and `reprice_quote_items` the only
- * write path. Exactly ONE TypeScript function may mirror the arithmetic —
- * `previewTotalsBreakdown`, which answers "what would this come to if I saved these prices?" for
- * prices that are not in the database yet. These tests fail the build if a second one appears.
  */
 describe('quote totals have exactly one derivation', () => {
   const posix = (p: string) => relative(ROOT, p).split('\\').join('/');
@@ -324,12 +259,6 @@ describe('quote totals have exactly one derivation', () => {
    * had no configuration field at all, so a selection the customer configured degraded to the base
    * product — quoted at the base, invoiced at the upgrade. Nothing disagreed about a derivation;
    * the option delta was simply dropped on the way to the quote (#341 join 3).
-   *
-   * `add_configuration_to_quote` reads the options, checks the option rules, prices through
-   * `get_configured_product_price` and inserts the row in ONE statement, so the price is frozen in
-   * the same breath it is read. Whoever WRITES the line must therefore not price the configuration
-   * itself — that would reopen the window between reading and freezing, and give a second place to
-   * "adjust" the figure on the way past.
    */
   const QUOTE_ITEM_WRITERS = [
     ...walk(join(ROOT, 'src/modules/quotes')),
@@ -361,25 +290,7 @@ describe('quote totals have exactly one derivation', () => {
   });
 });
 
-/**
- * Rent received — the THIRD money quantity to acquire the same shape, found reviewing #281.
- *
- * `property_rent_charges` carries a hand-set `status`/`paid_amount`, set from the Lettings tab. It
- * can ALSO carry an `invoice_id`, and then the tenant's money arrives in Finance as a
- * `payment_allocations` row that the rent charge never hears about. Two answers to "how much rent
- * has this tenancy actually received", nothing reconciling them:
- *
- *   - `landlord-statement` summed `status === 'paid'`, so a tenant who paid the rent invoice by
- *     card left the landlord statement reporting the rent as still outstanding and `net_to_landlord`
- *     short by exactly that amount — while Finance showed the invoice paid.
- *
- * Same signature as the order bug: stored data flawless, derived number wrong, invisible to both
- * the typecheck and every stored-data integrity check.
- *
- * `public.get_rent_charge_settlements(uuid[])` is now the single source (invoiced → the ledger;
- * uninvoiced → the manual flag, which is then the only record of the money), read through
- * `withRentSettlements`. `realestate.rent_charge_status_drift` guards the SQL half.
- */
+/** Rent received — the THIRD money quantity to acquire the same shape, found reviewing #281. */
 describe('rent settlement has exactly one derivation', () => {
   const posix = (p: string) => relative(ROOT, p).split('\\').join('/');
   // Both halves of the module: the edge function is where the offending sum actually lived, so a
@@ -464,24 +375,7 @@ describe('rent settlement has exactly one derivation', () => {
   });
 });
 
-/**
- * Project job cost — the FOURTH money quantity, added with WS2 of #285.
- *
- * Project margin has the same latent shape as the three above: it is assembled from four inputs
- * that each already live somewhere else (accepted quotes, issued invoices, supplier bills, logged
- * time), so the tempting move is to fetch the four lists into the Finance tab and subtract. That
- * is precisely how the order bug was written. Two specific traps here:
- *
- *   - `contracted_revenue` (accepted quotes) and `billed_revenue` (issued invoices) are two views
- *     of the SAME revenue. An invoice normally derives from a quote, so adding them double-counts.
- *   - `committed_cost` (open POs) and `supplier_cost` (bills) overlap the moment a bill is received
- *     against a PO. `get_project_pnl` nets the bill off the commitment; a client-side sum would not.
- *
- * `public.get_project_pnl(uuid)` is the single source and delegates labor to
- * `public.get_project_labor(uuid)` rather than re-summing `time_entries`, so the job-cost card and
- * the labor strip are incapable of disagreeing. These tests fail the build if the projects module
- * starts doing any of that arithmetic itself.
- */
+/** Project job cost — the FOURTH money quantity, added with WS2 of #285. */
 describe('project job cost has exactly one derivation', () => {
   const posix = (p: string) => relative(ROOT, p).split('\\').join('/');
   const files = walk(join(ROOT, 'src/modules/projects'));
@@ -541,19 +435,7 @@ describe('project job cost has exactly one derivation', () => {
     ).toEqual([]);
   });
 
-  /**
-   * HOW MUCH OF THIS QUOTE IS ALREADY BILLED — the quantity that did not exist, so nothing asked.
-   *
-   * `create_project_progress_invoice` validated that ONE percentage was in (0,100] and nothing
-   * else, and the Billing dialog opened on a hardcoded 50 with no running total anywhere. So
-   * 30 + 40 + 50 billed 120% of the job, and a retry after a dropped connection billed the same
-   * stage twice — every invoice individually valid, which is why no integrity check could see it.
-   * Its sibling `issue_invoice_from_quote` had guarded against a duplicate since it shipped; the
-   * path meant to be called REPEATEDLY had no guard at all.
-   *
-   * `public.get_quote_billing_progress` is now the single derivation, read by BOTH gates and by
-   * the dialog — so what is offered and what is allowed cannot disagree.
-   */
+  /** HOW MUCH OF THIS QUOTE IS ALREADY BILLED — the quantity that did not exist, so nothing asked. */
   const BILLED_DECL =
     /\b(?:const|let|var)\s+(?:billed|billedPct|billed_pct|remaining|remainingPct|remaining_pct|alreadyBilled)\s*(?::[^=]+)?=\s*(.+)$/;
 
@@ -682,27 +564,7 @@ describe('asset book value has exactly one derivation', () => {
 });
 
 describe('the line sell price has exactly one derivation', () => {
-  /**
-   * #347 defect 18 — the fourth money derivation, and the one that hid longest.
-   *
-   * `get_product_price_for_workspace` is the single price resolver: cost -> retail -> the discount
-   * ladder -> quantity breaks. But the CATEGORY custom rules (`category_extra`, `volume_category`)
-   * were resolved in TypeScript, in `QuotesService._layerBFactor`, which read
-   * `pricing_custom_rules` from the client, sorted by category ancestry, and multiplied
-   * `1 - pct/100` onto whatever the resolver had already returned.
-   *
-   * It ran at two call sites in QuotesService and nowhere else. So the same product, for the same
-   * customer, at the same quantity, cost one thing on a quote and a different thing on an order —
-   * and the order was never told these rules existed. Nothing failed. Both numbers were valid.
-   *
-   * Phase 1.1 moved them into the resolver, preserving the multiply-on-top semantics exactly, so
-   * `suggested_sell` / `final_sell` is now the WHOLE answer. `cash_payment` deliberately stays
-   * document-level (it reduces the subtotal before VAT, not a line price) with its own single
-   * source, `get_workspace_cash_discount_pct`.
-   *
-   * SCOPE: same caveat as every block in this file — TypeScript only. The SQL half is the
-   * resolver itself, which is not committed as a file.
-   */
+  /** #347 defect 18 — the fourth money derivation, and the one that hid longest. */
   const files = FINANCE_DIRS.flatMap((d) => walk(join(ROOT, d)));
   const posix = (p: string) => relative(ROOT, p).split(sep).join('/');
 
@@ -786,31 +648,7 @@ describe('the line sell price has exactly one derivation', () => {
   });
 });
 
-/**
- * The product catalog price (`product_prices`) — one derivation, and one upsert target.
- *
- * Two separate defects met on this table (#367) and each hid the other.
- *
- * 1. `discount_price` was derived in THREE TypeScript places — PriceLookupDrawer,
- *    ProductPricingCard, marketplacePricingService.setListPrice. Two rounded to 2dp, one did
- *    not, and the unrounded copy travelled out of the drawer into `quote_items.discounted_price`
- *    and `order_items.unit_price`, both unconstrained `numeric`, which store a float tail
- *    verbatim. 67.00000000000001 next to 67 is enough for `discounted_price !== unit_price` to
- *    read as a discount, so a quote line rendered a struck-through 67 above 67.00.
- *    The column is now GENERATED ALWAYS in Postgres. A fourth copy cannot be written: the
- *    insert fails with 428C9.
- *
- * 2. Every writer named `onConflict: 'workspace_id,product_id'`, but the only unique index is
- *    (workspace_id, product_id, variant_key) NULLS NOT DISTINCT. That is not a narrower match —
- *    Postgres raises 42P10, so every catalog price save failed. The two frontend sites threw
- *    (visible), the MIVAA one logged a warning and returned success (silent). The table held one
- *    row platform-wide.
- *
- * SCOPE: this scans repo files, so it sees the TypeScript half only. The MIVAA writer
- * (`app/api/products.py`) lives in a submodule that is EMPTY in CI — a scan of it here would
- * report "no offenders" for the wrong reason, so it is deliberately not scanned. The generated
- * column is the backstop that covers every runtime at once.
- */
+/** The product catalog price (`product_prices`) — one derivation, and one upsert target. */
 describe('the product catalog price has one derivation and one upsert target', () => {
   const posix = (p: string) => relative(ROOT, p).split(sep).join('/');
   const PRICE_DIRS = [

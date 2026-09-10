@@ -1,16 +1,4 @@
-/**
- * Get a WhatsApp number — search, buy, hold, release.
- *
- * The missing first step. Connecting WhatsApp assumed the workspace already owned a number, so a
- * tenant without one had no route into the product at all; Zernio sells them in 54 countries and
- * nothing here offered it.
- *
- * Two things this screen refuses to blur:
- *  - a purchase that returns a Stripe checkout URL is NOT a purchase yet, and neither is one that
- *    comes back asking for KYC. Both are shown as the step they are.
- *  - a brought-your-own number has no price and no release, because Zernio neither bills it nor
- *    owns its lifecycle. Showing it beside a bought one with a blank price implies "free".
- */
+/** Get a WhatsApp number — search, buy, hold, release. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Phone, Search, Loader2, ExternalLink, ShieldCheck, Trash2, AlertTriangle, Receipt, PauseCircle, RotateCw } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -83,10 +71,6 @@ export const PhoneNumbersTab: React.FC = () => {
   // Not `isOperator`. Giving up a number and settling a failed month are the tenant's own
   // business now — the edge function gates both on workspace owner/admin, and a UI that still
   // asked for operator would hide the button from everyone it was opened to.
-  // Two different gates, and they are not the same person. BUYING spends the platform's money
-  // on the platform's Zernio account, so it stays with the operator; GIVING ONE UP and settling
-  // a failed month are the tenant's own business (decided 2026-08-24) and belong to whoever
-  // runs the workspace. The edge function enforces exactly this split.
   const { isOperator, isWorkspaceManager } = usePermissions();
   const { toast } = useToast();
 

@@ -148,17 +148,7 @@ class MoodBoardAPI {
     if (error) throw error;
   }
 
-  /**
-   * Read a PUBLISHED board by its share token (#360 CB-15).
-   *
-   * The public page used to fetch by the board's own id, under an RLS policy that said
-   * `is_public = true` for role `public`. Two problems, and the second is the one that matters:
-   * the share never expired, and it could not be ROTATED — the URL was the board's identity, so
-   * revoking one recipient's link meant un-publishing for everybody, which is why nobody did it.
-   *
-   * `moodboard_by_share_token` is the only anonymous read now, and it projects: `user_id`, the
-   * client links, the dormancy fields and the keep-active token are not in it.
-   */
+  /** Read a PUBLISHED board by its share token (#360 CB-15). */
   async getPublicMoodBoard(shareToken: string): Promise<MoodBoard | null> {
     const { data, error } = await (supabase as any)
       .rpc('moodboard_by_share_token', { p_token: shareToken });
@@ -326,10 +316,6 @@ class MoodBoardAPI {
   // FKs on moodboard_items.moodboard_id and moodboard_presentation_sheets.moodboard_id
   // are ON DELETE CASCADE, so every child row is removed in one transaction.
   // Storage files (moodboard images in generation-images, sheet PDFs in pdf-documents)
-  // are NOT deleted synchronously — there is no AFTER DELETE storage trigger. Once the
-  // rows are gone the files are unreferenced and storage-orphan-cleanup-cron garbage-
-  // collects them (generation-images 14d grace, pdf-documents 72h) via
-  // build_storage_reference_set / find_orphan_storage_objects.
   async deleteMoodBoard(id: string): Promise<void> {
     const { error } = await supabase.from('moodboards').delete().eq('id', id);
 
@@ -481,9 +467,6 @@ class MoodBoardAPI {
   // prefix-deleted when the originating chat is deleted. To make the image
   // survive that, we COPY the bytes into a moodboard-owned folder
   // (`u/{user_id}/moodboards/{moodboard_id}/...`, outside any session prefix)
-  // and store the copy's URL on the moodboard_items row. The original stays in
-  // the chat. Non-generation-images URLs (external pins, VR splat URLs) are
-  // stored as-is — they have their own lifecycle.
   async addMediaFromChat(params: {
     moodboard_id: string;
     source_url: string;
@@ -618,19 +601,7 @@ class MoodBoardAPI {
     }));
   }
 
-  /**
-   * Mark a 3D generation as saved to a moodboard, and record WHICH one (#378 N7).
-   *
-   * `saved_to_moodboard_at` is what stops `job-cleanup-cron` deleting the generation 15 days after
-   * it was made. This method HAD NO CALLER: the real save path takes a media URL and had no
-   * generation id to pass, so on the live database 0 of 17 generations had ever been marked and
-   * the oldest sat exactly on the deletion boundary. Saving a design to a moodboard kept the image
-   * on the board and let the generation behind it be reaped on schedule.
-   *
-   * Best-effort at the call site, deliberately: the media IS on the moodboard by the time this
-   * runs, and failing the save because the retention stamp did not land would be the worse
-   * outcome. It is not silent — the caller logs it.
-   */
+  /** Mark a 3D generation as saved to a moodboard, and record WHICH one (#378 N7). */
   async markGenerationSaved(generationId: string, moodboardId: string): Promise<void> {
     const { error } = await supabase
       .from('generation_3d')
@@ -643,20 +614,7 @@ class MoodBoardAPI {
     if (error) throw error;
   }
 
-  /**
-   * Request a quote from someone else's (shared) moodboard.
-   *
-   * The signed-in viewer becomes the requester: we build a quote owned by them
-   * from the board's products, submit it (→ a `quote_requests` row), then record
-   * a `moodboard_quote_requests` link so the board's CREATOR gets the lead (this
-   * is what populates the "Quote reqs" stat on their profile). The creator is
-   * notified through the `moodboard_quote_requested` Flow — no hardcoded
-   * notification insert. Actual pricing is governed by the marketplace resale
-   * pyramid.
-   *
-   * Throws with a user-facing message on the guarded cases (not signed in, own
-   * board, empty board) so the caller can toast it directly.
-   */
+  /** Request a quote from someone else's (shared) moodboard. */
   async requestQuoteFromMoodboard(
     moodboardId: string,
   ): Promise<{ quote_id: string; quote_request_id: string }> {

@@ -139,19 +139,7 @@ export const Utils = {
       .replace(/^_|_$/g, '');
   },
 
-  /**
-   * Trusted client IP. Delegates to the canonical helper — do NOT re-derive one here.
-   *
-   * This used to read `x-forwarded-for.split(',')[0]` first, which is the exact thing
-   * invariant 10 forbids: the leftmost XFF hop is whatever the caller chose to prepend, so
-   * any per-IP quota keyed on it is defeated by rotating one header (#363 `EE-5`; the same
-   * mechanism confirmed live in `hr-careers`). `cf-connecting-ip` is set by Cloudflare and
-   * overwrites anything the client sends, so it is the one value here that is not spoofable.
-   *
-   * It had zero callers when this was fixed, which is why it never caused an incident — and
-   * exactly why it was worth correcting rather than deleting: the next person to reach for
-   * "get the client IP" finds one that is right.
-   */
+  /** Trusted client IP. Delegates to the canonical helper — do NOT re-derive one here. */
   getClientIP: (req: Request): string => getTrustedClientIp(req),
 
   // Create standardized error responses
@@ -297,19 +285,6 @@ export class RateLimiter {
 // Authentication utilities
 export class AuthUtils {
   // `checkAuthentication` was REMOVED here (#363 `EE-6`).
-  //
-  // It was a second, older authentication path living alongside `_shared/auth.ts`'s
-  // `authenticate()`, and it gave a weaker guarantee: its JWT branch looked up the caller's
-  // first active workspace with `.single()`, and when the user had NO active membership the
-  // lookup errored, `workspaceData` came back null — and it returned `{ success: true }` with
-  // `workspaceId: undefined` anyway. A caller that trusted the success flag and then filtered
-  // on an undefined workspace id is filtering on nothing.
-  //
-  // The inventory the audit asked for came back empty: zero callers outside this file. So the
-  // fix is deletion rather than repair — a duplicate auth path that nothing uses is a trap
-  // waiting for the next person who greps for "checkAuthentication" and finds it looking
-  // official. Use `authenticate()` from `_shared/auth.ts`; for the workspace binding a handler
-  // actually needs, use `userCanAccessWorkspace()`.
 
   // New method to check workspace membership
   static async checkWorkspaceMembership(

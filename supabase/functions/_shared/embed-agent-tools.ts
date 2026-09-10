@@ -1,22 +1,4 @@
-/**
- * The tool allowlist for the PUBLIC agent surface (#382 Phase 2/3).
- *
- * WHY THIS IS A SEPARATE, HARDCODED LIST AND NOT AN AGENT CONFIG. `agent-chat` binds tools from
- * `AGENT_CONFIGS[id].tools`, and `load_toolkit` can widen that set mid-conversation. Both are
- * correct for a signed-in member of a workspace and both are wrong for a stranger on a merchant's
- * website: the caller here is anonymous by construction, so the set of things they can reach must
- * be a constant in the source, not a value looked up at runtime.
- *
- * THE ALLOWLIST IS THE SECURITY BOUNDARY. This surface is a text box (or a button) driving tools,
- * which makes it the highest prompt-injection exposure in the platform. The defence is not
- * cleverness about what the visitor typed — it is that nothing on this list can mutate anything
- * except `raise_quote_request`, which is Turnstile-gated and writes one CRM contact and one
- * request. An injection can therefore produce bad prose. It cannot produce a bad row.
- *
- * Never add: anything CRM-mutating, finance, deals, contracts, inbox, messaging, SEO, B2B research,
- * job research, projects, docs, scraping, or `confirm`. `confirm` is the human-in-the-loop gate
- * (CLAUDE.md invariant 9) and a public surface has nobody to ask.
- */
+/** The tool allowlist for the PUBLIC agent surface (#382 Phase 2/3). */
 import type { EmbedKeyContext } from './embed-key.ts';
 
 export interface PublicTool {
@@ -35,13 +17,6 @@ export interface PublicTool {
   /**
    * What one run costs the platform's own API accounts, measured — NOT what the agent loop would
    * have cost, which is zero for everything here.
-   *
-   * Kept as a number rather than a boolean because the two states are not "free" and "expensive":
-   * `price_my_spec` and `calculate_kitchen_cost` are pure SQL and measured at EXACTLY zero rows in
-   * `ai_usage_logs` across repeated live runs, while `material_search` proxies MIVAA, which runs a
-   * query-understanding turn plus embeddings and books ~$0.0011 a call. Calling all three "free"
-   * was the first version of this file and it was wrong in the direction that matters: a surface
-   * an anonymous stranger can press, described as costing nothing, that quietly bills the account.
    */
   upstreamCostUsd: number;
   /** True for the one tool that writes. Gated on Turnstile before it is reached. */
@@ -121,17 +96,7 @@ export const PUBLIC_TOOLS: PublicTool[] = [
   },
 ];
 
-/**
- * What a given KEY may actually run.
- *
- * Three gates, and each exists because the alternative fails silently:
- *   • a `tools` key gets only the tools that do not need a catalogue, because it has none — and
- *     offering `price_my_spec` to an architect with no products returns "nothing matched" forever,
- *     which reads as a broken widget rather than as a misconfiguration;
- *   • anything with a non-zero upstream cost needs `paid_tools_enabled`, so a key handed out for a
- *     free calculator cannot quietly start billing the platform;
- *   • `tools_enabled` is the master switch for a catalogue key, which did not ask for this surface.
- */
+/** What a given KEY may actually run. */
 export function toolsForKey(key: {
   key_kind?: string | null;
   tools_enabled?: boolean | null;
@@ -148,18 +113,7 @@ export function toolsForKey(key: {
 
 export const PUBLIC_TOOL_NAMES: ReadonlySet<string> = new Set(PUBLIC_TOOLS.map((t) => t.name));
 
-/**
- * Build the allowlisted tools for one embed request.
- *
- * `workspaceId` comes from `ctx`, which came from the KEY — never from the request body, and never
- * from anything the model produced (CLAUDE.md invariant 1). Every factory below takes it as its
- * tenancy argument, so a tool physically cannot read another tenant's rows however it is called.
- *
- * `userId` is the empty string on purpose. There is no user: the visitor is anonymous. The one
- * tool that needs an actor (`raise_quote_request`) writes `user_id: null` and identifies the
- * person by the CRM contact it finds or creates from their email, exactly as the widget's own
- * `request_quote` action does.
- */
+/** Build the allowlisted tools for one embed request. */
 /** One input a public tool takes, projected from its own zod schema. */
 export interface PublicToolField {
   name: string;
@@ -170,16 +124,7 @@ export interface PublicToolField {
   description?: string;
 }
 
-/**
- * Project a tool's zod schema into the fields a form can render.
- *
- * NEVER HAND-MIRROR A TOOL'S ENUM. That rule exists in CLAUDE.md because hand-written option lists
- * drift into values no enum accepts, and it is written from experience — this function exists
- * because the widget's first version passed `insulation_level: 'average'` and `emitter: 'radiators'`
- * to a tool whose schema says `none|medium|modern|passive` and `underfloor|fan_coil|…`. Every call
- * failed, and it failed at the tool boundary where the visitor just sees a widget that does not
- * work. Reading the schema is the only version of this that cannot be wrong.
- */
+/** Project a tool's zod schema into the fields a form can render. */
 // deno-lint-ignore no-explicit-any
 export function fieldsFromSchema(schema: any): PublicToolField[] {
   const shape = schema?.shape ?? schema?._def?.shape?.();

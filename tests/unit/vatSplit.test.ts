@@ -1,19 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { splitByVatRate, splitGrossLikeTotals } from '../../src/modules/finance/utils/vatSplit';
 
-/**
- * Guards the bug this was extracted from (ORD-2026-0001).
- *
- * The order's "Pay" action pre-filled the Add Expense form with the supplier's OWED figure — a
- * VAT-INCLUSIVE number — into the form's "Subtotal (net)" box, with VAT hardcoded to 0. The IZIDA
- * line is 259.2 × €7 at 24%: €1,814.40 net + €435.46 VAT = €2,249.86 gross. With €2,200 paid the
- * remaining €49.86 landed as "net 49.86 / VAT 0.00", so the P&L cost was overstated and the input
- * VAT was lost. The sibling action ("Mark paid") had the opposite half of the same bug: it passed
- * the net and left VAT at 0, understating the total.
- *
- * Both are valid `number`s in valid fields, so nothing in the stack could see them. These two
- * functions are now the only arithmetic on that path.
- */
+/** Guards the bug this was extracted from (ORD-2026-0001). */
 describe('vatSplit', () => {
   describe('splitByVatRate — a line whose rate is known', () => {
     it('carries the line VAT instead of leaving it at zero', () => {

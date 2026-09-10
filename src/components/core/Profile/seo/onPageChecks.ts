@@ -1,26 +1,4 @@
-/**
- * The on-page check catalogue.
- *
- * Every audit already stores 52 boolean checks in `website_health_audits.onpage.checks`.
- * The panel showed only the FAILING ones as a list of issues, so a clean audit rendered
- * as an empty box — indistinguishable from an audit that never ran, and it never told
- * anyone what had actually been verified. "Tests seem like not have done anything or
- * reporting what is good and what is bad" is exactly that.
- *
- * So this turns the raw booleans into an INVENTORY: every check, passed or failed, with
- * a plain-language name and what the failure costs.
- *
- * POLARITY IS THE WHOLE PROBLEM. The provider does not return "pass/fail" — it returns a
- * fact, and whether that fact is good depends on the check:
- *
- *     is_https: true            GOOD  — the page is on HTTPS
- *     no_title: true            BAD   — the page has no <title>
- *     high_loading_time: true   BAD   — the page is slow
- *
- * Reading them all one way is how a dashboard congratulates a site for having no title.
- * `goodWhenTrue` is therefore mandatory per check, and an UNKNOWN key is reported as
- * unclassified rather than guessed — a wrong verdict is worse than an honest gap.
- */
+/** The on-page check catalogue. */
 
 export type CheckGroup = 'indexing' | 'content' | 'speed' | 'security' | 'markup' | 'links';
 

@@ -19,18 +19,6 @@ interface QuoteSettingsProps {
 /**
  * Quote settings: the expiration window (operator-only) and a rendered preview of the
  * workspace's PDF design.
- *
- * The four template slots are NOT edited here. They live on `workspace_pdf_templates`,
- * one row per workspace, and that row is the design for every presentation document —
- * quotes, catalogs, proformas, moodboard sheets. Its editor is Profile → Keys →
- * Document Templates (`WorkspacePdfTemplateCard`). This page used to carry a second
- * uploader over the same row and the same `quote-templates` bucket, which is not merely
- * redundant: it never wrote `cover_width`/`cover_height` (the renderer takes the PDF page
- * size and orientation from them, so a cover uploaded here kept the PREVIOUS cover's
- * dimensions), it uploaded the file undownscaled (pdf-lib decodes the whole image into
- * memory and a full-size PNG OOMs the PDF worker), and its delete removed a hardcoded
- * `quote-<slot>.png` path rather than whatever the column actually pointed at. One store,
- * one editor.
  */
 export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = false }) => {
   const { toast } = useToast();

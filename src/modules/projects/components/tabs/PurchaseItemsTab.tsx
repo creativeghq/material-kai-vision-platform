@@ -1,13 +1,6 @@
 /**
  * Project Purchase Items — made-to-order doors / windows (and other custom purchases) with a
  * structured measurement spec and a PDF generator (combined schedule + per-item spec sheets).
- *
- * Image handling (the key flow): a purchase item shows a real photo when LINKED to a catalog
- * product, otherwise it has NO photo until the user clicks "Generate image", which renders a
- * studio product shot of the configured door/window from its spec (generate-interior-gemini
- * `product-shot` mode). Either way `design_image_url` is what the purchase sheet embeds.
- *
- * Owner-only (operator/dealer/architect) — end-customer collaborators never reach this tab.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { formatMoney } from '@/utils/decimal';

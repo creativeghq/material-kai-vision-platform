@@ -1,20 +1,4 @@
-/**
- * AI Assessment — the things about it that are silent when broken (#397).
- *
- * One system, three subjects (project / finance / real estate). Every guard below exists because
- * the failure it catches is INVISIBLE — a wrong number is a valid number, a missing tile looks
- * like a tidy screen, an unregistered chunk looks like "done", a credit reserved after the call
- * is a free feature nobody notices until the bill, and a destination naming a tab that does not
- * exist opens a blank body.
- *
- *   1. SQL derives, TypeScript formats. The severity weights, the dimension scores and the
- *      verdict live in `score_assessment()` alone.
- *   2. ONE system, not three. Three copies of the claim, the action validation and the
- *      reserve/settle order is the shape this whole refactor exists to avoid.
- *   3. A destination is a promise the page keeps — per subject, against that subject's own page.
- *   4. Every dimension renders every time, for every subject.
- *   5. Reserve BEFORE the upstream call (invariant 10), refund on failure. Asserted on ORDER.
- */
+/** AI Assessment — the things about it that are silent when broken (#397). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

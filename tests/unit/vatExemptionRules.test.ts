@@ -1,16 +1,4 @@
-/**
- * The 0%-VAT exemption suggester.
- *
- * Neither Novus nor AADE derives the exemption cause — they only validate the one you send — so
- * this table is the platform's own reading of the rule, and it is the kind of thing that rots
- * silently: a wrong cause still produces a well-formed document, transmits fine, and is wrong only
- * on the tax return.
- *
- * What these tests pin is the SHAPE of the judgement, not tax advice: that the same destination
- * answers differently for goods and services, that an unverified VAT number is never treated as
- * B2B proof, that a missing country produces no suggestion rather than an invented cross-border
- * sale, and that anything uncertain is reported `low` so the UI cannot auto-apply it.
- */
+/** The 0%-VAT exemption suggester. */
 import { describe, expect, it } from 'vitest';
 
 import { suggestVatExemption } from '@/modules/finance/utils/vatExemptionRules';

@@ -4,23 +4,7 @@ import { join } from 'node:path';
 import { buildGapsGains, coversTerm, normalizeText, stemOf } from '../../supabase/functions/seo-api/handlers/gaps.ts';
 import { insertFaqEntry, isFaqHeading, faqPairsPresentIn } from '../../supabase/functions/seo-api/handlers/faq-insert.ts';
 
-/**
- * Two panels that looked finished and told the reader nothing true.
- *
- * GAPS/GAINS listed competitor PAGE TITLES. `Gap: ΨΑΡΑΔΕΛΛΗΣ | ΠΛΑΚΑΚΙΑ` meant "a rival's brand
- * name does not appear in your text", so acting on it meant writing about a competitor; and the
- * two figures beside every row —
- *
- *     competitorCount: 3,   // Approximate
- *     relevanceScore: 0.6,
- *
- * — were the same constants on every row of every article ever produced. Nothing could see it: a
- * hardcoded number is a valid number, and the panel rendered them faithfully.
- *
- * THE FAQ could not be added to at all. The only route in appended `## <question>` plus a TODO to
- * the BOTTOM of the document — after the conclusion, outside the FAQ block the viewer renders as
- * an accordion, and invisible to `faq_schema`, which is what a FAQPage rich result is built from.
- */
+/** Two panels that looked finished and told the reader nothing true. */
 
 const ROOT = process.cwd();
 const HANDLERS = join(ROOT, 'supabase/functions/seo-api/handlers');

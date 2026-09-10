@@ -1,24 +1,4 @@
-/**
- * Shape check for a body-supplied `article_plan`.
- *
- * `analyze` and `write` both took an `ArticlePlan` straight off the request body and
- * checked only that the KEY was present. `ArticlePlan` is a TypeScript interface, so
- * `body.article_plan` is typed `any` at the boundary and the compiler has nothing to
- * say — the first thing to notice a half-built plan was `plan.primaryKeyword
- * .toLowerCase()` throwing `Cannot read properties of undefined`, which the wrapper
- * turned into a 500. A malformed request is the CALLER's bug and must read as 400,
- * or every partial plan looks like a platform outage.
- *
- * The requirement is PER HANDLER and both lists live here, because the two read
- * overlapping but different fields: `analyze` reads slug/metaTitle/metaDescription,
- * `write` reads sections/lsiKeywords. Requiring the union would reject plans that
- * work today — a guard that fails a valid request is worse than the 500 it replaced.
- *
- * Deliberately NOT required by either list: `searchIntent` and `recommendedSchema`
- * (already optional-chained by their only readers) and `featuredSnippetTarget`
- * (nullable BY DESIGN — the type says `string | null` and `write` falls back to the
- * SERP signal). Validating a field the code handles as absent breaks working callers.
- */
+/** Shape check for a body-supplied `article_plan`. */
 
 interface PlanFieldSpec {
   readonly strings: readonly string[];

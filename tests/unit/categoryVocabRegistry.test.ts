@@ -1,25 +1,4 @@
-/**
- * The category vocabulary has ONE source, and no hand-written copy may reappear (#347 phase 3.4).
- *
- * There were FIVE copies of "which fine-grained material_category values exist":
- *   CATEGORY_FIELD_REGISTRY[*].controlled_vocab   (Python, deleted)
- *   stage_4_products.MATERIAL_CATEGORY_VOCAB      (Python, deleted)
- *   the hardcoded list inside _classify_product's prompt (deleted)
- *   material_categories.controlled_vocab          (the source)
- *   CATEGORY_DISPLAY_REGISTRY[*].controlledVocab  (TypeScript — this one)
- *
- * The TypeScript copy had drifted in BOTH directions, and the drift was load-bearing: it was
- * missing `carpet`, `door`, `window`, `fabric_swatch` and `leather_swatch` entirely, so a product
- * the extractor classified as one of those could not be resolved by `resolveUploadCategory()` at
- * all and rendered with the default display config instead of its category's. Nothing failed —
- * the product just quietly looked wrong.
- *
- * It is now `src/lib/categoryVocab.generated.ts`, a committed projection of the DB. This test
- * cannot check freshness against the database (CI has no credentials, and a test that skipped
- * without them would report green while enforcing nothing — same reasoning as
- * generationModelRegistry.test.ts). What it CAN enforce is that no second copy comes back, and
- * that the projection and the display registry agree about which categories exist.
- */
+/** The category vocabulary has ONE source, and no hand-written copy may reappear (#347 phase 3.4). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';

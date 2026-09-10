@@ -1,16 +1,4 @@
-/**
- * Opening a conversation must select the agent that OWNS it.
- *
- * A conversation row carries `agent_id`, and every deep link into the Hub
- * (`/agent-hub?conversation=<id>` — the bell notification, the daily job digest,
- * global search, the public KB) passes only that id. Nothing read the row's agent,
- * so the picker kept whatever was last active: the job digest opened its findings
- * under Vision, wearing Vision's avatar and model, and the first follow-up about a
- * job listing was sent to the interior designer.
- *
- * Nothing raises when this breaks — a wrong agent answers perfectly well — so it is
- * checked here at the source, where the three moving parts are visible together.
- */
+/** Opening a conversation must select the agent that OWNS it. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';

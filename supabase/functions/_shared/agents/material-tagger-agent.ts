@@ -1,30 +1,4 @@
-/**
- * Background Agent: Material Tagger
- *
- * Auto-tags materials with canonical structured attributes (color, material,
- * finish, application) for products that don't yet have populated attributes.
- *
- * What it does:
- *   1. Finds products with empty `attributes` (canonicalization hasn't run yet)
- *   2. Asks Claude Haiku to extract attribute values from name + description + metadata
- *   3. Routes the AI output through the `canonicalize-attributes` edge function
- *      so values land canonical English in `products.attributes` (and raw in
- *      `products.attributes_raw`)
- *
- * History: the previous version selected non-existent columns (material_type,
- * tags, image_url, category) and wrote tags to a missing top-level column,
- * which silently broke every run. Real attribute storage now lives in the
- * `attributes` jsonb column populated via the canonicalizer (PDF Stage 4 / XML
- * import / web scrape / catalog promote all flow through the same path); this
- * agent is the catch-up worker for products that arrived before canonicalization
- * was wired into their ingest path.
- *
- * Config params (background_agents.config):
- *   batch_size  number  Products per run (default 10, max 20)
- *   recanonicalize  boolean  If true, also re-tag products that already have
- *                            non-empty attributes (forces a re-run; use after
- *                            tuning the threshold or seeding new canonicals).
- */
+/** Background Agent: Material Tagger */
 
 import { loadPrompt } from '../prompt-utils.ts';
 import { runLangGraphAgent, logAgentAiUsage } from './base-agent.ts';
@@ -91,7 +65,6 @@ export class MaterialTaggerAgent implements AgentRunner {
       // we extract attributes from the available text — name + description
       // + any pre-extracted facets already in metadata. The canonicalizer
       // does the heavy lifting: even partial / messy values get normalized
-      // and clustered into existing canonicals.
       const metaSnippet = (() => {
         const m = (product.metadata || {}) as Record<string, unknown>;
         const keep = ['material_category', 'available_colors', 'finish', 'style', 'application', 'room', 'socket', 'light_color', 'mounting_type'];

@@ -1,26 +1,4 @@
-/**
- * Catalog-authority guard (#324).
- *
- * The bug this exists to stop: a verified manufacturer publishes a price and it lands on every
- * buyer's negotiated cost. `supplier_products.cost` is what THIS workspace agreed to pay THAT
- * supplier — two workspaces legitimately hold different costs for the same SKU — so a global
- * write would silently erase every negotiated contract on the platform, while every row stayed
- * a perfectly valid number. No integrity check on stored data can see that, and no typecheck can
- * either.
- *
- * The design instead is: publishing writes the factory's ASK onto the shared master row and
- * notifies the operator. `accept_master_price` is the only route to a real cost, it is
- * operator-gated, and it writes the root workspace alone.
- *
- * SCOPE — read this before assuming a clean run means the invariant holds.
- * These tests scan REPO FILES, so they see only the TypeScript half. This project's SQL is
- * applied through the Supabase MCP and never committed as a file (CLAUDE.md), so an RPC body
- * lives only in `pg_proc` and is invisible here. The SQL half is guarded in SQL by the
- * `catalog.publish_writes_cost` integrity check
- * (`dic_detect__catalog_publish_writes_cost`), which fails if a `publish_*` function writes a
- * cost column or if `accept_master_price` stops restricting its write to the root workspace.
- * A green `npm test` says nothing about that half.
- */
+/** Catalog-authority guard (#324). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

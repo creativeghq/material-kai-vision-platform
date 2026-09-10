@@ -29,21 +29,7 @@ import { Sparkline } from './seo/Sparkline';
 import { timeAgo } from '@/utils/datetime';
 import { compact } from './seo/seoMetrics';
 
-/**
- * Websites → AI Visibility.
- *
- * The LLM reporting surface. 636 probes across three models already existed in
- * `llm_mention_probes` and had no home on the website dashboard at all — this is
- * where that work becomes readable.
- *
- * The single most important thing this screen does is REFUSE TO REPORT A FAILED
- * MODEL AS ZERO. Every `gpt-4o-mini` probe in the stored set returned HTTP 429.
- * Counted the naive way — mentions ÷ probes sent — that model reads "0% share of
- * voice", which a person correctly interprets as "AI assistants never mention
- * us" and incorrectly acts on. The share is measured against probes that
- * ANSWERED (`get_website_ai_visibility`), a model with nothing to divide by
- * reports "No verdict", and the reason is printed next to it.
- */
+/** Websites → AI Visibility. */
 
 /** A model's own display name. Never invent a vendor label we cannot verify. */
 function modelLabel(model: string): string {
@@ -75,17 +61,7 @@ function ShareCell({ share, note }: { share: number | null; note: string | null 
   );
 }
 
-/**
- * The feed's own health, above its numbers.
- *
- * Without this the panel shows a confident share-of-voice figure computed from
- * data that stopped arriving six weeks ago, because every subject is switched off
- * and the nightly cron has been succeeding with nothing to do. A dashboard that
- * cannot say "this stopped" is not reporting, it is decorating.
- *
- * Each diagnosis carries the ONE action that resolves it — a banner that explains
- * a problem and leaves the reader to find the fix elsewhere is only half of it.
- */
+/** The feed's own health, above its numbers. */
 function MonitoringBanner({
   state, busy, onTrack, onTurnOn, onRun,
 }: {

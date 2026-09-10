@@ -9,27 +9,7 @@ import {
   isEmploymentType, isAbsenceType, isLocationType, isSeparationType,
 } from '@/modules/hr/hrVocabulary';
 
-/**
- * The HR vocabularies exist ONCE, and equal their CHECK constraints (#391).
- *
- * Eight sets were typed out across ten files — two to six copies each — agreeing only by
- * memory. The database is the enforcer, so a copy that drifts WIDER makes the UI offer a
- * value the write rejects with a raw `23514` naming a constraint the user has never heard
- * of; a copy that drifts NARROWER makes a legitimate value vanish from a dropdown with
- * nobody able to tell.
- *
- * WHY THIS TEST DOES NOT CARRY ITS OWN COPY OF THE VALUES
- * -------------------------------------------------------
- * That is the failure mode #391 names explicitly: a previous guard for this exact shape
- * "carried its own fourth copy of the list, hand-edited in the same commit as the other
- * three". A test whose pin you edit alongside the thing it pins can only ever catch
- * INCONSISTENCY, never INCORRECTNESS.
- *
- * So the values below are asserted against the CONSTRAINT TEXT, quoted verbatim from
- * `pg_constraint` on 2026-08-27. That string is not something anyone edits casually while
- * changing a dropdown, and if the constraint moves the fix is a migration plus a source
- * edit in one commit — which is the rule this file enforces.
- */
+/** The HR vocabularies exist ONCE, and equal their CHECK constraints (#391). */
 
 const ROOT = join(__dirname, '..', '..');
 

@@ -1,13 +1,6 @@
 /**
  * Price alert history — what the notification dispatcher actually fired, for whom, and whether
  * every channel got through.
- *
- * This was a hardcoded empty state with a "New Alert" button that did nothing: it always read
- * "No price alerts configured yet" even when alerts had fired. It now reads `price_alert_log`
- * (RLS: your own rows, or everything for an admin). There is deliberately no create action —
- * an alert is not a standalone object. Which alerts fire is a per-tracked-product setting
- * (`tracked_queries.alert_on_price_drop` / `_new_retailer` / `_promo` + `alert_channels`),
- * edited on that product's Monitoring tab.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Bell, Loader2, RefreshCw } from 'lucide-react';

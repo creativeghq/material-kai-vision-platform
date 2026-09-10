@@ -1,17 +1,4 @@
-/**
- * Background Agent: Social Analytics Sync
- *
- * Syncs post-level analytics from Zernio for all published social_posts
- * that haven't been synced in the last 2 hours.
- *
- * Runs every 2 hours via pg_cron.
- * Processes posts in batches of 20 to avoid Zernio rate limits.
- *
- * Config params (background_agents.config):
- *   batch_size         number   Posts per run (default 20, max 50)
- *   min_age_hours      number   Only sync posts published at least N hours ago (default 1)
- *   stale_after_hours  number   Re-sync if last synced > N hours ago (default 2)
- */
+/** Background Agent: Social Analytics Sync */
 
 import type { AgentRunner, AgentRunContext, AgentRunResult } from '../../../agents/types.ts';
 import { ZERNIO_BASE_URL, zernioKey, ensureZernioSecrets } from '../../../zernio.ts';

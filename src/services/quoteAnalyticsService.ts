@@ -1,23 +1,4 @@
-/**
- * Quote Analytics Service
- *
- * Tracks how quotes are viewed and downloaded so admins can see engagement
- * per quote (QuoteAnalyticsPanel on /quotes/manage/:id).
- *
- * Mirrors manufacturerAnalyticsService: batched (flush every 5s or at 20
- * events), fire-and-forget, never blocks the UI, silently re-queues on
- * transient failure.
- *
- * Events for ANONYMOUS public-link views/downloads are NOT written here —
- * those go through the `quote-public-share` edge function (service role),
- * since anonymous browsers can't satisfy the authenticated-insert RLS policy.
- *
- * Table (see migration `quote_view_analytics_and_public_share`):
- *   quote_analytics_events(id, event_type, view_context, quote_id, user_id,
- *                          session_id, source_page, metadata, created_at)
- *   event_type   ∈ 'viewed' | 'previewed' | 'downloaded'
- *   view_context ∈ 'customer' | 'admin' | 'public' | 'preview'
- */
+/** Quote Analytics Service */
 
 import { supabase } from '@/integrations/supabase/client';
 

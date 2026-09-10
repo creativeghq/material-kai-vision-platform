@@ -1,15 +1,4 @@
-/**
- * Social analytics — posts, their metrics, and account-level insights.
- *
- * This surface did not exist. `social_posts`, `social_post_analytics` and `social_account_insights`
- * were written by the publish path and by two background agents every 2h/24h, Zernio's analytics
- * add-on was being paid for, and nothing in `src/` rendered any of it: the capability registry
- * carried `social-post` with NO pageRoute, formally logged as a gap. Asking the agent was the only
- * way to see a number you had already collected.
- *
- * Numbers here are READ, never re-derived: `engagement_rate` is what Zernio reported for that post,
- * not likes+comments over reach computed a second time in TypeScript.
- */
+/** Social analytics — posts, their metrics, and account-level insights. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { BarChart3, RefreshCw, Loader2, Users, Eye, Heart, MessageCircle, Share2, AlertTriangle, ExternalLink } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -100,16 +89,6 @@ interface AccountRow {
 /**
  * What a connected account can actually answer, which is NOT the same question for a member
  * profile and a business page.
- *
- * Nearly everything on this screen is derived from a POST LIST — per-post engagement, the decay
- * curve, cadence-vs-engagement, the daily rollup. LinkedIn publishes no listing API for a
- * personal profile, so for a member account every one of those is empty by construction, and
- * rendering them anyway produces a screen of blank panels that reads as breakage. It also costs
- * three Zernio round trips per load to fetch nothing.
- *
- * What a member account HAS instead is the aggregate LinkedIn computes server-side, which needs
- * no post list at all — and which includes saves and sends, two figures a business page can
- * never return. So this is a fork in the road, not a ladder.
  */
 interface AccountCapabilities {
   /** The platform will enumerate this account's posts, so post-derived views have input. */

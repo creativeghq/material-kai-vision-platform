@@ -1,24 +1,4 @@
-/**
- * Guard: the embed BUILDER's two rules (#337).
- *
- * The builder asks "what are you after?" and ends in one of two places — a price, or a quote
- * request. Which one it shows is not a presentation choice, it is the whole contract:
- *
- *   1. A PRICE APPEARS ONLY ON AN EXACT MATCH. The server prices exact matches and deliberately
- *      returns near matches WITHOUT a price, because a near match is a suggestion and not an offer.
- *      If the widget renders a number next to a near match — or worse, derives one — it has quoted
- *      a merchant's customer a figure the merchant never agreed to, on the merchant's own page.
- *      That is the money-derivation rule (CLAUDE.md: SQL derives, TypeScript formats) arriving at
- *      the last hop, where it is easiest to break and hardest to notice.
- *
- *   2. NO MATCH IS NOT A DEAD END. "Nothing in the catalogue matches that" must always land on the
- *      quote form. A builder that shows an empty result for an unstocked spec throws away the lead
- *      the feature exists to capture, and would look like a bug rather than a decision.
- *
- * Source-level rather than behavioural: the builder is a custom element and the suite runs on the
- * `node` environment with no DOM, so mounting it would mean adding jsdom for one file. Both rules
- * are fully visible in the text — the same trade `embedShellIntegrity` makes.
- */
+/** Guard: the embed BUILDER's two rules (#337). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -278,20 +258,7 @@ describe('the embed builder cannot call the API without its key', () => {
   });
 });
 
-/**
- * Deep-link mode (#341 join 6) — `<materialkai-builder product-id="…">`.
- *
- * The program shipped two components and asked merchants to choose between them. They are one
- * entry with two modes: naming a product is the first question already answered. The distinction
- * is what gets deleted here, not the product widget — that still exists and is still what mounts
- * inside, on a match and on this path.
- *
- * Two ways this breaks quietly, both guarded below:
- *   • the wizard renders anyway, so a page about ONE product opens by asking what the visitor is
- *     after — and the verdict heading answers a question nobody asked;
- *   • the vocabulary is fetched regardless, spending a request (and a slice of the key's rate
- *     limit) on chips that are never drawn.
- */
+/** Deep-link mode (#341 join 6) — `<materialkai-builder product-id="…">`. */
 describe('the embed builder is also the deep link', () => {
   // `method()` matches `private …` declarations; connectedCallback is a public lifecycle hook.
   // Loosening that helper to make `private` optional would make it match CALL sites (`this.render(`)

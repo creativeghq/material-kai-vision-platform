@@ -1,37 +1,4 @@
-/**
- * Which of the platform's derived reads can the agent actually see?
- *
- * WHY THIS EXISTS
- * ---------------
- * On 2026-09-05 the agent answered "which keywords does materialshub.gr rank for" from a
- * third-party index while `get_website_rank_summary` (129 keywords, checked 35 minutes earlier)
- * and `get_gsc_summary` (Search Console, synced that morning) sat in the database with no tool in
- * front of them. Running this the same afternoon found the shape everywhere: the Websites
- * dashboard alone derived 16 verdicts in SQL and the agent could reach 4. A derived read with no
- * tool is data the platform paid to compute and the agent cannot use — so it guesses, or reaches
- * for a paid upstream that knows less.
- *
- * HOW IT WORKS
- * ------------
- *   exposed  = every `rpc('name')` in supabase/functions/_shared/tools/*.ts   (scanned from source)
- *   inventory = public.agent_data_coverage(exposed)                             (pg_proc, classified)
- *   gap       = inventory rows with kind = 'derived_read' and exposed = false
- *
- * The committed baseline (.github/agent-data-coverage-baseline.json) records the exposed set and
- * every known gap WITH A REASON — "todo: …" is a recorded intention, "unreviewed" is not a reason.
- * tests/unit/agentDataCoverage.test.ts holds the baseline to the source (an RPC a tool now reads
- * must leave the gap list; a reason must exist), and this script holds it to the DATABASE (a new
- * derived read with no tool exits 1 until someone decides).
- *
- * NOTE: deliberately no `#!` shebang — the test imports `scanExposedRpcs` through Vite.
- *
- * USAGE
- *   node scripts/audit-agent-data-coverage.mjs                    report; exit 1 on undecided gaps
- *   node scripts/audit-agent-data-coverage.mjs --write-baseline   rewrite the baseline (keeps reasons)
- *   node scripts/audit-agent-data-coverage.mjs --sql              print the SELECT for the SQL editor
- * Env (not needed for --sql): SUPABASE_URL, SERVICE_ROLE_KEY or SUPABASE_SERVICE_ROLE_KEY.
- * The service-role key lives only on the MIVAA host; run there, or use --sql and paste.
- */
+/** Which of the platform's derived reads can the agent actually see? */
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

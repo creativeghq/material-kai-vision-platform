@@ -397,16 +397,7 @@ class HrService {
       sb.from('vw_hr_employee_absence_summary').select('*').eq('workspace_id', workspaceId),
     ]);
     if (error) throw error;
-    /**
-     * The absence summary is not optional (#354 HR-10).
-     *
-     * Only the employees read was checked. When the summary read failed, `sums` was null, the map
-     * was empty, and every fallback below produced a plausible wrong number: 0 absence days taken,
-     * nobody on leave today, and — worst — `remaining_leave_days` falling back to the FULL annual
-     * allowance. Maria with 20 days and an approved 5-day absence reads 20 remaining, and someone
-     * approves leave she does not have. A swallowed read that yields a believable number is worse
-     * than one that yields an empty screen.
-     */
+    /** The absence summary is not optional (#354 HR-10). */
     if (sumErr) throw sumErr;
     const byId = new Map((sums ?? []).map((s: any) => [s.employee_id, s]));
     const employees = (emps ?? []).map((e: any) => {

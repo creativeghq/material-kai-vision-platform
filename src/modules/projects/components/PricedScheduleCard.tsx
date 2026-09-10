@@ -1,15 +1,4 @@
-/**
- * The priced schedule — a bill of quantities.
- *
- * Line totals come from the database. `amount` is a generated column, so this component displays
- * it and never multiplies quantity by rate itself: that product is a money quantity with exactly
- * one implementation, and a second one in the browser would be free to round differently.
- *
- * The schedule marked CONTRACT is the project's contract sum once accepted, and the CVR then
- * ignores accepted quotes entirely. That is stated on screen rather than left implicit, because
- * "which number is this job worth" having two possible sources is precisely the confusion the
- * precedence rule exists to remove.
- */
+/** The priced schedule — a bill of quantities. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, Plus, Trash2, ListOrdered, Check } from 'lucide-react';
 

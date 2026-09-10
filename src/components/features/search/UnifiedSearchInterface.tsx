@@ -317,13 +317,6 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
       // color, texture, style, and material searches.
       searchResponse = await UnifiedSearchService.searchMultiVector({
         // Send the user's words, or nothing. Never the filename.
-        //
-        // This used to fall back to `selectedImage.name` (or the literal "texture_search"),
-        // and the backend embedded that string into every text-derived channel — 41.5% of the
-        // ranking in the balanced profile was `voyage("IMG_2831.jpg")`. An empty query is now
-        // valid when an image is attached, and MIVAA answers it from the image instead:
-        // vision analysis fills the aspect and understanding vectors, and the text-only
-        // channels stand down rather than matching against a fabricated string.
         query: effectiveQuery.trim(),
         workspace_id: workspaceId,
         limit: 15,

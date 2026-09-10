@@ -1,22 +1,4 @@
-/**
- * A CRM party is a company OR a person, and every surface has to believe both.
- *
- * TWO DEFECTS THIS EXISTS FOR
- * ---------------------------
- * 1. **Contact-only counterparties.** The whole real-estate module was written with
- *    `*_contact_id` and no company twin, so a COMPANY could not be a vendor, a buyer, a landlord
- *    or a tenant — in a product sold to Greek construction and property firms. Nothing failed:
- *    the column simply did not exist, the UI only ever offered a person picker, and the gap was
- *    invisible until somebody asked why a company's record was empty (#376).
- *
- * 2. **A branch nobody added.** `get_party_work` is a UNION, and the party Work tab renders
- *    whatever it returns. A new party-linked table that nobody adds a branch for does not error —
- *    it just never appears, for every party, forever. That is the silent-zero shape: a plausible
- *    empty list and no signal at all.
- *
- * Both are checked against the SOURCE, not the live DB, because the repo is what CI has. The live
- * half is covered by `check_security_invariants()` and the migration itself.
- */
+/** A CRM party is a company OR a person, and every surface has to believe both. */
 import { describe, expect, it } from 'vitest';
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';

@@ -8,12 +8,6 @@ import { hasCreds, serviceClient, createUser, createWorkspace, addMember, teardo
 // so by the time the child trigger ran `is_workspace_writable()` found no workspace and coalesced
 // the missing row to false: "already deleted" was indistinguishable from "disabled" and the guard
 // aborted its own cascade. Any workspace holding a single order became undeletable — offboarding
-// and erasure included, not just the CI fixtures where it surfaced (40 leaked in one day).
-//
-// The failure was invisible from every angle that was being watched: the suites' own teardown
-// warns but never fails, and the nightly reaper returns `workspaces_blocked` in a jsonb nobody
-// reads while pg_cron records "succeeded". So assert the WORLD — that the row is gone — rather
-// than that the delete call returned no error, which is exactly what it did all along.
 const suite = hasCreds ? describe : describe.skip;
 
 suite('workspace delete · cascade past the disabled-workspace guard', () => {

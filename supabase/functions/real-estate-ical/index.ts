@@ -1,20 +1,4 @@
-/**
- * real-estate-ical — the two halves of short-let channel sync.
- *
- *  GET  ?token=…      the availability feed a channel (Airbnb, Booking.com, Vrbo) pulls from us.
- *  POST (cron auth)   pulls every active channel link's .ics and imports the bookings it holds.
- *
- * Channels all speak iCalendar and nothing else — no per-channel API, no partner approval — so this
- * one function is the whole integration.
- *
- * SECURITY:
- *  • The GET is anonymous and authorised solely by the per-listing `ical_token`. It publishes BLOCKED
- *    NIGHTS ONLY: no guest name, email or price. The URL is a bearer capability handed to third
- *    parties, and who is staying where is not theirs to have.
- *  • The POST fetches operator-supplied URLs, so every one goes through the shared SSRF guard again
- *    at read time — validating only at write time would leave a stored URL that later resolves
- *    somewhere internal (invariant 7).
- */
+/** real-estate-ical — the two halves of short-let channel sync. */
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';

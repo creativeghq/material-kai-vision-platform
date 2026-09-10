@@ -1,16 +1,4 @@
-/**
- * The public price, and the one way it goes wrong.
- *
- * A price on a marketing page is a money quantity with two possible sources: the plans that bill,
- * and a number somebody typed into a component. The second one is the drift anti-regression rule 1
- * exists to prevent, and here it has a sharper edge than usual — a stale figure on a public page is
- * not an inconvenience, it is a quote the checkout will not honour, and it is what a customer
- * screenshots.
- *
- * So: the page reads `get_public_pricing()`, and when that fails it shows NO price rather than a
- * fallback. The same rule as everywhere else in this codebase — a value, or a stated reason there
- * is no value, never a plausible default.
- */
+/** The public price, and the one way it goes wrong. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

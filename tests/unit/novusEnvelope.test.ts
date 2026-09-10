@@ -1,28 +1,4 @@
-/**
- * What the myDATA envelope has to say for the provider to accept it at all.
- *
- * Every assertion here was WRITTEN FROM A REJECTION the Novus sandbox actually returned on
- * 2026-09-06 (issue #319, the first time anything was transmitted). Until that pass,
- * `fiscal_submissions` had zero rows and the whole path looked healthy: the connector was
- * shipped, the settings card said the key was configured, and nothing had ever asked the
- * provider a question. It turned out that **no document of any kind could be transmitted**, and
- * each cause produced a plausible-looking failure rather than a loud one:
- *
- *   - `paymentMethodInvoiceLabel` was never sent. Mandatory → HTTP 400 on EVERY document.
- *   - the summary's `incomeClassification` was one entry for the whole net value, so any invoice
- *     whose lines carried two different classifications was refused (311/312/321) — which is
- *     exactly what the builder's own per-product classification feature produces.
- *   - a movement document (9.3) was sent as an invoice with zero totals: `paymentMethods` and
- *     `currency` are FORBIDDEN there (205), `itemDescr` + `measurementUnit` are mandatory (230),
- *     issuer/counterpart names are mandatory (204), and its classification is `category3`.
- *   - `fetchTransmitted` — the offline-recovery path's only way to learn a final MARK — omitted
- *     the mandatory `issuedFrom`/`issuedTo` (400 every time) and then parsed the wrong envelope,
- *     so a healthy queued document read as `rejected`. Since #193 that verdict CONDEMNS the
- *     document after a 6h grace.
- *
- * The shape of all four is the same: a wrong envelope is a valid envelope, so no typecheck and
- * no integrity probe could see it. Only the provider could, which is why these are pinned here.
- */
+/** What the myDATA envelope has to say for the provider to accept it at all. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

@@ -1,25 +1,4 @@
-/**
- * Every chunk a tool emits reaches the screen as something (#395).
- *
- * CLAUDE.md states the rule — "Every new tool's `onChunk` type MUST be registered in
- * `AGENT_RESULT_TITLES` in `AgentHub.tsx`, or the output is silently dropped" — and two guards
- * already cover parts of it: `toolkitCoverage` checks the `run:` quick-starts, and
- * `seoCardCoverage` checks that a `seo_*_card` has a branch in `SEOGenericCard`.
- *
- * What neither covers is the whole set. AgentHub routes a chunk one of three ways:
- *
- *   1. `seo_*_card`   → `SEOGenericCard`, content derived FROM the type (never blank)
- *   2. `catalog_*`    → a hand-written if/else chain that builds a sentence
- *   3. everything else → `AGENT_RESULT_TITLES[chunk.type]`
- *
- * A type matching none of the three is dropped in silence, and route 2 has its own version of
- * the same failure: `let line = ''` followed by `else if` arms, so a catalog chunk with no arm
- * renders an assistant bubble with NO CONTENT. The work happened; the screen says nothing.
- *
- * Both directions are checked, because the reverse — a title for a chunk nothing emits — is the
- * dead-branch shape `seoCardCoverage` was written to catch after 14 SEO types reached the chat as
- * `JSON.stringify(data)` while sitting in a map that looked complete.
- */
+/** Every chunk a tool emits reaches the screen as something (#395). */
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -121,28 +100,7 @@ describe('#395 — a tool chunk is never dropped in silence', () => {
   });
 });
 
-/**
- * The canvas has TWO registries and they have to agree.
- *
- * `getCanvasArtifact` decides which messages get a canvas TAB; `renderCanvasArtifact` decides
- * what is DRAWN for the active one, falling back to `renderDataCardBody`. The canvas only ever
- * renders a message that got a tab, so the two can disagree in both directions and neither
- * throws:
- *
- *   • a renderer with no tab is DEAD CODE. `KitchenCostResultCard` had a branch in
- *     `renderCanvasArtifact` from the day the canvas shipped and no entry in `getCanvasArtifact`,
- *     so the kitchen calculator was the one of three that could never open full-width. Reading
- *     `renderCanvasArtifact` alone, it looked handled.
- *
- *   • a tab with no renderer opens a BLANK PANE. `inputRequestData` got an artifact kind, a tab
- *     and a chat-stream chip in #370 — and `ClarifyCard` had exactly one call site, inside the
- *     stream's `canvasShown ? chip : card` ternary. So with the canvas open (the default) every
- *     agent follow-up question showed a chip saying "Needs your input", opened an empty canvas,
- *     and could not be answered. The fallback returns null for a field it does not know, which
- *     renders as nothing rather than as an error.
- *
- * Both directions, because each looks like coverage from the other side.
- */
+/** The canvas has TWO registries and they have to agree. */
 describe('the canvas tab registry and the canvas renderer agree', () => {
   // A field that HEADS its own branch — `if (message.x)`. A field mentioned INSIDE another
   // branch is a companion, not an artifact: `searchSpec` rides along with the products it

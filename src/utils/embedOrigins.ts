@@ -1,13 +1,4 @@
-/**
- * Origin-list helpers for embed keys (#321 M1, #258).
- *
- * Deliberately free of any Supabase import. These are the frontend half of a contract whose other
- * half is `supabase/functions/_shared/cors.ts`, and
- * [tests/unit/embedKeyOrigins.test.ts](../../tests/unit/embedKeyOrigins.test.ts) imports BOTH to
- * prove they agree. Living in `embedKeysService` put them behind a module-load client that throws
- * without env, so the parity test could not reach them — the guard would have been skipped for the
- * usual reason guards get skipped: it was inconvenient.
- */
+/** Origin-list helpers for embed keys (#321 M1, #258). */
 
 /**
  * Normalize what a human typed into an origin list.

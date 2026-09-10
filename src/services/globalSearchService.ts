@@ -1,23 +1,5 @@
 /**
  * The top-bar search palette's data layer — "find me anything in this workspace".
- *
- * Before this, the palette searched exactly two things: product NAMES and nav-item LABELS. So a
- * query that was neither — a person, a customer, an order number — matched nothing, and the only
- * item left standing in the palette was the "Smart search materials" action. cmdk highlights the
- * first item, so Enter ran it: type a colleague's name, land on the product catalogue. The
- * conversion was silent and there was no general search anywhere to fall back to (`/search` and
- * `/search-hub` both redirect to the product smart search).
- *
- * Everything now comes from ONE round trip — `public.global_search`, a SECURITY INVOKER function,
- * so each table's existing RLS stays the tenancy boundary and the palette can never surface a row
- * the caller could not already fetch. `kinds` narrows what is asked for; it is a filter for the
- * persona's surfaces, never an authorization gate.
- *
- * The KIND CATALOGUE — what can be found, where each kind opens, and the gates that must hold
- * first — lives in `@/config/searchKinds` and is re-exported here unchanged. It moved because the
- * agent result cards need the same answers to make a tool's rows openable, and a config module
- * must not import the Supabase client to get them.
- *
  * @see tests/unit/globalSearchKinds.test.ts — holds the catalogue honest.
  */
 import { supabase } from '@/integrations/supabase/client';

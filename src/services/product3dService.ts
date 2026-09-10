@@ -1,13 +1,4 @@
-/**
- * Product 3D models (#321 asset foundation).
- *
- * One row per (product, format) in `product_3d_models`: glb/gltf feed the web
- * viewer, usdz feeds iOS AR Quick Look. Files live in `generation-images` under
- * the entity-scoped `3d/{product_id}/` prefix (same carve-out as `pbr-maps/` —
- * the model's lifecycle follows the product, not a session). The table is
- * registered in `build_storage_reference_set()`, so a live row protects its
- * file from the storage-orphan cron; deleting the row releases the file for GC.
- */
+/** Product 3D models (#321 asset foundation). */
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
 import { safeStorageName } from '@/utils/storagePaths';

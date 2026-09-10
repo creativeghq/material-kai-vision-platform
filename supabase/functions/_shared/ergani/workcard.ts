@@ -4,8 +4,6 @@
 // The punch row is ALWAYS written (works as internal attendance even before Ergani is set up):
 //   - Ergani configured + employee has VAT → filed, punch.status='submitted' + protocol.
 //   - otherwise → punch.status='pending', filed=false, `reason` explains why.
-// opts.requireErgani (admin explicitly clicked "file") makes a missing config / VAT / Ergani error
-// throw instead of degrading to a local-only punch.
 
 import { HttpError } from '../api-logger.ts';
 import { resolveErganiCredentials, submitDocument, ErganiApiError } from './client.ts';

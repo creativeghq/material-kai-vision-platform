@@ -1,20 +1,7 @@
 import type { LucideIcon } from 'lucide-react';
 import type { Capability } from '@/auth/capabilities';
 
-/**
- * Universal entity templates (issue #322) — the adapter contract.
- *
- * A template is a NAMED, reusable starting point for a record: "50% deposit invoice",
- * "Interior fit-out project", "Client presentation moodboard". It generalizes what #242 built
- * for blueprints only, and replaces the scattered "duplicate this record" buttons
- * (`financeService.duplicateInvoice`, `ordersService.duplicate`, `moodboardSheetsService.duplicate`)
- * which can only copy something you already made.
- *
- * ONE table (`entity_templates`) discriminated by `entity_type`; the per-type knowledge lives
- * here, in one adapter each. Adding a type = one adapter + one value in the DB CHECK constraint
- * `entity_templates_entity_type_check` — a two-copy system, so it is guarded by
- * tests/unit/templateRegistry.test.ts.
- */
+/** Universal entity templates (issue #322) — the adapter contract. */
 
 /** Must stay identical to the DB CHECK `entity_templates_entity_type_check`. */
 export type TemplateEntityType =
@@ -30,22 +17,7 @@ export type TemplateEntityType =
   | 'property_listing'
   | 'inspection';
 
-/**
- * Field-name fragments a template payload must NEVER carry, whatever the entity.
- *
- * Three separate hazards, one list:
- *  - **identity / state** — ids, owners, `status`, timestamps. A template that carries them
- *    re-creates a record that claims to be the original.
- *  - **fiscal / secrets** — `fiscal_*`, `legal_number`, MARK, `*_token`. A myDATA-transmitted
- *    invoice cloned WITH its mark is a fake legal document; a cloned share token grants a
- *    stranger access to the new record.
- *  - **derived money** — `total`, `vat_amount`, `amount_paid`, … Storing a computed total in a
- *    template is a second derivation of a money quantity, exactly the shape
- *    tests/unit/moneyDerivation.test.ts exists to stop. Lines are captured; totals are recomputed
- *    by the ordinary create path.
- *
- * Enforced against every adapter's declared fields by tests/unit/templateRegistry.test.ts.
- */
+/** Field-name fragments a template payload must NEVER carry, whatever the entity. */
 export const FORBIDDEN_CAPTURE_FIELDS = [
   // identity / ownership / lifecycle
   'id', 'workspace_id', 'user_id', 'created_by', 'updated_by', 'created_at', 'updated_at',

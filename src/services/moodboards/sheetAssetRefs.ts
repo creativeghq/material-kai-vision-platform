@@ -1,16 +1,4 @@
-/**
- * How a presentation sheet NAMES an image it owns (#392).
- *
- * A sheet's layout used to store absolute URLs into `generation-images`, a PUBLIC bucket, so
- * revoking the share token revoked nothing: whoever kept a URL kept the image. Sheets now hold a
- * private copy of every image they show, in `sheet-assets/<sheet_id>/`, named by a string ref that
- * goes exactly where the URL went.
- *
- * IMPORT-FREE ON PURPOSE. Both runtimes need these five, and Vite resolves `@/` while Deno
- * resolves by URL — so this is the source and `_shared/sheetAssetRefs.generated.ts` is a byte
- * copy written by `npm run vocab:mirror`. Never hand-edit the mirror, and never add an import
- * here: one makes the copy unbuildable on the other side.
- */
+/** How a presentation sheet NAMES an image it owns (#392). */
 
 export const SHEET_ASSET_BUCKET = 'sheet-assets';
 export const SHEET_ASSET_SCHEME = 'sheet-asset://';

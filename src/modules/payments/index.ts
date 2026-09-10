@@ -34,8 +34,6 @@ const definition: ModuleDefinition = {
   // Business — legal entity printed on invoices + used as Stripe statement
   //   descriptor source. Single source of truth on finance_settings.
   // Providers — lists every enabled module with provides.payments=true.
-  // Invoicing — built-in invoice numbering + design. Defers to an ERP when
-  //   one is enabled (provides.invoicing=true wins single-provider race).
   settingsPanels: [
     { id: 'business', label: 'Business', icon: Building2, component: BusinessDetailsPanel },
     { id: 'providers', label: 'Providers', icon: CreditCard, component: ProvidersPanel },

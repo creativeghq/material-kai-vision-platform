@@ -2,13 +2,6 @@
  * Sellable services. A service is a `products` row with item_type='service'
  * (no stock, no image suite) so it reuses the pricing/line/myDATA machinery. Price lives
  * in product_prices (per workspace); myDATA VAT + income classification live on the product.
- *
- * ONE store, two doors. Finance → Settings → Services manages the workspace's whole list
- * (fiscal classification included). Profile → Services is the SAME rows filtered to the ones
- * a member has listed on their public profile (`products.profile_user_id`), edited through
- * self-guarding RPCs because a profile owner is often a plain member and products
- * UPDATE/DELETE RLS is admin/owner only. There used to be a second store — a jsonb blob on
- * `user_profiles` with a free-text price — that no invoice could ever read.
  */
 import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';

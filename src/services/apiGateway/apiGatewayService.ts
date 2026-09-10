@@ -35,14 +35,10 @@ export interface ApiUsageLog {
  *  every request; no admin view needs more than this at once. */
 const DEFAULT_USAGE_LOG_LIMIT = 500;
 
-//: The columns a LIST needs. Deliberately not `select('*')` (#390): that returned
-//: `api_key`, which held the credential in directly usable form — so a global admin
-//: calling `getAllApiKeys()` dumped every partner's working key into a browser, and a
-//: user's own key came back on every list rather than once at creation.
-//:
-//: The column is hashed and `key_prefix` is what a human identifies a key by. Naming
-//: the columns is also what makes the next column added to this table a decision
-//: rather than an automatic disclosure.
+// : The columns a LIST needs. Deliberately not `select('*')` (#390): that returned
+// : `api_key`, which held the credential in directly usable form — so a global admin
+// : calling `getAllApiKeys()` dumped every partner's working key into a browser, and a
+// : user's own key came back on every list rather than once at creation.
 const API_KEY_LIST_COLUMNS =
   'id, user_id, key_name, key_prefix, is_active, rate_limit_override, allowed_endpoints, expires_at, last_used_at, created_at, updated_at';
 
@@ -187,19 +183,6 @@ class ApiGatewayService {
 
   // `generateSecureKey` was deleted here (#390), and it is worth saying why rather than
   // just that it moved.
-  //
-  // It was named "secure" and built the key from `Math.random()`:
-  //
-  //     result += chars.charAt(Math.floor(Math.random() * chars.length));
-  //
-  // `Math.random()` is not a CSPRNG. V8 seeds it from a 128-bit xorshift state that an
-  // attacker who observes enough output can recover, and it was never intended to
-  // produce secrets. So the partner keys issued by this method are not merely stored in
-  // plaintext — they are PREDICTABLE, which is why hashing them is necessary but not
-  // sufficient and the live keys need rotating rather than just re-storing.
-  //
-  // Generation now happens in `create_api_key`, which uses `gen_random_bytes` — a real
-  // CSPRNG — and never lets the plaintext leave the one statement that returns it.
 }
 
 export const apiGatewayService = new ApiGatewayService();

@@ -1,16 +1,4 @@
-/**
- * TrackSubjectDialog — start tracking a brand or keyword.
- *
- * `createTrackedMention` existed in the service layer with **zero callers**: the only way
- * to create a subject was curl or the agent tool. Every one of the 17 subjects on this
- * platform arrived that way, which is also why none of them carries a `homepage_domain`
- * — nothing ever asked for one.
- *
- * That field is not cosmetic. It is the only thing that makes a GHOST CITATION decidable:
- * an AI answer that used your page as its source without naming you. Without it
- * `brand_cited` is NULL for every probe — undecidable, which the UI reports honestly and
- * which no amount of probing will resolve.
- */
+/** TrackSubjectDialog — start tracking a brand or keyword. */
 
 import React, { useState } from 'react';
 import {

@@ -1,19 +1,6 @@
 /**
  * A bounded sweep says where it stopped, a reference match is a match, and a duplicate stays
  * inside its own workspace (#359 CM-13 / CM-16 / CM-17).
- *
- * CM-13: the page walk is newest-first and capped at 20 × 500. When the cap was hit, everything
- * older was left behind — and the watermark still advanced to the newest transaction seen, so the
- * next run started after them. Those transactions sat outside every future window, and the run
- * returned `ok: true`. The same watermark-advances-past-the-failure shape confirmed as FE-20 in
- * #351.
- *
- * CM-16: `refText.includes(numberKey)` is a bare substring, on strings already reduced to
- * `A-Z0-9` runs. A bill numbered `7` matched the reference "INVOICE 1007". Auto-settling is the
- * one action here that moves money against a document with no human in the loop.
- *
- * CM-17: the heal-on-duplicate path looked a payment up by `(provider, provider_ref)` alone. Two
- * workspaces can have the SAME Revolut organisation connected, and then that pair exists in both.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';

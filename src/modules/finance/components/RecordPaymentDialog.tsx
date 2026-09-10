@@ -4,21 +4,6 @@
  *    settled) or an open order (a deposit / a payment on something not invoiced yet); with neither
  *    it records as on-account customer credit. One picker, because those are one question.
  *  - Refund/Return: money out to a customer (e.g. against a credit note).
- *  - Paid an expense: money out settling an EXISTING expense (supplier bill), including the ones
- *    that came from the Expenses Inbox (myDATA received documents).
- *
- * It settles; it never books. A received document that is not an expense yet is booked by
- * "Add to Expenses", whose form carries a "Mark as paid" tick — so the money always has an order
- * behind it. Converting a document HERE produced a paid bill with nothing to 3-way match.
- * Carries a finance category + method + back-datable date.
- *
- * The expense option settles a bill that already exists — it never creates one. Creating a NEW
- * cost is still NewExpenseDialog; going through here instead would double-count the payable.
- * The reverse direction (open an expense, see/attach its payments) is ExpensePaymentsDialog.
- *
- * `presetExpenseId` PRE-FILLS it (Payables → Pay, the Expenses Inbox row, "Record a payment"
- * inside ExpensePaymentsDialog): same form, same controls, the target simply starts selected and
- * still changeable. This is the ONLY money-out-against-a-bill form.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -74,16 +59,7 @@ export const RecordPaymentDialog: React.FC<{
   /** Open supplier bills this payment may settle — only meaningful with side='supplier'. Passed in
    *  by the caller that already loaded them rather than re-fetched here. */
   payableBills?: Array<{ id: string; supplier_bill_number: string | null; amount_due: number; currency: string }>;
-  /**
-   * Currency of the ORDER this payment is being recorded against.
-   *
-   * Without it the reset below forced 'EUR' on open and the picker rendered only for
-   * kind==='received', so every purchase-order payment submitted EUR. record_payment_fx books the
-   * unallocated remainder onto the order ONLY when the currencies match — deliberately, rather
-   * than booking a cross-currency remainder at a guess — so GBP 500 on a GBP purchase order was
-   * stored as EUR 500, the guard correctly declined, NO allocation row was created, and the order
-   * showed Unpaid with full Outstanding forever while the cash sat in the bank ledger.
-   */
+  /** Currency of the ORDER this payment is being recorded against. */
   orderCurrency?: string;
 }> = ({ workspaceId, open, onOpenChange, onSaved, initialCounterparty, orderId, orderLabel, defaultAmount, presetInvoiceId, presetExpenseId, side = 'customer', payableBills = [], orderCurrency }) => {
   const { toast } = useToast();
@@ -111,15 +87,6 @@ export const RecordPaymentDialog: React.FC<{
    * independent switches ("Send receipt" + "Also issue a …") whose combination was ambiguous.
    *  - `none`             — record the money only.
    *  - `payment_receipt`  — email a payment receipt (απόδειξη είσπραξης). NOT sent to myDATA.
-   *  - `fiscal_invoice`   — issue a τιμολόγιο (1.1).
-   *  - `fiscal_receipt`   — issue a retail receipt / ΑΛΠ (11.1).
-   *
-   * The two fiscal rows used to be ONE row whose kind the buyer rule picked, which is right by
-   * default and wrong whenever the operator knows better — a business buying for private use
-   * takes an ΑΛΠ. They are separate rows now, and the same asymmetry as the order menu applies:
-   * a buyer with no ΑΦΜ is offered the receipt only, because AADE rejects a τιμολόγιο issued to a
-   * consumer, while the reverse is legal and simply costs them the VAT deduction. `issueOffer.kind`
-   * carries that fact — 'receipt' means the shared rule found no VAT identity.
    */
   type IssueChoice = 'none' | 'payment_receipt' | 'fiscal_invoice' | 'fiscal_receipt';
   const [issueChoice, setIssueChoice] = useState<IssueChoice>('payment_receipt');
@@ -151,32 +118,13 @@ export const RecordPaymentDialog: React.FC<{
   /**
    * What "None" MEANS depends on where the dialog was opened, and the label used to claim the
    * standalone meaning in both places.
-   *
-   * Standalone it is on-account credit. Opened FROM an order the payment already carries
-   * `order_id`, and `record_payment_fx` books everything not allocated to a document as an
-   * allocation ON THAT ORDER (capped at what it still owes) — which is exactly what
-   * `get_order_settlements` counts. So "None" there settles the order and the money is never loose;
-   * "None — unallocated credit" read as "this payment will not touch the order" on the one screen
-   * where it always does.
    */
   const noTargetLabel = orderId
     ? `The order itself${orderLabel ? ` — ${orderLabel}` : ''}`
     : 'None — unallocated credit';
   const effectiveOrderId = orderId ?? (pickedOrderId || undefined);
 
-  /**
-   * Can THIS order still produce a sales document, and which one? (#378 F1)
-   *
-   * Derived here, from whichever order is effectively selected, rather than handed in by the
-   * host. It used to be two independent optional props — one that put the myDATA rows in the
-   * picker and one that performed the filing — so a caller could offer a document it had no way
-   * to issue, and only ONE of the seven surfaces that mount this dialog passed either. It could
-   * not be fixed by passing it six more times: on the generic surfaces the order is chosen INSIDE
-   * this dialog, so there is no order for a host to resolve from.
-   *
-   * Re-resolves when the operator changes the order in the "For" picker, because the answer is a
-   * property of the order and not of the screen.
-   */
+  /** Can THIS order still produce a sales document, and which one? (#378 F1) */
   const [issueOffer, setIssueOffer] = useState<{ kind: SalesDocumentKind; reason: string } | null>(null);
 
   // The fiscal choice is only meaningful while there is an order to issue against and an offer
@@ -269,10 +217,6 @@ export const RecordPaymentDialog: React.FC<{
       // Same "pull the preset in" treatment the expense list above already gets. The invoice
       // query is scoped to status ['issued','partially_paid','overdue','paid'] with limit 200,
       // so a DRAFT invoice — or any invoice past the 200-row cap — was never in this array.
-      // InvoiceDetailPage renders "Record payment" on drafts (it gates only on void /
-      // credit_noted), so selectedTarget resolved to null, allocations stayed [], and the money
-      // was booked as unallocated on-account credit while the toast said "Payment recorded" and
-      // amount_due never moved.
       let invoiceRows = invs;
       if (presetInvoiceId && !invoiceRows.some((i) => i.id === presetInvoiceId)) {
         const one = await financeService.getInvoice(presetInvoiceId).catch(() => null);
@@ -283,12 +227,6 @@ export const RecordPaymentDialog: React.FC<{
       // Attachable = not cancelled, and still owed something. What each one still owes comes from
       // the shared SQL derivation — the picker must never offer `total` as "what's left" on a
       // part-paid order.
-      //
-      // The "still owed" test reads that derivation too. It used to read the CACHED
-      // `orders.payment_status` column, so the gate and the figure beside it came from two
-      // different answers: an order the ledger still showed as owing was dropped from the list
-      // entirely whenever the column had drifted to 'paid' — and the one screen that could have
-      // recorded the money to correct it was the screen refusing to offer it.
       const live = ords.filter((o) => o.status !== 'cancelled');
       const bals = live.length
         ? await ordersService.orderBalances(live.map((o) => o.id)).catch(() => new Map<string, OrderBalance>())
@@ -644,17 +582,7 @@ export const RecordPaymentDialog: React.FC<{
       });
       // Order-attached: also create the order's receipt/invoice when asked (best-effort — the
       // payment is already recorded; a doc-issue hiccup shouldn't roll it back).
-      /**
-       * The payment stands whatever happens to the document — but SAY so (#351 A2).
-       *
-       * This was `catch { }` with no toast, directly above a block that reports
-       * `creditNoteFiscalError` properly. The current caller happens to show its own destructive
-       * toast, so the failure is visible today; the operator just gets a success toast beside it.
-       * An empty catch is a trap for the next issue call that throws instead of handling.
-       *
-       * Best-effort is right — the money is recorded and a doc hiccup must not roll it back. What
-       * is not right is silence.
-       */
+      /** The payment stands whatever happens to the document — but SAY so (#351 A2). */
       let issueDocError: string | null = null;
       // Fail closed if the screen still promises a fiscal document the state cannot deliver. The
       // effect above should make this unreachable; if it is reached, the honest outcome is the

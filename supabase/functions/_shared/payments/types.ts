@@ -1,17 +1,4 @@
-/**
- * payment-provider abstraction (server side).
- *
- * Mirrors `_shared/fiscal/types.ts`, with one deliberate difference: fiscal picks ONE
- * winning connector per capability, whereas payments are **multi-select** — a seller may
- * offer Stripe card AND Viva RF bank transfer on the same invoice and let the customer
- * choose. So the resolver returns an array, not a winner.
- *
- * A provider produces one of two fundamentally different things:
- *   - a **redirect** the customer is sent to (hosted card checkout), or
- *   - a **bank reference** the customer pays from their own banking app (Viva RF code),
- *     where settlement arrives later and is reconciled by webhook.
- * The hosted pay page renders each differently, so the shape is discriminated.
- */
+/** payment-provider abstraction (server side). */
 
 // One source (#391) — the generated mirror. The slug always matches the module slug
 // suffix (`payments-<slug>`) and the CHECK on `revolut_bank_transactions.provider`.

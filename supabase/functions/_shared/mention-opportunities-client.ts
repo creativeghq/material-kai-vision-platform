@@ -1,15 +1,4 @@
-/**
- * Shared client for the mention-monitoring `/opportunities-stateless` endpoint.
- *
- * Lets SEO-pipeline edge functions (seo-research, etc.) pull SERP-derived
- * signals (AI Overview text, featured-snippet target, PAA, related searches,
- * top organic, video / news / shopping carousels, knowledge-graph presence,
- * paid competitors) for an inline subject — no DB row, no per-user credits,
- * authenticated via the same `x-cron-secret` the cron jobs use.
- *
- * Failure mode: returns null. Callers are expected to log + degrade
- * gracefully — the SEO pipeline must never fail because of this.
- */
+/** Shared client for the mention-monitoring `/opportunities-stateless` endpoint. */
 
 import type {
   MentionOpportunity,

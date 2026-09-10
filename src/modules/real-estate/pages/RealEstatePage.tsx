@@ -218,18 +218,7 @@ const DashboardPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
   );
 };
 
-/**
- * The AML gate switch, and the reason the whole KYC feature was unreachable.
- *
- * `accept-offer` refuses with a 422 and the missing checks when `kyc_required_for_offers` is on,
- * and `KycPanel` renders NOTHING while the gate is off and no check has been recorded. The column
- * defaults to false and `update-kyc-policy` — live in the edge function and in the service since
- * #281 — had no caller anywhere, so the gate could never be turned on, so the panel never rendered,
- * so no check could ever be recorded, so the panel never rendered. A closed loop: a shipped
- * compliance feature that no workspace could reach, and nothing failed while it sat there.
- *
- * Broker-only, like the verdicts themselves — the API returns 403 to an agent either way.
- */
+/** The AML gate switch, and the reason the whole KYC feature was unreachable. */
 const KycPolicyCard: React.FC<{ ws: string | null }> = ({ ws }) => {
   const { toast } = useToast();
   const [s, setS] = useState<FeedSettings | null>(null);

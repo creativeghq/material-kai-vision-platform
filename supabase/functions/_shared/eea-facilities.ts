@@ -1,27 +1,4 @@
-/**
- * eea-facilities.ts — the EU Industrial Emissions Database, as a supplier-discovery source.
- *
- * Every other free source in this platform answers "is this company real?". This one answers a
- * question none of them can: **which factories exist?** It lists industrial INSTALLATIONS — the
- * plant, not the registered office — with the operator's parent company, the street it is on and
- * its coordinates, for EU27 + UK + Switzerland + Norway + Iceland.
- *
- * That distinction is the whole point. A company register gives you the registered office, which
- * for most manufacturers is an accountant's address in a different town. This gives you the kiln.
- *
- * It is also the only source here that supports DISCOVERY rather than lookup: "every ceramic-firing
- * plant in Poland" is one query, by sector code, for nothing. Reporting is mandatory above capacity
- * thresholds under the Industrial Emissions Directive, so coverage of real industrial plant is good
- * — but a small workshop below threshold is legitimately absent, and that is a miss, not a failure.
- *
- * Free: no key, no account, no quota published.
- *
- * KNOWN WEAKNESS, measured: `parentCompanyName` is self-reported by the operator and often the
- * legal entity rather than the trading brand — searching for "Paradyż" returns nothing although its
- * neighbours in Opoczno are listed. Strong for finding plants by SECTOR and COUNTRY; weaker for
- * looking up a brand you already have a name for. Say so rather than reporting an empty result as
- * "this manufacturer has no factories".
- */
+/** eea-facilities.ts — the EU Industrial Emissions Database, as a supplier-discovery source. */
 
 const DISCODATA_URL = 'https://discodata.eea.europa.eu/sql';
 const FACILITY_TABLE = '[IED].[latest].[ProductionFacility]';
@@ -53,17 +30,10 @@ export const FACILITY_SECTORS = {
 export type FacilitySector = keyof typeof FACILITY_SECTORS;
 
 /**
- * Escape a value for a SQL string literal.
+ * Escape a value for a SQL string literal, by doubling the quote.
  *
- * A DIFFERENT CONTRACT from `escapeHtml` (HTML text) and `escapeLike` (PostgREST filter grammar),
- * and it must never be substituted for either — CLAUDE.md invariant 11 exists because those two
- * drifted into each other. This one exists because Discodata takes raw SQL over HTTP, so an
- * agent-supplied company name is going into a query string.
- *
- * The target is a THIRD-PARTY, PUBLIC, READ-ONLY dataset, so the stakes are a broken query rather
- * than our data — but a factory legitimately called `O'Brien` breaks that query, and "no results"
- * is indistinguishable from "no such factory". Doubling the quote is what keeps an honest apostrophe
- * working, and the allowlist is what stops the rest.
+ * A DIFFERENT CONTRACT from `escapeHtml` and from a PostgREST filter escaper — invariant 11 exists
+ * because two of those drifted into each other. Never swap one for another.
  */
 export function sqlLiteral(value: string, maxLength = 80): string {
   return String(value ?? '')
@@ -222,13 +192,6 @@ export async function lookupDomainAge(domain: string): Promise<{
 
   // The Internet Archive is the fallback for the registries that redact creation dates under GDPR
   // — `.it` among them, which matters here because Italy is a primary tile market.
-  //
-  // It is also ERRATIC rather than merely slow: the same domain measured 6.9s, 10.4s and then over
-  // 22s within a few minutes, because CDX scans a domain's whole capture history. That is a bad
-  // dependency to block a tool call on, so it gets a modest deadline and its own failure state.
-  // "The archive did not answer in time" and "this domain has no history" are different facts, and
-  // an intermittent source reported as a flat miss is the harder version of the silent-zero problem
-  // — it looks right most of the time.
   let firstArchived: string | null = null;
   let archiveTimedOut = false;
   if (!registeredOn) {

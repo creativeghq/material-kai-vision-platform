@@ -18,30 +18,7 @@ interface HubEmptyStateProps {
   className?: string;
 }
 
-/**
- * EMPTY STATE.
- *
- * A list with no rows has to say WHICH kind of nothing it is, because the two
- * look identical and need opposite responses:
- *
- *   "You have no contacts yet"       → offer the create action
- *   "No contacts match these filters" → offer to clear the filters
- *
- * Showing the create action on a filtered-empty list is the classic version of
- * this mistake: the user has 4,000 contacts and is being invited to make
- * another one because a stage filter is set.
- *
- * ONE SIZE, SET HERE
- * ------------------
- * The offer is the only control on an empty surface, so it renders at the
- * platform's standard button — 36px, 14px text — whatever `size` the caller
- * put on it. Billing's "Go to quotes" shipped as `size="sm"` (32px, 12px text)
- * on the same project page as a Quotes tab whose hand-rolled empty state used
- * the standard button, and the two read as different sizes of the same thing.
- * A hundred call sites had copied the `size="sm"` from the doc example, so the
- * fix is not a sweep: the action slot normalises every button (and link
- * rendered as one) inside it. Guarded by tests/unit/emptyStates.test.ts.
- */
+/** EMPTY STATE. */
 export const HubEmptyState: React.FC<HubEmptyStateProps> = ({
   icon: Icon,
   title,

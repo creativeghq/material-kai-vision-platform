@@ -4,11 +4,6 @@ import { bypassHeaders } from './tests/e2e/vercelBypass';
 // Route-load smoke: drives the REAL deployed app in a headless browser and asserts each
 // route renders (no white-screen / chunk-load failure / error-boundary). Catches the class
 // of bug that took down /quotes /finance /discover after a deploy.
-//
-// In CI this points at the UNALIASED production candidate (deploy-frontend runs
-// `vercel deploy --skip-domain`), so a failure here stops `promote` and users never see the
-// build. The default below is the live domain, which is what you want when running it by hand
-// against production.
 const baseURL = process.env.SMOKE_BASE_URL || 'https://app.materialshub.gr';
 
 export default defineConfig({

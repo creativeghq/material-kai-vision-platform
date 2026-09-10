@@ -1,15 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 
-/**
- * Master catalog (#324) — the shared, cross-tenant record of what a product IS.
- *
- * Two rules this service exists to keep honest, both enforced server-side:
- *  1. Only the ONE user the operator confirmed as representing a factory may publish.
- *     Workspace membership is never enough — see `supplier_publishing_allowed`.
- *  2. A published PRICE reaches the operator's catalog and nowhere else. `publishPrice`
- *     writes the factory's ask onto the master row; it never touches any workspace's cost.
- *     `acceptPrice` is the only path to a real cost and is operator-only.
- */
+/** Master catalog (#324) — the shared, cross-tenant record of what a product IS. */
 
 /** Per-field provenance. Manufacturer beats operator beats our extraction. */
 export type FieldAuthority = 'extracted' | 'operator' | 'manufacturer';

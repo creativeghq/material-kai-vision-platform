@@ -21,17 +21,7 @@ import { onEnterOrSpace } from '@/utils/a11y';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
 import { imageUrlToBase64 } from '@/utils/imageToBase64';
 import { safeHref } from '@/utils/safeUrl';
-/**
- * Video models and what they cost, in one place.
- *
- * These MUST match `CREDIT_COSTS` in `generate-interior-video-v2` — that map is what the
- * generator actually debits; this is only what the picker advertises. They are checked against
- * each other by tests/unit/videoCreditFloor.test.ts, because a picker showing one price while
- * the generator charges another is a support ticket, not a compile error.
- *
- * `auto` has no credits: the model is chosen server-side from the video type, so the price is
- * not known until then.
- */
+/** Video models and what they cost, in one place. */
 const VIDEO_MODEL_OPTIONS: ReadonlyArray<{
   value: string; label: string; description: string; credits?: number;
 }> = [
@@ -390,15 +380,6 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
       // ~40s for the complete zone array before showing anything OR searching
       // anything, so the two costs were strictly serial: 40s of blank screen,
       // then 40s+ of matches filling in. Now the first zone is on screen in a
-      // few seconds and its search is already running while the model is still
-      // writing zone 9.
-      //
-      // Zones keep the MODEL's order, not confidence order. Ranking them would
-      // mean holding them all back — the exact wait being removed — and a row
-      // that jumps position after the user starts reading it is worse than an
-      // imperfect order. EVERY zone is rendered (no cap): an earlier cap of 8
-      // dropped legitimate zones (glass separators, wall tiles, faucets) the
-      // editor's zone-replace flow needs.
       const CONCURRENCY = 3;
       const searchQueue: Array<{ seg: SegmentWithResults; i: number }> = [];
       const waiters: Array<() => void> = [];
@@ -597,10 +578,6 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
       // NULL generation_id row still serves cache hits cleanly. If the
       // column is NOT NULL the insert fails gracefully and we simply
       // re-segment next time (no error surfaced to the user).
-      //
-      // A PARTIAL run is never cached: caching it would make the truncated list
-      // the permanent answer for this image, and the cache read has no way to
-      // tell a 6-zone image from a 20-zone one that stopped at 6.
       if (enriched.length > 0 && !partial) {
         const rows = enriched.map((s) => ({
           // `|| null`, not `?? null`. AgentHub renders this component with jobId="" for the
@@ -609,7 +586,6 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
           // (22P02). The failure was only console.warn'd, so the cache never persisted and
           // every open of the Products tab re-ran the full MIVAA segment call plus one
           // /api/rag/search per zone: real backend spend and ~80s of wait, forever, with no
-          // cache hit possible.
           generation_id: jobId || null,
           model_id: s.model_id,
           source_image_url: s.source_image_url,

@@ -1,15 +1,6 @@
 /**
  * ARPreviewModal Component
  * Full-screen 3D product viewer using React Three Fiber.
- *
- * Two rendering paths (#321 asset foundation):
- * - A real glb/gltf model exists in `product_3d_models` → render it via
- *   ProductModelStage. iOS Quick Look (usdz) was REMOVED 2026-08-11: nothing in the
- *   platform can produce a usdz, so the path advertised a capability that would
- *   never arrive and showed every iPhone visitor a "no AR model yet" placard.
- * - No model → the original PBR-textured swatch plane with the tiling slider.
- *
- * Still future: WebXR immersive-ar sessions (@react-three/xr v5 — R3F v8 line).
  */
 
 import React, { Suspense, useState, useEffect, useMemo, useRef } from 'react';

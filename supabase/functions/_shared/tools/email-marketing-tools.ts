@@ -1,20 +1,4 @@
-/**
- * Email Marketing Tools — agent-chat surface for the tenant email-marketing add-on.
- *
- * ONE tool, actions:
- *   - list           — recent email campaigns in the workspace
- *   - list_templates — the workspace's marketing templates (needed to compose)
- *   - create_draft   — create a DRAFT campaign (name + template + audience filter)
- *   - send           — send a draft/paused campaign (mass-comms → human-in-the-loop confirm gate)
- *
- * Sending is a paid, mass-comms action with BYOK + quota rules, so `send` is gated behind an
- * explicit confirmation chunk (invariant #9). It resolves the audience the SAME way the Email page
- * does — category members PLUS any manual_emails on the campaign — then enqueues + flips to sending.
- *
- * Gated on module `email-marketing` enabled + workspace entitlement (paid add-on). Service-role
- * client, but EVERY read/write is scoped to the server-derived workspaceId and the template is
- * verified in-workspace before use (CLAUDE.md invariant 1 — never trust a body-supplied id).
- */
+/** Email Marketing Tools — agent-chat surface for the tenant email-marketing add-on. */
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what

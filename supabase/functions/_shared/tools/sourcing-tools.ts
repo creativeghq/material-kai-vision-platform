@@ -1,15 +1,4 @@
-/**
- * Sourcing Tools — agent-chat surface for the sourcing/fulfillment spine.
- *
- * Tools (all 0-credit — internal flow, mirrors price/mention internal usage):
- *   - source_product        — rank supply options for a product (resolve_sourcing_options RPC)
- *   - create_purchase_order — commit a sourcing plan → allocations + draft POs (commit_sourcing_options RPC)
- *   - send_purchase_order   — email a PO to the supplier (generate-purchase-sheet-pdf {order_id, send})
- *
- * The RPCs are SECURITY DEFINER and gate on auth.uid() (resolve = workspace member,
- * commit = finance manager), so we call them with the USER's JWT — not the service
- * role — and surface any 42501 ('finance manager required') as a friendly error.
- */
+/** Sourcing Tools — agent-chat surface for the sourcing/fulfillment spine. */
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what

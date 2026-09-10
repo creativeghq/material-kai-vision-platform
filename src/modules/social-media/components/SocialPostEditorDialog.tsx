@@ -1,20 +1,4 @@
-/**
- * Open a social post — read it, finish it, send it.
- *
- * The posts table was the only reader `social_posts` had, and it was read-only. Everything that
- * writes a post is the agent: `generate_content` files the draft, `generate_image` and
- * `generate_video` hang media on it. So a draft could be SEEN on the page and only ACTED on by
- * going back to chat and describing which one you meant — for a row the screen was already
- * showing. That is the gap this closes: caption and hashtags are editable, the media is visible,
- * and publish / schedule / delete are here rather than in a sentence you have to compose.
- *
- * Publishing goes through `zernio-api` (`publish_now` / `schedule`) — the same path the agent
- * uses, never a direct write of `status: 'published'`, because the status is the RECORD of a send
- * that happened and setting it locally would invent one.
- *
- * A published post is read-only. Its caption is what went out; letting someone edit it here would
- * leave our copy disagreeing with the live post and nothing to reconcile the two.
- */
+/** Open a social post — read it, finish it, send it. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ExternalLink, Loader2, Send, Trash2, CalendarClock, Save } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';

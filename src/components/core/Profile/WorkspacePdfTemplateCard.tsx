@@ -3,10 +3,6 @@
  * documents (quotes, catalogs, proformas). Invoices + receipts are fiscal documents and
  * keep their own compliant design. Owner-managed, workspace-scoped. Uploads are free-form
  * (any image you want) — no hardcoded filenames.
- *
- * Backend: `workspace_pdf_templates` (workspace_id PK; cover/background/backcover paths
- * + cover dimensions). Files live in the private `quote-templates` bucket under the
- * workspace prefix. The shared PDF renderer (_shared/pdf/branding.ts) reads this row.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { FileImage, Loader2, Trash2, Upload } from 'lucide-react';

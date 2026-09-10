@@ -3,9 +3,6 @@
 // blocks with syntax highlighting, links, images, admonitions, frontmatter — and
 // emits clean GFM markdown, so it is drop-in compatible with everything that
 // already stores `content_markdown` + renders it with react-markdown + remark-gfm.
-// A Rich / Source / Diff toggle (top-right of the toolbar) lets power users drop to
-// raw markdown at any time. Themed to the platform's light/dark tokens via
-// MarkdownEditor.css (the `dark-theme` class is toggled from ThemeContext).
 import React, { forwardRef, useMemo } from 'react';
 import {
   MDXEditor,

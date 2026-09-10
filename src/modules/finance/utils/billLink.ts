@@ -1,18 +1,5 @@
 /**
  * "What is this cost for?", as it sits on a `supplier_bills` row — the pure half.
- *
- * Five nullable columns answer ONE question, so they are handled as one value: pick a target and
- * exactly one of them is set. A caller able to write three of them can leave a bill booked to a
- * job AND to somebody else's sales order, which are two answers to a question that has one, and
- * both of them valid uuids.
- *
- * This lives outside the dialog so the mapping can be tested by CALLING it. The text-matching
- * guard in `orderLinkTargets.test.ts` cannot tell a real handler from a same-shaped helper: when
- * `linkToColumns` was deliberately broken to prove the guard fired, `linkKey` — sitting in the
- * same file, switching on the same `.kind`, with the same `case` labels — vouched for it and the
- * suite stayed green. Exhaustiveness over a discriminated union is a behavioural property; asking
- * a regex about it gets the answer a regex can give.
- *
  * @see tests/unit/billLink.test.ts
  */
 import type { OrderLinkTarget } from '@/modules/finance/services/ordersService';
@@ -56,16 +43,6 @@ export function linkKey(v: OrderLinkTarget): string {
 /**
  * The picked value back to columns. Mirrors what `NewExpenseDialog` writes at creation, so a bill
  * edited later and a bill created there end up in the same shape.
- *
- * A cost booked ON an order is reported under that order's job — the same inheritance a linked
- * sales order gets, so the expense does not float unattributed while its order has a project.
- * `trip` and `property` are FILING links and set no project: a property is not a job, and
- * inferring one from the other invents work nobody raised.
- *
- * `merge_order` and `customer` are absent deliberately, not by omission — a bill has no line
- * items to merge, and creating a second document is not something an edit does. The surfaces that
- * offer those kinds turn the corresponding picker groups off, and the exhaustiveness test pins
- * both facts.
  */
 export function linkToColumns(v: OrderLinkTarget): BillLinkColumns {
   switch (v.kind) {
@@ -94,11 +71,6 @@ export interface BillLinkSubject {
  * Which column wins when more than one is set — and more than one legitimately is: since #378
  * Phase 1 a bill raised from a purchase order carries BOTH `order_id` and the job it inherited
  * from that order.
- *
- * The order resolves FIRST. It is the more specific answer and it carries the project with it;
- * reading the project first would print a job name over a bill whose real subject is a PO, which
- * is the mistake the order header made when it fed the same control a full link and printed a
- * customer's order number under the word "Project".
  */
 export function linkSubject(cols: BillLinkColumns): BillLinkSubject | null {
   if (cols.order_id) return { kind: 'cost_of_order', id: cols.order_id };

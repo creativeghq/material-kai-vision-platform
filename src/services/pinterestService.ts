@@ -93,23 +93,6 @@ export async function importPinsBulk(
 }
 
 // ── Pinterest account CONNECTION lives with Zernio, not here ──────────────
-//
-// The OAuth board-browsing half that used to sit here (getAuthUrl / completeOAuth /
-// getConnectionStatus / getBoards / getBoardPins / disconnect) has been removed. It read and wrote
-// `social_accounts.access_token` / `refresh_token` / `token_expires_at` / `platform_account_id` /
-// `account_name` — columns that no longer exist, because that table was reshaped for Zernio
-// (`zernio_account_id`, `handle`, `display_name`). Every one of those calls had been failing; the
-// modal caught the error and showed an empty board list, so it looked like "no boards" rather than
-// "this is broken".
-//
-// Connecting a Pinterest ACCOUNT is a solved problem elsewhere: Zernio is the OAuth broker, it
-// already lists `pinterest` in SUPPORTED_PLATFORMS, and it already owns `social_accounts`. Board
-// and pin BROWSING is not something Zernio offers — its API is profiles / accounts / usage /
-// webhooks / inbox / media, with no token passthrough — so that capability would need a direct
-// Pinterest app and token storage again. Deliberately not reinstated.
-//
-// Importing pins by URL, below, needs no account connection and is what actually populates a
-// moodboard.
 
 export const pinterestService = {
   extractPin,

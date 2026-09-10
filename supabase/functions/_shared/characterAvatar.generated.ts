@@ -2,50 +2,7 @@
 // Regenerate: npm run vocab:mirror (part of gen:all). Freshness is enforced by
 // tests/unit/vocabularyMirrors.test.ts, which fails the build on any drift.
 
-/**
- * The character avatar shown for a contact whose photo we cannot get.
- *
- * WhatsApp gives a business no customer profile picture — measured 2026-08-25 across every
- * endpoint that declares the field: `participantPicture` null on all 100 conversations,
- * `avatarUrl` absent from all 516 contact records. So this is not a placeholder waiting for a
- * real photo. It is the avatar, permanently.
- *
- * ── A cast, not a render per person ──
- * The characters are generated ONCE by `messaging-api generate-avatar-cast` (Gemini, 3D cartoon
- * style) into `generation-images/avatars/cast/NNN.png`, and each contact is assigned one by a
- * hash of their id. 516 contacts would otherwise be 516 generations to bill, wait for and store,
- * and the style would drift between calls. This way the cost is a few dollars once, assignment is
- * instant, and a contact keeps the same face forever.
- *
- * A hand-drawn SVG version was tried first and thrown away: flat vector shapes cannot reach the
- * soft-shaded 3D look this is for, and it read as a different product entirely.
- *
- * ── WHICH person, from the id. WHICH HALF of the cast, from the name. ──
- * The slot is still hashed off the contact's stable id, so the character is ASSIGNED rather than
- * inferred — a name is edited and re-capitalised, and hashing on it would hand people a new face
- * every time their record is tidied up.
- *
- * The hash alone, though, is a coin flip on a set that is half women and half men, and it loses
- * that flip half the time in front of the operator: `Desislava Slavova` — a name whose every
- * token is grammatically feminine — was drawn as a bearded man in glasses, beside her own
- * messages, for as long as the thread existed. "We do not guess" was the intent; a 50/50 guess
- * was the behaviour, just an unstated one.
- *
- * So the name narrows the POOL and the id still picks within it. `nameGender` answers only where
- * the answer is in the grammar of the name (a Slavic `-ova`, a Greek final `ς`, an honorific) or
- * in a curated given-name list, and returns null for everything else — a null pool is the whole
- * cast, i.e. exactly the old behaviour. It is never asked about ethnicity, which carries no such
- * signal and has no business being inferred.
- *
- * ── One person, one face: the verdict is derived ONCE, server-side ──
- * The inbox draws a counterparty in five places off four different name strings (`thread.subject`
- * in the list and the header, the WhatsApp profile name in the drawer, the CRM contact name in
- * the rail and on every message row). A pool resolved per screen would therefore give one person
- * two faces the moment those strings disagreed — the exact bug this module already carries a
- * regression test for, one input over. `inbox-api` resolves the slot from the participant row and
- * ships it as `counterparty_avatar_slot` / `avatar_slot`; the client renders the number it is
- * given, and only hashes a seed itself when the server sent none.
- */
+/** The character avatar shown for a contact whose photo we cannot get. */
 
 /* ────────────────────────────── The cast ────────────────────────────── */
 
@@ -61,20 +18,7 @@ export interface CastCharacter {
   readonly look: string;
 }
 
-/**
- * The 24 rendered characters, in slot order — `avatars/cast/000.png` is `CAST[0]`.
- *
- * ONE roster: `generate-avatar-cast` builds its prompts from `look`, and the picker reads
- * `gender` off the same row. A hand-kept second list would let the generator render slot 7 as a
- * woman while the picker went on handing slot 7 to men, and every face would still be a 200.
- *
- * Diversity is spread across the cast deliberately — it is a set of characters, and a set that is
- * all one age or one hair length just looks broken. Nothing here is derived from a real contact.
- *
- * DO NOT REORDER OR REWORD an entry: the PNGs are already rendered against these strings, so
- * editing one silently makes the stored picture disagree with the roster describing it. Add to
- * the end and re-run `generate-avatar-cast` with `startIndex` at the old length.
- */
+/** The 24 rendered characters, in slot order — `avatars/cast/000.png` is `CAST[0]`. */
 export const CAST: readonly CastCharacter[] = [
   { gender: 'female', look: 'young woman, long dark wavy hair, warm brown skin, small gold earrings' },
   { gender: 'male', look: 'older man, short grey hair, neat grey beard, glasses with dark rectangular frames, light skin' },
@@ -363,26 +307,7 @@ export function castObjectFor(seed: string | null | undefined, gender?: CastGend
   return castObjectForSlot(castSlotFor(seed, gender));
 }
 
-/**
- * ── One person, one seed ──
- *
- * The seed is the thing that decides WHICH of the 24 characters somebody gets, so two places
- * seeding the same person differently is two different people on screen — and it is completely
- * silent, because both faces load, both are from the cast, and both look designed.
- *
- * That is exactly what shipped: the conversation header seeded on the THREAD id and the message
- * rows seeded on the SENDER PARTICIPANT id, so the counterparty of thread
- * `d3a43bcd…` wore `cast/016` at the top of the screen and `cast/021` beside every one of his
- * messages — a woman in the header, a man in the transcript, for one man. Nothing could catch it:
- * a wrong seed is a valid string and a wrong face is a 200.
- *
- * So the seed is the COUNTERPARTY'S PARTICIPANT ROW, everywhere, and these two functions are the
- * only places that decide it. The participant id and not the contact id: a WhatsApp number is
- * filed into the CRM later, and seeding on `contact_id` would hand somebody a new face on the day
- * their record is tidied up — the failure this module's header warns about, one column over. Not
- * the thread id either: a thread can hold two customers (one does), and they must not share a
- * face.
- */
+/** ── One person, one seed ── */
 
 /** The seed for the face of a thread's counterparty — the header, the list row, the drawer, the rail. */
 export function castSeedForThreadCounterparty(

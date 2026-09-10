@@ -1,21 +1,6 @@
 /**
  * Delivery trail writer — the ONE way an edge function records that a document
  * was sent, delivered, opened, or viewed.
- *
- * Before this, "was it viewed?" was answered seven different ways: event tables
- * for quotes and catalogs, a read-modify-write `share_view_count = x + 1` on
- * moodboard sheets (which silently lost concurrent views), five separate
- * `increment_*_view_count` RPCs, and nothing at all on the invoice pay page and
- * the contract signing page — the two that matter most.
- *
- * Everything now writes `document_events` through `record_document_event`, and
- * everything READS the derived answer from `get_document_delivery`. Do not add
- * an eighth counter, and do not count `document_events` in application code.
- *
- * Bot filtering, the 30-minute view-collapse window and the visitor hashing all
- * live INSIDE the SQL function, not here — a caller cannot get them subtly
- * wrong, and the difference between "viewed 4x" and "viewed 40x because a mail
- * scanner followed the link" is invisible once it is stored.
  */
 
 import type { DbClient } from './supabase-client.ts';

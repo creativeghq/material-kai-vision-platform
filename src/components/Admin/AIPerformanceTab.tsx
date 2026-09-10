@@ -2,11 +2,6 @@
  * AI Performance — self-contained monitoring surface for all AI models
  * (Claude vision/chunking/haiku + embedding models) plus Interior Design
  * generation stats and chunk-quality metrics.
- *
- * Lifted out of the Operations dashboard's inline "AI Performance"
- * tab into its own component so it can live under /admin/ai-configs?tab=performance.
- * Loads its own data (ai_usage_logs + agent_usage_logs + generation_3d) instead
- * of borrowing the Operations dashboard's shared fetch.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -122,13 +117,6 @@ export const AIPerformanceTab: React.FC = () => {
         //     inserter, never sets it. `.not('total_cost','is',null)` therefore matched zero
         //     rows FOREVER, so the generation count, image count and user count were zeroed
         //     too, not just the cost. Filter dropped.
-        //  2. Cost is not generation_3d's to hold. `ai_usage_logs.billed_cost_usd` is the single
-        //     source for what a call cost (CLAUDE.md: one derivation per money quantity), and
-        //     `combinedLogs` is already loaded above — so it is summed from there rather than
-        //     re-derived into a second column that would then drift.
-        //  3. The image tally read `model.status === 'completed' && model.image_urls`. The
-        //     writer stores `{ mode, [modelLabel]: { success: true, image_url } }` — no
-        //     `status`, no `image_urls` array. It would have counted 0 even with rows present.
         const INTERIOR_OPS = ['interior_design_generation', 'interior_design'];
         const totalCost = combinedLogs
           .filter((l) => INTERIOR_OPS.includes(l.operation_type))

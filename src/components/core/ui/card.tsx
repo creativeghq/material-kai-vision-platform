@@ -2,26 +2,7 @@ import * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
-/**
- * PANEL — the container surface of the design system.
- *
- * Opaque fill, one hairline, 6px radius, no shadow at rest. The previous card
- * was a glass panel (translucent white film + 12px backdrop blur + a floating
- * shadow + a 2px hover lift). Three reasons that is gone:
- *
- *  - A translucent panel has no fixed contrast ratio. The legibility of a table
- *    row inside it depended on whatever happened to be scrolling underneath,
- *    so the same content was compliant in one scroll position and marginal in
- *    another — and no static audit can catch that.
- *  - `backdrop-filter` forces the compositor to re-sample everything behind the
- *    element. On a dashboard with a dozen panels that is a dozen live blurs.
- *  - The 2px hover lift meant passing the mouse across a grid rippled it.
- *
- * A panel is a quiet frame; the data inside it is the thing worth looking at.
- * For a panel that IS a click target, add `panel-interactive` (or wrap it in an
- * <a>/<button> — the CSS picks that up) to get a border+fill hover, still with
- * no movement.
- */
+/** PANEL — the container surface of the design system. */
 const Card = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>

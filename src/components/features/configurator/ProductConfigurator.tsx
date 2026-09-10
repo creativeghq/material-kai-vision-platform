@@ -1,16 +1,4 @@
-/**
- * Product configurator (#321 M2, #260 Phase 1) — pick options, watch the model change, see the price.
- *
- * The material-only slice: choices repaint named glTF materials on the M0 model. Geometry
- * add/remove and incompatibility rules are Phase 2 of #260 and deliberately absent.
- *
- * **The price shown here is never computed here.** Every change re-asks
- * `get_configured_product_price`, which returns the total already derived. Adding the deltas up in
- * this component would be the second implementation of a money quantity, and the one most likely
- * to disagree with the quote that follows it —
- * [tests/unit/configuratorMoneyDerivation.test.ts](../../../../tests/unit/configuratorMoneyDerivation.test.ts)
- * fails the build on it.
- */
+/** Product configurator (#321 M2, #260 Phase 1) — pick options, watch the model change, see the price. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Loader2, AlertTriangle, Save } from 'lucide-react';
@@ -98,17 +86,6 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
   const valueIds = useMemo(() => selectionToValueIds(selection), [selection]);
 
   // Re-price on every change. One round trip, no arithmetic on this side.
-  //
-  // A FAILED resolver is tracked separately from a product that has no price (#385 FN-2).
-  // `.catch(() => setPrice(null))` collapsed the two, and `null` rendered as "Not priced"
-  // — so an RLS failure, a network error or a defect inside
-  // `get_configured_product_price` was indistinguishable from a legitimate absence, and
-  // *Add to quote* stayed enabled either way.
-  //
-  // This is FN-1 applied to money. The platform's own rule already draws this line
-  // elsewhere: `material_cost` null means NOT PRICED YET, never 0. The same distinction
-  // is needed between "not priced" and "pricing failed", because only one of them is
-  // safe to put in front of a customer.
   const [pricingError, setPricingError] = useState(false);
   useEffect(() => {
     if (!activeWorkspaceId) return;

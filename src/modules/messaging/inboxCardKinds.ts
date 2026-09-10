@@ -1,18 +1,4 @@
-/**
- * What a catalog card in an Inbox message can be — written ONCE.
- *
- * A member picks a product or a service from the workspace catalog and the card goes to the
- * customer in the channel's own rich shape (a WhatsApp interactive card, a table in an email, a
- * card in the thread). The CLIENT needs these to build a pick and render the card; the EDGE
- * validates the pick against the same list, prices it, and labels the card's button from it.
- * Two runtimes, one declaration — mirrored by `npm run vocab:mirror`
- * (tests/unit/vocabularyMirrors.test.ts holds the copy to this source).
- *
- * Only the closed value-sets live here. The composer's slash commands and their UI copy are in
- * `src/pages/Inbox/inboxSlashCommands.ts`, because no edge function reads them.
- *
- * THIS FILE IS IMPORT-FREE, ON PURPOSE — it is byte-mirrored to the edge.
- */
+/** What a catalog card in an Inbox message can be — written ONCE. */
 
 export const INBOX_CARD_KINDS = ['product', 'service'] as const;
 export type InboxCardKind = (typeof INBOX_CARD_KINDS)[number];

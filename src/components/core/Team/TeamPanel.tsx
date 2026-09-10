@@ -1,15 +1,4 @@
-/**
- * Team & Portals — the ONE surface for "who is on this team and what do they see".
- *
- * Replaces the pair of finance-scoped cards (MembersCard + TeamInviteCard) that could only mint a
- * link and list names: this one invites by email or link, shows what is still outstanding so an
- * invite can be taken back, and re-roles or removes an existing member. Every role's label, portal
- * and description comes from `WORKSPACE_ROLE_META` so the invite picker, the member rows and the
- * pending list can never disagree.
- *
- * Mounted at Profile → Team and Finance → Settings → Team. Owner/admin only (the write RPCs
- * re-check that server-side and return false rather than throwing).
- */
+/** Team & Portals — the ONE surface for "who is on this team and what do they see". */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Users, Loader2, Copy, Link2, Mail, X, Trash2, ShieldCheck, Clock,

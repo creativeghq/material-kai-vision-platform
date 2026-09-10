@@ -1,23 +1,4 @@
-/**
- * Open / Follow-up / Done — three statuses that existed for a long time and did nothing.
- *
- * THE DEFECT
- * ----------
- * Measured 2026-09-01: all 56 live threads sat in `open`. Neither of the other two had ever been
- * used once, and three separate things explain why.
- *
- *  1. It was named twice. The dropdown that SET it said Open / Snoozed / Closed; the tabs that
- *     FOUND it, directly beside them, said Open / Follow-up / Done. One enum, two vocabularies.
- *  2. "Follow-up" never came back. No date, no cron — a shelf you had to remember to walk past.
- *     A follow-up with no moment attached is just a second Done.
- *  3. Every message forced it back to `open`, including OUR OWN reply and even a private note.
- *     Which is exactly backwards: the moment you mark a thread "chase this" is right after you
- *     answered it, so the act of answering undid it.
- *
- * (3) was written out three times — inbox-api's send path, the Zernio social refresh and the
- * inbound-email handler — so it is now a database trigger, and these tests watch the app for its
- * return rather than trusting that three copies stay deleted.
- */
+/** Open / Follow-up / Done — three statuses that existed for a long time and did nothing. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

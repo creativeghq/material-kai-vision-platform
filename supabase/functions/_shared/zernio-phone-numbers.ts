@@ -1,26 +1,4 @@
-/**
- * Zernio phone numbers — search, buy, list, release.
- *
- * Zernio provisions numbers in 54 countries ($3–$21/month) and "a WhatsApp number is just a
- * phone number with WhatsApp enabled on it". None of it was reachable from this platform: the
- * only way to get a WhatsApp sender was to already own one and connect it, which is a dead end
- * for any tenant that does not have one — and the commonest reason a workspace never turns
- * WhatsApp on.
- *
- * TENANCY. Every endpoint here takes or returns `profileId`, and the profile-per-workspace map
- * (`social_zernio_profiles`) is exactly that boundary: a purchase goes INTO the workspace's own
- * profile, the list is filtered BY it, a release is checked AGAINST it. Which is also why the
- * shared-default-profile fallback has to block the writes — see `assertOwnProfile`.
- *
- * Separate module rather than more of `zernio.ts` only because that file is already the shared
- * transport for two products; this is one feature's surface on top of it.
- *
- * Every exported call takes `supabase` and resolves secrets itself. That looks redundant next to
- * the handler doing it at entry, and is not: on the edge runtime the key may live only in
- * `platform_secrets`, and a wrapper that trusts its caller to have resolved first is one import
- * away from running on an unresolved (env-only) key — which fails as a 401 from Zernio, not as
- * anything that names the real cause. `resolveSecret` caches, so the repeat costs nothing.
- */
+/** Zernio phone numbers — search, buy, list, release. */
 import { zernioApi, ensureZernioSecrets } from './zernio.ts';
 
 type SupabaseLike = { from: (t: string) => any };
@@ -132,16 +110,7 @@ export type PurchaseOutcome =
   | { kind: 'kyc_required'; country: string | null; numberType: string | null; kycUrl: string }
   | { kind: 'done'; message: string | null };
 
-/**
- * `POST /v1/phone-numbers/purchase`.
- *
- * Three non-failure outcomes, and collapsing them is how a buy flow lies to the operator:
- *  - 200 returns a Stripe `checkoutUrl` — NOTHING is bought until that is paid;
- *  - 202 `kyc_required` means the country needs identity documents first, and returns the form;
- *  - anything else is a plain success message.
- * 402 (no payment method) and 409 (`PURCHASE_VELOCITY` / `AREA_CODE_UNAVAILABLE`) are real
- * failures whose specific cause is worth repeating instead of "purchase failed".
- */
+/** `POST /v1/phone-numbers/purchase`. */
 export async function purchasePhoneNumber(supabase: SupabaseLike, params: {
   profileId: string;
   country?: string;

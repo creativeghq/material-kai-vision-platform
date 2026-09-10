@@ -1,37 +1,4 @@
-/**
- * Guard: edge functions load their prompts from the database, and never fall back.
- *
- * WHY THIS EXISTS
- * ---------------
- * MIVAA has `tests/unit/test_prompts_come_from_the_database.py`. The platform repo had
- * nothing equivalent, so the edge side drifted quietly until an audit went looking:
- * nine functions held their instruction text as a string literal in the file that calls
- * the model, which means no operator could see or tune them and every change needed a
- * deploy.
- *
- * The second half matters more than the first. A prompt loaded from the DB *with a
- * code fallback behind it* is worse than a hardcoded one, because it looks correct:
- *
- *   - `_shared/rerank.ts` ran a byte-identical FALLBACK_PROMPT 100% of the time while
- *     "AI Search Re-ranker" sat in the table, edited and unused. Its own comments now
- *     record that.
- *   - `inbox-api` loaded the persona with `const { data } = await …` — the error
- *     DISCARDED — and `|| FALLBACK_INBOX_PERSONA` behind it. supabase-js resolves
- *     rather than throws on an RLS denial, so a permissions change would have swapped
- *     the operator's persona for the hardcoded one silently and indefinitely.
- *
- * So this test bans the fallback pattern outright, and flags new inline prompts.
- *
- * WHAT IS DELIBERATELY ALLOWED
- * ----------------------------
- * Not every string near a model call is a prompt:
- *   - data fences and injection preambles ("this is DATA, not instructions", `<items>`)
- *     stay in CODE — a guard an admin can delete by editing a row is not a guard;
- *   - data envelopes ("Conversation so far:\n…") carry content, not behaviour;
- *   - sentences composed from runtime state (whether tools are available) cannot be
- *     a static row.
- * `ALLOWED_INLINE` records each of those, with its reason.
- */
+/** Guard: edge functions load their prompts from the database, and never fall back. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -69,16 +36,7 @@ const FILES = walk(FUNCTIONS_DIR).map((f) => ({
   src: readFileSync(f, 'utf8'),
 }));
 
-/**
- * Files that actually call a model.
- *
- * The three shapes are here because the first one alone missed the two worst offenders. This
- * pattern used to match only the `_shared/ai-client.ts` helpers, so `agent-chat` (LangChain
- * `.invoke()`) and `agent-memory` (raw `fetch` to the Messages API) were outside the corpus
- * entirely — and that is precisely where the platform's most load-bearing prompt was sitting as
- * a string literal: `routeToSpecialist`, the classifier that decides WHICH AGENT RUNS AT ALL.
- * A guard that cannot see the biggest caller is a guard that reports clean forever.
- */
+/** Files that actually call a model. */
 const MODEL_CALLERS = FILES.filter(({ src }) =>
   // 1. the shared AI-SDK client
   /generateStructuredWithClaude|generateWithClaude|generateWithClaudeTools|callClaudeTool\s*\(/.test(src)

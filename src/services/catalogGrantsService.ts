@@ -1,16 +1,4 @@
-/**
- * Catalog grants — which of the operator's factories a dealer workspace may see and resell.
- *
- * The shape this exists to protect: a dealer NEVER gets a copy of an operator product. They
- * get visibility of the operator's row plus their own `product_prices` row against it. One
- * product, N prices — so the operator's updates, images and embeddings propagate, and there
- * is nothing to drift.
- *
- * Everything here goes through workspace-scoped RPCs rather than table reads, because
- * visibility depends on WHICH workspace you are acting in and an RLS policy on `products` can
- * only see the user. A user in one granted and one ungranted workspace would otherwise see
- * the granted catalog in both.
- */
+/** Catalog grants — which of the operator's factories a dealer workspace may see and resell. */
 import { supabase } from '@/integrations/supabase/client';
 
 export interface GrantedCatalogProduct {

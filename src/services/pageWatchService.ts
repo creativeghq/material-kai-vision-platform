@@ -1,15 +1,4 @@
-/**
- * Page watches — client for the `page-watches` edge function (issue #331).
- *
- * Every call goes through the edge function rather than hitting the tables
- * directly, because creating or removing a watch has a REMOTE half: a Firecrawl
- * monitor that must be created, updated and deleted in step with the row. A
- * direct table write from here would leave an orphan monitor billing us on its
- * schedule with no row left pointing at it.
- *
- * Reads could bypass it (RLS covers them), but they go through the same door so
- * there is one place where "what a watch looks like to the UI" is decided.
- */
+/** Page watches — client for the `page-watches` edge function (issue #331). */
 
 import { supabase } from '@/integrations/supabase/client';
 
@@ -66,16 +55,7 @@ export interface PageWatchChange {
   acknowledged_by: string | null;
 }
 
-/**
- * The cadences a watch may run on.
- *
- * Not free text. Firecrawl's natural-language schedule parser accepts "every day
- * at 09:00" and rejects "every Monday at 08:00" — which was the second example in
- * this form's own placeholder until 2026-08-16, so following our own hint saved a
- * watch that Firecrawl had refused to schedule. The edge function maps each of
- * these to a cron expression; both copies are pinned equal by
- * tests/unit/pageWatchWebhook.test.ts.
- */
+/** The cadences a watch may run on. */
 export const PAGE_WATCH_SCHEDULES = [
   'every hour',
   'every 6 hours',

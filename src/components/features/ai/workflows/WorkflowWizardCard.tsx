@@ -1,24 +1,4 @@
-/**
- * WorkflowWizardCard — the prominent "do it step by step" surface.
- *
- * Sits below the small WorkflowTracker breadcrumb and renders the CURRENT
- * step as a big visual form card with:
- *   • Step indicator strip (●●●○○○○○ Step 3 of 8)
- *   • Progress bar
- *   • Step icon + title + description
- *   • Schema-driven form (reuses WorkflowInlineForm) for structured input
- *   • "Or describe in your own words" expandable override that lets the user
- *     swap the form for a free-form prompt without leaving the wizard
- *   • Skip + Next buttons
- *
- * Every "Next" click composes a structured continuation message that the
- * agent picks up — `[workflow:<def_id>/<step_id>] continue with input: <json>`
- * (or, when the user used the free-form override, just the prose). The agent
- * emits step_progress chunks on completion so the WorkflowTracker advances.
- *
- * On final-step completion the wizard collapses to a green "Complete" summary
- * with a "Build another" / "Iterate further" pair of follow-up actions.
- */
+/** WorkflowWizardCard — the prominent "do it step by step" surface. */
 import React, { useMemo, useState } from 'react';
 import {
   Check, ChevronDown, ChevronRight, Loader2, SkipForward, AlertCircle,
@@ -54,9 +34,6 @@ interface Props {
    *      JSON OR free-form prose depending on whether useCustomPrompt is set).
    *   2. Marking the step as `running` so the tracker reflects the in-flight
    *      state until the agent emits `workflow_step_progress`.
-   *
-   * The wizard does NOT mutate runtime state itself — that stays the parent's
-   * responsibility so chunks from the agent are the single source of truth.
    */
   onAdvance: (args: {
     runId: string;

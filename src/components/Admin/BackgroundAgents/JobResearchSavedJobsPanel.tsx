@@ -1,15 +1,4 @@
-/**
- * Saved/applied job-listing triage for a single job-research agent.
- *
- * Mounted inside `AgentRunHistoryDrawer` only when `agent.agent_type === 'job-research'`.
- * Shows the listings the user has marked saved / applied / interested across all
- * runs of THIS tracked_job. Lets the admin (or the user via shared row visibility)
- * undo a status, jump to the source URL, or tag a wrong match for the classifier.
- *
- * v0.3 — replaces the dropped hidden "/knowledge-base/job-sources" page. Cross-
- * conversation triage lives here, scoped to one tracked_job, alongside the
- * background-agents framework.
- */
+/** Saved/applied job-listing triage for a single job-research agent. */
 
 import { useEffect, useMemo, useState } from 'react';
 import { ExternalLink, Bookmark, CheckCircle2, X, Briefcase } from 'lucide-react';

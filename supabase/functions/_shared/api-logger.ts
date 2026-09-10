@@ -1,63 +1,4 @@
-/**
- * Edge Function Observability Wrapper
- *
- * Single chokepoint that wraps any edge function handler to give the whole
- * fleet two things automatically, with no per-function boilerplate:
- *
- *  1. **Request logging** — one row per request in `api_usage_logs`. Column
- *     mapping (the table is request-shaped, not "endpoint/method/status"
- *     shaped — a mismatch here silently fails every insert):
- *       request_path        ← function name
- *       request_method      ← HTTP method
- *       response_status     ← status code
- *       response_time_ms    ← duration
- *       ip_address          ← client IP (NOT NULL — falls back to '0.0.0.0')
- *       user_agent          ← UA header
- *       is_internal_request ← service-role / internal Bearer call
- *
- *  2. **Error reporting to Sentry** — the single unified mechanism for
- *     edge-function error capture. Wrapped functions should NOT
- *     call `captureException` themselves for top-level request failures — the
- *     wrapper does it. Sentry is kept signal-only:
- *       - handler throws (unhandled) → captureException(realError) — stack-grouped
- *       - handler returns/throws 5xx  → captureMessage(error level), function + status
- *       - 4xx                          → never reported (client errors, not bugs)
- *       - a 4xx whose failure is the DATABASE being unavailable → rewritten to 503 and
- *         reported. A handler saying `HttpError(400, dbError.message)` is describing the
- *         caller's input; when the thing it is describing is a Cloudflare 522 page, that
- *         sentence is wrong and it silenced a four-hour outage (see `upstream-failure.ts`).
- *       - a 4xx that is really an RLS refusal → 403, not reported (a correct authorization
- *         answer), with the policy's own text kept out of the response body.
- *       - a 4xx that is really a MISSING GRANT → 500 and reported, but ONLY when the caller
- *         was authenticated. Postgres writes the same "permission denied for function x"
- *         whether we forgot a GRANT or an ANON caller reached an authenticated-only object —
- *         and the second is a correct refusal (403), not a bug. `is_workspace_member` and
- *         `get_related_products` are both granted correctly; every "permission denied" for
- *         them in the logs was the integration suite probing as anon. Reporting those would
- *         have made the new alert worthless on day one.
- *       - 5xx whose message reads like a client error (validation / auth / method /
- *         not-found) → NOT reported, even though some functions mislabel these as
- *         500 (see `isLikelyClientError`). The HTTP response is left untouched —
- *         only the Sentry report is suppressed.
- *       - throw `HttpError(4xx, msg)` to both return the right status AND skip Sentry.
- *       - duplicate (function + status + message) events are throttled per worker
- *         (60s) so a looping failure can't flood the DSN (it has no sampling).
- *     Deep / background captures (errors swallowed mid-pipeline that never
- *     reach the wrapper — e.g. detached async work) should still call
- *     `captureException` directly from `_shared/sentry.ts`; they carry context
- *     the wrapper cannot see and ride the same underlying transport.
- *
- * The `api_usage_logs` table has no error-message column, so 4xx/5xx detail is
- * logged to the function console (and 5xx to Sentry); the status code is always
- * queryable from the table.
- *
- * Usage:
- *   import { withApiLogging } from '../_shared/api-logger.ts';
- *   Deno.serve(withApiLogging('my-function', async (req) => {
- *     // ... your handler ...
- *     return new Response(...);
- *   }));
- */
+/** Edge Function Observability Wrapper */
 
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from './cors.ts';
@@ -122,7 +63,6 @@ function getErrorStatus(err: unknown): number | undefined {
 // 500 for "Domain is required"). We leave the HTTP response untouched but keep
 // these OUT of Sentry so the dashboard stays signal-only. Tunable — widen/narrow
 // as real noise vs. real bugs gets observed. Genuine server faults ("Cannot read
-// properties of undefined", "fetch failed", DB errors) don't match and are reported.
 const CLIENT_ERROR_RE =
   /(unauthor|forbidden|not allowed|method not allowed|permission denied|\brequired\b|missing (required )?param|invalid (endpoint|request|param|parameter|input|body|json|argument|token|signature)|must be (a |an |provided|set)|not found|no .{0,40} found|bad request|malformed)/i;
 function isLikelyClientError(message: string | null): boolean {
@@ -146,19 +86,7 @@ function isThrottled(key: string): boolean {
   return false;
 }
 
-/**
- * `name` may be a plain string, or a function of the request.
- *
- * The resolver form exists for DISPATCHERS — one function serving several tasks behind a
- * query param. Logged under one flat name, their tasks are indistinguishable in
- * `api_usage_logs`, and a dispatcher that deliberately skips some tasks with a 200 dilutes
- * its own failure rate below every threshold `ops.silent_zero` applies. `monitoring-cron`
- * did exactly that: 261 real 5xx sat at ~74% of its calls because the disabled-module skip
- * kept answering 200, so neither the endpoint branch nor the cron branch ever flagged it
- * while a feature was dead for three months.
- *
- * Resolve to `<fn>?task=<task>` and each task is measured on its own.
- */
+/** `name` may be a plain string, or a function of the request. */
 export function withApiLogging(
   name: string | ((req: Request) => string),
   handler: Handler,
@@ -179,23 +107,7 @@ export function withApiLogging(
       functionName = typeof name === 'function' ? 'unknown' : name;
     }
 
-    /**
-     * The TRUSTED hop, and the precedence used to be backwards.
-     *
-     * This tried the LEFTMOST `x-forwarded-for` entry first and only fell back to
-     * `cf-connecting-ip` — i.e. it preferred the one value the caller writes over the one
-     * Cloudflare overwrites and the client cannot forge. Every edge function is wrapped in this
-     * logger, so `api_usage_logs.ip_address` is caller-controlled platform-wide: the column an
-     * abuse investigation starts from reports whatever the abuser typed, and one client can wear
-     * a different address on every request.
-     *
-     * Not a quota, so not invariant 10 — but this is the widest-scope instance of the same
-     * mistake in the codebase, and the point of the shared helper is that the ordering lives in
-     * one place.
-     *
-     * ip_address is NOT NULL on the table, so keep the sentinel rather than letting the insert
-     * fail (which is exactly what used to happen).
-     */
+    /** The TRUSTED hop, and the precedence used to be backwards. */
     const trustedIp = getTrustedClientIp(req);
     const ip = trustedIp === 'unknown' ? '0.0.0.0' : trustedIp;
     const userAgent = req.headers.get('user-agent') || null;

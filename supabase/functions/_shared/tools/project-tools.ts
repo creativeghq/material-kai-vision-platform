@@ -1,19 +1,4 @@
-/**
- * Project Workspace Tools — agent-chat surface for the Projects module.
- *
- * Tools:
- *   - create_project        — new project with optional client + rooms + category
- *   - list_my_projects      — user's active projects with budget / deadline summary
- *   - find_project          — fuzzy lookup by name (returns id + summary)
- *   - add_task              — add a task (optionally a subtask via parent_task_id)
- *   - add_purchase_item     — add a made-to-order door/window (with spec) to a project
- *   - generate_purchase_sheet — render the project's purchase items into a spec-sheet PDF
- *
- * Cost discipline: project DB tools are 0 credits. generate_purchase_sheet renders a
- * PDF (no AI) — also free; per-item image generation is a separate UI action.
- * Module-gated on `projects` slug — disabled-module errors are returned as
- * friendly strings rather than thrown.
- */
+/** Project Workspace Tools — agent-chat surface for the Projects module. */
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what

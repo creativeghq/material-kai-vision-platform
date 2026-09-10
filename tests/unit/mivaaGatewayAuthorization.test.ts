@@ -1,25 +1,4 @@
-/**
- * Guard: the MIVAA gateway authorizes the path it is about to REQUEST (#361 `EG-1`–`EG-3`).
- *
- * This gateway is the only authorization boundary MIVAA has. MIVAA runs every database
- * operation through a service-role client, 63 of its 370 route blocks have no validating auth
- * dependency, and `/api/internal`, `/api/embeddings`, `/api/rag` and `/api/jobs` are excluded
- * from its JWT middleware by prefix. So whatever reaches it executes with service-role
- * authority. Three ways past this gateway were open at once:
- *
- *   EG-1  The admin guard tested `MIVAA_ENDPOINTS[action].path` — the TEMPLATE — and
- *         substitution happened afterwards, unencoded. `rag_get_job` with
- *         `job_id = "../../../admin/system/metrics?x="` passed a guard that saw
- *         `/api/rag/documents/job/{job_id}` and then sent `/api/admin/system/metrics`.
- *         Eleven of twelve parameters were interpolated raw; only `factory_name` was encoded,
- *         which is what showed the correct handling was known.
- *   EG-2  `multipart/form-data` returned before the auth block entirely, forwarding the
- *         privileged MIVAA credential for a caller with no JWT at all.
- *   EG-3  `/job-status/` did the same, one line above it.
- *
- * Static, over source text, because the failures are all about ORDER — which check runs before
- * which line — and order is visible in the source. A runtime test would need a MIVAA to talk to.
- */
+/** Guard: the MIVAA gateway authorizes the path it is about to REQUEST (#361 `EG-1`–`EG-3`). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -78,14 +57,6 @@ describe('the admin gate reads the resolved path, not the template', () => {
 
     // The gate is `isAdminAction(action, finalPath)`: privileged by explicit action NAME, or by
     // the RESOLVED path. Both halves are pinned.
-    //
-    // The name list exists only so a privileged route that does NOT live under /api/admin can
-    // still be gated — `admin_system_health` and `admin_system_metrics`, whose real MIVAA paths
-    // are `/api/system/...` because that router is mounted at `prefix="/api"`. Before that was
-    // corrected they pointed at `/api/admin/system/...`, which 404'd; fixing the path without
-    // the name list would have un-gated host CPU, memory and disk for any authenticated user.
-    //
-    // Delete the path half and EG-1 comes straight back, so it is asserted separately.
     expect(src, 'the admin gate no longer consults the resolved path')
       .toMatch(/isAdminAction\(action, finalPath\)/);
     expect(src, 'isAdminAction no longer falls back to the resolved path — EG-1 returns')

@@ -1,15 +1,4 @@
-/**
- * Authoring the configurator's options (#321 M2, #260 Phase 1).
- *
- * Without this the runtime is unreachable: options could only be created by someone with SQL
- * access, which is not a feature a tenant has.
- *
- * The target material is a PICKER, not a text field, populated by parsing the product's own GLB.
- * A free-text field is the whole silent-zero class in one control — type `Fabric` where the model
- * says `Fabric_Navy` and you get an option that renders, is selectable, is priced, and changes
- * nothing, with no error anywhere. The runtime still warns after the fact (`unmatchedTargets`), but
- * preventing it at authoring time is better than reporting it afterwards.
- */
+/** Authoring the configurator's options (#321 M2, #260 Phase 1). */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { Plus, Trash2, Loader2, Palette } from 'lucide-react';

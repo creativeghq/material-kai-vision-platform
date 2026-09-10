@@ -1,17 +1,6 @@
 /**
  * A bank account is a payment destination. Two defects on the same table (#366) were both about
  * money going somewhere nobody chose:
- *
- *   • BU-9 — nothing validated an IBAN anywhere. `normalizeIban` deliberately does not (it runs on
- *     every keystroke and a half-typed IBAN must stay editable), and there were ZERO mod-97 checks
- *     across both repos. So a typo was storable as a counterparty payment destination and the
- *     first thing to notice would be a failed — or misdirected — transfer.
- *   • BU-4 — "set as primary" was a client-side two-phase write. A failure between the two calls
- *     left the counterparty with NO primary while the toast said "Failed to set primary", which
- *     reads as "nothing changed".
- *
- * Neither is visible to a typecheck: a wrong IBAN is a valid string, and a missing primary is a
- * valid absence.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';

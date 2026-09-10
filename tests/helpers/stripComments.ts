@@ -1,44 +1,4 @@
-/**
- * The one way a guard test strips comments from source it is about to assert against.
- *
- * There were TEN implementations across 41 test files, and — like every other set of copies this
- * codebase has found — they had drifted to different strengths. Thirty of them ran
- *
- *     src.replace(BLOCK_COMMENTS, '').replace(LINE_COMMENTS, '')
- *
- * which is wrong in a way that is invisible from the test's own output. A `//` comment
- * containing `/*` opens a block comment as far as that first `replace` is concerned, and it
- * closes at the next `*​/` anywhere below — deleting every line in between. `mivaa-gateway`
- * documents MIVAA's excluded prefixes as `/api/rag/*` in ordinary line comments, so 10,000
- * characters of real code disappeared before any assertion ran. Three other edge functions were
- * affected the same way.
- *
- * A guard that silently stops seeing the code it guards does not fail. It PASSES — it finds
- * nothing to object to, reports green, and keeps reporting green while the thing it was written
- * to prevent walks back in. That is the worst available failure mode for a test whose entire job
- * is to notice.
- *
- * Swapping the two replaces fixes that case and still loses to `'image/*'` — a `/*` inside a
- * string literal, which no ordering can help with. So this is a scanner rather than a pair of
- * regexes: one pass, tracking whether it is inside a string, and therefore correct on both.
- *
- * Two contracts, because callers genuinely need both:
- *   • `stripComments` removes the comment text. Use it when asserting on WHAT the source says.
- *   • `blankComments` replaces it with spaces, preserving every byte offset, line and column.
- *     Use it when reporting a line number, slicing by index, or comparing positions.
- *
- * `stripComments` NORMALIZES CRLF to LF; `blankComments` deliberately does not, because it would
- * cost exactly the byte-for-byte alignment that is its whole reason to exist. A guard's anchor
- * describes source STRUCTURE — say `"from('quote_items')\n      .insert({"` — not a byte
- * encoding, and on a Windows checkout with `core.autocrlf=true` every one of those newlines is
- * CR LF on disk, so the anchor cannot match. `quoteCostBasis` failed exactly that way locally
- * while passing in CI, where the checkout is LF. A guard that is red on one platform and green on
- * the other teaches people to stop reading `npm test`, which is the same muting problem the rest
- * of this file exists to prevent.
- *
- * A `blankComments` caller that needs both alignment AND a multi-line anchor must normalize the
- * source itself, before reading, so that offsets and anchors agree on one representation.
- */
+/** The one way a guard test strips comments from source it is about to assert against. */
 
 type Mode = 'strip' | 'blank';
 

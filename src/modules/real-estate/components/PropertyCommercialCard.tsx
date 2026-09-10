@@ -1,21 +1,4 @@
-/**
- * What has been bought, sold and spent ON this building.
- *
- * `orders.property_id` and `supplier_bills.property_id` shipped with a writer and no reader — a
- * building could be told what was bought for it and could never say so. A write-only link is
- * indistinguishable from a working one from the side that writes it, which is exactly why the
- * one-way-link class in #378 went unnoticed for so long.
- *
- * Deliberately NOT a project P&L. A job is one commitment tracked through two stages, so
- * `get_project_pnl` nets committed against actual; a building accumulates unrelated documents over
- * years, and a supplier bill that invoices a purchase order listed here is the SAME money. So
- * "ordered" and "billed" are shown apart and never added, and a bill that belongs to one of the
- * orders above says so rather than leaving the reader to double-count it.
- *
- * Renders nothing when nothing is linked. The way to link a building is on the ORDER or the
- * EXPENSE, so an empty state here could offer no honest create action — and `HubEmptyState` is
- * explicit that an empty state without a way out of being empty is worse than no empty state.
- */
+/** What has been bought, sold and spent ON this building. */
 import React, { useEffect, useState } from 'react';
 import { Building2, Receipt, ShoppingCart } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';

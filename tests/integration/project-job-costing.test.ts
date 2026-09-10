@@ -2,23 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { hasCreds, serviceClient, createUser, createWorkspace, addMember, teardown, runId, type TestUser } from './_harness';
 
-/**
- * Project job costing (#285 WS1/WS2) end to end, against real RLS.
- *
- * Nothing else can cover this. `get_project_pnl` / `get_project_labor` are pure SQL, so the
- * unit tier can only assert that the TypeScript does not re-derive the numbers — it cannot say
- * whether the arithmetic is right, whether the tenancy guards hold, or whether a cost that
- * should count actually counts. Every bug this suite pins was invisible to a green `npm test`:
- *
- *   - an approved expense tagged to a project not reaching actual_cost at all;
- *   - the expense form only saving project_id when `billable` was ticked, so every ABSORBED
- *     cost was silently unattributable to the job that bore it;
- *   - a pending claim moving the margin before anyone reviewed it;
- *   - deleting a project with any task failing outright on a project_events FK.
- *
- * Written against a live workspace with a real signed-in JWT, so the RLS policies and the
- * SECURITY DEFINER guards are the ones actually exercised.
- */
+/** Project job costing (#285 WS1/WS2) end to end, against real RLS. */
 const suite = hasCreds ? describe : describe.skip;
 
 /** jsonb numerics arrive as strings over PostgREST; compare as numbers. */

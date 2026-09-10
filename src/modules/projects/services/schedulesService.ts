@@ -1,15 +1,4 @@
-/**
- * Priced schedules — a bill of quantities: rates against measured quantities.
- *
- * `amount` is a GENERATED column in the database and is therefore READ-ONLY here. Quantity times
- * rate is a money quantity and it has exactly one implementation; this service never computes it,
- * never sends it, and a schedule total is the sum of what the database returned.
- *
- * ONE CONTRACT SCHEDULE PER PROJECT, enforced by a partial unique index. When an accepted contract
- * schedule exists it IS the contract sum and `get_project_cvr` ignores accepted quotes entirely —
- * a contractor who has priced a BoQ has one contract sum, and the quotes that led to it are
- * working papers.
- */
+/** Priced schedules — a bill of quantities: rates against measured quantities. */
 import { supabase } from '@/integrations/supabase/client';
 
 export { SCHEDULE_STATUSES, isScheduleLive } from '../scheduleVocabulary';

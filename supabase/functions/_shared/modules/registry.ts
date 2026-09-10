@@ -1,36 +1,4 @@
-/**
- * Edge-function-side module registry.
- *
- * Mirrors `src/modules/_core/registry.ts` for the Deno runtime that runs
- * Supabase edge functions. Each agent-callable module declares its
- * contributions (background agents, LLM tools) in `<slug>/manifest.ts`
- * inside this folder; the platform-level edge functions (the agent
- * runner, the agent-chat tool list builder) merge contributions from
- * enabled modules only.
- *
- * Why this exists: the previous design hardcoded
- *   `import { SocialAnalyticsSyncAgent } from '../agents/...'`
- * in `_shared/agents/registry.ts`. Toggling a module off in the DB
- * had no effect — the runner would still pick up the agent on its
- * cron tick. Same for tools: the KAI agent edge function imported
- * social tools statically, so disabling Social Media still showed
- * the tools to the LLM.
- *
- * This loader gates BOTH at request time:
- *   - Agent runner: skip if `is_module_enabled(agent.module_slug) === false`
- *   - Tool list:    omit module tools if module is off
- *
- * Module manifest contract (each `<slug>/manifest.ts` exports a
- * default `EdgeModuleManifest`):
- *
- *   {
- *     slug: 'social-media',
- *     agents: [SocialAnalyticsSyncAgent, SocialInsightsSyncAgent],
- *   }
- *
- * Ordering is irrelevant — the platform-level builder just unions all
- * enabled-module contributions with the platform-default set.
- */
+/** Edge-function-side module registry. */
 
 import type { DbClient } from '../supabase-client.ts';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';

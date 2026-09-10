@@ -1,18 +1,6 @@
 /**
  * The working surfaces of a tender package: what is being priced, who was asked, and what they
  * came back with.
- *
- * These existed only in the service until now. The comparison table could be rendered but a
- * package could never be filled, nobody could be invited and no rate could be entered — so the
- * whole feature was a screen that could only ever show an empty package. Unreachable work is the
- * failure this codebase guards against everywhere else, and it is the one I walked into here.
- *
- * ITEMS come from the priced schedule wherever possible, carrying description, unit, quantity and
- * cost code but NEVER our rate: sending our own price out with the enquiry answers the question
- * the tender exists to ask.
- *
- * RATES are typed per bidder against frozen quantities. Marking a bid received and stamping its
- * date happen in one write, because the database refuses one without the other.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {

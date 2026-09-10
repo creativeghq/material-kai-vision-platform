@@ -1,19 +1,4 @@
-/**
- * Project category management.
- *
- * The point of categorising projects is that a tenant can name the kinds of work they actually do
- * — a builder's "Renovation" and a logistics operator's "Warehouse" are not the same business, and
- * neither is served by a fixed list somebody else chose. So the four platform defaults are a
- * starting point, not the vocabulary.
- *
- * Platform defaults (`workspace_id IS NULL`) are shown read-only with a lock, exactly as
- * `DealTypeManager` shows them: they are shared with every tenant, so one workspace renaming
- * "Trip" would rename it for everyone.
- *
- * Writes are RLS-gated to workspace owners/admins. The controls are hidden for everyone else
- * rather than left armed to fail — a button that always errors is worse than no button — but the
- * hiding is UX only; `project_categories`'s policies are the boundary.
- */
+/** Project category management. */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Plus, Trash2, Loader2, Lock, ChevronUp, ChevronDown } from 'lucide-react';
 

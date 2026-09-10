@@ -1,18 +1,4 @@
-/**
- * Product fiscal-identity coverage guard.
- *
- * `products` carries a dozen fiscal/catalog columns that decide what an invoice line, a POS
- * sale and a customs declaration say. Three surfaces WRITE them — the warehouse intake form,
- * the stock-item editor, the product modal — and for a long time only the intake form offered
- * the full set while the product modal rendered three. The result was a write-only path: an
- * operator could set an invoicing unit or a TARIC code on intake and then had nowhere to see
- * or correct it, and nothing failed, because a missing form field is not a type error and an
- * unedited column is a perfectly valid NULL.
- *
- * `FISCAL_KEYS` in warehouseService is the single definition of which columns those are. This
- * test fails the build when the editor stops covering it — the same shape of guard as
- * `toolkitCoverage`, for the same reason: two hand-maintained lists that must not drift.
- */
+/** Product fiscal-identity coverage guard. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

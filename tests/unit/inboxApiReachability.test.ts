@@ -1,20 +1,4 @@
-/**
- * Guard: every action `inbox-api` implements is reachable from a screen (#342).
- *
- * `update_intake_items` and `search_intake_products` shipped with the rest of order intake,
- * complete with typed client wrappers, and had no caller. Nothing failed — the edge function
- * routed them, the wrappers typechecked, the tests passed. A reviewer looking at an intake could
- * only accept the model's whole reading or dismiss it, so one wrong line meant throwing away four
- * right ones, and the two actions that existed to fix exactly that were unreachable.
- *
- * This is the same shape `toolkitCoverage` guards on the agent side: a tool registered on an agent
- * but in no cluster is silently stripped, and a factory nothing instantiates is unreachable however
- * good the picker looks. The router is not the surface. A `case` is not a caller.
- *
- * Comments are stripped before anything is counted. `inbox-api` DISCUSSES `remove_participant` in
- * a comment about AI takeover, and a guard that accepts prose as a call site would have reported
- * this whole file green while the two intake actions sat unreachable.
- */
+/** Guard: every action `inbox-api` implements is reachable from a screen (#342). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, sep } from 'node:path';

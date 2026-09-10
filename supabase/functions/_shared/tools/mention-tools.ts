@@ -1,20 +1,4 @@
-/**
- * Mention Monitoring Tools — agent-chat surface for mention tracking.
- *
- * Tools:
- *   - track_product_mentions   — start/stop monitoring on a product or brand
- *   - get_mention_summary      — pull 7d/30d snapshot inline
- *   - check_llm_visibility     — one-shot LLM probe across cheap models
- *   - find_negative_mentions   — filtered feed for reputation triage
- *
- * Cost discipline:
- *   - track_product_mentions / get_mention_summary: 0 credits (DB reads)
- *   - check_llm_visibility:     2 credits (4 templates × 4 cheap models)
- *   - find_negative_mentions:   0 credits (DB read)
- *
- * Module-gated: every tool first verifies `mention-monitoring` is enabled.
- * If not, it returns a friendly error chunk without touching credits.
- */
+/** Mention Monitoring Tools — agent-chat surface for mention tracking. */
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what
@@ -150,18 +134,7 @@ async function refund(userId: string, workspaceId: string | null, amount: number
   }
 }
 
-/**
- * Read a product BY ID AND WORKSPACE (#352 A11, security invariant 1).
- *
- * `productId` is a model-supplied tool argument and this is the service-role client, so without
- * the workspace filter this is the pattern CLAUDE.md names as the recurring root cause of
- * pentest #250. It was worse than a plain read: the caller emits `product.name` in a progress
- * chunk before MIVAA gets a chance to authorise anything, so another tenant's product NAME
- * reached the user's screen even when the tracking call was later refused.
- *
- * Returning null on a mismatch is the 404-not-403 rule — indistinguishable from "no such
- * product", so ids cannot be enumerated.
- */
+/** Read a product BY ID AND WORKSPACE (#352 A11, security invariant 1). */
 async function getProductRow(productId: string, workspaceId: string) {
   const sb = svcClient();
   const { data } = await sb
@@ -192,23 +165,7 @@ async function getTrackedForProduct(productId: string, workspaceId: string) {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/**
- * Turn whatever the agent was given into the MIVAA path prefix for that subject.
- *
- * `tracked_mentions` holds two kinds of row and MIVAA serves both — `/products/{id}/…`
- * for a product enrolment, `/track/{id}/…` for a free brand/keyword subject. Every tool
- * in this file spoke only the first, so on a platform where all 17 tracked rows are the
- * second kind, "how visible is Flobali in AI answers?" could not be answered by the agent
- * at all. It did not error; there was simply no id to give it.
- *
- * Resolution order, most specific first:
- *   product_id           → the product's enrolment
- *   subject as a UUID    → that tracked row
- *   subject as a label   → exact match first, then a single prefix match
- *
- * A label matching several subjects returns them rather than guessing: picking one and
- * reporting its numbers under the other's name is worse than asking.
- */
+/** Turn whatever the agent was given into the MIVAA path prefix for that subject. */
 async function resolveSubjectBase(
   args: { product_id?: string; subject?: string },
   userId: string,
@@ -216,22 +173,7 @@ async function resolveSubjectBase(
 ): Promise<{ base: string; label: string; trackedMentionId?: string } | { error: string; candidates?: string[] }> {
   const sb = svcClient();
   if (args.product_id) {
-    /**
-     * A product id from the MODEL is proven to be in this workspace first (#395).
-     *
-     * This branch used to build the MIVAA path straight from the argument with no check at all.
-     *
-     * MIVAA has since been read (#395): its mention routes DO enforce ownership — `row.user_id !=
-     * caller` → 403 — and a service-role bearer is rejected outright, because `_validate_token`
-     * accepts an `mk_` key, a Supabase JWT with `aud=authenticated`, or a MIVAA JWT with a `sub`,
-     * and a service-role key is none of those. So the old code was not an authority bypass; it
-     * failed as a 401/403 from another service instead of saying what was wrong.
-     *
-     * The check still belongs here, for two reasons. Invariant 1 asks the CALLER to prove the
-     * object it names, whatever the callee does. And MIVAA's check is on the USER axis only —
-     * there is no workspace check anywhere in its mention routes — so the workspace axis exists
-     * only at this line.
-     */
+    /** A product id from the MODEL is proven to be in this workspace first (#395). */
     if (workspaceId) {
       const { data: prod } = await sb
         .from('products')
@@ -332,26 +274,7 @@ export const createTrackProductMentionsTool = (
     async ({ product_id, subject_label, subject_type, action, aliases, auto_expand_aliases, sources_enabled, language_codes, country_codes, alert_on_spike, alert_on_negative_sentiment, alert_on_new_outlet, alert_on_llm_visibility_change }) => {
       const denied = await moduleGate(workspaceId, MODULE_SLUG);
       if (denied) return denied;
-      /**
-       * A SUBJECT is trackable from chat, not only a product (#395).
-       *
-       * `tracked_mentions` is reached two ways — a product enrolment and a free brand/keyword
-       * subject — and MIVAA has served both since the feature shipped (`POST /track` takes
-       * `subject_label` / `subject_type` / `brand_name` and enforces the table's own constraint).
-       * This tool required a `product_id` and offered nothing else, so the subject arm had no
-       * agent surface at all.
-       *
-       * That is not hypothetical: `mention-monitor`'s FIRST step in workflowRegistry asks for
-       * exactly `subject_label` + `subject_type` (brand / keyword / product). Someone launching
-       * "Monitor mentions" from the command palette and typing a brand name reached a step whose
-       * only bound tool could not act on it.
-       *
-       * Same shape as `docs/prevention-coverage.md` #16 — one addressing mode has a surface and
-       * the other does not — with the halves swapped: here the SCREEN existed and the tool did
-       * not. Exactly one of the two ids is required, and saying neither is refused rather than
-       * defaulted, because guessing which thing to monitor is how a paid feed ends up watching
-       * the wrong word.
-       */
+      /** A SUBJECT is trackable from chat, not only a product (#395). */
       const wantsSubject = !!subject_label?.trim();
       if (!product_id && !wantsSubject) {
         return JSON.stringify({

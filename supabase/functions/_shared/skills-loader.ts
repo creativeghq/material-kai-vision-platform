@@ -13,10 +13,6 @@ import type { Skill, SkillMetadata } from './skills-types.ts';
 // export is what we import here — the Supabase Edge Runtime's Deno build does
 // not enable `--unstable-raw-imports`, so we cannot import the .md directly.
 // When editing a skill: edit both files OR edit SKILL.md and copy into skill.ts.
-//
-// `agents:` in the frontmatter holds agent IDS (kai, erp, interior-designer), not display names —
-// getSkillsForAgent matches on the id, so a skill listing "jarvis" or "trinity" is simply never
-// offered to anyone, with nothing raised.
 import b2bManufacturerResearch from './skills/b2b-manufacturer-research/skill.ts';
 import customerFacingReply     from './skills/customer-facing-reply/skill.ts';
 import designToQuote           from './skills/design-to-quote/skill.ts';

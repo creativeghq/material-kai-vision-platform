@@ -62,25 +62,7 @@ const HIDE_BELOW = {
   xl: 'hidden xl:table-cell',
 } as const;
 
-/**
- * DATA TABLE — the list surface: selection, sorting, loading, empty, footer.
- *
- * Everything here exists because a hand-rolled table in this codebase kept
- * missing one of them:
- *
- *  - **The sort affordance is always visible**, greyed until used. A caret that
- *    only appears on hover is undiscoverable on touch and invisible to anyone
- *    scanning for "can I sort this at all".
- *  - **Numeric columns align right and use `tabular-nums`.** Proportional digits
- *    make a column of money impossible to compare down the page, because the
- *    decimal points do not line up.
- *  - **Loading renders skeleton ROWS, not a spinner.** The table keeps its shape,
- *    so nothing below it jumps when the data lands.
- *  - **Empty is a state, not a blank area.** A table body with nothing in it and
- *    no message is indistinguishable from one that failed to load.
- *  - **The header checkbox reports a partial selection** as `indeterminate`,
- *    which is the only honest answer when some rows on the page are picked.
- */
+/** DATA TABLE — the list surface: selection, sorting, loading, empty, footer. */
 export function HubDataTable<Row>({
   rows,
   columns,

@@ -267,19 +267,7 @@ const CountSheetDialog: React.FC<{ countId: string | null; workspaceId: string; 
     try { return await p; } finally { inFlight.current.delete(p); }
   };
 
-  /**
-   * Make the durable count match what is on screen. Returns false if anything failed.
-   *
-   * Counted quantities used to persist ONLY on the input's `onBlur`, so clicking Post while a
-   * field still had focus raced that save: the count could post with the old or null quantity and
-   * no adjustment movement was ever created. `post_stock_count` cannot catch this — it correctly
-   * refuses a *second* post, but it cannot know the first one carried stale data. A count that
-   * silently posts the wrong number is worse than no count, because it closes the discrepancy in
-   * the audit trail without fixing the stock.
-   *
-   * This also covers the case blur never handled at all: a value typed and then submitted by
-   * keyboard, where no blur fires before the click.
-   */
+  /** Make the durable count match what is on screen. Returns false if anything failed. */
   const flushPendingEdits = async (): Promise<boolean> => {
     // Blur saves already running: let them finish before diffing, or the diff re-sends them.
     await Promise.allSettled([...inFlight.current]);

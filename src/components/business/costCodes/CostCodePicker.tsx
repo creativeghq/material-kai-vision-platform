@@ -1,14 +1,6 @@
 /**
  * The one cost code picker. Every surface that codes money uses this — a supplier bill, an
  * expense, a time entry, a quote line, an order line, a project task, a snag.
- *
- * Two things it deliberately does that a plain <Select> would not:
- *
- *  • An empty list says WHY it is empty and where to fix it, rather than rendering an empty menu.
- *    A picker with no options looks identical to a feature that is broken, and the workspace that
- *    has not installed a library yet is exactly the one that needs telling.
- *  • A failed load is reported, never rendered as "no cost codes". The uncoded bucket in the cost
- *    report is real money; a picker that quietly offers nothing is how it gets there.
  */
 import React from 'react';
 import { Loader2, AlertTriangle } from 'lucide-react';

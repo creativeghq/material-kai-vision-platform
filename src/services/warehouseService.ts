@@ -305,17 +305,6 @@ export const warehouseService = {
   /**
    * Create the catalog product for a received supplier line through the SHARED ingest core
    * (`/api/products/create-manual`) — the same path the dealer "Add product" form uses.
-   *
-   * This is what makes an intake-created product a first-class catalog citizen: the core
-   * registers each photo in `document_images`, runs the full image suite (SLIG visual +
-   * Claude vision_analysis → Voyage understanding + the 4 aspect vectors), canonicalizes the
-   * facets, and writes the Voyage text embedding. Doing a bare `products` insert here — as
-   * this used to — produced a product that was invisible to every search surface and whose
-   * photos lived nowhere the platform looks.
-   *
-   * Falls back to the local insert when MIVAA is unreachable: a warehouse receipt must never
-   * be blocked by the AI backend being down. The product is then created without embeddings
-   * and can be re-ingested later.
    */
   async createProductViaIngestCore(input: {
     workspaceId: string; name: string; sku?: string | null; externalSku?: string | null;
@@ -434,17 +423,7 @@ export const warehouseService = {
     if (error) throw error;
   },
 
-  /**
-   * "We already carry this" — does the OPERATOR catalog already contain this product?
-   *
-   * A dealer workspace cannot read the operator's products (RLS is workspace-scoped), so
-   * without this a dealer adding an item we already stock silently creates a duplicate that
-   * shares none of our identity, images or embeddings. The RPC verifies membership before
-   * returning anything and reports whether the caller may actually sell the match.
-   *
-   * Returns [] for the operator itself (nothing above it) and on any failure — this is an
-   * advisory check, never a gate on creating a product.
-   */
+  /** "We already carry this" — does the OPERATOR catalog already contain this product? */
   async findOperatorCatalogMatches(
     workspaceId: string,
     query: string,
@@ -574,18 +553,7 @@ export const warehouseService = {
   // line never finishes. The old flat read (every pending row, plus one price-preview round trip
   // PER ROW) is what made the tab take a minute to become usable.
 
-  /**
-   * ONTOLOGY — turn the queue's free text into a ranked work list.
-   *
-   * `ontology_scan_intake_terms` notes every distinct maker on a queued line, and every issuer
-   * NAME whose VAT could not already answer who they are. Terms an existing home can resolve are
-   * returned and written nowhere; the rest become gaps, counted by how many LINES carry them.
-   *
-   * Why this is called from the intake screen rather than a cron: the gaps only matter to the
-   * person looking at the queue, and a layer nothing calls is the failure this whole system is
-   * organised against — the ontology shipped a week before this and was reached by nothing, not
-   * one file. Idempotent, so calling it on page load is safe.
-   */
+  /** ONTOLOGY — turn the queue's free text into a ranked work list. */
   async scanIntakeTerms(workspaceId: string): Promise<{
     terms_scanned: number; already_resolved: number;
     manufacturer_gaps: number; supplier_gaps: number;

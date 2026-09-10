@@ -1,31 +1,6 @@
 /**
  * Guard: a grant says WHO may look, never WHAT they get, and a privileged storage handle is
  * derived rather than accepted. (Audit #364 — EX-2, EX-3, EX-4.)
- *
- * Three findings, one shape: the check that ran was row-level and the data that came back was
- * not.
- *
- *   EX-3  `catalog-access` resolved the CRM/membership lookups against the catalog OWNER's
- *         earliest active workspace membership rather than `presentation_catalogs.workspace_id`.
- *         For a multi-workspace owner that decided who may read a catalog using a different
- *         tenant's contact list. The same first-workspace mistake as `CM-22` in #359 — except
- *         here it is the access decision itself. And with no workspace resolved at all it fell
- *         through to an UNSCOPED lookup: any platform user's email on the whole instance
- *         matched, and the CRM searches spanned every tenant.
- *
- *   EX-4  `verify` then returned `cover_data` / `body_data` / `back_cover_data` as the raw jsonb
- *         the builder wrote. Every material carried `provenance` (the source PDF id and page it
- *         was lifted from), `price_source`/`price_source_ref`, `image_source_ref` (a product id
- *         or the supplier URL an image was scraped from) and `specs_raw`. None of it renders.
- *
- *   EX-2  `customer-assets-api` let the client write `document_bucket` / `document_path` through
- *         `warranty.save`, and then handed both to the SERVICE-ROLE storage client to sign and
- *         to remove. Owning one warranty row was enough to read — or delete — any object in any
- *         bucket. RLS never saw it: the row was legitimately theirs.
- *
- * Static, over source text. The value is in pinning the shape at the boundary, because all three
- * of these were invisible at every other layer: the queries were valid, the rows were real, and
- * every response was a 200.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';

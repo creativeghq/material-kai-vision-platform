@@ -3,14 +3,6 @@ import React, { useCallback, useRef } from 'react';
 /**
  * Shared image-backdrop canvas used by every interactive sheet widget
  * (CalloutCanvas, DimensionCanvas, FixtureSymbolCanvas).
- *
- * Mounts an <img> as the backdrop, captures pointer events on a transparent
- * overlay, converts client coordinates to NORMALIZED [0..1] space relative to
- * the rendered image area, and yields them to children via render-props.
- *
- * Why normalized: the PDF builder uses the same [0..1] convention to position
- * annotations regardless of final pixel dimensions, so the same data round-trips
- * to PDF without per-device coordinate math.
  */
 
 export interface NormalizedPoint {

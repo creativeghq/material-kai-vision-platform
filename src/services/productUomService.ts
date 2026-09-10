@@ -1,22 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { convertToBase, convertPrice, availableUnits, type ProductUom } from '@/lib/uom';
 
-/**
- * Units of measure and quantity price breaks for a product.
- *
- * The platform buys and sells the same article in different units — a gypsum board is invoiced
- * per m², counted per piece and shipped per pallet — and until now nothing related them. A
- * supplier line of 288 m² became 288 *pieces* on the stock row, because `record_stock_movement`
- * takes a bare number and no unit. That is the platform's worst failure shape: a wrong number
- * that is a perfectly valid number, which no constraint and no typecheck can see.
- *
- * The ladder is DERIVED in SQL (`get_product_uom`), never assembled here. Only the irreducible
- * facts are stored — pieces per box, boxes per pallet — and area per piece comes from the
- * product's own dimensions. TypeScript formats; SQL derives.
- *
- * The one rule callers must respect: **a missing factor is not 1.** `convertToBase` returns null
- * when the ladder cannot relate two units, and that has to be surfaced, never defaulted.
- */
+/** Units of measure and quantity price breaks for a product. */
 
 export interface ProductPackaging {
   product_id: string;

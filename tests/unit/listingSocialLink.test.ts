@@ -1,25 +1,4 @@
-/**
- * A post about a listing is LINKED to it, not tagged in jsonb (#378 N6).
- *
- * THE FINDING, AND THE HALF THAT WAS ALREADY TRUE
- * ----------------------------------------------
- * The issue says "marketing content connects to nothing it markets… marketing ROI is structurally
- * unanswerable rather than merely unreported". Half right, and the true half is the more
- * interesting defect: `real-estate-listing-social` has always announced a published listing and
- * always recorded WHICH property — as `metadata->>'property_id'`.
- *
- * A jsonb key is not a link:
- *   • no foreign key, so deleting the property leaves a dangling id nothing cleans up;
- *   • no index, and the idempotence check ran `.contains('metadata', …)` on every call;
- *   • nothing can JOIN it, which is exactly why the ROI question could not be asked of data that
- *     was already being written.
- *
- * WHAT THIS PINS
- * --------------
- * That the writer, the idempotence check and the reader all use the COLUMN. Any one of them
- * falling back to `metadata` puts the link back where it was — and it would keep working, which is
- * what makes it worth a test rather than a comment.
- */
+/** A post about a listing is LINKED to it, not tagged in jsonb (#378 N6). */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -61,11 +40,6 @@ describe('a generated video says what it was for (#378 N7)', () => {
    * the finished video URL ONTO that post. The `generation_videos` row it created for async
    * polling recorded the model, aspect ratio, duration, credits and prediction id — and not which
    * post it was for.
-   *
-   * So the relationship ran one way. From the post you could see a video; from the generation you
-   * could not see the post, which means nothing could answer "what did this video cost and what
-   * was it for" without parsing URLs. With N6 above, the chain a listing's marketing actually
-   * forms is complete: property -> post -> video.
    */
   it('the generation records the post it was generated for', () => {
     expect(

@@ -1,29 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-/**
- * Public product + 3D model read API for the embed SDK (#321 M1, #258).
- *
- * Anonymous. The caller presents a PUBLISHABLE embed key; `authenticateEmbedKey` turns it into a
- * workspace and that workspace is the only one this request can ever see. Nothing here reads a
- * workspace, user or product owner from the request — the key is the tenancy binding
- * (CLAUDE.md invariant 1).
- *
- * WHY THIS FUNCTION EXISTS AT ALL. `products` has no anon SELECT policy (authenticated +
- * is_workspace_member), and it must stay that way: the catalog holds cost prices, supplier links
- * and unpublished drafts. Loosening that RLS to serve a widget would expose every column of every
- * product to the internet. So the public path is this narrow, service-role endpoint that returns
- * an explicit allowlist of fields for an explicit allowlist of rows.
- *
- * WHAT COUNTS AS PUBLIC. Exactly what the online storefront already treats as public:
- * `product_prices.storefront_published = true` in this workspace. Reusing that flag rather than
- * inventing an `embed_published` twin means a tenant has ONE answer to "is this product public",
- * and unpublishing works everywhere at once.
- *
- * Actions (GET query params or a POST JSON body):
- *   • list       → published products, with which 3D formats each has
- *   • product    → one published product: media, gross price, and its glb/gltf/usdz models
- *   • blueprints → the workspace's embed-published configurators (metadata only)
- *   • blueprint  → one configurator: composition schema + items, cost basis folded
- */
+/** Public product + 3D model read API for the embed SDK (#321 M1, #258). */
 import { serviceClient } from '../_shared/supabase-client.ts';
 import { captureException } from '../_shared/sentry.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
@@ -124,19 +100,7 @@ async function loadOptions(
   }));
 }
 
-/**
- * The product ids this KEY may read, or null when the key is unrestricted.
- *
- * Server-side and non-negotiable: the scope lives on the key row, never in a request parameter,
- * because the key is publishable and anything the request can assert an attacker can assert too.
- *
- * This is the LIST filter; `isProductInScope` below is the GATE, and the gate is authoritative —
- * it re-asks about the one id through `embed_scope_covers_product`, the single SQL copy of the
- * rule. Kept as a query here because the shape differs (a capped set for a listing, not a yes/no),
- * and because it is deliberately allowed to truncate at MAX_SCOPE_ID_FILTER where the gate never
- * may. If the two ever disagree the gate wins, so the failure is a product appearing in a listing
- * and 404-ing when opened — visible, and never the reverse.
- */
+/** The product ids this KEY may read, or null when the key is unrestricted. */
 async function scopeRestriction(
   supabase: ReturnType<typeof serviceClient>,
   ctx: EmbedKeyContext,
@@ -177,14 +141,6 @@ async function isProductInScope(
   productId: string,
 ): Promise<boolean> {
   // THE RULE LIVES IN SQL, and this is now a pass-through (#341 join 5).
-  //
-  // It used to be spelled out here. Then the readiness panel needed the same answer — "which of my
-  // keys can actually serve this product" — and a second spelling of one rule is precisely what
-  // `embed.spec_offer_match_drift` exists to catch elsewhere: a panel promising a merchant their
-  // product is reachable while this endpoint 404s it. `embed_scope_covers_product` is the single
-  // copy; both callers pass the scope they already hold, so nothing re-reads the key row.
-  //
-  // Fails CLOSED: an RPC error answers "not in scope" rather than falling through to serve.
   const { data, error } = await supabase.rpc('embed_scope_covers_product', {
     p_workspace_id: ctx.workspaceId,
     p_scope_type: ctx.scopeType,
@@ -285,14 +241,6 @@ Deno.serve(withApiLogging((req) => {
   // A browser sends OPTIONS with NO custom headers, so `x-embed-key` is not readable here — the
   // preflight cannot know which key is coming. It is answered from `?key=` when the caller put it
   // there, and otherwise permissively.
-  //
-  // Answering permissively is safe, and refusing here would be a bug rather than a control. The
-  // preflight only decides whether the browser may SEND the real request; the real request is
-  // where the key is checked and where the response either carries this origin's CORS headers or
-  // carries none at all. A disallowed origin therefore still cannot read a single byte — it just
-  // learns that fact one round trip later. Refusing every keyless preflight, by contrast, would
-  // break the documented header-based flow completely, because that flow's preflight is ALWAYS
-  // keyless.
   if (req.method === 'OPTIONS') {
     const key = new URL(req.url).searchParams.get('key');
     if (!key) {
@@ -412,14 +360,6 @@ Deno.serve(withApiLogging((req) => {
     const ids = priced.map((r: any) => r.product_id);
 
     // Which of these have a ready model, in one query rather than N — AND how big it is.
-    //
-    // The DIMENSIONS ship with the listing because the room planner reads them off this action and
-    // there is nowhere else for it to get them: `action=product` carries them, but the planner
-    // loads a whole catalogue, and one request per product to learn a width is not a listing.
-    // Without them every product was placed at the 0.6 m placeholder with
-    // `footprint_source: 'default'`, even when its GLB had been measured on upload — a plausible
-    // number, nothing raised, and the one question the planner exists to answer ("does it fit")
-    // answered wrongly for every item.
     const formatsByProduct = new Map<string, string[]>();
     const sizeByProduct = new Map<string, { width_m: number | null; height_m: number | null; depth_m: number | null }>();
     if (ids.length) {
@@ -497,15 +437,6 @@ Deno.serve(withApiLogging((req) => {
     const options = await loadOptions(supabase, workspaceId, productId, vatRate);
 
     // HOW THIS TENANT WANTS THEIR PRODUCTS LIT (#335, wired to the embed in #382).
-    //
-    // `resolve_scene_settings` has answered `embed key → product → workspace default` since it
-    // shipped, and `scene_settings` has carried an `embed_key_id` column for exactly this — and
-    // nothing on this surface ever called it. So a merchant who set a product's lighting in-app
-    // saw it in the in-app viewer and the AR modal, and not on their own website, which is the one
-    // place their customers look. The key is passed, so a per-key override finally means something.
-    //
-    // Fails soft: an error here returns nothing and the widget keeps its built-in rig. Lighting is
-    // not worth failing a product render over.
     const { data: scene } = await supabase.rpc('resolve_scene_settings', {
       p_workspace_id: workspaceId,
       p_product_id: productId,
@@ -580,16 +511,6 @@ Deno.serve(withApiLogging((req) => {
   }
 
   // ── #382 Phase 1: the tenant's own configurator ──────────────────────────────────────────────
-  //
-  // The blueprint engine models the domain the facet wizard only gestures at — zones, module
-  // types, widths and counts, appliances, hardware yields, service connections. Until now the only
-  // anonymous path to it was `public-project-plan`, which serves OUR platform starters on OUR
-  // marketing page, so a merchant could not put their own configurator on their own site.
-  //
-  // Both actions answer with the SAME payload shape `public-project-plan` uses, from the shared
-  // column list and cost-basis fold in `_shared/blueprint/anon-pricing.ts` — the visitor prices
-  // interactively in the browser through `blueprintComposition`, and the operator's material cost,
-  // labour rate and margin never leave the server.
   if (action === 'blueprints') {
     // The shelf. Metadata only: enough to choose one, not enough to price anything — a listing
     // that shipped every item of every blueprint would hand the whole rate card to a page load.
@@ -689,11 +610,6 @@ Deno.serve(withApiLogging((req) => {
     // The SITE key is public by design — it is rendered into the widget in the page source. It ships
     // with the vocabulary because the builder needs to know whether to render a challenge BEFORE the
     // visitor reaches the quote form, and `request_quote` is the only write here.
-    //
-    // Without this the fallback path was dead. `verifyTurnstile` fails CLOSED when a secret is
-    // configured, and it is configured on this platform, so a builder that rendered no challenge
-    // had every quote request rejected — the exact silent-zero shape: the lead-capture half of the
-    // feature returning "Bot check failed" forever while the priced half looked perfectly healthy.
     const siteKey = (await resolveSecret(supabase, 'TURNSTILE_SITE_KEY')
       .catch(() => ({ value: null })))?.value ?? null;
 
@@ -706,19 +622,6 @@ Deno.serve(withApiLogging((req) => {
   }
 
   // ── #337 stage 3: "see it" when there is nothing to see ──────────────────────────────────────
-  //
-  // A spec the catalog cannot satisfy has no model and no photograph, because the thing does not
-  // exist yet. That is exactly when a visitor most needs to see something — and it is the one stage
-  // that costs real money, charged to the merchant, triggered by an anonymous stranger on their own
-  // website. So it is gated harder than every other action here:
-  //
-  //   • opt-in per key (`allow_generation`, default false) — a merchant who never asked cannot be
-  //     billed, and a leaked key cannot be turned into a spending endpoint
-  //   • a per-key DAILY cap, consumed atomically, separate from the per-minute read quota
-  //   • credits debited BEFORE the upstream call (invariant 10), never after
-  //
-  // Every refusal returns 200 with `available:false`. A visitor is not owed an explanation of the
-  // merchant's billing, and the widget simply does not offer the picture.
   if (action === 'visualize') {
     const { data: keyRow } = await supabase
       .from('material_kai_keys')
@@ -813,14 +716,6 @@ Deno.serve(withApiLogging((req) => {
   }
 
   // ── #337 "price it" ──────────────────────────────────────────────────────────────────────────
-  //
-  // The visitor built a spec across the wizard's stages and asked what it costs. Three answers:
-  //   exact → a real product, priced by the one derivation
-  //   near  → products that satisfy part of it, deliberately WITHOUT a price
-  //   none  → nothing matches; the caller should offer a quote request
-  //
-  // A price is only ever emitted for an exact match. Anything looser would put a number on a
-  // merchant's website that this tenant never agreed to.
   if (action === 'resolve') {
     let spec: Record<string, unknown>;
     try {
@@ -921,11 +816,6 @@ Deno.serve(withApiLogging((req) => {
     // The AI impression the visitor was looking at when they asked (#341 join 7). Kept because the
     // operator quoting this is otherwise reading a facet list and imagining what the customer had
     // on screen — while the picture they are anchored on existed and was discarded.
-    //
-    // VALIDATED, not trusted. This caller is anonymous, so an arbitrary string here would be stored
-    // and then rendered in the admin: a stranger would be choosing what an operator's browser
-    // loads. Only our own public generation objects are accepted; anything else is dropped and the
-    // request still lands, because losing the lead over a bad image URL would be the worse failure.
     const generatedPrefix = `${supabaseUrl}/storage/v1/object/public/generation-images/`;
     const claimedImage = typeof params.generated_image_url === 'string' ? params.generated_image_url : null;
     const generatedImageUrl = claimedImage && claimedImage.startsWith(generatedPrefix) && claimedImage.length <= 2048
@@ -950,19 +840,6 @@ Deno.serve(withApiLogging((req) => {
     const requestId = (request as { id: string }).id;
 
     // ── #382 Phase 4: the lead arrives as a PLAN, not a chip list ──────────────────────────────
-    //
-    // A configurator lead carries the visitor's actual layout — zones, module widths, counts,
-    // appliances. Recording only `spec` meant the operator quoting it re-typed the kitchen from a
-    // facet list while the real thing existed and was discarded, which is precisely the re-typing
-    // the SDK exists to remove.
-    //
-    // DELEGATED, not reimplemented. `project-plan-engine`'s `create-from-blueprint` already loads
-    // the blueprint tree with sub-blueprint expansion, applies option defaults, FREEZES the rate
-    // tables (`snapshotRateTables`) and strips absorbed groups. A second copy here would be a
-    // second derivation of plan money, free to disagree with the one the operator then edits.
-    //
-    // AFTER the request, never before. If the plan cannot be created the lead must still land —
-    // losing a customer because a plan write failed is the worse failure by a distance.
     let planId: string | null = null;
     const blueprintId = String(params.blueprint_id ?? '').trim();
     if (blueprintId) {
@@ -1028,11 +905,6 @@ Deno.serve(withApiLogging((req) => {
     // The ONLY write this anonymous surface has. Three things make that safe, and all three are
     // server-side because the caller is untrusted by construction:
     //   • workspace_id comes from the key, never the body (invariant 1)
-    //   • the product must be published AND in this key's scope — otherwise anyone holding a key
-    //     could write events against arbitrary product ids and pollute another tenant's dashboard
-    //   • event_type is an allowlist, and metadata is size-capped
-    // The per-key quota was already consumed by authenticateEmbedKey, so event spam costs the
-    // spammer their own rate limit.
     const productId = String(params.product_id ?? '').trim();
     const eventType = String(params.event_type ?? '').trim();
     if (!productId || !eventType) {
@@ -1072,7 +944,6 @@ Deno.serve(withApiLogging((req) => {
     // widget call reported success, which is the platform's dominant failure shape
     // (`ops.silent_zero`, #361 `EG-21`). Two changes: the error is CAPTURED rather than
     // logged into a stream nobody reads, and the response says plainly that the event was
-    // not recorded, so a caller (and a smoke test) can tell the difference.
     if (insErr) {
       console.error('[products-3d-api] event insert failed', insErr.message);
       void captureException(new Error(`3D embed analytics insert failed: ${insErr.message}`), {

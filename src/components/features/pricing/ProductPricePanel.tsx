@@ -5,8 +5,6 @@
  *     cost down the resale chain for an operator-catalog product it resells).
  *   • Retail   = this workspace's list_price (editable — works for the owner AND a
  *     reseller pricing a resold product; saved to product_prices for this workspace).
- *   • Margin   = retail − cost, shown red when negative (display-only, no block).
- * A reseller can set a retail price here, not only the price-owner.
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Loader2, Save } from 'lucide-react';

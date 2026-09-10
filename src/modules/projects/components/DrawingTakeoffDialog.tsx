@@ -1,18 +1,4 @@
-/**
- * The schedules printed on a drawing, proposed as bill-of-quantities lines.
- *
- * A PROPOSAL, and the whole screen is built around that. Every row shows the schedule and row it
- * was transcribed from, because that citation is the only thing separating this from measuring a
- * drawing — and measuring is what the reader is forbidden to do, since a guessed quantity is
- * indistinguishable from a read one and somebody orders materials against it.
- *
- * Rows arrive UNTICKED. A screen that pre-selects everything and offers "Add" turns confirmation
- * into a formality, which is the same as not asking.
- *
- * A row with no printed quantity is kept and shown as "not stated". It is a real finding — the
- * sheet lists the item and gives no count — and it is added as a line with a null quantity so the
- * gap is in the BoQ where somebody has to close it, rather than silently absent or, worse, zero.
- */
+/** The schedules printed on a drawing, proposed as bill-of-quantities lines. */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, ScanLine, AlertTriangle, Check } from 'lucide-react';
 

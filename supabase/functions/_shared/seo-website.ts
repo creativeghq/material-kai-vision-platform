@@ -1,15 +1,4 @@
-/**
- * seo-website.ts — resolve the connected website an SEO operation belongs to.
- *
- * Connected websites (`user_websites`) are workspace-shared. Every SEO output —
- * articles, keyword research, toolkit runs, domain audits — is filed under the
- * website it was produced for, and the SEO toolkits default to the workspace's
- * primary (default) website when the caller doesn't name one.
- *
- * Shared by: seo-api pipeline/research handlers, seo-agent-tools, seo-tools.
- * The Supabase client passed in is the SERVICE-ROLE client — callers are
- * expected to have already reconciled the caller against the workspace.
- */
+/** seo-website.ts — resolve the connected website an SEO operation belongs to. */
 
 export interface ResolvedWebsite {
   id: string;

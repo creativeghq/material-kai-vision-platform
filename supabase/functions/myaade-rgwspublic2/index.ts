@@ -1,23 +1,4 @@
-/**
- * myaade-rgwspublic2
- *
- * SOAP 1.2 client for ΑΑΔΕ RgWsPublic2 — Greek business lookup by ΑΦΜ.
- *
- *   POST /functions/v1/myaade-rgwspublic2
- *     body: { afm: string, company_id?: string }
- *
- *   Returns: { ok, valid_afm, basic_rec, activities, error?, source, checked_at, secret_sources }
- *
- * Auth model:
- *   - Caller must be an authenticated user (we use the user's JWT to identify them).
- *   - TAXISnet creds come from the shared resolveAadeCredentials helper
- *     (env-first → DB fallback, common to every myaade-* function).
- *
- * Side effects ΑΑΔΕ users should know about:
- *   - Every lookup writes an audit entry to the looked-up ΑΦΜ's TAXISnet inbox.
- *   - There is a monthly quota on the TAXISnet account. We minimize calls via
- *     `crm_companies.aade_data` cache (90-day TTL — refreshed on demand).
- */
+/** myaade-rgwspublic2 */
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { mergeKad } from '../_shared/kad.ts';
@@ -438,20 +419,7 @@ Deno.serve(withApiLogging('myaade-rgwspublic2', async (req: Request) => {
       }, 404);
     }
 
-    /**
-     * RECORD THAT *WE* VERIFIED IT (#353 CRM-7).
-     *
-     * `crm_companies.vat_validated` is a trust assertion on a record that feeds invoicing, and it
-     * sat in the crm-api write allowlist — so any CRM-capable caller could mark a number verified
-     * having done no lookup at all. It could not simply be dropped: the real flow is this
-     * server-side lookup followed by a client save.
-     *
-     * The receipt is the missing link. Written only when ΑΑΔΕ actually answered with an ACTIVE
-     * business (`deactivation_flag === '1'`), so a save cannot stamp "verified" for a number ΑΑΔΕ
-     * reported as deactivated. Keyed on the normalised number (#353 CRM-4) so `EL800370260` and
-     * `800 370 260` are one receipt. The workspace is already verified above by
-     * `is_workspace_finance_manager`.
-     */
+    /** RECORD THAT *WE* VERIFIED IT (#353 CRM-7). */
     if (body.workspace_id && basicRec.deactivation_flag === '1') {
       const { error: receiptErr } = await admin.from('vat_validation_receipts').upsert({
         workspace_id: body.workspace_id,
@@ -528,8 +496,6 @@ Deno.serve(withApiLogging('myaade-rgwspublic2', async (req: Request) => {
     // gate (created_by === user OR GLOBAL role admin/super_admin/owner) was STRICTER than the lookup, so
     // a finance-role user or a workspace-admin member who didn't create the company passed the lookup but
     // the cache never persisted → the 90-day short-circuit could never fire → every repeat re-burned the
-    // quota and re-notified the third party. Now: persist whenever the company belongs to the authorized
-    // workspace.
     if (body.company_id) {
       const { data: company } = await admin
         .from('crm_companies')

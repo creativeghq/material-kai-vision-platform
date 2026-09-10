@@ -1,15 +1,4 @@
-/**
- * Markup on a drawing revision — clouds, notes and measurements over the sheet.
- *
- * Two things live in SQL rather than here:
- *
- *  - **Raising an RFI from a markup.** `raise_rfi_from_markup` creates the question AND stamps the
- *    markup in one call. Two calls would leave a NUMBERED RFI in the register with no link back on
- *    a dropped connection, and the person — who saw an error — would press again and put a second
- *    numbered question to the architect about the same detail.
- *  - **The scale**, which lives on the REVISION. Every measurement on a sheet uses one scale, and
- *    storing it per markup is how two lines on one drawing end up measured differently.
- */
+/** Markup on a drawing revision — clouds, notes and measurements over the sheet. */
 import { supabase } from '@/integrations/supabase/client';
 import type { MarkupGeometry, MarkupKind } from '../lib/drawingMarkup';
 

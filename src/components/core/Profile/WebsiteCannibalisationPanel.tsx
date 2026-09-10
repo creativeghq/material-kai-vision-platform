@@ -11,20 +11,7 @@ import {
 } from '@/services/userWebsitesService';
 import { compact } from './seo/seoMetrics';
 
-/**
- * Websites → Search Performance → Competing pages.
- *
- * Google picks ONE page per query per site. When two of yours qualify it may not
- * pick the one you would, and the signal that should have gone to a single page is
- * split — so neither ranks as well as one would.
- *
- * This is invisible in every other view by construction: each page, looked at
- * alone, is fine. It only appears when you group Search Console rows by QUERY and
- * notice more than one of your own URLs under it — which is why it needs its own
- * surface rather than a column somewhere.
- *
- * Everything here is derived by `get_website_cannibalisation`; this formats.
- */
+/** Websites → Search Performance → Competing pages. */
 
 function severityVariant(s: string): 'error' | 'warning' | 'neutral' {
   return s === 'high' ? 'error' : s === 'medium' ? 'warning' : 'neutral';

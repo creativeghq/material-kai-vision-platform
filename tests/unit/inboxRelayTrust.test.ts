@@ -1,22 +1,4 @@
-/**
- * The Inbox does not deliver whatever it is told to, wherever it is told to (#359 CM-6/7/8).
- *
- * Three findings that are moderate alone and a closed loop together:
- *
- *   CM-6 `create_thread` wrote `metadata: payload.metadata ?? {}` — the request body, verbatim,
- *        into the column the relay reads to decide where a message goes. `email_from` is the
- *        recipient and `email_to` is the mailbox we send FROM, so a caller could have the platform
- *        deliver arbitrary text to an arbitrary address from the tenant's own verified sender.
- *   CM-7 An already-stored attachment reference passed through untouched, so any private object
- *        the service role could reach — a payslip, a contract, another customer's invoice — could
- *        be attached and relayed out.
- *   CM-8 The sentiment classifier fenced the transcript with a bare `<conversation>` tag, which is
- *        something a message can contain and thereby close.
- *
- * Combined with the model-settable `confirm` on `manage_inbox` (#352), the loop closes: an
- * attacker emails you, the agent reads it, and the agent mails whoever the injected text names,
- * with whatever file it names attached.
- */
+/** The Inbox does not deliver whatever it is told to, wherever it is told to (#359 CM-6/7/8). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

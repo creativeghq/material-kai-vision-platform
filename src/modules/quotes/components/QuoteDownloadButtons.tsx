@@ -1,14 +1,4 @@
-/**
- * QuoteDownloadButtons
- *
- * Two actions:
- *  1. "Preview"      — opens /quotes/:id/preview in a new tab
- *  2. "Download PDF" — captures each .quote-page with html2canvas → jsPDF (A3 landscape)
- *
- * The hidden QuoteDocument is rendered off-screen at full resolution (4961×3508 px,
- * no zoom) so html2canvas sees the exact same pixels as the print-ready document.
- * We await document.fonts.ready before capture so Open Sans renders correctly.
- */
+/** QuoteDownloadButtons */
 
 import React, { useRef, useState } from 'react';
 // Dynamically imported on button click to avoid bundling ~613KB on page load

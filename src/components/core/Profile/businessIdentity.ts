@@ -1,23 +1,4 @@
-/**
- * The business identity behind Profile → Business.
- *
- * **The derivation is in SQL and nothing here repeats it.** `my_business_identity()` answers who
- * you are as a business — the explicit `user_profiles.business_id` link if there is one, otherwise
- * the invoicing profile of a workspace you own or administer — and returns the two copies plus the
- * identity fields they disagree on, already compared.
- *
- * That split is the whole point. "Am I a business?" used to be recorded twice: once in
- * `finance_settings.business_*`, the identity printed on every invoice and transmitted to myDATA,
- * and once in `user_profiles.entity_type`, the copy `role-upgrade-requests` checks. Only the first
- * is load-bearing, so it is the one an operator fills in — and a workspace could therefore invoice
- * as a real ΕΕ, with a VAT number and a ΓΕΜΗ number, while its own admin was shown a badge reading
- * "Solo entity" and told to switch if they "operate as a registered company". Nothing was
- * detectably wrong: `'solo'` is a valid `entity_type` and the finance row was complete.
- *
- * A TypeScript twin of the projection would be that same second copy wearing a different hat, so
- * this file holds only the shapes, the labels and the parser. If you need to know what the
- * invoicing profile says, ask the database. Kept free of the Supabase client so it stays testable.
- */
+/** The business identity behind Profile → Business. */
 
 /** The company fields Profile → Business edits, mirroring the `crm_companies` columns it writes. */
 export interface BusinessForm {

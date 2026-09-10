@@ -53,9 +53,6 @@ export async function createWorkspace(svc: SupabaseClient, label: string, rid: s
     // provider for this tenant. This tier runs against PRODUCTION on purpose — that is how it
     // covers real RLS — and on 2026-07-28 a test flipping a delivery note to `issued` fired the
     // seeded Order-Dispatched flow and produced 134 attempted sends from the production domain.
-    // Set it HERE rather than inferring it from the `e2e-` slug: that convention exists for
-    // cleanup_test_artifacts to reap rows, and reusing it as an egress signal would silently mute
-    // a real customer who happened to pick a matching slug. (#292 item 1)
     .insert({
       name: `E2E ${label} ${rid}`,
       slug: `e2e-${label}-${rid}`.toLowerCase(),
@@ -71,24 +68,6 @@ export async function createWorkspace(svc: SupabaseClient, label: string, rid: s
 /**
  * Put the fixture's owner on an unlimited plan. **Opt-in — call it only from a suite that needs
  * more than ten catalog products.**
- *
- * #214 added `enforce_material_quota`, which caps a workspace at its plan's `max_materials`.
- * `workspace_quota` resolves that from the OWNER's active subscription and falls back to the
- * `free` plan — 10 materials — when there is none. A fixture owner has no subscription, so from
- * the moment that trigger shipped every suite creating more than ten products died with
- * `quota_exceeded`, and since the deploy job runs these tests, nothing deployed for hours. The cap
- * was right; the fixtures were invisible to it.
- *
- * Deliberately done through the REAL mechanism — a real `user_subscriptions` row on the real
- * `enterprise` plan — rather than exempting fixtures inside the trigger. An `is_fixture` bypass in
- * `enforce_material_quota` would be a quota escape hatch living in production code, keyed on a
- * column, one RLS mistake away from being a free upgrade for anyone who can create a workspace.
- *
- * NOT called from createWorkspace, and that is the point. A plan raises the workspace's TIER, and
- * tier covers modules: granting it to every fixture made `hr-job-postings-admin` — which asserts a
- * 402 for a workspace not entitled to HR — get a 201 instead. A bare workspace with no plan is
- * what most suites are actually testing against, so it stays the default and the quota is bought
- * only where it is needed.
  */
 export async function grantUnlimitedPlan(svc: SupabaseClient, userId: string): Promise<void> {
   const { data: plan, error: planErr } = await svc
@@ -151,12 +130,6 @@ async function step(
 
 // Best-effort teardown. Data first (FK), then memberships, workspaces, users. Never throws —
 // the email-prefix cron is the backstop if anything here fails.
-// It must never throw, but it MUST NOT be silent. Never write `.then(() => {}, () => {})`
-// here — that discards the error object as well as the exception, so a BEFORE DELETE guard on
-// a cascaded child (finance_categories' system-category trigger) aborting `delete from
-// workspaces` leaves teardown reporting nothing and "passing" while fixture workspaces pile
-// up in production. Collect every failure, VERIFY the workspaces actually went, and warn
-// loudly with the count.
 export async function teardown(svc: SupabaseClient, opts: { wsIds?: string[]; userIds?: string[] }): Promise<void> {
   const explicitWs = (opts.wsIds || []).filter(Boolean);
   const userIds = (opts.userIds || []).filter(Boolean);

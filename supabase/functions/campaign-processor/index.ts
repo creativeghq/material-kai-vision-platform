@@ -2,19 +2,6 @@
  * Campaign Processor Edge Function
  * Processes scheduled + sending EMAIL campaigns and dispatches to recipients via email-api.
  * Runs via cron every minute.
- *
- * This only handles `channel_type='email'` campaigns (WhatsApp/messaging campaigns are
- * driven by messaging-processor). Every send is workspace-scoped and BYOK-only:
- *   • passes `workspace_id` so email-api resolves the workspace's OWN Resend key + verified sender
- *     AND enforces the platform-controlled per-workspace daily cap (checkWorkspaceSendQuota).
- *   • passes `templateSlug` (resolved from campaign.template_id) + `subjectOverride` so email-api
- *     renders the template with variables while the campaign's subject_line wins.
- *   • passes `requireWorkspaceSender: true` → email-api 503s rather than falling back to the
- *     platform domain. A campaign whose workspace has no BYOK is short-circuited to `paused` with
- *     a `blocked_reason` (the UI surfaces "configure Resend") instead of burning every recipient.
- *
- * The previous version POSTed `{template_id, subject, variables}` (keys email-api doesn't read) and
- * never passed workspace_id — every campaign send errored and would have used the platform key.
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -261,20 +248,7 @@ serve(withApiLogging('campaign-processor', async (req) => {
 
       for (const recipient of recipients) {
         try {
-          /**
-           * CLAIM THE ROW, do not merely mark it (#357 AE-4).
-           *
-           * This was an unconditional `update({status:'sending'}).eq('id', …)` after a plain
-           * SELECT of pending rows. Two concurrent runs — a retry, an overlapping cron tick,
-           * a manual trigger — both read the same pending set, both wrote 'sending', and both
-           * sent. The recipient gets the campaign twice, which for marketing mail is a
-           * compliance problem and not merely untidy.
-           *
-           * `.eq('status', 'pending')` makes the UPDATE itself the claim: Postgres applies it
-           * to at most one worker, and the loser gets no row back and skips. Same shape as
-           * `receive_order_into_warehouse` (#355), which makes a repeat receive a no-op by
-           * construction rather than by hoping the caller does not retry.
-           */
+          /** CLAIM THE ROW, do not merely mark it (#357 AE-4). */
           const { data: claimed, error: claimErr } = await supabase
             .from('campaign_recipients')
             .update({ status: 'sending' })
@@ -354,18 +328,7 @@ serve(withApiLogging('campaign-processor', async (req) => {
             console.log(`Campaign ${campaign.id} hit daily send cap; will resume when the cap resets.`);
             break;
           } else if (emailResponse.status === 429) {
-            /**
-             * ANY other 429 — a provider throttle, an upstream Resend limit (#357 AE-16).
-             *
-             * Only the daily-cap code above was treated as retryable; every other 429 fell to
-             * the `throw` below and the catch marked the recipient FAILED. Failed is terminal:
-             * it drops out of the pending queue for good, so transient throttling permanently
-             * removed people from a campaign they were meant to receive — and the campaign then
-             * completed as `partial_failure` with a count that looks like bad addresses.
-             *
-             * Re-queued and the batch stops, rather than continuing to hammer something that
-             * has just asked us to slow down. The cron picks it up on the next tick.
-             */
+            /** ANY other 429 — a provider throttle, an upstream Resend limit (#357 AE-16). */
             await supabase.from('campaign_recipients').update({ status: 'pending' }).eq('id', recipient.id);
             console.warn(
               `[campaign-processor] campaign ${campaign.id} throttled (429 ${result?.code ?? 'no code'}) — `

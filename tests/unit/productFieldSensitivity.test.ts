@@ -1,27 +1,4 @@
-/**
- * The product detail surface hides internal fields, and cannot be made to stop quietly (#368).
- *
- * THE BUG. `ProductDetailModal`'s permission model gates SECTIONS — stock, cost, listings,
- * movements each ask whether this viewer may see that section, on both axes (ownership AND
- * capability). The Details tab is not a section. It is a walker: it collects
- * `attributes` + `metadata` + `properties` + `specifications`, descends into nested groups, and
- * renders every remaining key it finds. So the gating was per-section while the renderer was
- * per-key, and anything sensitive landing in jsonb rather than in a dedicated column went
- * straight past it — to whoever could see the product, including a project client.
- *
- * That is not hypothetical here: `attributes_raw` is where supplier XML lands, `attributes` is
- * where AI extraction writes, and extraction is explicitly allowed to invent fields the registry
- * has never seen. A feed carrying `cost`, `wholesale`, `buy_price` or `margin` renders.
- *
- * WHY THESE TESTS AND NOT A TYPE. A withheld field and a shown field are the same string; a
- * filter that has quietly stopped filtering produces a page that looks exactly right. The
- * failure is invisible by construction, so it has to be asserted.
- *
- * SCOPE. The server half — `is_internal_product_field`, `redact_internal_product_fields` and the
- * allowlisted projection in `get_product_detail` — lives in `pg_proc` and cannot be seen from
- * here (this project's SQL is applied through the Supabase MCP and never committed as a file).
- * A green run here says nothing about that half.
- */
+/** The product detail surface hides internal fields, and cannot be made to stop quietly (#368). */
 import { describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

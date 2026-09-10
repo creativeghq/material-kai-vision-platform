@@ -18,12 +18,6 @@ import { formatDate } from '@/utils/datetime';
  * navigate beyond this thread; signup carries the token so the account can adopt the
  * thread via token_claim (the conversion handshake). Anonymous reads go through the
  * service-role token branch of inbox-api (RLS would otherwise hide the thread).
- *
- * READING is link-only; REPLYING is not (#357 AE-12). Possession of the URL proves possession of
- * the URL — a forwarded mail, a quoted reply chain or a shared mailbox hands it to someone who
- * would then be posting as the customer. So the first reply from a browser costs a one-time code
- * sent to the address the link was issued for, and the proof that comes back is kept locally for
- * a few hours. A forwarded link carries no localStorage, which is the whole point.
  */
 
 /** Where this browser keeps its proof for one conversation. Keyed by token: a customer may hold

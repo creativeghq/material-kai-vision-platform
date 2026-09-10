@@ -1,17 +1,4 @@
-/**
- * Flesch Reading Ease, 0–100, or null when the formula does not apply.
- *
- * The field shipped as a hardcoded `readabilityScore: null // Could be enhanced with
- * Flesch-Kincaid`, so every article reported a blank where a score belongs.
- *
- * Null for non-Latin scripts, and that is the point rather than a shortcoming. Flesch's
- * constants are fitted to English syllable and sentence statistics; run them over Greek and
- * they still return a number — a confident, meaningless one, which is worse than a blank
- * because nothing downstream can tell it from a real reading. The platform's first article
- * is Greek, so this would have been the very first score it produced. A stated absence beats
- * a fabricated figure (anti-regression rule 3); the length checks above are language-agnostic
- * and keep working either way.
- */
+/** Flesch Reading Ease, 0–100, or null when the formula does not apply. */
 export function readingEase(markdown: string): number | null {
   // Strip markdown furniture so hashes, list bullets and link syntax are not counted as words.
   const prose = markdown

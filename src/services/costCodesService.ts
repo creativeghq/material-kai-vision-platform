@@ -1,16 +1,4 @@
-/**
- * Cost codes — the classification every construction cost and every priced line hangs off.
- *
- * Unlike `project_categories`, there is NO platform-default tier. Nobody numbers a cost breakdown
- * the same way ("05.2 Plumbing" is one firm's convention and another's nonsense), so every row
- * belongs to one workspace and is that workspace's to rename. The starter library is COPIED in by
- * `install_starter_cost_codes` rather than shared, which is what makes it editable on day one.
- *
- * RLS is the boundary — select for members, write for workspace admins — so this service adds no
- * scoping of its own beyond the workspace filter the query needs anyway. What it adds is a
- * readable sentence for the errors a user can actually cause: a raw 23505 / 23503 / 23514 / 42501
- * says nothing about what to do next, and the hierarchy guard raises three different 23514s.
- */
+/** Cost codes — the classification every construction cost and every priced line hangs off. */
 import { supabase } from '@/integrations/supabase/client';
 import { type CostCode } from '@/utils/costCodeTree';
 

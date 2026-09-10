@@ -9,15 +9,6 @@ import { formatDate, localISODateOffset } from '@/utils/datetime';
  * Listing performance (#281 gap 8). Everything here is READ from
  * `get_property_performance` — days-on-market included. Nothing on this panel recomputes a metric
  * from columns; that is the whole point of the derivation existing.
- *
- * Form choices, deliberately:
- *  • The headline metrics are single numbers with no trend to show → stat tiles, not charts.
- *  • Views over time is one series → a sparkline with no legend (the heading names it).
- *  • Lead sources is magnitude across a handful of named categories → ONE hue with the source name
- *    carrying identity, so there is no categorical palette to get wrong and identity is never
- *    color-alone.
- * Colour comes from the theme's `--primary` token, so light and dark are the design system's
- * problem rather than a second hardcoded palette.
  */
 
 const Tile: React.FC<{ label: string; value: React.ReactNode; hint?: string }> = ({ label, value, hint }) => (

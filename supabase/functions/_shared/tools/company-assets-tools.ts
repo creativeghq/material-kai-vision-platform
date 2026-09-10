@@ -1,12 +1,6 @@
 /**
  * Company Assets Tools — agent-chat surface for the shared Company Assets register (the same
  * data the Finance + HR "Assets" panels use). One tool, action enum: list / add / assign / return.
- *
- * Tracks owned/leased/financed company property (vehicles, phones, cards, laptops, equipment) and
- * who currently holds each. All reads/writes are scoped to the caller's workspace_id (resolved
- * upstream by agent-chat, NEVER from the LLM args) — this is the tenancy boundary under the
- * service-role client. People/assets referenced by name are resolved within that workspace only,
- * so a cross-workspace id can never be reached.
  */
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic

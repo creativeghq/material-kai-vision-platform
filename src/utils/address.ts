@@ -1,17 +1,6 @@
 /**
  * Postal-address derivations — ONE implementation, shared by every surface that
  * shows an address.
- *
- * The platform stores an address as loose parts (`street` / `street_number` /
- * `postal_code` / `city` / `state` / `country`, plus a legacy free-text `address`
- * that older rows put the whole street line into). Turning those parts back into
- * something a human — or Google Maps — can read is a DERIVATION, and it was
- * about to be written a fourth time. `formatAddressLine` in `crm.service.ts`
- * delegates here so there is exactly one answer to "what does this address say".
- *
- * Deliberately dependency-free apart from the country-code table (itself import-free
- * and mirrored to Deno): it is pure string work with no dependency on the supabase
- * client, so a component can pull it without dragging the CRM service in.
  */
 import { isoCountryCode } from '@/lib/countryCodes';
 
@@ -97,19 +86,7 @@ function finite(v: unknown): number | null {
   return Number.isFinite(n) ? (n as number) : null;
 }
 
-/**
- * A Google Maps URL for this address, or null when there is nothing to point at.
- *
- * Precedence is most-exact-first, because each later form is a guess at the one
- * before it:
- *   `cid` / `place_id` — Google's own id for THAT listing
- *   `lat`/`lng`        — a surveyed point (a property listing carries one)
- *   the address text   — Google's best guess, which for a warehouse on an
- *                        industrial road is frequently a different building
- *
- * Uses the documented `maps/search/?api=1` entry point — stable, needs no API
- * key, and works on desktop web, Android and iOS (where it hands off to the app).
- */
+/** A Google Maps URL for this address, or null when there is nothing to point at. */
 export function googleMapsUrl(
   a: AddressLike | null | undefined,
   ids?: { place_id?: string | null; cid?: string | null; lat?: number | string | null; lng?: number | string | null },

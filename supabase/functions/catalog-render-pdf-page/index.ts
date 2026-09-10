@@ -1,14 +1,4 @@
-/**
- * catalog-render-pdf-page
- *
- * Thin proxy to MIVAA's `/api/internal/catalog/rasterize-pdf-page`. Takes a
- * `source_pdf_id` + `page_no` (+ optional normalized [0..1] bbox), returns a
- * signed URL to the rendered PNG stored at `pdf-tiles/catalog-extracted/`.
- *
- * Used by `catalog-extract-from-pdfs` and `catalog-translate-pdf` to populate
- * `image_url` on every extracted candidate without dragging the heavy Wasm
- * PDF stack into the edge runtime.
- */
+/** catalog-render-pdf-page */
 import { corsHeaders } from '../_shared/cors.ts';
 import { jsonResponse } from '../_shared/http.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';

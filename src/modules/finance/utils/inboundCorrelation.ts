@@ -1,36 +1,4 @@
-/**
- * A ΔΑ and the ΤΙΜ that bills it, told apart and shown together.
- *
- * myDATA has TWO kinds of delivery note, and only one of them needs any of this:
- *
- *   ΤΔΑ  `1.1` with `isDeliveryNote` — a delivery note that IS the invoice. Full per-item prices,
- *        total = the sum of its lines, self-contained. 522 held here, every one priced.
- *   ΔΑ   `9.3` — issued when the invoice follows SEPARATELY, so it prices nothing: the items and
- *        quantities are there and every value is zero. 104 held here, 205 lines, 35 issuers, not
- *        one non-zero value. Its ΤΙΜ then collapses the itemisation to a single value-only line,
- *        because the detail already reached AADE on the ΔΑ and repeating it would file it twice.
- *
- * So it is the ΔΑ/ΤΙΜ pair that arrives as two halves of one purchase. Saying "a delivery note
- * carries no money" is false and was this feature's first mistake — it is true of a ΔΑ only, and
- * only because the invoice is coming.
- *
- * Held apart, the Expenses inbox shows 104 deliveries worth nothing next to 701 invoices of
- * nothing, and neither row is wrong. This module is the wording that joins them.
- *
- * Two rules it exists to keep, both of which are easy to break by writing the obvious thing:
- *
- *  1. **A guess never renders as a fact.** `status` is `linked` (AADE stated it in the document
- *     header, or an operator confirmed it) or `suggested` (ours, nobody has ruled on it). The
- *     suggested wording is a QUESTION — "ΔΑ 2944?" — and the confirmed wording is a statement.
- *     Rendering both as "Detail on ΔΑ 2944" would make a 0.25-confidence coincidence and the
- *     issuer's own declaration the same sentence.
- *
- *  2. **The invoice's money never appears in the delivery note's money column.** It is the
- *     obvious fix for a ΔΑ row reading €0.00 and it is double counting: the column is summed, and
- *     the €626.44 is already on the ΤΙΜ row two lines up. A delivery note is worth zero because
- *     it IS worth zero; what it was missing is a NAME for the money, not the money. So the
- *     correlation goes in the detail column as "Invoiced by ΤΙΜ 2734" and the totals stay put.
- */
+/** A ΔΑ and the ΤΙΜ that bills it, told apart and shown together. */
 
 /** What an edge means, read from this document's side. Derived in SQL by `_inbound_link_relation`. */
 export type InboundLinkRelation =
@@ -92,17 +60,7 @@ const typeWord = (docType: string | null | undefined): string => {
   return 'invoice';
 };
 
-/**
- * What to CALL the other document.
- *
- * `other_label` is the issuer's own `series aa`, and for a Greek series that is already the whole
- * answer — ΔΑ 2944 and ΤΙΜ 2734 tell an operator what they are looking at. But a series is free
- * text and plenty of issuers use digits: this workspace holds documents labelled `0 000008` and
- * `1 1`, and "Detail on 0 000008" gives the person confirming nothing to confirm.
- *
- * So the type word is added exactly when the label cannot speak for itself — no letters in it —
- * rather than always, which would produce "Invoiced by invoice ΤΙΜ 2734".
- */
+/** What to CALL the other document. */
 export function documentLabel(link: InboundLinkSummary): string {
   const label = (link.other_label ?? '').trim();
   if (!label) return `${typeWord(link.other_doc_type)} ${link.other_mark}`;
@@ -229,20 +187,7 @@ export function correlationCellLabel(link: InboundLinkSummary | undefined): {
   };
 }
 
-/**
- * Whether a line's money is a real figure, and if not, why not.
- *
- *   stated       the line carries its own money, as an ordinary invoice line does
- *   derived      the lines came off a delivery note, but there is only ONE of them — so the
- *                invoice total IS that line's money. Nothing is apportioned and nothing guessed.
- *   unallocated  several delivery-note lines against one invoice total, and the delivery note's
- *                own line values are all zero, so there is no share to pro-rate by. A boiler and
- *                its flue are not half the invoice each. THIS is where a dash is the honest answer.
- *   none         there are no lines at all
- *
- * The first cut collapsed `derived` into `unallocated` and hid a figure we actually knew on 74 of
- * 134 linked pairs. Suppressing a known number is its own kind of lying about the data.
- */
+/** Whether a line's money is a real figure, and if not, why not. */
 export type InboundLineCostStatus = 'stated' | 'derived' | 'unallocated' | 'none';
 
 /** Per-line verdict, so a reader never has to infer it from whether a number happens to be null. */

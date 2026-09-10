@@ -1,16 +1,4 @@
-/**
- * Shared Zernio client + helpers.
- *
- * Zernio (formerly Late) is the social-publishing + WhatsApp backbone.
- * Base URL: https://zernio.com/api/v1 — Bearer-auth with the workspace's Zernio API key.
- *
- * This file is the single source of truth for the Zernio client. `zernio-api/zernio.ts`
- * re-exports from here so the social functions keep their existing import paths.
- *
- * Secret resolution is env-first / DB-fallback and goes through _shared/secrets.ts →
- * resolveSecret(): ZERNIO_API_KEY first, falling back to the legacy LATE_API_KEY so existing
- * deployments keep working until the new key is pasted in.
- */
+/** Shared Zernio client + helpers. */
 
 import { resolveSecret } from './secrets.ts';
 import { fetchBinaryGuarded, SSRFError } from './fetch-image.ts';
@@ -27,26 +15,12 @@ let resolvedWebhookSecret: string | null = null;
 let resolvedAt = 0;
 
 // A resolved key is cached, but NOT for ever.
-//
-// An edge worker stays warm for many minutes. Caching indefinitely means the very state an
-// admin is actively fixing — key absent — sticks for the life of the worker: they paste the
-// key, the row saves, and the warm worker keeps answering 503 from a cached ''. That is the
-// same "saved and never read" shape this whole resolver exists to remove, just with a shorter
-// fuse. A found key is stable, so it is held longer; an ABSENT one is re-checked almost
-// immediately, because someone is probably fixing it right now.
 const RESOLVED_TTL_MS = 5 * 60_000;
 const ABSENT_TTL_MS = 15_000;
 
 /**
  * Resolve the Zernio secrets through the platform resolver and cache them for the worker.
  * MUST be awaited at handler entry, before the first zernioKey() / zernioApi() call.
- *
- * Both getters used to read Deno.env.get() directly, which can NEVER see an admin-saved value:
- * the secrets-bootstrap that would copy platform_secrets into env is a no-op on the Supabase
- * edge runtime, where Deno.env.set throws 'The operation is not supported' (the warning is
- * documented in _shared/secrets-bootstrap.ts). That made the whole Zernio surface a silent dead
- * end — messaging-api answered 503 with 'paste the key at /admin/modules/messaging/settings →
- * Keys', the admin pasted it, the row saved, and nothing ever read it back. Sentry KAI-RD.
  */
 export async function ensureZernioSecrets(supabase: SupabaseLike): Promise<void> {
   const ttl = resolvedApiKey ? RESOLVED_TTL_MS : ABSENT_TTL_MS;
@@ -103,14 +77,6 @@ export class ZernioApiError extends Error {
 /**
  * Call the Zernio REST API. Throws ZernioApiError on non-2xx. Returns parsed JSON
  * (or {} for empty bodies).
- *
- * Rate limits are tier-based (60 req/min on the free tier, 600 on standard; analytics
- * endpoints are stricter at ~6 req/s). A 429 carries `Retry-After` in seconds, which is
- * relative and therefore immune to clock skew — honour it rather than guessing. Without this
- * a single burst (sync-channels over N accounts, the analytics agent over a batch of 20)
- * surfaced as an opaque failure with no indication that waiting would have fixed it.
- *
- * `opts.headers` exists for `x-request-id`, Zernio's 5-minute idempotency key.
  */
 export async function zernioApi(
   method: string,
@@ -160,19 +126,7 @@ export async function zernioApi(
 // The hunt was solving a problem that did not exist, and it is gone rather than unused so it
 // cannot be picked back up.
 
-/**
- * Download a Zernio-hosted media URL, authenticated.
- *
- * This is the contract the real payloads turned out to use — the guessed per-index endpoint was
- * not it. An inbound media message carries, inline:
- *
- *   { "url": "https://zernio.com/api/v1/whatsapp/media/1634823348214373?accountId=…",
- *     "content_type": "image" }
- *
- * That URL is an API endpoint, not a public file: it needs the bearer key, so a browser cannot
- * load it and the operator sees a broken image. Storing it and rendering it directly is therefore
- * not an option even ignoring expiry — it has to be pulled server-side and kept.
- */
+/** Download a Zernio-hosted media URL, authenticated. */
 export async function fetchZernioMediaUrl(
   url: string,
 ): Promise<{ bytes: Uint8Array; contentType: string; fileName?: string } | null> {
@@ -209,22 +163,7 @@ export async function fetchZernioMediaUrl(
   }
 }
 
-/**
- * One inbound attachment, fetched from the endpoint that actually serves it.
- *
- * `GET /inbox/conversations/{conversationId}/messages/{messageId}/attachments/{index}` — Zernio
- * addresses attachments SEPARATELY from the message. That is why nothing arrived by reading the
- * webhook payload: measured 2026-08-24, 36 inbound messages and zero stored attachments, five of
- * them carrying the placeholder `[Unsupported message]` where the customer's file should be.
- *
- * The response contract is not documented, and both plausible shapes are real APIs, so both are
- * handled rather than assumed:
- *   • the bytes themselves, with a content-type; or
- *   • JSON carrying a (usually short-lived) URL to follow.
- *
- * Returns BYTES in either case. A URL is followed here rather than stored, because a link that
- * expires is not an attachment — storage convention #7: persist the object, never the URL.
- */
+/** One inbound attachment, fetched from the endpoint that actually serves it. */
 export async function fetchZernioAttachment(params: {
   conversationId: string;
   messageId: string;
@@ -299,18 +238,7 @@ export async function fetchZernioAttachment(params: {
   };
 }
 
-/**
- * Fetch ONE connected account by its Zernio id.
- *
- * There is no `GET /v1/accounts/{accountId}` — the spec exposes only PUT / PATCH / DELETE on
- * that path. Both OAuth callbacks called it anyway and would have died at the last step of
- * every connect, social and WhatsApp alike. It was never noticed because ZERNIO_API_KEY has
- * never had a value, so the request failed earlier, at the 503.
- *
- * The list endpoint is the supported read. Narrow it with the filters the spec accepts
- * (`profileId`, `platform`) so this stays one page even on a large tenant, then match on
- * `_id` — the list item's id field is `_id`, not `accountId`.
- */
+/** Fetch ONE connected account by its Zernio id. */
 export async function fetchZernioAccount(
   accountId: string,
   filters: { profileId?: string; platform?: string } = {},
@@ -327,12 +255,6 @@ export async function fetchZernioAccount(
 /**
  * Sign a body with the SAME secret verifyZernioSignature checks, for a locally-originated
  * replay (the inbox backfill).
- *
- * The alternative was a service-role bypass on the webhook handler, i.e. a second way in that
- * skips signature verification. Invariant 6 says verify before processing and fail closed; a
- * bypass added "just for replay" is the shape that ends up reachable. Signing instead means the
- * replay goes through the exact same door as a real delivery, and an unset secret fails it for
- * the same reason.
  */
 export async function signZernioBody(rawBody: string): Promise<string> {
   const secret = zernioWebhookSecret();
@@ -492,20 +414,7 @@ export async function getZernioWebhookStatus(): Promise<ZernioWebhookStatus> {
   };
 }
 
-/**
- * Register (or repair) the Zernio webhook pointing at zernio-webhook-handler.
- *
- * NOTHING in this repo ever did this. The handler existed, verified signatures and wrote to
- * the inbox, and Zernio had never been told the URL — so the entire inbound path was
- * unreachable by construction, not by bug. It cannot be inferred from any local signal:
- * "no inbound messages" is indistinguishable from "nobody messaged us".
- *
- * Also repairs two states Zernio can land in on its own:
- *  - `isActive: false` — Zernio auto-disables a webhook after 10 consecutive delivery
- *    failures, and our own signature check fails CLOSED, so a misconfigured secret
- *    switches the hook off permanently after ten inbound messages.
- *  - a subscription missing events we now branch on, after this list grows.
- */
+/** Register (or repair) the Zernio webhook pointing at zernio-webhook-handler. */
 export async function ensureZernioWebhook(
   supabase: SupabaseLike,
   opts: { secret?: string } = {},
@@ -779,28 +688,7 @@ export async function setCommentHidden(params: {
   }
 }
 
-/**
- * When did the counterparty last write to us, according to ZERNIO?
- *
- * Meta's 24h service window opens on the CUSTOMER's inbound message, so answering "may we send a
- * freeform reply?" means knowing when that was. We normally read it out of `inbox_messages`,
- * which is cheap and correct — for a thread whose inbound messages we actually hold.
- *
- * A thread can exist without them. One is born from a `message.sent` echo: the operator types on
- * their handset under coexistence, Zernio echoes it, and the thread is created around an OUTBOUND
- * message with no history behind it. Zernio has the conversation's whole history; we have one
- * message. Reading our own table there does not answer "the customer has not written in 24h" — it
- * answers "we hold no inbound message", which is the silent-zero shape: an absence of rows read as
- * a fact about the world. Thread c7e4f75a on 2026-08-25 was exactly that — the customer's last
- * message sat in Zernio dated 2026-08-07 and the inbox held none of it, so the operator saw a
- * message sent twenty minutes earlier under a banner saying the window had closed, with no
- * evidence on screen either way.
- *
- * Returns the ISO timestamp of the newest inbound message, `null` for a conversation that
- * genuinely has none, and `undefined` when we could not find out (network, revoked key, unknown
- * conversation) — a distinction the caller needs, because "no customer message ever" and "we do
- * not know" must not both render as a confident verdict.
- */
+/** When did the counterparty last write to us, according to ZERNIO? */
 export async function fetchLastInboundAt(params: {
   accountId: string;
   conversationId: string;

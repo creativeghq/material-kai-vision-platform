@@ -1,33 +1,4 @@
-/**
- * "May this workspace use this module?" — asked once, by every agent tool that needs it (#395).
- *
- * `_shared/entitlement.ts` states the doctrine for edge handlers: *module entitlement enforcement
- * at the API boundary is the real security line; nav and route guards are UX only.* Agent tools
- * are an API boundary — a tool call reaches the same tables the page does, without passing the
- * page's `EntitlementGuard` — and half of them were not asking.
- *
- * MEASURED 2026-08-29: of the 19 tool files whose catalog entry declares a paid `moduleSlug`, 9
- * checked entitlement and 10 did not. Five of the unchecked ones asked only `modules.enabled` —
- * the PLATFORM-WIDE publish flag, which is true for everyone — so they read like a gate and
- * refuse nobody. At that moment three of the four non-root workspaces were not entitled to
- * Catalogs, Deals, Expenses, Job Research, Mention Monitoring or Price Monitoring, and could use
- * every one of them by asking the agent. The nav tile was hidden the whole time, which is exactly
- * why nothing looked wrong.
- *
- * BOTH HALVES OR NEITHER. `modules.enabled` is the operator's kill switch for a feature nobody
- * should be using yet; `is_workspace_entitled` is whether THIS tenant bought it. Checking only
- * the first is the shape described above. Checking only the second lets a workspace keep using a
- * module the operator has pulled.
- *
- * Returns the refusal STRING a tool returns verbatim, or `null` to proceed — so a call site is
- * two lines and cannot accidentally continue:
- *
- *     const denied = await moduleGate(workspaceId, 'presentation-catalogs');
- *     if (denied) return denied;
- *
- * FAILS CLOSED. A DB error here means we cannot establish entitlement, and serving on a maybe is
- * how a paid module leaks.
- */
+/** "May this workspace use this module?" — asked once, by every agent tool that needs it (#395). */
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
 

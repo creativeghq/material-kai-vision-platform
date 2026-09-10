@@ -82,21 +82,7 @@ export const fiscalConnectorService = {
     return (data ?? []) as FiscalSubmission[];
   },
 
-  /**
-   * Re-send a document that did not land.
-   *
-   * A CANCELLATION ATTEMPT IS NOT A SUBMISSION. Its row carries the delivery note it was
-   * cancelling, so routing on `document_table` alone re-ran the 9.3 SUBMISSION path: against a
-   * note already accepted that answers `skipped: already_accepted` and the operator is told the
-   * cancellation worked when it never happened; against one that is not accepted it files a
-   * SECOND movement document at AADE and spends the credits for it. `fiscal_invoice_type` is the
-   * only thing that tells them apart.
-   *
-   * The bodies mirror `financeService.submitCreditNoteFiscal`, `deliveryNotesService.submitFiscal`
-   * and `submitInvoice` below. They are restated rather than delegated so this module does not
-   * pull the whole finance service into every bundle that imports it — if the edge function's key
-   * for a document kind ever changes, all four move together.
-   */
+  /** Re-send a document that did not land. */
   async retransmit(sub: FiscalSubmission): Promise<any> {
     const body =
       sub.fiscal_invoice_type === 'cancel_9.3' || sub.fiscal_invoice_type === 'cancel_receiving'

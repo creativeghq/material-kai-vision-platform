@@ -1,20 +1,4 @@
-/**
- * Public share lookup for quotes.
- *
- * POST /functions/v1/quote-public-share { token, event?, session_id? }
- *   → { quote: { ... } | null, pdf_url: signed-1h-url | null, not_found?: bool }
- *
- * Anonymous-friendly: the route accepts the project anon key in
- * Authorization: Bearer (Supabase enforces this at the gateway), then uses
- * the service role internally to bypass RLS. Only returns quotes where
- * `public_share_token` matches AND `public_share_enabled` is true. The token
- * is a cryptographically random uuid v4, so guessing is infeasible.
- *
- * Every successful lookup writes a `quote_analytics_events` row
- * (view_context='public') so admins can see who is opening the shared link.
- * Passing event:'download' logs a downloaded event instead of a view — the
- * public page calls this just before it opens the signed PDF URL.
- */
+/** Public share lookup for quotes. */
 
 import { createClient } from '@supabase/supabase-js';
 import { withApiLogging } from '../_shared/api-logger.ts';

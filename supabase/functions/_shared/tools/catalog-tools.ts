@@ -1,20 +1,4 @@
-/**
- * Catalog Tools — admin-only (gated at agent-chat injection layer).
- *
- * 9 tools for the presentation_catalogs flow:
- *   create_catalog              — initialize a new catalog row
- *   attach_catalog_pdfs         — link uploaded source PDFs to a catalog
- *   extract_from_catalog_pdfs   — free-form Vision query over attached PDFs
- *   translate_pdf_to_catalog    — PDF-to-PDF whole-catalog translation pass
- *   add_material_to_catalog     — explicit add (with price/image source)
- *   find_image_for_material     — DB visual_search → web image fallback
- *   adjust_catalog_pricing      — proportional re-price to a target total / delta / %
- *   generate_catalog_pdf        — invokes generate-catalog-pdf edge function
- *   publish_catalog             — flips status, mints slug
- *
- * Every tool emits chunks for the AgentHub chat surface so candidate
- * extractions / image options / generated PDFs render inline.
- */
+/** Catalog Tools — admin-only (gated at agent-chat injection layer). */
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what
@@ -56,22 +40,7 @@ function emit(onChunk: ChunkSink, chunk: any) {
  * state needed; if the user resumes a half-built catalog the run_id resolves
  * to the same tracker.
  */
-/**
- * `definition_id` NAMES THE WORKFLOW, and it used to be hardcoded (#395).
- *
- * `WorkflowTracker` resolves everything from it: `getWorkflow(runtime.definition_id)` gives the
- * header name, the icon and the step list a row can be matched against. So a plan that says
- * `catalog-build` puts the reader in "Build a catalog", with its eight steps, whatever actually
- * ran.
- *
- * `translate_pdf_to_catalog` is the first step of `catalog-translate` — the registry says so, on
- * that step's own `tool_id`. It emitted a `catalog-build` plan plus `step_id: 'translate' as any`,
- * and a step id absent from the named definition falls through to `title={s.def?.title || s.id}`:
- * a raw "translate" row, appended to the wrong workflow's plan. The `as any` was the tell.
- *
- * The comment on that call site said the wizard "advances from Translate PDF → Generate PDF
- * automatically". It could not: `catalog-build` has no Translate PDF step to advance from.
- */
+/** `definition_id` NAMES THE WORKFLOW, and it used to be hardcoded (#395). */
 type CatalogWorkflowId = 'catalog-build' | 'catalog-translate';
 
 function emitWorkflowPlan(onChunk: ChunkSink, args: {
@@ -142,24 +111,7 @@ async function ensureUniqueSlug(supabase: any, base: string): Promise<string> {
   return `${base}-${Date.now()}`;
 }
 
-/**
- * The gate for nine catalog tools — and it did not know about workspaces (#395).
- *
- * `catalog_id` is a model-supplied argument, the client here is SERVICE-ROLE, and the only check
- * was `owner_user_id === userId`. That is a USER identity, not a tenancy binding: a catalog you
- * own in workspace B was fully readable, editable and publishable from a workspace-A session, so
- * one agent turn could pull another tenant's catalogue body into this workspace's work. CLAUDE.md
- * invariant 1 asks for both — derive the workspace from the verified JWT, and prove the target
- * belongs to it. The sibling path 130 lines below already does exactly that for source PDFs, with
- * a comment calling it a BOLA guard; this one was simply never given the workspace.
- *
- * The owner check STAYS. Removing it would widen access to every teammate, which is a product
- * decision about who may edit a colleague's catalogue, not a security fix — and widening access
- * while closing a hole is how a fix becomes a second finding.
- *
- * A catalog with NO workspace (`create_catalog` accepts a null one) stays reachable by its owner:
- * it belongs to no tenant, so there is no tenant to leak it across.
- */
+/** The gate for nine catalog tools — and it did not know about workspaces (#395). */
 async function loadCatalog(supabase: any, catalogId: string, ownerId: string, workspaceId: string | null) {
   const { data, error } = await supabase
     .from('presentation_catalogs')
@@ -653,19 +605,7 @@ export const createTranslatePdfToCatalogTool = (userId: string, workspaceId: str
           preserve_original_layout: !!input.preserve_original_layout,
         });
 
-        /**
-         * The catalog-translate workflow, named as itself (#395).
-         *
-         * `metadata: { workflow_def: 'catalog-translate' }` was the previous attempt at saying
-         * this, and NOTHING reads that key — the tracker resolves the definition from
-         * `definition_id` alone, which said `catalog-build`.
-         *
-         * `run_id` stays the catalog id, which is the module's deterministic-resume rule. The
-         * consequence is deliberate and worth stating: translating a PDF into a catalog that is
-         * mid-BUILD switches that tracker to the translate workflow. That is what the user just
-         * did, and it beats the previous behaviour of showing the build plan with a raw
-         * "translate" row bolted on.
-         */
+        /** The catalog-translate workflow, named as itself (#395). */
         emitWorkflowPlan(onChunk, {
           catalog_id: catalogId!,
           definition_id: 'catalog-translate',
@@ -767,13 +707,6 @@ export const createAddMaterialToCatalogTool = (userId: string, workspaceId: stri
           // which is what we PAY, not what we sell for. The old query named both missing columns, so
           // PostgREST rejected it and a catalog material sourced from a product never picked up a
           // price at all.
-          //
-          // Reading `cost` instead would be worse than the bug: it would publish the cost basis to a
-          // customer as the price. The sell price has exactly one derivation in this platform —
-          // `_pricing_markup_ladder`, reached through `get_product_price_for_workspace` — and
-          // CLAUDE.md is explicit that TypeScript formats it rather than re-deriving it. No customer
-          // is in scope here (a catalog is published, not quoted to one party), so the ladder is
-          // asked with no company/contact and answers with the workspace's own list price.
           const { data: priced } = await supabase.rpc('get_product_price_for_workspace', {
             p_workspace_id: catalog.workspace_id,
             p_product_id: input.material.price_source_ref,
@@ -1170,18 +1103,6 @@ export const createAdjustCatalogPricingTool = (userId: string, workspaceId: stri
         const factor = targetNet / currentNet;
 
         // ONE DERIVATION, in `_shared/catalog-repricing.ts` (#352 A13).
-        //
-        // This block used to scale `price`, `net_value` and `discount_value` INDEPENDENTLY by
-        // the same factor, each rounded to 2dp on its own — so the three stopped reconciling.
-        // The audit's worked case: `price 33.33 x qty 3 - discount 10.00 = net 89.99`,
-        // retargeted to net 100, stored `price 37.04, discount 11.11, net 100.00`, while the
-        // reader adds up `37.04 x 3 - 11.11` and gets 100.01. Every figure is a valid number, so
-        // nothing raises and no typecheck sees it; the customer's document simply does not add
-        // up. Rule 1c: every figure the reader can add up must add up.
-        //
-        // EXTRACTED rather than fixed in place, because in place it was untestable — inline in a
-        // tool closure there was nowhere to put the worked example, which is why it could be
-        // wrong for as long as it was. `tests/unit/catalogRepricing.test.ts` runs those numbers.
         const scaled = scaleToTargetNet(
           priced.map((m) => {
             const sp = m.specs || (m.specs = {});

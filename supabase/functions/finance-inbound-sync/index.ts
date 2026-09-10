@@ -4,25 +4,6 @@
  * and advances a separate per-workspace MARK watermark for each. No-ops cleanly when creds
  * aren't configured yet, so it can be scheduled now and "switches on" the moment the operator
  * pastes credentials.
- *
- *   RequestDocs             documents OTHER businesses issued to us      source='mydata'
- *   RequestTransmittedDocs  documents WE transmitted                     source='mydata_self'
- *
- * The second one is issue #377. Foreign supplier invoices are not filed against us by anybody —
- * a Bulgarian supplier is not a myDATA obligor — so the finance team types them into myAADE as
- * `14.x`, which makes US the transmitter. They therefore land on RequestTransmittedDocs and are
- * permanently invisible to RequestDocs. This platform polled only RequestDocs for two years:
- * EUR 45,413.93 of foreign purchases across 12 suppliers, plus EUR 104,750.07 of self-reported
- * rent and payroll, were sitting one endpoint away the whole time. Nothing had failed — the
- * question was wrong, and "0 foreign invoices" read as a fact about the business.
- *
- * Cron: invoke with header `x-cron-secret: <CRON_SECRET>`.
- *
- * Manual ("Sync from myDATA") calls may bound the pull to an explicit issue-date window via
- * `{ date_from, date_to }` (ISO `yyyy-mm-dd`) so the operator isn't dragged back through
- * years of history. A dated pull ignores the MARK watermark on the REQUEST (`mark=0`) —
- * otherwise an already-advanced watermark would silently empty an older window — but the
- * stored watermark still only ever moves forward.
  */
 import { createClient } from '@supabase/supabase-js';
 import { resolveSecret } from '../_shared/secrets.ts';
@@ -60,20 +41,7 @@ function toAadeDate(iso: unknown): string | null {
 /** myDATA `invoiceType` family, i.e. the part before the dot. `'14.1'` -> `'14'`. */
 const family = (docType: string | null) => String(docType ?? '').split('.')[0];
 
-/**
- * The families on RequestTransmittedDocs that are EXPENSES we self-reported.
- *
- *   13.x  foreign services / expenses           reverse charge
- *   14.x  foreign purchases                     reverse charge
- *   16.1  rent                                  a real payable, to a landlord
- *   17.x  payroll and accounting adjustments    HR's, never a supplier bill
- *
- * Everything else that endpoint returns is a SALE we issued, which already lives in `invoices` —
- * ingesting one would invent a supplier bill for our own revenue. The filter is applied HERE
- * rather than as an `invType` query param because the param takes a single value per call, and
- * asking eight times per workspace per night to avoid parsing a few hundred KB is the wrong
- * trade. Skipped documents are counted and reported, never silently dropped.
- */
+/** The families on RequestTransmittedDocs that are EXPENSES we self-reported. */
 const SELF_TRANSMITTED_EXPENSE_FAMILIES = new Set(['13', '14', '16', '17']);
 
 /** Hard stop on the continuation loop: 40 pages is ~4,000 documents in one run, far past any real
@@ -92,17 +60,7 @@ interface DocFetch {
   error?: string;
 }
 
-/**
- * Fetch EVERY page of a myDATA retrieval call.
- *
- * Both endpoints truncate at roughly 100 documents and hand back a `<continuationToken>` holding
- * the partition/row key to resume from. Nothing in this platform ever read it. The cron survived
- * by accident — its watermark advanced to page one's last MARK, so it caught up one page per
- * night — but the manual dated pull asks from `mark=0` bounded by dates and deliberately ignores
- * the watermark, so it returned page one and called it the year. Measured live: the 2025 window
- * returns 103 documents and a token, and page two holds 50 more. Page one carries no marker
- * distinguishing it from a complete result.
- */
+/** Fetch EVERY page of a myDATA retrieval call. */
 async function fetchAllDocPages(
   baseUrl: string,
   endpoint: 'RequestDocs' | 'RequestTransmittedDocs',
@@ -450,8 +408,6 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
         // identical to `found` on every run and the UI's "N new documents" toast reported the
         // size of the WINDOW. Re-pulling September said "10 new documents" and added none; a
         // window with genuinely nothing new was indistinguishable from one where everything was
-        // new. The insert set is already in hand two lines down — auto-convert has always used
-        // exactly it — so the honest number was there the whole time and nothing read it.
         if (newId) { inserted++; freshDocIds.push(newId); }
         if (Number(mark) > Number(maxMark)) maxMark = mark;
       }
@@ -479,15 +435,6 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
     // document — and the invoice carries the money with its itemisation collapsed to a single
     // value-only line, because the detail already reached AADE on the delivery note. Held
     // apart, the Inbox shows 104 deliveries worth nothing next to 701 invoices of nothing.
-    //
-    // The issuer may state the link outright in `<correlatedInvoices>`, which has been sitting
-    // unread in `raw.xml` since the first sync — every one of the 11 present resolves to a
-    // document we already hold. Suppliers who leave it empty (ALKYON among them) get a scored
-    // candidate instead, which is a SUGGESTION and stays one until an operator accepts it.
-    //
-    // Cheap, deterministic and no model call, so it runs here rather than in `enrich` below:
-    // the operator who clicked "Sync from myDATA" should see the pair joined when the pull
-    // returns, not two minutes later.
     let aadeLinks = 0;
     let suggestedLinks = 0;
     // A failure here reports 0 links, which is byte-identical to "nothing to correlate" — the
@@ -530,16 +477,6 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
     // model calls plus ΓΕΜΗ/ΑΑΔΕ name lookups — and Supabase's REQUEST IDLE TIMEOUT is 150s,
     // separate from the 400s wall clock: at 150s the gateway hands the caller a 504 while the
     // worker runs happily on and finishes. On 2026-09-08 a run took 162s, so the browser got
-    // `POST | 504` at 151.4s and the toast said "Sync failed" — for a run that had already
-    // committed its documents, its watermark and its auto-converted expenses, and which then
-    // logged its own 200 into `api_usage_logs`. The operator did the only thing offered and
-    // clicked again, paying for the whole 162s a second time. Same shape as the `docs is not
-    // defined` 500 recorded a few lines down: the work lands and the caller is told it failed.
-    //
-    // So the enrichment is packaged here and, on the interactive path, started AFTER the
-    // response via `EdgeRuntime.waitUntil` — which keeps the isolate alive to the wall clock
-    // without keeping the caller on the line. The cron awaits it inline: nothing reads a
-    // 504 there, and its counts belong in the run's own summary.
     const enrich = async () => {
     // ── Background AI product extraction → pending-products queue (credit-gated) ──
     // For each not-yet-extracted inbound doc with line detail, run the cheapest model to
@@ -571,19 +508,6 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
       const autosyncMode = (wsFin as any)?.warehouse_autosync_mode ?? 'suggest';
       const r2 = (n: number) => Math.round(n * 100) / 100;
       // `off` means don't read supplier lines at all: no AI call, no credits, no queue.
-      //
-      // `lines_source='none'` documents are excluded here BY CONSTRUCTION, not by a second test:
-      // `inbound_docs_needing_extraction` requires at least one line with a non-empty
-      // `item_description`, and that is precisely the condition `lines_source` records. Every
-      // 14.x carries one value-only line, so the model would have nothing to read and would
-      // either return nothing or invent something — and those two are indistinguishable from
-      // "this supplier sells nothing we stock".
-      //
-      // The batch comes from documents that still NEED extraction. The "already extracted?"
-      // test MUST be in the query, not the loop: `.order(created_at desc).limit(30)` with the
-      // skip applied afterwards fixes the window BEFORE the skip, so once the 30 newest are
-      // done every later run re-reads the same 30, skips them all and never reaches the 31st.
-      // Such a backlog does not drain slowly — it never drains.
       const sel = autosyncMode === 'off'
         ? { data: [] as any[], error: null }
         : await supabase.rpc('inbound_docs_needing_extraction', {
@@ -643,32 +567,12 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
             const s = byIdx.get(i);
             const qty = l.quantity != null && Number(l.quantity) > 0 ? Number(l.quantity) : 1;
             // A DOCUMENT THAT PRICES NOTHING STATES ZERO, AND ZERO IS NOT NULL.
-            //
-            // "A delivery note carries no money" is FALSE and was the first version of this
-            // comment. A ΤΔΑ (Τιμολόγιο–Δελτίο Αποστολής, `1.1` with `isDeliveryNote`) is a
-            // delivery note that IS the invoice: it states full per-item prices and its total is
-            // the sum of its lines. 522 of them here, every one priced. A plain ΔΑ (`9.3`) is
-            // the one issued when the invoice follows separately, and only THAT one prices
-            // nothing — 104 here, 205 lines, 35 issuers, not a single non-zero value.
-            //
-            // So the test is the DATA, not the type code. myDATA does not forbid values on a 9.3,
-            // and keying on the family alone would silently null out a real price the day a
-            // supplier sends one — destroying a stated figure to avoid inventing one.
-            //
-            // Read wrongly, that zero becomes `unit_cost = 0`: a valid number, on its way to
-            // stock valuation and margin, indistinguishable from goods somebody got for free.
-            // It has to be the whole DOCUMENT, though, not the line: a zero line on a document
-            // that prices its other lines is a real zero — a free sample, a warranty replacement.
             const pricesNothing = !all.some((x: any) => Number(x?.net_value ?? 0) !== 0);
             const netValue = !pricesNothing && l.net_value != null ? Number(l.net_value) : null;
             const unitCost = netValue != null ? r2(netValue / qty) : null;
             // A myDATA line is not just a description. It states the unit, the supplier's own
             // article code and the VAT category, and those are FACTS about the document — read
             // them rather than asking a model to re-derive them from prose that may not say.
-            // `src/lib/units.ts` puts it plainly: "wherever a code is present it is the
-            // authority — never infer the unit from a product description instead." Inferring
-            // it is exactly what this did, for every line it ever queued: 4.1 metres of worktop
-            // (measurement_unit 4) was filed as 4.1 pieces, which is not a thing.
             const unitCode = l.measurement_unit != null ? Number(l.measurement_unit) : null;
             const itemCode = String(l.item_code ?? '').trim();
             // The product name ALONE. `size` and `attributes` are kept in their own columns and
@@ -735,7 +639,6 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
     // ΓΕΜΗ public registry, then — only for the ΑΦΜ ΓΕΜΗ has no record of, and only when the
     // workspace opted in — from ΑΑΔΕ, which notifies the looked-up business (see
     // resolve-issuer-names.ts). Best-effort: never fails the sync, and each run also chips
-    // away at pre-existing name-less rows.
     let issuers: unknown = null;
     try {
       issuers = await resolveInboundIssuerNames(supabase, workspaceId, gemiApiKey, {

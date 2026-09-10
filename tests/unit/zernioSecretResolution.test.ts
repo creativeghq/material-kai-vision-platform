@@ -1,22 +1,4 @@
-/**
- * Zernio secret-resolution guard.
- *
- * The Zernio key powers BOTH surfaces that talk to it — WhatsApp messaging and social
- * publishing — and for its whole life it was read as `Deno.env.get('ZERNIO_API_KEY')`, in
- * FOUR hand-rolled copies (_shared/zernio.ts, zernio-webhook-handler, and the two
- * social-media sync agents).
- *
- * That can never see an admin-saved value. `platform_secrets` reaches `Deno.env` only via
- * _shared/secrets-bootstrap.ts, which is a documented no-op on the Supabase edge runtime —
- * `Deno.env.set` throws "The operation is not supported" there. So the entire surface was a
- * silent dead end: messaging-api answered 503 telling the admin to paste the key at
- * /admin/modules/messaging/settings → Keys, the admin pasted it, the row saved, and nothing
- * ever read it back (Sentry KAI-RD / KAI-RC, 2026-08-15). The webhook handler was worse — it
- * failed its signature check CLOSED, so every inbound WhatsApp reply was rejected 401.
- *
- * The fix is one resolver (`ensureZernioSecrets` → `resolveSecret`, env-first / DB-second) and
- * no second copy. This test makes a fifth copy a red build rather than a convention.
- */
+/** Zernio secret-resolution guard. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
@@ -98,11 +80,6 @@ describe('Zernio secrets resolve through _shared/zernio.ts, not Deno.env', () =>
   it('every entry point that reads the key awaits ensureZernioSecrets first', () => {
     // A file that calls zernioKey()/zernioApi()/zernioWebhookSecret() but never awaits the
     // resolver silently falls back to env-only — the exact bug, reintroduced one file at a time.
-    // Every entry point into the Zernio client, not just the three low-level ones. The
-    // WRAPPERS matter more, not less: inbox-api relays every operator reply through
-    // sendWhatsAppReply() and names zernioKey() nowhere, so checking only the low level
-    // declared the one function that relays customer messages compliant while it ran on an
-    // unresolved key.
     const ENTRY_POINTS = [
       'zernioApi', 'zernioKey', 'zernioWebhookSecret',
       'sendWhatsAppMessage', 'sendWhatsAppReply',
@@ -159,13 +136,6 @@ describe('we only call Zernio endpoints that exist', () => {
   // Checked against the published OpenAPI spec (https://docs.zernio.com/api/openapi, v1.0.4,
   // 566 operations). Our ZERNIO_BASE_URL ends in /v1, so a call to `/accounts` is the spec's
   // `/v1/accounts`.
-  // The BARE path is the one with no GET. Sub-resources under it are a different matter: the
-  // spec exposes 20+ `GET /v1/accounts/{accountId}/<sub>` operations (health, bluesky-settings,
-  // slack-settings, linkedin-organizations, linkedin-post-analytics, linkedin-aggregate-
-  // analytics…), and they are real. An earlier version of this pattern stopped at
-  // `/accounts/${` and so forbade the whole family, which would have blocked the only analytics
-  // endpoint a LinkedIn personal profile has. Anchored on what follows the interpolation: a `/`
-  // means sub-resource and is fine, anything else is the bare read.
   const BARE_ACCOUNT_GET = /zernioApi\(\s*['"]GET['"]\s*,\s*[`'"]\/accounts\/\$\{[^}]*\}(?!\/)/;
 
   it('the bare-account-read pattern still catches the shape it was written for', () => {
@@ -190,18 +160,7 @@ describe('we only call Zernio endpoints that exist', () => {
     ).toEqual([]);
   });
 
-  /**
-   * Every operation in Zernio's published spec, as a committed fixture.
-   *
-   * Regenerate with:
-   *   curl -s https://docs.zernio.com/llms-full.txt \
-   *     | grep -oE '^## (GET|POST|PUT|PATCH|DELETE) /v1/[^ ]*' \
-   *     | sed 's/^## //' | sort -u > tests/fixtures/zernio-operations.txt
-   *
-   * Committed rather than fetched at test time: a guard that needs the network is a guard that
-   * goes yellow on a bad DNS day and gets skipped. (`docs.zernio.com/openapi.json` serves the
-   * docs SPA's HTML, not a spec — do not try to parse it.)
-   */
+  /** Every operation in Zernio's published spec, as a committed fixture. */
   const SPEC_OPS = new Set(
     readFileSync(join(__dirname, '..', 'fixtures', 'zernio-operations.txt'), 'utf-8')
       .split('\n').map(l => l.trim()).filter(Boolean)
@@ -376,9 +335,6 @@ describe('service stability', () => {
     // transient fault. Status/lifecycle syncs must NOT — they reconverge on the next event or
     // sync, and retrying them just loops.
     // Anchored on the RETRY DECISION itself, not on "the first catch (err) in the file".
-    // That anchor silently slid the moment an unrelated try/catch was added earlier in the
-    // source — which happened when inbound attachment fetching landed — and a guard that
-    // relocates itself is a guard reading whatever it happens to land on.
     const decision = handler.code.indexOf('Transient failure handling');
     expect(decision, 'the transient-failure 5xx branch is gone from the webhook dispatcher').toBeGreaterThan(-1);
     const block = handler.code.slice(handler.code.lastIndexOf('catch (err)', decision), decision + 200);
@@ -434,13 +390,6 @@ describe('social lands in the inbox, and public stays public', () => {
     // A comment reply goes out under our own post to the whole audience. An agent replying
     // unprompted is broadcasting on its own initiative, and a tool that returns a real balance
     // is one sentence from publishing it.
-    // Anchored on the CODE, not on the comment beside it. This used to match
-    // `allowAgent: false,\s*// never auto-answer in public` — which passed only because the
-    // stripper of the day removed full-line comments and left trailing ones, so the assertion
-    // was really checking that somebody had written a particular sentence. Rewording the
-    // comment would have broken it; deleting `allowAgent: false` and keeping the comment
-    // would not have. The rule is that the PUBLIC comment thread is created with the agent
-    // off, so that is what is pinned: the flag, in the call that builds the comments thread.
     expect(handler.code).toMatch(/allowAgent: false,[\s\S]{0,400}?externalKey: `comments:/);
 
     // The second half moved. inbox-api no longer builds the reply itself — a customer turn runs

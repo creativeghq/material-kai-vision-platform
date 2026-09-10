@@ -6,24 +6,7 @@
  */
 import type { FinanceSettings } from '@/modules/finance/services/financeService';
 
-/**
- * Every setting this screen may write (#351 D2).
- *
- * This used to be an object literal spelled out inside `save()`, and the five DIGEST fields were
- * not in it — while the Digest panel had working controls for all five, wired to `onPatch`, behind
- * a "Save digest settings" button that calls this very function. So the toggle flipped, the save
- * reported success, and `setSettings(updated)` then overwrote local state with the server row, so
- * the toggle visibly flipped BACK.
- *
- * `finance-digest-aggregate` gates on exactly those fields, so the cron ran nightly and found
- * nothing. Measured before the fix: 3 workspaces, `digest_enabled` true on 0, recipients on 0,
- * `digest_last_sent_at` NULL on all. The feature had never sent once, and nothing ever errored —
- * the `ops.silent_zero` shape CLAUDE.md names.
- *
- * A hand-kept payload inside the function is what failed, so the list is named and OUTSIDE it, and
- * a guard test asserts every key this file edits appears here. A new control with no save is now a
- * red build rather than a switch that does nothing.
- */
+/** Every setting this screen may write (#351 D2). */
 export const EDITABLE_SETTING_KEYS = [
   'statements_enabled',
   'statement_email_subject',

@@ -1,23 +1,4 @@
-/**
- * Searching CRM parties — the one way to do it.
- *
- * `crm_contacts` / `crm_companies` each carry a generated `search_fold` column holding every
- * searchable field of that party (name, first/last name, email, website, VAT), folded by
- * `public.crm_fold()`: lowercased, accents stripped, final sigma normalised. Match it with a
- * term folded the same way and Greek finally behaves — `Κώστας` finds `ΚΩΣΤΑΣ ΑΛΕΞΙΟΥ`,
- * `societe` finds `Société`.
- *
- * Before this there were ~12 party pickers each `ilike`-ing its own subset of raw columns, all
- * of them accent-sensitive and most of them building a PostgREST `or()` string by hand. Do not
- * add a thirteenth: [tests/unit/crmPartySearch.test.ts](../../tests/unit/crmPartySearch.test.ts)
- * fails the build when a `src/` file ilikes a raw name/email/website/vat column on either table.
- *
- * ```ts
- * supabase.from('crm_companies').select('id, name')
- *   .eq('is_customer', true)
- *   .ilike(CRM_SEARCH_COLUMN, foldedLike(term))
- * ```
- */
+/** Searching CRM parties — the one way to do it. */
 import { foldForSearch } from '@/components/core/filters/types';
 import { transliterateGreek } from '@/services/crm/greekTransliteration';
 
@@ -41,19 +22,7 @@ function escapeLike(value: string): string {
   return value.replace(/[%_\\]/g, '\\$&');
 }
 
-/**
- * Build the `%…%` pattern for an `ilike` against `search_xscript`: fold, transliterate, escape.
- *
- * BOTH SIDES GO TO LATIN (#353 CRM-1). The column carries the transliteration next to the
- * original, and the query is transliterated the same way, so `μεταλλικα` finds `Metallika Erga`
- * and `papadopoulos` finds `Παπαδόπουλος`. Only Greek→Latin is attempted, because the reverse is
- * genuinely ambiguous — `Vasilis` could be `Βασίλης` or `Βασιλης`, and `v` is `β` in one word
- * and the `υ` of `αυ` in the next. Pushing both sides one way needs no such guess.
- *
- * Order matters twice. Fold before transliterating, because the mapping is written against
- * folded input (no accents, no final sigma). Escape LAST — escaping first would leave the
- * pattern's own metacharacters half-processed by the two passes that follow.
- */
+/** Build the `%…%` pattern for an `ilike` against `search_xscript`: fold, transliterate, escape. */
 export function foldedLike(term: string): string {
   return `%${escapeLike(transliterateGreek(foldForSearch(term)))}%`;
 }
@@ -68,17 +37,7 @@ export function foldedName(term: string): string {
   return transliterateGreek(foldForSearch(term));
 }
 
-/**
- * Quote a value for use INSIDE a PostgREST `or(...)` filter string.
- *
- * That grammar is comma-delimited, so an unquoted value carrying a comma is re-parsed as
- * syntax — verified against the live API, the unquoted form returns 400. Greek business names
- * carry commas, and so do factory names lifted out of PDFs. Inside double quotes only `"` and
- * `\` need escaping.
- *
- * A DIFFERENT contract from `escapeHtml` (invariant 11) — PostgREST filter grammar, not HTML.
- * Twin of `quoteOrValue` in `crm-api/handlers/contacts-api-handler.ts`.
- */
+/** Quote a value for use INSIDE a PostgREST `or(...)` filter string. */
 export function quoteOrValue(value: string): string {
   return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 }

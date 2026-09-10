@@ -11,23 +11,6 @@ import { supabase } from '@/integrations/supabase/client';
  * ImageEmbeddingsInspector — admin diagnostic panel for the 6 image
  * embedding collections on a single image (visual SLIG + understanding +
  * 4 aspect collections post-2026-05-04).
- *
- * Reads from MIVAA `/api/admin/images/{id}/embeddings-status` (the read
- * side of the v2 aspect-embeddings rollout) and surfaces:
- *   - VisionAnalysis JSON + parse status
- *   - Per-aspect: model, schema_version, presence flag, the EXACT
- *     source text the aspect was Voyage-embedded from
- *   - SLIG visual + understanding embedding presence
- *   - Per-aspect "Rebuild" buttons that POST to
- *     /api/admin/images/{id}/rerun-aspect-embeddings
- *
- * The source-text panel is the killer feature — when an image returns
- * wrong matches in search, an admin opens this and IMMEDIATELY sees
- * whether the input string Voyage embedded was right (e.g. color="warm
- * white, grey veining" for a marble image) or wrong (color=[]). They
- * then either rerun aspect embeddings (cheap, ~$0.0001) or rerun the
- * full vision_analysis pass (Opus, more expensive, repopulates VA
- * before re-embedding everything).
  */
 
 interface AspectState {

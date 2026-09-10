@@ -1,27 +1,4 @@
-/**
- * Delivery trail — registry + single-derivation guard.
- *
- * Three failure shapes this feature is exposed to, none of them visible to TypeScript:
- *
- *  1. **Four-copy drift.** The list of trackable document types lives in FOUR places: the
- *     `document_events.entity_type` CHECK, the `email_logs.entity_type` CHECK, the edge-side
- *     `DOCUMENT_ENTITY_TYPES` and the frontend `DOCUMENT_ENTITY_TYPES`. Add a type to some and
- *     not others and it fails in a specific, silent way: the page records a view, the INSERT
- *     throws a CHECK violation, `record_document_event` swallows it (deliberately — analytics
- *     must never break a customer's page), and the list column reads "never opened" forever.
- *     That is the same shape as the invite roles that were offerable but not storable.
- *
- *  2. **An eighth counter.** This feature exists because "was it viewed?" had SEVEN answers.
- *     A new `increment_*_view` RPC or a `view_count = x + 1` write in an edge function
- *     re-creates the exact bug — and a wrong count is a valid number, so nothing raises.
- *
- *  3. **Re-derivation in TypeScript.** `emailStatus` / `viewCount` come from
- *     `get_document_delivery`. A component that recomputes "opened = openedAt != null" is a
- *     second derivation that will disagree with SQL the moment the ladder changes (a bounce
- *     must outrank an open — a component doing its own null-check gets that backwards).
- *
- * Mirrors the reasoning in moneyDerivation.test.ts and templateRegistry.test.ts.
- */
+/** Delivery trail — registry + single-derivation guard. */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

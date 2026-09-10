@@ -1,15 +1,4 @@
-/**
- * ToolkitFormModal — generic "collect-then-send" form for toolkit quick-starts.
- *
- * Why this exists: most toolkit quick-starts used to fire a vague prompt and
- * then have the agent ask "which keyword? / which domain? / which country?" in
- * chat — multiple round trips for one result. When a quick-start declares a
- * `form` (see ToolkitQuickStart in agentToolsCatalog), clicking it instead
- * opens this modal, COLLECTS every required field up front, renders the
- * quick-start's `promptTemplate` with the values, and auto-sends ONE complete
- * message. Same shape as JobSitesFormModal, but driven entirely by data so a
- * single component powers every toolkit.
- */
+/** ToolkitFormModal — generic "collect-then-send" form for toolkit quick-starts. */
 import React, { useEffect, useMemo, useState } from 'react';
 import { loadVocabulary, type VocabularyTerm } from '@/services/vocabularies';
 import { Check, ChevronsUpDown, ImagePlus, X } from 'lucide-react';
@@ -84,22 +73,7 @@ interface Props {
   }) => void;
 }
 
-/**
- * Market lists come from `reference_vocabularies` (issue #370), not from constants here.
- *
- * There were two hand-written arrays at this spot and they were both wrong for at least one of
- * their users. `COMMON_MARKETS` (the `country` kind) offered the United States, Australia and
- * Canada and omitted Poland, Turkey, Serbia and Romania — so the B2B "Enrich a company" picker
- * offered markets we do not source from and hid every one we do, while the b2b search tool swept
- * a different 30. Three lists, three answers, nothing to hold them together but convention —
- * which is exactly how the `escapeHtml` copies drifted to three different strengths.
- *
- *   `country`      → `sourcing_markets` — the 30 the B2B search actually sweeps
- *   `country_code` → `seo_markets`      — ISO alpha-2, which the SEO tools require
- *
- * A failed fetch renders an empty, disabled select rather than a stale default list: a default
- * that silently substitutes for the real vocabulary is the failure this whole change removes.
- */
+/** Market lists come from `reference_vocabularies` (issue #370), not from constants here. */
 function useVocabulary(key: string): { terms: VocabularyTerm[]; loading: boolean; failed: boolean } {
   const [terms, setTerms] = useState<VocabularyTerm[]>([]);
   const [loading, setLoading] = useState(true);

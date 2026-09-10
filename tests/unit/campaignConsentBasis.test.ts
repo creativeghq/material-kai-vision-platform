@@ -1,22 +1,4 @@
-/**
- * A campaign address carries a NAMED lawful basis, or it is not mailed (#357 AE-7 / AE-8).
- *
- * `crm_contacts.marketing_consent` has existed all along: it is a column with a NOT NULL default,
- * a checkbox on the contact page, and the real-estate module gates every buyer digest and instant
- * alert on it. The EMAIL CAMPAIGN resolver never read it. Every contact in the book was mailable
- * whatever the box said, and a pasted address that matched nobody in the workspace was mailed on
- * no basis at all — which is AE-8 as filed.
- *
- * That is AE-5's shape again: a control that is stored, shown, edited, and never consulted. It is
- * invisible to typecheck (the column is selected and assigned), invisible to lint, and invisible to
- * every integrity probe, because the stored data is perfectly correct.
- *
- * The derivation is SQL — `campaign_address_consent_basis` — and no repo-file guard can see
- * pg_proc. What this file pins is the half that lives in the checkout: the vocabulary, the split,
- * and that every surface which shows or approves a recipient count counts the MAILABLE subset. The
- * SQL half is watched by `marketing.campaign_recipient_without_lawful_basis`, which reads the
- * OUTPUT (a pending recipient with no basis) rather than the function body.
- */
+/** A campaign address carries a NAMED lawful basis, or it is not mailed (#357 AE-7 / AE-8). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

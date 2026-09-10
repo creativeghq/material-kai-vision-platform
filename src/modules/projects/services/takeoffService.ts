@@ -1,16 +1,4 @@
-/**
- * Reading a drawing's own printed schedules into proposed bill-of-quantities lines.
- *
- * It is TRANSCRIPTION, never measurement. A door schedule is a table the design team authored and
- * printed; copying it is reading. A quantity worked out from the geometry of a plan is a guess that
- * looks exactly like a fact — a plausible number somebody orders materials against, with nothing
- * downstream able to tell it from a measured one. The edge function's prompt bans it and its tool
- * schema requires a `source` on every row, so anything that arrives here can be checked against the
- * sheet in seconds.
- *
- * It returns a PROPOSAL and writes nothing. Adding lines to a schedule is a separate, explicit act
- * by a person who has looked at them.
- */
+/** Reading a drawing's own printed schedules into proposed bill-of-quantities lines. */
 import { supabase } from '@/integrations/supabase/client';
 
 /** One row transcribed from a schedule printed on the drawing. */

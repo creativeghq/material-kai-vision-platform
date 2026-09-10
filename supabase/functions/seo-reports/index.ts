@@ -1,21 +1,4 @@
-/**
- * seo-reports — build a scheduled SEO report and hand it to Flows to deliver.
- *
- * The report COMPOSES the derivations the dashboard already reads
- * (`build_website_seo_report`); it computes nothing itself. That is the whole design
- * constraint: a report is the copy that goes to a client, so it is the worse of the
- * two to have drift, and a second implementation of any figure drifts.
- *
- * A RUN is a frozen snapshot. Re-opening last month's report shows what was true
- * last month — re-deriving on read would show today's numbers under an old date,
- * which is the one thing a report must not do.
- *
- * Delivery is NOT hardcoded here. It emits `seo.report_ready` and a seeded flow
- * carries it, so an operator can retarget or silence it without a deploy.
- *
- * Actions (user JWT): run — generate one report now.
- * Action (x-cron-secret): cron-run — every report whose next_due_at has passed.
- */
+/** seo-reports — build a scheduled SEO report and hand it to Flows to deliver. */
 
 import { createClient } from '@supabase/supabase-js';
 import { withApiLogging } from '../_shared/api-logger.ts';

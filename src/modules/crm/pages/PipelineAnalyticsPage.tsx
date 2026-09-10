@@ -44,25 +44,7 @@ import {
   type DealVelocityRow,
 } from '@/services/dealsService';
 
-/**
- * PIPELINE ANALYTICS — what the board cannot tell you by looking at it.
- *
- * Every number on this page is computed by SQL (`get_deal_stage_funnel`, `get_deal_velocity`,
- * `get_deal_outcomes_by_month`, `get_deal_owner_stats`, `get_deal_forecast`) and only formatted
- * here. That is not ceremony: a conversion rate implemented twice is a conversion rate that will
- * eventually disagree with itself, and the funnel in particular needs to know which stage is
- * further along — which the database already knows from `crm_deal_stages.sort` and the browser
- * would have to be told.
- *
- * Two honesty rules run through the whole page:
- *
- *   1. **Money is never summed across currencies.** Each money figure is per-currency, because
- *      €10,000 + $10,000 = 20,000 of nothing.
- *   2. **A measurement says how much data it rests on.** Stage velocity shows its sample size and
- *      refuses to draw a number from fewer than three observations. An average over two deals is
- *      not a cycle time, and a dashboard that renders it as one invites a staffing decision the
- *      data cannot support.
- */
+/** PIPELINE ANALYTICS — what the board cannot tell you by looking at it. */
 
 /** Chart colours come from the theme tokens, so the page is legible in all four theme combinations. */
 const CHART = {

@@ -1,21 +1,4 @@
-/**
- * contact-extract.ts — pull the phone, the email and the VAT number out of a scraped company page.
- *
- * These three live in the site FOOTER and the imprint page, which is the one part of a website
- * `onlyMainContent: true` deliberately throws away. `company_website_scrape` had that flag on and
- * asked for markdown only, so the switchboard number and the VAT number were being discarded on a
- * page we had already paid Firecrawl to fetch — and then an Opus pass was asked to find contact
- * details in text they had been removed from.
- *
- * The VAT number matters more than it looks. `create_company_from_vat` already turns a VAT into an
- * official ΑΑΔΕ / VIES record — legal name, registered address — and VIES covers all 27 member
- * states. Discovery could never reach it, because a web search yields a NAME and VIES needs a VAT.
- * EU law requires a company's own site to publish its VAT, so the site is the missing link between
- * the two halves.
- *
- * DETERMINISTIC ON PURPOSE. No model runs here. A regex that finds nothing is visibly empty; a
- * model asked for a phone number will produce something that looks like one.
- */
+/** contact-extract.ts — pull the phone, the email and the VAT number out of a scraped company page. */
 
 /**
  * EU VAT number formats, per member state, as the national part only (no country prefix).
@@ -167,25 +150,12 @@ function fromText(text: string, out: ExtractedContacts): void {
 /**
  * One candidate shape for both VAT paths: an alphanumeric run that may carry a SINGLE separator
  * between characters, and must begin and end on an alphanumeric.
- *
- * The end anchor is what makes it usable. A capture of `[A-Z0-9][A-Z0-9\s.\-]{5,15}` looks
- * equivalent and is not: it happily runs past the number and swallows the following words, so
- * `P.IVA. 01411010356 - Via Radici Nord` yielded `01411010356VIARADICINORD` and matched no country
- * format at all. Requiring an alphanumeric after each optional separator stops the run at the first
- * ` - `, and still tolerates the way real imprints print a VAT: `DE 143 454 214`, `IT-01270230350`.
  */
 const VAT_CANDIDATE = '[A-Z0-9](?:[\\s.\\-]?[A-Z0-9]){5,15}';
 
 /**
  * Strip the separators and any leading country prefix, then take the LONGEST leading run that fits
  * the country's own format.
- *
- * The trimming loop is not defensive padding, it is load-bearing. `VAT_CANDIDATE` tolerates a
- * single separator between characters so that `DE 143 454 214` is readable — but that also lets a
- * greedy match run straight on into the next word when the page prints
- * `P.Iva IT01270230350 Capitale sociale`, yielding `01270230350CAPITALESOCIALE`, which fits no
- * country format and silently drops a VAT that is plainly there. Taking the longest valid prefix
- * recovers the number without giving up the spaced form.
  */
 function acceptVat(
   cc: string,

@@ -1,23 +1,4 @@
-/**
- * Who sees what on the product record.
- *
- * `ProductDetailModal` is mounted on a dozen surfaces — the admin catalog, Discover, dashboard
- * widgets, moodboards (client-shareable), quote lines, agent results, the 3D designer — so the
- * viewer can be an operator, a warehouse hand, a sales rep, an invited employee or a project
- * client. It used to gate EVERY internal surface on one capability, `pricing.manage`, which is
- * about pricing rules and says nothing about stock or customs. That is coarse in both
- * directions: the warehouse team could not read back fields they set at intake, and one
- * capability change would have silently moved four unrelated surfaces at once.
- *
- * This test pins the intended matrix against `PERSONA_CAPABILITIES` itself, so it fails if
- * someone widens a persona rather than only if someone edits the modal. Granting
- * `warehouse.manage` to `end_user` — a project client — should be a red build, not a quiet
- * disclosure of stock levels to a customer.
- *
- * NOTE the second axis this cannot test: every gate is ALSO `&& isOwnProduct`, i.e. the product
- * belongs to the viewer's active workspace. Capability alone never unlocks anything here, and
- * the source assertions below check that the conjunction is still written that way.
- */
+/** Who sees what on the product record. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -100,23 +81,7 @@ describe('product modal — the gates are still conjunctions with ownership', ()
   });
 });
 
-/**
- * The modal must survive `product === null`.
- *
- * Every caller mounts it unconditionally — `product={selectedProduct}` alongside
- * `isOpen={!!selectedProduct}` — so the component body runs with a null product on EVERY render of
- * the dashboard (LatestWidgets), Discover, quote lines, moodboards and the agent product strip.
- * `if (!product) return null` is what makes that safe.
- *
- * The persona gates above sit ABOVE that guard, reading the prop through an
- * `as unknown as {...}` cast that erased the `| null`. tsc stayed silent, and all five surfaces
- * threw "Cannot read properties of null (reading 'workspace_id')" into the error boundary on load.
- *
- * Rule: at the TOP LEVEL of the component body, nothing above the guard may touch `product` except
- * a null check or an optional-chained read (`product?.id`, which is how the hook dep arrays cite
- * it). Reads nested inside a hook or callback are exempt — those carry their own guards and do not
- * run during the null render.
- */
+/** The modal must survive `product === null`. */
 describe('product modal — null product is a render, not a crash', () => {
   const src = readFileSync(MODAL, 'utf8');
   const GUARD = 'if (!product) return null;';

@@ -1,15 +1,4 @@
-/**
- * What may leave the EEA.
- *
- * QwenCloud/DashScope runs in Singapore by default. Alibaba offers an EU deployment
- * scope in Frankfurt, and pointing `DASHSCOPE_BASE_URL` there is the REAL fix; this
- * gate is the floor for the period before that, and for the next person who wires a
- * caller to a non-EEA provider without thinking about it.
- *
- * The tests below pin two things in equal measure: that it catches what it claims to,
- * and that it does NOT claim to catch what it cannot. A gate believed to be complete
- * is worse than no gate, because it stops people thinking about the half it misses.
- */
+/** What may leave the EEA. */
 import { describe, it, expect } from 'vitest';
 import {
   findPersonalData,

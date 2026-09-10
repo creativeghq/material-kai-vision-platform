@@ -1,24 +1,4 @@
-/**
- * Single source of truth for the GLOBAL ACCOUNT TIER names + role checks.
- *
- * This is `public.roles` — what kind of account someone has platform-wide (operator, supplier,
- * architect…), set by a platform operator. It is NOT where team membership lives: "runs HR", "on the
- * warehouse team", "sales manager" are per-workspace facts and belong to `workspace_members.role`,
- * catalogued in `./workspaceRoles.ts` and assigned from Profile → Team. Adding a functional role
- * here would make it true in every workspace the user belongs to.
- *
- * Rule: ALL role literals + role checks must come from this file.
- * Never write `role === 'admin'` again — use `isAdmin(role)`.
- *
- * Mirrors the values in `public.roles` — after 2026-07-31 that is exactly `admin`, `supplier`,
- * `architect` and `user`: the two tiers `role_upgrade_requests` accepts, plus the operator flag and
- * the baseline. `sales` and `finance` used to sit here and were removed; they are workspace roles
- * (`accountant`, `sales`, `sales_manager`) and only ever meant something within one workspace.
- *
- * Both `admin` and `super_admin` are recognised as platform admins; `workspace_members.role` can
- * also hold `owner`, treated equivalently for admin checks. `OWNER`, `FACTORY` and `DEALER` below
- * are not rows in `public.roles` — they are legacy/workspace values kept so old data resolves.
- */
+/** Single source of truth for the GLOBAL ACCOUNT TIER names + role checks. */
 
 export const ROLES = {
   ADMIN: 'admin',

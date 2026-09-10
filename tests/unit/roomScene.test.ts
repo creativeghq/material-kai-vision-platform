@@ -1,16 +1,4 @@
-/**
- * True-scale room placement guard (#321 M3, #259 Phase 2).
- *
- * The 3D room and the 2D plan must agree about how big things are, and every way they can disagree
- * produces a room that renders beautifully and is wrong:
- *
- *  • Reusing the TURNTABLE transform would scale every model to a fixed on-screen size, so a
- *    wardrobe and a vase would come out the same — a plan you cannot order from.
- *  • Getting the plan→scene origin conversion wrong mirrors the room. Everything lands on the
- *    opposite side, which is a perfectly plausible room and the wrong one.
- *
- * Driven against the real fixture, whose true size is known.
- */
+/** True-scale room placement guard (#321 M3, #259 Phase 2). */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync } from 'fs';
 import path from 'path';

@@ -1,25 +1,4 @@
-/**
- * Presentation-sheet type coverage guard.
- *
- * A sheet type is declared in SEVEN hand-maintained places across three runtimes.
- * TypeScript catches only two of them (`Record<SheetType, …>` in the frontend
- * service); the rest are separate files with no shared type, so a new sheet type
- * that misses one fails SILENTLY and in a type-specific way:
- *
- *   • miss the edge SHEET_CREDITS  → the create path throws on an undefined cost,
- *                                    or worse, debits NaN/0 credits
- *   • miss INTERACTIVE_TYPES       → the canvas never opens; the user gets an
- *                                    empty PDF instead of an editor
- *   • miss the PDF builder switch  → renders a blank A3 with a title block only
- *   • miss the agent tool enum     → the agent simply cannot create the sheet
- *   • miss the DB enum             → the insert fails at runtime
- *
- * These are exactly the "silent zero" shape CLAUDE.md warns about, so the
- * invariant is a red build instead of prose.
- *
- * The edge/Deno files are read as TEXT, not imported — importing them into
- * Vitest would drag in Deno-only module specifiers.
- */
+/** Presentation-sheet type coverage guard. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -111,16 +90,6 @@ describe('presentation sheet type coverage', () => {
 
   it('every sheet type is creatable by the agent tool', () => {
     // Read from the generated MANIFEST rather than by parsing the tool's source (#391).
-    //
-    // It used to parse `const SHEET_TYPES = [...]` out of the tool file. That list is
-    // gone — the tool imports the single source now — so the old anchor would find
-    // nothing and the check would pass on an empty set, which is the way a guard stops
-    // guarding without failing.
-    //
-    // The manifest is the AST projection of what the tool's zod schema actually
-    // resolves to, which is a stronger statement than what its source text says: if the
-    // import ever stops resolving, the param degrades to `type: 'string'` and this finds
-    // no options at all.
     const manifest = read('src/components/features/ai/toolManifest.generated.ts');
     const block = /name: 'generate_presentation_sheet'[\s\S]*?\n {2}\},/.exec(manifest);
     expect(block, 'generate_presentation_sheet is not in the tool manifest').toBeTruthy();

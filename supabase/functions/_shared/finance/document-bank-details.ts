@@ -1,32 +1,4 @@
-/**
- * The payment block printed on somebody else's invoice — declared ONCE for both readers.
- *
- * WHAT THIS IS FOR. A supplier invoice almost always prints where to pay it: "ΤΡΑΠΕΖΑ ΠΕΙΡΑΙΩΣ ·
- * IBAN GR16 0110 1250 0000 0001 2300 695 · δικαιούχος ACME ΑΕ". We hold exactly that fact per
- * counterparty in `crm_bank_accounts`, and until now every one of them was typed in by hand off a
- * document the platform had already opened and read.
- *
- * TWO READERS, ONE CONTRACT. `scan-receipt` reads a photographed/scanned invoice for the expense
- * form; `inbox-attachment-intelligence` reads every PDF and photo that arrives in the Inbox. Both
- * already send the file to Claude behind a FORCED tool call, so extracting the payment block costs
- * no extra model call and no extra credit — it is four more properties on a schema the file is
- * already being read against. They share this module so the two cannot come to different answers
- * about what "the IBAN on the document" means, and so a test can hold both to it.
- *
- * WHAT THIS DELIBERATELY DOES NOT DO. It does not write anything, anywhere. `crm_bank_accounts` is
- * a payment DESTINATION — `_shared/payments/payout.ts` loads a row from it and sends real money on
- * Revolut/Viva — so an IBAN a model read off a PDF that anyone can email us must never become one
- * without a person looking at it. The reading lands on the document's own row; binding it to a
- * party and reviewing it is `crm_record_bank_account_suggestion` /
- * `crm_accept_bank_account_suggestion`, both of which need a member's JWT.
- *
- * THE CHECKSUM IS REPORTED, NOT ENFORCED. A document can print a typo and a model can misread a
- * character, and the two are worth telling apart — but neither is a reason to drop the sighting on
- * the floor. `checksum_ok: false` is a value with a verdict on it; silently returning null would
- * be a hidden row.
- *
- * Guarded by tests/unit/documentBankDetails.test.ts.
- */
+/** The payment block printed on somebody else's invoice — declared ONCE for both readers. */
 
 import { isValidIban, normalizeIban } from '../iban.generated.ts';
 

@@ -1,28 +1,4 @@
-/**
- * What the picker OFFERS equals what the binder BINDS — on the admin axis (#395).
- *
- * `agentToolsCatalog` is a browse surface: `getAccessibleAgents(role)` drops any tool marked
- * `adminOnly` for a non-admin, `getAccessibleToolkits(role)` drops any toolkit marked the same,
- * and `CommandPalette` renders the survivors as clickable entries with their example prompts.
- * `agent-chat` is the enforcer: a tool pushed inside `if (isAdmin) { … }` is simply absent from a
- * member's bound set.
- *
- * When the two disagree in the direction "offered but not bound", nothing errors. The member
- * clicks *Keyword Difficulty*, a prompt is sent, the model has no such tool, and it answers with
- * prose — or apologises for a capability the screen just advertised. **36 SEO tools and 6 SEO
- * toolkits were in exactly that state**: the binder's own comment says *"SEO toolkit (admin-only —
- * each call spends real DataForSEO credits on the platform's tab)"*, and five of the family were
- * marked in the catalog while the other 36 were not.
- *
- * `load_toolkit` had the same hole on the same axis, and the comment beside it had already named
- * the rule: *"an unfiltered list is a menu handed to the model with entries it can only ever be
- * refused on."* It filtered by the agent's own tool set and not by role, so six SEO clusters sat
- * in every member's menu — refused correctly by `applyToolkitInRun`, which is why it never
- * surfaced as a failure: the cost is a wasted turn, not an error.
- *
- * This reads the binder's source rather than a second list of admin tools, because a second list
- * is the thing that drifted.
- */
+/** What the picker OFFERS equals what the binder BINDS — on the admin axis (#395). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

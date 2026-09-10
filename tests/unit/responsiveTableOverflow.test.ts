@@ -1,27 +1,6 @@
 /**
  * Responsive guard: a wide table must be REACHABLE on a phone, and a section rail must not
  * become a wall of navigation above the content.
- *
- * WHY THIS IS A SOURCE-LEVEL TEST AND NOT A MEASUREMENT
- * -----------------------------------------------------
- * The obvious check — render a route at 375px and assert `document.documentElement.scrollWidth
- * === 375` — is worthless on this platform, and audit #299 proved it by running it: all 20
- * authenticated routes returned exactly 375, zero overflow, everywhere. That is not a clean bill
- * of health. `Layout.tsx` puts `overflow-x-hidden` on `<main>`, so any child that overflows is
- * CLIPPED rather than scrolled and the document never widens. A document-scrollWidth assertion
- * passes today and would pass through real breakage, forever.
- *
- * Element-level measurement is the check that counts, but it needs a real layout engine — jsdom
- * has none, so `getBoundingClientRect()` returns zeros here. That measurement lives in the audit
- * (and would need a browser harness to automate).
- *
- * So this test pins what IS statically decidable, which is also what was actually wrong:
- *   1. a table inside a wrapper that explicitly CLIPS (the original #299 root cause), and
- *   2. a table with no horizontal scroller at all — 58 of them, every one silently losing its
- *      right-hand columns on a phone. The first version of this file deliberately did not assert
- *      (2) because "every table has a scroll wrapper" flagged 70 sites against ONE measured
- *      clip. That reasoning held only while the sites were unfixed: they are wrapped now, so the
- *      rule costs nothing to keep and is the only thing stopping the 59th.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -263,7 +242,6 @@ describe('a section rail is a strip on a phone, not a wall', () => {
    * that are attribute-qualified, i.e. strictly more specific than the `.section-rail` class
    * and emitted after it in the compiled sheet. The strip came out with the column's stretch,
    * no gaps, no bottom rule and the active marker painted down the LEFT EDGE of the chip.
-   * `.section-rail` cannot win that fight; the vertical treatment has to be scoped instead.
    */
   it('the vertical-orientation treatment is scoped to lg, in both places that carry it', () => {
     const tabs = readFileSync(join(SRC, 'components/core/ui/tabs.tsx'), 'utf8');
@@ -307,33 +285,7 @@ describe('a section rail is a strip on a phone, not a wall', () => {
   });
 });
 
-/**
- * The bottom of the page, on a phone.
- *
- * `<main>` reserved room for the fixed tab bar with `padding-bottom` and had done since the bar
- * shipped — and the last ~56px of every page still sat underneath it. Reported on
- * /finance?tab=mydata_book, where the closing rows of the myDATA book could not be read.
- *
- * The reservation was real; it was being SPENT. `<main>` is a column flex scroll container, so a
- * page root is a flex item with the default `flex-shrink: 1`. An item's automatic minimum size
- * (`min-height: auto`) is its content, which is why most pages were fine — but an explicit
- * `min-height` REPLACES that floor, and `min-h-screen` is the root of 67 pages here, FinancePage
- * among them. Chromium then shrinks the root by exactly the padding, the scrollable height comes
- * out unchanged, and the reservation buys nothing.
- *
- * Measured in headless Chromium at 390×844 on a replica of this shell, scrolled to the bottom, as
- * the gap between the last row and the bar's top edge:
- *
- *     page root                         gap
- *     no min-height                      0px    padding honoured
- *     min-h-screen                     -56px    padding swallowed
- *     min-h-screen + a spacer element  -56px    the root absorbs the spacer too
- *     min-h-screen + margin-bottom     -56px    …and the margin
- *     min-h-screen + flex-shrink: 0      0px    the fix
- *
- * So the padding and the shrink lock are ONE rule in two declarations: either alone reserves
- * nothing, and a future edit that keeps the obvious half is the regression this guards.
- */
+/** The bottom of the page, on a phone. */
 describe('page content clears the mobile tab bar', () => {
   const css = readFileSync(join(SRC, 'index.css'), 'utf8').replace(/\r\n/g, '\n');
   const MOBILE = '@media (max-width: 767px)';

@@ -1,15 +1,4 @@
-/**
- * Room planner persistence (#321 M3, #259 Phase 1).
- *
- * Items are READ through `room_layout_items_resolved`, never from the base table, because the
- * footprint a plan draws is DERIVED — an explicit override, else the product's measured 3D model
- * dimensions, else a neutral default. Storing the footprint on the item would freeze a copy of the
- * product's real size, and the plan would keep drawing last year's sofa at last year's size with
- * nothing to flag it. The view is `security_invoker = on`, so it inherits the tables' RLS
- * (CLAUDE.md invariant 3) rather than becoming a way around it.
- *
- * Writes go to the base table, which is the only thing that has authored columns at all.
- */
+/** Room planner persistence (#321 M3, #259 Phase 1). */
 import { supabase } from '@/integrations/supabase/client';
 import { PRODUCT_IMAGE_SELECT, getProductImageUrl } from '@/utils/productMetadata';
 import type { Tables } from '@/integrations/supabase/types';

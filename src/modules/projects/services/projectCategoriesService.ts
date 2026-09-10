@@ -1,18 +1,4 @@
-/**
- * Project categories — "what KIND of job is this" (Renovation, Trip, Warehouse, Real Estate).
- *
- * Two tiers, exactly like `crm_deal_types`, and the distinction is the whole point:
- *
- *   • `workspace_id IS NULL` — a PLATFORM DEFAULT. Shared by every tenant and read-only to them,
- *     so one workspace renaming "Trip" cannot rename it for everyone. There is no per-workspace
- *     copy of the defaults, which is what keeps a fix to a default reaching every workspace.
- *   • `workspace_id = <ws>` — that tenant's own, created and edited from the category manager.
- *
- * RLS is the boundary (select: default OR member; write: workspace admin), so this service adds
- * no filtering of its own beyond the read scope. What it does add is a readable sentence for the
- * three errors a user can actually cause — duplicate label, category still in use, not an admin —
- * because a raw 23505 / 23503 / 42501 tells them nothing about what to do next.
- */
+/** Project categories — "what KIND of job is this" (Renovation, Trip, Warehouse, Real Estate). */
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ProjectCategory {

@@ -1,23 +1,6 @@
 /**
  * A supplier payout is bound to its bill, sent once, and configured for the right tenant
  * (#359 CM-19 / CM-22).
- *
- * CM-19 is two defects in one dialog, and the file's own header states the intent both of them
- * broke: *"The payment reference carries the bill number, so when the transfer executes, the
- * bank-feed matcher settles the bill automatically."*
- *
- *   1. `setBusy(true)` is React state, so a double-click enters `send()` twice before the first
- *      render — the eleventh instance of this class platform-wide, and the only one whose
- *      consequence is an IRREVERSIBLE duplicate bank transfer.
- *   2. The reference was a free-text `<Input>` and the payload was
- *      `reference || bill.supplier_bill_number` — so anything typed in the box REPLACED the bill
- *      number, and the transfer then reconciled to nothing.
- *
- * CM-22: `InvoicingPanel` and `BusinessDetailsPanel` resolved the workspace as
- * `order('created_at').limit(1)` — the user's oldest membership. For anyone in more than one
- * workspace that is arbitrary; for the platform operator (these panels sit behind AdminGuard) it
- * is the root workspace. They write invoice numbering and the business identity that goes on
- * documents.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -190,31 +173,7 @@ describe('#359 CM-22 — the panels configure the workspace you are looking at',
   }
 });
 
-/**
- * The bulk bill run — 2026-08-30.
- *
- * #359 CM-19 established `revolut_payouts.supplier_bill_id` as THE binding: `reconcileOutgoingRevolut`
- * reads it first and only falls back to matching the reference TEXT when it is absent, which CM-19
- * calls "guessing at something we recorded". Three instruction paths set it — the dialog's
- * `send-payment`, `confirm-bill-match`, and the reconciler itself.
- *
- * `pay-due-bills` did not. That is the BULK path — the one whose whole purpose is paying many bills
- * at once — so the payments most likely to need reliable reconciliation were exactly the ones
- * reconciling by guess.
- *
- * With no link, nothing could answer "does this bill already have a payment out", either. A second
- * run drafts the same bills again: a double-click, or a retry after the draft call timed out with
- * the draft already created at Revolut. One approval in the Revolut app then executes an entire
- * duplicate run. The approval step is what makes that survivable, not what makes it safe — a bill
- * run exists so that one approval covers many payments, so "there are two of them" is precisely
- * what an approver is least likely to notice.
- *
- * KNOWN GAP, stated rather than papered over: the reconciler finds a payout by
- * `provider_id = tx.transaction_id`, and a bulk run stores the DRAFT id there, because Revolut
- * returns one draft rather than a payment id per bill. So the link now recorded is correct and
- * usable by the duplicate guard, but the feed-side lookup still cannot use it for bill-run
- * payments. Closing that needs the executed payments' own ids, which arrive on a different event.
- */
+/** The bulk bill run — 2026-08-30. */
 describe('#359 CM-19 — the bulk bill run binds and does not double-draft', () => {
   const run = (() => {
     const i = api.indexOf("case 'pay-due-bills'");

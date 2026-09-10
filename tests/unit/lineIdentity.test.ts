@@ -1,28 +1,4 @@
-/**
- * Line identity — "which one is this line?" (#347 phase 5).
- *
- * Three failure shapes, none of which TypeScript or an integrity check can see:
- *
- *  1. **The re-insert that quietly forgets.** `ordersService.updateItems` DELETEs every line of
- *     the order and re-INSERTs from the editor's state. Any column missing from that insert is
- *     therefore destroyed by an edit that had nothing to do with it — change a quantity, lose
- *     the chosen size. Nothing throws, the order still has lines, and the wrong physical thing
- *     ships. The same applies to `create`.
- *
- *  2. **A second vocabulary.** The quote line used to build `selected_attributes` as a re-keyed
- *     `{size, color}` pair while the registry calls those fields `available_sizes` and `finish`.
- *     Re-keying is a translation, and a translation is exactly where the fifth vocabulary this
- *     issue exists to collapse would come from. The field names must be the registry's own.
- *
- *  3. **Two columns that can disagree.** `selected_size` / `selected_color` are slices of
- *     `selected_attributes`, read by the PDF templates and (phase 6) the warehouse. Written
- *     independently they drift, and a line reads 600x600 while its attributes say 300x300. They
- *     are projected in ONE place so that cannot happen.
- *
- * SCOPE. This is the TypeScript half. Whether the SQL resolver returns sane options is not
- * visible here — `get_line_identity_options` lives in pg_proc and is exercised against the live
- * schema, not this suite.
- */
+/** Line identity — "which one is this line?" (#347 phase 5). */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -136,11 +112,6 @@ describe('price upserts name the variant in their conflict target', () => {
    * since #347 phase 7.1. An upsert that still says `onConflict: 'workspace_id,product_id'`
    * does not merge — it raises "there is no unique or exclusion constraint matching the ON
    * CONFLICT specification" at the moment someone saves a price.
-   *
-   * That is exactly what happened: dropping the two-column constraint broke one SQL function
-   * and three client upserts at once. The SQL half is covered by the production smoke check
-   * `db.plpgsql-lint`, which caught it — but that check compiles plpgsql and cannot see a
-   * string in a TypeScript file, so the client half needs this.
    */
   const UPSERT_SITES = [
     'src/modules/finance/services/servicesService.ts',

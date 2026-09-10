@@ -130,22 +130,7 @@ export async function handleCheckout(req: Request, body: any): Promise<Response>
         cancel_url: cancelUrl,
       });
     } else if (type === 'subscription') {
-      /**
-       * THE SERVER DECIDES WHAT A SUBSCRIPTION COSTS (#360 CB-12).
-       *
-       * `price: priceId` took the Stripe price id straight from the request body, so a caller
-       * could name ANY price that exists on the platform's Stripe account — a test price, an
-       * archived one, a price belonging to a different product — and have a subscription created
-       * against it. The one thing standing between that and a mispriced subscription was the
-       * webhook's tier mapping, which is a different file with a different author.
-       *
-       * `subscription_plans` already holds the answer, and `crm-api`'s handler already reads it
-       * that way. The client names a PLAN; the server names the price. Same defect as FE-23 in
-       * #351 on the unified Stripe route.
-       *
-       * A legacy `priceId` is still accepted, but only if it IS one of the active plans' stored
-       * price ids — which makes it a lookup, not a trust.
-       */
+      /** THE SERVER DECIDES WHAT A SUBSCRIPTION COSTS (#360 CB-12). */
       const planIdRaw = typeof body.planId === 'string' ? body.planId : null;
       const { data: plans, error: plansErr } = await supabase
         .from('subscription_plans')

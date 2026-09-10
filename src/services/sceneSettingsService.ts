@@ -1,17 +1,4 @@
-/**
- * How a workspace's 3D surfaces look (#335) — read through one derivation.
- *
- * WHAT IS STORED IS A CHOICE, NOT A LIGHT. The rigs themselves (`LIGHTING_PRESETS`) are code: they
- * carry HDRI names, sun angles and light positions a renderer reads. What a tenant picks is which
- * rig, plus the few numbers beside it — exposure, camera framing, whether the environment shows
- * behind the product.
- *
- * THE LADDER IS RESOLVED IN SQL. `resolve_scene_settings(workspace, product, embed_key)` answers
- * embed key → product → workspace default → code defaults, and nothing here re-implements that
- * precedence. This is the third setting in the platform with that shape (pricing markup and
- * catalogue scope are the others), and the reason it is a function rather than a convention is
- * that three copies of a precedence rule eventually disagree about one case.
- */
+/** How a workspace's 3D surfaces look (#335) — read through one derivation. */
 import { supabase } from '@/integrations/supabase/client';
 import type { PresetKey } from '@/components/features/lighting/lightingPresets';
 

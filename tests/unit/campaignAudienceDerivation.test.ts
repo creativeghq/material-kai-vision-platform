@@ -1,33 +1,4 @@
-/**
- * Campaign-audience derivation guard.
- *
- * The bug this exists to stop: "who does this campaign go to" was implemented FIVE times —
- * `CreateMarketingCampaignModal` (tenant preview), `marketingService.ensureRecipients`,
- * `manage_email_campaign` (agent tool), `CreateCampaignModal` (admin page) and the dead
- * `campaignService.addRecipients` — across TWO incompatible `audience_filter` schemas
- * (`{category_ids, manual_emails}` vs `{type, emails, recipients}`).
- *
- * Every copy drifted, and each drift was invisible:
- *   - agent-created drafts materialized NO rows, so "send" flipped the status and emailed nobody
- *     (that failure is the entire reason `ensureRecipients` was written);
- *   - the agent path dropped `manual_emails` and silently under-sent;
- *   - the admin path deduped nothing (a user and a contact sharing an address got two emails),
- *     set no merge vars (`{{firstName}}` rendered blank) and read `user_profiles` platform-wide,
- *     putting other tenants' users in one workspace's campaign;
- *   - the tenant modal's "all contacts" toggle was never persisted, so re-resolving a saved
- *     campaign silently lost it;
- *   - the admin "estimate" counted source tables by hand, so it disagreed with the send.
- *
- * None of that is visible to a typecheck (a wrong recipient list is a valid array) or to an
- * integrity check (the stored rows were internally consistent). The only durable fix is ONE
- * derivation, in SQL: `resolve_campaign_audience` answers "who", `campaign_materialize_recipients`
- * writes the rows, and TypeScript formats.
- *
- * SCOPE — a green run here does NOT prove the invariant holds.
- * This scans REPO FILES, so it only sees the TypeScript half. This project's SQL is applied via
- * the Supabase MCP and never committed (CLAUDE.md), so a function body lives only in `pg_proc` and
- * is invisible to this test. A second audience derivation added in SQL would pass this file.
- */
+/** Campaign-audience derivation guard. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';

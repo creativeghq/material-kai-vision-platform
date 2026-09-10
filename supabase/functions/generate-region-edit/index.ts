@@ -1,22 +1,4 @@
-/**
- * generate-region-edit
- *
- * Masked inpainting: regenerate only the user-painted area of a room image.
- * Uses Grok Aurora's /v1/images/edits endpoint with an explicit binary mask.
- *
- * Mask convention (PNG):
- *   white pixels (255,255,255) = regenerate this area
- *   black pixels (0,0,0)       = keep exactly as-is
- *
- * Request body (JSON):
- *   image_url     string   — public URL of the room image to edit
- *   mask_data_url string   — PNG data URL of the binary mask
- *   prompt        string   — what to change in the masked area
- *   user_id       string?  — required when called with service role key
- *   workspace_id  string?
- *
- * Credits: 20 per call (Grok inpainting with mask)
- */
+/** generate-region-edit */
 
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
@@ -45,16 +27,7 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-/** Fetch a remote image and return raw bytes + detected mime type.
- *
- * SSRF-guarded (invariant 7). `url` is caller-supplied
- * (`body.image_url`), so a raw fetch here was a working internal port scanner:
- * an authenticated user could point it at 169.254.169.254 (cloud metadata),
- * loopback or RFC1918, and the thrown message below leaks the upstream status
- * back to them — a response oracle. `redirect: 'error'` is REQUIRED by the
- * guard's contract: a public URL can 302 to a blocked address after the check.
- * On failure we deliberately do NOT echo the status or URL back to the caller.
- */
+/** Fetch a remote image and return raw bytes + detected mime type. */
 /** Guarded AND bounded. This one already called assertSafeUrl and refused
  *  redirects; what it lacked was a size cap, so an attacker-chosen URL could still
  *  stream unbounded bytes into the isolate. */
@@ -189,16 +162,6 @@ Deno.serve(withApiLogging('generate-region-edit', async (req) => {
     const billedCostUsd = editPricing ? rawCostUsd! * editPricing.markup_multiplier : null;
 
     // The billing row is best-effort for the REQUEST but not for the books (#347 audit).
-    //
-    // It must never throw: the credits are already debited and the upstream call already
-    // happened, so failing here would punish the user for an accounting problem. But the old
-    // `.then(() => {}, () => {})` discarded the outcome entirely, which is the
-    // `stamp_job_refresh_cost` shape — spend charged to a tenant and reported against nobody,
-    // with billing sitting at zero and the exception swallowed.
-    //
-    // try/catch rather than checking `error` alone, because both failure modes have to be
-    // caught: supabase-js RESOLVES with `{ error }` on an RLS denial, and REJECTS on a
-    // transport error. This function has no top-level Sentry reach for a mid-pipeline swallow.
     try {
       const { error: usageErr } = await supabase.from('ai_usage_logs').insert({
         user_id: userId,

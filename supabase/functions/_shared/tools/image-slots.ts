@@ -1,29 +1,4 @@
-/**
- * ONE slot convention for the interior image modes.
- *
- * When two images are attached, AgentHub's composer shows two labelled slots:
- *
- *     slot 0 → "Inspiration"  · "Style & colors to copy"
- *     slot 1 → "Your Room"    · "Layout to preserve"
- *
- * `copy-style` has always read them that way, and `ai-client`'s `IMAGE_LABELS` tells Gemini the
- * same thing ("STYLE REFERENCE IMAGE (first image)" / "ROOM TO EDIT (second image)"). `image-edit`
- * read them BACKWARDS — `images[0]` was the photo to edit and `images[1]` the style donor — and
- * `floor-plan-render` did too. So the same two slots meant opposite things depending on a mode the
- * user never chose, and nothing anywhere said so.
- *
- * What that cost, conversation b520cc11 (2026-09-09): a user attached a 355x355 terrazzo swatch
- * and a 1280x1600 photo of their kitchen and asked to swap the floor tile. `image-edit` sent the
- * SWATCH as the photo to edit and the KITCHEN as the "inspiration", so Gemini was handed a flat
- * texture plus a paragraph describing a green kitchen and invented a room that does not exist.
- * Twice, 15 credits each. Nothing failed: a wrong room is a valid image.
- *
- * Every mode that transforms one supplied photo now resolves its slots HERE, so there is one
- * answer to "which one is the room". Guarded by tests/unit/imageEditPipeline.test.ts.
- *
- * Import-free on purpose — the guard test imports it directly, and this file must stay readable
- * by both Deno and vitest.
- */
+/** ONE slot convention for the interior image modes. */
 
 /** The material / inspiration / tile reference. Never the thing being edited. */
 export const SLOT_REFERENCE = 0;

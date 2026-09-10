@@ -1,18 +1,4 @@
-/**
- * per-supplier markup overrides (#332 step 6).
- *
- * "Mark everything from this supplier up 35%" was not expressible: `pricing_rules.scope` only
- * allowed product and category, even though supplier is a first-class dimension everywhere else
- * (`supplier_products`, `platform_suppliers`, the #324 identity spine).
- *
- * Sits BELOW brand in the ladder — product → brand → supplier → category → default — because a
- * brand is what the customer is buying and a supplier is only who we happen to buy it from. The
- * same brand arriving through two distributors should not move the shelf price.
- *
- * Matched on `products.supplier_company_id`, which is why the picker reports a product count:
- * a supplier we buy from but that is nobody's default supplier is offered with 0, so the
- * operator can see the rule would reach nothing rather than wondering why prices did not move.
- */
+/** per-supplier markup overrides (#332 step 6). */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, Plus, Trash2, Truck } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';

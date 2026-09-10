@@ -33,20 +33,7 @@ interface HubStatTileProps {
   className?: string;
 }
 
-/**
- * KPI TILE — one number, its label, and how it moved.
- *
- * Rules this encodes, all of which a hand-rolled tile tends to get wrong:
- *
- *  - **The number is the loudest thing.** 24px semibold with `tabular-nums`, so
- *    a row of tiles has its digits on a shared grid and the eye can compare
- *    magnitudes without reading each one.
- *  - **The delta is coloured by MEANING, not direction** (see `upIsGood`), and
- *    carries an arrow as well as a colour, because roughly 1 in 12 men cannot
- *    separate the red from the green.
- *  - **The label sits above the number.** Below, it reads as a caption for
- *    whatever comes next in the column rather than a name for the figure.
- */
+/** KPI TILE — one number, its label, and how it moved. */
 export const HubStatTile: React.FC<HubStatTileProps> = ({
   label,
   value,

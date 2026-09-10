@@ -1,24 +1,4 @@
-/**
- * AI Assessment — one panel, three subjects (#397).
- *
- * WHAT THIS SCREEN IS. Two halves that must not be confused for each other:
- *
- *   THE SIGNALS are free and live. `preview()` re-derives them every time the panel opens — the
- *   checks, the six dimension scores and the verdict, all computed by `get_assessment_snapshot`
- *   in SQL. Nothing here computes a number.
- *
- *   THE REPORT costs credits. It is one Claude turn over those same signals, producing the
- *   headline, the narrative and the ranked actions. It is a SNAPSHOT — frozen when it ran — which
- *   is why it is shown next to a live "as of" date rather than pretending to be current.
- *
- * Every dimension renders every time, and one that could not be judged says so. A tile that
- * disappears when there is no data makes a broken collector pixel-identical to a healthy subject;
- * a tile showing 0 is worse, because 0 is a score.
- *
- * Mounted three times — the project tab, the Finance hub, the property workbench — because the
- * report is about three different things and belongs beside each of them. It is ONE component for
- * the same reason the SQL is one system: three copies would drift on the first change.
- */
+/** AI Assessment — one panel, three subjects (#397). */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {

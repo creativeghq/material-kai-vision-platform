@@ -1,26 +1,4 @@
-/**
- * ONE agent, TWO audiences — and the boundary between them holds.
- *
- * ── What this guards ────────────────────────────────────────────────────────────────────────
- * The Inbox no longer runs a small assistant of its own. A customer conversation runs JARVIS: the
- * same system prompt, the same operating doctrine, the same knowledge grounding, the same
- * reasoning. That is the product decision, and it is a good one — improving JARVIS improves every
- * customer conversation instead of improving one of two assistants.
- *
- * It is only safe because of the clamp. `AGENT_CONFIGS['kai'].tools` declares 166 tools including
- * `manage_finance`, `pay_expense`, `send_purchase_order`, `manage_crm`, `manage_hr` and
- * `manage_inbox`. The other party in an Inbox thread is a stranger typing free text into that
- * loop. Every assertion below exists because deleting the thing it checks would be invisible:
- * replies keep arriving, they are still polite, and a capability has quietly become reachable by
- * anyone with the business's WhatsApp number.
- *
- * ── Why source assertions ───────────────────────────────────────────────────────────────────
- * The clamp is a property of how the turn is ASSEMBLED, several hundred lines before any model
- * call, inside an edge function that cannot be imported into vitest (top-level `await import` of
- * npm specifiers, `Deno.env` at module scope). There is no return value that reveals whether
- * `load_toolkit` was bound. So this reads the source — the same technique
- * `toolkitCoverage.test.ts` uses on the same file, for the same reason.
- */
+/** ONE agent, TWO audiences — and the boundary between them holds. */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -34,19 +12,7 @@ const ACCOUNT_TOOLS = 'supabase/functions/_shared/tools/customer-account-tools.t
 const AGENT_CHAT = 'supabase/functions/agent-chat/index.ts';
 const INBOX = 'supabase/functions/inbox-api/index.ts';
 
-/**
- * Pull the string literals out of `CUSTOMER_SAFE_TOOL_IDS`.
- *
- * Anchored on `= [`, not on the first `[` after the name — the declaration is
- * `CUSTOMER_SAFE_TOOL_IDS: readonly string[] = [`, so "first bracket" is the one in `string[]`
- * and "first closing bracket after it" is the one right behind it. That returned an empty array,
- * and an empty array makes the two assertions below PASS: nothing forbidden in it, and its length
- * is under the cap. Two security checks reporting green by having nothing to check — the exact
- * silent-zero shape CLAUDE.md is about, authored inside the test written to prevent one.
- *
- * Hence `expect(ids.length).toBeGreaterThan(0)` here rather than in one caller: a parse that finds
- * nothing must fail loudly wherever it is used, not quietly satisfy a "must not contain" rule.
- */
+/** Pull the string literals out of `CUSTOMER_SAFE_TOOL_IDS`. */
 function safeToolIds(): string[] {
   const src = code(AUDIENCE);
   const start = src.indexOf('CUSTOMER_SAFE_TOOL_IDS');
@@ -172,11 +138,6 @@ describe('agent-chat applies the audience clamp', () => {
     // `load_toolkit` clamps to the narrowed set so it could only load nothing — but an escape
     // hatch that merely fails is still surface, and a customer's message can burn a round trip
     // discovering it. `request_input` renders an Approve/Decline card with nobody to press it.
-    //
-    // `BOUND_META_TOOLS`, not a conditional `META_TOOLS`. The declaration has to stay a plain
-    // literal because `toolkitCoverage.test.ts` reads it to prove a tool homed in no cluster is
-    // still reachable by every agent, and a guard cannot read a ternary. Two names: one for what
-    // exists, one for what gets bound.
     expect(src).toMatch(/const BOUND_META_TOOLS = forCustomer \? \[\] : META_TOOLS;/);
     expect(src).toMatch(/if \(BOUND_META_TOOLS\.includes\('load_toolkit'\)\)/);
     expect(src).toMatch(/if \(BOUND_META_TOOLS\.includes\('request_input'\)\)/);

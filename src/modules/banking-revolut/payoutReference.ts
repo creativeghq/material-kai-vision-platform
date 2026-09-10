@@ -1,21 +1,4 @@
-/**
- * The reference a supplier payout carries (#359 CM-19).
- *
- * `PayViaRevolutDialog` sent `reference || bill.supplier_bill_number` — so anything typed into the
- * reference box REPLACED the bill number, and the box was right there, editable, next to the
- * amount. The file's own header states the intent it was breaking: *"The payment reference carries
- * the bill number, so when the transfer executes…"*. Edit it and the transfer reconciles to
- * nothing; combined with weak reference matching (CM-16) and internal legs failing open (CM-12),
- * an edited reference is a payment that will not match back to anything.
- *
- * The bill number is now composed IN rather than replaced. The operator's note is still theirs —
- * it just cannot displace the one part of the string the bank feed reads.
- *
- * The real binding is `payout_instructions.supplier_bill_id`, a foreign key set at instruction time.
- * This string is for whoever reads the bank statement.
- *
- * Import-free so a test can load it directly.
- */
+/** The reference a supplier payout carries (#359 CM-19). */
 
 /** Revolut caps a payment reference at 140 characters. */
 export const PAYOUT_REFERENCE_MAX = 140;

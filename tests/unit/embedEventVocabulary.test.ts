@@ -1,23 +1,4 @@
-/**
- * Embed analytics vocabulary — three places, one list.
- *
- * An event type has to appear in all three or it silently reads as zero, and WHICH zero depends on
- * which one you miss:
- *
- *   1. the widget emits it            (`src/embed/materialkai-product.ts`)
- *   2. the endpoint allows it         (`EMBED_EVENT_TYPES` in products-3d-api)
- *   3. the dashboard displays it      (`EMBED_EVENT_LABELS` in EmbedKeysCard)
- *
- * Miss (2) and the beacon is refused with a 400 — which the beacon swallows by design, so the
- * merchant sees a metric that never moves. Miss (3) and the rows are written correctly and shown to
- * nobody. Both look exactly like "nobody used that feature", which is the most expensive kind of
- * wrong: it reads as a product answer rather than a bug.
- *
- * This is not hypothetical on this surface. `action=event` once 400'd on 100% of calls because the
- * beacon posts with an empty body and the handler called `req.json()`, and it was invisible for the
- * same reason — the beacon swallows its own errors. `embed_configure` then sat on #258's list,
- * emitted by nothing and displayed by nothing, until #341.
- */
+/** Embed analytics vocabulary — three places, one list. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

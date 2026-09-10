@@ -1,19 +1,6 @@
 /**
  * One supplier's received (myDATA) documents — the table, the row actions and the three dialogs
  * they open.
- *
- * Extracted from `PartyInboundDocsCard` so the CRM record and Finance → Expenses by Supplier show
- * the SAME rows with the SAME behaviours. The alternative was a second copy of the action wiring
- * (dismiss, receive to warehouse, record payment, create order, the `ordered` set), which is
- * behaviour, not decoration — and the surfaces would have drifted the first time one of them
- * gained an action.
- *
- * Deliberately chrome-free: no Card, no heading. The host frames it, because one host is a card on
- * a company record and the other is a modal opened off a supplier row.
- *
- * A row OPENS — it does not navigate. Every dialog here (preview, receive, record payment, new
- * order) stacks on top of the host and leaves it mounted, so the errand runs without the operator
- * losing the list, the page they were on, or a form they had half filled in.
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Loader2, CalendarDays } from 'lucide-react';
@@ -57,19 +44,7 @@ const Tile: React.FC<{ label: string; value: React.ReactNode; note?: React.React
   </div>
 );
 
-/**
- * Spend, booked and paid for the window in force.
- *
- * Three rules this encodes, all of them the difference between a number and a lie:
- *
- *  - A FAILED read is not zero. `null` says the totals could not be read; it never prints 0.
- *  - PAID is only meaningful against what was BOOKED. A supplier can have 206 documents, EUR
- *    37,525.96 invoiced and nothing paid simply because nobody has turned any of it into an
- *    expense yet — which is a to-do, not a debt. The ratio sits under the figure so the two
- *    cannot be read apart.
- *  - Currencies are not added. A window spanning EUR and USD has no single total, so it says so
- *    instead of printing their sum.
- */
+/** Spend, booked and paid for the window in force. */
 const MoneyStrip: React.FC<{ money: IssuerMoney | null | undefined; loading: boolean; windowed: boolean }> = ({
   money, loading, windowed,
 }) => {

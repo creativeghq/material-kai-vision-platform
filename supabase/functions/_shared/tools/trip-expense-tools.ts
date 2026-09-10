@@ -1,17 +1,4 @@
-/**
- * Trip Card Tools — agent-chat surface for sales-team expense reports.
- *
- * Tools (all 0 credits, DB-only):
- *   - create_trip_card  — start a new trip card (owned by the calling user)
- *   - add_trip_expense  — add a day expense line to a draft card (+ optional receipt later in the UI)
- *   - list_trip_cards   — list the caller's own trip cards
- *   - submit_trip_card  — submit a draft card to finance for approval
- *
- * Ownership is enforced explicitly (service-role bypasses RLS): every read/write
- * is scoped to user_id = the authenticated agent user. Module-gated on
- * `sales-finance`. Finance review (approve/reject) is intentionally NOT exposed
- * to the agent — that happens in the Finance UI.
- */
+/** Trip Card Tools — agent-chat surface for sales-team expense reports. */
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what

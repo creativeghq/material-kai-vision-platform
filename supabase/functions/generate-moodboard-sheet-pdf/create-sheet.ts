@@ -4,11 +4,6 @@
 //   - the agent tool (generate_presentation_sheet) invokes this edge function
 //     with {action:'create', ...} and translates the response into chat chunks;
 //   - the SheetWizardModal (frontend) invokes it via moodboardSheetsService.
-// Previously this logic lived ONLY in the agent tool, so the client path
-// silently skipped credits + auto-extract. Now it lives here, beside the render.
-// This module does NOT render the PDF. The handler renders passive types via its
-// existing render block (so there's one renderer); interactive types return for
-// the canvas. Refund-on-render-failure is handled by the handler.
 
 import { getGenerationPrompt } from '../_shared/prompt-utils.ts';
 import type { DbClient } from '../_shared/supabase-client.ts';
@@ -225,14 +220,6 @@ export async function createSheet(
   }
 
   // 3b. Snapshot the images into the sheet's own private folder (#392).
-  //
-  //     Runs AFTER the insert because the folder is keyed by sheet id, and after the credit
-  //     debit because it is not the expensive part — a failed copy leaves the source URL in
-  //     place, so this can never turn a paid-for sheet into a broken one. The row is written
-  //     twice as a result; that is deliberate and NOT the create-then-stamp shape rule 4
-  //     warns about, because the second write is idempotent: re-running the snapshot on a
-  //     payload that already holds refs copies nothing and rewrites nothing, so a retry (or
-  //     the next edit) repairs a half-copied sheet instead of duplicating anything.
   const sheetId = (sheet as any).id as string;
   const snapshot = await snapshotSheetAssets(supabase as any, sheetId, initial_data, fetchImageGuardedOrNull);
   const copied = Object.keys(snapshot.report.copied).length;

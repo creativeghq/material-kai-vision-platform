@@ -1,27 +1,4 @@
-/**
- * SEO toolkit card coverage guard.
- *
- * THE DEFECT THIS EXISTS TO CATCH, measured on 2026-08-27: the SEO tools emitted
- * 51 distinct `seo_*_card` chunk types and only 37 had a renderer. The other 14
- * arrived in the user's chat as `JSON.stringify(data)` — among them AI Overview,
- * Search Console striking-distance, keyword ideas, search volume and on-page
- * issues, i.e. most of what the toolkit is FOR.
- *
- * What made it invisible is worth stating, because it is the reason a human
- * reviewer kept missing it. All 14 were dutifully listed in `AGENT_RESULT_TITLES`
- * in AgentHub.tsx, which reads exactly like coverage. It is not. AgentHub routes
- * every chunk whose type starts with `seo_` and ends with `_card` to
- * `SEOGenericCard` BEFORE that titles map is ever consulted, so an entry there
- * has no effect whatsoever on whether the card renders. Two registries, one of
- * them decorative — and the decorative one was the complete-looking one.
- *
- * So this test deliberately ignores `AGENT_RESULT_TITLES` and checks the only
- * thing that actually decides what a user sees: does `SEOGenericCard` have a
- * branch for every type the edge tools emit.
- *
- * Source-based by necessity — these are Deno edge modules that this Vitest
- * process cannot import.
- */
+/** SEO toolkit card coverage guard. */
 
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';

@@ -1,31 +1,4 @@
-/**
- * What may leave the EEA (issue #394).
- *
- * QwenCloud/DashScope runs in Singapore by default, which is a transfer out of the
- * EEA with no adequacy decision. Alibaba does offer an EU deployment scope in
- * Frankfurt (`eu-central-1`), and pointing at it is the REAL fix — see
- * `DASHSCOPE_BASE_URL` in ai-client.ts. This module is the second line, for the
- * period before that is configured and for the case where someone points a new
- * caller at a non-EEA provider without thinking about it.
- *
- * WHAT THIS IS NOT
- * ----------------
- * It is not GDPR compliance and must never be described as such. It catches
- * identifiers that a regex can catch with high precision. It does NOT catch:
- *
- *   - a person's NAME. "Find me everything about Maria Papadopoulou" reads to this
- *     gate as an ordinary research question, because a name is not distinguishable
- *     from any other proper noun without knowing your CRM.
- *   - a postal address.
- *   - a company that is a sole trader, where the company IS a person.
- *
- * So this is a FLOOR, not a guarantee. The guarantee is the EU endpoint plus a DPA.
- * Saying otherwise would make the gate worse than useless: a filter believed to be
- * complete is how people stop thinking about the thing it half-covers.
- *
- * It fails CLOSED. An unreadable payload is refused, because the failure mode of
- * letting it through is a transfer that cannot be undone.
- */
+/** What may leave the EEA (issue #394). */
 
 export interface ResidencyVerdict {
   allowed: boolean;
@@ -51,17 +24,7 @@ const IBAN_CANDIDATE = /\b([A-Z]{2}[0-9]{2}[A-Z0-9]{10,30})\b/g;
 const LABELLED_TAX_ID =
   /(?:^|[^A-Za-zͰ-Ͽ])(?:ΑΦΜ|AFM|VAT(?:\s*(?:no|number|id))?|TIN|Tax\s*(?:ID|number))[\s:.#-]*([A-Z]{0,2}[0-9][0-9\s-]{6,15})/i;
 
-/**
- * A phone number needs a phone SIGNAL, not merely enough digits.
- *
- * The first version accepted any run of 9+ digits, which made `article 123456789 in
- * the 2026 catalogue` a phone number — i.e. it blocked ordinary catalogue research,
- * which is the traffic this provider is FOR. A gate that fires on the normal case
- * gets switched off, and then it protects nothing.
- *
- * So: an explicit international prefix, or an explicit label. A bare digit run never
- * counts, and that is a deliberate hole — see the module docstring on being a floor.
- */
+/** A phone number needs a phone SIGNAL, not merely enough digits. */
 const PHONE_INTL = /\+\d{1,3}[\s.-]?(?:\(?\d{2,4}\)?[\s.-]?){2,4}\d{2,4}/;
 const PHONE_LABELLED =
   /(?:^|[^A-Za-zͰ-Ͽ])(?:τηλ|τηλέφωνο|tel|phone|mobile|κινητό|fax)[\s.:]*\+?[\d\s().-]{7,}/i;

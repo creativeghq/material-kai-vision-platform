@@ -1,20 +1,4 @@
-/**
- * Put the NAME beside the id, flat, on every row a tool returns.
- *
- * The result cards can turn `supplier_company_id` into a link to that company — `recordLinks.ts`
- * knows where a company opens — but a link needs words. Most list tools select the foreign key and
- * not the name, so the row said `KEROS HELLAS` nowhere: the card showed `Notes: Order ORD-2026-0001
- * — KEROS HELLAS …` and the reader had to parse a sentence to learn who the expense was with,
- * while the model's prose answer in the same conversation had a Supplier column. Same data, two
- * different answers on the two halves of the screen.
- *
- * FLAT on purpose. A PostgREST embed (`customer:crm_companies(name)`) returns a nested object, and
- * the card's table builder skips non-scalar columns — so an embed adds the name to the payload and
- * removes it from the table. One extra `in()` read per list is the honest price.
- *
- * Never overwrites a name the row already carries: `supplier_bills.supplier_name` is what the
- * document SAID, and the CRM company is who we think it is. When they differ the document wins.
- */
+/** Put the NAME beside the id, flat, on every row a tool returns. */
 
 export interface PartyNamePair {
   /** The row's foreign-key field, e.g. `supplier_company_id`. */

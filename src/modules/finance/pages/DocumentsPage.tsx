@@ -461,8 +461,6 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
         // the payment form on a settle-only branch, which could pay an expense but never
         // record one, so the label described something the form could not do — and it
         // dead-ended ("nothing to pay") for the ordinary case where the bill doesn't exist
-        // yet. Settling a bill you already have belongs on that bill's own row, where you can
-        // see what is owed: Expenses / Payables / the Inbox all carry "Record payment".
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             {/* The chevron is the only thing telling you this opens a choice rather than the

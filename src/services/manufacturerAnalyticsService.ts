@@ -1,28 +1,4 @@
-/**
- * Manufacturer Analytics Service
- *
- * Tracks product interaction events for manufacturer/B2B analytics.
- * Uses batching (flush every 5s or at 20 events) and fire-and-forget patterns
- * to avoid blocking the UI.
- *
- * The schema this file used to paste inline had drifted from the live table and was worse than
- * no documentation: it claimed a CHECK constraint on event_type that did not exist (so the table
- * silently became a two-family bus when the 3D embed widget started writing `embed_*` rows) and
- * described an RLS shape ("admins read") that was never applied. The live contract is now:
- *
- * - `event_type` is CHECK-constrained to BOTH families — the six product events below and the six
- *   `embed_*` events in `products-3d-api`. A typo fails the insert instead of reading as zero.
- * - `workspace_id` is DERIVED from the product by a BEFORE INSERT trigger, never sent by this
- *   service. That is deliberate: a client that could assert its own workspace_id could attribute
- *   engagement to a tenant it does not belong to (security invariant 1).
- * - INSERT requires `user_id = auth.uid()` and membership of the derived workspace, so an
- *   unauthenticated view cannot be recorded — see the guard in `track()`.
- * - SELECT is workspace-scoped, and there is exactly one read policy. Consumers must go through a
- *   SECURITY DEFINER RPC (`company_market_analytics`) rather than reading this table directly;
- *   a direct read returns only what the caller's own workspace generated.
- *
- * Migration: `manufacturer_analytics_event_bus_foundation` (issue #350).
- */
+/** Manufacturer Analytics Service */
 
 import { supabase } from '@/integrations/supabase/client';
 
@@ -30,16 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 // Types
 // ---------------------------------------------------------------------------
 
-/**
- * Every member has a live call site — `manufacturerEventContract.test.ts` fails the build otherwise.
- *
- * `product_search_impression` / `product_search_click` were briefly deleted during #350 on the
- * reading that no product-search surface existed: the smart search appeared to return PDF chunks.
- * It does not. `multi_vector` returns product-shaped rows; the frontend was mapping `id` from a
- * `chunk_id` the backend never sends, so results arrived with `undefined` ids and looked like
- * chunks. With that mapping fixed the surface is a real product search, and these two describe
- * something `product_view` cannot: appearing in a ranked result set, and being chosen out of one.
- */
+/** Every member has a live call site — `manufacturerEventContract.test.ts` fails the build otherwise. */
 export type ManufacturerEventType =
   | 'product_view'
   | 'product_save'

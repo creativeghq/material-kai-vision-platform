@@ -4,19 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { quoteUrl } from '@/modules/quotes/routes';
 
-/* ────────────────────────────────────────────────────────────────────────────
-   Data for the dashboard's operational blocks.
-
-   Counts are read with `{ count: 'exact', head: true }` — one COUNT per bucket,
-   no rows transferred, exact at any table size. The obvious alternative (fetch
-   the status column and group in JS) needs a row cap, and a silent cap reads as
-   "you have 200 orders" when you have 5,000. See the "no silent caps" rule in
-   CLAUDE.md.
-
-   Every query is bound to the ACTIVE WORKSPACE. These tables are workspace-scoped
-   and RLS enforces it, but the filter is explicit here too so a policy change can
-   never silently widen what the dashboard totals.
-   ──────────────────────────────────────────────────────────────────────────── */
+/* Data for the dashboard's operational blocks. */
 
 /** Status vocabularies, taken from the live CHECK constraints — not guessed.
  *  orders_status_check: draft | confirmed | partially_fulfilled | fulfilled | cancelled
@@ -52,21 +40,7 @@ const EMPTY_PIPELINE: PipelineCounts = {
 // Pre-resolution state, not a failure state — `loading` distinguishes them.
 const EMPTY_CRM: CrmCounts = { total: 0, customers: 0, suppliers: 0 };
 
-/** One exact COUNT, scoped to the workspace. Returns NULL when the query failed.
- *
- *  It used to return 0, and the error was destructured first — so this was a decision,
- *  not an oversight (#385 FN-1). The intent was right: a dashboard tile must never take
- *  the page down. But 0 is not a safe default here, it is a WRONG ANSWER that looks like
- *  a right one. An RLS change, a network blip or a permissions regression renders as
- *  "you have no orders", on the first screen anyone looks at, and a workspace that
- *  genuinely has none is indistinguishable from one whose query just failed.
- *
- *  null keeps the never-throw property and drops the false claim. `StatBlock` renders it
- *  as "—", which is the platform's own convention for an absent value.
- *
- *  The derivation itself was always right and is untouched: `{ count: 'exact', head: true }`
- *  is a real SQL count, not a client-side `.length` over a capped page, and it is
- *  workspace-scoped. */
+/** One exact COUNT, scoped to the workspace. Returns NULL when the query failed. */
 async function countWhere(
   table: 'orders' | 'quotes' | 'crm_companies',
   workspaceId: string,

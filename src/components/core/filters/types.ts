@@ -153,12 +153,6 @@ export function describeValue(field: FilterField, value: FilterValue): string {
 /**
  * The fold every search box in the filter system compares through — case-insensitive AND
  * diacritic-insensitive.
- *
- * `toLowerCase()` alone is not enough for a Greek CRM. `Κώστας` and `ΚΩΣΤΑΣ` differ only by
- * accents, and the final sigma `ς` is a different codepoint from `σ`, so typing a name the
- * way it is actually spelled ("κωστάς") matched nothing in a list holding "ΚΩΣΤΑΣ ΑΛΕΞΙΟΥ".
- * Same for Latin accents (`Trendafil` vs `Трендафил` is a different alphabet and still
- * won't match — transliteration is not this function's job).
  */
 export function foldForSearch(value: unknown): string {
   return String(value ?? '')

@@ -2,21 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, Eye } from 'lucide-react';
 import { moodboardSheetsService } from '@/services/moodboardSheetsService';
 
-/**
- * Debounced live PDF preview that re-renders on canvas-state change.
- *
- * Strategy: every time `data` changes, schedule a render 1.5s later. If the
- * user is still moving things around, the timer resets. When the timer
- * eventually fires, we update the sheet with the latest data + invoke the
- * PDF function. The preview iframe shows the result.
- *
- * Uses an `<iframe>` rather than rendering pages on a canvas because the
- * server-rendered PDF is the source of truth — what you see is exactly what
- * a Render PDF click would produce. Free of layout drift.
- *
- * Callers MUST gate on `enabled=true` only when they have a backdrop set,
- * otherwise validation will reject the render.
- */
+/** Debounced live PDF preview that re-renders on canvas-state change. */
 interface LivePreviewPanelProps {
   sheetId: string;
   data: Record<string, any>;

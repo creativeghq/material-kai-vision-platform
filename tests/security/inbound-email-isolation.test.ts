@@ -1,22 +1,4 @@
-/**
- * Acceptance guard — issue #342 §6.
- *
- * Two separate walls, both of which are prose in a README today and would otherwise survive only
- * as long as the next person reads it:
- *
- * 1. **The Cloudflare Email Worker resolves no tenancy.** It lives outside this repo's
- *    enforcement — no semgrep ruleset, no `check_security_invariants()`, no `deno check`, no
- *    review path — so a tenancy decision that drifts into it is invisible to every other gate we
- *    have. It must never look up a workspace, a user's address row or a thread, and it must never
- *    hold a database credential.
- *
- * 2. **An agent/inbox reply never borrows the finance sending identity, and no finance send ever
- *    looks like an autoresponder.** `Auto-Submitted: auto-replied` on a real invoice makes a
- *    customer's mail client treat it as a bounce; `requireWorkspaceSender: true` on an agent reply
- *    would send a stranger's conversation from the tenant's verified finance domain.
- *
- * Source-level and hermetic: greps the shipped files, no network, no database.
- */
+/** Acceptance guard — issue #342 §6. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
@@ -218,10 +200,6 @@ describe('#342 the assistant answers only when the owner asked it to', () => {
   // `!automated && !platformSender`, which never mentions it. The toggle in the Inbox changed
   // nothing, and since the column DEFAULTS to false, the shipped behaviour was the opposite of the
   // schema's intent: a brand-new address auto-replied to strangers, unattended, on credit.
-  //
-  // A column that is fetched but never read is invisible to typecheck (the value is used — it is
-  // assigned to a field), invisible to lint, and invisible to any integrity probe, because the
-  // stored data is perfectly correct. Only a source-level assertion sees it.
   it('reads auto_reply_enabled in the decision, not merely into a variable', () => {
     const gate = src.match(/const\s+autoReplyAllowed\s*=\s*([^;]+);/);
     expect(gate, 'the autoReplyAllowed gate has been renamed or removed').toBeTruthy();

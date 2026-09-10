@@ -4,44 +4,7 @@ import { join } from 'path';
 
 import { stripComments } from '../helpers/stripComments';
 
-/**
- * PARTNER API keys are stored hashed, verified in ONE place, and never read back (#390).
- *
- * EMBED KEYS ARE DELIBERATELY EXCLUDED, AND THAT IS A CORRECTION
- * --------------------------------------------------------------
- * The first version of this change hashed `material_kai_keys` too, on the grounds that it
- * had "the identical design". It does not. An embed key is PUBLIC by construction: it
- * ships in the merchant's page source as `<materialkai-builder api-key="mk_embed_…">` and
- * is bounded by `allowed_origins`, not by secrecy — `embedKeysService.generateEmbedKey`
- * says so in as many words.
- *
- * So hashing bought nothing there (the value is already on the page) and cost the
- * read-back the product depends on: `productEmbedReadinessService` regenerates the
- * install snippet from it, and a merchant who closes the tab must be able to get the key
- * again. A show-once embed key is a key the merchant loses. It was reverted.
- *
- * The distinction is the point, and it is why this file now says `api_keys` everywhere it
- * used to say "either key table": one of these is a Bearer credential nobody but its
- * owner ever sees, and the other is published HTML.
- *
- * `api_keys.api_key` held the credential in directly usable form — 36 characters,
- * `kai_` prefix, not a digest. That is not one bug: it changes the severity of every
- * other defect touching the table, because any cross-tenant read, column-projection
- * slip, log line or backup that includes the column hands over a WORKING credential
- * rather than metadata. A client-callable `getAllApiKeys()` did `select('*')` with no
- * filter, so a global admin dumped every partner's plaintext key into a browser.
- *
- * Two things the issue did not have, both found while fixing it:
- *
- *   * `generateSecureKey` built the key from `Math.random()`. It is named "secure" and
- *     is not a CSPRNG, so the live keys were PREDICTABLE as well as plaintext — which
- *     is why hashing them is necessary but not sufficient and they need rotating.
- * WHY VERIFICATION IS IN SQL
- * The comparison happens in Python (MIVAA), in an edge function and in the browser.
- * Several implementations of "hash the presented key the same way" is several chances to
- * disagree about encoding, and disagreeing here is a total auth failure — or worse, a
- * silent mismatch on one runtime only.
- */
+/** PARTNER API keys are stored hashed, verified in ONE place, and never read back (#390). */
 
 const ROOT = join(__dirname, '..', '..');
 
@@ -72,10 +35,6 @@ function walk(dir: string, out: string[] = []): string[] {
 // rather than written again — there were ten hand-rolled copies across 41 test files and
 // thirty of them ate real code, which is the failure mode where a guard reports green
 // because it has stopped seeing the source it guards.
-//
-// It is a JS/TS scanner. The one Python file read below is checked for the PRESENCE of
-// an RPC name, so the only false positive available is that name appearing in a
-// docstring — which would still mean somebody had documented it.
 
 const SOURCE_DIRS = ['src', 'supabase/functions', 'api', 'mivaa-pdf-extractor/app'];
 

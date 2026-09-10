@@ -283,26 +283,13 @@ export const MarketTrendsTab: React.FC = () => {
   };
 
   /*
-    Loading follows the tabs. The core fetch — the four platform queries behind the KPI row, the
-    demanded-materials table and the discovery-channel breakdown — always runs, because the KPIs sit
-    above the rail and are on screen whichever sub-area you are in. Everything else is a PANE
-    loader that fires the first time you open its sub-area: 3D scenes and quote baskets for
-    Activity, the funnel for Buyers, unmatched search terms for Discovery, week-over-week growth and
-    two years of seasonality for Demand.
-
-    That is nine queries deferred, several of them 1,000–5,000 rows, on a page where the reader
-    only ever looks at one sub-area at a time.
-
-    `panesLoaded` keys on the FILTERS as well as the tab, so switching back to a pane you have
-    already opened costs nothing, while changing the category or the time range correctly reloads
-    it. A pane that throws is removed from the set so it can be retried by revisiting it, rather
-    than being remembered as done.
-
-    Panes wait for `coreReady`: the Buyers funnel needs two totals the core fetch produces, and
-    landing directly on ?tab=buyers would otherwise race it and draw a funnel out of zeroes.
-    Demo data is seeded up-front for every pane, so a sub-area is never empty while its real query
-    is still in flight.
-  */
+   * Loading follows the tabs. The core fetch — the four platform queries behind the KPI row, the
+   * demanded-materials table and the discovery-channel breakdown — always runs, because the KPIs sit
+   * above the rail and are on screen whichever sub-area you are in. Everything else is a PANE
+   * loader that fires the first time you open its sub-area: 3D scenes and quote baskets for
+   * Activity, the funnel for Buyers, unmatched search terms for Discovery, week-over-week growth and
+   * two years of seasonality for Demand.
+   */
   const coreTotals = useRef({ saves: 0, quoted: 0 });
   const panesLoaded = useRef(new Set<string>());
   const [coreReady, setCoreReady] = useState(false);

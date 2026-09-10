@@ -1,29 +1,4 @@
-/**
- * Your time, in one place — Profile → Schedule.
- *
- * Three surfaces used to answer one question between them, and none of them could see the others:
- *
- *   • **Availability** was a card two thirds of the way down the Profile tab, wedged between the
- *     supplier-verification form and the featured moodboard.
- *   • **Appointments** — the bookings that availability produces — was its own tab.
- *   • **Calendar** — the CRM meetings you keep — was a third tab.
- *
- * Which meant the commonest question a professional has ("why has nobody booked me?") needed
- * three tabs to answer, and the answer — Accept bookings is off, or no dates are published — was
- * on the one furthest from the empty list. They are one rail now, so the empty Appointments
- * section can point at the section that fills it.
- *
- * The rail is `HubSideNav` (the settings archetype) rather than three more tabs: the Profile tab
- * strip already wraps to two lines, and a fourth row of tabs stops telling you where you are.
- * Same shape as `SocialHubPanel`, deliberately — `?section=` is a real deep-link that round-trips
- * through the URL, so a reload and a bookmark both keep their place.
- *
- * `?section=` is this panel's EXTERNAL contract: `/profile?tab=schedule&section=calendar` is what
- * `appDestinations`, the launcher and `crm-meeting-reminders` link to. Renaming a section id
- * breaks those links silently — they resolve, fall back to the default section, and land the
- * reader somewhere plausible and wrong — so the ids are pinned by
- * tests/unit/profileSectionLinks.test.ts.
- */
+/** Your time, in one place — Profile → Schedule. */
 import React, { useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { CalendarCheck, CalendarDays, Clock } from 'lucide-react';

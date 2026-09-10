@@ -4,25 +4,7 @@ import { join, relative } from 'node:path';
 import { formatMoney, formatNumber } from '@/utils/decimal';
 import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
-/**
- * One money formatter, one locale (#329).
- *
- * `formatMoney` in `src/utils/decimal.ts` pins `en-IE` deliberately: English is the platform
- * default for all UI and documents, and a euro amount has to look the same on every screen.
- *
- * This has now drifted **twice**. Its own docstring records the first time — five copies in the
- * projects module passing `undefined` as the locale, so the same amount rendered "€1,234.56" on
- * one screen and "1.234,56 €" on another depending on the viewer's browser language. By the time
- * this test was written it had happened again: twelve more hand-rolled `Intl.NumberFormat`
- * currency formatters across assets, pricing, finance, real estate and the tools pages, using
- * **three** different locales (`undefined`, `en-GB`, `en-IE`).
- *
- * A comment saying "use the helper" clearly does not hold. This does.
- *
- * Note it only forbids CURRENCY formatting. `Intl.NumberFormat` for plain numbers, percentages or
- * file sizes is fine and common — the rule is about money, which must be consistent because
- * people compare the figures across screens.
- */
+/** One money formatter, one locale (#329). */
 const SCAN_ROOT = 'src';
 const CANONICAL = 'src/utils/decimal.ts';
 

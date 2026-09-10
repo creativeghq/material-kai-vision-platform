@@ -1,17 +1,4 @@
-/**
- * Guards the accessibility ratchet itself.
- *
- * `npm run lint:a11y` is the real gate (it runs eslint, which is far too slow for the unit
- * suite). This test guards the things that would quietly disable that gate: rules flipped back
- * to `off`, a baseline edited upward, or a rule promoted to `error` while still carrying
- * violations.
- *
- * Background: every jsx-a11y rule sat at `'off'` under a comment reading "Accessibility - off
- * for now" while the plugin was installed and registered. Audit #302 found 1,325 unlabelled
- * inputs and 280 unnamed icon buttons — every one added AFTER the plugin landed. The failure was
- * never a missing tool; it was a tool switched off. So the thing worth testing is that it stays
- * switched on.
- */
+/** Guards the accessibility ratchet itself. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';

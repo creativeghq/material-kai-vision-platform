@@ -1,20 +1,4 @@
-/**
- * KAI Task Agent
- *
- * General-purpose background agent that executes any natural-language task
- * dispatched from the KAI chat interface.
- *
- * Tools available — every one of these is CONSTRUCTED below, which is the only sense in which a
- * tool is available. This list said `web_search` for months while no factory existed for it:
- *   - material_search       — MIVAA 7-vector fusion search
- *   - knowledge_base_search — MIVAA KB search
- *   - web_search            — Anthropic server-side web search
- *   - web_fetch             — one URL as text, via Firecrawl
- *
- * The agent receives a task_prompt written by the user plus optional
- * context (conversation history excerpt, workspace_id, etc.) and runs
- * a full LangGraph loop until it produces a final report.
- */
+/** KAI Task Agent */
 
 import type { AgentRunner, AgentRunContext, AgentRunResult } from './types.ts';
 import { runLangGraphAgent, logAgentAiUsage } from './base-agent.ts';
@@ -114,19 +98,7 @@ function makeKBSearchTool(
   };
 }
 
-/**
- * web_search — the open web, via Anthropic's server-side search tool.
- *
- * `defaultTools` has listed `web_search` since this file was written, and the header comment
- * above still advertises it. Nothing ever CONSTRUCTED it. That is the "a push site is not a
- * binding" shape from CLAUDE.md, one layer down: a declaration with no factory behind it.
- *
- * The consequence was not a missing feature, it was a FABRICATED one. On 2026-08-25 this agent
- * was handed a real research task — confirm the Greek dealer for each of 107 brands — found both
- * of its two tools erroring, and rather than stopping wrote a confident 4,300-token report out of
- * training data, headed "Research date: 2025". A background researcher with no way to look
- * anything up does not return nothing; it returns fiction.
- */
+/** web_search — the open web, via Anthropic's server-side search tool. */
 function makeWebSearchTool(anthropicApiKey: string) {
   return {
     name: 'web_search',
@@ -297,7 +269,6 @@ export class KaiTaskAgent implements AgentRunner {
     // tools erroring, this agent did not stop and did not report the breakage as the result — it
     // wrote a polished 4,300-token report from training data, dated it, and returned it as
     // research. For a question like "who already represents this brand in Greece", a confident
-    // wrong answer is worse than no answer: it is acted on.
     const systemPrompt = agentConfig.system_prompt_override || [
       'You are KAI, a material intelligence agent working on a background task assigned by an admin user.',
       'Complete the task thoroughly, use your tools as needed, and produce a detailed structured report.',
@@ -331,10 +302,6 @@ export class KaiTaskAgent implements AgentRunner {
     // Reserve a ceiling before the Opus loop; block if the triggering admin can't afford it.
     // Keyed on the agent's creator + their workspace pool. Settled to actual cost after the run.
     // Bill the user who DISPATCHED the task, falling back to the agent's creator (#363 `EE-9`).
-    // The runner previously had no acting user at all, so every dispatched task was charged to
-    // whoever created the background agent — one person's balance paying for another's work,
-    // with both inside the same workspace so nothing looked wrong. `dispatch_background_task`
-    // has always recorded `dispatched_by`; it just had no way to reach here.
     const billUserId = (actingUserId ?? agentConfig.created_by ?? undefined) as string | undefined;
     const billWorkspaceId = (agentConfig.workspace_id ?? undefined) as string | undefined;
     const reserve = await reserveCredits(supabase, billUserId, billWorkspaceId, KAI_TASK_CREDIT_CEILING, 'kai_task_agent');
@@ -389,17 +356,6 @@ export class KaiTaskAgent implements AgentRunner {
 
     // Settle the reserve against the actual token-based cost: refund the unused surplus (or charge
     // the overage best-effort when a long run exceeded the ceiling).
-    //
-    // The rate comes from `ai_model_pricing`, not from a literal. The map this replaced priced
-    // `claude-opus-4-8` at 15.00/75.00 and defaulted unknown models to the same — the real rate is
-    // 5.00/25.00, so every Opus background task settled at THREE TIMES its cost. That is the exact
-    // literal `sub-agent-tools.ts` had removed from it for the same reason; this copy survived
-    // because nothing was looking at it. One derivation, from the table.
-    //
-    // A missing row means the cost is UNKNOWN, so the reservation is released rather than settled
-    // against a guess.
-    // 0 when the model is unpriced: the reservation is RELEASED in that branch, so nothing was
-    // charged and the returned figure has to say so rather than report a settle that never ran.
     let actualCredits = 0;
     const price = await resolveTokenPrice(supabase, model);
     if (!price) {

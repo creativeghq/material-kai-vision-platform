@@ -1,22 +1,4 @@
-/**
- * "What is still owed to us / by us" — assembled ONCE, here.
- *
- * This is the money-derivation rule from CLAUDE.md applied to receivables and payables. The
- * answer is not one table: it is the aging view PLUS confirmed-but-not-yet-invoiced orders PLUS
- * customer money held on account, and each part changes the total. Anything that re-derives a
- * subset gets a different, equally valid-looking number:
- *
- *   • The Finance page's Receivables tab reads all three.
- *   • The dashboard's Finance block used to sum `invoices.amount_due` for three statuses, capped
- *     at 1000 rows, and label the result with whichever currency the last row happened to carry.
- *     In a workspace with no invoices and two confirmed sales orders it reported "All Settled"
- *     while the tab it linked to listed the orders as outstanding. The stored data was correct in
- *     both places; only the derivation differed, so nothing could flag it — a wrong number is a
- *     valid number.
- *
- * So both callers load the SAME rows through `loadAgingLedger` and summarize them with the SAME
- * `summarizeAging`. Adding a third consumer means calling these, never re-querying `invoices`.
- */
+/** "What is still owed to us / by us" — assembled ONCE, here. */
 import { financeService, type AgeBucket, type AgingRow } from './financeService';
 import { ordersService } from './ordersService';
 
@@ -144,17 +126,7 @@ export async function loadAgingLedger(workspaceId: string): Promise<AgingLedger>
   return { ar, ap, deposits, overlayFailed };
 }
 
-/**
- * Which currency a set of aging rows may honestly be totalled in, and whether it is mixed.
- *
- * Bucket totals, the DSO base and the AR/AP figures all sum `amount_due` across every row, so they
- * are only meaningful when the rows share a currency. Fall back to formatMoney's EUR default and a
- * USD invoice's 1,000 is added to the euro total and shown with a euro symbol.
- *
- * Summing genuinely mixed rows is not something a symbol can fix, so this reports the dominant
- * currency AND whether the set is mixed; callers label the total honestly and warn when it cannot
- * be trusted. Converting to a base currency needs stored FX rates per document.
- */
+/** Which currency a set of aging rows may honestly be totalled in, and whether it is mixed. */
 export function aggregateCurrency(rows: AgingRow[]): { currency: string; mixed: boolean } {
   const totals = new Map<string, number>();
   for (const r of rows) {
@@ -197,12 +169,6 @@ export const isAgingRowOverdue = (r: AgingRow): boolean =>
 export function summarizeAging(rows: AgingRow[]): AgingSummary {
   // Owed and held are reported as two separate POSITIVE numbers, never netted into one figure
   // that can go negative on screen.
-  //
-  // The accumulator is `owed`, not `outstanding`, and the distinction is the one
-  // moneyDerivation.test.ts polices: an ORDER's `outstanding` is derived once by
-  // `get_order_settlements` and may only ever be READ. What happens here is a sum of already-
-  // derived `amount_due` across rows — aggregation, not a second derivation — and naming the
-  // accumulator after the thing that must never be recomputed is how the two get confused.
   let owed = 0;
   let creditHeld = 0;
   let overdueTotal = 0;

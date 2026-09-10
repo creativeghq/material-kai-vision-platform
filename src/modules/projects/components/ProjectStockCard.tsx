@@ -1,29 +1,4 @@
-/**
- * What stock is held for this job (#378 N3).
- *
- * THE FINDING, AND WHY THIS IS NOT A NEW `demand_type`
- * ---------------------------------------------------
- * The issue says "a project cannot hold material" and proposes widening
- * `stock_allocations.demand_type` from ('order_item','quote_item') to include a project. Its own
- * caveat is right and still stands: that column has eight SQL consumers plus `inbox-api`, a tool
- * `z.enum` and the generated manifest, and adding a value none of them understands creates
- * reservations no delivery path relieves and no integrity check validates.
- *
- * Checking what a job can ALREADY hold changes the question. Material reaches stock through the
- * documents a project produces: a `quote_item` reserves when the quote is built and an
- * `order_item` reserves when a SALES order is confirmed, and both carry the project. So a job with
- * a quote or a sale has always held its material — there was simply no way to SEE it, because
- * nothing joined allocations back to the job. That is what this shows.
- *
- * What a new demand type would genuinely add is a hold for a job with no quote and no sale — our
- * own fit-out, or material set aside before quoting. That is a different lifecycle (what relieves
- * it, what reconciles it, what cancels it) and it belongs in its own design rather than bolted
- * onto a vocabulary about order fulfilment.
- *
- * PURCHASE ORDERS ARE ABSENT ON PURPOSE. A purchase order is inbound SUPPLY, not a hold on stock
- * we already have — which is why `_orders_reserve_on_status` reserves only for sales orders.
- * Showing them here would double-count the same material as both arriving and reserved.
- */
+/** What stock is held for this job (#378 N3). */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Loader2, Boxes } from 'lucide-react';
 

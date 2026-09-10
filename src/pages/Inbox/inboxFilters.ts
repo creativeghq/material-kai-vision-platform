@@ -1,18 +1,4 @@
-/**
- * Filter definitions for the Inbox thread list.
- *
- * The status tabs (Open / Follow-up / Done) and the mailbox folders stay as navigation —
- * they are how you move around a mailbox, not a constraint you stack. Everything secondary
- * (channel, label, thread type, AI state, unread, recency) lives in the modal.
- *
- * `label` carries no accessor on purpose: it is a request parameter on `inboxApi.listThreads`,
- * so the server has already applied it and the client matcher passes it through.
- *
- * `source` is BOTH: picking one narrows the `list_threads` request to the channel that source
- * arrives on (so the server still does the coarse work) and then the accessor separates the
- * sources that share a channel — a public-profile enquiry from ordinary mail, a DM from a
- * comment. It replaced a bare `channel` filter, which could not tell any of those apart.
- */
+/** Filter definitions for the Inbox thread list. */
 import { CalendarDays, MessagesSquare, Tag, UserRound } from 'lucide-react';
 import { NONE_VALUE, optionsFromRows, type FilterGroupDef, type FilterOption } from '@/components/core/filters';
 import type { InboxLabel, InboxThread } from '@/services/inboxApi';

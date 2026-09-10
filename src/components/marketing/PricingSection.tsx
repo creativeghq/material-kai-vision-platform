@@ -1,16 +1,4 @@
-/**
- * The public price.
- *
- * Every figure comes from `get_public_pricing()`, which reads the plans that actually bill. The
- * alternative was writing "€25" into this file — a second copy of a money quantity, and the one
- * kind of drift a customer screenshots. `included_modules` is derived by the same `tier_rank`
- * comparison the entitlement gate uses, so what this page promises and what a workspace can
- * actually open cannot disagree.
- *
- * WHEN THE FETCH FAILS IT SHOWS NO PRICE. Not a cached one, not a hardcoded fallback — a line
- * saying the plans could not be loaded, and a link to the page that always knows. A stale price on
- * a public page is worse than no price: one is an inconvenience, the other is a quote.
- */
+/** The public price. */
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Check, Loader2 } from 'lucide-react';

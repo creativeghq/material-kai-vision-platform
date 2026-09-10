@@ -1,22 +1,4 @@
-/**
- * Document-level myDATA taxes (`taxesTotals`), `reducesPayable`, and `recType` 3.
- *
- * Read against the AADE Appendix that ships with the Novus provider docs (last update
- * 15/07/2025, `src/modules/myaade/NovusProvider/Appendix.pdf`) and the live provider swagger.
- * Three things the platform did not emit at all until this test existed:
- *
- *  1. `taxesTotals` — the DOCUMENT-level declaration. A line carries exactly ONE category per
- *     bucket, so a document charging the same AADE code at several rates — which is what a
- *     recycling levy is, fees 17 at a different rate per ΑΗΗΕ appliance class — was
- *     unrepresentable. AADE's own answer is N rows, each with a free-text `taxTypeLabel`.
- *  2. `reducesPayable` — Appendix §23. The builder hardcoded the sign of every bucket.
- *  3. `recType` 3, "Other Taxes Line with VAT" (Appendix §12). A levy billed to the customer as
- *     its own VAT-bearing line could only ever ride on a goods line, which states a different
- *     fact to AADE.
- *
- * The cases below pin the parts that are silent when wrong: a doubled tax, a flipped sign and a
- * levy filed as goods are all VALID numbers on a VALID document, so nothing downstream raises.
- */
+/** Document-level myDATA taxes (`taxesTotals`), `reducesPayable`, and `recType` 3. */
 import { describe, it, expect } from 'vitest';
 
 import {
@@ -49,17 +31,7 @@ const firstInvoice = (payload: Record<string, unknown>) =>
   (payload as any).invoice[0];
 
 describe('reducesPayable — AADE Appendix §23, one boolean whose effect follows the tax sign', () => {
-  /**
-   * The whole truth table, verbatim from the Appendix:
-   *
-   *   1 Withheld / 5 Deductions — deductive (−): TRUE subtracts, FALSE does not.
-   *   2 Fees / 3 Other / 4 Stamp — additive (+): TRUE does NOT add, FALSE adds.
-   *
-   * This is the TS twin of `public.mydata_tax_payable_delta`; the same ten rows were run
-   * against the SQL function on the live database when it was created. A drift here means the
-   * on-screen total and the transmitted gross have started to disagree, which is the shape of
-   * every money bug this codebase has had.
-   */
+  /** The whole truth table, verbatim from the Appendix: */
   const TRUTH: [number, boolean, number][] = [
     [MYDATA_TAX_TYPE.withheld, true, -10], [MYDATA_TAX_TYPE.withheld, false, 0],
     [MYDATA_TAX_TYPE.deductions, true, -10], [MYDATA_TAX_TYPE.deductions, false, 0],

@@ -1,15 +1,4 @@
-/**
- * The ONE place a blueprint + dimensions becomes money on the edge.
- *
- * Three callers share it — the public estimator (`public-project-plan` → estimate), the public
- * kitchen lead (→ kitchen_lead) and the agent tool (`calculate_kitchen_cost`). They must agree:
- * a configurator total, a recorded lead and an agent's answer for the same kitchen are the same
- * number, or the platform is quoting three different prices for one spec.
- *
- * `project-plan-engine` deliberately does NOT use this: it is the authoritative writer of
- * PERSISTED plan prices and resolves workspace service/product rates on top (buildRateMap), which
- * an anonymous or read-only caller has no business seeing. Same formula, wider inputs.
- */
+/** The ONE place a blueprint + dimensions becomes money on the edge. */
 
 import { evaluateFormula, computeLinePricing, round2 } from './formula.ts';
 import { deriveComposition, hasComposition, optionFlags } from './composition.ts';
@@ -63,12 +52,6 @@ export interface CompositionInput {
  *    zero or twice.
  *  - an ungrouped line is on iff listed; pass `null` to fall back to each line's own
  *    `default_selected`, which is what an un-configured estimate wants.
- *
- * `composition` is the zone configuration, for blueprints that declare zones. It does two things:
- * publishes the derived metres/counts as formula variables (so the flat per-metre lines keep
- * resolving off a real composition), and ABSORBS the option_groups its globals are bound to — those
- * groups stop being priced here because their money now arrives through the zone's own lines. Skip
- * that and every zone is charged twice.
  */
 export function computeBlueprint(
   rows: Record<string, any>[],
@@ -169,10 +152,6 @@ export function computeBlueprint(
     // general sockets too — and a kitchen deriving ordinary socket counts that NOTHING schedules
     // then raised no issue at all. That is precisely the case this check exists for: the
     // electrician finds out on fitting day.
-    //
-    // A trailing word boundary does not match between `socket` and `_dedicated`, because `_` is
-    // a word character — which is the whole point. Keys come from the blueprint author's schema,
-    // so they are escaped rather than trusted to be identifier-safe.
     const countsKey = (k: string) =>
       new RegExp(String.raw`\btotal_` + k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + String.raw`\b`);
     for (const row of derived.schedule) {
@@ -231,17 +210,7 @@ export function matchByLabel<T extends { label: string }>(candidates: T[], query
     ?? null;
 }
 
-/**
- * Turn a caller's free-text picks into the id set computeBlueprint wants.
- *
- * Lives here, beside the money, and is deliberately PURE — `calculate_kitchen_cost` is reachable
- * only through agent-chat, which the edge typecheck gate cannot check (its type graph exceeds
- * 12 GB), so the part that decides what gets priced must be testable without that file.
- *
- * `unmatched` is returned, never swallowed: a finish the price list does not carry must surface
- * as a correction, because silently pricing the default produces a confident quote for a spec
- * nobody asked for.
- */
+/** Turn a caller's free-text picks into the id set computeBlueprint wants. */
 export function resolveSelection(
   rows: Record<string, any>[],
   picks: { options?: string[]; extras?: string[] },

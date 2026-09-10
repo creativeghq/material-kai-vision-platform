@@ -1,13 +1,4 @@
-/**
- * Price Monitoring API client.
- *
- * Wraps MIVAA's `/api/v1/price-monitoring/*` endpoints. After the 2026-05-01
- * consolidation, every internal product is a `tracked_queries` row — there is
- * no separate `competitor_sources` / `price_history` schema. The product-scoped
- * endpoints (`/products/{id}/...`) are the canonical surface; the legacy
- * `/discover`, `/start`, `/stop`, `/check-now`, `/sources/{id}`, `/history/{id}`
- * aliases are kept short-term for backwards compat and will be removed.
- */
+/** Price Monitoring API client. */
 
 import { supabase } from '@/integrations/supabase/client';
 
@@ -43,10 +34,6 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
  *                  EXCLUDE from price statistics.
  *   family       — same brand + series, DIFFERENT SKU. Shown under
  *                  "Similar Products in this series". Inert.
- *   unverifiable — Firecrawl couldn't extract product_name. Keep, EXCLUDE.
- *   null         — legacy row created before identity classification shipped.
- *
- * 'mismatch' never reaches the UI — dropped at classification time.
  */
 export type MatchKind = 'exact' | 'variant' | 'family' | 'unverifiable' | null;
 

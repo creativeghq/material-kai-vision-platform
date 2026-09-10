@@ -1,15 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-/**
- * Portal lead emails → a structured lead.
- *
- * Syndication pushes listings out; the enquiries those portals generate come back as email, and were
- * being retyped by hand or lost. This turns one forwarded message into the fields
- * `property_inquiries` needs.
- *
- * Split out and dependency-free so `tests/unit/inboundLead.test.ts` can exercise the parsing against
- * real message shapes. Portal formats change without notice, and a parser with no tests is one that
- * silently starts dropping the phone number.
- */
+/** Portal lead emails → a structured lead. */
 
 /** Normalised parse of a forwarded portal email. */
 export interface ParsedPortalLead {

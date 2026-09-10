@@ -1,13 +1,4 @@
-/**
- * ProductMonitorTab — per-product price monitoring view.
- *
- * Layout (top → bottom):
- *   1. Header with Enable toggle + Admin "Refresh now" button
- *   2. Price history chart (combines Perplexity-discovered + custom URL data points)
- *   3. Discovered retailers table (Perplexity Sonar, auto-discovered, up to 10)
- *      + Claude summary above the table (closest retailer, pricing anomalies)
- *   4. Custom Monitoring section (user-pasted URLs tracked via Firecrawl)
- */
+/** ProductMonitorTab — per-product price monitoring view. */
 
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -970,13 +961,6 @@ const SimilarProductsSection: React.FC<{
 /**
  * Per-row admin actions (post-consolidation: every internal product is a
  * tracked_query, so all DB writes target tracked_query_price_history).
- *
- *   - Thumb-down: POST /classifier-correction with the row's id from
- *     tracked_query_price_history. Next classifier run pulls it in as
- *     a few-shot example.
- *   - "Trust this reading": flips manual_override=true on the anomaly row
- *     so the median sees it on the next refresh.
- *   - "Dismiss reading": clears is_anomaly so the yellow banner goes away.
  */
 const correctClassifier = async (historyRowId: string, kind: string, note?: string) => {
   await submitClassifierCorrection({

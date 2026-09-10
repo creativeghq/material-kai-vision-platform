@@ -1,26 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 
-/**
- * Per-product supplier price list (#324 phase 5) over `supplier_products`.
- *
- * `cost` here is THIS workspace's negotiated deal with THAT supplier — it is private and is
- * never written by a manufacturer publish. Two workspaces legitimately hold different costs
- * for the same SKU. The only automated path into a cost is the operator accepting a published
- * ask (`catalogMasterService.acceptPrice`), and that touches the operator catalog alone.
- *
- * EVERY CALL HERE IS AN RPC, AND THAT IS THE POINT (#368 PD-3).
- * This service used to take a `workspaceId` argument from React state and persist it: it
- * listed by `product_id` alone, mutated by row id alone, and wrote whatever workspace the
- * caller handed it. RLS bounded that, which is why it was a defence-in-depth gap rather than
- * a live leak — but it is the shape invariant 1 forbids, and the mitigation was one layer
- * deep. It also never checked that `supplier_company_id` belonged to the workspace at all.
- *
- * The RPCs derive the workspace from the PRODUCT row and re-check the caller against it, so
- * there is no workspace id on this surface to get wrong. `set_preferred_supplier_product`
- * additionally scopes BOTH of its statements, where the old client version cleared
- * `is_preferred` by product_id alone and so reached into another workspace's row for the same
- * product.
- */
+/** Per-product supplier price list (#324 phase 5) over `supplier_products`. */
 export interface SupplierProductRow {
   id: string;
   workspace_id: string;

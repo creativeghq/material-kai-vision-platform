@@ -35,16 +35,6 @@ interface StatBlockProps {
 /**
  * StatBlock — an operational panel: what the number is, what it is made of, and
  * a way into the detail.
- *
- * The breakdown is the point. A bare "0" tells you nothing; "0 open — 1 draft,
- * 3 confirmed, 1 fulfilled" tells you where the work actually sits. This mirrors
- * the reference dashboard's cards, which pair every figure with its composition
- * and a "view details" link.
- *
- * HEIGHT IS FIXED ON PURPOSE. The loading and resolved states must occupy the
- * same box or the dashboard shifts as each block's query lands — four blocks
- * resolving independently is four shifts. `rows` is padded to ROW_SLOTS so a
- * block with two breakdown rows is exactly as tall as one with four.
  */
 const ROW_SLOTS = 3;
 

@@ -1,16 +1,4 @@
-/**
- * Quantity discounts — "5 pallets is cheaper than 5 boards".
- *
- * A break is entered in whatever unit the seller thinks in and compared against the order in
- * BASE units, so a threshold of "1 pallet" fires on an order of 288 m² when the ladder relates
- * them. Resolution happens inside `get_product_price_for_workspace`, the same function quotes,
- * orders and the POS already call — a break is not a second pricing path, it is one more source
- * in the existing discount ladder.
- *
- * Discounts do NOT stack: a customer on 10% ordering a pallet at 15% pays 15%. The preview
- * below shows exactly what the resolver would charge, including which rule won, because "why is
- * this price what it is" has to stay answerable.
- */
+/** Quantity discounts — "5 pallets is cheaper than 5 boards". */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Loader2, Plus, Trash2, Percent, Tag } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';

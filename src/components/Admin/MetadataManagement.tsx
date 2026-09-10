@@ -396,9 +396,6 @@ export const MetadataManagement: React.FC = () => {
       // can be locked or golden. Deleting them from here would be a second derivation path with
       // no way back. So: check, and TELL the operator, rather than silently leaving orphans or
       // silently destroying curated values. (#365 AD-41)
-      //
-      // Clean today: 21 canonical rows across 2 facets, 0 outside the registry. This keeps it
-      // that way by making the moment it stops being true visible.
       const { count: remaining } = await supabase
         .from('products')
         .select('id', { count: 'exact', head: true })

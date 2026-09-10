@@ -5,28 +5,6 @@
 /**
  * What ONE agent turn may carry — declared once, for the composer that offers it and the
  * edge function that enforces it.
- *
- * These are a COST GUARD, not a preference. Images and documents become native Anthropic
- * vision/document content blocks with no per-item cap, while the turn fee is flat (partner)
- * or metered only post-hoc (internal) — so an unbounded multimodal payload buys tens of
- * dollars of input tokens for a near-zero charge. agent-chat therefore refuses an oversized
- * turn with 413 BEFORE any model call.
- *
- * WHY IT LIVES HERE. The three numbers used to be `const`s inside agent-chat's request
- * handler, so the only party that knew them was the one refusing. The composer appended
- * attachments with no ceiling of any kind: a user attached 19 PDFs, watched 19 chips appear,
- * pressed send, uploaded every byte, and got back
- * `Agent execution failed: 413 - {"error":"Too many documents attached: 19 (max 6 per turn)."}`.
- * Nothing was wrong with the guard — the surface offering the attachments simply could not
- * see it. Same shape as the toolkit picker offering tools the binder never binds: an offer
- * the enforcer refuses is silent until a user finds it.
- *
- * `checkAgentAttachments` is the ONE predicate. The composer calls it to stop before the
- * upload, the edge calls it to refuse; a second hand-written count comparison is the drift.
- *
- * THIS FILE IS IMPORT-FREE, ON PURPOSE — it is byte-mirrored to the edge by
- * `npm run vocab:mirror` (part of `gen:all`), and freshness is enforced by
- * tests/unit/vocabularyMirrors.test.ts.
  */
 
 /** Images on one turn. They are uploaded to storage first, so this is a count, not bytes. */
@@ -122,18 +100,7 @@ export function attachmentRoom(current: number, incoming: number, limit: number)
   return { accepted, rejected: incoming - accepted };
 }
 
-/**
- * How many of `incoming` fit under the byte ceiling, in order, given what is already attached.
- *
- * The count clamp alone leaves the BYTE limit discoverable only at send — six legal-count PDFs are
- * ~40MB of base64 — which is the same "find out after the upload" shape the counts were clamped to
- * close. Measured on documents only: images are uploaded to storage first and reach the turn as
- * short URLs, so counting the composer's own data URLs against them would refuse turns the server
- * would happily take.
- *
- * A single item over the whole ceiling accepts nothing, rather than accepting it and refusing at
- * send — an item that can never fit is not a queueing problem.
- */
+/** How many of `incoming` fit under the byte ceiling, in order, given what is already attached. */
 export function attachmentsWithinBytes(
   existing: readonly string[],
   incoming: readonly string[],

@@ -1,19 +1,4 @@
-/**
- * Guards the top-bar search palette against the two failures that made it useless.
- *
- *  1. **Enter ran the wrong thing.** The palette searched only product names and nav labels, so
- *     any other query — a colleague, a customer, an order number — matched nothing and left the
- *     "Smart search materials" action as the sole item. cmdk highlights the first item, so Enter
- *     ran it: a person search silently became a product search and landed the user in the
- *     catalogue. The fix is source ORDER, which is why a test has to hold it: results first,
- *     nav second, the material-search action last. Nothing else in the file expresses that, and
- *     nothing about moving a JSX block back up would fail a typecheck.
- *
- *  2. **A result that cannot be opened.** Each kind's gate has to match the guard on the route it
- *     navigates to, or the palette trades "wrong destination" for "permission wall" — the same
- *     broken process wearing a different hat. `/quotes/manage/:id` is workspace-admin only and
- *     `/finance/**` is `finance.manage`; both were found by reading the router, not by guessing.
- */
+/** Guards the top-bar search palette against the two failures that made it useless. */
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -185,9 +170,6 @@ describe('global search kind catalogue', () => {
     //   contracts, hr_employees, warehouse_items, flows, campaigns, crm_meetings,
     //   trip_expense_reports, page_watches, tech_radar_subjects, hr_job_postings,
     //   customer_assets, workspace_docs.
-    // kb_docs is absent for a different reason: its only reader is the PUBLIC article page
-    // (published + public), which is 3 of 677 rows — a kind that would look like coverage and
-    // deliver almost none.
   });
 
   it('offers a persona only the kinds it can open', () => {

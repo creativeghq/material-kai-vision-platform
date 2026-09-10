@@ -18,20 +18,7 @@ function timeAgo(iso: string | null | undefined): string {
 }
 const fmt = (n: number | null | undefined) => (n == null ? '—' : formatNumber(Math.round(n)));
 
-/**
- * A missing figure says WHY it is missing (CLAUDE.md rule 3).
- *
- * `seo-domain-tracker` records a verdict per source — `ok` | `no_data` | `failed` — precisely so
- * a reader can tell "the backlink index has no record of this domain" from "the backlinks call
- * failed". Every one of this site's snapshots has NULL backlinks; the recent ones say
- * `backlinks: no_data`, which is a real answer and not a broken collector. The panel rendered
- * both as `—`, which is the same defect it was already fixed for once: hiding the row and
- * showing an em dash are the same statement, and neither is true.
- *
- * The words come from `seoMetrics.statusPresentation`, which every other SEO surface uses and
- * which FAILS CLOSED on a status it does not recognise. Snapshots older than the tracker change
- * carry no verdict at all, and unknown provenance keeps the em dash rather than inventing one.
- */
+/** A missing figure says WHY it is missing (CLAUDE.md rule 3). */
 type SourceKey = 'overview' | 'backlinks' | 'ranked';
 
 function sourceVerdict(s: DomainIntel['latest'], key: SourceKey): string | null {

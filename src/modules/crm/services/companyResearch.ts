@@ -1,19 +1,4 @@
-/**
- * One shared "research this party" routine for the whole CRM.
- *
- * Chain (each step best-effort, a failure never blocks the next):
- *   1. ΑΑΔΕ RgWsPublic2  — official name, structured address, ΔΟΥ, legal form, ΚΑΔ  (Greek ΑΦΜ only)
- *   2. ΓΕΜΗ OpenData     — Γ.Ε.ΜΗ. number (ΑΑΔΕ never returns it), legal form, status, extra ΚΑΔ
- *   3. company-enrich    — the soft identity no registry carries: website, socials, phone,
- *                          email, description, industry, headcount (web search + Apollo)
- *
- * Precedence: registry fields (1+2) are authoritative and overwrite; enrichment (3) only fills
- * slots that are still blank after the registry pass, so it can never clobber official data.
- *
- * Callers: AddCompanyModal (create), CompanyDetailPage (refresh), ContactDetailPage (refresh),
- * InboundDocActionsMenu (Expenses inbox → add issuer to CRM). Previously each of these carried
- * its own partial copy of the chain, which is why the inbox path ran ΑΑΔΕ only.
- */
+/** One shared "research this party" routine for the whole CRM. */
 import { aadeService, type AadeLookupResult } from '@/modules/myaade';
 import { gemiService, type GemiLookupResult } from '@/services/gemiService';
 import { enrichCompany, type CompanyEnrichFields } from '@/services/companyEnrichService';

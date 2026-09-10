@@ -1,21 +1,4 @@
-/**
- * Product configurator — options, live material swap, and configured pricing (#321 M2, #260 Phase 1).
- *
- * **The price is never computed here.** `get_configured_product_price` returns `configured_price`
- * already derived, and this module hands it to the UI to format. That is CLAUDE.md's first
- * anti-regression rule applied to a new money quantity: "base plus the options you picked" is
- * exactly the arithmetic that gets rewritten in the configurator, the quote builder and the embed
- * widget and then disagrees between them. A wrong total is a valid `number`, so nothing downstream
- * — not typecheck, not an integrity probe — can notice. Summing `price_delta` in TypeScript is a
- * bug even when it produces the right answer today;
- * [tests/unit/configuratorMoneyDerivation.test.ts](../../tests/unit/configuratorMoneyDerivation.test.ts)
- * fails the build on it.
- *
- * Options are AUTHORED data in their own tables, deliberately not in `products.attributes` — that
- * column is the gold layer of the facet pipeline and is rebuilt wholesale from `attributes_raw` by
- * the recanonicalize sweep, which would erase them without an error (#260 left this question open;
- * this is the answer and the reason).
- */
+/** Product configurator — options, live material swap, and configured pricing (#321 M2, #260 Phase 1). */
 import { supabase } from '@/integrations/supabase/client';
 import type { MaterialOverride } from '@/components/features/ar/materialOverrides';
 import type { Tables } from '@/integrations/supabase/types';
@@ -245,18 +228,7 @@ export const productConfiguratorService = {
     return data;
   },
 
-  /**
-   * Turn a saved configuration into a quote line (#260 Phase 3).
-   *
-   * Everything happens in one SQL statement: the price is read from the derivation and FROZEN onto
-   * the line in the same breath. Quotes freeze their own numbers — which is exactly why a
-   * configuration stores none — and doing the read here then writing it back would open a window
-   * between the two, plus an obvious place for someone to "adjust" the figure on the way past.
-   *
-   * The function also refuses to pair a quote and a configuration from different workspaces. Both
-   * being individually visible is not the same as belonging together: a user in two workspaces can
-   * legitimately read one of each.
-   */
+  /** Turn a saved configuration into a quote line (#260 Phase 3). */
   async addToQuote(quoteId: string, configurationId: string, quantity = 1): Promise<{
     quote_item_id: string;
     unit_price: number | null;

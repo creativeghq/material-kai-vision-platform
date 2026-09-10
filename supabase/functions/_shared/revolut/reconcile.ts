@@ -1,34 +1,6 @@
 /**
  * Revolut feed reconciliation (#315 phase 2) — match incoming statement lines to open
  * invoices and settle them through the ONE money path.
- *
- * WHAT EVEN ENTERS THE MATCHER. Two filters run before the ladder, because the feed is
- * per-LEG and carries every kind of money movement, not just customer payments:
- *   - `type = 'transfer'` only. A `topup`, `exchange` credit, `card_refund`, `refund` or
- *     `fee` leg is not a customer paying an invoice; letting those in filled the review
- *     queue with own-money and fired one "unmatched bank payment" alert per line.
- *   - Transactions with an `out` leg of ours are INTERNAL movements (pocket→pocket), whose
- *     `in` leg is otherwise indistinguishable from an incoming customer payment. They are
- *     stamped `ignored` so they leave the review surface instead of being re-scanned and
- *     re-suggested on every pass. A transaction with more than one `in` leg is ambiguous
- *     (which leg is the payment?) and is never auto-settled — it can still be matched by
- *     hand from the feed.
- *
- * Matching ladder, most→least certain:
- *   1. `reference` — the transfer text contains exactly one open invoice's
- *      internal_number → AUTO-match.
- *   2. `amount_name` — exactly one open invoice has this exact amount_due AND the
- *      counterparty name matches the invoice's customer (transliterated, so a Greek
- *      bank statement matches a Latin CRM name) → AUTO-match.
- *   3. Weaker signals (unique amount alone, or name alone) → SUGGESTED: the line waits
- *      in the review queue with candidate invoice ids; a human confirms.
- *   4. Nothing → stays `unmatched`; one `bank_payment_unmatched` flow event is emitted
- *      per line, ever (stamped via unmatched_notified_at).
- *
- * Settlement is ALWAYS `recordInvoicePayment` (payments + payment_allocations →
- * `get_order_settlements` derives paid status) — never a local re-derivation
- * (CLAUDE.md anti-regression rule #1). Auto-match never over-pays: record-payment caps
- * allocation at live amount_due and leaves any excess as on-account credit.
  */
 
 // deno-lint-ignore-file no-explicit-any
@@ -178,39 +150,10 @@ export function legShapeIsComplete(shape: LegShape | undefined): boolean {
   return shape.inLegs + shape.outLegs >= shape.legsTotal;
 }
 
-/**
- * How far apart the operator's stated payment date and the bank's booking date may be.
- *
- * They are two different facts about one event: `paid_at` is when the person says the money moved,
- * `booked_at` is when the bank says it did. Instant transfers agree; a SEPA transfer books a day or
- * two later; somebody writing up last week's payments backdates them, or does not. Ten days either
- * way is wide enough to cover all of that — the guard against a wrong bind is not the window, it is
- * the demand that the amount, the currency and the account all agree and that exactly ONE candidate
- * survives.
- */
+/** How far apart the operator's stated payment date and the bank's booking date may be. */
 const RECORDED_PAYMENT_WINDOW_DAYS = 10;
 
-/**
- * Is this feed line a payment somebody already wrote down by hand?
- *
- * The case: an operator pays a supplier in the Revolut app, comes here, and records it against the
- * bill so the books are right. Days later the sync pulls the same transfer. Nothing in the ladder
- * below knows that payment exists — it reasons about open documents, not about money already
- * booked — so the line either sits unmatched forever or, worse, allocates a second time against
- * whatever the first payment left open.
- *
- * Returns the payment id to BIND to, or null. Deliberately conservative, because the failure it
- * prevents (double-booking) and the failure it could cause (marking a real second transfer as
- * already-recorded, so a genuine payment never reaches the books) are both silent:
- *
- *   - the feed row must name one of OUR accounts, and the payment must name the SAME one. A line
- *     with no `bank_account_id` is unknown, not a match — fail closed;
- *   - same direction, same currency, cent-equal amount;
- *   - dated within the window above;
- *   - the payment must not already be bound to another line;
- *   - and exactly ONE payment may survive all of that. Two candidates is a person's decision, not
- *     a guess we are entitled to make.
- */
+/** Is this feed line a payment somebody already wrote down by hand? */
 export async function findAlreadyRecordedPayment(
   service: any,
   workspaceId: string,
@@ -321,15 +264,6 @@ export async function settleTransaction(
  * OUTGOING side (#315): match completed outgoing transfers to supplier bills, so a
  * drafted bill run (whose payment references carry the bill number) marks its bills
  * paid when it actually executes. AUTO-ONLY and conservative:
- *   - reference quotes exactly one open bill's number, amount ≤ its due → settle
- *   - or exactly one open bill with cent-equal amount_due AND supplier-name match → settle
- * The payments row + payment_allocations.supplier_bill_id write mirrors the manual
- * bank-payment path; bill amount_paid/amount_due derive from allocations as always.
- *
- * What does NOT match is now announced. Money leaving the account with no bill behind it
- * — a transfer someone made by hand in the Revolut app — used to be visible only to
- * whoever thought to browse the feed; it now raises the same one-per-line
- * `bank_payment_unmatched` alert the incoming side has always raised.
  */
 export async function reconcileOutgoingRevolut(service: any, workspaceId: string): Promise<{ settled: number; unmatched: number; errors: string[] }> {
   const out = { settled: 0, unmatched: 0, errors: [] as string[] };
@@ -577,10 +511,6 @@ export async function reconcileWorkspaceRevolut(service: any, workspaceId: strin
     // not been written yet was auto-matched against a customer invoice. That is the exact hazard
     // CLAUDE.md records about this feed: match a row in isolation and an internal pocket move
     // settles a customer invoice.
-    //
-    // Left `unmatched` rather than `ignored`: we do not know it is internal either, and the next
-    // pass — once the missing legs have synced — will classify it properly. Ignoring it here would
-    // hide a real payment for good.
     if (!legShapeIsComplete(shape)) {
       result.unmatched++;
       continue;

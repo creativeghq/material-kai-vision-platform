@@ -1,17 +1,4 @@
-/**
- * Shared PDF branding + template resolution.
- *
- * The single, workspace-defined source of truth for how EVERY generated PDF is
- * branded (quotes, catalogs, proformas, …). Resolves, per workspace:
- *   - the branded template images (cover / intro / content-bg / back cover) with
- *     per-slot precedence: this workspace's finance_settings → operator root
- *     default → legacy system_settings → hardcoded filenames, AND
- *   - the "FROM" company identity (name / address / phone / email / VAT), overlaid
- *     from the workspace's own finance_settings business identity (white-label).
- *
- * Extracted verbatim from generate-quote-pdf's data-fetcher so quotes and catalogs
- * share one branding path. Template images live in the `quote-templates` bucket.
- */
+/** Shared PDF branding + template resolution. */
 import type { DbClient } from '../supabase-client.ts';
 import { SupabaseClient } from '@supabase/supabase-js';
 
@@ -179,14 +166,7 @@ export async function fetchTemplateImage(
   }
 }
 
-/** Fetch an image from a public URL. Null on any failure.
- *
- * The docstring here used to promise "https only, 8 MB cap" and the body delivered
- * neither: the regex accepted `http://`, `redirect: 'follow'` let a public URL 302
- * to an internal address, and the cap was checked AFTER `arrayBuffer()` had already
- * read everything. `image_url` on a catalog material is model-supplied
- * (`add_material_to_catalog`), so this was the reachable end of audit #352 `A8`.
- * One helper now — see _shared/fetch-image.ts for why there were five. */
+/** Fetch an image from a public URL. Null on any failure. */
 export async function fetchImageBytesFromUrl(url: string | null | undefined): Promise<Uint8Array | null> {
   const img = await fetchImageGuardedOrNull(url);
   return img?.bytes ?? null;

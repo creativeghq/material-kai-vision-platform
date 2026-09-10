@@ -1,22 +1,6 @@
 /**
  * Sales-document-kind guard — the same shape as the money-derivation guard, for a business rule
  * instead of a money quantity.
- *
- * The bug this exists to stop: "is this buyer a business, so do they get a τιμολόγιο or an ΑΛΠ
- * retail receipt" was implemented TWICE. NewInvoiceDialog checked the buyer's VAT number
- * (correct — AADE rejects an invoice issued to a VAT-less party). OrdersPanel checked only
- * whether a CRM company was linked:
- *
- *     const salesDocKind = order?.customer_company_id ? 'invoice' : 'receipt';
- *
- * Those disagree for a sole trader (ατομική επιχείρηση) held as a CONTACT carrying an ΑΦΜ — a
- * business the order flow called retail, so it proposed a receipt to someone entitled to an
- * invoice. Nothing about the stored data is wrong, and 'receipt' is a perfectly valid string, so
- * neither an integrity check nor the typechecker can see it. The document is transmitted to
- * myDATA, so the correction is a 5.1 credit note plus a reissue — not a delete.
- *
- * One rule, in `salesDocumentKind.ts`. This test fails the build if a surface starts deciding it
- * from the company link again.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -119,17 +103,7 @@ describe('nobody re-derives the rule', () => {
   });
 });
 
-/**
- * The SECOND axis: what is being supplied.
- *
- * The myDATA sales type is a 2×2, and only the buyer half was ever implemented. Every one of the
- * 16 documents this platform had issued was 1.1 or 11.1 — the goods column — because
- * `generate_invoice_from_order` hardcoded it. A commission, a design fee, an installation, a
- * construction valuation: all transmitted to AADE as a SALE OF GOODS.
- *
- * Nothing raised and nothing could. All four codes are valid, the envelope validates, the MARK
- * comes back. It is the payment-code rotation again — a plausible value in the right range, wrong.
- */
+/** The SECOND axis: what is being supplied. */
 import {
   supplyKindOf, mydataSalesDocumentType, mydataSalesDocumentReason,
 } from '@/modules/finance/utils/salesDocumentKind';

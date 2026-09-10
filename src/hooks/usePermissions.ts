@@ -2,12 +2,6 @@
  * The single capability hook. Resolves the current persona from the active
  * workspace and exposes `can(capability)`. Replaces ad-hoc `isAdmin()` / role-string
  * checks across the app.
- *
- *   const { can, persona } = usePermissions();
- *   if (can('crm.view')) { … }
- *
- * `loading` mirrors WorkspaceContext — gate on it before trusting `can()` so surfaces
- * don't flash for a frame while memberships resolve.
  */
 import { useMemo } from 'react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -54,11 +48,6 @@ export function usePermissions(): PermissionsApi {
     // Finer axes are derived from the resolved persona (which the account role
     // drives), so a Supplier/Architect/Finance/Sales account role grants the right
     // gates even without a workspace-tree node. operator stays root-only.
-    // `isAccountant` = the INVITED EXTERNAL accountant (workspace role) — a RESTRICT
-    // flag (no expense approval / no settings). The internal `finance` account
-    // role also resolves to the accountant persona (Finance surface) but is NOT
-    // isAccountant, so it keeps approval rights (server: is_workspace_finance_manager
-    // already allows finance + owner/admin).
     const isAccountant = workspaceRole === 'accountant';
     // Both sales personas get the same focused nav subset; the manager differs only in the SCOPE
     // of ROWS (team-wide rather than own), which is expressed by `sales.team.view`. Margin is not

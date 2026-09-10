@@ -1,23 +1,4 @@
-/**
- * What a pasted link IS — read off the page's own metadata.
- *
- * A customer sends a product URL and the inbox rendered the 180-character percent-encoded string
- * they pasted, as plain text, not even clickable. The page it points at states its own title,
- * description and picture in `<head>`; every chat app in the world shows those, and the reason to
- * show them here is not decoration — the operator is being asked "is our decking like this one",
- * and the answer is in a photograph they currently have to leave the app to see.
- *
- * ── Parsed, never rendered ──
- * This module EXTRACTS text from someone else's HTML. Nothing it returns is HTML: the client
- * renders the strings as JSX text nodes (invariant 11), and the entity decoder below exists so
- * `&amp;` reads as `&` in a text node — it is not, and must never become, a sanitiser. A value
- * that arrives here is untrusted third-party content in every case.
- *
- * Regex rather than a DOM parser, deliberately. Deno has no built-in `DOMParser`, the alternative
- * is a dependency parsing attacker-controlled markup, and the job is reading four attributes out
- * of `<head>` — not understanding the document. A page whose markup defeats these patterns
- * produces a null field, which is a stated "no preview", not a wrong one.
- */
+/** What a pasted link IS — read off the page's own metadata. */
 
 /** The fields a preview card can show. Every one is optional — a page may state none of them. */
 export interface LinkPreview {
@@ -87,17 +68,7 @@ function metaTags(html: string): Map<string, string> {
   return out;
 }
 
-/**
- * An absolute https URL for the picture, or null.
- *
- * `og:image` is regularly a site-root path (`/img/hero.jpg`) or protocol-relative (`//cdn/…`),
- * so it is resolved against the page it was found on — the FINAL url after redirects, because
- * resolving against the one that was pasted points a relative path at the wrong host.
- *
- * http is dropped rather than upgraded. The card renders in our app over TLS, so an http image is
- * mixed content the browser blocks anyway — and silently rewriting somebody's URL to https is a
- * guess that produces a broken image instead of an absent one.
- */
+/** An absolute https URL for the picture, or null. */
 function absoluteImage(raw: string | null, base: string): string | null {
   if (!raw) return null;
   try {

@@ -1,18 +1,4 @@
 // asset-service-reminders-cron — the reminder half of the installed base (#343).
-//
-// Three things get told to somebody here:
-//   • a service occurrence entered its lead-time window   -> asset.service_due
-//   • a service occurrence passed its due date, still open -> asset.service_overdue
-//   • a warranty is approaching its end date               -> asset.warranty_expiring
-//
-// Nothing in this file writes a `user_notifications` row or calls `email-api`. It emits FLOW
-// EVENTS carrying the fully-resolved payload, and the seeded `system-default` flows deliver
-// them — so an admin can pause, retarget or add a channel without a deploy.
-//
-// De-duplication is stamped on the row, per reminder: `reminded_at` / `overdue_reminded_at` on
-// the occurrence, and a jsonb offset->timestamp map on the warranty. A stamp is written only
-// when the emit actually succeeded; a transient failure leaves the row unstamped so the next
-// tick retries rather than losing the reminder for good.
 
 import { createClient } from '@supabase/supabase-js';
 import type { DbClient } from '../_shared/supabase-client.ts';

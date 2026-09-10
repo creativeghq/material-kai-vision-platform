@@ -1,23 +1,5 @@
 #!/usr/bin/env node
-/**
- * Production smoke tests — "are the critical flows actually alive, right now".
- *
- * Runs against the LIVE deployed system (not mocks). Used two ways:
- *   1. Post-deploy gate  — run right after a deploy; a FAIL fails the deploy run.
- *   2. Synthetic monitor — run on a schedule (every ~10 min); a FAIL pages you.
- *
- * Each check hits a real endpoint / RPC and asserts 2xx + the expected shape.
- * A check whose required secret is missing is SKIPPED (not failed), so the
- * harness still provides value before every secret is wired.
- *
- * Exit code: 0 if no check FAILED, 1 if any FAILED (skips don't fail the run).
- *
- * Config via env (public URLs default in; secrets/keys passed by the workflow):
- *   MIVAA_BASE_URL       (default https://v1api.materialshub.gr)
- *   SUPABASE_URL         (default https://bgbavxtjlbvgplozizxu.supabase.co)
- *   SUPABASE_ANON_KEY    (public anon key — required for the DB checks)
- *   MIVAA_CRON_SECRET    (optional — enables the cron-refresh check)
- */
+/** Production smoke tests — "are the critical flows actually alive, right now". */
 
 const MIVAA = (process.env.MIVAA_BASE_URL || 'https://v1api.materialshub.gr').replace(/\/$/, '');
 const SUPABASE_URL = (process.env.SUPABASE_URL || 'https://bgbavxtjlbvgplozizxu.supabase.co').replace(/\/$/, '');
@@ -148,14 +130,6 @@ await check('db.products.sample', ['DB_KEY'], async () => {
  * `contact:crm_contacts!crm_deals_contact_id_fkey`. A renamed constraint or a dropped column makes
  * every one of them a 400 at request time while `tsc` stays green, and a board that errored reads
  * exactly like a board with no deals. That is the silent-zero shape, so it gets a probe.
- *
- * ANON is the right principal and a 401 is the PASS. PostgREST parses the select, resolves the
- * embeds and PLANS the query before RLS runs; anon then trips on `is_workspace_member`, which it
- * has no EXECUTE grant for. So:
- *    401  → the select parsed, the columns exist, the embeds resolved   (what we assert)
- *    400  → a column or a relationship is gone                          (the regression)
- * The control below proves the distinction is real by sending a knowingly-bad embed and requiring
- * a 400 — without it, a harness that accepted everything would look like a pass.
  */
 const DEALS_SELECTS = [
   ['crm_deals', 'id, workspace_id, deal_type_id, title, stage, status, value, currency, probability, ' +
@@ -247,7 +221,6 @@ await check('db.plpgsql-lint', ['DB_KEY'], async () => {
 //   which is loud in a toast and silent in a `{ data }` destructure: `products.profile_user_id`
 //   broke Profile → Services, and `order_items.configured_options` made every order detail
 //   render with no lines for a week. `lint_column_grants()` lists such columns unless their
-//   COMMENT says "NOT selectable" (the declared-withheld cost columns). Strict zero.
 await check('db.column-grants', ['DB_KEY'], async () => {
   const { res, json } = await http(`${SUPABASE_URL}/rest/v1/rpc/lint_column_grants`, {
     method: 'POST',
@@ -264,16 +237,6 @@ await check('db.column-grants', ['DB_KEY'], async () => {
 });
 
 // 4b. Does this checkout still agree with the live schema?
-//
-//   `db.plpgsql-lint` above asks the same question of SQL functions and answers it well — it is
-//   what caught `add_configuration_to_quote` inserting a `line_total` that had just become
-//   GENERATED. Nothing asked it of the other three kinds of writer, so the same migration also
-//   left an edge function selecting a dropped column (every shared quote link returned not_found,
-//   with a 200) and two test fixtures seeding one, and each was found separately by breaking.
-//
-//   Scans `.from().select()/.insert()/.update()` across the edge functions, src, the integration
-//   tests and api/, against `schema_column_registry()`. See scripts/schema-writers.mjs — including
-//   why the baseline it carries is shrink-only and what is currently on it.
 await check('db.schema-writers', ['DB_KEY'], async () => {
   const { run } = await import('../schema-writers.mjs');
   const { problems, stale, known, checked, skipped } = await run();
@@ -329,16 +292,6 @@ await check('db.data-integrity.registry', ['DB_KEY'], async () => {
 });
 
 // 7b. Every prompt a call site depends on is still switched on (#347 phase 3P.6).
-//
-//   Prompts have NO code fallback by design (3P.4): a deactivated or empty row does not
-//   degrade the output, it raises and the work stops. That is correct — and it is exactly why
-//   the discovery moment matters. The nightly probe
-//   (`ops.prompt_required_but_inactive`) would find it tomorrow; this finds it at DEPLOY,
-//   which is what the plan asks for: "not at 2am mid-catalog".
-//
-//   `used_in` is the claim that a call site reads a row, and all 153 active prompts carry it.
-//   So "claimed AND (inactive OR empty)" is answerable from data alone, with no list of
-//   required keys to keep in sync here — a list that would itself be a second copy.
 await check('db.prompts.required-are-live', ['DB_KEY'], async () => {
   const { res, json } = await http(
     `${SUPABASE_URL}/rest/v1/prompts?select=name,prompt_type,category,stage,is_active,used_in&used_in=not.is.null`,

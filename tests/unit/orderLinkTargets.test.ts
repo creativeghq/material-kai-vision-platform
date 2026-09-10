@@ -1,29 +1,4 @@
-/**
- * Order-link guard.
- *
- * "What is this cost for?" resolves to four different writes, and two of them look identical in the
- * UI while doing opposite things to money:
- *
- *   • MERGE  — append these lines to an order that already exists
- *   • LINK   — point at a customer's sales order via `covers_order_id`, writing nothing into it
- *
- * A sales order settles on money IN; a purchase order settles on money OUT. So appending
- * purchase-cost lines to a customer's sales order bills the customer what we paid our supplier —
- * a wrong number that is a perfectly valid number, invisible to typecheck and to every stored-data
- * integrity check, exactly like the settlement bug that `moneyDerivation.test.ts` exists to stop.
- *
- * Two invariants keep that impossible, and this file fails the build if either is removed:
- *
- *   1. Merging goes through `append_order_items` and always declares the type it expects. The RPC
- *      refuses the mismatch, so the rule lives in the database rather than in a caller's good
- *      intentions.
- *   2. Merging never goes through `updateItems`, which DELETEs every line and re-inserts it.
- *      `stock_allocations.demand_id` points at `order_items.id`, so a delete silently drops the
- *      order's stock reservations and its `quantity_delivered` along with them.
- *
- * Plus: order line totals are derived in SQL (`recompute_order_totals`), so a merged order and a
- * created order cannot end up rated by two different rules.
- */
+/** Order-link guard. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -196,10 +171,6 @@ describe('every offered link kind is handled by its call site', () => {
    * "generalised over the opt-in groups so a future one inherits it". It was not: adding
    * `allowOrder` to the picker and deleting its handler left every case here green, because a
    * group the list does not name is a group this file cannot see.
-   *
-   * So the list is now checked against the component. A new `allowX` prop must be added here in
-   * the same change, which is the two-line edit the comment above assumed — and if it is
-   * forgotten, this fails instead of quietly covering three groups out of four.
    */
   it('the opt-in list names every opt-in prop the picker actually has', () => {
     const picker = read(join(ROOT, 'src/modules/finance/components/OrderLinkPicker.tsx'));
@@ -292,10 +263,6 @@ describe('the filing links reach a column', () => {
    * could only be written at creation, so a cost that arrived after its goods (freight, customs,
    * an installer) could reach its order only from the ORDER's side, which requires already
    * knowing which order it was.
-   *
-   * The invariant that matters here is that the five columns move as ONE SET. A patch able to
-   * carry three of them can leave a bill booked to a job AND to somebody else's sales order —
-   * two answers to a question that has one, and both of them valid uuids.
    */
   it('an existing expense can be re-pointed, and all five columns move together', () => {
     const body = methodBody(fin, 'updateSupplierBillMeta');
@@ -378,25 +345,7 @@ describe('order line totals are derived in SQL', () => {
   });
 });
 
-/**
- * One name for a building, platform-wide.
- *
- * There were FOUR answers, and the differences were not stylistic: `'Untitled property'` in the
- * finance link surfaces, `'Untitled listing'` on the workbench header and the portfolio row,
- * `'Untitled'` in the portfolio's own property select, and a `title || name || reference_code`
- * chain in the CRM pipeline subject picker that covered properties and projects with one
- * expression. So one untitled building was called three different things depending on which
- * screen you were standing on, and only one of the four ever fell back to the ADDRESS — the thing
- * a person actually recognises a building by.
- *
- * `@/utils/propertyLabel` is now the only source, in two documented shapes:
- *   • `propertyLabel` — a self-contained string (dropdown row, link field, board card); falls
- *     through to the reference code, because a bare code beats "Untitled property".
- *   • `propertyName`  — for a surface that ALREADY prints the reference beside it; stops before
- *     the code so the same string is not rendered twice in one control.
- *
- * DISCOVERED, not listed. A hand-kept file list is a list of the files somebody already looked at.
- */
+/** One name for a building, platform-wide. */
 describe('a property has one name', () => {
   const NAMING_SITES = (() => {
     const found: string[] = [];
@@ -465,12 +414,6 @@ describe('a property has one name', () => {
 /**
  * The agent can file an expense the same way the form can — and, crucially, cannot INVENT the
  * thing it files against.
- *
- * `resolveCategory` and `resolvePayee` in the same file are find-or-create, and rightly so: those
- * are labels, and a new one costs nothing. A trip card and a property are RECORDS. An agent that
- * conjured "the Athens trip" because the expense mentioned Athens would fabricate a claim nobody
- * filed, and every later expense would file against the fake one — while every message the
- * operator saw said it had worked.
  */
 describe('the agent files expenses, and never invents what it files against', () => {
   const TOOLS = join(ROOT, 'supabase/functions/_shared/tools/expense-tools.ts');

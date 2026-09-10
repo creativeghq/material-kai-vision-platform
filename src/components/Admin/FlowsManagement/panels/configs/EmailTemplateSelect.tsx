@@ -1,17 +1,4 @@
-/**
- * Picks the email template a `send_email` flow action renders.
- *
- * This was a free-text "Template slug (optional)" box. The engine has always supported it —
- * flow-engine forwards `template_id`/`template_slug` to email-api as `templateSlug` — but the slug
- * of a template you build in Email Marketing is `mkt-<name>-<8 random hex>`, generated server-side
- * and, until now, displayed nowhere. So the field could only be filled correctly by reading the
- * database: every template a tenant designed was unreachable from their own automation.
- *
- * The list is exactly what the caller may use, because `email_templates` RLS already says so —
- * `workspace_id IS NULL` (platform templates) OR a workspace you belong to. `is_active` matches
- * email-api's own lookup, which requires it: a Draft template resolves to a 404 at send time, so
- * offering one here would just move the failure later.
- */
+/** Picks the email template a `send_email` flow action renders. */
 import React, { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import {

@@ -1,32 +1,4 @@
-/**
- * Comparing two B2B research runs (issue #394).
- *
- * WHY THIS IS NOT THE VISION CONSENSUS
- * ------------------------------------
- * For vision, two readers looking at one image should say the same thing, so
- * DISAGREEMENT is the defect signal and the writer's answer is authoritative.
- *
- * Research is the opposite shape. There is no single right answer to "ceramic tile
- * manufacturers in Poland" — there is a long tail, and two searches will legitimately
- * surface different slices of it. A challenger that finds three companies the
- * incumbent missed has done something USEFUL, not something wrong.
- *
- * So agreement is the wrong metric entirely. What matters is:
- *
- *   COVERAGE      — how many real companies did each surface, and how much of the
- *                   union did each contribute?
- *   VERIFIABILITY — of what it surfaced, how much can be checked?
- *
- * The second is what stops coverage becoming a hallucination contest. A model that
- * invents ten plausible Polish furniture companies "wins" on coverage and is worse
- * than useless, because the failure only shows up when somebody emails a domain that
- * does not exist. Verifiability is the objective half — a domain either resolves or
- * it does not, no judgement involved — and it is the research equivalent of scoring
- * `detected_text` on exact matches rather than on how good the prose sounded.
- *
- * Nothing here decides a winner. It records what each run produced so a human can
- * look at a real comparison instead of a vendor benchmark.
- */
+/** Comparing two B2B research runs (issue #394). */
 
 export interface ManufacturerRecord {
   company_name: string;
@@ -81,18 +53,7 @@ export function normaliseDomain(raw?: string | null): string | null {
   return /^[a-z0-9.-]+\.[a-z]{2,}$/.test(d) ? d : null;
 }
 
-/**
- * Does this domain actually exist?
- *
- * HEAD, short timeout, redirects followed — we are asking "is there a site here",
- * not reading it. Anything that answers at all counts, including a 403 or a 500: the
- * question is whether the company's web presence is real, and a server that refuses
- * us is still a server. Only a DNS failure or a timeout is a no.
- *
- * Deliberately NOT routed through the SSRF guard: these are model-proposed hostnames,
- * so the guard is exactly right in principle — but it resolves and rejects private
- * ranges, which is what we want, so we use it. See the caller.
- */
+/** Does this domain actually exist? */
 export async function domainResolves(
   domain: string,
   opts: { timeoutMs?: number } = {},
@@ -208,20 +169,6 @@ function stripDomains<T extends { domains: Set<string> }>(s: T): Omit<T, 'domain
 }
 
 // ── General web research: compare the SOURCES, not the prose ────────────────
-//
-// The B2B lane above compares structured company records, and it works because a
-// domain either resolves or it does not — an objective check with no judgement in it.
-//
-// General research returns PROSE plus citations, and two paragraphs cannot be
-// compared objectively. Scoring them needs an LLM judge, which is the subjective
-// thing this whole approach exists to avoid: a judge that prefers the better-written
-// answer tells you which model writes well, not which one found more.
-//
-// So the prose is NOT scored. What is scored is the evidence underneath it — which
-// sources each provider actually surfaced, how many resolve, and where they overlap.
-// That is weaker than the B2B case and the weakness is worth stating plainly: a
-// source existing does not prove the claim it was cited for. It does prove the model
-// did not invent the citation, which is the failure that matters most here.
 
 export interface SourceSideStats {
   /** Distinct source URLs cited. */

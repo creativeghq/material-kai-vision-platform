@@ -1,21 +1,4 @@
-/**
- * dashboard-insights
- *
- * Generates a short, personalised set of AI insights for the home dashboard's
- * "AI Insights" panel, derived from a live snapshot of the caller's workspace
- * activity (projects, finance / AR, tasks, inbox, quotes).
- *
- * Design goals (per product spec):
- *  - **Cached for 15 days** per (user, workspace) in `dashboard_insights_cache`.
- *    A warm cache returns instantly without an LLM call.
- *  - **Never errors** — if the LLM call fails (credits, timeout, bad output) we
- *    fall back to a deterministic, numbers-driven insight set built from the same
- *    snapshot, cached with a SHORT TTL so the next visit re-attempts the AI path.
- *    The endpoint always returns 200 with usable insights (except auth failures).
- *
- * Auth: user JWT. Body: { workspace_id: string, force?: boolean }.
- * Response: { insights, model, source: 'ai'|'fallback', generated_at, expires_at, cached }.
- */
+/** dashboard-insights */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { jsonResponse as json } from '../_shared/http.ts';
@@ -71,18 +54,6 @@ interface Snapshot {
 
 
 // ── Stats gathering ─────────────────────────────────────────────────
-//
-// ONE call to `dashboard_workspace_snapshot`, derived in SQL (#364 EX-5, EX-10, EX-11).
-//
-// This was six independent PostgREST reads, each ending in `.catch(() => {})`, each leaving its
-// field at the zero it was initialised to. That is the silent-zero shape on the surface whose
-// entire purpose is noticing change: every query could fail and the panel would still render a
-// confident "your workspace is looking healthy" — and then CACHE it for fifteen days, so the
-// failure outlived its cause. Two of them were also capped at 1000 rows, and the task block had
-// no workspace filter at all.
-//
-// One call means one failure signal. `degraded` is what a partial answer looks like now, and the
-// caller refuses to cache a long TTL over it.
 
 async function gatherSnapshot(
   admin: SB,

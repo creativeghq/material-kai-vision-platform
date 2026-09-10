@@ -1,15 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-/**
- * The HTTP door every AI Assessment function stands behind.
- *
- * There are three functions rather than one because each is sold as its own module and each
- * resolves its subject differently — a project id from the body, the workspace from the session,
- * a property id from the body. Everything AFTER that is identical, so it lives here: the JWT, the
- * tenancy binding, the entitlement gate, the preview/run split, and the 402 mapping.
- *
- * Kept out of `_shared/assessment.ts` on purpose: that module is imported by the agent toolkit
- * inside `agent-chat`, and it should not drag the auth and api-logger graph in with it.
- */
+/** The HTTP door every AI Assessment function stands behind. */
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from './cors.ts';
 import { authenticate, getUserId, userCanAccessWorkspace } from './auth.ts';

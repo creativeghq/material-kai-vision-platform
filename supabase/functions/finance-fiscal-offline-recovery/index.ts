@@ -3,26 +3,6 @@
  * "offline" and the final MARK is assigned later. This cron re-queries the connector for
  * any invoice / credit-note / delivery-note still in fiscal_status='offline' and stamps the
  * final MARK once available. Safe to schedule continuously; no-ops when there's nothing pending.
- *
- * An offline document has exactly three possible fates, and until #193/M6 this function
- * handled only the first:
- *   1. AADE accepts it late      → stamp the MARK, done.
- *   2. AADE REJECTS it late      → the document is dead: a legal series number is burned and the
- *                                  customer is holding a provisional PDF for a document that was
- *                                  refused. Previously this fell through the `if` and the row sat
- *                                  at 'offline' forever, re-queried every 15 minutes, with the
- *                                  invoice page still promising the MARK would "appear shortly".
- *   3. It never resolves at all  → same invisibility, no verdict to act on.
- * (2) and (3) now both end in a human being told, and (2) also refunds the transmission credits
- * — an immediate rejection is already free at issue time, so a late one must match or the price
- * of one filed document depends on whether AADE happened to be up when the operator clicked.
- * A rejection is only made terminal after a
- * grace period AND on a real provider error code, because a not-yet-transmitted document can
- * look like an error to `fetchTransmitted` — burning a live document on a transient blip would
- * be worse than waiting. Even then the flip is always accompanied by an alert, and the invoice
- * page's re-submit button remains the escape hatch.
- *
- * Cron: invoke with header `x-cron-secret: <CRON_SECRET>`.
  */
 import { createClient } from '@supabase/supabase-js';
 import { resolveSecret } from '../_shared/secrets.ts';
@@ -77,24 +57,7 @@ Deno.serve(withApiLogging('finance-fiscal-offline-recovery', async (req) => {
 
   type DocTable = 'invoices' | 'credit_notes' | 'delivery_notes';
 
-  /**
-   * Give back the transmission credits for a document AADE refused on delayed transmission.
-   *
-   * At issue time the debit is kept for anything `accepted` OR `offline`, and refunded for
-   * everything else — so an IMMEDIATE rejection is free while a rejection that surfaced hours
-   * later cost the tenant 2 credits. Same outcome, same tenant behaviour, and the only
-   * discriminator is whether AADE happened to be down at the moment they clicked, which the
-   * tenant can neither see nor influence. Worse, they fix the cause and re-issue for another 2,
-   * so one filed document costs 4. The rule is "you pay when it lands on AADE", and this is the
-   * half of it that was missing.
-   *
-   * Finds the original debit by the document key stamped on its metadata by
-   * finance-issue-invoice. Idempotency is the `fiscal_credits_refunded_at` stamp on the document
-   * rather than a probe for an existing refund row, because the two wallets record refunds in
-   * two different tables with two different metadata shapes — a guard written against one would
-   * silently miss the other and pay out twice. Root workspaces transmit free and have no debit
-   * to find, which falls out of the lookup returning nothing.
-   */
+  /** Give back the transmission credits for a document AADE refused on delayed transmission. */
   const refundLateRejection = async (table: DocTable, r: any, docLabel: string) => {
     if (r.fiscal_credits_refunded_at) return false; // a previous tick already did this
     const docKeys = { einvoice_document_table: table, einvoice_document_id: r.id };
@@ -216,12 +179,6 @@ Deno.serve(withApiLogging('finance-fiscal-offline-recovery', async (req) => {
         // `uid` is what the Novus docs name for picking up the SECOND (MARKed) copy of a
         // document that came back Offline, and it is the only key an offline document reliably
         // has: it has no MARK yet, by definition. It was never sent.
-        //
-        // The issuer VAT is NORMALIZED. `finance_settings.business_vat` is free text and the
-        // operator workspace stores it as `EL802349569`; the provider answers HTTP 401 for the
-        // prefixed spelling, so the poll failed for every document of every workspace that
-        // writes the number that way — silently, since a failed poll just leaves the document
-        // queued for the next tick.
         const res = await conn.connector.fetchTransmitted(
           {
             invoiceMark: r.fiscal_mark ?? undefined,
@@ -250,18 +207,6 @@ Deno.serve(withApiLogging('finance-fiscal-offline-recovery', async (req) => {
         // ── The document was REFUSED on delayed transmission (#193 / M6) ───────────────
         // Only terminal on a real provider verdict AND after the grace period: a document the
         // provider simply hasn't transmitted yet must never look identical to a refusal.
-        //
-        // AS OF 2026-09-06 THIS BRANCH IS UNREACHABLE FOR NOVUS, AND THAT IS CORRECT.
-        // RequestTransmittedDocs LISTS transmitted documents; a refused one simply is not in the
-        // list, so the endpoint cannot express "AADE said no" — only "not there (yet)". The old
-        // parser appeared to reach this branch because it mis-read the response envelope and
-        // returned `rejected` for EVERYTHING, which after the 6h grace would have condemned
-        // every healthy queued document. Do not restore that by loosening `fetchTransmitted`.
-        // The real safety net is the stuck-offline alert below: it fires at 24h, re-fires on a
-        // cadence, is never terminal, and tells a human to check the provider portal. So
-        // `rejected_late` and `credits_refunded` sitting at 0 is the expected reading here, not
-        // a silent zero — `stuck_alerted` is the counter that moves. A genuine late-rejection
-        // detector needs a signal the provider does not currently offer (ask at certification).
         const definitiveRejection =
           res?.status === 'rejected'
           && !!res.errorCode
@@ -367,9 +312,6 @@ Deno.serve(withApiLogging('finance-fiscal-offline-recovery', async (req) => {
   // Online payments generate their receipt in a post-response background task, which
   // gives immediacy but not durability: if the worker dies mid-task the receipt is lost
   // with no retry. Sweep any recent CARD payment that still has no receipt PDF and mint it.
-  // Scoped to stripe_payment_intent_id IS NOT NULL on purpose: a MANUALLY recorded payment
-  // may legitimately have no receipt because the user un-ticked "Send receipt to customer",
-  // and silently generating one would override that choice.
   {
     const since = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
     const { data: missing } = await supabase.from('payments')
@@ -401,11 +343,6 @@ Deno.serve(withApiLogging('finance-fiscal-offline-recovery', async (req) => {
   // Every submission records the provider's remaining credit balance and, until now, nothing
   // read it back. This pool is the OPERATOR's single master key: when it empties, every tenant
   // stops invoicing simultaneously — the tenant-side out-of-credits block does nothing for it.
-  //
-  // Dedup is on the observation, not the clock: we stamp the exact submission row we alerted
-  // for, so re-reading the same latest row on the next tick stays quiet. A later submission
-  // that is merely still-low is not a new event either — only crossing the next tier DOWN
-  // speaks up again, which is what makes this safe to run every 15 minutes.
   {
     results.credits_alerted = 0;
     const { data: readings } = await supabase.from('fiscal_submissions')

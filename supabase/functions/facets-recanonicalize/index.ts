@@ -1,30 +1,4 @@
-/**
- * facets-recanonicalize
- *
- * Proxy for MIVAA's POST /api/admin/facets/recanonicalize — the bulk facet
- * re-canonicalization sweep (#316). Same shape and reasoning as the
- * canonicalize-attributes proxy next door: the MIVAA URL and admin key stay in one
- * place, and the endpoint stays admin-only upstream without every caller carrying
- * credentials.
- *
- * Two callers, and the difference between them matters:
- *
- *   1. The nightly cron (`facets-recanonicalize-degraded`), which sends
- *      `degraded_only: true`. Those products are broken RIGHT NOW — their canonical
- *      attributes are empty because a dependency failed, not because they have no
- *      facets, so they are invisible to every facet filter until replayed. Retrying
- *      them is unambiguously correct and cheap: an outage's worth of rows, not a
- *      catalog.
- *
- *   2. A human, after changing canonicalization RULES (similarity threshold, a curated
- *      alias from /lock, a golden-set correction). That is the full sweep, it costs a
- *      Voyage embedding per raw value across the entire catalog, and it is deliberately
- *      NOT automated. Bump CURRENT_FACET_CANONICALIZATION_VERSION in MIVAA, then drive
- *      this endpoint until `remaining` reaches 0.
- *
- * The defaults here encode that split: `degraded_only` defaults to TRUE. A caller who
- * wants to spend money on a full catalog sweep has to say so explicitly.
- */
+/** facets-recanonicalize */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsHeaders } from '../_shared/cors.ts';

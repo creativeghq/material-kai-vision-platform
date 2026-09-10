@@ -1,29 +1,4 @@
-/**
- * SEO Agent Tools — conversational SEO research surface for the KAI agent.
- *
- * This file is the new home for SEO-research tools that surface DataForSEO +
- * mention-monitoring data inline in the chat. The legacy [`seo-tools.ts`](seo-tools.ts)
- * stays as-is for the article-generation pipeline (research → plan → write →
- * analyze).
- *
- * Wave 1A tools (this file):
- *   - seo_research_keyword — full SERP + Labs research card for one keyword
- *
- * Wave 1B / 2 / 3 tools will append here as they ship.
- *
- * Cost discipline (invariant 10, #365 `AD-13`):
- *   - EVERY tool here reaches DataForSEO on the OPERATOR's x-cron-secret credential, so "no
- *     partner credits" never meant "no money". All three dispatchers below now reserve the
- *     caller's credits BEFORE the fetch and settle against the cost DataForSEO itself reports —
- *     see `_shared/tools/dataforseo-spend-gate.ts`. A caller who cannot pay is refused with
- *     nothing spent upstream.
- *   - Add a new dispatcher and it must open a gate too; a raw `fetch` to the SEO gateway from
- *     this file is ungated spend.
- *
- * Pattern: every tool emits a chunk via onChunk so the frontend can render
- * an inline card, then returns a compact JSON summary so the LLM can keep
- * the conversation moving without re-emitting the full payload.
- */
+/** SEO Agent Tools — conversational SEO research surface for the KAI agent. */
 
 import { resolveWebsite, type ResolvedWebsite } from '../seo-website.ts';
 import { openSpendGate, dataForSeoTaskError } from './dataforseo-spend-gate.ts';
@@ -112,22 +87,7 @@ async function callSEOAgentRoute(
   }
 }
 
-/**
- * Say "the index has no record of this" in words the model cannot round to zero.
- *
- * A tool that answers `{ success: true, target: "x" }` with the numbers simply
- * ABSENT has told the model nothing, and the model fills the gap the way a
- * confident writer does — "0 backlinks", "no referring domains". Both are claims
- * about the world, and both are wrong when the real answer is "this domain is not
- * in the backlink index".
- *
- * Measured 2026-08-27: `/backlinks/summary/live` answers `status_code: 20000,
- * "Ok.", result_count: 0, result: null` for materialshub.gr — a clean, truthful
- * empty. So the distinction is not hypothetical, it is the live case.
- *
- * Same vocabulary the Websites dashboard uses (`seoMetrics.ts`): a metric is a
- * value or a stated reason there is no value.
- */
+/** Say "the index has no record of this" in words the model cannot round to zero. */
 function emptyResult(
   subject: Record<string, unknown>,
   what: string,
@@ -493,19 +453,6 @@ export const createSEOGscTopMoversTool = (
 /**
  * "Which keywords do we rank for?" answered from what the platform already MEASURES for the
  * connected website, rather than from a third-party index.
- *
- * Why this exists: on 2026-09-05 (conversation 9225f61f) that exact question was answered from
- * DataForSEO Labs — two keywords at positions 75 and 82, SERPs crawled seven weeks earlier —
- * while the workspace's own tracker had checked 129 keywords 35 minutes before (brand at #1, a
- * category page at #24) and Search Console was connected and synced that morning. No tool
- * exposed the tracker at all, and the two Search Console tools were named for niches
- * ("striking distance", "movers"), so the model reached for the index and then wrote that
- * first-party data "would confirm" — one call away.
- *
- * Reads `get_website_rank_summary` (a live Google check of the keywords this workspace CHOSE to
- * follow, run daily) and `get_gsc_summary` (Google's own report of what it showed). Both derive
- * the verdict in SQL — `status` is `ok` / `no_data` / `not_collected` / `collector_failed` —
- * and this tool relays it: a source that is missing is STATED, never rendered as zero.
  */
 export const createSEOMyRankingsTool = (
   _userId: string, onChunk?: (chunk: any) => void, ctx?: SeoWebsiteCtx,
@@ -619,11 +566,6 @@ export const createSEOMyRankingsTool = (
  * cannibalisation, competitor series, Analytics. Until 2026-09-05 NONE of them had an agent
  * tool: `agent_data_coverage()` listed 16 website RPCs with 4 exposed. So "is our site healthy"
  * got a paid third-party crawl instead of the audit that ran last night.
- *
- * One tool with a `kind` enum rather than eleven tools: the model picks a report the way the
- * dashboard's tabs do, every kind resolves the site the same way, and the card is one renderer.
- * The RPCs already derive the verdict (`status`, `note`), and this relays it: a source that is
- * missing is STATED, never rendered as zero.
  */
 const SITE_REPORT_DEFAULT_DAYS: Record<string, number> = {
   search_metrics: 180, domain_intel: 180, ai_visibility: 90, ai_answers: 90,
@@ -663,16 +605,7 @@ function siteReportCardProjection(data: any): {
   const stats: Array<{ label: string; value: string }> = [];
   const items: Array<{ left: string; right?: string; sub?: string; href?: string }> = [];
   const skip = /(^id$|_id$|url|^task|^error$|^note$|^status$|_at$)/;
-  /**
-   * How the subject is SET UP, which is never a finding.
-   *
-   * `overview` returns the `user_websites` row under `website`, so the card led with
-   * "website is active true", "website is default true", "website max pages 6000",
-   * "website display name Materials Hub" — four of its ten slots spent restating
-   * configuration for a site the card already names in its own footer. Scoped to the
-   * subject record on purpose: `is_active` under `tracked_domains` ("1 of 1 active") is a
-   * real figure and must survive.
-   */
+  /** How the subject is SET UP, which is never a finding. */
   const SUBJECT_KEYS = new Set(['website', 'site', 'domain_record']);
   const CONFIG_KEYS = new Set(['is_default', 'is_active', 'max_pages', 'display_name', 'name', 'slug']);
   const scalar = (v: any) => typeof v === 'number' || typeof v === 'boolean' || (typeof v === 'string' && v.length <= 40);

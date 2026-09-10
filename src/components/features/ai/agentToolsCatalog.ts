@@ -1,24 +1,4 @@
-/**
- * agentToolsCatalog — single source of truth for the agent tool inventory.
- *
- * Used by:
- *   - ToolkitPickerModal  (visual toolkit-cluster picker; primary surface)
- *   - PromptBuilderModal  (browse tools + click-to-prefill starter prompts)
- *   - Future: an admin-side tool-coverage report
- *
- * Per-tool fields:
- *   id           — agent-side tool name (matches the registered tool)
- *   name         — short human label
- *   desc         — one-sentence description shown in browse modals
- *   category     — grouping for the UI (Search, B2B, SEO, etc.)
- *   adminOnly    — true when only admin/owner can invoke
- *   moduleSlug   — when present, the tool requires that module to be enabled
- *                  in the public.modules table (e.g. mention-monitoring).
- *                  PromptBuilder can hide / dim these when disabled.
- *   credits      — partner credit cost per call (numeric; 0 = free for user)
- *   examples     — 1-3 starter prompts the user can click to pre-fill chat
- *   imageRequired — when true, only meaningful when the user has attached an image
- */
+/** agentToolsCatalog — single source of truth for the agent tool inventory. */
 import type { HubId } from '@/config/nav-items';
 
 export interface AgentToolEntry {
@@ -1174,17 +1154,10 @@ export function findTool(toolId: string): AgentToolEntry | undefined {
   return undefined;
 }
 
-// ═════════════════════════════════════════════════════════════════════════════
 // TOOLKITS
-// ─────────────────────────────────────────────────────────────────────────────
 // Tools are grouped into named "toolkits" so the user can enable / disable a
 // whole capability cluster at once instead of ticking 50 checkboxes. The agent
 // gets only the LEAN core toolkit by default (massive token savings) and can
-// either (a) call the `load_toolkit` meta-tool mid-conversation if it needs
-// more, or (b) the user can pre-enable toolkits from the visual picker.
-// Token estimate: ~250 tokens per tool definition. Cards in the picker show
-// the rough cost so users can see what they're spending.
-// ═════════════════════════════════════════════════════════════════════════════
 
 /**
  * One field in a quick-start's collect-then-send form. Rendered generically by
@@ -1221,9 +1194,6 @@ export interface ToolkitFormField {
  * is invoked directly (mode:'direct_tool' on agent-chat), bypassing the model.
  * RBAC + toolkit gating still apply server-side (the owning toolkit is sent in
  * selected_toolkits; admin-only tools never bind for non-admins).
- *
- * Omit `run` to keep the legacy behavior: render `promptTemplate`/`prompt` and
- * auto-send it as a chat message (right for multi-step workflows + creative seeds).
  */
 export interface ToolkitQuickStartRun {
   /** Target agent tool id (must match a registered tool name). */
@@ -1242,9 +1212,6 @@ export interface ToolkitQuickStartRun {
    *  - 'csv'     → split on commas → string[]
    *  - 'lines'   → split on newlines/commas → string[]
    * Text fields without a coercion pass through as trimmed strings.
-   *
-   * `deriveCoercions` (toolAutoFields.ts) fills these in from the manifest for
-   * derived forms; anything declared here wins over the derived value.
    */
   coerce?: Record<string, 'number' | 'boolean' | 'csv' | 'lines'>;
 }
@@ -1296,15 +1263,6 @@ export interface ToolkitQuickStart {
    * past tense, no tool names ("I've pulled up your appointments for the next 7
    * days."). REQUIRED on every `run` quick-start and checked by
    * tests/unit/toolkitCoverage.test.ts.
-   *
-   * A direct run has no model turn, so nobody was ever going to narrate it: the
-   * reply fell through to the edge function's placeholder and the chat read
-   * "Done — ran manage_appointments." — the internal tool id, shown to a customer.
-   * Written here rather than derived because `description` is a noun phrase for a
-   * list quick-start ("Upcoming appointments") and a verb phrase for an action one
-   * ("Book a new appointment"); no single template survives both.
-   *
-   * Placeholder-free: it is shown verbatim, never rendered against form values.
    */
   done?: string;
   /** Lucide icon name. */
@@ -1323,11 +1281,6 @@ export interface ToolkitQuickStart {
    * (see toolAutoFields.deriveAutoFields). Enum params become selects carrying
    * EVERY option the z.enum declares, so adding an option to a tool surfaces it
    * in the UI with no frontend edit — which is the point.
-   *
-   * Explicit opt-in, and only meaningful together with `run`. A `form` entry still
-   * overrides the derived field for the same param, so you can relabel one field
-   * without hand-writing the rest. Params pinned by `fixedArgs`, ids, and
-   * object/record-shaped params are never asked for.
    */
   autoFields?: boolean;
   /**
@@ -1347,9 +1300,6 @@ export interface ToolkitQuickStart {
    * message's attached images, the generation pipeline is forced via `mode`, the
    * `promptTemplate` is rendered from the remaining text fields, and ONE complete
    * generation message is auto-sent. Mirrors `run`, but for the image pipelines
-   * (image-edit / redesign / floor-plan-render / virtual-staging / re-light / VR)
-   * instead of a deterministic tool call. This replaces the old `opensModal` +
-   * bare-prompt path that dead-ended when no photo was attached yet.
    */
   generation?: ToolkitQuickStartGeneration;
   /**
@@ -1357,10 +1307,6 @@ export interface ToolkitQuickStart {
    * AgentHub (a guided canvas) instead of just sending a prompt. The host maps
    * the id to the right surface:
    *   - 'new-design'      → from-scratch room designer (room/style/details)
-   *   - 'virtual-staging' → stage an attached room photo with furniture
-   *   - 'gemini-edit'     → targeted edit / apply-material on an attached photo
-   * If the host can't open the modal (e.g. no image yet) it falls back to
-   * sending `prompt`, so the quick-start is never inert.
    */
   opensModal?: 'new-design' | 'virtual-staging' | 'gemini-edit';
   /**
@@ -1387,19 +1333,7 @@ export interface ToolkitDefinition {
   moduleSlug?: string;
   /** When true, this toolkit is always loaded (cannot be disabled by the user). */
   alwaysOn?: boolean;
-  /**
-   * Which agents' launchers OFFER this toolkit's quick-starts. `alwaysOn` only.
-   *
-   * Binding and offering are not the same question, and conflating them put "Size a heat
-   * pump" and "Price a kitchen" on Edith's opening screen. `alwaysOn` exists so the TOOLS
-   * stay bound on every agent — `calculators` was made a cluster precisely to express the
-   * hardcoded always-bound list it replaced — but it also put every one of its quick-starts
-   * on every agent's first screen, which is not the same claim. Ask Edith to size a heat
-   * pump and she still can; she just no longer opens by suggesting it.
-   *
-   * Omit for a genuinely universal always-on toolkit (`core`, `web-research`) — those stay
-   * everywhere. This narrows the OFFER only; it never removes a tool.
-   */
+  /** Which agents' launchers OFFER this toolkit's quick-starts. `alwaysOn` only. */
   starterAgents?: string[];
   /**
    * 1–4 starter actions surfaced in the ToolkitOnboardingCard the moment the
@@ -1483,10 +1417,6 @@ export const TOOLKITS: ToolkitDefinition[] = [
     // on reproduces the state this was built to fix: on 2026-08-25 an agent was asked to list a
     // competitor's brands, had no tool that could read a web page, and burned its whole
     // iteration budget inventing workarounds (Wayback CDX, the WordPress REST API, `site:`
-    // queries) for tools it did not have.
-    //
-    // Both halves are here on purpose. web_search finds a URL; web_fetch reads it. An agent with
-    // only the first can learn that a page exists and cannot open it.
     id: 'web-research',
     name: 'Web Research',
     description: 'Search the open web and read any page in full. Use for competitor and brand questions, distributor / "where to buy" lookups, sitemaps and product indexes — anything the workspace database does not already know.',
@@ -2476,7 +2406,6 @@ export const TOOLKITS: ToolkitDefinition[] = [
         // quick-start, and it was broken two ways: `trigger` is not a param at all, and
         // the field literally keyed `action` overwrote the pinned `action: 'create'`
         // router verb with the user's prose (buildToolInput applies form values AFTER
-        // fixedArgs). The agent translates the sentence into the structured call.
         label: 'Create a flow', description: 'Trigger → action automation', icon: 'Plus',
         prompt: 'Create a new flow.',
         promptTemplate: 'Create a flow named "{{name}}" that runs when {{trigger}} and then {{what_it_does}}.',
@@ -3033,11 +2962,6 @@ export const TOOLKITS: ToolkitDefinition[] = [
       // _shared/product-prompt-builder.ts — and NOTHING in the product could reach
       // them. No quick-start, no button anywhere. Same shape as generate_3d: the
       // capability existed and the entry point did not, so the only way in was
-      // phrasing a free-text prompt the agent happened to route correctly.
-      //
-      // The product photo is optional in all three: the modes render from a name and
-      // a spec when no photo exists, which is the case that matters — a catalogue
-      // item with no photography yet.
       {
         label: 'Product shot',
         description: 'Render one product on seamless white — a catalog hero image',
@@ -3663,10 +3587,6 @@ export const TOOLKITS: ToolkitDefinition[] = [
     // non-curated agent, so an unclustered tool is stripped even when an agent lists it. They
     // were also listed by no agent, so they were unreachable twice over — the 2026-08-26 sweep
     // got "not available for this agent or your role" for all three as an ADMIN.
-    //
-    // `admin-misc` is the right home precisely because it is `adminOnly`: they stay invisible to
-    // everyone who should not see raw DB/Sentry/infra state, which is what the original intent
-    // was actually protecting.
     tool_ids: [
       'dispatch_background_task', 'price_lookup', 'seo_dataforseo_call',
       'checkServerHealth', 'querySentry', 'queryDatabase',
@@ -3880,7 +3800,6 @@ export const TOOLKIT_AGENTS: Record<string, string[]> = {
   // cluster whose tools they mostly do not bind. The honest resolution is the other direction
   // from the clusters above: an ops grab-bag belongs to the operator, so it stays on the
   // generalist. Pepper keeps `price_lookup` and `dispatch_background_task` as bound tools —
-  // it just is not offered a cluster it cannot run.
 };
 
 /**
@@ -3909,15 +3828,6 @@ export function getToolkitOwnerAgents(toolkit: ToolkitDefinition): string[] {
  * carries. This is what the canvas empty state offers, so choosing Vision from the agent
  * dropdown answers with staging/sheets/projects instead of the same three always-on
  * clusters every other agent shows.
- *
- * Returns [] for the generalist and the orchestrator ON PURPOSE: they own all 45 clusters,
- * and 45 groups of starters is not a menu. JARVIS keeps offering the active set, which is
- * the honest answer for a router whose pitch is "just ask".
- *
- * OFFERING IS NOT BINDING. Nothing here is added to `activeToolkits` — a starter click goes
- * through `ensureAgentAndToolkit`, which enables the one toolkit that was launched. Seeding
- * the whole set on every agent switch would bind ~60 SEO tools the moment you pick Edith,
- * which is the ~15k-token default the toolkit system exists to avoid.
  */
 export function getAgentSignatureToolkits(
   agentId: string,
@@ -3929,25 +3839,7 @@ export function getAgentSignatureToolkits(
   );
 }
 
-/**
- * Which agent should run a toolkit's quick-start, given who is selected right now.
- *
- * `getToolkitOwnerAgents` puts the GENERALIST first because kai owns every toolkit,
- * so `owners[0]` is always 'kai'. Reading that as the target moved every quick-start
- * click OFF the specialist the user had picked and ONTO the hidden generalist — which
- * is not a cosmetic difference: kai's system prompt carries none of the specialist's
- * doctrine, it is not exempt from the Haiku cost-router, and `forceToolCall` is keyed
- * to the specialist id. On 2026-08-21 "Design a room" was launched from Vision, ran as
- * kai on Haiku, and called `generate_gemini` alone — one image where the interior
- * prompt's rule ("call generate_3d AND generate_gemini for pure text-to-image") would
- * have produced the model grid. Nothing failed; the user just got the cheaper tool.
- *
- * Order of preference:
- *   1. the current agent, when it already owns the toolkit — a deliberate pick wins
- *   2. the first SPECIALIST owner — so JARVIS/orchestrator lands on the specialist
- *      that has the doctrine, not on the generalist
- *   3. the generalist, for toolkits no specialist owns
- */
+/** Which agent should run a toolkit's quick-start, given who is selected right now. */
 export function resolveToolkitAgent(toolkit: ToolkitDefinition, currentAgentId: string): string {
   const owners = getToolkitOwnerAgents(toolkit);
   if (owners.includes(currentAgentId)) return currentAgentId;

@@ -38,18 +38,7 @@ export {
   type QuoteTemplatePayload,
 } from './adapters';
 
-/**
- * The template registry (issue #322).
- *
- * The type list exists TWICE and must not drift: `TEMPLATE_ENTITY_TYPES` in schema.ts, and the DB
- * CHECK constraint `entity_templates_entity_type_check`. A type present in one but not the other
- * fails in a specific way — a row the UI cannot render, or an insert that throws a CHECK violation
- * the moment a user presses Save. tests/unit/templateRegistry.test.ts pins them together, the same
- * way workspaceRoles.test.ts pins the role catalog to its CHECK constraints.
- *
- * The Record type below (not Partial) is what guarantees every LIVE type has an adapter: adding a
- * value to LIVE_TEMPLATE_TYPES without an adapter is a typecheck failure, not a runtime surprise.
- */
+/** The template registry (issue #322). */
 export const TEMPLATE_ADAPTERS: Record<LiveTemplateEntityType, TemplateAdapter<never>> = {
   invoice: invoiceAdapter as unknown as TemplateAdapter<never>,
   quote: quoteAdapter as unknown as TemplateAdapter<never>,

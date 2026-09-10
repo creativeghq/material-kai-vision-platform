@@ -1,16 +1,4 @@
-/**
- * Agent Scheduler Cron
- *
- * Runs every minute. Checks all enabled background agents with
- * trigger_type='cron', parses their schedule expression, and
- * dispatches any that are due to background-agent-runner.
- *
- * Uses the same cron parsing logic as flow-scheduler-cron.
- * Register via Supabase Dashboard > Database > Extensions > pg_cron:
- *   SELECT cron.schedule('agent-scheduler', '* * * * *',
- *     $$SELECT net.http_post(url:='<SUPABASE_URL>/functions/v1/agent-scheduler-cron',
- *       headers:'{"Authorization":"Bearer <SERVICE_KEY>"}'::jsonb, body:'{}'::jsonb)$$);
- */
+/** Agent Scheduler Cron */
 
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders }  from '../_shared/cors.ts';
@@ -130,10 +118,6 @@ Deno.serve(withApiLogging('agent-scheduler-cron', async (req) => {
       // this an agent whose work exceeds its cron interval (e.g. * * * * *
       // with a 3-minute Replicate health check) gets fanned out into N
       // concurrent runs all contending for the same heartbeat row.
-      // background_agents.last_run_status is only written at completion
-      // ('completed' / 'failed' / 'cancelled'), so query agent_runs directly
-      // for a non-terminal row — auto-recovery-cron handles genuinely-stuck
-      // ones separately on its 8-minute heartbeat threshold.
       const { data: inflight } = await supabase
         .from('agent_runs')
         .select('id')

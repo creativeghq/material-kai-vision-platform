@@ -1,26 +1,4 @@
-/**
- * Resolve the names this queue uses that CRM does not know.
- *
- * Rungs 2 and 3 of the markup ladder match `products.brand_company_id` and
- * `products.supplier_company_id`. A maker or an issuer with no company behind it means those
- * rungs are unreachable for every line carrying the name, so the ladder falls through to the
- * workspace default — measured on the live backlog, 988 lines blocked on 92 supplier names and
- * 203 on 88 makers, with the top ten of each clearing 62% and 43% of them.
- *
- * That concentration is the whole reason this screen is worth having: the list is ranked by how
- * many LINES a term blocks, so the work is a few dozen decisions rather than 1,734.
- *
- * ── What this screen may and may not do ───────────────────────────────────────────────────────
- * It never creates a CRM party as a side effect of resolving. A maker on an invoice line is as
- * likely to be a typo, an abbreviation or the distributor's own name, and CLAUDE.md forbids
- * minting a party silently — so "not in CRM" offers `QuickAddCompanyDialog`, which runs the
- * duplicate probe every other creation path runs, and the operator decides.
- *
- * A `candidate` is drawn as a QUESTION, never as an answer. It is a model's guess with a
- * confidence and its evidence attached; only `ontology_confirm_binding` — a workspace admin —
- * can move it to `confirmed`. Rendering the two alike would discard the only distinction that
- * makes an AI-assisted mapping safe to act on.
- */
+/** Resolve the names this queue uses that CRM does not know. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Check, Loader2, Search, Sparkles, UserPlus, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';

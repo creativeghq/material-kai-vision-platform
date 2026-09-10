@@ -1,15 +1,4 @@
-/**
- * catalog-translate-pdf
- *
- * Whole-PDF → catalog body translation. One Vision pass over the entire
- * source PDF returns sections + materials, written into the target catalog's
- * body_data. Use case: admin uploads a manufacturer catalog and wants the
- * full thing mirrored as a new editable catalog.
- *
- * preserve_original_layout=true mirrors page-by-page (one PDF page = one
- * section). preserve_original_layout=false (default) restructures by
- * category — Claude groups materials into sensible sections.
- */
+/** catalog-translate-pdf */
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -154,7 +143,6 @@ Deno.serve(withApiLogging('catalog-translate-pdf', async (req) => {
     // download from the private `pdf-documents` bucket; `target_catalog_id` reaches an UPDATE of
     // someone else's catalog body. Both answer 404 rather than 403, so neither id can be
     // enumerated. Level 'secret' is the backend caller and is exempt by design — it supplies
-    // `caller_user_id` for cost attribution instead.
     const { data: targetCatalog } = await supabase
       .from('presentation_catalogs')
       .select('id, workspace_id')

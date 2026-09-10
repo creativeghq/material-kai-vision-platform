@@ -1,18 +1,4 @@
-/**
- * Capability layer (single source of truth for "what can this user do here?").
- *
- * The platform has historically gated on ad-hoc `isAdmin()` string checks scattered
- * across components, plus three disconnected role sources. This file collapses gating
- * into ONE model:
- *
- *     (role in active workspace) + (marketplace rank of that workspace) + (platform-operator flag)
- *        → a single PERSONA
- *        → a fixed set of CAPABILITIES
- *
- * Adding a capability or changing who gets it is a one-line edit to PERSONA_CAPABILITIES,
- * never a 20-file sweep. Consume via `usePermissions()` / `<Can>` — never re-derive
- * persona logic in a component.
- */
+/** Capability layer (single source of truth for "what can this user do here?"). */
 
 /** Who the user effectively is in the active workspace. */
 export type Persona =
@@ -49,11 +35,6 @@ export type Capability =
   | 'sales.team.view'       // sales manager: the WHOLE team's quote book, not just own rows.
                             // Backed server-side by is_workspace_sales_manager(workspace_id) in
                             // consolidated_quotes_select_public — this flag only unhides the UI.
-                            // SCOPE OF ROWS, NOT OF MARGIN: the cost basis and the applied markup
-                            // are gated separately by user_can_read_quote_costs(), which answers
-                            // only for the quote's CREATOR or a workspace owner/admin. A manager
-                            // sees the team's book with the margin column blank on quotes they
-                            // did not build.
   | 'projects.use'          // projects + client views
   | 'moodboards.use'        // moodboards / design surfaces
   | 'agent.use'             // KAI agent / chat
@@ -119,7 +100,6 @@ export const PERSONA_CAPABILITIES: Record<Persona, Capability[]> = {
   // sell price with the cost column blank. Still NOT a workspace manager: no finance settings,
   // pricing, network or warehouse. The team-wide read is enforced in RLS
   // (is_workspace_sales_manager), so the extra capability only reveals UI the server would
-  // already answer.
   sales_manager: ['sales.portal', 'sales.team.view', 'quotes.use', 'crm.view', 'marketplace.browse', 'agent.use', 'inbox.use'],
   // ── Functional team roles. Deliberately MINIMAL: each holds only its own module's capability
   //    plus agent.use, so a team member can never reach finance, pricing, the network or the team.
@@ -135,12 +115,6 @@ export const PERSONA_CAPABILITIES: Record<Persona, Capability[]> = {
   // documents. Deliberately NO crm.view / sales.portal / finance / anything else, so an employee
   // can never see another person's (e.g. a sales rep's) details. Data is further self-scoped in
   // hr-api's self- endpoints (the caller's own linked hr_employees row).
-  // `agent.use` is granted so the employee can reach My HR from chat via the self-scoped
-  // `manage_my_hr` tool ("how much leave do I have left?", "request 3 days off"). It opens the
-  // Agent Hub surface, NOT data: every toolkit is independently gated (module slug / adminOnly /
-  // capability), so an employee still only gets Core + My HR, and manage_my_hr takes no
-  // employee_id — hr-api resolves the subject from their own JWT. Note the cost side: agent use
-  // draws on the workspace's pooled credits, so an employee can spend the owner's balance.
   employee: ['hr.self', 'agent.use'],
   // Invited property agent: the Real Estate surface only. Manages listings (shared team asset,
   // D1) and works their own leads/viewings (self-scoped via responsible_sales_user_ids / listing_agent_id
@@ -162,18 +136,6 @@ export interface PersonaInputs {
 /**
  * Workspace TEAM roles → their scoped persona. EXHAUSTIVE over every scoped role in
  * `WORKSPACE_MEMBER_ROLES`; checked ahead of the account tier in `resolvePersona`.
- *
- * Five of these (`client`, `accountant`, `sales`, `employee`, `realestate_agent`) used to sit
- * BELOW the account-tier switch as individual `if`s, on the theory that moving them would change
- * who wins for an existing user. It changed who won in the wrong direction: a user carrying a
- * global tier of `supplier`/`dealer`/`factory`/`architect` and invited into a workspace as a
- * CLIENT resolved to `dealer` — finance.manage, crm.view, warehouse.manage, network.manage and
- * pricing.manage, handed to the customer (#358 PQ-1). The `if`s each carried a comment about
- * preceding the `staff` fallback; the hazard was the switch ABOVE them.
- *
- * The only roles NOT here are `owner`/`admin` (whose persona depends on the workspace's rank) and
- * `member` (the plain-staff fallback). Guarded by tests/unit/workspaceRoles.test.ts, which fails
- * when a role in the catalog has no entry here.
  */
 const TEAM_ROLE_PERSONA: Record<string, Persona> = {
   sales: 'sales',
@@ -188,20 +150,7 @@ const TEAM_ROLE_PERSONA: Record<string, Persona> = {
   client: 'end_user',
 };
 
-/**
- * Resolve the single persona.
- *
- * THE ORDER IS THE POINT (#358 PQ-1). The WORKSPACE role decides who you are here; the global
- * account tier only answers when there is no workspace role to read. It used to be the other way
- * round for five roles — `client`, `accountant`, `sales`, `employee`, `realestate_agent` sat as
- * individual `if`s BELOW the account-tier switch — so a user carrying a tier of
- * `supplier`/`dealer`/`factory`/`architect` and invited into a workspace as a CLIENT resolved to
- * `dealer` and was shown finance, CRM, warehouse, network and pricing. Each of those `if`s carried
- * a comment about preceding the `staff` fallback; the hazard was the switch above them.
- *
- * `operator` is granted ONLY by root-workspace ownership, never by an account role, so a tenant
- * can never become a platform operator.
- */
+/** Resolve the single persona. */
 export function resolvePersona({ isPlatformOperator, rank, workspaceRole, accountRole }: PersonaInputs): Persona {
   if (isPlatformOperator) return 'operator';
 
@@ -227,12 +176,6 @@ export function resolvePersona({ isPlatformOperator, rank, workspaceRole, accoun
 
   // 4. No workspace role at all (membership not resolved / a user outside any workspace). Only
   //    here does the global account tier speak.
-  //    NOTHING functional belongs in this switch. `public.roles` is the GLOBAL account tier — a
-  //    value set by a platform operator and true in EVERY workspace the user belongs to — so it
-  //    holds only `supplier` / `architect` (the tiers role_upgrade_requests accepts), `admin`, and
-  //    the `user` baseline. "Sales", "finance", "runs HR", "warehouse team" are per-workspace facts
-  //    and live ONLY in workspace_members.role. `sales` and `finance` were removed from this switch
-  //    on 2026-07-31 along with their rows.
   switch (accountRole) {
     case 'supplier':
     case 'dealer':   // legacy alias

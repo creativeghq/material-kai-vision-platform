@@ -1,14 +1,4 @@
-/**
- * SheetWizardModal — the single guided "New Sheet" flow.
- *
- * Opened from BOTH entry points (MoodboardSheetsTab "+ New Sheet" with a moodboard
- * pre-selected; the Presentation Sheets toolkit quick-starts with a type
- * pre-selected). Walks: type → moodboard → type-specific inputs → submit. Submit
- * calls the UNIFIED backend (moodboardSheetsService.createSheet → the
- * generate-moodboard-sheet-pdf `create` action) so credits + auto-extract run in
- * one place. Passive types come back rendered; interactive types come back for the
- * canvas — the host decides what to show via onCreated.
- */
+/** SheetWizardModal — the single guided "New Sheet" flow. */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, ImagePlus, ChevronLeft, Check } from 'lucide-react';
 import {

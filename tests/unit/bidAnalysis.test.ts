@@ -1,18 +1,4 @@
-/**
- * Bid analysis — why the cheapest number on the screen is regularly not the cheapest offer.
- *
- * The failure this exists to prevent has one shape and it is expensive: a bid wins because of what
- * it LEFT OUT. Nothing about it looks wrong — the total is a real total of the lines the bidder
- * chose to price, the comparison table is correct, and the omission arrives months later as a
- * variation at a rate nobody competed on.
- *
- * The numbers live in SQL (`get_tender_bid_analysis` / `get_tender_bid_summary`), so what is
- * testable here is the layer that turns the derivation into questions — and the rule that layer
- * has to keep: every question names a line the analysis flagged, and there is no path to one
- * without a finding. A generated "have you allowed for scaffolding?" that no figure supports is
- * worse than silence: it teaches the reader the list is padding, and the two that matter get
- * skimmed with the rest.
- */
+/** Bid analysis — why the cheapest number on the screen is regularly not the cheapest offer. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

@@ -1,15 +1,4 @@
-/**
- * Revolut transaction sync (#315) — cron sweep over every connected workspace.
- *
- * Dual auth, mirroring finance-inbound-sync:
- *   - cron path: `x-cron-secret` (pg_cron) or service-role key
- *   - human path: an authenticated finance user; the sweep is then restricted to THEIR
- *     workspaces so one tenant's "Sync now" can never pull for everyone.
- *
- * The webhook receiver keeps rows fresh in near-real-time; this sweep is the backstop
- * that also advances the watermark and repairs any missed deliveries. Single-workspace
- * interactive sync lives in `revolut-api?action=sync-now` (same shared core).
- */
+/** Revolut transaction sync (#315) — cron sweep over every connected workspace. */
 
 // deno-lint-ignore-file no-explicit-any
 

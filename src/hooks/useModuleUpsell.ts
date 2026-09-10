@@ -1,13 +1,6 @@
 /**
  * Shared module-upsell logic — the ONE place that turns "workspace lacks module X" into an
  * actionable upsell (owner → Buy/Stripe checkout, member → request from owner, plan path).
- *
- * Extracted from EntitlementGuard so BOTH the full-page route guard (EntitlementGuard) and the
- * inline cross-module tab gate (ModuleTabGate) share identical availability + buy/request behavior.
- * Do not re-implement this per surface — that's exactly the copy-paste this consolidates.
- *
- * `available` fails OPEN while loading (mirrors useEntitlements) so paid surfaces don't flash a
- * lock for a frame. The API/route (`assertEntitled`) remains the real boundary.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useEntitlements } from '@/hooks/useEntitlements';
@@ -64,10 +57,6 @@ export function useModuleUpsell(moduleSlug: string, moduleName?: string): Module
   // that id, and NULL returns 400 `not_available_on_plan`. So the owner saw a live
   // "Add Contracts — €29/mo" button and every single click errored — measured:
   // workspace_module_subscriptions has 0 rows, the purchase path has never once executed.
-  //
-  // A module priced but not wired to Stripe is not purchasable, and saying so drops the user
-  // into the subscriptions route below instead of a dead end. This does NOT create the Stripe
-  // products — that is a dashboard action — it stops the UI lying about them. (audit #272)
   const purchasable = !!mod?.is_addon && !!mod?.addon_stripe_product_id;
   const label = moduleName ?? mod?.name ?? moduleSlug;
   // Price still shows on an unpurchasable add-on: knowing it costs EUR 29/mo is useful even

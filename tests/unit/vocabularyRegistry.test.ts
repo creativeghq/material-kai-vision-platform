@@ -1,24 +1,4 @@
-/**
- * Value vocabularies live in `public.reference_vocabularies` — not in a constant (issue #370).
- *
- * WHAT WENT WRONG. The 30 sourcing markets were `B2B_REGIONS`, a module-local const in
- * b2b-tools.ts used only to interpolate a string into a web-search query. The model could not read
- * it from the prompt, the schema (`region` was a bare `z.string()`), the tool description (it named
- * the five region KEYS and never their members), or the KB. Asked to "search the countries list we
- * have in place", the agent searched the Knowledge Base three times, found nothing, INVENTED a
- * list and presented it as the platform's — Bulgaria in the wrong region, 13 markets missing.
- * Nothing could catch it: a wrong country list is a valid country list.
- *
- * And there were three lists, all disagreeing:
- *   B2B_REGIONS       30 sourcing markets (edge)
- *   COMMON_MARKETS    14 readable names, no Poland/Turkey/Serbia/Romania (ToolkitFormModal)
- *   COUNTRY_CODES     16 ISO codes (ToolkitFormModal)
- * so the B2B "Enrich a company" picker offered Australia and Canada and hid every market the
- * search tool actually swept.
- *
- * This file is the ratchet. It is a TEXT rule for the same reason escapeHtmlParity is: the copies
- * drifted precisely because convention was the only thing holding them together.
- */
+/** Value vocabularies live in `public.reference_vocabularies` — not in a constant (issue #370). */
 import { describe, it, expect } from 'vitest';
 import { readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
@@ -127,7 +107,6 @@ describe('country vocabularies are data, not constants', () => {
     // which is defined by regulation rather than by preference. Banning the NAME would have
     // pushed correct code around for nothing; the market-name scan above is what catches a real
     // fourth country list, and it did — it found `SUPPORTED_MARKETS` in _shared/b2b-markets.ts,
-    // whose docstring claimed agent-chat and flow-engine used it while nothing imported it.
     for (const dead of ['B2B_REGIONS', 'B2B_ALL_COUNTRIES', 'COMMON_MARKETS', 'SUPPORTED_MARKETS']) {
       expect(
         new RegExp(`\\b${dead}\\b`).test(all),
@@ -174,20 +153,7 @@ describe('country vocabularies are data, not constants', () => {
   });
 });
 
-/**
- * A country string means a MARKET ROW, and the row is what carries the language.
- *
- * `country` is a free string on b2b_manufacturer_search on purpose — any country is searchable,
- * not only the ones we sweep — so what arrives is whatever the model typed. It used to be matched
- * against `value` with a `===`, so `Czechia` matched nothing: the search ran, said "in Czechia",
- * and silently dropped the Czech native-language clause that is the entire reason the row carries
- * a language at all. Unresolved and language-less look identical from the outside, so nothing
- * raised — the same shape as the invented country list one layer up.
- *
- * The alternative names are DATA (`metadata.aliases`, seeded by the sourcing_market_aliases
- * migration) rather than a map in a source file, because a map of country names in a source file
- * is another copy of the country list, which is what the scans above exist to stop.
- */
+/** A country string means a MARKET ROW, and the row is what carries the language. */
 describe('resolveMarket — a country string resolves to the market row it means', () => {
   const term = (
     value: string,

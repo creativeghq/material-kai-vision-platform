@@ -1,19 +1,4 @@
-/**
- * Two facts about an inbound document that the Expenses Inbox keeps apart on purpose.
- *
- *   WHERE THE MONEY RECORD CAME FROM   `source`        permanent
- *   WHETHER THE LINES NAME ANYTHING    `lines_source`  changes when someone completes it
- *
- * They look like one thing and are not. A `14.x` foreign purchase is `source='mydata_self'`
- * forever — we typed it into myAADE, so its totals are an immutable AADE anchor and its lines are
- * ours — while its `lines_source` moves from `none` to `user` the moment an operator types what
- * was actually on the pallet. Collapsing them into one badge loses exactly the distinction that
- * matters on the day the typed lines disagree with the supplier's PDF.
- *
- * There is no separate tab for self-transmitted documents, and there must not be one: once a
- * `14.x` has lines it is indistinguishable from a `1.1` to warehouse, catalog, payables and P&L
- * (issue #377, decision 5). Provenance is a FILTER over one queue, not a partition of it.
- */
+/** Two facts about an inbound document that the Expenses Inbox keeps apart on purpose. */
 
 import type { InboundLinesSource, InboundSource } from '@/modules/finance/services/inboundService';
 
@@ -67,12 +52,6 @@ export const docFamily = (docType: string | null | undefined): string =>
  * 13.x (foreign services) and 14.x (foreign purchases) are reverse-charged: the acquisition is
  * zero-rated at source, we self-account the VAT and reclaim it in the same return, so it nets to
  * zero and never moves. The supplier is owed the NET.
- *
- * SQL owns the derivation — `_inbound_doc_to_supplier_bill_core` decides what the payable IS, and
- * `dic_detect__finance_reverse_charge_booked_at_gross` watches it. This is the presentation half
- * of the same rule: without it the table shows EUR 270.29 of VAT and EUR 1,396.51 gross next to a
- * payable of EUR 1,126.22, which is a valid number in the wrong direction and the exact shape of
- * "Payment: Paid next to an outstanding balance".
  */
 export const isReverseCharged = (docType: string | null | undefined): boolean =>
   docFamily(docType) === '13' || docFamily(docType) === '14';
@@ -80,19 +59,6 @@ export const isReverseCharged = (docType: string | null | undefined): boolean =>
 /**
  * What the supplier actually invoiced — the only total a reader should ever be shown as "what
  * this cost".
- *
- * On a `13.x`/`14.x` the supplier charged NO VAT: the purchase is zero-rated at source, so the
- * gross of their invoice IS the net. KEROS CERAMICA billed EUR 1,126.22 and their paper says
- * 1,126.22. myDATA's `totalGrossValue` on that document is 1,396.51 because it adds the EUR 270.29
- * of Greek VAT we self-assess — an artefact of OUR accounting entry, not a figure on anything the
- * supplier sent, and not money that will ever move in either direction.
- *
- * Showing 1,396.51 as the document's total is the display-layer twin of booking gross into
- * payables: a valid number, arrived at by correct arithmetic, describing a payment nobody will
- * ever make. It was on screen in five separate places before this existed.
- *
- * The AADE figures stay untouched in `total_vat` / `total_gross` — they are bronze, and the VAT
- * return genuinely needs them. This decides what a HUMAN is shown.
  */
 export function invoicedTotal(doc: {
   doc_type?: string | null; total_net?: number | null; total_gross?: number | null;

@@ -1,14 +1,4 @@
-/**
- * Template payload coercion (#322).
- *
- * A template payload is stored jsonb — as trustworthy as whatever wrote it. The starter project
- * templates shipped with `visibility: "client"`, which `project_tasks_visibility_check` rejects;
- * passed through unchecked, that aborts the insert PARTWAY through building the task tree and
- * leaves a half-populated project behind. The value was fixed in the data, but a template is
- * user-editable, so the same string can come back tomorrow.
- *
- * These are the narrowings that keep a bad payload value from becoming a failed import.
- */
+/** Template payload coercion (#322). */
 import { describe, expect, it } from 'vitest';
 import { childRows, depositPct, num, oneOf, parentSelect, pickDeclared, positiveQty, str } from '@/services/templates/coerce';
 

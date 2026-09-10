@@ -1,19 +1,6 @@
 /**
  * A ΔΑ and the ΤΙΜ that bills it — one purchase, two documents, and every way of joining them
  * that renders perfectly well while being wrong.
- *
- * myDATA is REQUIRED to file the pair as two documents: a delivery note is not a tax document, so
- * it carries the items at zero money, and the invoice carries the money with its itemisation
- * collapsed to one value-only line. Both rows are individually correct. The failures live entirely
- * in how they are JOINED, and none of them can be caught by a typecheck, a constraint or an
- * integrity probe over stored data, because in all of them the stored data is flawless:
- *
- *   - A 0.25-confidence coincidence rendered in the same words as the issuer's own declaration.
- *   - The invoice's €626.44 shown in the delivery note's money column, which is summed, so the
- *     supplier's spend doubles while every individual figure stays right.
- *   - An invoice total divided by the line count to fill in a per-item cost that nobody stated.
- *   - A cited MARK we do not hold, dropped from the list, so "correlated with a document we have
- *     not received" renders identically to "not correlated with anything".
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -288,16 +275,6 @@ describe('a ΤΔΑ is a delivery note that DOES carry prices', () => {
   /**
    * "A delivery note carries no money" was the first version of this feature's central claim and
    * it is FALSE. myDATA has two kinds:
-   *
-   *   ΤΔΑ  `1.1` with `isDeliveryNote` — a delivery note that IS the invoice. Full per-item
-   *        prices, and the total is the sum of its lines. 522 held here, every one priced.
-   *   ΔΑ   `9.3` — issued when the invoice follows separately, so it prices nothing.
-   *        104 held here: 205 lines, 35 issuers, not one non-zero value.
-   *
-   * The distinction matters because the fix for the second must not touch the first, and because
-   * myDATA does not FORBID values on a 9.3 — so keying on the type code would silently null out a
-   * real price the day a supplier sends one. Destroying a stated figure to avoid inventing one is
-   * the same class of error, pointed the other way.
    */
   it('decides from the values, not from the document type', () => {
     const src = read('supabase/functions/finance-inbound-sync/index.ts');

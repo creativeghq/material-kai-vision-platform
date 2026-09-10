@@ -4,30 +4,7 @@ import { join, relative } from 'node:path';
 import { formatDate } from '@/utils/datetime';
 import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
-/**
- * Dates render through one formatter, in one locale (#329).
- *
- * `new Date(x).toLocaleDateString()` uses the BROWSER's locale, so the same timestamp rendered
- * "Aug 5, 2026" for one user and "5 Αυγ 2026" for another, on the same screen, with nothing in the
- * code to say so. `formatDate` pins `en-US` for the same reason `formatMoney` pins `en-IE`:
- * English is the platform default for all UI and documents.
- *
- * 244 call sites were migrated in one pass. This stops the 245th.
- *
- * SCOPE — deliberately narrow, and the narrowness is the point:
- *
- *  • Only `new Date(…).toLocale*String()` is forbidden, where the receiver is PROVABLY a Date.
- *  • Bare `someVar.toLocaleString()` is NOT flagged. 133 of those exist and many are numbers —
- *    `credits.toLocaleString()`, `count.toLocaleString()` — where "fixing" them with a date
- *    formatter would be catastrophic. They have the same browser-locale problem for thousand
- *    separators, but that needs a number formatter and a typed pass, not this rule.
- *  • Calls passing an options object are NOT flagged: the caller asked for a specific shape on
- *    purpose (`{ month: 'short', year: '2-digit' }`), and `formatDate` cannot express all of them.
- *  • `toLocaleTimeString` is NOT flagged — `formatDate` has no time-only mode, so there is
- *    nowhere to send those 6 call sites yet.
- *
- * A guard that flagged the ambiguous cases would be either wrong or ignored. This one is neither.
- */
+/** Dates render through one formatter, in one locale (#329). */
 const SCAN_ROOT = 'src';
 const CANONICAL = 'src/utils/datetime.ts';
 

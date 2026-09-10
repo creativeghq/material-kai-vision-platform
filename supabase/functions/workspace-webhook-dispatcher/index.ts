@@ -1,26 +1,4 @@
-/**
- * Outbound tenant webhook dispatcher (#330).
- *
- * `flow-engine` enqueues a delivery row per subscribed endpoint the moment an event fires; this
- * cron does the actual POST. The split matters: a tenant endpoint can be slow, down, or hostile,
- * and none of that may be allowed to slow or fail the business transaction that emitted the
- * event.
- *
- * Three things this has to get right, none of them optional:
- *
- *  1. **SSRF.** The URL is tenant-supplied — the canonical hostile input. It goes through the
- *     shared guard at delivery time, not merely at registration: DNS can be re-pointed at
- *     169.254.169.254 after the row is stored. `redirect: 'error'` because a public URL can 302
- *     to a blocked address after the check passes.
- *  2. **Signature.** HMAC-SHA256 over `{timestamp}.{body}`, so a receiver can verify both the
- *     payload and its freshness. Signing over the body alone would let anyone replay a captured
- *     delivery forever.
- *  3. **Bounded retries.** Exponential backoff, a hard attempt cap, and auto-disable after
- *     enough consecutive failures — a dead endpoint must stop generating work rather than
- *     retrying until the table fills.
- *
- * Cron: invoke with header `x-cron-secret: <CRON_SECRET>`.
- */
+/** Outbound tenant webhook dispatcher (#330). */
 import { createClient } from '@supabase/supabase-js';
 import { resolveSecret } from '../_shared/secrets.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';

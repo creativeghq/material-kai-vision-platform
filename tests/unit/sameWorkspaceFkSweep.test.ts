@@ -2,28 +2,6 @@
  * Live sweep: every write that stores a workspace-scoped foreign key taken from the REQUEST BODY
  * is accounted for — either it proves the referenced row is the caller's, or it is listed here
  * with the guarantee that makes it safe.
- *
- * `sameWorkspaceFkGuard.test.ts` pins the sites this class was already fixed in. This file is the
- * half that matters more: it re-runs the SEARCH on every build, so a NEW site fails the day it is
- * written rather than in an audit two months later.
- *
- * That distinction is the whole lesson. The class was found in real estate (#356 `RE-4`), paired
- * with CRM (#353 `CRM-5`), and assumed to be a two-module problem. Sweeping for the SHAPE found
- * it in five more places, in modules nobody had connected to it. A list of the places somebody
- * already looked is not coverage.
- *
- * WHY AN ACKNOWLEDGEMENT LIST RATHER THAN CLEVER DETECTION. A first version tried to decide
- * automatically whether each site was guarded, by looking for a workspace check near the value.
- * It was wrong in both directions and each fix broke a different case — most instructively, the
- * insert payload itself reads `workspace_id: workspaceId, warehouse_item...`, so a write could
- * vouch for itself and stock-api's real bug read as guarded. A guard that is subtly wrong about
- * what it has verified is worse than one that asks a human once. So: the sweep flags every site,
- * and a site leaves the list only by calling the shared helper on the value or by being written
- * down with a reason. New code fails closed.
- *
- * The FK set is DERIVED, not typed out: every relationship in `types.ts` whose referenced table
- * carries a `workspace_id`. A new workspace-scoped table is watched as soon as the generated
- * types know about it.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';

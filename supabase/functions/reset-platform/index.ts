@@ -15,117 +15,11 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
  *  browser that a direct API call never loads. */
 const RESET_CONFIRM_PHRASE = 'RESET PLATFORM';
 
-// ============================================================
 // LOCK RULE: any row with a boolean `is_locked = true` is NEVER deleted, in
 // any cleared table (discovered dynamically via the reset_lock_aware_tables
 // RPC). Lockable tables today are flows + facet_canonical_values (both already
 // preserved); the guard is future-proof for anything lockable that later lands
 // in the clear list. Knowledge Base CATEGORIES are preserved in full; KB DOCS
-// are preserved except UNPROTECTED docs (public/unlocked/non-auto-synced — the
-// auto-extracted catalog docs in the public per-material categories that mirror
-// the ingestion taxonomy: Tiles/Wood/Heating/…/General), which are cleaned in
-// STEP 1.5 via wipe_unprotected_kb_docs(). Locked/agent-level KB docs survive.
-// PRESERVED (never deleted during platform reset):
-// DB Tables:
-//   - system_settings          ← /admin/system-settings config
-//   - upsells                  ← global admin-managed upsell catalogue
-//   - timeline_steps           ← global project timeline steps
-//   - flows                    ← flow engine definitions (admin-managed)
-//   - background_agents        ← background agent definitions (admin-managed)
-//   - roles / role_permissions ← RBAC
-//   - ai_model_pricing         ← pricing reference data
-//   - subscription_plans       ← billing plans
-//   - webhook_endpoints        ← configured webhook URLs
-//   - kb_categories / kb_doc_attachments
-//                              ← KB categories preserved in full
-//   - kb_docs                  ← Knowledge Base docs — preserved EXCEPT unprotected
-//                                (public/unlocked/non-auto-synced) docs, which are
-//                                cleaned in STEP 1.5 (wipe_unprotected_kb_docs)
-//   - crm_companies / crm_contacts / crm_contact_relationships / crm_company_contacts
-//                              ← CRM (user request — keep contacts)
-//   - profiles / auth.users / workspaces / workspace_members
-//                              ← user accounts & workspaces
-//   ── Credits & Billing (DO NOT TOUCH) ──
-//   - user_credits             ← per-user credit balances
-//   - credit_transactions      ← full credit debit/top-up history
-//   - credit_packages          ← available credit package catalogue
-//   ── Prompts (admin-managed) ──
-//   - prompts                  ← saved agent/system prompts
-//   - prompt_history           ← audit trail — TRIMMED to 5 most recent per prompt_id (not wiped)
-//   ── Price Monitoring (DO NOT WIPE — long-running observational state) ──
-//   Price-history series are only useful when contiguous; a reset would
-//   destroy weeks/months of trend data and invalidate sanity bands,
-//   volatility scoring, classifier learnings, and brand-retailer cache.
-//   Customer-facing tracked_queries (external API consumers) MUST survive.
-//   Internal product monitoring also lives in tracked_queries now (api_key_id
-//   IS NULL + product_id NOT NULL) — the legacy competitor_sources /
-//   price_history / price_monitoring_products / product_excluded_urls tables
-//   were dropped.
-//   - tracked_queries                 ← every monitored subject (internal + external)
-//   - tracked_query_price_history     ← every price snapshot (internal + external)
-//   - tracked_query_promoted_urls     ← sticky admin URL overrides
-//   - tracked_query_excluded_urls     ← per-tracked-query exclusion list
-//   - price_lookups                   ← external /lookup usage log
-//   - price_discrepancies             ← cross-source disagreement log
-//   - price_alert_log                 ← dispatched alert audit + dedupe
-//   - match_corrections               ← admin "wrong match" feedback (few-shot)
-//   - classifier_verdict_cache        ← Haiku product-identity verdict cache (7d TTL)
-//   - brand_retailer_index            ← (brand, retailer_domain, country) cache
-//   - retailer_extraction_recipes     ← per-retailer selector recipes + self-heal stats
-//   ── Finance / Fiscal (LEGALLY RETAINED — NEVER WIPE) ──
-//   Greek myDATA/AADE records are legally required to be retained. A reset
-//   here is irreversible data destruction with compliance consequences.
-//   - invoices / invoice_items / credit_notes / credit_note_items
-//   - supplier_bills / supplier_credit_notes / supplier_credit_note_items
-//   - payments / payment_allocations / planned_payments / cheques
-//   - delivery_notes / delivery_note_items / inbound_documents
-//   - stock_allocations / supplier_products / warehouse_coverage
-//   - stock_movements / time_entries
-//   - warehouses / warehouse_items / warehouse_pending_items
-//   - pos_sessions / pos_cash_movements / pos_signatures / pos_terminals
-//   - document_series             ← legal invoice/receipt numbering sequences
-//   - fiscal_connectors / fiscal_submissions   ← AADE/Novus transmission ledger
-//   - finance_settings / finance_branches / finance_categories / pricing_rules
-//   - trip_expense_items / trip_expense_reports
-//   - workspace_fiscal_bindings / workspace_inbound_credentials
-//     / workspace_payment_config / workspace_storefront / workspace_doc_type
-//     / workspace_module_entitlements
-//   ── Secrets & API keys (NEVER WIPE) ──
-//   - platform_secrets / platform_secret_module_links
-//   - api_keys                    ← CASCADE root: deleting wipes every external
-//                                    customer's tracked_queries/mentions/jobs
-//   - material_kai_keys
-//   ── Customer-facing monitoring (DO NOT WIPE — same policy as price monitoring) ──
-//   Long-running observational series + external API consumer state.
-//   - tracked_mentions + mention_history / mention_outlets / mention_promoted_urls
-//     / mention_excluded_urls / mention_match_corrections / mention_alert_log
-//     / mention_classifier_verdict_cache / llm_mention_probes
-//   - tracked_jobs + job_listings / job_excluded_urls / job_match_corrections
-//     / job_alert_log / job_classifier_verdict_cache / job_research_sites
-//   - seo_tracked_domains / seo_research_runs / seo_domain_audit_history
-//   ── Agent Fabric persistent layer (NEVER WIPE, secrets cascade) ──
-//   - agent_definitions / agent_projects / agent_project_secrets
-//     / agent_project_deployments / agent_project_snapshots
-//     (only the runtime — agent_runs/agent_artifacts/agent_inbox_messages — is cleared)
-//   ── Connection tokens (NEVER WIPE — re-auth pain) ──
-//   - social_accounts / social_zernio_profiles
-//   - messaging_channels / messaging_settings / messaging_optouts (compliance)
-//   ── Config / reference ──
-//   - modules / api_endpoints / mydata_reference / aade_lookup_log
-//   - xml_mapping_templates / flow_area_registry / category_complement_rules
-//   - catalog_templates           ← admin branding assets (parallels quote-templates)
-//   - material_categories         ← admin-curated materials taxonomy that drives the
-//                                    ingestion/PDF-processing classifier (ai_extraction_
-//                                    enabled, prototype embeddings). NOT user content —
-//                                    wiping it breaks discovery until re-seeded.
-// Storage Buckets (6 buckets post-consolidation 2026-05-23):
-//   - pdf-documents            ← KB raw uploads + catalog-output/ + quote-output/ + moodboard-output/
-//   - pdf-tiles                ← extracted/ (KB) + catalog-extracted/
-//   - generation-images        ← AI outputs + product-crops/ + 3d/ + designer/ + agent/ + social/
-//   - quote-templates          ← quote + catalog/ template assets (admin uploads)
-//   - moodboard-sheet-references ← static UI illustrations for sheet picker
-//   - profile-avatars          ← user avatar images ({userId}/avatar.ext)
-// ============================================================
 
 // Tables to clear (in order to respect foreign key constraints).
 // Order matters — delete child tables before parent tables.
@@ -342,34 +236,12 @@ const TABLES_TO_CLEAR = [
   'user_follows',                  // Follow graph
   'notifications',                 // Legacy/secondary notifications table (derived)
 
-  // ============================================================
   // PRESERVED (not in this list — see header comment for full list):
   // - Knowledge Base (kb_*)
   // - CRM (crm_*)
-  // - Users / Profiles / Workspaces / Credits
-  // - Admin config: system_settings, prompts,
-  //   upsells, timeline_steps, flows, background_agents, roles,
-  //   ai_model_pricing, subscription_plans, webhook_endpoints, etc.
-  // - prompt_history — trimmed separately (keep 5 most recent per prompt)
-  // - Price Monitoring (tracked_queries, tracked_query_price_history,
-  //   tracked_query_promoted_urls, tracked_query_excluded_urls,
-  //   price_lookups, price_discrepancies, price_alert_log,
-  //   match_corrections, classifier_verdict_cache, brand_retailer_index,
-  //   retailer_extraction_recipes)
-  //   ⚠️ DO NOT add price-monitoring tables here — long-running
-  //   observational data, customer-facing API state, and learned caches.
-  // ============================================================
 ];
 
-// ============================================================
 // NEVER_CLEAR — hard guard against catastrophic future edits.
-// These tables hold legally-retained financial records, secrets, customer
-// API-key state, or long-running customer-facing observational data. If any
-// of them is ever added to TABLES_TO_CLEAR (by mistake, refactor, or a future
-// switch to a denylist), the reset ABORTS before deleting anything — see the
-// overlap assertion at the top of the handler. This is fail-closed by design.
-// Do NOT "resolve" an overlap by removing the entry from here. Remove it from
-// TABLES_TO_CLEAR instead.
 const NEVER_CLEAR = new Set<string>([
   // Finance / fiscal (legally retained)
   'invoices', 'invoice_items', 'credit_notes', 'credit_note_items',
@@ -428,22 +300,7 @@ const IDLESS_DELETE_COLUMN: Record<string, string> = {
   facet_merge_log: 'id',             // PK `id` is bigint, not uuid — zero-uuid predicate can't target it
 };
 
-// ============================================================
 // Storage buckets to clear (AI/processing-generated content only)
-// Post-consolidation: 6 anchor buckets exist. We clear the two
-// that hold regenerable AI/processing output. pdf-documents holds raw user
-// uploads (KB) plus generated outputs (catalog-source/, catalog-output/,
-// quote-output/, moodboard-output/, client-view-output/) — those become
-// orphans when their DB rows are cleared above (presentation_catalogs,
-// catalog_source_pdfs, quotes, moodboards, project_client_views) and the
-// nightly storage-orphan-cleanup-cron sweeps them within its grace window.
-// pdf-tiles/catalog-extracted/ is removed outright since we wipe pdf-tiles whole.
-// PRESERVED buckets:
-//   - pdf-documents                ← KB raw uploads + generated outputs (cleaned by orphan cron)
-//   - quote-templates              ← admin-uploaded template assets (quotes + catalog branding)
-//   - profile-avatars              ← user avatars (kept across resets)
-//   - moodboard-sheet-references   ← admin-curated UI illustrations
-// ============================================================
 const BUCKETS_TO_CLEAR = ['pdf-tiles', 'generation-images'];
 
 // Path prefixes inside a cleared bucket that hold SETTINGS / BRANDING assets,
@@ -499,18 +356,6 @@ async function listAllFiles(bucketName: string, folderPath = ''): Promise<string
 /**
  * Reset Platform Edge Function
  * Clears all user-generated data while preserving system configuration.
- *
- * PRESERVED: system_settings, upsells, timeline_steps, kb_* tables,
- *            crm_companies, crm_contacts, profiles/auth.users,
- *            user_credits, credit_transactions, credit_packages,
- *            prompts, prompt_history,
- *            price-monitoring tables (tracked_queries,
- *            tracked_query_price_history, tracked_query_promoted_urls,
- *            tracked_query_excluded_urls, price_lookups,
- *            price_discrepancies, price_alert_log, match_corrections,
- *            classifier_verdict_cache, brand_retailer_index,
- *            retailer_extraction_recipes),
- *            quote-templates bucket, pdf-documents bucket, profile-avatars bucket
  */
 Deno.serve(withApiLogging('reset-platform', async (req) => {
   // Handle CORS
@@ -521,15 +366,6 @@ Deno.serve(withApiLogging('reset-platform', async (req) => {
   try {
     // AUTHORIZATION (#362). This deletes every tenant's data, so the gate has to mean
     // "operates the platform" — and the previous one did not.
-    //
-    // It was `authenticate(req, { allowedRoles: ['admin'] })`, which resolves against
-    // `workspace_members.role` in ANY workspace. That is the per-workspace business role
-    // every tenant's own administrator holds, so any customer admin could wipe all tenants.
-    // The second operand, `!auth.success && !isAdminAccess(auth)`, could never contribute:
-    // isAdminAccess is `auth.success && level === 'secret'`, ANDed against `!auth.success`.
-    //
-    // The two things that legitimately mean platform operator are the service-role bearer
-    // and the GLOBAL account tier (`user_profiles.role_id → roles.name`). Nothing else.
     let authMode: 'service_role' | 'platform_operator';
     let actorId: string | null = null;
     let actorEmail: string | null = null;
@@ -691,14 +527,6 @@ Deno.serve(withApiLogging('reset-platform', async (req) => {
     }
 
     // STEP 1.5: Clean the Knowledge Base — delete UNPROTECTED kb_docs only.
-    // kb_* tables are intentionally NOT in TABLES_TO_CLEAR (their FK/lock model
-    // can't be expressed by the generic neq-delete). Instead we call a helper
-    // that mirrors kb_block_locked_doc_delete()'s effective_locked rule and drops
-    // only docs that are public/unlocked/non-auto-synced (the auto-extracted
-    // catalog docs in the per-material public categories). Agent-level + is_locked categories
-    // (HeatPumps, Product Management, Internal Configuration) and their docs, plus
-    // every category row, survive. Categories are left intact (unlocked ones just
-    // end empty and are re-used by upsert_kb_doc on the next ingest).
     console.log('\n🗑️  STEP 1.5: Clean Knowledge Base (unprotected docs only)');
     results.knowledge_base = { deleted: 0 };
     try {
@@ -717,15 +545,6 @@ Deno.serve(withApiLogging('reset-platform', async (req) => {
     }
 
     // STEP 1.6: Purge ORPHANED Agent Fabric projects (workspace_id IS NULL).
-    // The Agent Fabric persistent layer (agent_projects + its CASCADE children
-    // secrets/deployments/snapshots) is in NEVER_CLEAR so legitimately
-    // workspace-owned, deployed agents + their secrets survive a reset. But an
-    // agent_projects row with NULL workspace_id is unreachable — the RLS policy is
-    // `is_workspace_admin(workspace_id)`, which never grants on NULL — so it can
-    // never be seen or owned by anyone; it's pure orphan junk (e.g. an early test
-    // project). Delete those; the delete CASCADEs to its secrets/deployments/
-    // snapshots. NOTE: agent_definitions is intentionally NOT here — it's a GLOBAL,
-    // un-workspaced agent-type registry (developer/qa-reviewer/…), preserved config.
     console.log('\n🗑️  STEP 1.6: Purge orphaned Agent Fabric projects (NULL workspace)');
     results.orphan_agent_fabric = [];
     for (const tableName of ['agent_projects']) {
@@ -807,14 +626,6 @@ Deno.serve(withApiLogging('reset-platform', async (req) => {
 
     // STEP 3: TRUNCATE high-volume / id-less tables + ALL VECS collections via RPC.
     // None of these can go through the PostgREST delete-all path:
-    //   • system_logs is ~1M+ rows → DELETE hits the statement timeout
-    //   • paddleocr_metrics (bigint PK) / query_understanding_cache / review_summaries
-    //     have non-uuid or absent `id` columns → the .neq('id', zero-uuid) predicate errors
-    //   • DELETE is NOT granted to the PostgREST role on the vecs schema, so the old
-    //     per-collection delete silently no-op'd → ghost embeddings survived every reset
-    // reset_truncate_heavy() is SECURITY DEFINER and TRUNCATEs all of them reliably
-    // (fixed allow-list, no dynamic input). This is the single source of truth for
-    // clearing every image embedding collection — missing one leaves ghost images.
     console.log('\n🗑️  STEP 3: TRUNCATE VECS + high-volume/id-less tables (RPC)');
     results.truncated = { tables: [] };
     try {

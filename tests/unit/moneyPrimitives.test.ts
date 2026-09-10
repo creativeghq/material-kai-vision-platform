@@ -1,25 +1,4 @@
-/**
- * One implementation per money primitive.
- *
- * CLAUDE.md states the rule for derived money quantities ("one derivation per money quantity"), but
- * the same disease had spread through the plumbing underneath it, where nobody was looking because
- * each copy is two lines long and obviously correct in isolation:
- *
- *   round2      13 declarations, TWO different results. The canonical pair nudged by Number.EPSILON
- *               so 1.005 -> 1.01; the eleven local `r2` copies did not, so the same subtotal rounded
- *               differently depending on which file computed it.
- *   formatMoney  6 declarations. The canonical pins `en-IE`; five copies in the projects module
- *               passed `undefined`, so one euro amount rendered "EUR 1,234.56" and another
- *               "1.234,56 EUR" purely from the viewer's browser language. One also dashed a real
- *               zero because it tested falsiness.
- *   VAT on net   9 open-coded `net * pct / 100` sites, next to a module whose header claimed to be
- *               the only place that arithmetic lived.
- *   remainder    `amount - sum(allocations)` in three TS sites and three SQL functions, disagreeing
- *               on WHICH column to sum -- see paymentSweepWiring.test.ts.
- *
- * None of these were reported by a user. They are all latent: every copy agrees on the common path
- * and diverges only at a half-cent, a non-English browser, or a cross-currency settlement.
- */
+/** One implementation per money primitive. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';

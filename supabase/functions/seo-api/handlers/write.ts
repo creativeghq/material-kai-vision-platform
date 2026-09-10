@@ -41,20 +41,7 @@ const CREDIT_COST = 20;
 
 const WRITE_TEMPERATURE = 0.7;
 
-/**
- * Article output budget.
- *
- * This was 8192, which is a comfortable ceiling for a 2,000-word ENGLISH article (~1.3
- * tokens/word) and not one for anything else. Greek, the first language this pipeline was
- * actually asked for, runs closer to 2.5–3.5 tokens per word on a BPE tokenizer, so the
- * same 2,000-word target needs 5,000–7,000 tokens and a 2,500-word one exceeds the cap
- * outright. The failure mode is silent: unlike the structured plan call, which at least
- * threw a parse error when it was truncated, prose comes back as a perfectly valid string
- * that simply stops mid-sentence, gets scored by `analyze`, auto-fixed, and published.
- *
- * Set well clear of the worst case rather than tuned to a language, and paired with the
- * `finishReason === 'length'` check below so that if it is ever hit it is LOUD.
- */
+/** Article output budget. */
 const WRITE_MAX_OUTPUT_TOKENS = 32000;
 
 
@@ -285,20 +272,7 @@ Call to action: ${brief.callToAction || 'No hard CTA — focus on value'}`;
   return prompt;
 }
 
-/**
- * First-hand experience block — the "E" in E-E-A-T.
- *
- * Every other input to the writer (research, SERP signals, competitor content
- * scores) is derived from the pages we are trying to outrank, so an article built
- * from those alone is by construction a better-formatted restatement of what is
- * already ranking. Google's helpful-content guidance calls that out directly
- * ("adds substantial value beyond source material", "demonstrates first-hand
- * expertise"). This block is the only place where information the SERP does not
- * contain enters the prompt.
- *
- * Returns '' when the brief carries none — the analyzer raises a `firsthand_experience`
- * fix in that case rather than the writer inventing experience it does not have.
- */
+/** First-hand experience block — the "E" in E-E-A-T. */
 async function buildFirsthandExperienceBlock(supabase: DbClient, brief: NormalizedBrief | null): Promise<string> {
   const fx = brief?.firsthandExperience;
   if (!fx) return '';

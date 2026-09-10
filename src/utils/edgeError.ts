@@ -1,12 +1,4 @@
 // Unwrap Supabase edge-function invocation errors into the REAL reason.
-// `supabase.functions.invoke()` converts any non-2xx response into a thrown
-// `FunctionsHttpError` whose `.message` is the useless generic string
-// "Edge Function returned a non-2xx status code". The actual reason the function
-// returned (e.g. "Statement sending is disabled in finance settings.",
-// "Link expired", "Stripe is not configured") lives in the JSON response BODY,
-// reachable only via `await error.context.json()`.
-// Use these helpers at every `functions.invoke` call site so users see the real
-// reason instead of the generic masked message.
 
 /**
  * Resolve the human-readable message from a `supabase.functions.invoke` error.
@@ -74,12 +66,6 @@ export function isNotEntitledError(parsed: ParsedEdgeError): boolean {
 /**
  * True when the refusal is "you are out of credits" — the twin of `isNotEntitledError`, and the
  * cue to open the top-up flow instead of printing a failure.
- *
- * Running out of credits is not an error the user made; it is the moment to sell them more. Every
- * surface was hand-rolling its own test for it and getting a different answer: AgentHub matched
- * `/insufficient credits/i` — with a SPACE — against a body that says `insufficient_credits` with
- * an UNDERSCORE, so its top-up card, which has existed all along, could never once have rendered.
- * The user got the raw JSON of the 402 instead. One test, in the same file as the entitlement one.
  */
 export function isInsufficientCreditsError(parsed: ParsedEdgeError): boolean {
   return parsed.code === 'insufficient_credits';
@@ -101,24 +87,6 @@ export function looksInsufficientCredits(text: unknown): boolean {
 /**
  * The human sentence inside a REFUSAL that reached us as raw TEXT — a streamed agent turn, which
  * reads the body with `response.text()` and has no `functions.invoke` error to unwrap.
- *
- * Returns `null` when there is nothing better than what the caller already has, so the call site
- * reads `humanEdgeRefusal(text) ?? \`Error: ${text}\`` and never loses a message it cannot improve.
- *
- * WHY. AgentHub throws `Agent execution failed: ${status} - ${body}` and its catch translated
- * exactly ONE shape — the 402 credits refusal. Everything else printed the status and the raw JSON
- * at the user: a 413 for attaching too many PDFs rendered as
- * `Error: Agent execution failed: 413 - {"error":"Too many documents attached: 19 (max 6 per turn)."}`
- * when the function had written a perfectly good sentence and put it in the body.
- *
- * ONLY 4xx. A refusal is a decision the function made and wrote a sentence for; a 5xx is a crash,
- * and its body carries whatever the exception said. Presenting that as clean prose would strip the
- * status and render an internal error as an ordinary assistant reply — a failure the reader cannot
- * tell from an answer, which is worse than the raw text it replaced. Same line `withApiLogging`
- * draws when it reports 5xx to Sentry and deliberately never reports 4xx.
- *
- * Slug-shaped bodies (`insufficient_credits`, `not_entitled`) are deliberately NOT humanised — the
- * slug is worse to read than the raw text, and the credit path keys off the raw string.
  */
 export function humanEdgeRefusal(text: unknown): string | null {
   if (!text) return null;

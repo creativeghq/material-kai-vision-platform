@@ -1,15 +1,6 @@
 /**
  * Canonical totals breakdown shown on every "final" customer-facing document
  * (quotes, invoices, exports). Five explicit lines so VAT + discount are never hidden:
- *
- *   Price                 (net subtotal, after per-line/customer discounts)
- *   Discount              (order-level "paid upfront" discount only)
- *   Price after Discount  (= Price − Discount = net taxable base)
- *   VAT                   (VAT on the post-discount net)
- *   Final                 (= Price after Discount + VAT = grand total)
- *
- * Per-line/customer discounts are shown per row in the items table; this block consolidates
- * the order-level discount only (the chosen "net subtotal + order discount" convention).
  */
 export interface TotalsBreakdown {
   price: number;
@@ -24,21 +15,7 @@ export interface TotalsBreakdown {
 import { round2 as r2 } from '@/utils/decimal';
 import { vatOf } from '@/modules/finance/lib/vatMath';
 
-/**
- * Preview of the totals for prices the operator is still typing.
- *
- * `public.get_quote_totals(uuid[])` is the single source for quote money (CLAUDE.md,
- * "One derivation per money quantity"), but it derives from STORED `quote_items.line_total`,
- * so it cannot answer "what would this quote come to if I saved these prices?". That one
- * question is what this exists for — and nothing else. Once prices are saved, every reader
- * takes the SQL answer.
- *
- * The step order and per-step rounding here mirror get_quote_totals EXACTLY, including
- * folding extras into the taxable base before VAT and summing rounded parts rather than
- * re-rounding a product. If you change one, change both: the reason quote totals were
- * wrong is that three implementations rounded differently and
- * `priceAfterDiscount + vat` disagreed with `final` by a cent.
- */
+/** Preview of the totals for prices the operator is still typing. */
 export function previewTotalsBreakdown(input: {
   subtotal: number | null | undefined;
   cashDiscountPct: number | null | undefined;

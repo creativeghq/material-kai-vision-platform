@@ -55,19 +55,7 @@ export const ResupplySection: React.FC<{ workspaceId: string }> = ({ workspaceId
     } finally { setAiBusy(false); }
   };
 
-  /**
-   * Synchronous in-flight latch (#355 WH-3).
-   *
-   * `setReordering` / `setBulkBusy` are async React state, so they cannot stop a second click
-   * that is already queued: `confirm()` blocks the main thread, the second click's event waits
-   * behind it, and the moment the first handler `await`s the queued handler runs from the top.
-   * Both POs are then legitimate, DISTINCT orders — so `receive_order_into_warehouse`'s
-   * idempotency does not help, and receiving both correctly adds double the stock. This is the
-   * one place in the module where double-submit survives the SQL guards, precisely because the
-   * duplicate is a NEW object rather than a repeat operation on an existing one.
-   *
-   * A ref is set and read in the same synchronous turn, which is what state cannot do.
-   */
+  /** Synchronous in-flight latch (#355 WH-3). */
   const inFlightReorders = useRef<Set<string>>(new Set());
   const bulkRunning = useRef(false);
 

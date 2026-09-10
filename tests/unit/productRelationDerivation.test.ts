@@ -1,26 +1,4 @@
-/**
- * Product-relationship derivation guard (issue #267).
- *
- * The bug this exists to stop: "what relates to this product" was answered TWICE.
- * MIVAA's search enrichment, the agent tools and the admin backfill all read the
- * gold-layer `product_edges` table (derived once by `rebuild_product_edges`, served
- * by `get_related_products`). The product-detail *Related* tab did not — it called
- * `find_similar_products` / `find_complementary_products`, which re-derived the
- * answer live per query from a different signal mix. Same question, two answers,
- * and the user-facing one was the weaker: it scored same-name variants with
- * `random()` and, when nothing matched, fell through to "the most recently added
- * products" at a flat 0.50 — unrelated rows presented as similar.
- *
- * Both RPCs are dropped. This test fails the build if a second derivation reappears
- * on the client side.
- *
- * SCOPE — a clean run does NOT prove the invariant holds. This scans REPO FILES, so
- * it sees only the TypeScript half; this project's SQL lives in `pg_proc` and is
- * never committed (CLAUDE.md), so a new SQL function that re-derives relationships
- * is invisible here. The DB-side rules are: one derivation (`rebuild_product_edges`)
- * and one read path (`get_related_products`), and `product_edges` rows must pass the
- * `product_edges_workspace_parity` trigger.
- */
+/** Product-relationship derivation guard (issue #267). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';

@@ -1,15 +1,4 @@
-/**
- * Zernio Publish handler
- *
- * Publishes or schedules social media posts via the Zernio API.
- * Zernio handles cross-platform publishing via OAuth-connected accounts.
- *
- * Actions:
- *   publish_now  → publishes immediately (publishNow: true)
- *   schedule     → schedules for a future datetime (scheduledFor, scheduled_at required)
- *
- * No credit cost — uses the workspace's Zernio subscription.
- */
+/** Zernio Publish handler */
 
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../../_shared/http.ts';

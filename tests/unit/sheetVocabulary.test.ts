@@ -7,21 +7,7 @@ import {
   SHEET_TYPES, SHEET_STATUSES, isSheetType, isSheetStatus,
 } from '@/services/moodboards/sheetVocabulary';
 
-/**
- * `SheetType` exists ONCE, and equals the `moodboard_sheet_type` enum (#391).
- *
- * Twelve values, declared in SIX files — the largest duplication in the sweep by
- * copies × values. `presentation-sheet-tool.ts` carried a comment recording that its copy
- * had ALREADY drifted against the tool's own schema once, which is the argument for
- * removing the copies rather than adding another test that compares them.
- *
- * WHY THE PIN IS THE ENUM'S OWN OUTPUT
- * -------------------------------------
- * #391 names the failure mode: a previous guard for this shape "carried its own fourth
- * copy of the list, hand-edited in the same commit as the other three". So the expected
- * values below are `pg_enum` output quoted verbatim, in `enumsortorder`, rather than a
- * tidy array somebody would edit alongside a dropdown.
- */
+/** `SheetType` exists ONCE, and equals the `moodboard_sheet_type` enum (#391). */
 
 const ROOT = join(__dirname, '..', '..');
 

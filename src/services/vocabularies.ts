@@ -1,20 +1,4 @@
-/**
- * Value vocabularies — the frontend reader for `public.reference_vocabularies` (issue #370).
- *
- * The edge twin is supabase/functions/_shared/vocabularies.ts. Both read the same table; neither
- * restates its contents. This replaces `COMMON_MARKETS` and `COUNTRY_CODES`, two hand-written
- * lists in ToolkitFormModal that disagreed with the 30 markets the b2b tool actually searched —
- * the picker offered Australia and Canada and omitted Poland, Turkey, Serbia and Romania, i.e.
- * every market we actually source from.
- *
- * Kept byte-honest by tests/unit/vocabularyRegistry.test.ts, which fails if a second copy of a
- * vocabulary reappears in the repo. That is the `escapeHtml` lesson: three copies drifted to
- * three different answers precisely because convention was the only thing holding them together.
- *
- * FAILURE MODE: `loadVocabulary` throws when the table cannot be read and returns [] only when the
- * vocabulary is genuinely empty. Callers must not paper over the difference with a default list —
- * a fallback is invisible when it fires, and an admin's edit would then change nothing forever.
- */
+/** Value vocabularies — the frontend reader for `public.reference_vocabularies` (issue #370). */
 import { supabase } from '@/integrations/supabase/client';
 
 export interface VocabularyTerm {

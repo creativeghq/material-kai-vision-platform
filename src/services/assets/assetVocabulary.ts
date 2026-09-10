@@ -1,21 +1,4 @@
-/**
- * The company-assets value-sets, written ONCE (#391).
- *
- * `category` and `acquisition_type` were declared in `assetsService` (as unions) and in
- * `company-assets-tools` (as `as const` arrays feeding a `z.enum`) — one fact, two
- * runtimes, agreeing only by memory.
- *
- * `CompanyAssetsPanel` is NOT a third copy: it derives its option lists from the label
- * maps with `Object.keys(...)`, which is the right shape and stays as it is.
- *
- * THE DATABASE IS THE ENFORCER
- * -----------------------------
- * `company_assets_category_check` and `company_assets_acquisition_type_check` admit
- * exactly these. Pinned to the constraint text by `tests/unit/assetVocabulary.test.ts`.
- *
- * THIS FILE IS IMPORT-FREE, ON PURPOSE — byte-mirrored to the edge by
- * `npm run vocab:mirror`.
- */
+/** The company-assets value-sets, written ONCE (#391). */
 
 /** `company_assets_category_check`. */
 export const ASSET_CATEGORIES = [

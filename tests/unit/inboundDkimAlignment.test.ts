@@ -5,17 +5,7 @@ import { join } from 'node:path';
 import { stripComments } from '../helpers/stripComments';
 import { parseAuthResults, dkimAlignedWith } from '../../supabase/functions/_shared/email-auth';
 
-/**
- * A DKIM pass must be a pass FOR THE CLAIMED SENDER (#357 AE-5).
- *
- * The spoofing gate read `auth.dkim !== 'pass'` — a pass for ANY domain. An attacker signs a
- * message with a domain they own, sets `From: someone@yourcustomer.test`, and DMARC fails while
- * DKIM passes, so the gate opened and the agent could auto-reply as though the claimed sender
- * were verified.
- *
- * Inbound email is the most attacker-friendly surface in the platform: anyone can send one and
- * every header is theirs to choose. The signature domain is the one thing that is not.
- */
+/** A DKIM pass must be a pass FOR THE CLAIMED SENDER (#357 AE-5). */
 
 const ROOT = join(__dirname, '..', '..');
 

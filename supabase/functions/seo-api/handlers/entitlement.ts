@@ -3,8 +3,6 @@
 // `seo-toolkit`. Handlers that already resolve a workspace call assertEntitled directly;
 // the rest use resolveAndAssertSeoEntitled, which derives the workspace from the acting
 // user's most recent active membership (same resolution the persistence paths use).
-// A user with no workspace membership passes through (nothing to be entitled) — the debit
-// still applies, and such accounts are an operator anomaly, not a tenant.
 import { assertEntitled } from '../../_shared/entitlement.ts';
 
 export const SEO_MODULE = 'seo-toolkit';

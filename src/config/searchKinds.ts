@@ -1,17 +1,6 @@
 /**
  * The record kinds the platform can find and open, and the gates that must hold before it offers
  * to. Pure config — no Supabase client, no network — because two different things need it:
- *
- *   • `globalSearchService` (the ⌘K palette's data layer), which also does the RPC round trip;
- *   • `config/recordLinks.ts`, which turns an id in an agent tool payload into somewhere to go.
- *
- * It used to live entirely inside the service, so the second consumer would have pulled the
- * Supabase client into a config module — and with it a module-load `throw` in every test and every
- * surface that only wanted to know where a company opens.
- *
- * `globalSearchService` re-exports everything here, so nothing that already imported these names
- * had to move.
- *
  * @see tests/unit/globalSearchKinds.test.ts — holds the catalogue honest.
  */
 import {

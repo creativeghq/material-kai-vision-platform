@@ -1,15 +1,4 @@
-/**
- * moodboard-keep-active
- *
- * One-click "keep this moodboard" target for the dormancy warning/reminder email.
- * GET /functions/v1/moodboard-keep-active?token=<keep_active_token>
- *
- * Validates the token, clears the dormancy schedule, and bumps updated_at so the
- * activity clock resets. Public (no login) — the token is a 96-hex-char random
- * secret, so it's the capability. Returns a small self-contained HTML page.
- *
- * verify_jwt = false (see config.toml) so the link works straight from an email.
- */
+/** moodboard-keep-active */
 
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';

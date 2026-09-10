@@ -369,17 +369,7 @@ export class QuotesService {
     return data || [];
   }
 
-  /**
-   * Quotes for the ACTIVE WORKSPACE, with their items (the /quotes list and the sales portal).
-   *
-   * The workspace filter is explicit and it is not a duplicate of RLS. The read policy on
-   * `quotes` is `user_id = auth.uid() OR is_workspace_admin(ws) OR is_workspace_sales_manager(ws)`
-   * — a user-and-role rule, not a workspace one — so an unfiltered select returns every quote the
-   * caller owns ANYWHERE plus every quote of every workspace they administer, all merged into one
-   * list. Every count next to it (the dashboard's Quotes block, this page's own stat cards) is
-   * scoped to one workspace, so the tile and the list it links to disagreed by exactly the quotes
-   * belonging to the other workspaces.
-   */
+  /** Quotes for the ACTIVE WORKSPACE, with their items (the /quotes list and the sales portal). */
   async getUserQuotes(): Promise<QuoteWithItems[]> {
     const { data: userData } = await supabase.auth.getUser();
     const workspaceId = getActiveWorkspaceId(userData.user?.id);
@@ -426,22 +416,7 @@ export class QuotesService {
     }));
   }
 
-  /**
-   * Get a specific quote with its items
-   *
-   * `includeCost` is a SELLER switch (#368 follow-up). The embed used to be
-   * `product:products(*)`, and `products` carries `cost`, `cost_source`, `markup_percent`,
-   * `supplier_company_id` and the raw supplier feed in `attributes_raw`. This method backs the
-   * customer page (`/quotes/:id`, no admin gate) as well as the admin one, and `quote_items`'
-   * RLS only requires workspace membership — which a project client has. So every one of those
-   * columns was landing in the customer's browser on the page where they read their own quote.
-   * The list scrubbed cost before RENDER (`convertToDisplayProduct` sets `wholesale: 0`), which
-   * is why nothing looked wrong; the row was already over the wire.
-   *
-   * Per-line `cost_snapshot` is no longer a column on `quote_items` at all — it lives in
-   * `quote_item_costs`, whose RLS answers only the sell side (#358 PQ-2). `includeCost` decides
-   * whether to go and ask for it; a customer asking gets an empty set, not a filtered row.
-   */
+  /** Get a specific quote with its items */
   async getQuote(quoteId: string, opts?: { includeCost?: boolean }): Promise<QuoteWithItems> {
     const { data: quote, error: quoteError } = await supabase
       .from('quotes')
@@ -517,28 +492,8 @@ export class QuotesService {
   /**
    * THE money on a quote, derived — subtotal, the cash discount, accepted extras, the taxable
    * base, VAT and the grand total.
-   *
-   * `public.get_quote_totals(uuid[])` is the single source (CLAUDE.md, "one derivation per money
-   * quantity"). Read it rather than the cached `quotes.subtotal` / `vat_amount` / `grand_total`
-   * columns: those are restamped by `reprice_quote_items` and are stale between repricings — the
-   * cached `extras_total` was removed outright because its writer missed the delete path.
-   *
-   * Returns null when the derivation could not be read. A caller must render that as "unknown",
-   * never as zero.
    */
-  /**
-   * What accepting this quote PRODUCED (#378 C1).
-   *
-   * Accepting a quote is not just a status change: the `quote_accepted_create_order` trigger on
-   * `quotes` raises a confirmed sales order from its lines and a draft pre-invoice carrying a
-   * 30-day pay token, so the public quote page can offer "Pay now" immediately. All of it is
-   * correct, and none of it was visible from the quote — the operator marked a quote accepted and
-   * the fulfilment chain started somewhere they had no link to.
-   *
-   * Read, never derived: this reports the documents the trigger made. It does not create them,
-   * and an absent order means the trigger did not run (a quote accepted before that trigger
-   * existed), not that one should be minted here.
-   */
+  /** What accepting this quote PRODUCED (#378 C1). */
   async getQuoteDocuments(quoteId: string): Promise<{
     order: { id: string; order_number: string | null; status: string; total: number | null; currency: string | null } | null;
     preInvoice: { id: string; internal_number: string | null; status: string; total: number | null; currency: string | null } | null;
@@ -727,11 +682,6 @@ export class QuotesService {
       if (quote?.workspace_id) {
         // Pass the quote's customer so the resolver applies their pricing-level discount.
         // audience='seller' → staff get cost_basis + margin (never exposed to the buyer).
-        // Quantity + unit so `product_price_breaks` can fire (#347 defect 16). They travel
-        // together or not at all: `get_product_price_break` does
-        // `coalesce(convert_to_base_unit(product, qty, unit), qty)`, so a quantity sent without
-        // its unit is silently read as already being in base units and can match the wrong
-        // threshold — "5 pallets" firing at 5 pieces is exactly what the UoM ladder prevents.
         const breakArgs = customUnit && qtyNow > 0
           ? { p_quantity: qtyNow, p_unit: customUnit }
           : {};
@@ -1168,18 +1118,7 @@ export class QuotesService {
     }
   }
 
-  /**
-   * Incoming requests that nobody has turned into a quote yet (#337).
-   *
-   * `getQuoteRequests()` above reads the `quotes` table, so despite its name it can only ever show
-   * work that already exists. A request from the website embed has no quote — that is the entire
-   * point of it — so it was landing in `quote_requests` and being seen by nobody: leads accumulating
-   * in a table with no reader, which is the business-level version of the silent zero.
-   *
-   * `quote_id is null` is the definition of "not yet handled". The contact is resolved separately
-   * rather than through a nested select because `crm_contacts` and `quote_requests` have no
-   * PostgREST relationship declared, and a nested select that cannot resolve fails the whole query.
-   */
+  /** Incoming requests that nobody has turned into a quote yet (#337). */
   async listUnquotedRequests(workspaceId: string): Promise<UnquotedRequest[]> {
     const { data, error } = await supabase
       .from('quote_requests')
@@ -1426,18 +1365,7 @@ export class QuotesService {
     return data;
   }
 
-  /**
-   * The customer's decision on one extra.
-   *
-   * Goes through `set_quote_upsell_decision` rather than a direct UPDATE: the row also carries
-   * `metadata.custom_price` and `metadata.quantity`, which is what `get_quote_totals` prices the
-   * extra from. A customer holding UPDATE on that row could re-price their own upsell. The RPC
-   * writes `customer_accepted` + `decided_at` and nothing else (#358 PQ-2).
-   *
-   * There is no `extras_total` to restamp any more: `get_quote_totals` derives it from the
-   * accepted upsells every time it is asked, so removing an accepted extra can no longer leave an
-   * overstated cached total behind (#358 PQ-6).
-   */
+  /** The customer's decision on one extra. */
   async updateUpsellAcceptance(
     quoteUpsellId: string,
     accepted: boolean,

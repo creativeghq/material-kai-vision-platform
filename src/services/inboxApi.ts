@@ -638,12 +638,6 @@ export const inboxApi = {
   /**
    * What a URL pasted into a conversation actually points at — the page's own title, description
    * and picture, read server-side and cached per URL.
-   *
-   * Scoped to the thread on purpose: the server refuses a URL this conversation does not contain,
-   * so the endpoint is not a general fetch-anything proxy. `preview.cache_status` is the answer
-   * even when there is no card — `no_metadata` (the page states none), `fetch_failed` (we could
-   * not read it), `blocked` (the address was refused). A caller that treats all three as "no
-   * preview" is fine; one that treats them as "the page has no picture" is wrong.
    */
   linkPreview(thread_id: string, url: string) {
     return call<{ preview: InboxLinkPreview }>('link_preview', { thread_id, url });
@@ -651,23 +645,7 @@ export const inboxApi = {
 
   // ── Follow-up: bring this back, and optionally chase them ──
 
-  /**
-   * "Remind me on Thursday", and optionally "send this if they have not replied by then".
-   *
-   * ONE mechanism for both: a reminder is a follow-up with no `message`. "Send it if there is no
-   * reply in X days" needs no third concept either — the customer replying is what cancels it,
-   * and that cancellation lives in a database trigger, so it happens whatever channel the reply
-   * arrives on.
-   *
-   * Pass `at` (an absolute instant) rather than `days` from the browser: the client knows the
-   * operator's timezone and can offset a calendar day correctly across a DST boundary, where the
-   * server — whose session is UTC — can only add 24 hours.
-   *
-   * `warning` comes back when the chase cannot work: on WhatsApp a freeform message is only
-   * accepted inside Meta's 24-hour service window, and a follow-up is usually days away. Said at
-   * the moment of scheduling, because the alternative is believing for three days that something
-   * will be sent.
-   */
+  /** "Remind me on Thursday", and optionally "send this if they have not replied by then". */
   setFollowUp(input: {
     thread_id: string;
     at?: string;
@@ -790,16 +768,7 @@ export const inboxApi = {
   }) {
     return call<{ intake: OrderIntake; totals: IntakeTotals }>('update_intake', { thread_id, ...changes });
   },
-  /**
-   * Replace the lines wholesale — fix one, drop one, add one.
-   *
-   * Two things the caller has to get right, because the server cannot infer either:
-   *  • `line_no` names the PREVIOUS reading this line continues, so keep an existing line's
-   *    original number even after reordering; omit it entirely for a line the member added.
-   *  • Send `unit_price` ONLY for a price the member actually typed. Supplying it stamps
-   *    `unit_price_source='manual'`, and a manual line stops re-pricing when the customer
-   *    changes — so echoing back a resolver price silently freezes it.
-   */
+  /** Replace the lines wholesale — fix one, drop one, add one. */
   updateIntakeItems(thread_id: string, items: Array<Partial<IntakeItem>>) {
     return call<{ intake: OrderIntake; totals: IntakeTotals }>('update_intake_items', { thread_id, items });
   },
@@ -862,18 +831,7 @@ export const inboxApi = {
  * editor. `key` is what's stored in `inbox_labels.color`; `chip` is the Tailwind class set for a
  * pill (works in both themes); `dot` tints the small swatch in the picker.
  */
-/**
- * The label palette. Each chip is a light/dark PAIR and both halves are mandatory.
- *
- * These were `bg-x-500/15 text-x-300 border-x-500/30` — one set of classes, picked against the
- * dark theme. A `-300` shade is pale by design: it reads on plum-black and it disappears on the
- * light themes' cream and white, where a label chip rendered at roughly 1.6:1. Nothing raised,
- * because a wrong colour is a valid class. Same fix as the source tags in
- * `src/pages/Inbox/inboxSource.ts`, and the same house pattern as `src/utils/statusTone.ts`.
- *
- * Written out rather than assembled: Tailwind's scanner reads source text, so a class built
- * from a template literal produces no CSS rule at all.
- */
+/** The label palette. Each chip is a light/dark PAIR and both halves are mandatory. */
 export const LABEL_COLORS: Array<{ key: string; label: string; chip: string; dot: string }> = [
   { key: 'slate',   label: 'Slate',   chip: 'bg-slate-500/10 dark:bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-500/25 dark:border-slate-500/30',             dot: 'bg-slate-500 dark:bg-slate-400' },
   { key: 'rose',    label: 'Rose',    chip: 'bg-rose-500/10 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/25 dark:border-rose-500/30',                   dot: 'bg-rose-500 dark:bg-rose-400' },

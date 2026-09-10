@@ -1,15 +1,4 @@
-/**
- * MIVAA API Client
- *
- * Centralized client for all MIVAA backend API calls.
- *
- * Features:
- * - Direct calls to MIVAA backend (no proxy overhead)
- * - Supabase auth token integration
- * - Automatic retry logic
- * - Error handling
- * - Type safety
- */
+/** MIVAA API Client */
 
 import { supabase } from '@/integrations/supabase/client';
 import { RetryHelper } from '@/utils/retryHelper';
@@ -406,17 +395,6 @@ export class MivaaApiClient {
   /**
    * Multi-vector search - THE ONLY search method used in the platform
    * Uses consolidated /api/rag/search endpoint with strategy="multi_vector"
-   *
-   * 7-vector fusion search with intelligent weighting:
-   * - Text (15%) - Voyage AI 1024D semantic understanding
-   * - Visual (15%) - SLIG 768D visual similarity
-   * - Understanding (20%) - Voyage AI 1024D from Claude Opus 4.8 vision_analysis (tool_use)
-   * - Color (12.5%) - SLIG 768D color palette matching
-   * - Texture (12.5%) - SLIG 768D texture pattern matching
-   * - Style (12.5%) - SLIG 768D design style matching
-   * - Material (12.5%) - SLIG 768D material type matching
-   *
-   * All vectors stored as halfvec (float16) for 50% storage savings.
    */
   async searchMultiVector(payload: {
     query: string;
@@ -623,15 +601,6 @@ export class MivaaApiClient {
 
   /**
    * Consolidated job status read.
-   *
-   * Backend endpoint: GET /api/rag/documents/job/{job_id}/full-status
-   *
-   * Returns `{core, stage_history, recovery_history, products, memory}` in a
-   * single round trip, replacing the prior pattern of querying
-   * `background_jobs` + `product_processing_status` + (historically)
-   * `job_checkpoints`/`job_progress` from the client separately. Prefer this
-   * over the individual table reads when rendering a single job's detail view.
-   *
    * @returns full-status payload
    */
   async getJobFullStatus(jobId: string): Promise<MivaaApiResponse<{
@@ -684,17 +653,7 @@ export class MivaaApiClient {
     });
   }
 
-  /**
-   * Get the document extraction health / observability snapshot.
-   *
-   * Returns per-document extraction state: whether Layer 1 (catalog
-   * layout) + Layer 2 (catalog legends) have run, which legend types
-   * were found, global certifications propagated, per-product coverage
-   * buckets, and a sample of products with missing critical fields +
-   * source breakdown (which extractor populated each field).
-   *
-   * Used by the Document Health tab in AsyncJobQueueMonitor.
-   */
+  /** Get the document extraction health / observability snapshot. */
   async getDocumentExtractionStatus(
     documentId: string,
     sampleLimit: number = 20,
@@ -738,22 +697,7 @@ export class MivaaApiClient {
     });
   }
 
-  /**
-   * The same detection as `segmentImage`, one zone at a time.
-   *
-   * `onZone` is awaited per zone, in arrival order, so a handler that crops or
-   * enqueues work cannot interleave itself and lose the index it was handed. Zones
-   * come in the MODEL's order, not sorted by confidence — sorting would mean holding
-   * them all back, which is the wait this exists to remove.
-   *
-   * Deliberately NOT wrapped in `RetryHelper`: a stream that dies after ten zones has
-   * already handed those ten to `onZone`, and replaying the request would deliver them
-   * a second time. The caller decides what a partial answer is worth.
-   *
-   * `unsupported: true` means the backend has no such route (this repo and MIVAA
-   * deploy separately, so a frontend that assumed the route exists would simply show
-   * nothing against an older backend). Fall back to `segmentImage` on it.
-   */
+  /** The same detection as `segmentImage`, one zone at a time. */
   async streamSegmentImage(
     payload: { image_url?: string; image_base64?: string; workspace_id?: string },
     onZone: (zone: MaterialZone, index: number) => void | Promise<void>,

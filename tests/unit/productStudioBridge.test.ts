@@ -1,13 +1,4 @@
-/**
- * The product → Interior Designer hand-off.
- *
- * `product-shot`, `product-lifestyle` and `material-texture` have existed in
- * generate_gemini since it shipped — each with its own prompt builder in
- * `_shared/product-prompt-builder.ts` — and until 2026-08-22 NOTHING could reach them:
- * no button, no quick-start. The capability was complete and the entry point absent,
- * which is the same shape that left `generate_3d` with one call in the platform's
- * lifetime. These cases pin the entry point so it cannot quietly disappear again.
- */
+/** The product → Interior Designer hand-off. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

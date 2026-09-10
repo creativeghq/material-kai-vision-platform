@@ -17,9 +17,6 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 //      with cost_snapshot copied from quote_items. Idempotent — returns existing invoice
 //      if one exists for the quote.
 //   2. If body.issue_now=true, flip status draft → issued (stamps issued_at + due_at).
-//   3. If body.submit_fiscal=true, transmit to the workspace's legal_invoice connector
-//      (Novus → myDATA).
-// Auth: admin / super_admin / owner / finance.
 
 interface RequestBody {
   /** Create/find the invoice from this quote. Provide this OR invoice_id. */
@@ -64,13 +61,14 @@ type Reservation =
   | { ok: true; refund: () => Promise<void> }
   | { ok: false; code: 'insufficient_credits'; error: string; balance: number };
 
-/** Atomically RESERVE (debit up-front) the transmission cost before we hand the document to
+/**
+ * Atomically RESERVE (debit up-front) the transmission cost before we hand the document to
  *  the connector. `debit_credits` (workspace pool → personal) takes a row lock and returns success=false on
  *  insufficient balance — the previous flow only pre-checked the balance then debited AFTER a
  *  successful (paid) submit while swallowing failures, so a debit that lost the race gave away
  *  a free myDATA transmission. Reserving first closes that race; the returned `refund()` gives
  *  the credits back if the submit fails or the document is not accepted. Operator root
- *  transmits free. */
+ */
 async function reserveTransmission(
   // `string | null`, because that is what `auth.userId` IS at every call site — null at
   // 'secret'/'anon' level. The `!userId` check below treats null and undefined identically, so
@@ -150,7 +148,6 @@ async function buyerRiskBlocks(supabase: any, invoiceId: string): Promise<string
     // "Block issuance while the buyer has an unpaid / overdue invoice" and every
     // invoice issued regardless. A financial control that reported active while
     // being absent. Default false: enabling stays an explicit operator choice, so
-    // this cannot start blocking issuance for anyone who has not asked for it.
     block_min_order: s?.risk_block_min_order ?? false,
     block_unpaid: s?.risk_block_unpaid_invoice ?? false,
   };
@@ -328,17 +325,7 @@ interface AcceptedSubmission {
   is_offline: boolean | null;
 }
 
-/**
- * Has this EXACT document already been accepted by the authority?
- *
- * Keyed on (document_table, document_id), not on `invoice_id`: a credit note stores the SOURCE
- * invoice's id there, so keying on it would let one invoice's submission answer for its credit
- * note and vice versa.
- *
- * `failed` is deliberately distinct from "no row". A read that errored means we do not KNOW
- * whether the document was sent, and a caller must treat that as "do not send" — the whole point
- * of the guard is that transmitting twice cannot be undone.
- */
+/** Has this EXACT document already been accepted by the authority? */
 async function findAcceptedSubmission(
   supabase: DbClient,
   documentTable: DocumentTable,
@@ -647,13 +634,6 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
     // ── Delivery-note CANCELLATION path (myDATA 9.3) ──────────────────────────
     // The only cancellation myDATA offers. An invoice is never withdrawn — it is corrected by a
     // credit note (5.1 wholesale / 11.4 retail), which is the immutability rule, not a gap.
-    //
-    // THE PROVIDER'S DUPLICATE GUARD IS RACY. A second CancelDeliveryNote for the same MARK
-    // usually comes back 251 "already been cancelled" — but a fast retry got Success twice, a
-    // second cancellation MARK and a second 0.25-credit charge (both observed, #319). A guard
-    // that holds except under retry is no guard, so the stored mark is OURS: taken with a
-    // conditional update BEFORE calling out, so a caller that lost the race — or is retrying a
-    // request whose response never arrived — is told the note is already cancelled.
     if (body.cancel_delivery_note) {
       const dnId = body.cancel_delivery_note.delivery_note_id;
       if (!dnId) return json({ error: 'cancel_delivery_note.delivery_note_id is required' }, 400);
@@ -991,13 +971,6 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
       });
 
       // The claim is the SUBMISSION, not the document's status column.
-      //
-      // `invoices.fiscal_status` is written AFTER the connector returns. If that write is lost —
-      // RLS, a dropped connection, a transient PostgREST failure — the document still reads
-      // "not accepted" while ΑΑΔΕ holds a MARK for it, and the operator, told it failed, presses
-      // the button again. That mints a SECOND legal document for one sale. Anti-regression rule 4:
-      // the duplicate guard reads the row written on the SUCCESS path, never the status column
-      // written after it.
       const prior = await findAcceptedSubmission(supabase, 'invoices', invoiceId);
       if (prior.failed) {
         // Cannot prove the document was NOT already sent. Refusing is the only safe answer:
@@ -1061,19 +1034,6 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
             });
 
             // ── ERROR 228: THE DOCUMENT IS ALREADY FILED, AND THE PROVIDER JUST TOLD US ITS MARK
-            //
-            // The dangerous case is not the double-click — it is the send whose RESPONSE WAS
-            // LOST. The first call reached AADE, no submission row was written because nothing
-            // came back, the operator retries, and 228 arrives looking like a refusal: credits
-            // refunded, `fiscal_status='rejected'`, while the document sits registered at AADE
-            // with a MARK nobody recorded.
-            //
-            // The MARK is NOT adopted on the provider's word alone. The same 228 is what a
-            // NUMBERING COLLISION produces — two different documents issued under one series+AA —
-            // and adopting it there would stamp this invoice with another document's legal
-            // number. So we fetch the filed document and adopt only when it is demonstrably the
-            // same one: same series, same AA, and the same gross total. Anything else is reported
-            // as the collision it is, for a human to resolve.
             if (result.status === 'rejected' && result.duplicateOf?.mark && resolved.resolved.connector.fetchTransmitted) {
               const filed = await resolved.resolved.connector.fetchTransmitted(
                 { invoiceMark: result.duplicateOf.mark, issuerVatNumber: input.issuer.vatNumber },

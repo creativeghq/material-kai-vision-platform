@@ -1,35 +1,4 @@
-/**
- * Guard: every edge writer into `ai_usage_logs` says whether the call SUCCEEDED.
- *
- * WHY THIS EXISTS
- * ---------------
- * `ops.silent_zero_provider` is the probe that catches "this provider is refusing every
- * call we pay for". It judges a provider ONLY on rows whose `metadata` carries a
- * `success` key, and that rule is correct — its own comment says why: a row that never
- * claimed to succeed is not evidence that it failed, and counting silent rows as failures
- * would flag every logger that simply records no outcome.
- *
- * The rule only works if the writers hold up their end. Measured 2026-08-23 over seven
- * days of `ai_usage_logs`:
- *
- *     voyage        510 calls,   0 declared an outcome
- *     anthropic     596 calls,  12 declared an outcome
- *     perplexity     30 calls,  30 declared an outcome   <- the only one watched
- *
- * ~1,100 calls a week outside the probe's field of view, and the single provider it could
- * see is the one it correctly caught at 401.
- *
- * Demonstrated rather than argued: thirty simulated Anthropic failures inserted the way
- * these writers logged them produced ZERO findings; the same thirty with `success: false`
- * fired the probe. Same outage, one key apart.
- *
- * And it is not hypothetical. On 2026-08-22 the Anthropic account hit zero and every
- * agent, vision and classifier call began returning 400. The probe said nothing and could
- * not have — a person noticed the agent replying with an error string.
- *
- * `_shared/ai-client.ts` matters most: CLAUDE.md names it the intended chokepoint for
- * edge model calls, and it declared nothing at all.
- */
+/** Guard: every edge writer into `ai_usage_logs` says whether the call SUCCEEDED. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';

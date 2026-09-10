@@ -1,24 +1,4 @@
-/**
- * `company_registry_lookup` is the FREE path, and both halves of that have to stay true.
- *
- * Free in the literal sense: GLEIF, ARES and ANAF are public government/foundation endpoints that
- * take no key and no account, so the tool debits nothing. The moment someone adds a
- * `debitExternalServiceCredits` / `reserveCredits` call to it, the reason it exists — start here
- * before you spend anything — is gone, and the agent's "this is free, always try it first"
- * instruction in the tool description becomes a lie the model has no way to detect.
- *
- * And free in the sense that matters for #334: it answers the question the paid providers do NOT.
- * Apollo sells employee counts and technographics; the registries say whether the entity is real,
- * what it is called on paper, and what its registration number is. That number is the bridge to
- * the ΑΑΔΕ / VIES lookup `create_company_from_vat` already implements — which is why this tool
- * must never grow its own VAT-lookup path instead of pointing at that one.
- *
- * The third property is the one that already bit during development. OpenStreetMap was in this
- * tool as "the free phone source" until it was measured: Overpass times out on a country-wide name
- * regex, and Nominatim returned a phone for none of four test manufacturers. It reported
- * `unavailable` on 100% of calls while the tool as a whole still looked healthy. A per-source
- * `hit` / `miss` / `unavailable` verdict is what made that visible in one run, so it is pinned.
- */
+/** `company_registry_lookup` is the FREE path, and both halves of that have to stay true. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -126,11 +106,6 @@ describe('company_registry_lookup stays the free path', () => {
    * entirely, with the word Marazzi nowhere in its name, carrying a real LEI and a real address.
    * Six genuine MARAZZI companies ranked below it. Handed to the agent unranked, that is not a
    * fuzzy match; it is the wrong company presented as a confident one.
-   *
-   * Re-ranked and NOT filtered, which is the half that is easy to get wrong on a later edit: GLEIF
-   * holds Karelia as `ΚΑΠΝΟΒΙΟΜΗΧΑΝΙΑ ΚΑΡΕΛΙΑ ΑΝΩΝΥΜΟΣ ΕΤΑΙΡΕΙΑ`, so a name in another script is a
-   * real match this check cannot always confirm. Dropping it would lose the Greek supplier — the
-   * exact case the platform's folding and transliteration machinery exists for.
    */
   it('re-ranks GLEIF by whether the name actually matches, and never drops the rest', () => {
     expect(SRC, 'the name-match check is gone').toMatch(/function nameMatchesQuery\(/);

@@ -1,20 +1,4 @@
-/**
- * "Which job is this for?" — for a document whose only link column is `project_id`.
- *
- * An invoice and a quote each carry exactly one free link: the job. They have no
- * `covers_order_id`, no `trip_report_id`, no `property_id`, so the full "what is this for?"
- * control would offer rows that cannot be stored — and a row that silently does nothing is the
- * failure this codebase keeps paying for. This narrows `OrderLinkPicker` to the one group those
- * documents can answer with.
- *
- * It is an ADAPTER, not a second picker. The search, the workspace scoping and the legality rules
- * are still `search_order_link_targets`; what lives here is the project-only configuration and the
- * label resolution, in one place so the invoice and the quote cannot drift apart — which is how
- * "the same field behaves differently over here" starts.
- *
- * The label is resolved rather than stored: a denormalized copy is one more thing to keep in step
- * with a rename.
- */
+/** "Which job is this for?" — for a document whose only link column is `project_id`. */
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { OrderLinkPicker } from '@/modules/finance/components/OrderLinkPicker';

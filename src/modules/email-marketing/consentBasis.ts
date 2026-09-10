@@ -1,15 +1,4 @@
-/**
- * Why an address may be mailed by a campaign — the vocabulary, its wording, and the split (#357 AE-8).
- *
- * Import-free on purpose: the derivation itself is SQL (`campaign_address_consent_basis`), and this
- * module only names and formats the answer, so a test can load it without a Supabase client.
- *
- * `crm_contacts.marketing_consent` existed all along. It is on the contact page and the real-estate
- * module honours it on every alert and digest; the campaign resolver — the one surface actually
- * labelled marketing — never read it, so a contact with the box unticked received every campaign,
- * and a pasted address matching nobody was mailed on no basis at all. Same shape as AE-5's
- * `auto_reply_enabled`: stored, shown, edited, never consulted.
- */
+/** Why an address may be mailed by a campaign — the vocabulary, its wording, and the split (#357 AE-8). */
 
 export type ConsentBasis =
   | 'workspace_member'  // a colleague — the working relationship, not a mailing list

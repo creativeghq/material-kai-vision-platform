@@ -23,17 +23,7 @@ export const MAX_FILTER_IDS = 1000;
 // the existing importer (companies-api-handler) keeps working and no second copy appears.
 export { escapeLike };
 
-/**
- * Quote a value for use INSIDE a PostgREST `or(...)` filter string.
- *
- * That grammar is comma-delimited with `.` separating column/operator/value, so an unquoted
- * value carrying `,` or `(` is re-parsed as syntax — a Greek business name
- * ("ΠΛΑΚΑΚΙΩΝ, ΠΛΑΚΟΛΙΘΩΝ") is enough to do it. Inside double quotes only `"` and `\` need
- * escaping. Composes with `escapeLike`: fold → escapeLike → quoteOrValue.
- *
- * A DIFFERENT contract from `escapeHtml` (invariant 11) — this is PostgREST filter grammar,
- * not HTML. Never substitute one for the other.
- */
+/** Quote a value for use INSIDE a PostgREST `or(...)` filter string. */
 export function quoteOrValue(value: string): string {
   return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 }

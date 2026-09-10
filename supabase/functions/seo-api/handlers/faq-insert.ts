@@ -1,14 +1,4 @@
-/**
- * Where an FAQ entry goes in the markdown — the part that can silently land in the wrong place.
- *
- * Separated from the handler so it can be tested without a Deno runtime or a model call. The
- * handler reads `Deno.env` at module load, so importing it from a unit test throws before a
- * single case runs; this is the same split as `readability.ts` and for the same reason.
- *
- * WHICH heading counts as the FAQ section is not decided here — that lives in
- * `_shared/seo/articleSections.generated.ts`, because the viewer and the analyzer have to answer
- * it the same way. This file only decides where the text lands.
- */
+/** Where an FAQ entry goes in the markdown — the part that can silently land in the wrong place. */
 
 import {
   findConclusionLine,
@@ -84,17 +74,7 @@ export function insertFaqEntry(
 /** A stored FAQ pair. The pipeline writes `faq_schema` as a bare array of these. */
 export interface FaqPair { question: string; answer: string }
 
-/**
- * The stored FAQ schema, reduced to the entries the article actually shows.
- *
- * The BODY is the source of truth: `faq_schema` is a projection of it for the FAQPage rich
- * result, and a projection that outlives what it projects is a page claiming an FAQ it does not
- * display. That is exactly what a Revert produced — adding a question wrote both, reverting
- * restored only the markdown, and the article came back with six FAQ headings and eight schema
- * entries. Measured on the real article, immediately after the feature that caused it.
- *
- * Cheap enough to run on every write that touches the body, which is where it is called from.
- */
+/** The stored FAQ schema, reduced to the entries the article actually shows. */
 export function faqPairsPresentIn(markdown: string, pairs: FaqPair[]): FaqPair[] {
   const headings = new Set(
     [...markdown.matchAll(/^#{2,4}\s+(.+?)\s*$/gm)].map((m) => STRIP_ACCENTS(m[1])),

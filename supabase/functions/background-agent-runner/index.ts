@@ -1,18 +1,4 @@
-/**
- * Background Agent Runner
- *
- * Universal executor for all background agents.
- * Triggered by: scheduler cron, event emission, manual API call, chain trigger.
- *
- * Request body:
- *   agent_id      string   (required) ID from background_agents table
- *   run_id        string   (optional) Resume/update an existing pending run
- *   input_data    object   (optional) Override / augment config input
- *   triggered_by  string   (optional) 'cron' | 'event' | 'manual' | 'chain' | 'api'
- *
- * Response:
- *   { success, run_id, status, duration_ms, output? }
- */
+/** Background Agent Runner */
 
 const ANTHROPIC_API_KEY = () => Deno.env.get('ANTHROPIC_API_KEY') || '';
 const SUPABASE_URL             = Deno.env.get('SUPABASE_URL')!;
@@ -55,12 +41,6 @@ Deno.serve(withApiLogging('background-agent-runner', async (req: Request) => {
   // emitter, chain triggers, and agent-chat — all of which present the project
   // service-role key as `Authorization: Bearer <service_role_key>`. Accept that
   // directly; any other caller must carry a valid user/secret credential.
-  // CRITICAL: authenticate() returns { success:false } (it does NOT throw) for a
-  // service-role bearer — it falls through to validateUserToken() and getUser()
-  // resolves to "no user" without raising. So the service-role check MUST run on
-  // the !success path, not only inside a catch. The previous catch-only fallback
-  // was dead code: every cron/event/chain dispatch was rejected with 401, which
-  // is why these agents never produced a single run since creation.
   const authHeader = req.headers.get('Authorization') || '';
   const isServiceRole =
     !!SUPABASE_SERVICE_ROLE_KEY && authHeader.includes(SUPABASE_SERVICE_ROLE_KEY);
@@ -190,36 +170,6 @@ Deno.serve(withApiLogging('background-agent-runner', async (req: Request) => {
     }
 
     // The run must belong to the agent that was named (#363 `EE-9`, invariant 1).
-    //
-    // `agent_id` and `run_id` were previously trusted as an unrelated pair: the membership check
-    // above validates the caller against `agent_id`'s workspace, and then this lookup fetched
-    // ANY run by id. So a caller who legitimately administers one workspace could pass their own
-    // agent_id together with another tenant's run_id and the runner would execute using that
-    // run's stored `input_data` — its task_prompt and its conversation_id — then write the
-    // status, output and error back onto the victim's `agent_runs` row and post the finished
-    // report into the victim's chat conversation. Cross-tenant read, cross-tenant write, and a
-    // message injected into someone else's conversation, all from two ids in one body.
-    //
-    // Both halves are checked because they can disagree independently: `agent_id` binds the run
-    // to the agent the caller was authorized against, and `workspace_id` catches a run whose
-    // agent has since moved. 404 rather than 403 on mismatch, so the response cannot be used to
-    // probe which run ids exist.
-    // SYSTEM agents are the exception, and leaving them out of it broke every chat dispatch.
-    //
-    // `KAI Background Tasks` (00000000-…-0001) has `workspace_id = NULL` on purpose: it serves
-    // every tenant, and `dispatch_background_task` correctly stamps each run with the USER'S
-    // workspace so the work belongs to their tenant. Equality can therefore never hold, so this
-    // check 404'd every single chat-dispatched run — the agent told the user "I'll post results
-    // back here", `dispatch_background_task` returned success, and nothing ran. One run existed
-    // in the whole table and it died 2s after creation.
-    //
-    // Relaxing the workspace comparison for a NULL-workspace agent does not reopen the hole this
-    // check was written for. That attack is a JWT caller pairing their own agent_id with another
-    // tenant's run_id, and it is closed by the `agent_id` equality below, which still applies to
-    // everyone: a caller can only ever reach runs of the agent they named. A system agent is not
-    // reachable by a JWT caller at all — the membership check above does
-    // `.eq('workspace_id', agentConfig.workspace_id)` with NULL, which matches no row, so any
-    // non-service-role caller is already 403'd before getting here.
     const runRecord = existingRun as AgentRunRecord & { workspace_id?: string | null };
     const agentIsSystemWide = (agentConfig.workspace_id ?? null) === null;
     if (
@@ -275,33 +225,12 @@ Deno.serve(withApiLogging('background-agent-runner', async (req: Request) => {
 
   // WHO this run is acting for (#363 `EE-9`). The dispatching user's id is recorded by
   // `dispatch_background_task` as `input_data.dispatched_by`, and until now nothing read it:
-  // the runner executed under the service role with no notion of an acting user at all, and
-  // the KAI task agent billed `background_agents.created_by` — the person who created the
-  // agent, who is often not the person who dispatched the task. Prefer the JWT caller when
-  // there is one (it is verified); fall back to the recorded dispatcher for the service-role
-  // dispatch paths, where there is no JWT to read.
-  //
-  // This is identity for attribution and billing, NOT a capability. It must never be used to
-  // widen what the run can reach — the workspace binding above already decides that.
   const actingUserId: string | null =
     authedUserId ??
     ((run.input_data as Record<string, unknown> | null)?.dispatched_by as string | undefined) ??
     null;
 
   // The workspace the RUN belongs to, which is not always the agent's.
-  //
-  // `agentConfig.workspace_id` is NULL for the shared system agents (KAI Background Tasks is
-  // `00000000-…-0001`), so every dispatched task ran with no tenant: MIVAA types `workspace_id`
-  // as a required string and answered 422 `Input should be a valid string` on every knowledge-base
-  // search this runner made. `dispatch_background_task` has always stamped the chat turn's
-  // workspace onto the run row — agent-chat derived it from the verified JWT — it just never
-  // reached the runner.
-  //
-  // TENANCY (invariant 1): using the run's workspace WIDENS what the run can read, so a JWT
-  // caller must be checked against the effective workspace and not only the agent's. The check at
-  // the top of this handler validated `agentConfig.workspace_id`; with a NULL there it passed
-  // vacuously for a system agent while `run.workspace_id` pointed anywhere. Service-role callers
-  // (cron / chain / agent-chat) are exempt exactly as they are above.
   const effectiveWorkspaceId: string | null =
     (run.workspace_id as string | null) ?? agentConfig.workspace_id ?? null;
 
@@ -595,17 +524,7 @@ async function postResultToChat(
   }
 }
 
-/**
- * A failure is a result, and it belongs in the same place the success would have gone.
- *
- * `dispatch_background_task` tells the user "I'll post the results back here in this
- * conversation". Until now only the SUCCESS path posted: a failed run wrote `error_message` to
- * `agent_runs`, and the workspace-owner alert below never fires for a chat dispatch (the KAI
- * system agent has `workspace_id` NULL by design, so the `if (agentConfig.workspace_id)` guard is
- * always false). The completion trigger only fired on 'completed'. So the thread the user was
- * watching simply went quiet, forever, with nothing anywhere saying why — run
- * fa735825 died on a 500 in 491ms and produced zero notifications and zero messages.
- */
+/** A failure is a result, and it belongs in the same place the success would have gone. */
 async function postTerminalStateToChat(
   conversationId: string,
   runId:          string,

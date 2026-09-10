@@ -1,15 +1,4 @@
-/**
- * A monitoring number is comparable, or it is not shown (#360 CB-14 / CB-21).
- *
- * CB-14: the price comparison was `((theirs - ours) / ours) * 100` with no currency check at all —
- * `theirs` in `row.current_currency`, `ours` in a `currency` prop that DEFAULTED TO 'USD' on a
- * platform that prices in euro. A GBP price against a EUR list price rendered as a confident red
- * "+12%" with a trend arrow. A wrong number is a valid `number`, so nothing else could catch it.
- *
- * CB-21: the panels' reads were `.catch(() => null)`, and null renders as an empty state. On these
- * screens zero IS an answer — no new mentions, no price movement — so an outage that produces one
- * is indistinguishable from good news, on the surfaces whose entire purpose is noticing change.
- */
+/** A monitoring number is comparable, or it is not shown (#360 CB-14 / CB-21). */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

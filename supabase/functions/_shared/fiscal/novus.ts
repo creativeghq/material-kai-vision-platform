@@ -1,10 +1,5 @@
 // Novus Provider (myDATA/AADE) connector — REST API v2.3.
 // Docs: src/modules/myaade/NovusProvider/. Base URLs:
-//   sandbox    https://provider-dev.timologisi.online
-//   production https://provider.timologisi.online
-// Auth header: `API-KEY: {key}`. HTTP is ALWAYS 200 on a processed request —
-// branch on response[].statusCode (Success | Offline | XMLSyntaxError |
-// ValidationError | TechnicalError). 5XX = transient → resend transmissionFailure=1.
 
 import type {
   FiscalConnector,
@@ -64,7 +59,6 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
   // So a customer with no address on file produced a 9.3 with a blank delivery point — and the
   // counterpart block below fills a missing postcode with '0' and a missing city with 'NONE',
   // which is worse than blank: it is a plausible-looking placeholder on a registered document.
-  // Blocking is recoverable; a movement filed to nowhere is not.
   if (header.movePurpose != null) {
     const incomplete = ([['loading', header.loadingAddress], ['delivery', header.deliveryAddress]] as const)
       .filter(([, a]) => !a || !String(a.street ?? '').trim() || !String(a.city ?? '').trim() || !String(a.postalCode ?? '').trim())
@@ -82,13 +76,6 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
   // A MOVEMENT DOCUMENT (9.3) IS A DIFFERENT ENVELOPE, NOT AN INVOICE WITH ZERO TOTALS.
   // AADE refuses it outright unless four things differ from every value-bearing type — verified
   // against the sandbox 2026-09-06 (#319), where our 9.3 came back with all of these at once:
-  //   205 "Payment Methods is forbidden for this invoice type"
-  //   205 "Currency is forbidden for this invoice type"
-  //   230 "itemDescr / measurementUnit … is mandatory for invoice detail 1"
-  //   204 "issuer Name / issuer address / Counterpart Name is mandatory for this invoice type"
-  // and its classification is `category3` (Transport) with NO classificationType, not the income
-  // pair a sale carries. So no delivery note has ever been accepted — which is also why the
-  // offline sweep had nothing to find for one.
   const isMovement = header.movePurpose != null;
 
   // WHICH LEDGER THIS DOCUMENT CLASSIFIES INTO — income, expenses, or neither.
@@ -229,12 +216,6 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
   // those lines' net values. Emitting a single entry for the whole net value — which is what
   // this did — is accepted only while every line happens to share one classification, and is
   // rejected outright the moment two differ:
-  //   311 Classification with type … not found in invoice summary
-  //   312 Sum of classifications … not matching with related total in invoice summary
-  //   321 Classifications included in the invoice rows and in the invoice summary do not match
-  // That is exactly the case the builder's own per-product classification feature produces
-  // (`mydata_income_classification_type` on a product), so the feature could never transmit.
-  // Verified against the sandbox 2026-09-06 (issue #319).
   const byClassification = new Map<string, { classificationType: string; classificationCategory: string; amount: number }>();
   for (const l of lines) {
     if (!l.incomeClassificationType) continue;
@@ -378,9 +359,6 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
         // several rows of the SAME bucket — a recycling levy is one AADE code (fees 17) charged
         // at a different rate per ΑΗΗΕ appliance class, which a line, holding one category per
         // bucket, cannot state. `taxTypeLabel` is what names the class.
-        //
-        // Emitted only when the document is in that mode; the builder leaves every line's tax
-        // amount unset there, because declaring a tax in both places files it twice.
         ...(taxesTotals?.length
           ? {
               taxesTotals: taxesTotals.map((t) => ({
@@ -398,8 +376,6 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
         // registers and what earns the MARK. This block only feeds the letterhead of the PDF
         // *Novus* draws. We do not use that PDF: we render our own and stamp the returned MARK
         // + QR onto it, and `invoiceUrl` (Novus's rendered copy) is deliberately never served.
-        // The issuer sub-block is mandatory per the Provider docs, so the envelope stays — but
-        // nothing render-only that has a side effect belongs in it.
         providerAdditionalInvoiceDetails: {
           issuer: {
             name: issuer.name ?? '',
@@ -558,26 +534,6 @@ function interpret(entry: any, httpStatus: number): FiscalSubmissionResult {
     default: {
       // ERROR 228 IS NOT A REFUSAL — IT IS THE PROVIDER TELLING US THE DOCUMENT IS ALREADY FILED,
       // AND NAMING ITS MARK.
-      //
-      // The provider dedupes on a UID derived from issuer + series + AA (verified 2026-09-06,
-      // #319: resending with a DIFFERENT total produced the same UID and the same 228). So the
-      // dangerous case is not the double-send — it is the send whose RESPONSE WAS LOST. The first
-      // call reached AADE, no `fiscal_submissions` row was written because the response never
-      // came back, the operator retries, and 228 came back as a plain rejection: credits
-      // refunded, `fiscal_status='rejected'`, while the document sits registered at AADE with a
-      // MARK nobody recorded. That is the "create-then-stamp pair" failure in CLAUDE.md wearing
-      // the provider's clothes.
-      //
-      // The MARK is surfaced separately rather than returned as `accepted`, because the same 228
-      // is ALSO what a numbering collision looks like — two different documents sharing a
-      // series+AA. Adopting the MARK blindly would stamp one invoice with another's.
-      //
-      // NOTHING CONSUMES THIS YET. Adopting it safely means fetching the filed document and
-      // confirming it is really ours (series + AA + totals) before writing the MARK down, and
-      // that branch is not built — so today a 228 still lands in the plain `rejected` path and
-      // the operator has to reconcile by hand. Tracked on #319.
-      // The MARK alone is the recovery handle; the authentication code is a bonus, so it is
-      // matched optionally rather than being required for the branch to fire at all.
       const dupMessage = String(firstError(entry).message ?? '');
       const dup = /MARK:\s*(\d+)/i.exec(dupMessage);
       const dupAuth = /AUTHENTICATION_CODE:\s*([0-9A-F]+)/i.exec(dupMessage);
@@ -653,7 +609,6 @@ export const novusConnector: FiscalConnector = {
     // transmitted a perfectly ordinary invoice with the contract reference, buyer reference,
     // budget and due date silently removed. No error, no warning, a valid MARK on a document
     // missing everything that made it B2G. Route list read from the provider's own swagger
-    // 2026-09-06 (#319).
     const route = input.b2g ? 'SendInvoicesB2G' : 'SendInvoices';
     const url = `${ctx.baseUrl}/api/v1/Provider/${route}?skipSignature=${skip}`;
     const payload = buildNovusPayload(input) as any;
@@ -697,24 +652,6 @@ export const novusConnector: FiscalConnector = {
   },
 
   // RequestTransmittedDocs — the ONLY way an offline-queued document ever gets its final MARK.
-  //
-  // Two things about this endpoint are not like SendInvoices, and getting either wrong makes the
-  // whole offline-recovery path silently dead (verified against the sandbox 2026-09-06, #319):
-  //
-  //  1. `issuedFrom` + `issuedTo` are MANDATORY. Without them the provider answers HTTP 400
-  //     problem+json, never a document — so every poll failed, for every document, always.
-  //  2. It answers `{ providerTransmittedDocs: [ … ] }` — NOT the `{ response: [ … ] }` envelope
-  //     SendInvoices uses, and each entry is `{ uid, mark, authenticationCode, … }` with NO
-  //     `statusCode`. Feeding that to `interpret()` fell through to the default branch and
-  //     reported `rejected`, so a perfectly healthy queued document read as refused by AADE.
-  //
-  // Both failures produce a *plausible* verdict, which is why nothing raised: the cron ran, the
-  // call "succeeded", and `finance.paid_draft_never_issued`-style probes saw a rejection rather
-  // than a stall. Since #193 that verdict also flips `fiscal_status` to 'rejected' after the 6h
-  // grace — i.e. it would have condemned documents AADE had accepted.
-  //
-  // NOT FINDING THE DOCUMENT IS NOT A REJECTION. An empty list means "not transmitted yet",
-  // which is `offline`, so the caller keeps waiting instead of burning a live document.
   async fetchTransmitted(query, ctx) {
     const qs = new URLSearchParams();
     if (query.invoiceMark) qs.set('invoiceMark', query.invoiceMark);
@@ -724,13 +661,6 @@ export const novusConnector: FiscalConnector = {
     // Required by the provider. Default to a window wide enough to cover any document still in
     // the offline queue (the provider must transmit within 1 day of issue; 30 days is the
     // sandbox retention) rather than leaving them unset, which is a hard 400.
-    //
-    // The window is deliberately generous at BOTH ends rather than precise. There is no
-    // workspace business timezone (CLAUDE.md §1b), so a date computed here is a UTC date while
-    // the document's `issueDate` is the operator's calendar day: a "today" upper bound drops a
-    // document issued in the Athens evening, and the cron then reports it as still offline. A
-    // day of slack past today costs nothing — the results are filtered by identifier below — and
-    // removes the whole class of off-by-one-day misses.
     const dayMs = 86_400_000;
     const now = Date.now();
     const isoDay = (t: number) => new Date(t).toISOString().slice(0, 10);
@@ -813,15 +743,6 @@ export const novusConnector: FiscalConnector = {
 
   // POST /CancelDeliveryNote — REST v2.3. Verified against the sandbox 2026-09-06 (#319):
   // returns `statusCode:"Success"` with a `cancellationMark` and costs 0.25 credits.
-  //
-  // THE PROVIDER'S OWN DUPLICATE GUARD IS RACY — DO NOT RELY ON IT. Sending the same MARK twice
-  // usually answers 251 "Invoice with MARK … has already been cancelled", but a fast retry got
-  // Success BOTH times: a second cancellationMark was minted and 0.25 credits billed again.
-  // Both outcomes observed against the sandbox on 2026-09-06 (#319) with the same code, which is
-  // the worst kind of guard — it works while you are testing it. So the "one thing, and a retry
-  // must not do it twice" rule is enforced at OUR end: claim the note (`where
-  // fiscal_cancellation_mark is null`) before calling, and never re-send once a mark is stored.
-  // See `finance-issue-invoice`.
   async cancelDeliveryNote(input, ctx) {
     return await cancelMovement(`${ctx.baseUrl}/api/v1/Provider/CancelDeliveryNote`, input, ctx);
   },

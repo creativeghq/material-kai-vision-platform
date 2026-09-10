@@ -1,20 +1,4 @@
-/**
- * How this product is lit and framed (#335) — set it, and see it.
- *
- * #335 asked for "a visual editor for those values that shows the result live, rather than a form
- * of numbers", and that is the whole design here: every control writes straight to the preview
- * beside it. Exposure and framing are unjudgeable as numbers — 1.4 means nothing until a chair is
- * standing in it.
- *
- * TWO SCOPES, ONE CARD. A tenant almost always wants "make my catalogue look like this", and
- * occasionally "except this one product". Splitting those across two screens would hide the common
- * case behind navigation, so the card edits the product and can promote the same values to the
- * workspace default in one action.
- *
- * The precedence itself is NOT here. `resolve_scene_settings` answers embed key → product →
- * workspace default → code defaults, and this card only ever writes one scope and reads back what
- * the ladder returns — so what the preview shows is what every other surface will show.
- */
+/** How this product is lit and framed (#335) — set it, and see it. */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Loader2, RotateCcw, Building2 } from 'lucide-react';

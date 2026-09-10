@@ -1,27 +1,4 @@
-/**
- * seo-toolkit-audit — composite domain audit for /admin/seo dashboard.
- *
- * Two invocation modes:
- *   1. User-driven (with user JWT): "Audit now" button on the dashboard.
- *      Verifies row ownership via RLS implicitly (the user's JWT identity
- *      is checked against tracked_domain.user_id). Service-role Supabase
- *      client is used for the actual writes once ownership is verified.
- *
- *   2. Cron-driven (with x-cron-secret header): pg_cron tick fires hourly
- *      and audits any tracked_domain where next_audit_at < now(). No user
- *      JWT — service-role does the row look-up by id.
- *
- * Pipeline:
- *   - Read tracked_domain row by id
- *   - Call MIVAA /api/v1/seo-agent/site-review (composite: domain rank +
- *     ranked keywords + competitors + backlinks summary + anchors)
- *   - Insert seo_domain_audit_history row from result
- *   - Update seo_tracked_domains denormalised current_* fields +
- *     last_audited_at + last_audit_id + next_audit_at
- *
- * Required env: PYTHON_BACKEND_URL, CRON_SECRET(), SUPABASE_URL,
- *               SUPABASE_SERVICE_ROLE_KEY.
- */
+/** seo-toolkit-audit — composite domain audit for /admin/seo dashboard. */
 
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../../_shared/secrets-bootstrap.ts';

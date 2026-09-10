@@ -61,21 +61,6 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
   }
 
   // ── DERIVED ANALYTICS (pass-through) ───────────────────────────────────────
-  //
-  // Five endpoints on the plan we already pay the analytics add-on for, called by nothing:
-  // daily metrics, content decay, posting frequency, one post's timeline, follower history.
-  //
-  // Pass-through by design — NOT persisted. Every one of them is a DERIVATION Zernio already
-  // performs (a rollup, a correlation, a decay curve). Storing a copy would be a second
-  // derivation of the same quantity that drifts the moment either side changes, and there is
-  // nothing here a later read cannot ask for again.
-  //
-  // TENANCY: `profileId` defaults to "all" on every one of these. Omitting it does not error —
-  // it silently returns every tenant's analytics on the operator's account. It is passed on
-  // every call, always, from the workspace's own profile.
-  //
-  // The add-on gate is 402/403 with a specific message; surfacing that as a generic 500 would
-  // send an operator debugging code when the answer is "buy the add-on".
   if (
     action === 'get_daily_metrics' || action === 'get_content_decay'
     || action === 'get_posting_frequency' || action === 'get_follower_stats'
@@ -140,20 +125,6 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
   }
 
   // ── LINKEDIN PERSONAL AGGREGATE ────────────────────────────────────────────
-  //
-  // The ONLY analytics endpoint that answers for a personal LinkedIn profile, and a different
-  // one from every other read here: `/analytics/*` and `/v1/analytics` are per-POST and need a
-  // post list, which LinkedIn does not publish for a member. This one is per-ACCOUNT — LinkedIn
-  // aggregates it server-side and hands back totals, so it needs no post list at all.
-  //
-  // It is also the only place the SCOPE question gets an answer. `r_member_postAnalytics` is
-  // granted at connect time; without it LinkedIn returns nothing and every downstream number is
-  // a legitimate-looking zero. Zernio reports that as a 403 `missing_scope` with
-  // `action: 'reconnect'`, which is surfaced verbatim rather than folded into a generic failure:
-  // "reconnect the account" and "you have no engagement" are opposite instructions.
-  //
-  // Its coverage is narrower than it sounds and the UI must not overstate it: LinkedIn only
-  // aggregates posts published THROUGH Zernio. Posts written in the LinkedIn app are outside it.
   if (action === 'get_linkedin_aggregate') {
     if (!social_account_id) return jsonResponse({ success: false, error: 'social_account_id required' }, 400);
 
@@ -215,21 +186,6 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
   }
 
   // ── ACCOUNT-LEVEL METRICS, ANY PLATFORM ────────────────────────────────────
-  //
-  // Every platform here has an account-level analytics endpoint and we were calling exactly one
-  // of them (LinkedIn personal). Instagram, Facebook Pages and LinkedIn organization pages each
-  // have their own, and none of them was reachable from this app.
-  //
-  // They can share ONE implementation because Zernio deliberately gave three of them the same
-  // response shape — `metrics` keyed by name, each `{ total, values[] }`, plus an
-  // `unavailableMetrics` list. That list is the important part and the reason this is worth
-  // normalising rather than passing through: **a metric the platform could not serve is OMITTED
-  // from `metrics` and named in `unavailableMetrics`, never returned as 0.** Flattening the two
-  // together would manufacture exactly the confident zero this codebase keeps being bitten by.
-  //
-  // LinkedIn PERSONAL is the odd one out — flat numbers under `analytics`, no unavailable list —
-  // so it is mapped into the same shape here. One normalisation server-side beats four shapes
-  // the client has to know apart.
   if (action === 'get_account_metrics') {
     if (!social_account_id) return jsonResponse({ success: false, error: 'social_account_id required' }, 400);
 
@@ -343,15 +299,6 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
   }
 
   // ── LINKEDIN COMPANY PAGES ON AN EXISTING CONNECTION ───────────────────────
-  //
-  // "Can we manage more than one account?" has a LinkedIn-specific answer that is easy to get
-  // wrong in both directions. A member connection ALREADY carries every company page that member
-  // administers — `organizationUrn` on publish picks between them — so the pages do not each
-  // need connecting, and telling someone to connect one per page is wrong. But the pages are
-  // invisible until something asks, so assuming there are none is equally wrong.
-  //
-  // Read-only and cheap. Answers [] for a member who administers nothing, which is a fact worth
-  // rendering rather than an error.
   if (action === 'get_linkedin_organizations') {
     if (!social_account_id) return jsonResponse({ success: false, error: 'social_account_id required' }, 400);
 
@@ -413,35 +360,6 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
   }
 
   // ── IMPORT EXTERNAL POSTS ──────────────────────────────────────────────────
-  //
-  // Analytics only ever covered posts WE published: get_post_analytics reads social_posts where
-  // zernio_post_id IS NOT NULL, and a post written in LinkedIn was never in that table. On a
-  // freshly connected account that is an empty screen with a refresh button that does nothing,
-  // next to an account that plainly has posts.
-  //
-  // TWO calls, and the order is the whole point. `GET /posts?source=external` reads what Zernio
-  // has ALREADY pulled from the platform, which for a new account is nothing — listing first
-  // returns an empty array and looks exactly like "this account has no posts".
-  // `POST /posts/sync-external` is the one that reaches out to the platform and fetches.
-  // It is debounced ~15s per account by Zernio, so calling it on every refresh is safe.
-  //
-  // The sync response also carries per-post `analytics` inline, so an imported post arrives with
-  // its engagement already attached instead of waiting for a second pass.
-  //
-  // BUT A BULK SYNC IS NOT AVAILABLE FOR EVERY ACCOUNT, and the account that cannot do it is the
-  // one most likely to be connected first. `POST /posts/sync-external { accountId }` works by
-  // reading the platform's LISTING API; LinkedIn does not expose one for PERSONAL profiles, only
-  // for organization pages. So on a personal LinkedIn account the call succeeds, reports zero
-  // posts found, and there is no error anywhere — the first version of this shipped against
-  // exactly such an account and imported nothing while reporting success.
-  //
-  // Zernio's answer for that case is a per-URL import: `{ accountId, url }` fetches that single
-  // post, at any age, published long before the account was connected, WITH full analytics. So a
-  // personal LinkedIn account is not "unsupported" — it is a different import, and saying so is
-  // the whole difference between a button that does nothing and one that asks for a link.
-  //
-  // `post_urls` therefore drives the by-URL path for any account, and a listable account keeps
-  // the bulk sweep. What an account cannot do is reported in `notes`, never swallowed.
   if (action === 'import_external_posts') {
     if (!workspace_id) return jsonResponse({ success: false, error: 'workspace_id required' }, 400);
 
@@ -549,13 +467,6 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
         }));
 
         // Merge, preferring the freshly-synced copy: it is the one carrying analytics.
-        //
-        // THE TWO CALLS DO NOT AGREE ON THE ID FIELD. `GET /posts` returns Zernio `Post` objects,
-        // keyed `_id`. `POST /posts/sync-external` returns `ExternalPostSummary`, which has no
-        // `_id` at all — it identifies a post by `platformPostId` plus `platformPostUrl`. Reading
-        // only `_id` therefore dropped every freshly-synced post on the floor, silently and on
-        // every platform, so even an Instagram account that CAN be swept would have imported the
-        // stored history and none of the engagement that was the point of syncing.
         const postKey = (p: Record<string, any>) =>
           String(p?._id ?? p?.platformPostId ?? p?.platformPostUrl ?? '');
 

@@ -1,20 +1,4 @@
-/**
- * seo-toolkit-research — user-driven research wrapper.
- *
- * The dashboard + ProductSEOTab fire research with the user's session JWT.
- * This edge function:
- *   1. Verifies the JWT (Authorization: Bearer ...)
- *   2. Calls MIVAA's /api/v1/mention-monitoring/opportunities-stateless
- *      with x-cron-secret (server-side only — never exposed to the browser)
- *   3. Persists the result into seo_research_runs (RLS owner-scoped)
- *   4. Returns the full DataForSEO opportunity payload
- *
- * Body: { kind, subject, params, label? }
- * `params` is forwarded verbatim to /opportunities-stateless.
- *
- * Required env: PYTHON_BACKEND_URL, CRON_SECRET(), SUPABASE_URL,
- *               SUPABASE_SERVICE_ROLE_KEY.
- */
+/** seo-toolkit-research — user-driven research wrapper. */
 
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../../_shared/secrets-bootstrap.ts';

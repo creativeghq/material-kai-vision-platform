@@ -1,19 +1,4 @@
-/**
- * Finance Tools — agent-chat READ surface for invoices + customer balances.
- *
- * ONE tool, actions:
- *   - list_invoices     — recent invoices (optionally for one customer / unpaid only)
- *   - customer_balance  — open A/R balance for a customer ("what does ACME owe?")
- *
- * READ-ONLY by design. Issuing an invoice is a legal/tax act with server-side numbering
- * (finance-issue-invoice + next_invoice_number) and MUST stay a deliberate action on the
- * Finance page — the agent does not create/issue invoices here. This delivers the high-value,
- * zero-risk half ("ask the agent about finance"); a confirmed draft-create tool can follow.
- *
- * Tenancy: reads run through a USER-JWT client so RLS scopes invoices to the workspace and the
- * membership-asserting `get_customer_open_balance` RPC passes (it needs auth.uid). Module gate
- * (`sales-finance` + entitlement) is checked via the service client. 0 credits.
- */
+/** Finance Tools — agent-chat READ surface for invoices + customer balances. */
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what

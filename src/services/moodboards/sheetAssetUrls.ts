@@ -9,19 +9,7 @@ import {
   sheetAssetPath,
 } from './sheetAssetRefs';
 
-/**
- * Turn a sheet's stored image refs into URLs a browser can load, and back again (#392).
- *
- * RESOLVE AT THE BOUNDARY, NOT PER `<img>`. About thirty render sites across seven canvas
- * components read `data.hero_image_url`, `item.image_url`, `chip.image_url` and friends. They all
- * keep working untouched because `moodboardSheetsService.list/get/createSheet` hand them a payload
- * whose image values are already signed URLs, and `update` folds them back before the write.
- *
- * THE FOLD-BACK IS THE PART THAT MATTERS. A canvas loads a sheet, moves a chip, saves the whole
- * `data` object back. Without `toSheetAssetRefs` that write would replace every ref with the
- * one-hour signed URL it was rendered with — the sheet would look fine all afternoon and be a
- * page of dead images tomorrow, with nothing to point at as the moment it broke.
- */
+/** Turn a sheet's stored image refs into URLs a browser can load, and back again (#392). */
 
 /** How long a rendered sheet's images stay loadable. Long enough to draw on, short enough to revoke. */
 const SIGNED_URL_TTL_SECONDS = 60 * 60;

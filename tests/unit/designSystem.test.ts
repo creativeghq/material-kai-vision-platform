@@ -1,31 +1,4 @@
-/**
- * Guards the design system against the four ways it can be undone WITHOUT anything failing.
- *
- * A visual regression is not a type error and not a test failure; it ships, and it is noticed
- * weeks later by somebody who assumes it was always like that. So this file does not try to
- * police taste. It pins only the things that (a) silently revert a deliberate decision, or
- * (b) compile to nothing at all — which is worse, because the class LOOKS right in the source.
- *
- * The four:
- *
- *   1. An off-scale opacity modifier (`bg-white/8`, `border-white/12`). Tailwind only generates
- *      opacity variants for steps in `theme.opacity` (0,5,10,…,100). Anything else produces NO
- *      CSS RULE. The platform had 74 of them: 31 `border-white/8` borders that have never once
- *      been drawn in dark mode, plus 25 `divide-white/8` row separators in the same state. They
- *      read as intentional in every code review and were invisible in the product.
- *
- *   2. A theme block that forgets a surface token. `hsl(var(--hairline))` with `--hairline`
- *      undefined is an INVALID color, so the declaration is dropped and the border vanishes —
- *      in that theme only. Nothing errors, and whoever added the theme is unlikely to be the
- *      person who notices.
- *
- *   3. Reintroducing the global font-weight override. `.font-bold { font-weight: 300 !important }`
- *      and friends flattened every weight utility in the app to one value, so hierarchy was
- *      impossible to express and every attempt to fix a specific component silently failed.
- *
- *   4. Rolling a primitive back to the marketing language — pill buttons, filled-pill tabs, a
- *      glass card. These are one-line edits with app-wide consequences.
- */
+/** Guards the design system against the four ways it can be undone WITHOUT anything failing. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -235,11 +208,6 @@ describe('design system — the app canvas stays flat', () => {
  * The generic agent result card is the ONLY renderer for all 127 result types in
  * AGENT_RESULT_TITLES — contracts, appointments, CRM deals, campaigns, stock, flows, assets. So
  * its shape handling is not a detail, it IS the Agent Hub's presentation layer.
- *
- * A list payload (`{ flows: [...] }`, `{ deals: [...] }`) used to render as one grey chip per row
- * with `Name: x  Status: y` runs inside it — readable at one row, a wall at twenty, and impossible
- * to scan down a column. "List my flows" then added a SECOND message, "Done! I've pulled up the
- * automations…", restating what the card had shown. Right data, wrong shape, said twice.
  */
 describe('agent result card follows the table language', () => {
   const card = readFileSync(join(process.cwd(), 'src/components/features/ai/AgentResultCard.tsx'), 'utf8');

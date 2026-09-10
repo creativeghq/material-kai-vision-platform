@@ -9,20 +9,6 @@ import { toast } from 'sonner';
 /**
  * WorkspaceContext — the single source of truth for the *active* workspace and
  * the current user's standing within the marketplace tree.
- *
- * Three role axes, kept deliberately distinct (this is the fix for the
- * "every owner looked like a platform admin" conflation):
- *   1. workspaceRole   — the user's role IN the active workspace (owner|admin|member|client).
- *                        Drives "can I manage THIS workspace" decisions.
- *   2. isPlatformOperator — owner/admin of the ROOT (Materials Hub) workspace, and
- *                        nobody else. Drives "can I administer the PLATFORM" decisions
- *                        (the /admin/* surfaces, module toggles, operator finance).
- *   3. marketplaceRank — operator | dealer | architect, derived from the active
- *                        workspace's node flags. Drives catalog behaviour.
- *
- * Active-workspace selection is persisted per-user in localStorage for now; the
- * durable home is `app_metadata.workspace_id` on the JWT (a later increment that
- * lets MIVAA + RLS read the active workspace server-side).
  */
 
 export type MarketplaceRank = 'operator' | 'dealer' | 'architect';

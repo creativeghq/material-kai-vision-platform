@@ -2,13 +2,6 @@
  * CategoryAssignmentPicker — embeddable component that lets an admin pick which
  * CRM categories a user / contact / company belongs to. Drops into the CRM
  * detail pages without the full Categories admin page.
- *
- * Shows ALL category kinds (Custom + Professional type + Role) as assignable
- * tags on contacts and companies. For platform USERS the professional_type /
- * role categories are auto-synced from user_profiles.professional_type / role,
- * so there they stay read-only (managed by the resync RPC); only Custom is
- * hand-toggled. Industry + the lead vocabularies have their own dedicated
- * pickers, so they're not duplicated here.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, Tags } from 'lucide-react';

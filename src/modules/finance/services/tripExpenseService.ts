@@ -1,15 +1,4 @@
 // Trip Cards (sales-team expense reports) — service surface.
-// A trip card (`trip_expense_reports`) is owned by a sales rep and holds
-// day-by-day expense lines (`trip_expense_items`), each with an optional
-// receipt/invoice attachment. The rep builds it as a draft, submits it, and
-// finance approves/rejects each line. On approval the workspace's
-// `trip_expense_reimbursement_mode` setting decides whether a reimbursement
-// payable is auto-posted (handled DB-side in trip_expense_review_item).
-// CRUD goes straight to the tables under RLS. Status transitions + review go
-// through SECURITY DEFINER RPCs. Receipt upload / signed URLs / PDF render go
-// through the `trip-expense-ops` edge function (service role) because receipts
-// live in the private pdf-documents bucket and finance (a different user than
-// the rep) must be able to read them.
 
 import { supabase } from '@/integrations/supabase/client';
 import { emitProjectLifecycle } from '@/modules/projects/services/projectsService';
@@ -248,10 +237,6 @@ export const tripExpenseService = {
    * booked to it. Distinct from the card's own `trip_expense_items`, which are the rep's
    * out-of-pocket claims; a filed bill is a company cost (a hotel invoiced to the company, a
    * flight on the company card) that belongs to the trip without belonging to the claim.
-   *
-   * Totals come back DERIVED and grouped by currency — the client formats, it does not sum. Only
-   * SALES orders count as earned: a purchase made on a buying trip is spend, and netting the two
-   * directions into one figure is the money-derivation mistake this codebase already made once.
    */
   async cardLinks(reportId: string): Promise<TripCardLinks> {
     const { data, error } = await (supabase as any).rpc('get_trip_card_links', { p_report_id: reportId });
@@ -418,18 +403,7 @@ export const tripExpenseService = {
     vatRate = 24,
   ): Promise<string> {
     if (itemIds.length === 0) throw new Error('No expenses selected');
-    /**
-     * ONE transaction (#351 S4), and it bills what the comment above says it bills.
-     *
-     * Create → lines → stamp were three separate writes; a failure on the stamp left the claims
-     * reading unbilled beside an invoice that already carried them, so retrying billed the
-     * client twice for the same receipts.
-     *
-     * `approval_status = 'approved'` is applied server-side now (#351 S3) — only `billable` was
-     * ever checked here, while the panel filtered approval and the doc comment claimed it. And
-     * a selection spanning two currencies is refused rather than summed into whichever currency
-     * happened to be first.
-     */
+    /** ONE transaction (#351 S4), and it bills what the comment above says it bills. */
     const { data, error } = await supabase.rpc('bill_trip_expenses_to_invoice', {
       p_workspace_id: workspaceId,
       p_customer_company_id: customer.type === 'company' ? customer.id : null,
@@ -473,17 +447,7 @@ export const tripExpenseService = {
     if (error) throw error;
     const report = data as TripExpenseReport;
 
-    /**
-     * An approved cost landed on a job (#378 Phase 4).
-     *
-     * Read AFTER the decision, and only for an approval: `get_project_pnl` counts a trip line as
-     * cost once it is approved, so this is the moment the job's margin actually moves. A rejected
-     * line changes nothing and must not announce itself as a cost.
-     *
-     * The line names its own job, so the event is emitted per LINE rather than per card — one
-     * card routinely spans several jobs, and announcing the card against the first line's project
-     * would attribute a hotel in Athens to whichever job happened to sort first.
-     */
+    /** An approved cost landed on a job (#378 Phase 4). */
     if (decision === 'approved') {
       try {
         const { data: line } = await supabase

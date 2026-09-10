@@ -1,36 +1,4 @@
-/**
- * A project lifecycle trigger is wired in EVERY place, or it is half-wired (#378 Phase 4).
- *
- * THE GAP
- * -------
- * Of the platform's whole trigger vocabulary, the only project events were two invitation ones and
- * two request ones. "The job is now on site" — the thing everyone downstream waits for — could not
- * start an automation at all. So the automations the issue imagines (deal won → project from
- * template; expense approved on a billable job → next progress invoice) had no project-side event
- * to hang on.
- *
- * WHY A CONTRACT TEST AND NOT A SPOT CHECK
- * ----------------------------------------
- * §8 of the flows doc requires SEVEN coordinated pieces per trigger, and the failure mode of
- * missing one is silent in a different way each time:
- *
- *   1. the `TriggerType` union            — missing: the node cannot be typed
- *   2. a config interface                 — missing: `TriggerConfigMap` is not exhaustive
- *   3. the icon maps (two of them)        — missing: the node renders with no icon
- *   4. the label map                      — missing: "My Flows" shows the raw event name
- *   5. a `paletteItems` entry             — missing: NOBODY CAN DRAG IT. The trigger exists and is
- *                                           unreachable, which is the shape this whole issue is about
- *   6. a `flow_area_registry` row         — missing: the area is undiscoverable
- *   7. a seeded ACTIVE, LOCKED default    — missing: the trigger fires and nothing happens
- *
- * Plus the emitter, which is the one nothing else can substitute for: `workspace_id` MUST be in
- * the payload, because a trigger without it can never be forked by a tenant. `appointment_booked`
- * shipped in exactly that state and its table has no workspace column to put there.
- *
- * The DB half (6 and 7) is not committed source, so it is verified by probe at authoring time and
- * asserted here only as far as source text can reach. That limit is stated rather than papered
- * over: a green run here does NOT prove the seeded flow exists.
- */
+/** A project lifecycle trigger is wired in EVERY place, or it is half-wired (#378 Phase 4). */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -76,12 +44,6 @@ const EMITTERS: Record<(typeof LIFECYCLE_TRIGGERS)[number], string | null> = {
    * time. Its emitter is `sweep_overdue_project_tasks`, a SQL function on a daily pg_cron job —
    * so there is no committed source to point at, and this test says so rather than asserting on a
    * file that would never contain it.
-   *
-   * Verified by probe instead: the sweep announces an overdue task once, skips one already
-   * announced for that due date, RE-ANNOUNCES one that was rescheduled, and skips both a done task
-   * and a future one. The marker is the due date it announced, not a "sent at" timestamp, because
-   * `pg_net` is fire-and-forget — a timestamp would mean "we tried once" and a dropped request
-   * would silence that task forever.
    */
   project_task_overdue: null,
 };
@@ -139,10 +101,6 @@ describe('the emitter is the part nothing else substitutes for', () => {
      * `workspace_id` in the payload — verify the payload, not that an emitter exists".
      * `fork_workspace_flow_default` disables the global in the same transaction, so forking a
      * trigger whose payload has no workspace ends with FEWER notifications and nothing raising.
-     *
-     * ONE helper is why this is a single assertion rather than eight: each emitter passes a
-     * project id and the wording, and the helper resolves the workspace, the owner and the URL.
-     * Eight hand-built payloads is how four of them end up subtly different.
      */
     const helper = svc.slice(svc.indexOf('export async function emitProjectLifecycle'));
     expect(helper.slice(0, 2600), 'workspace_id missing from the shared payload').toMatch(/workspace_id: project\.workspace_id/);

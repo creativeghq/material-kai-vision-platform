@@ -1,27 +1,4 @@
-/**
- * What work is happening at this building.
- *
- * `projects.property_id` shipped with a WRITER — the project's Overview tab has a property picker
- * — and no reader. A building could be told which jobs happen there and could never say so.
- * That is #378's one-way-link class, and it is invisible from the side that writes it: the picker
- * saves, the value persists, everything looks connected. This is the sibling of
- * `PropertyCommercialCard`, which exists for exactly the same reason.
- *
- * (#378 N4 asked for `properties.project_id`. That is the wrong direction — a building hosts many
- * jobs over its life, a job happens at one building — and the FK already existed correctly on
- * `projects`. What was missing was the read, not the relationship.)
- *
- * Deliberately shows NO derived money. `get_project_pnl` is the single source for a job's figures
- * and it self-guards by RAISING for a non-member, so calling it per row would abort the whole
- * card on one inaccessible project; a building-level total would also be a second derivation of a
- * money quantity. `budget_amount` is the number the operator typed and is labelled Budget, never
- * "cost". The real figures live one click away, on the project.
- *
- * Renders nothing when empty, for the same reason the commercial card does: a building cannot
- * create this link from its own side today — the picker is on the project — so an empty state
- * here could offer no honest create action, and `HubEmptyState` is explicit that an empty state
- * with no way out of being empty is worse than none.
- */
+/** What work is happening at this building. */
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { HardHat, CalendarDays } from 'lucide-react';

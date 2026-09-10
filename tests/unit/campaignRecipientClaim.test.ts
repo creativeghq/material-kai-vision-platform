@@ -4,17 +4,7 @@ import { join } from 'node:path';
 
 import { stripComments } from '../helpers/stripComments';
 
-/**
- * A campaign recipient is CLAIMED, not merely marked (#357 AE-4).
- *
- * `campaign-processor` selected `status='pending'` rows and then wrote `status='sending'`
- * unconditionally. Two concurrent runs — a retry, an overlapping cron tick, a manual trigger —
- * both read the same pending set and both sent. For marketing mail a double send is a compliance
- * problem, not untidiness.
- *
- * The fix is the `receive_order_into_warehouse` pattern from #355: make the write itself the
- * claim, so a repeat is a no-op by construction rather than by hoping nobody retries.
- */
+/** A campaign recipient is CLAIMED, not merely marked (#357 AE-4). */
 
 const ROOT = join(__dirname, '..', '..');
 const src = stripComments(

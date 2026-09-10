@@ -1,42 +1,4 @@
-/**
- * Cross-encoder style reranking for search results.
- *
- * WHY THIS IS SHARED RATHER THAN ONLY AN EDGE FUNCTION
- * ----------------------------------------------------
- * Every image in this platform carries six embedding aspects — `visual_768` (SigLIP2) plus
- * color / texture / style / material at 1024, plus `understanding_1024`. Vector search returns
- * candidates PER ASPECT. Something has to fuse them into a single ordering, and without that the
- * only options are "pick one aspect" or "average them", neither of which is ranking.
- *
- * This is a fresh implementation, not a restoration: the original `ai-rerank` edge function was
- * deployed with no source in the repo and the tombstone that replaced it overwrote the only copy.
- *
- * It lives in `_shared` so the three search paths can call it IN-PROCESS. Making them each do an
- * HTTP round-trip to an edge function to reorder a list they already hold would add a network hop
- * and a second failure mode to something that must never break search. `functions/ai-rerank/`
- * is a thin wrapper over this same code for external callers.
- *
- * DEGRADATION IS THE WHOLE DESIGN
- * -------------------------------
- * Reranking is a quality improvement, never a gate. Every failure path returns the ORIGINAL
- * order:
- *
- *   - 0 or 1 candidate      -> returned untouched, no LLM call, no cost. This is what makes it
- *                              safe to wire into all three paths while the catalog is empty:
- *                              it is inert until there is something to rank.
- *   - no ANTHROPIC_API_KEY  -> untouched
- *   - SEARCH_RERANK_ENABLED -> set to "false" to turn it off everywhere without a deploy
- *     ="false"
- *   - model error / timeout -> untouched, logged
- *   - model returns ids we  -> unknown ids dropped, anything it forgot is appended in its
- *     did not send             original relative order, so a result can never VANISH because
- *                              the reranker was creative
- *
- * This is deliberately NOT the fail-open pattern the security invariants ban. That rule is about
- * auth / entitlement / quota / credit gates, where failing open grants access. Here the "closed"
- * behaviour would be to return no results at all, which is strictly worse for the user and
- * protects nothing.
- */
+/** Cross-encoder style reranking for search results. */
 import { generateStructuredWithClaude } from './ai-client.ts';
 import { z, type ZodType } from 'npm:zod@3';
 import { loadPrompt } from './prompt-utils.ts';
@@ -212,9 +174,6 @@ export async function rerankResults<T>(
   // hardcoded FALLBACK_PROMPT 100% of the time while "AI Search Re-ranker" sat in the table,
   // editable and unread (#347 phase 3P). The two texts were byte-identical, so this is a
   // no-op for ranking behaviour and admin edits now actually take effect.
-  //
-  // Without the prompt we DECLINE to rerank rather than invent one. Returning the source order
-  // is a documented outcome of this function; a rerank driven by a guessed prompt is not.
   if (!opts.supabase) {
     return degraded('no supabase client to load the rerank prompt');
   }
@@ -240,12 +199,6 @@ export async function rerankResults<T>(
   try {
     // Structured output, i.e. a forced tool call — not free-form JSON with a salvage parser.
     // (security invariant 9)
-    //
-    // `explanation` is unconditionally optional in the SCHEMA and asked for via the prompt
-    // instead. Building the shape conditionally made zod's inference recurse through the
-    // generic on generateStructuredWithClaude until it hit TS2589 ("type instantiation is
-    // excessively deep") — caught by typecheck:edge, and fixed rather than baselined. The
-    // explicit RerankModelOutput annotation keeps that inference shallow.
     const result = await generateStructuredWithClaude<RerankModelOutput>(
       prompt,
       RERANK_SCHEMA as ZodType<RerankModelOutput>,

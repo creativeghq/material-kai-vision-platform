@@ -1,26 +1,4 @@
-/**
- * RegionEditCanvas
- *
- * Full-screen canvas overlay that lets the user paint a mask over a room image,
- * then describe what to change in the masked area.
- *
- * Drawing tools:
- *   - Brush  — freehand paint (default)
- *   - Eraser — remove mask strokes
- *   - Clear  — wipe entire mask
- *
- * How it works:
- *   1. The room image is shown as background.
- *   2. User paints over the area they want to change — shown as a semi-transparent amber overlay.
- *   3. User types what to change in the selected area.
- *   4. On Apply, we export:
- *        - maskData: PNG data URL (white = change, black = keep)
- *        - prompt: the change instruction + auto-appended spatial lock
- *        - modelTier: 'grok' (only Grok supports masking)
- *   5. Parent calls onApply({ imageUrl, maskDataUrl, prompt }) → generates via generate-region-edit.
- *
- * Result flow: result appears in a before/after viewer (Accept / Refine / Discard).
- */
+/** RegionEditCanvas */
 
 import React, {
   useRef,

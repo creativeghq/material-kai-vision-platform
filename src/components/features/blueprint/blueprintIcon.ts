@@ -1,17 +1,4 @@
 // Icon for a blueprint, picked from what the scope IS.
-//
-// Every blueprint used to render the same Sparkles, which made a rail of five starters five
-// identical rows — the icon column carried no information at all, so it was decoration taking up
-// space a reader scans first.
-//
-// Matched against `project_type` and the title together, because `project_type` is free text and
-// frequently absent: PlanTab writes the plan's own title into it, and a blueprint created from the
-// New dialog has none at all. Falling back to the title means a blueprint called "Bathroom refit"
-// still gets the bath.
-//
-// ORDER MATTERS — first match wins, and the specific patterns come before the general ones.
-// "kitchen_cabinets" contains "kitchen", so cabinets has to be tested first or every cabinet job
-// renders as a hob. Same reason the catch-all renovation terms sit at the bottom.
 import {
   Archive, Bath, CookingPot, DoorOpen, Droplets, Hammer, Home, LayoutTemplate,
   Paintbrush, Sofa, Zap,

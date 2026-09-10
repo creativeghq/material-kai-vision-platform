@@ -1,29 +1,4 @@
-/**
- * Job Cleanup Cron Edge Function
- *
- * Automatically cleans up old completed/failed jobs, logs, and stale records.
- * Triggered every Sunday at 03:00 UTC via pg_cron (cron.job table).
- *
- * Cleans:
- * - background_jobs         completed/failed > 5 days old
- *  * - data_import_jobs        completed/failed, non-scheduled > 5 days old
- * - job_checkpoints         (legacy, dropped — history now on background_jobs.stage_history)
- * - data_import_history     > 30 days old
- * - agent_checkpoints       > 30 days old  (conversation snapshots, not needed after)
- * - flow_run_steps          steps belonging to completed/failed runs > 30 days old
- * - flow_runs               completed/failed > 30 days old
- * - generation_3d           unsaved renders > 15 days old (crop files are reaped by the
- *                           storage GC, not here — see block 10)
- * - vr_worlds (failed)      status=failed > 7 days old
- * - job_progress            (legacy, dropped — progress events now on background_jobs.stage_history)
- * - system_logs             > 30 days old  (operational Python API logs, ~77k rows/day)
- * - ai_call_logs            > 30 days old  (per-call AI API debug logs, distinct from ai_usage_logs)
- * - search_query_tracking   > 90 days old  (search analytics)
- *
- * ai_usage_logs is intentionally excluded — retained indefinitely for billing/business analytics.
- * system_logs also has a dedicated daily pg_cron SQL job (system-logs-daily-cleanup) for
- *       high-volume purging — this weekly pass handles any overflow.
- */
+/** Job Cleanup Cron Edge Function */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
@@ -175,32 +150,6 @@ serve(withApiLogging('job-cleanup-cron', async (req) => {
     // ── 7. flow_run_steps — COUNTED here, deleted by cascade below ──────────
     {
       // TWO BUGS DEEP, so both are worth keeping written down.
-      //
-      // AGE IS NOT A REFERENCE CHECK (#365 AD-28). This block first matched on `created_at`
-      // alone, with no status filter and no look at the parent — so the steps of a run still in
-      // flight after 30 days (a long scheduled flow, a retrying one, anything paused) were
-      // deleted out from under it. The janitor hazard inverted: not failing to delete, but
-      // deleting something still in use.
-      //
-      // THEN THE FIX FOR THAT BROKE, in a way only production could show.
-      //
-      // AD-28 resolved the finished parents first and deleted their steps by id — correct in
-      // intent, and it put ~900 uuids into a PostgREST `in.(…)` filter, which travels in the URL.
-      // At 886 finished runs that is roughly 33KB of query string, and the gateway answers
-      // `400 Bad Request`. It worked while the platform had a handful of runs and started failing
-      // the week flows got busy: 200 every Sunday until 2026-08-16, then 500 on 08-23 and 08-30.
-      // pg_cron reported "succeeded" throughout, because it only sees that net.http_post was
-      // enqueued — which is what `ops.cron_reported_success_but_no_effect` exists to catch, and
-      // did.
-      //
-      // The real answer is that this block should not exist. `flow_run_steps.flow_run_id` is
-      // `ON DELETE CASCADE`, so deleting the finished runs below already removes exactly their
-      // steps — atomically, with no id list, no URL limit, and no window in which the parent is
-      // gone and the children are not. Verified live: 21,340 steps, 0 orphaned.
-      //
-      // So the count here is a COUNT, not a delete. It is taken before the runs go, filtered
-      // through the parent with an inner join, so the number reported stays true without
-      // enumerating a single id.
       const { count, error } = await supabase
         .from('flow_run_steps')
         .select('id, flow_runs!inner(status, created_at)', { count: 'exact', head: true })
@@ -255,27 +204,6 @@ serve(withApiLogging('job-cleanup-cron', async (req) => {
       /**
        * STORAGE IS NOT DELETED HERE. It used to be, and that hand-rolled block carried three
        * defects at once — all of them fixed by not having it.
-       *
-       * 1. THE 33KB URL, AGAIN. It collected crop paths by resolving the doomed generations first
-       *    and passing their ids to `.in('generation_id', …)`, which travels in the URL. That is
-       *    the identical shape AD-28 introduced in the flow_run_steps block above and that broke
-       *    this cron from 2026-08-16 (200 every Sunday, then 500) — fixed there this morning and
-       *    left standing here, ten lines below its own post-mortem. A partial sweep is how a
-       *    defect survives its own fix.
-       *
-       * 2. IT DELETED FILES FOR ROWS IT WAS NOT DELETING. The crop collection was unbounded while
-       *    the row delete is `.limit(500)`. Past 500 matches it removed storage for generations
-       *    whose rows remain, so a render still listed in the UI renders broken until the next
-       *    weekly run.
-       *
-       * 3. IT SWALLOWED ITS OWN ERROR. `const { data: segRows } = await …` with no `error`, so a
-       *    failed lookup silently skipped every file, with no console.error either.
-       *
-       * The platform already answers this properly: entity-delete cleanup is GC-based, not
-       * trigger-based (CLAUDE.md, Storage). Deleting the row drops the file out of
-       * `build_storage_reference_set()` — which covers `generation_3d_segments.crop_storage_url`
-       * in `generation-images`, verified — and `storage-orphan-cleanup-cron` reaps it. That path
-       * is bounded, retried, and audited; this one was none of those.
        */
       const { data: deleted, error: delErr } = await supabase
         .from('generation_3d')

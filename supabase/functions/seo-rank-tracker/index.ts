@@ -1,26 +1,4 @@
-/**
- * seo-rank-tracker — daily positions for the keywords a workspace CHOSE.
- *
- * Distinct from `seo-domain-tracker`, which discovers what a domain happens to rank
- * for and replaces that set wholesale each week. This follows a fixed, user-picked
- * set over time and must never lose a day — a rank tracker with a hole in it cannot
- * answer the only question it exists for.
- *
- * Actions (user JWT): run — check one website's keywords now.
- * Action (x-cron-secret): cron-run — one leg of the daily sweep.
- *
- * COST. One SERP call per keyword per run ($0.0006 measured), so this is the most
- * expensive cron in the SEO module by a wide margin and the only one whose cost scales
- * with what the user types in. Every run is capped and time-bounded.
- *
- * COVERAGE. The cap is per RUN, not per day: the sweep is scheduled several times a
- * day and `seo_keywords_due(p_only_stale => true)` hands each leg the keywords the
- * earlier legs did not reach, so a set larger than the cap is still covered daily
- * instead of rotating over two. It was one leg of 60 against a 129-keyword set — the
- * panel said "followed daily" over figures that blended three capture dates, and a
- * failed check waited a full day for its retry. Adding legs is free where the work is
- * already done: a leg with nothing due makes no upstream call at all.
- */
+/** seo-rank-tracker — daily positions for the keywords a workspace CHOSE. */
 
 import { createClient } from '@supabase/supabase-js';
 import { withApiLogging } from '../_shared/api-logger.ts';
@@ -45,9 +23,6 @@ const MAX_PER_RUN = 60;
  * edge gateway cuts the request off at 150 s with a 504 `IDLE_TIMEOUT` — well before
  * pg_net's 280 s. A sweep over a 129-keyword set checked TEN, so each keyword came
  * round every ~13 days under a panel that said "checked daily". Nothing raised:
- * every keyword that WAS checked was checked correctly. Twelve in flight puts the
- * cap at ~5 rounds, ~100 s, with margin under the ceiling; DataForSEO's live
- * endpoint has no concurrency limit at this scale and MIVAA's dispatcher adds none.
  */
 const CONCURRENCY = 12;
 
@@ -196,10 +171,6 @@ async function serp(
  * retrieved after several retry attempts" and 40101 "internal SE server error",
  * both transient by their own description. One retry still left 5–8% of a sweep as
  * unknown (measured 2026-09-05: 15 failures in 128 calls, 8 keywords left failed).
- * A keyword that fails all three gets one shallower read (see `trackKeywords`) and, if
- * that fails too, is recorded as unknown with the message — never as unranked. A later
- * leg retries it with spare capacity, and `seo_keywords_due` puts it at the head of
- * tomorrow's first leg if it is still unanswered.
  */
 const SERP_ATTEMPTS = 3;
 const SERP_BACKOFF_MS = [1500, 4000];
@@ -226,17 +197,7 @@ async function serpWithRetry(
   throw last ?? new OutOfTime();
 }
 
-/**
- * Find our best organic position on one SERP.
- *
- * `rank_group` is the position AMONG ORGANIC RESULTS — what a person means by
- * "we're third". `rank_absolute` counts every block on the page, so a SERP with an
- * image pack above the fold would report us a place or two lower than any other
- * tracker and than Search Console.
- *
- * A subdomain counts as us; a domain that merely CONTAINS ours does not
- * (`notmaterialshub.gr`), which a substring test would wrongly claim as a win.
- */
+/** Find our best organic position on one SERP. */
 function findPosition(items: any[], host: string): { position: number | null; url: string | null } {
   let best: { position: number; url: string | null } | null = null;
   for (const it of items) {
@@ -277,10 +238,6 @@ const OWNABLE_FEATURES = [
  * Which non-organic blocks on the page cite or show us. A position of 4 under an AI
  * Overview that cites us is a different day from a position of 4 under one that cites
  * three rivals, and `serp_features` alone (which blocks EXIST) cannot tell them apart.
- * Each block type's item shape differs (a featured snippet carries `domain` at the top,
- * an AI Overview buries it in `references`, People Also Ask in `expanded_element`), so
- * the test is a bounded walk for any domain/url that is ours rather than a per-type map
- * that goes stale the next time the provider adds a field.
  */
 function ownedFeatures(items: any[], host: string): string[] {
   const owned = new Set<string>();
@@ -292,17 +249,7 @@ function ownedFeatures(items: any[], host: string): string[] {
   return OWNABLE_FEATURES.filter((f) => owned.has(f));
 }
 
-/**
- * Check the keywords handed to us and store today's positions.
- *
- * WHICH keywords is not decided here — `seo_keywords_due` derives that in SQL, once,
- * for both entry points. This function's only job is asking, reading and writing.
- *
- * ONE queue for every site in the batch, not a pool per site. Each row carries its own
- * website, so the twelve workers stay busy whoever the work belongs to: a pool per site
- * run in sequence gives a site with two due keywords a concurrency of two, and thirty
- * such sites would spend the whole run doing a dozen checks.
- */
+/** Check the keywords handed to us and store today's positions. */
 async function trackKeywords(
   supabase: any,
   keywords: DueKeyword[],
@@ -379,9 +326,6 @@ async function trackKeywords(
       // land on the same Greek depth-100 tasks — so the shallower ask often answers
       // where three deep ones did not. "Not in the top 50" is a real answer and the row
       // carries the depth that produced it; unknown is not an answer at all.
-      // Nothing was observed — the run simply ended. Record NOTHING: an `error` row is
-      // a claim that we asked and were refused, and it would stamp the keyword out of
-      // the rest of the day's legs. Unstamped and stale is the front of the next queue.
       if (e instanceof OutOfTime) return;
       try {
         if (triedShallow) throw e;
@@ -518,8 +462,6 @@ Deno.serve(withApiLogging('seo-rank-tracker', async (req: Request) => {
     // A "no" here that the queue disagreed with can only be a transient RPC error (both
     // ask the same `is_workspace_entitled`), and it costs that workspace one leg: the
     // rows are dropped unstamped, so they are still the stalest and lead the next one.
-    // A PERMANENT failure of that function fails the queue's own call and returns 500,
-    // which is loud — that is the difference from the version this replaced.
     const sites = new Map<string, { id: string; workspace_id: string; url: string }>();
     const entitled = new Map<string, boolean>();
     const work: DueKeyword[] = [];

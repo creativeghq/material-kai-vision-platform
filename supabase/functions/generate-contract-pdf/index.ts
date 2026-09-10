@@ -143,15 +143,6 @@ Deno.serve(withApiLogging('generate-contract-pdf', async (req) => {
     const bytes = await pdf.save();
 
     // WHERE this is written depends on whether it is evidence (#356 `RC-1`).
-    //
-    // It used to be one fixed path with `upsert: true` for every render, so regenerating a
-    // signed contract destroyed the signed artifact — the only copy of what the counterparty
-    // received — and anyone holding the earlier link silently got the new terms instead.
-    //
-    // A signed contract therefore gets an immutable object, written ONCE. If one already
-    // exists, this returns it rather than rendering over it: re-reading a concluded agreement
-    // must not be able to change it. A draft keeps the old overwrite behaviour, because a draft
-    // is a working copy and nobody has agreed to it.
     const isSigned = c.status === 'signed';
     const existingSignedPath = (c as { signed_pdf_path?: string | null }).signed_pdf_path ?? null;
 

@@ -1,28 +1,4 @@
-/**
- * AI-derived material maps for a product (#321 / #260 item 6).
- *
- * WHAT THIS REPLACED. `products.metadata.pbr_maps` had four readers, no writer, and 0 rows for its
- * entire life — `generate-pbr-maps` has never existed in this repo. The renderers were real; only
- * the supplier was missing, so every material preview fell back to stretching the raw product photo
- * across a plane as if it were a seamless texture.
- *
- * NOTHING NEW GENERATES ANYTHING HERE. `generate-interior-gemini` already has a `material-texture`
- * mode whose whole purpose is "flatten a real supplier swatch into a tileable version of ITSELF,
- * rather than inventing a material the customer will not receive" — which is exactly the rule this
- * feature needs. This service calls that and records the result; the provider choice (Gemini or
- * Grok) and the credit debit already live in `resolveGenerationRouting`, so neither is re-decided
- * here.
- *
- * THE BENCH IS THE MODEL COLUMN. Several candidates can exist for one product/option; `is_selected`
- * marks the one the renderer uses. That is what makes "run two models and compare" a data question
- * rather than a code branch.
- *
- * ALBEDO ONLY, DELIBERATELY. A diffusion model asked for a normal map returns a picture that looks
- * like one — the RGB it produces are not surface directions, so a renderer doing arithmetic on them
- * lights the surface wrongly and it reads as plastic. The normal is derived from the selected
- * albedo instead (height-from-luminance), which needs an imaging stack; that belongs in MIVAA,
- * which already ships numpy/opencv/Pillow, and lands separately.
- */
+/** AI-derived material maps for a product (#321 / #260 item 6). */
 import { supabase } from '@/integrations/supabase/client';
 import { MIVAA_API_URL } from '@/config/mivaa';
 

@@ -1,31 +1,4 @@
-/**
- * Guard: the knowledge search skips corpora that are empty — and only ever for that reason.
- *
- * THE MEASUREMENT
- * ---------------
- * MIVAA's knowledge-base endpoint runs one vector-search branch per requested `search_type`,
- * whether or not the table behind it holds a row. Live, 2026-08-23, identical query returning the
- * identical 6 results:
- *
- *   search_types=["kb_docs"]                      →  4.1s
- *   search_types=["kb_docs","chunks","products"]  → 17.2s
- *
- * `document_chunks` and `products` are both at 0 rows on this platform, so thirteen of those
- * fifteen seconds bought nothing. Every knowledge lookup — and since automatic grounding, that is
- * every substantive turn — paid it.
- *
- * Worth recording how it was found: the re-ranker was the obvious suspect and was innocent. It is
- * a single Haiku reorder that never drops a result. An earlier comment in knowledge-grounding.ts
- * confidently pointed at it, which is exactly the wrong optimisation, and the only thing that
- * corrected it was measuring the two calls side by side.
- *
- * THE RISK THIS PINS
- * ------------------
- * A "skip the empty ones" optimisation has one dangerous failure mode: a probe that errors and is
- * read as "empty". That converts a transient database hiccup into "this workspace has no
- * documents" — silently, with a latency improvement as cover. So the probe must FAIL OPEN
- * (assume non-empty), and the skip must be driven by nothing except emptiness.
- */
+/** Guard: the knowledge search skips corpora that are empty — and only ever for that reason. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

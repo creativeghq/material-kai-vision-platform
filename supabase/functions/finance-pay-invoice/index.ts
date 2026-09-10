@@ -16,12 +16,6 @@ import { recordPageEvent } from '../_shared/document-events.ts';
 // Two entry modes:
 //   1. Authenticated admin/finance: body { invoice_id }
 //      Mints (or rotates) a pay_token first if missing; returns checkout URL + pay link.
-//   2. Public unauth: body { pay_token, success_url, cancel_url }
-//      Resolves the token via SECURITY DEFINER RPC, refuses if expired or already paid,
-//      and returns a hosted Stripe Checkout URL.
-// Stripe webhook (stripe-webhooks/handlePaymentSucceeded) consumes the metadata
-// and creates a `payments` row + `payment_allocations` row, which fires the
-// status-keeper trigger and flips the invoice to paid / partially_paid.
 
 interface AdminBody {
   invoice_id: string;

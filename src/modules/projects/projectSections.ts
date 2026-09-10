@@ -1,18 +1,4 @@
-/**
- * The project page's sections — their ids, their titles, and the one way to link to them.
- *
- * `?tab=` names a section. Four notification action_urls, the sheet-share mail, the construction
- * tools and two in-page buttons all build that link, and until this existed each one spelt the
- * destination by hand: BillingTab said "Go to quotes" beneath a tab titled "Quotes", and the
- * Quotes tab said "Go to Quotes". Same page, one place, two spellings — both valid strings, both
- * buttons working, nothing raised. A place is named by its TITLE, and the title is declared here
- * once: the page's strip renders from it and every "Go to …" reads it, so renaming a section
- * renames every button that points at it.
- *
- * Import-free on purpose so a Deno mirror could take it verbatim. Guarded by
- * tests/unit/projectTabLinks.test.ts (every section is reachable and deep-linkable) and
- * tests/unit/destinationLabels.test.ts (a link to a section is labelled from here, not by hand).
- */
+/** The project page's sections — their ids, their titles, and the one way to link to them. */
 export const PROJECT_TABS = [
   'overview', 'rooms', 'products', 'moodboards', 'plan', 'purchases', 'quotes', 'billing',
   'finance', 'sheets', 'client-view', 'contracts', 'handover', 'tasks', 'site', 'documents',

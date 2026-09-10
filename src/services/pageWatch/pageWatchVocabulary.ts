@@ -1,17 +1,4 @@
-/**
- * The page-watch value-sets, written ONCE (#391).
- *
- * `PageWatchChangeStatus` was a union in `pageWatchService` and a `Set` in
- * `page-watch-webhook` — two shapes of one fact across the Vite/Deno boundary.
- *
- * THE DATABASE IS THE ENFORCER
- * -----------------------------
- * `page_watch_changes_status_check` and `page_watch_changes_judge_confidence_check`.
- * Pinned to the constraint text by `tests/unit/pageWatchVocabulary.test.ts`.
- *
- * THIS FILE IS IMPORT-FREE, ON PURPOSE — byte-mirrored to the edge by
- * `npm run vocab:mirror`.
- */
+/** The page-watch value-sets, written ONCE (#391). */
 
 /**
  * `page_watch_changes_status_check`.
@@ -42,18 +29,7 @@ export function isJudgeConfidence(v: unknown): v is JudgeConfidence {
   return typeof v === 'string' && (JUDGE_CONFIDENCES as readonly string[]).includes(v);
 }
 
-/**
- * `page_watches_category_check` — what KIND of page is being watched.
- *
- * A different fact from the status above: this is on the WATCH, that is on a detected
- * CHANGE. They live in one file because they are one feature's vocabulary, not because
- * they are related sets.
- *
- * `supplier_terms` is first because it is the default the create form applies — a watch is
- * overwhelmingly a supplier's price list or T&Cs page. The category drives nothing but
- * grouping and the digest's wording today; it is a CHECK rather than a free-text tag so
- * that stays true.
- */
+/** `page_watches_category_check` — what KIND of page is being watched. */
 export const PAGE_WATCH_CATEGORIES = [
   'supplier_terms', 'regulatory', 'partner_docs', 'competitor', 'other',
 ] as const;

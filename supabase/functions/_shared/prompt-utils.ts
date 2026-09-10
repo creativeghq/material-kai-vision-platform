@@ -2,22 +2,6 @@
  * Shared prompt loading utilities — THE loader for edge functions (#347 phase 3P).
  * Loads prompts from the `prompts` table so all prompts are DB-driven
  * and editable via /admin/ai-configs.
- *
- * NO CODE FALLBACK. `getGenerationPrompt` used to take a required `fallback` argument and was
- * documented as "never throws"; every caller therefore carried a hardcoded copy of its prompt.
- * That is invisible when it fires — and it fired constantly: `getGenerationPrompt(supabase,
- * 'ai_rerank', ...)` queries prompt_type='generation', but the re-ranker prompt is filed under
- * prompt_type='tool'. The lookup matched zero rows on every call, so search re-ranking ran on
- * the hardcoded string 100% of the time while "AI Search Re-ranker" sat in the table, editable
- * and unread.
- *
- * Missing and unreachable are separate errors on purpose: "add the row" and "the database is
- * down" need different reactions, and collapsing them is how an outage looks like a
- * misconfiguration for as long as nobody looks.
- *
- * Includes an in-memory cache with 5-minute TTL to avoid repeated DB
- * queries for prompts that rarely change. The Deno isolate keeps the
- * cache alive across requests until cold-start.
  */
 import type { DbClient } from './supabase-client.ts';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -95,25 +79,7 @@ export async function getAgentSystemPrompt(
   return data.system_prompt;
 }
 
-/**
- * The shared operating doctrine appended to EVERY agent's system prompt (issue #370, Class C).
- *
- * WHY IT IS SHARED. Measured across the 15 active agent prompts: 8 carried confirm-first language
- * and only 5 carried any "default / broad / proceed" counterweight — and `product-business` and
- * `erp`, the two most action-oriented specialists, had none. So Pepper asked the user to name
- * countries (the tool defaults to all 30) and to define a furniture segment (the schema is
- * satisfied by "furniture"), twice, and searched nothing. Per-agent prose could not fix that: the
- * absence was the problem, and fifteen hand-edited copies would drift the way every other
- * hand-kept mirror in this repo has.
- *
- * WHY IT IS A DB ROW, not a constant here. CLAUDE.md: never hardcode a prompt in a file that calls
- * a model. Behaviour tuning is exactly what an admin should be able to change without a deploy.
- *
- * Missing is NOT fatal — unlike an agent's own prompt, this one augments. A hard failure here
- * would take the whole chat down over a tuning row, so it warns and returns ''. That is a
- * deliberate exception to the no-fallback rule and it is safe because the empty string is not a
- * substitute doctrine, it is the absence of one, and the warning says so.
- */
+/** The shared operating doctrine appended to EVERY agent's system prompt (issue #370, Class C). */
 export async function getSharedOperatingDoctrine(supabase: DbClient): Promise<string> {
   const cacheKey = 'system:shared_operating_doctrine';
   const cached = getCachedPrompt(cacheKey);
@@ -140,16 +106,6 @@ export async function getSharedOperatingDoctrine(supabase: DbClient): Promise<st
 /**
  * Load a tool-specific prompt from the database.
  * prompt_type = 'tool', category = toolName
- *
- * Reads `prompt_text` first, then `system_prompt` — the same order as `loadPrompt`, and for the
- * same reason: `prompt_text` is the column /admin/ai-configs writes, so reading `system_prompt`
- * only made admin edits inert.
- *
- * It also made rows seeded with `prompt_text` alone throw outright. Four SEO writer sub-prompts
- * (`seo_writer_article_structure`, `..._firsthand_header`, `..._firsthand_hardrule`,
- * `..._no_knowledge_panel`) were extracted to the DB that way, so every SEO article-writing request
- * failed 100% of the time from the moment they shipped — a `.single()` that found its row and threw
- * anyway because the one column it selected was null.
  */
 export async function getToolPrompt(
   supabase: DbClient,

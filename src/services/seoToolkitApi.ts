@@ -1,28 +1,4 @@
-/**
- * SEO Toolkit API client.
- *
- * Two surfaces back the four `/admin/seo` dashboard tabs:
- *
- *   1. Direct Supabase reads from the new tables
- *      (seo_research_runs / seo_tracked_domains / seo_domain_audit_history)
- *      via supabase-js. RLS enforces user-scoping.
- *
- *   2. MIVAA `/api/v1/seo-agent/*` calls for live audits + research. Authed
- *      with the user's session JWT (NOT the cron secret — the dashboard is
- *      a user surface). The dispatcher route on MIVAA already accepts
- *      x-cron-secret for internal infra calls; we'll mirror the agent-tool
- *      path which goes through the agent-chat edge function rather than
- *      hitting MIVAA directly. That keeps the credit-attribution chain
- *      consistent.
- *
- * For NOW, the dashboard fires research by writing the request and
- * persisting via supabase, then invoking the seo-agent edge function (a
- * lightweight wrapper to be added — alternatively the dashboard can
- * bypass and call MIVAA with a user JWT once we expose a session-auth
- * version of /opportunities-stateless). To keep this branch lean we use
- * a hybrid: chat-driven research persists into seo_research_runs from the
- * agent tool side; the dashboard reads/displays history.
- */
+/** SEO Toolkit API client. */
 
 import { supabase } from '@/integrations/supabase/client';
 

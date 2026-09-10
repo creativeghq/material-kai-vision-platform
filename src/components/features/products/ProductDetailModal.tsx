@@ -261,14 +261,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   // All hooks must be declared before any conditional return (Rules of Hooks)
 
   // Load stacked product when a recommendation card is clicked.
-  //
-  // This used to be `.from('products').select('*')` with the error discarded and the row cast
-  // to `Product` (#368 PD-2). `select('*')` is every column, and products carries `cost`,
-  // `cost_source`, `markup_percent`, `supplier_company_id` and the raw supplier feed in
-  // `attributes_raw` — all of it gated everywhere else in this file, none of it gated by the
-  // table's RLS, which grants plain workspace membership. So clicking a recommendation handed
-  // procurement data to a project client. The RPC returns an allowlisted, jsonb-redacted
-  // projection and verifies membership against the caller's JWT rather than the id it was given.
   useEffect(() => {
     if (!stackedProductId) { setStackedProduct(null); setStackedError(null); return; }
     let cancelled = false;
@@ -488,19 +480,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   // widgets, moodboards, quote lines, agent results, the 3D designer), so the viewer can be an
   // operator, a warehouse hand, a sales rep or a project client. Two axes decide, and BOTH must
   // pass — a capability alone is not enough:
-  //   1. OWNERSHIP. Business data only ever concerns a product in the viewer's ACTIVE
-  //      workspace. Operator-catalog reference items and other nodes' products have no stock,
-  //      cost or listing that means anything here, and asking for them would be a cross-tenant
-  //      read dressed up as a UI feature.
-  //   2. CAPABILITY, from the persona model in `auth/capabilities.ts` — not the coarse
-  //      `pricing.manage` this file used for everything, which is about pricing rules and says
-  //      nothing about stock. `staff` and `warehouse_staff` run the warehouse and hold
-  //      `warehouse.manage`; neither holds `pricing.manage`, so gating stock on the latter
-  //      would hide the warehouse from the warehouse team.
-  // Personas that hold none of these — `end_user` (project clients), `employee`, `hr_*`,
-  // `marketing_staff`, `accountant`, `realestate_agent` — see the product and nothing else.
-  // Note `end_user` DOES hold `quotes.use`, which is why availability keys off `sales.portal`
-  // rather than the ability to quote.
   const isOwnProduct = !!activeWorkspaceId && product.workspace_id === activeWorkspaceId;
   /** Warehouse rows, locations, the movement ledger, listings. Operations data. */
   const canSeeStock = isOwnProduct && can('warehouse.manage');
@@ -969,16 +948,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   //   1. commercial.vision_variants  — Structured array produced by the Claude
   //      Vision spec extractor: [{sku, name, color, format, pattern?}].
   //      This is the canonical source when the spec vision pass has run.
-  //   2. commercial.sku_codes        — Legacy dict keyed by variant slug
-  //      ("valenova_blue_30x60": "V2BL3060"). Parsed into the same shape
-  //      when vision_variants is absent.
-  // Grout code lookup per variant:
-  //   - commercial.grout_details     — [{supplier, product, code, for_variant}]
-  //     from the vision extractor. Match by for_variant (name or color).
-  //   - commercial.grout_color_codes — Dict keyed by variant/color name.
-  // We return ONE row per variant with an object of grout codes keyed by
-  // supplier ({mapei: "M142", kerakoll: "K05", ...}) so the table can render
-  // whatever suppliers are present without hard-coding a single column.
   interface Variant {
     sku: string;
     name: string;
@@ -1130,12 +1099,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
     // ─── Dedup pass ────────────────────────────────────────────────────
     // Multiple sources (vision_variants, sku_codes, commercial.product_table)
-    // can emit the same physical variant in different shapes — different SKU
-    // formats (compound "VALENOVA TAUPE LT/11,8X11,8" vs catalog "39661"),
-    // different casing ("taupe" vs "Taupe"), unit-trailing sizes
-    // ("11,8x11,8" vs "11,8x11,8 cm"), or partially-populated patterns
-    // ("—" vs "12 patterns"). Collapse these onto a single row, taking the
-    // most-informative value per cell and unioning grout codes.
     const isMoreInformativeSku = (a: string, b: string): boolean => {
       // Prefer non-sentinel, then non-compound (no "/"), then numeric, then shorter
       if (a === DISPLAY_SENTINEL && b !== DISPLAY_SENTINEL) return false;
@@ -1489,7 +1452,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   // a curated/structured renderer has already shown, so the catch-all at the
   // bottom can render literally everything else without duplication. Seeded
   // with the keys consumed by the special cards (appearance / certifications /
-  // variants) and the Key-Specs sidebar summary.
   const consumedKeys = new Set<string>([
     // Key Specs sidebar (summary) + packaging block
     'factory_name', 'factory_group_name', 'brand', 'origin', 'country_of_origin',
@@ -2478,8 +2440,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           // metadata. Special sections rendered by dedicated cards below are
           // skipped here. Each rendered key is marked consumed so the catch-all
           // neither drops nor duplicates it. Driving this off the registry rather
-          // than a hardcoded key list is what lets lighting / wood / sanitary /
-          // kitchen show their full spec sheet instead of a tile-shaped subset.
           const SPECIAL_SECTION_KEYS = new Set(['appearance', 'certifications', 'compliance', 'packaging', 'commercial']);
           const registrySectionCards = registrySections
             .filter(section => !SPECIAL_SECTION_KEYS.has(section.key))
@@ -2592,18 +2552,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             // a section — it is a walker over whatever keys the product happens to carry, so
             // section gating does not reach it. `attributes` and `attributes_raw` are where
             // supplier XML lands and where AI extraction writes, and extraction is explicitly
-            // allowed to produce fields the registry has never heard of. A feed carrying
-            // `cost`, `wholesale`, `buy_price` or `margin` therefore rendered to whoever
-            // could see the product, including a project client.
-            //
-            // The decision is the registry's (`material_metadata_fields.sensitivity`), with
-            // `internal_product_field_pattern()` as the floor for keys it has never seen.
-            // Both are read from the DB by useFieldRegistry — the same two things
-            // `is_internal_product_field()` consults server-side.
-            //
-            // `withhold` is deliberately three-valued. Until the registry has loaded there is
-            // no answer, and rendering everything while waiting is exactly the failure this
-            // exists to prevent — so an unresolved key is withheld, not shown.
             const canSeeInternalFields = canSeeCost;
             const withholdKey = (key: string): boolean => {
               if (canSeeInternalFields) return false;

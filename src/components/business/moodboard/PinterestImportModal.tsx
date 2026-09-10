@@ -1,13 +1,4 @@
-/**
- * PinterestImportModal
- *
- * Allows users to import Pinterest pins into a moodboard.
- * Phase 1: Paste a pin URL → extract image → add to moodboard → auto-match materials
- * Board browsing was removed: it required Pinterest OAuth tokens in `social_accounts`,
- * whose token columns are gone (the table now belongs to Zernio). Zernio brokers the
- * account connection but exposes no board/pin read API, so there is nothing to browse
- * through. URL import needs no account and is what actually fills a moodboard.
- */
+/** PinterestImportModal */
 
 import React, { useState, useEffect } from 'react';
 import {

@@ -10,10 +10,6 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 // the SKU → cost rows it contains onto products.cost. This is the operator-facing
 // surface for maintaining procurement costs: an admin uploads a supplier price
 // list as a KB doc, then triggers this function to apply it to the catalog.
-// Input:  { kb_doc_id: uuid, dry_run?: boolean }
-// Output: { ok, parsed_rows, matched, updated, unmatched, errors, dry_run }
-// Match key: products.sku (then products.external_sku as fallback) within the
-// same workspace as the KB doc.
 
 interface RequestBody {
   kb_doc_id: string;

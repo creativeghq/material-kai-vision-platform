@@ -2,17 +2,6 @@
  * The invitable workspace-team roles — ONE catalog, read by the invite form, the members list and
  * the pending-invite list, so a role's label, portal and description can never disagree between
  * the three surfaces.
- *
- * This is the "who is a sales manager?" answer: a workspace role, set by invitation (or by
- * re-roling an existing member), which `resolvePersona` in `./capabilities` turns into a persona
- * and therefore a portal. It is deliberately NOT the `roles` table — that one holds the global
- * ACCOUNT tier (Operator / Supplier / Architect …) set by a platform admin under Users.
- *
- * Mirrored server-side by `workspace_invites_role_check` / `workspace_members_role_check` and the
- * role allowlists inside `create_workspace_invite` / `set_workspace_member_role`. Adding a role
- * means: enum here + both CHECK constraints + both RPC allowlists + a `crm_categories` row of
- * kind='role' with `source_value` = the role value (so the derived category appears) + a
- * `resolvePersona` branch. Guarded by tests/unit/workspaceRoles.test.ts.
  */
 
 /** Roles that can be handed out via an invite link / invite email. */

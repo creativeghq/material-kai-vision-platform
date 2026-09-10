@@ -1,30 +1,4 @@
-/**
- * #320 — stock leaves the warehouse only against a fiscal document.
- *
- * The locked decision (#236, 2026-06-27): under Greek law goods may only move with an
- * accompanying document — a τιμολόγιο / τιμολόγιο–δελτίο αποστολής, or a standalone
- * Δελτίο Αποστολής transmitted to myDATA as a 9.3. Until this landed, hand-editing a line's
- * delivered quantity in the order window called `deliver_order_line`, which decremented
- * `warehouse_items` with no document behind it — and the UI said so out loud, which is how the
- * behaviour became something operators relied on.
- *
- * The gate itself is in SQL: `deliver_order_line` is now a picking marker that delegates to
- * `_deliver_order_line_core(..., false)`, and only the document contexts (`issue_delivery_note`,
- * `mark_invoice_issued` on an order-linked invoice) pass `true`. The core is REVOKEd from
- * `anon`/`authenticated`, so the gate is the ABSENCE of a reachable parameter rather than a
- * default someone can override.
- *
- * SCOPE — the same caveat as moneyDerivation.test.ts, and it matters more here.
- * This file scans REPO FILES. The SQL half lives only in `pg_proc` (this project applies DDL
- * through the Supabase MCP and never commits migration files, per CLAUDE.md), so a green run
- * here says NOTHING about whether the SQL gate still stands. That half is guarded in SQL, by
- * `finance.stock_bypasses_document_gate` (`dic_detect__finance_stock_bypasses_document_gate`),
- * which fails if `deliver_order_line` writes stock again or if a function outside the document
- * allowlist passes `p_move_stock => true`. It was verified to fire on both shapes.
- *
- * What THIS file can see is the client half: nobody reaching around the gate from TypeScript,
- * and the UI no longer promising a stock movement that will not happen.
- */
+/** #320 — stock leaves the warehouse only against a fiscal document. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';

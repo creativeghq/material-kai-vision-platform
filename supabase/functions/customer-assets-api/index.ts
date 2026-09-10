@@ -1,14 +1,5 @@
 // customer-assets-api — the installed base (#343): a customer's equipment, its warranties,
 // and its recurring service plans.
-//
-// One action-discriminated function (merge rule). Every write goes through the RLS-bound USER
-// client or a SECURITY DEFINER RPC that calls `assert_workspace_member` — never the service-role
-// client trusting a body-supplied id, which is the shape the pentest kept finding (invariant 1).
-//
-// There is deliberately no `next_due_on` anywhere in here. "When is this next due" is answered by
-// the single open row in `customer_asset_service_events`, surfaced by the
-// `customer_asset_service_due` view. Completing an occurrence is the only thing that opens the
-// next one, and that happens inside `complete_asset_service` so it cannot half-apply.
 
 import { createClient } from '@supabase/supabase-js';
 import type { DbClient } from '../_shared/supabase-client.ts';
@@ -36,20 +27,7 @@ const ASSET_WRITABLE = [
   'installed_on', 'location_note', 'notes', 'project_id', 'room_id', 'supplier_company_id',
 ] as const;
 
-/**
- * `document_bucket` / `document_path` are DELIBERATELY ABSENT (#364 EX-2).
- *
- * They were writable here, and `warranty.document_url` / `warranty.delete_document` then handed
- * whatever they contained to the SERVICE-ROLE storage client to sign and to remove. A caller who
- * owned one warranty row could therefore set `{document_bucket: 'pdf-documents', document_path:
- * 'invoices/<someone else>/...'}` and get back a signed URL for any object in any bucket — or
- * delete it. Ownership of the ROW was checked; nothing checked that the row pointed at an object
- * the row was entitled to.
- *
- * The pair is now written in exactly one place: `warranty.upload_document`, from a path this
- * function derives, and read back only through `warrantyObjectRef`, which re-checks that shape
- * before the service role touches it.
- */
+/** `document_bucket` / `document_path` are DELIBERATELY ABSENT (#364 EX-2). */
 const WARRANTY_WRITABLE = [
   'kind', 'provider_company_id', 'provider_name', 'policy_number', 'starts_on', 'ends_on',
   'coverage_notes', 'remind_days_before',

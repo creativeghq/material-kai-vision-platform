@@ -109,8 +109,6 @@ const DataImportHub = lazy(() => import('./components/Admin/DataImportHub'));
 // SystemSettingsPage lazy import.)
 // QuoteRequestsAdmin + QuoteDetailPage live in `src/modules/quotes/pages/` — registered through buildModuleRoutes().
 // StatusTagsManagement, UpsellsManagement, TimelineStepsManagement live in `src/modules/quotes/pages/` — registered through buildModuleRoutes().
-// Email pages live in `src/modules/email/` — registered through buildModuleRoutes().
-// Messaging pages live in `src/modules/messaging/` — registered through buildModuleRoutes().
 const FlowsManagement = lazy(() => import('./components/Admin/FlowsManagement').then(m => ({ default: m.FlowsManagement })));
 const MonitoringPage = lazy(() => import('./pages/Admin/MonitoringPage'));
 const SupplierClaimsPage = lazy(() => import('./pages/Admin/SupplierClaimsPage'));

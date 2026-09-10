@@ -1,20 +1,4 @@
-/**
- * Automations — the workspace-owner surface for the Flows toolkit.
- *
- * Two views: a LIST of the workspace's own automations, and the VISUAL BUILDER (the same
- * xyflow builder the admin uses, in `tenantMode` so the palette is trimmed to the safe subset).
- * New/Edit open the builder; the DB (tenant write RLS + the flows_tenant_allowlist_guard trigger)
- * is the real security boundary. "Create with AI" deep-links to the KAI agent as an alternative
- * create path.
- *
- * Below the list sits PLATFORM DEFAULTS — the operator's seeded flows that run inside this
- * workspace. The operator's rows are never editable in place and their graphs are never sent here;
- * customising one FORKS it into this workspace as an ordinary automation, which then shows up in
- * the list above like any other.
- *
- * Layout follows the design-system New-Page checklist: <PageHeader> + `p-3 sm:p-6` wrapper +
- * `div.dashboard-card` sections.
- */
+/** Automations — the workspace-owner surface for the Flows toolkit. */
 
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';

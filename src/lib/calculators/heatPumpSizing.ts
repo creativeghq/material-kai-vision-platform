@@ -1,19 +1,4 @@
-/**
- * Heat-pump sizing estimator — pure, deterministic, no I/O.
- *
- * Canonical source of truth for the calculation. The `/tools/heat-pump` page
- * imports it directly (runs client-side, instant, no backend). The agent tool
- * `calculate_heat_pump_sizing` keeps a MIRROR of this logic in
- * `supabase/functions/_shared/tools/calculator-tools.ts` (Deno can't import
- * across the Vite boundary) — keep the two in sync. Same pattern as the
- * TOOLKITS_INDEX mirror in toolkit-tools.ts.
- *
- * IMPORTANT: these are COARSE PLANNING FIGURES for a first estimate, not a
- * substitute for a proper thermal-loss study (ΕΛΟΤ ΕΝ 12831 / ΤΟΤΕΕ 20701).
- * The W/m² baselines are midpoints of the commonly-cited ranges for Northern
- * Greek dwellings; the climate-zone factors are a relative adjustment around
- * those baselines. A professional should always confirm with a real ΠΕΑ/study.
- */
+/** Heat-pump sizing estimator — pure, deterministic, no I/O. */
 
 export type InsulationLevel = 'none' | 'medium' | 'modern' | 'passive';
 export type ClimateZone = 'A' | 'B' | 'C' | 'D';

@@ -68,7 +68,6 @@ async function loadCustomerDiscount(
       // workspace A could pass a workspace B company UUID and get back B's name,
       // `discount_percent` and `discount_notes` — and A's pricing guidance was then computed
       // from B's discount. Returning null on a mismatch is the 404-not-403 rule: it is
-      // indistinguishable from "no such company", so ids cannot be enumerated.
       .eq('workspace_id', workspaceId)
       .maybeSingle();
     if (!data) return null;
@@ -119,16 +118,7 @@ interface ReasoningHints {
   manufacturer_hint?: string;
 }
 
-/**
- * LangChain Tool: Price Lookup from KB (admin-gated)
- *
- * Returns top N chunks from the Pricing category. The agent is expected to:
- *  1. Read the snippets.
- *  2. Combine price_list + discount_rule / contract_terms where applicable.
- *  3. Apply MOQ/quantity tiers, effective dates, unit sanity.
- *  4. Emit a reasoning chain and final number (or say "cannot determine").
- *  5. Render the proposal via the `price_proposal` chunk for UI commit.
- */
+/** LangChain Tool: Price Lookup from KB (admin-gated) */
 export const createPriceLookupTool = (
   workspaceId: string,
   onChunk?: (chunk: any) => void,

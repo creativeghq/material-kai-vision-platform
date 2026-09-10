@@ -16,22 +16,7 @@ import {
 } from '@/services/userWebsitesService';
 import { compact } from './seo/seoMetrics';
 
-/**
- * Websites → Competitors.
- *
- * Your domain and the ones you compete with, on the same metric over the same
- * window. The comparison is the point: an organic-traffic line means very little
- * on its own and a great deal beside three rivals.
- *
- * Two things this does that a naive chart does not:
- *
- *  - **A tracked-but-never-measured competitor is drawn as absent, not as zero.**
- *    A rival added five minutes ago has no snapshots; plotting it at the axis
- *    floor invents a story about a company we simply have not looked at yet.
- *  - **Lines are keyed to a fixed palette by index**, so a domain keeps its colour
- *    between renders and between metrics. A legend whose colours reshuffle when
- *    you switch metric is worse than no legend.
- */
+/** Websites → Competitors. */
 
 const METRICS: { key: string; label: string }[] = [
   { key: 'organic_traffic', label: 'Organic traffic' },

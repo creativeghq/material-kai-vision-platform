@@ -1,14 +1,4 @@
-/**
- * Product recommendations — reads the gold-layer `product_edges` table.
- *
- * There is ONE derivation of "what relates to this product" (issue #267):
- * `rebuild_product_edges(workspace)` derives the edges in SQL from silver, and
- * `get_related_products(...)` is the only read path. This file formats; it never
- * re-derives. The previous `find_similar_products` / `find_complementary_products`
- * RPCs were a second, live-per-query derivation that answered the same question
- * differently — they are gone, and
- * [tests/unit/productRelationDerivation.test.ts] fails the build if they come back.
- */
+/** Product recommendations — reads the gold-layer `product_edges` table. */
 
 import { supabase } from '@/integrations/supabase/client';
 

@@ -4,9 +4,6 @@
  *  - a "See all N activity codes (ΚΑΔ)" link → modal listing the full merged ΚΑΔ list.
  *  - a ΓΕΜΗ "People (from registry)" list (directors/representatives) where each person has a
  *    (+) to create a CRM contact under this company.
- *
- * Data comes from crm_companies.kad_all (normalized) + gemi_data.persons (raw ΓΕΜΗ record). Both
- * are populated by the myaade-rgwspublic2 / mygemi-opendata enrichment functions.
  */
 import React, { useMemo, useState } from 'react';
 import { Layers, UserPlus, Loader2, Check, Star } from 'lucide-react';

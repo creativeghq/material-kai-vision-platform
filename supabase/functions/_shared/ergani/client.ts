@@ -4,10 +4,6 @@
 // Guide: "Unified Application Guide for Work-Time Organization & the Digital Work Card",
 // §6 (Web API REST). Every workspace runs under its OWN e-EFKA "Ergani" account
 // (workspace_ergani_credentials), against either the trial or the production environment.
-// Auth (§6.1.1): POST /Authentication {Username,Password,Usertype} → JWT accessToken (3h) +
-// refreshToken. Bearer on every subsequent call. On 401 with header `api-token-expired:true`,
-// refresh via /Authentication/Refresh (§6.1.2). We keep a per-workspace in-memory token cache
-// so a burst of submissions in one warm worker reuses one login.
 
 const ENDPOINTS = {
   trial: 'https://trialeservices.yeka.gr/WebServicesApi/api/',

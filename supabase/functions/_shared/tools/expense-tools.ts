@@ -1,24 +1,4 @@
-/**
- * Expense Tools — agent-chat surface for business operating expenses (rent, utilities, fees…).
- *
- * Mirrors the Finance "Add expense" page flow: an expense is a categorized supplier bill (the
- * canonical spend record that feeds Payables/AP + P&L per category). Payee is required by the
- * DB (supplier_bills CHECK). Tools:
- *   - record_expense         — create a categorized expense bill (optionally paid now)
- *   - list_recent_expenses   — read the workspace's recent expense bills
- *   - pay_expense            — settle an EXISTING expense, including one still sitting in the
- *                              myDATA Expenses Inbox as an unconverted received document
- *   - get_expense_payments   — the reverse direction: what has settled a given expense
- *
- * pay_expense / get_expense_payments are the agent mirror of ExpensePaymentsDialog. They write
- * only through the allocation ledger (record_payment_fx → payment_allocations), so the bill's
- * amount_paid / status are derived by the same triggers the UI relies on — nothing here decides
- * for itself what is settled.
- *
- * All writes are scoped to the caller's workspace_id (resolved upstream by agent-chat).
- * Category + payee are resolved by name (find-or-create). record_payment_fx settles the
- * "paid now" case; its assert_workspace_member is a no-op under the service context.
- */
+/** Expense Tools — agent-chat surface for business operating expenses (rent, utilities, fees…). */
 
 import { computeExpenseSplit } from '../finance/expense-math.ts';
 import { moduleGate } from './module-gate.ts';
@@ -91,18 +71,7 @@ async function resolvePayee(workspaceId: string, name: string): Promise<{ id: st
   return { id: ins.data.id, name: ins.data.name };
 }
 
-/**
- * Resolve a FILING target by name — an expense card or a building.
- *
- * Deliberately NOT find-or-create, unlike the category and payee above. Those are labels: a new
- * one costs nothing and inventing it is the helpful answer. A trip card and a property are
- * RECORDS. Conjuring "the Athens trip" because the operator's expense mentioned Athens would
- * fabricate a claim nobody filed and a building nobody owns, and every later expense would file
- * against the fake one.
- *
- * Ambiguity is reported, never guessed. Two cards called "June expenses" belong to two different
- * people, and picking the first is how one rep's hotel bill lands on another's claim.
- */
+/** Resolve a FILING target by name — an expense card or a building. */
 async function resolveFilingTarget(
   workspaceId: string,
   table: 'trip_expense_reports' | 'properties',
@@ -181,18 +150,7 @@ export const createRecordExpenseTool = (userId: string, workspaceId: string, onC
       if (billIns.error) throw billIns.error;
       const billId = billIns.data.id;
 
-      /**
-       * The bill above is COMMITTED (#395, the #351 C3 shape on the agent surface).
-       *
-       * Bill and payment are two writes with no transaction between them. Throwing here rejected
-       * the whole call, so the agent reported "could not record expense" for a payable that
-       * exists — and the obvious next turn recreates it, booking the cost and the cash-out twice.
-       * The identical defect was fixed in `financeService.createExpense` for the dialog; the tool
-       * kept it.
-       *
-       * So a payment failure is REPORTED, not thrown. The bill is settleable from Payables, which
-       * is the recovery the operator actually has, and `pay_expense` is the tool for it.
-       */
+      /** The bill above is COMMITTED (#395, the #351 C3 shape on the agent surface). */
       let paymentId: string | null = null;
       let paymentError: string | null = null;
       if (paid && total > 0) {
@@ -489,17 +447,7 @@ export const createGetExpensePaymentsTool = (userId: string, workspaceId: string
 
 // ───────────────────────────── list_recent_expenses ─────────────────────────────
 
-/**
- * Where each recorded expense CAME FROM, as a fact rather than a guess.
- *
- * Asked "only the expenses from myAADE, not the ones added manually", the model had no filter and
- * no column, so it read the origin out of the `notes` prose ("From myDATA received document 4000…")
- * and answered from a string. `inbound_documents.created_supplier_bill_id` is the actual link, and
- * `supplier_bills.order_id` is the other one — both joinable, neither previously asked.
- *
- * Three origins, because there are three: a document ΑΑΔΕ sent us, a cost booked against one of our
- * own orders, and something a person typed in.
- */
+/** Where each recorded expense CAME FROM, as a fact rather than a guess. */
 async function stampExpenseSource(sb: any, workspaceId: string, rows: any[]): Promise<any[]> {
   if (rows.length === 0) return rows;
   const fromMydata = new Set<string>();
@@ -582,30 +530,7 @@ export const createListExpensesTool = (userId: string, workspaceId: string, onCh
   });
 
 // ───────────────────────────── list_mydata_expenses ─────────────────────────────
-/**
- * The myDATA / ΑΑΔΕ expenses feed — what suppliers have filed against US.
- *
- * This did not exist, and its absence was invisible. Asked for "the expenses we get from myAADE",
- * the agent had exactly one expense tool — `list_recent_expenses` over `supplier_bills` — so it
- * answered with the SIX booked expenses and inferred which came from myDATA by reading the `notes`
- * prose. It reported two. There were 1,866 documents in the inbox spanning 2024-02 to 2026-08.
- * Every part of that answer was well-formed and confidently wrong by three orders of magnitude:
- * the silent-zero shape (CLAUDE.md, anti-regression 2) seen from the reader's side.
- *
- * `inbound_documents` was reachable from ONE place in the whole agent surface — a lookup inside
- * `pay_expense` to find a bill to settle — so a document nobody had booked could be paid and never
- * listed.
- *
- * Three questions, because they are three different answers and conflating them is how "we have
- * none" and "we never connected" become the same sentence:
- *   • `status`    — is myDATA connected at all, when did it last sync, how much is sitting there
- *   • `suppliers` — who has filed against us, how much, how much still unfiled (with the CRM link)
- *   • `documents` — the documents themselves
- *
- * The first two are DERIVED IN SQL and read, not re-derived: `workspace_inbound_status` and
- * `inbound_issuers_summary` are what the Finance page's own supplier inbox reads, so the agent and
- * the screen cannot disagree about how many documents a supplier has sent.
- */
+/** The myDATA / ΑΑΔΕ expenses feed — what suppliers have filed against US. */
 export const createMydataExpensesTool = (
   userId: string,
   workspaceId: string,

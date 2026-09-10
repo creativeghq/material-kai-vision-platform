@@ -4,10 +4,6 @@
 // scattered, drifting places — SIDEBAR_NAV_ITEMS (nav/launcher), agentToolsCatalog.TOOLKITS
 // (toolkit picker), and agent-chat AGENT_CONFIGS (tool→agent binding). This registry declares
 // each capability ONCE so every surface reads the same definition and can hand off between them.
-// Rail #2 of the fabric. It is deliberately additive: it does not replace the three lists yet —
-// it links them by id so we can migrate capabilities onto shared rails one at a time. The first
-// consumer is the `?capability=<id>` deep-link in the Agent Hub page (rail #3) which resolves the
-// owning agent + a toolkit quick-start from here instead of every call site hand-rolling params.
 import type { HubId } from './nav-items';
 import { HUBS } from './nav-items';
 
@@ -79,7 +75,6 @@ export const CAPABILITIES: readonly CapabilityDef[] = [
   // reads that table is the posts list on the social hub's Analytics section. With no route here
   // the caption card had nowhere to hand off to, so a drafted post was written, charged for, and
   // then unreachable from the thing that made it. `openInLabel` because the landing is the
-  // profile's channels rail, not the Marketing Hub — same reason contract/warehouse carry one.
   { id: 'social-post', label: 'Social Post', hub: 'marketing', openInLabel: 'Social Posts', pageRoute: '/profile?tab=social-accounts&section=analytics', agentId: 'social-media', agentTool: 'manage_social', toolkitId: 'social', recordTable: 'social_posts', moduleSlug: 'social-media' },
   { id: 'email-campaign', label: 'Email Campaign', hub: 'marketing', pageRoute: '/marketing/email', agentId: 'kai', agentTool: 'manage_email_campaign', toolkitId: 'email-marketing', recordTable: 'campaigns', moduleSlug: 'email-marketing' },
   // openInLabel, like contract/warehouse: /automations is its own page, not the Marketing Hub
@@ -93,8 +88,6 @@ export const CAPABILITIES: readonly CapabilityDef[] = [
   // firing one of its quick-starts (`initialToolkitId` is derived from this registry and nowhere
   // else), so a launcher chip for them was impossible until they were declared here. Agent-only,
   // like the two above: `pageRoute` stays undefined because none of them has a page.
-  // `moduleSlug` mirrors the SEO & Content nav tile — the seo-api handlers refuse a workspace that
-  // does not own `seo-toolkit`, so the launcher must not offer the chip to one that doesn't.
   { id: 'seo-domain', label: 'SEO Domain Intel', hub: 'marketing', agentId: 'marketing', agentTool: 'seo_domain_snapshot', toolkitId: 'seo-domain', canvasKind: 'seo', moduleSlug: 'seo-toolkit' },
   { id: 'seo-backlinks', label: 'SEO Backlinks', hub: 'marketing', agentId: 'marketing', agentTool: 'seo_backlinks_summary', toolkitId: 'seo-backlinks', canvasKind: 'seo', moduleSlug: 'seo-toolkit' },
   { id: 'seo-content', label: 'SEO Content & Tech', hub: 'marketing', agentId: 'marketing', agentTool: 'seo_site_crawl_start', toolkitId: 'seo-content', canvasKind: 'seo', moduleSlug: 'seo-toolkit' },
@@ -183,26 +176,12 @@ export const RESULT_TYPE_CAPABILITY: Record<string, string> = {
   // was: it names findings, ranks actions, and offers no way to reach the project any of it is
   // about. `project` is a DETAIL_ROUTE capability, so the handoff deep-links to /projects/:id
   // when the payload carries `project_id` — which all three of these do.
-  // One chunk set, three subjects. `project` is a DETAIL_ROUTE capability, so a payload carrying
-  // `project_id` deep-links to /projects/:id; a finance or property payload carries none and the
-  // card falls back to the hub, which is the right landing for both.
   assessment_report: 'project',
   assessment_actions: 'project',
   assessment_action_applied: 'project',
 };
 
-/**
- * Result types whose "add one of these" is a SETUP flow that only exists in the app UI.
- *
- * The generic card offers "Add {thing}" under any list by asking the agent for it. That is right
- * for a contact and wrong for a connected account: connecting one is an OAuth handshake with
- * Meta/LinkedIn, and no tool can perform it — `manage_social`'s own description says so. Asking
- * the model anyway produces a paragraph explaining where to go, which is the dead end the button
- * was supposed to remove. So these link to the place instead of prompting.
- *
- * `destination` is an id in `appDestinations.ts` — that file owns the route, this one owns which
- * result type belongs to it.
- */
+/** Result types whose "add one of these" is a SETUP flow that only exists in the app UI. */
 export const RESULT_SETUP_DESTINATION: Record<string, { destination: string; label: string }> = {
   social_accounts: { destination: 'social-accounts', label: 'Connect an account' },
   // A WhatsApp sender is Meta Embedded Signup brokered by Zernio — same shape, same reason.

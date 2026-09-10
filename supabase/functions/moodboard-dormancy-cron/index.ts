@@ -1,23 +1,4 @@
-/**
- * moodboard-dormancy-cron
- *
- * Daily lifecycle sweep for abandoned moodboards. Timeline (active boards only):
- *   idle > 30 days  → warn the owner, schedule deletion for +15 days, mint a
- *                     one-click "keep active" token.
- *   5 days before   → reminder notification.
- *   day 0           → hard-delete the board (FK cascade drops items + sheets;
- *                     storage-orphan-cleanup reclaims the files).
- *   any activity / keep-active click → clock resets, schedule cleared.
- *
- * The heavy lifting (reactivation + deletion + candidate selection with the
- * GREATEST(updated_at, last item) activity math) is in the SQL RPC
- * moodboard_dormancy_scan(). This function emits the two notifications through
- * the Flows engine (bell + email via seeded system-default flows) and stamps
- * the rows only AFTER a successful emit, so a failed notification retries next
- * day rather than silently deleting an un-warned board.
- *
- * Scheduled via pg_cron (moodboard-dormancy-daily). Cron-authorized only.
- */
+/** moodboard-dormancy-cron */
 
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
