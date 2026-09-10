@@ -54,15 +54,18 @@ Deno.serve(withApiLogging('profile-review-summary', async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
-  // Any signed-in caller may ask for a refresh: the subject is public data and every input is
-  // re-read server-side from `user_id`, so there is nothing here to forge.
-  const auth = await authenticate(req, { requireUser: true });
-  if (!auth.success || !auth.userId) return json({ error: auth.error || 'Unauthorized' }, 401);
+  // A signed-in user (the reviewer, right after saving) OR an internal service-role caller —
+  // this is offered as a flow action, and a flow node authenticates as the service role, for
+  // which authenticate() returns level 'secret' with a null userId. Nothing here is forgeable:
+  // the subject is public data and every input is re-read server-side from `user_id`.
+  const auth = await authenticate(req, { requireUser: false });
+  if (!auth.success) return json({ error: auth.error || 'Unauthorized' }, 401);
+  if (!auth.userId && auth.level !== 'secret') return json({ error: 'Unauthorized' }, 401);
 
   let body: any;
   try { body = await req.json(); } catch { return json({ error: 'invalid JSON' }, 400); }
-  const userId = String(body?.user_id ?? '').trim();
-  if (!userId) return json({ error: 'user_id is required' }, 400);
+  const subjectUserId = String(body?.user_id ?? '').trim();
+  if (!subjectUserId) return json({ error: 'user_id is required' }, 400);
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
@@ -74,14 +77,14 @@ Deno.serve(withApiLogging('profile-review-summary', async (req) => {
     supabase
       .from('profile_reviews')
       .select('overall_rating, comment, service_name, created_at')
-      .eq('to_user_id', userId)
+      .eq('to_user_id', subjectUserId)
       .eq('is_hidden', false)
       .order('created_at', { ascending: false })
       .limit(MAX_REVIEWS_READ),
     supabase
       .from('review_summaries')
       .select('summary_text, last_computed_at, summary_status')
-      .eq('user_id', userId)
+      .eq('user_id', subjectUserId)
       .maybeSingle(),
   ]);
 
@@ -91,7 +94,7 @@ Deno.serve(withApiLogging('profile-review-summary', async (req) => {
   const withText = all.filter((r) => (r.comment ?? '').trim().length > 0);
 
   if (withText.length < MIN_REVIEWS) {
-    await record(supabase, userId, {
+    await record(supabase, subjectUserId, {
       summary_status: 'not_enough_reviews',
       summary_error: null,
       summary_text: '',
@@ -131,7 +134,8 @@ Deno.serve(withApiLogging('profile-review-summary', async (req) => {
       temperature: 0.3,
       maxTokens: 400,
       task: 'profile_review_summary',
-      userId,
+      // Attribute the spend to the profile the summary is FOR, not to whoever tripped it.
+      userId: subjectUserId,
     });
     // A truncated blurb is still a valid string and would print mid-sentence on a public
     // profile, so it is a failure here rather than the summary.
@@ -142,7 +146,7 @@ Deno.serve(withApiLogging('profile-review-summary', async (req) => {
     const message = e instanceof Error ? e.message : String(e);
     // Recorded, not swallowed: an empty summary_text otherwise cannot say whether nobody has
     // written enough reviews or the generator has been failing since it shipped.
-    await record(supabase, userId, {
+    await record(supabase, subjectUserId, {
       summary_status: 'generation_failed',
       summary_error: message.slice(0, 500),
       last_computed_at: new Date().toISOString(),
@@ -150,7 +154,7 @@ Deno.serve(withApiLogging('profile-review-summary', async (req) => {
     return json({ error: 'Could not generate the review summary', detail: message }, 502);
   }
 
-  await record(supabase, userId, {
+  await record(supabase, subjectUserId, {
     summary_text: text,
     summary_status: 'ok',
     summary_error: null,
