@@ -61,6 +61,16 @@ describe('address derivation', () => {
     expect(formatAddressLines(GREEK)).toEqual(['ΙΑΣΩΝΙΔΟΥ 17', '56334 ΕΛΕΥΘΕΡΙΟ', 'Central Macedonia', 'Greece']);
   });
 
+  it('falls back to the ISO country code when there is no country name', () => {
+    // A property listing stores `country_code` and no `country`. Dropping the country from the
+    // query lets Google place a Greek street name in whichever country the words look like.
+    expect(addressMapsQuery({ street: 'Ermou', street_number: '15', city: 'Athens', country_code: 'EL' }))
+      .toBe('Ermou 15, Athens, GR');
+    // The name wins when both are present — "Greece" is what the operator typed.
+    expect(addressMapsQuery(GREEK)).toContain('Greece');
+    expect(addressMapsQuery(GREEK)).not.toContain(', GR');
+  });
+
   it('keeps the state OUT of the one-liner and IN the maps query', () => {
     // On screen the περιφέρεια after the town is noise (it is derived from the ΤΚ). In a maps
     // query it is a disambiguating token, and Google is the one reading it.
@@ -177,10 +187,19 @@ describe('no second copy', () => {
     ).toEqual([]);
   });
 
-  it('the util stays import-free so any layer can use it', () => {
-    // It is pulled by components, services and a page; an import of the supabase client here
-    // would drag the whole data layer into each of them.
-    const src = readFileSync(join(process.cwd(), UTIL), 'utf8');
+  it('the util stays out of the data layer so any layer can use it', () => {
+    // It is pulled by components, services and a page; an import of the supabase client — or of
+    // anything that reaches one — would drag the whole data layer into each of them. Its one
+    // dependency is the country-code table, which is pure data.
+    const imports = [...readFileSync(join(process.cwd(), UTIL), 'utf8').matchAll(/^import .*?from '([^']+)'/gm)]
+      .map((m) => m[1]);
+    expect(imports).toEqual(['@/lib/countryCodes']);
+  });
+
+  it('the country-code table is import-free, because it is byte-mirrored to Deno', () => {
+    // Vite resolves `@/`, Deno resolves by URL: a single import makes the mirror unbuildable in
+    // the runtime it was copied into, and the failure surfaces at request time, not at build.
+    const src = readFileSync(join(process.cwd(), 'src', 'lib', 'countryCodes.ts'), 'utf8');
     expect(src).not.toMatch(/^\s*import\s/m);
   });
 });

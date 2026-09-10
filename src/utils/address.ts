@@ -9,9 +9,11 @@
  * about to be written a fourth time. `formatAddressLine` in `crm.service.ts`
  * delegates here so there is exactly one answer to "what does this address say".
  *
- * Deliberately import-free: it is pure string work with no dependency on the
- * supabase client, so a component can pull it without dragging the CRM service in.
+ * Deliberately dependency-free apart from the country-code table (itself import-free
+ * and mirrored to Deno): it is pure string work with no dependency on the supabase
+ * client, so a component can pull it without dragging the CRM service in.
  */
+import { isoCountryCode } from '@/lib/countryCodes';
 
 /**
  * The shape every address-bearing row in the platform shares. Every field is
@@ -73,9 +75,18 @@ export function hasMappableAddress(a: AddressLike | null | undefined): boolean {
   return Boolean(streetLine(a) || clean(a.city) || clean(a.postal_code));
 }
 
-/** The query string handed to Google Maps — the full address INCLUDING state. */
+/**
+ * The query string handed to Google Maps — the full address INCLUDING state.
+ *
+ * Falls back to the ISO country code when there is no country NAME. Several tables store one
+ * without the other (a property listing has `country_code` and no `country` at all), and a
+ * query that drops the country entirely puts a Greek street name in whichever country Google
+ * decides the rest of the words look most like. `isoCountryCode` is what turns the stored VAT
+ * code `EL` into the `GR` Google knows.
+ */
 export function addressMapsQuery(a: AddressLike): string {
-  return [streetLine(a), clean(a.postal_code), clean(a.city), clean(a.state), clean(a.country)]
+  const country = clean(a.country) || (isoCountryCode(a.country_code) ?? '');
+  return [streetLine(a), clean(a.postal_code), clean(a.city), clean(a.state), country]
     .filter(Boolean)
     .join(', ');
 }

@@ -4,6 +4,7 @@ import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
 import { getCrmScope, scopeAllows, isUuid, type CrmScope } from './_scope.ts';
 import { callDataForSEO } from '../../_shared/tools/dataforseo-dispatch.ts';
+import { isoCountryCode } from '../../_shared/countryCodes.generated.ts';
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL') || '',
@@ -26,16 +27,31 @@ const supabase = createClient(
  * exactly the information the operator opened the panel to get.
  */
 
-/** Party rows carry the VAT country code, where Greece is `EL`; ISO — which DataForSEO's
- *  location table is keyed on — says `GR`. Sending `EL` was not an error: it fell through to
- *  the client's default location, which is the United States. A Greek supplier searched in
- *  Michigan returns "no listing", and no layer says why. */
-const VAT_TO_ISO_COUNTRY: Record<string, string> = { EL: 'GR', UK: 'GB' };
-
-function isoCountry(code: string | null | undefined): string | null {
-  const cc = (code || '').trim().toUpperCase();
-  if (!cc || cc.length !== 2) return null;
-  return VAT_TO_ISO_COUNTRY[cc] ?? cc;
+/**
+ * WHERE we search matters as much as what we search for, and getting it wrong is silent.
+ *
+ * DataForSEO's `country_to_location` does not reject a code it does not know — it falls through
+ * to its default, the United States. So both of these produced a billed lookup on the wrong
+ * continent, stored as `no_match` and shown to the operator as "Google has no listing":
+ *
+ *   - `EL`, the VAT code every Greek party row carries, which ISO calls `GR` (fixed in the
+ *     shared `countryCodes` table, mirrored to both runtimes);
+ *   - NOTHING AT ALL, which is the commoner case by far — 9 of 10 live `crm_contacts` rows have
+ *     no country on them.
+ *
+ * So the country is resolved, never defaulted: the caller's explicit choice, else the party's
+ * own, else the workspace's registered country (a workspace's counterparties are overwhelmingly
+ * in its own country, and it beats Michigan by any measure). If none of the three answers, the
+ * lookup is REFUSED rather than aimed at a continent nobody chose — and the resolved code is
+ * stored on the row, so the panel can say where it looked.
+ */
+async function workspaceCountry(workspaceId: string): Promise<string | null> {
+  const { data } = await supabase
+    .from('finance_settings')
+    .select('business_country_code')
+    .eq('workspace_id', workspaceId)
+    .maybeSingle();
+  return isoCountryCode((data as { business_country_code?: string | null } | null)?.business_country_code);
 }
 
 interface PartyRow {
@@ -180,7 +196,20 @@ export async function handleGoogleBusiness(req: Request): Promise<Response> {
           { status: 400, headers: corsHeaders },
         );
       }
-      const countryCode = isoCountry(party.row.country_code);
+      const countryCode = isoCountryCode(String(body.country_code ?? ''))
+        ?? isoCountryCode(party.row.country_code)
+        ?? await workspaceCountry(party.row.workspace_id);
+      if (!countryCode) {
+        // Refused BEFORE the spend gate, so nothing is charged for a search we already know is
+        // pointed at the wrong place.
+        return new Response(
+          JSON.stringify({
+            error: 'No country to search in. Set the country on this record, or your own in '
+              + 'Finance → Settings → Business Profile, and try again.',
+          }),
+          { status: 400, headers: corsHeaders },
+        );
+      }
 
       const result = await callDataForSEO(
         'business_google_my_business_info',
@@ -220,7 +249,16 @@ export async function handleGoogleBusiness(req: Request): Promise<Response> {
       if (error) {
         return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: corsHeaders });
       }
-      let prune = supabase.from('crm_google_business_profiles').delete().neq('id', (inserted as { id: string }).id);
+
+      // Prune by AGE, not by "everything that is not me". Two operators refreshing the same
+      // party at once each delete the other's row under the `neq id` form, and both paid calls
+      // end with ZERO stored mirrors and a panel holding a dead id — the silent-zero shape,
+      // arrived at from two successful lookups. Deleting only what is strictly older is monotone:
+      // whichever row is newest survives both passes, and a tie keeps both (the read takes one).
+      let prune = supabase
+        .from('crm_google_business_profiles')
+        .delete()
+        .lt('fetched_at', (inserted as { fetched_at: string }).fetched_at);
       prune = companyId ? prune.eq('company_id', companyId) : prune.eq('contact_id', contactId!);
       await prune;
 

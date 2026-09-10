@@ -871,6 +871,7 @@ export const googleBusinessAPI = {
   async lookup(
     parent: { companyId?: string; contactId?: string },
     query?: string,
+    countryCode?: string,
   ): Promise<{ profile: GoogleBusinessProfile; error?: string }> {
     const token = await getAuthToken();
     const response = await fetch(`${getApiBase()}/crm-api/google-business`, {
@@ -880,6 +881,9 @@ export const googleBusinessAPI = {
         company_id: parent.companyId,
         contact_id: parent.contactId,
         query: query || undefined,
+        // Absent = let the server resolve it (party → workspace). It refuses rather than
+        // defaulting, so an unresolvable country is an error the operator can act on.
+        country_code: countryCode || undefined,
       }),
     });
     const body = await response.json().catch(() => ({} as Record<string, unknown>));

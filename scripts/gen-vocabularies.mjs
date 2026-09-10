@@ -175,6 +175,16 @@ export const VOCABULARIES = [
     'supabase/functions/_shared/crm/greekTransliteration.generated.ts',
   ],
   [
+    // VAT registration code → ISO-3166. `EL` (Greece) and `UK` are the two that differ, and the
+    // consumers that care sit on both sides of the runtime boundary: the CRM's Google Business
+    // lookup resolves a search location on the edge before it spends, and the client builds a
+    // maps query from the same column. DataForSEO defaults an unknown code to the US rather than
+    // rejecting it, so the two copies drifting apart is a billed lookup on the wrong continent
+    // reported as "no listing".
+    'src/lib/countryCodes.ts',
+    'supabase/functions/_shared/countryCodes.generated.ts',
+  ],
+  [
     // #353 CRM-4/CRM-7 — the VAT normaliser. Mirrored because the validation receipt is keyed
     // on it, written by `vies-validate` / `myaade-rgwspublic2` and read by `crm-api`.
     'src/services/crm/vatNormalize.ts',

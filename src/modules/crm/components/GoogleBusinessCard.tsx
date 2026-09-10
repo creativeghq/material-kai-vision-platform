@@ -89,6 +89,8 @@ export const GoogleBusinessCard: React.FC<Props> = ({
   const [busy, setBusy] = useState(false);
   const [editingQuery, setEditingQuery] = useState(false);
   const [query, setQuery] = useState('');
+  /** Blank = let the server resolve it from the party, then the workspace. */
+  const [country, setCountry] = useState('');
 
   const load = useCallback(async () => {
     if (!companyId && !contactId) { setLoading(false); return; }
@@ -111,7 +113,7 @@ export const GoogleBusinessCard: React.FC<Props> = ({
   const runLookup = async () => {
     setBusy(true);
     try {
-      const { profile: p, error } = await googleBusinessAPI.lookup(parent, query);
+      const { profile: p, error } = await googleBusinessAPI.lookup(parent, query, country);
       setProfile(p);
       setEditingQuery(false);
       if (error) {
@@ -184,6 +186,19 @@ export const GoogleBusinessCard: React.FC<Props> = ({
                 businesses of the same name apart.
               </p>
             </div>
+            <div className="w-28 space-y-1">
+              {/* WHICH Google matters: the search runs in one country's index, and the wrong one
+                  answers "no listing" rather than failing. Blank = the record's country, then
+                  the workspace's; the server refuses instead of guessing when neither is set. */}
+              <label htmlFor="gbp-country" className="text-xs font-medium text-muted-foreground">Country</label>
+              <Input
+                id="gbp-country"
+                value={country}
+                onChange={(e) => setCountry(e.target.value.toUpperCase().slice(0, 2))}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void runLookup(); } }}
+                placeholder={profile?.location_country_code || 'auto'}
+              />
+            </div>
             <div className="flex gap-2">
               <Button size="sm" variant="ghost" onClick={() => setEditingQuery(false)} disabled={busy}>Cancel</Button>
               <Button size="sm" onClick={runLookup} disabled={busy || !query.trim()}>
@@ -223,9 +238,10 @@ export const GoogleBusinessCard: React.FC<Props> = ({
           <div className="space-y-2 rounded-md border border-hairline p-3 text-sm">
             <p className="font-medium">No Google listing under that name</p>
             <p className="text-muted-foreground">
-              Google answered and has no Business Profile matching “{profile.query}”. Many
-              wholesalers and manufacturers genuinely have none — try the trading name, or add
-              the town.
+              Google answered and has no Business Profile matching “{profile.query}”
+              {profile.location_country_code ? ` in ${profile.location_country_code}` : ''}. Many
+              wholesalers and manufacturers genuinely have none — try the trading name, add the
+              town, or check the country the search ran in.
             </p>
             <p className="text-[11px] text-muted-foreground">Checked {formatDate(profile.fetched_at)}</p>
           </div>
@@ -288,6 +304,7 @@ export const GoogleBusinessCard: React.FC<Props> = ({
             <div className="flex flex-wrap items-center justify-between gap-2 border-t border-hairline pt-3">
               <span className="text-[11px] text-muted-foreground">
                 From Google {formatDate(profile.fetched_at)} · searched “{profile.query}”
+                {profile.location_country_code ? ` in ${profile.location_country_code}` : ''}
               </span>
               <div className="flex items-center gap-2">
                 {/* The listing's own place_id/cid — Maps opens THIS business, not a text guess. */}
