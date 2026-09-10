@@ -1,20 +1,4 @@
-/**
- * Viva.com BYOK setup card.
- *
- * Mounted in Profile → Keys (WorkspaceKeysTab) alongside the other per-workspace BYOK
- * cards, and on the payments-viva module settings page.
- *
- * THE STEP ORDER IS LOAD-BEARING. Creating the payment source comes first because it is
- * what MINTS the 4-digit source code the credentials step asks for — the previous version
- * asked for the code in step 1 and only mentioned the source in step 2, so there was no
- * order in which a first-time reader could follow it.
- *
- * Two things get equal weight to the credentials, deliberately, because both fail SILENTLY:
- *   - the webhook, since Viva has no API to register one for the tenant. Skip it and their
- *     customers' payments succeed at Viva while their invoices never mark paid;
- *   - the connection test, since a wrong source code authenticates, saves, and is accepted
- *     everywhere right up until the first real sale.
- */
+/** Viva.com BYOK setup card. */
 import React, { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Copy, CreditCard, ExternalLink, Loader2, XCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -645,17 +629,31 @@ export const VivaConfigCard: React.FC<Props> = ({ workspaceId }) => {
           </div>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm">RF code (bank transfer) <span className="text-warning">— coming soon</span></p>
+              <p className="text-sm">RF code (bank transfer)</p>
               <p className="text-xs text-muted-foreground">
-                Greek merchants only. The buyer pays from their banking app using a 20-digit
-                reference — no IBAN needed. Temporarily unavailable while we finish verifying the
-                bank-transfer settlement flow; only card is offered at checkout for now.
+                Greek merchants only, EUR only. The buyer pays from their own banking app using a
+                20-digit reference — no IBAN needed. The code is minted once per invoice, never
+                expires, and prints on the PDF above the bank details as well as in the invoice email.
               </p>
+              {/*
+                A bank transfer produces NO card transaction, so RF settles only through Viva's 2054
+                `Account Transaction Created` webhook — there is no periodic sweep behind it. Offering
+                it while Viva has never delivered a webhook means the customer pays and the invoice
+                stays open: the worst of the silent shapes, because the money really did move. Say so
+                rather than quietly accepting the toggle.
+              */}
+              {!status?.last_webhook_at && (
+                <p className="mt-1 text-xs text-warning">
+                  Viva has never delivered a webhook to us. A bank transfer settles ONLY through the
+                  2054 notification, so turn this on once a delivery has arrived — until then a paid
+                  RF invoice would stay unpaid on the books.
+                </p>
+              )}
             </div>
             <Switch
-              checked={false}
+              checked={(status?.methods ?? []).includes('bank_reference')}
               onCheckedChange={(on) => toggleMethod('bank_reference', on)}
-              disabled
+              disabled={saving || !credsReady}
             />
           </div>
 

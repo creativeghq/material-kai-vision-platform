@@ -19,16 +19,6 @@ Deno.serve(withApiLogging('finance-send-invoice-email', async (req) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
   // A TRUSTED INTERNAL CALLER IS ALLOWED, because the seeded "Invoice Issued" flow is one.
-  //
-  // `requireUser: true` rejected the flow engine, which runs as the service role — so the only
-  // way to send a customer their actual invoice was for a person to press Send. The automatic
-  // path emitted a one-line "your invoice has been issued" with no document attached, which is
-  // a notification about an invoice, not the invoice.
-  //
-  // `secret` level is only reachable by something already holding the service-role key, i.e.
-  // another edge function; there is no route to it from a browser. The tenancy check below still
-  // applies to every human caller, and the workspace is read off the INVOICE either way — never
-  // from the request body.
   const auth = await authenticate(req, { requireUser: false, allowedRoles: ['admin', 'super_admin', 'owner', 'finance'] });
   if (!auth.success) return json({ error: auth.error ?? 'Unauthorized' }, 401);
   const internal = auth.level === 'secret';
@@ -140,11 +130,16 @@ Deno.serve(withApiLogging('finance-send-invoice-email', async (req) => {
       const rf = await ensureInvoiceRf(supabase, invoice_id);
       if (rf?.rfCode) {
         rfCode = rf.rfCode;
+        // State the amount the CODE is for, not the invoice total. `ensureInvoiceRf` mints against
+        // `amount_due`, so on a part-paid invoice this told the customer to transfer the full total
+        // while the code expected the remainder — Viva matches by amount, so the payment would not
+        // settle AND the customer would have overpaid by everything already paid.
+        const rfAmount = money(Number(rf.amount ?? inv.amount_due ?? 0), inv.currency);
         rfHtml = `
       <div style="margin:16px 0;padding:12px 14px;background:#f6f2f5;border-radius:8px">
         <div style="color:#666;font-size:12px">Pay by bank transfer — no IBAN needed</div>
         <div style="font-family:monospace;font-size:16px;font-weight:700;letter-spacing:1px;margin-top:4px">${esc(rf.rfCode)}</div>
-        <div style="color:#888;font-size:11px;margin-top:4px">Use this code as the payment reference in your banking app. Transfer exactly ${total}.</div>
+        <div style="color:#888;font-size:11px;margin-top:4px">Use this code as the payment reference in your banking app. Transfer exactly ${rfAmount}.</div>
       </div>`;
       }
     }

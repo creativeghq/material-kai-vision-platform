@@ -35,20 +35,7 @@ import { lineDetailLabel } from '../_shared/finance/configured-options.ts';
 // Open Sans — the platform-wide typeface. Static TTFs cover full Greek + Latin +
 // Cyrillic + Euro (verified), so Greek invoice text renders correctly. SemiBold is
 // the document "bold" (the app's heaviest loaded weight).
-/**
- * #374 Phase 6 — attach each line's full chosen variant, derived by SQL `variant_label`.
- *
- * The two renderers below printed `selected_color` / `selected_size` only, so a finish, a wood
- * species or an IP rating was chosen, priced and stored and then never appeared on the invoice.
- * Derived in SQL rather than assembled here because the rule needs the field registry — which
- * keys are identity axes at all, and which are internal and must never reach a customer document.
- *
- * Mutates in place onto `_variant_label`; best-effort, because an invoice must still render when
- * the registry is unreachable, and then the projected columns carry it exactly as before.
- *
- * `credit_note_items` carries no `selected_attributes` column, so those rows simply get no label
- * and fall back — the same output they produce today.
- */
+/** #374 Phase 6 — attach each line's full chosen variant, derived by SQL `variant_label`. */
 async function attachVariantLabels(supabase: any, items: any[]): Promise<void> {
   if (!items?.length) return;
   try {
@@ -225,20 +212,7 @@ function fmtMoney(n: any, currency: string, lang: Lang): string {
 }
 
 
-/**
- * Signed URL for a stored PDF — or null when the object is not actually there.
- *
- * A recorded `pdf_storage_path` is bookkeeping, not proof of a file. Objects get
- * removed out of band: `storage-orphan-cleanup-cron` deleted every payment
- * receipt on this project while `payments` was missing from
- * `build_storage_reference_set()`, and the rows kept pointing at them.
- * `createSignedUrl()` signs a path without checking it resolves, so the cache
- * branches below were handing back URLs that 404 — a "cached: true" response
- * that is simply wrong.
- *
- * Check the world, not the bookkeeping: probe storage, and let the caller fall
- * through to a rebuild when the file is gone.
- */
+/** Signed URL for a stored PDF — or null when the object is not actually there. */
 // Typed by what the helper actually uses rather than by a SupabaseClient
 // generic: `ReturnType<typeof createClient>` instantiates the generics
 // differently from the client this function builds, and the mismatch is noise
@@ -339,11 +313,6 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
   // re-render it for a DIFFERENT amount — that would hand the customer a second receipt whose
   // figure no longer matches the one they have. Applying credit no longer mutates payment
   // amounts (it allocates), so this is defense-in-depth: serve the issued copy unchanged.
-  //
-  // Rebuilding a receipt whose FILE has vanished is not that case: the re-render reuses the
-  // stored receipt_number and the row's own amounts, so the customer's copy still matches.
-  // Note this branch deliberately ignores `regenerate` — an issued receipt is never
-  // re-rendered on request, only restored when its file is genuinely absent.
   if (kind === 'payment_receipt' && (row as any).receipt_number && row.pdf_storage_path) {
     const url = await signedIfPresent(supabase.storage, row.pdf_storage_path);
     if (url) return json({ ok: true, pdf_url: url, pdf_storage_path: row.pdf_storage_path, cached: true });
@@ -393,10 +362,6 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
       // New balance = the party's AR position after this payment. Positive = still owes;
       // negative = in credit. Delegated to get_customer_open_balance so there is exactly ONE
       // definition of a customer balance in the platform.
-      // Only ever computed for direction='in'. A receipt for money we paid OUT (an expense,
-      // a supplier bill) is an AP event: it moves the bank account, never the customer's
-      // receivable. The previous hand-rolled sum here counted BOTH directions, so paying a
-      // party inflated what that same party appeared to owe us.
       let newBalance: number | null = null;
       if (row.direction === 'in' && (row.counterparty_company_id || row.counterparty_contact_id)) {
         try {
@@ -570,12 +535,6 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
     }
 
     // WHO TRANSMITTED IT, named on the paper.
-    // The provider's General Provider Rules require every document issued through their service
-    // to display the provider's name and website. Read from the connector that ACTUALLY carried
-    // this document (`fiscal_submissions.connector_slug`) rather than from the workspace's
-    // current binding — a document transmitted last year through one provider must keep crediting
-    // that provider after the binding changes — and never hardcoded here, which would credit
-    // Novus for a document Novus never saw.
     if (transmittedBy) {
       const { data } = await supabase.from('fiscal_connectors')
         .select('legal_display_name, legal_website')
@@ -802,11 +761,6 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
   // and a Greek business issuing at 00:30 Athens time would print YESTERDAY on a fiscal document
   // that AADE numbered under today. That is the CLAUDE.md §1b defect landing on the paper the
   // customer keeps.
-  //
-  // The zone is the one the WORKSPACE already stores (`hr_settings.timezone`, NOT NULL, default
-  // Europe/Athens) — the same value payroll and the Ergani filings are timed by. Deriving it from
-  // the issuer's country instead would have been a second mechanism beside a working one, and a
-  // worse one: `business_country_code` is null on most rows.
   const fiscalTz = tz || 'Europe/Athens';
   const fmtIssueDate = (d: Date) => d.toLocaleDateString(locale, { timeZone: fiscalTz });
   const fmtIssueTime = (d: Date) => d.toLocaleTimeString(locale, {
@@ -1004,11 +958,6 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
   // discounted line reads "2 x 100.00 -> Net 150.00" on the customer's copy, and without the
   // per-line VAT and other-taxes columns the only place those amounts appear is a document
   // total nobody can tie back to a line.
-  //
-  // A charge column is drawn only when at least one line uses it. The reference document this
-  // was modelled on prints 0,00 in every charge column on every line; showing them
-  // unconditionally would cost the description column ~90pt on an ordinary invoice that has no
-  // discount and no other taxes.
   const anyDiscount = (items ?? []).some((it: any) => Number(it.discounted_price ?? 0) > 0);
   const anyOtherTaxes = (items ?? []).some((it: any) => Number(it.other_taxes_amount ?? 0) > 0);
   // Right-aligned money columns, laid out from the right edge inward, so the description
@@ -1172,7 +1121,6 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
   // BEFORE cashFactor was even computed — pre-discount rows sitting beside post-discount
   // totals on the same document — and separately rounded its own running VAT sum for the
   // total instead of summing the rows it had just printed. Both are fixed by deriving everything
-  // below from `vatRows`, which is what the reader can actually add up.
   const cashPct = Number(inv.cash_discount_pct ?? 0);
   const cashFactor = cashPct > 0 && cashPct < 100 ? 1 - cashPct / 100 : 1;
   const r2n = (n: number) => Math.round(n * 100) / 100;
@@ -1431,6 +1379,20 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
     }
     if (detail) accountLines.push(a?.label ? `${a.label}: ${detail}` : detail);
   }
+  // ── Viva RF bank-transfer code — ABOVE the bank details, deliberately. ──
+  //    It read as a footnote to the IBANs when it is the opposite: an RF code makes them
+  //    unnecessary. Twenty digits pasted into a banking app reconcile themselves, where paying an
+  //    IBAN by hand means a reference we then have to match on text — the path that produces
+  //    unmatched money in the feed. Whichever is listed first is the one most people use, so the
+  //    one that settles itself goes first. The IBANs stay: RF is Greek-domestic and EUR-only.
+  if (rfCode) {
+    if (y < M + 60) newPage();
+    const rfColor = spec.headerStyle === 'sidebar' ? colors.accent : MUTED;
+    text(`${L.rfCode}: ${rfCode}`, M, y, 9, bold, rfColor); y -= 11;
+    for (const nl of wrap(L.rfNote, font, 7.5, right - M)) { text(nl, M, y, 7.5, font, MUTED); y -= 9; }
+    y -= 4;
+  }
+
   if (payBits.length || accountLines.length) {
     if (y < M + 110) newPage();
     // Sidebar (Modern) prints bank details in the accent color, like the design reference.
@@ -1440,16 +1402,6 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
       if (y < M + 60) newPage();
       text(i === 0 ? `${L.bank}: ${line}` : line, M, y, 8.5, font, bankColor); y -= 11;
     });
-    y -= 4;
-  }
-
-  // ── Viva RF bank-transfer code — printed right below the IBANs so a customer holding
-  //    the document (and not the pay link) can pay by bank transfer with no IBAN. ──
-  if (rfCode) {
-    if (y < M + 60) newPage();
-    const rfColor = spec.headerStyle === 'sidebar' ? colors.accent : MUTED;
-    text(`${L.rfCode}: ${rfCode}`, M, y, 9, bold, rfColor); y -= 11;
-    for (const nl of wrap(L.rfNote, font, 7.5, right - M)) { text(nl, M, y, 7.5, font, MUTED); y -= 9; }
     y -= 4;
   }
 
