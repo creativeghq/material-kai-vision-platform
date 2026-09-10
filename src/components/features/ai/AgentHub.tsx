@@ -20,8 +20,6 @@ import {
   X,
   LayoutTemplate,
   Layers,
-  PanelRightClose,
-  PanelRightOpen,
   Plus,
   Globe,
   GripVertical,
@@ -63,7 +61,10 @@ import { DemoAgentResults } from './DemoAgentResults';
 import { AgentResultCard } from './AgentResultCard';
 import { useRecordLinkAccess } from '@/hooks/useRecordLinkAccess';
 import { ConversationManagerModal } from './ConversationManagerModal';
-import { CanvasPanel, ArtifactChip, type CanvasArtifact, type CanvasArtifactGroup } from './CanvasPanel';
+import {
+  ArtifactModal, ArtifactChip, artifactKindIcon, artifactKindLabel,
+  type CanvasArtifact, type CanvasArtifactGroup,
+} from './CanvasPanel';
 import {
   SheetInspector, StagingInspector, ProductsInspector, WorldInspector, BoardInspector, RenderInspector,
   JobFindingsInspector, SourcingInspector, OrderInspector, MentionSummaryInspector, MentionFeedInspector,
@@ -1002,20 +1003,16 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   // the two role facts the destination routes branch on. Resolved once here — the card takes it
   // as a prop so it stays renderable outside every provider.
   const recordLinkAccess = useRecordLinkAccess();
-  // Studio canvas: artifacts (moodboard sheet / products /
-  // virtual staging) render full-width in a left-docked panel; the chat sits on
-  // the right. Off by default — opening it collapses the matching chat cards to
-  // chips so each artifact lives in exactly one place.
-  // Canvas is shown automatically whenever the conversation has an artifact, so
-  // the chat auto-docks to a right rail while you work. `canvasHidden` lets the
-  // user reclaim a full-width chat; `chatCollapsed` hides the chat to focus the canvas.
-  const [canvasHidden, setCanvasHidden] = useState(false);
-  // On a phone the canvas and the chat can NEVER share the viewport — a 390px
-  // screen split between a flex-1 canvas and a 400px chat rail collapsed the
-  // canvas to a sliver. Below `md` the studio is single-pane: `chatCollapsed`
-  // doubles as "the canvas is the active pane", and exactly one is mounted.
   const isMobile = useIsMobile();
-  const [chatCollapsed, setChatCollapsed] = useState(false);
+  /**
+   * The artifact currently OPEN, or null for "the conversation is all you see".
+   *
+   * The canvas used to be a docked pane, which made the chat a 400px rail for the whole
+   * conversation and gave every turn a tab whether it produced anything or not. It is a modal
+   * now: one full-width chat, an artifact is a chip in the stream, and this id is the one thing
+   * that decides whether something is over it. `canvasHidden` / `chatCollapsed` / `railMode` are
+   * gone with the pane — there is nothing to dock, collapse or size against.
+   */
   const [activeCanvasId, setActiveCanvasId] = useState<string | null>(null);
   /**
    * The top-up offer, when a turn was refused for credits. A dialog rather than a route: the
@@ -2510,12 +2507,12 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         workflowRunId: boundWorkflowRunId ?? undefined,
       }),
     }));
-    // Open the canvas ON the page this turn draws. The tab-validity effect below only moves
-    // focus when the current tab stops existing, so without this a second turn would leave the
-    // canvas parked on the previous turn's result while the new one ran unseen behind a tab.
-    // For a workflow step that page is the PIPELINE's — the tool run is deliberately
-    // suppressed, so focusing its id would be focusing a tab that does not exist.
-    setActiveCanvasId(`run:${boundWorkflowRunId ?? runId}`);
+    // NOTHING is opened here, deliberately. Starting a turn is not a result: the work reports
+    // itself on the run line in the stream, and the modal opens only when the turn actually
+    // PRODUCES something (the yield effect). This line used to select the turn's run, which is
+    // why a conversation of prose answers spent itself behind a checklist.
+    // A previous turn's artifact is left open on purpose — you asked a follow-up about the thing
+    // you are looking at, so taking it off the screen the moment you press send is wrong.
 
     // The turn is committed, so the toolkit-onboarding focus has done its job. This is the
     // "or sends any message" clause the state's own comment has always claimed and never
@@ -4806,8 +4803,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
   // Reset the canvas when switching conversations.
   useEffect(() => {
-    setCanvasHidden(false);
-    setChatCollapsed(false);
     setActiveCanvasId(null);
     setHiddenArtifactIds([]);
     // Runs are live state for THIS thread's turns — a reloaded conversation replays its
@@ -4819,54 +4814,51 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   }, [currentConversationId]);
 
   /**
-   * A run page yields, ONCE, to what its turn produced.
+   * PRODUCING something opens it. Starting a turn does not.
    *
-   * Watching the work is the point until there is an outcome; then the outcome is. Without
-   * this the canvas sits on a finished checklist while the article it wrote is one tab away,
-   * unopened. Once per run, because a user who clicks back to "how it ran" must be able to
-   * stay there — an effect that re-yields every render is a tab you cannot open.
+   * This is the whole difference between the canvas as a pane and the canvas as a thing you
+   * open. The pane version selected the turn's run at the SEND site, before a single tool had
+   * reported, so every turn took the screen — and most turns produce prose, which meant the
+   * answer got a 400px rail and the canvas got a checklist of nothing. Conversation d3ec683e is
+   * four of those in a row.
+   *
+   * Keyed on the RUNS of this session, never on `canvasGroups` alone: loading a conversation
+   * rebuilds every past artifact into a group, and an effect that opened "the newest" would pop
+   * a modal over a thread you had only just opened. Runs are cleared per conversation, so a
+   * historical artifact has none and can never trigger this.
+   *
+   * Once per run, because a user who closes the modal must be able to keep it closed — an
+   * effect that re-opens every render is a modal you cannot dismiss.
    */
   const yieldedRunsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
-    if (!activeCanvasId?.startsWith('run:')) return;
-    const runId = activeCanvasId.slice('run:'.length);
-    if (yieldedRunsRef.current.has(runId)) return;
-    const group = canvasGroups.find((g) => g.members.some((m) => m.id === activeCanvasId));
-    const produced = group?.members.filter((m) => m.kind !== 'run') ?? [];
-    if (produced.length === 0) return;
-    yieldedRunsRef.current.add(runId);
-    setActiveCanvasId(produced[produced.length - 1].id);
-    // ...and SHOW it. Selecting a tab in a canvas the user has closed changes nothing they
-    // can see: `canvasHidden` unmounts the whole pane, so every toolkit that finished while
-    // the canvas was collapsed produced a result into a surface that was not on screen, and
-    // the only clue was a chip in the chat. This is the one place it is right to re-open —
-    // the turn has PRODUCED something, which is what they asked for. Run START deliberately
-    // does not (see the `setActiveCanvasId` at the send site): re-opening a pane on every
-    // turn would fight a user who just closed it to read the chat full-width.
-    setCanvasHidden(false);
-  }, [canvasGroups, activeCanvasId]);
-
-  // Keep the active tab valid; default to the newest artifact.
-  useEffect(() => {
-    if (canvasArtifacts.length === 0) {
-      setActiveCanvasId(null);
-      return;
+    for (const run of displayRuns) {
+      if (yieldedRunsRef.current.has(run.run_id)) continue;
+      const group = canvasGroups.find((g) => g.members.some((m) => m.id === `run:${run.run_id}`));
+      const produced = group?.members.filter((m) => m.kind !== 'run') ?? [];
+      if (produced.length === 0) continue;
+      yieldedRunsRef.current.add(run.run_id);
+      // The LAST thing the turn produced: the outcome, with the steps that made it behind it
+      // on the sub-tabs.
+      setActiveCanvasId(produced[produced.length - 1].id);
     }
-    setActiveCanvasId((prev) =>
-      prev && canvasArtifacts.some((a) => a.id === prev)
-        ? prev
-        : canvasArtifacts[canvasArtifacts.length - 1].id,
-    );
+  }, [canvasGroups, displayRuns]);
+
+  /**
+   * Keep the open artifact valid — and CLOSE when it goes.
+   *
+   * Deliberately not "fall back to the newest": that is what the tab strip did, and a strip
+   * always has something selected. A modal that re-points itself at an unrelated artifact when
+   * you delete the one you were reading is a modal that opened itself.
+   */
+  useEffect(() => {
+    setActiveCanvasId((prev) => (prev && canvasArtifacts.some((a) => a.id === prev) ? prev : null));
   }, [canvasArtifacts]);
 
-  // Bring a specific artifact into focus in the canvas (from a chat chip).
+  // Open an artifact over the conversation (from a chat chip, a run line, or the header list).
   const focusCanvas = useCallback((id: string) => {
     setActiveCanvasId(id);
-    setCanvasHidden(false);
-    // Desktop: dock the chat back open beside the canvas. Mobile: the canvas
-    // takes over the single pane (the chat is one tap away via the back arrow).
-    setChatCollapsed(isMobile);
-  }, [isMobile]);
+  }, []);
 
   // Attach a temporary catalog source PDF straight from chat. Reuses the exact
   // same upload path as the admin builder (catalogsService.uploadSourcePdf →
@@ -4954,7 +4946,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
   // Bespoke "data cards" (jobs / sourcing / POs / mentions / SEO / catalog). Extracted so the
   // SAME markup renders on the canvas AND inline. The trailing markdown content stays in
-  // the chat rail; this returns only the card body.
+  // the chat stream; this returns only the card body.
   const renderDataCardBody = (message: Message): React.ReactNode => {
     if (message.jobFindingsData) {
       return (
@@ -5436,6 +5428,31 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     return null;
   };
 
+  /**
+   * The artifact's line in the chat — derived, never typed out.
+   *
+   * The stream used to carry THIRTY hand-written `<ArtifactChip kind="…" title="…">` calls, each
+   * a second copy of the mapping `getCanvasArtifact` already makes, sitting inside a
+   * `canvasShown ? chip : fullCard` ternary that also duplicated `renderCanvasArtifact`'s whole
+   * body. Two registries of the same fact and two renderers of the same card, held together by
+   * nothing: a result could be called one thing on its chip and another on its tab, and a new
+   * artifact kind needed four edits to appear everywhere.
+   *
+   * One derivation names it, one renderer draws it, and this is the only thing the stream says
+   * about an artifact.
+   */
+  const renderArtifactChip = (message: Message): React.ReactNode => {
+    const artifact = getCanvasArtifact(message);
+    if (!artifact) return null;
+    return (
+      <ArtifactChip
+        artifact={artifact}
+        active={activeCanvasId === artifact.id}
+        onOpen={() => focusCanvas(artifact.id)}
+      />
+    );
+  };
+
   const renderCanvasArtifact = (message: Message): React.ReactNode => {
     if (message.generation_job) return renderGenerationGrid(message);
     if (message.demoData) {
@@ -5751,12 +5768,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     return [...signature, ...active].filter((tk) => (tk.quick_starts?.length || 0) > 0);
   }, [activeToolkits, selectedAgent, userRole, enabledModulesArray]);
 
-  // The agent welcome + toolkit starters. This is the canvas-first empty state:
-  // when the canvas is open with no artifact yet, it fills the middle workspace
-  // (instead of a dead "your canvas" placeholder). When the canvas is hidden it
-  // renders inside the chat rail instead. `withHero` shows the big agent intro
-  // (only for a brand-new, message-less chat); mid-conversation we show just the
-  // starter grid so the canvas isn't a void while outputs haven't landed yet.
+  // The agent welcome + toolkit starters — a fresh conversation's empty state, full width in
+  // the chat. It used to have a second home in the canvas pane, which is why it was written to
+  // take `withHero`: the pane rendered it with no hero mid-conversation, to avoid sitting there
+  // as a void while outputs had not landed. Nothing is a void now — a conversation with no
+  // artifacts is just a conversation — so this renders in exactly one place.
   const renderAgentStarters = (withHero: boolean): React.ReactNode => {
     const justTk = justEnabledToolkitId ? TOOLKITS.find((t) => t.id === justEnabledToolkitId) : null;
     const showJustEnabled = !!justTk && (justTk.quick_starts?.length || 0) > 0;
@@ -5871,19 +5887,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const activeRunRetryText = activeRun?.user_message_id
     ? visibleMessages.find((m) => m.id === activeRun.user_message_id)?.content?.replace(/^▶\s*/, '')
     : undefined;
-  // The canvas is the permanent middle workspace for every agent; the chat is a
-  // right rail. `canvasHidden` is an escape hatch to reclaim a full-width chat.
-  const canvasShown = !canvasHidden;
-  // Single-pane below `md`: the canvas is mounted only when it's the active pane.
-  const canvasPaneVisible = canvasShown && (!isMobile || chatCollapsed);
-  const chatPaneHidden = canvasShown && chatCollapsed;
-  // The chat is a fixed 400px rail whenever the canvas is docked beside it. Its
-  // header must be sized against THAT, not the viewport: `sm:`/`md:` are viewport
-  // queries, so on a 1900px screen they happily showed "Canvas" + "Conversations"
-  // + "⌘K" + "New" — ~508px of controls inside a 400px rail. The overflow ran off
-  // the right of the rail and got sheared off by Layout's `overflow-x-hidden` at
-  // the screen edge (⌘K cut in half, New invisible). Compact = icon-only controls.
-  const railMode = canvasShown && !isMobile;
+  /**
+   * The turn the open artifact belongs to — the modal draws its sub-tabs from this, so the
+   * steps behind a result stay reachable without a conversation-wide tab strip.
+   */
+  const activeCanvasGroup = activeCanvasId
+    ? canvasGroups.find((g) => g.members.some((m) => m.id === activeCanvasId)) ?? null
+    : null;
 
   return (
     <ActiveMoodboardProvider value={activeMoodboard} onChange={setActiveMoodboard}>
@@ -5901,19 +5911,21 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         onTogglePin={handleTogglePin}
       />
 
-      {/* Studio canvas — full-width artifact workspace, docked left of the chat */}
-      {canvasPaneVisible && (
-        <CanvasPanel
-          groups={canvasGroups}
-          activeId={activeCanvasId}
-          onSelect={setActiveCanvasId}
-          onCloseArtifact={handleCloseArtifact}
-          onDeleteArtifact={handleDeleteArtifact}
-          singlePane={isMobile}
-          // Mobile's control is "back to chat"; desktop's is "close the canvas".
-          onClose={() => (isMobile ? setChatCollapsed(false) : setCanvasHidden(true))}
-          inspector={activeCanvasMessage ? renderCanvasInspector(activeCanvasMessage) : null}
-        >
+      {/* The open artifact, full size, over the conversation. Mounted only when something IS
+          open — there is no empty canvas to hold welcome copy any more, because the chat is
+          never behind anything. */}
+      <ArtifactModal
+        group={activeCanvasGroup}
+        activeId={activeCanvasId}
+        onSelect={setActiveCanvasId}
+        onCloseArtifact={handleCloseArtifact}
+        onDeleteArtifact={handleDeleteArtifact}
+        onClose={() => setActiveCanvasId(null)}
+        inspector={activeCanvasMessage ? renderCanvasInspector(activeCanvasMessage) : null}
+        // The same "set the input and send" every result card already uses — not a second
+        // composer, and the one thing a modal would otherwise take away from the docked pane.
+        onAsk={handleCardAsk}
+      >
           {activeRun ? (
             <RunCanvas
               run={activeRun}
@@ -5941,39 +5953,14 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             />
           ) : activeCanvasMessage
             ? renderCanvasArtifact(activeCanvasMessage)
-            : renderAgentStarters(visibleMessages.length === 0)}
-        </CanvasPanel>
-      )}
+            : null}
+      </ArtifactModal>
 
-      {/* Collapsed-chat handle — re-dock the chat when the canvas is full-screen */}
-      {canvasShown && chatCollapsed && !isMobile && (
-        <button
-          onClick={() => setChatCollapsed(false)}
-          title="Show chat"
-          className="flex w-10 shrink-0 flex-col items-center gap-2 border-l border-hairline bg-sidebar py-4 text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <PanelRightOpen className="h-5 w-5" />
-          <span className="[writing-mode:vertical-rl] text-[11px] font-medium uppercase tracking-wider">Chat</span>
-        </button>
-      )}
-
-      {/* Main Chat Area — full width, or a collapsible right rail when the canvas is shown */}
-      <div
-        className={cn(
-          'min-h-0 flex flex-col',
-          chatPaneHidden && 'hidden',
-          // Right rail beside the canvas on desktop; full width on mobile (where
-          // the canvas is a separate, mutually-exclusive pane).
-          !chatPaneHidden && canvasShown && !isMobile
-            ? 'w-full max-w-[400px] shrink-0 border-l border-hairline'
-            : 'flex-1 min-w-0',
-        )}
-      >
+      {/* The conversation — the whole window. No rail, no collapse handle, no single-pane
+          mobile fork: there is only ever one thing behind the modal. */}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {/* Studio header — agent identity + conversation manager launcher */}
-        <div className={cn(
-          'flex items-center px-3 sm:px-4 py-2.5 border-b border-hairline shrink-0',
-          railMode ? 'gap-1.5' : 'gap-3',
-        )}>
+        <div className="flex shrink-0 items-center gap-3 border-b border-hairline px-3 py-2.5 sm:px-4">
           <AgentAvatar agentId={currentAgent?.id} className={cn('w-9 h-9 flex-shrink-0', currentAgent?.color)} />
           <div className="min-w-0 flex-1">
             <h3 className="text-sm font-bold tracking-tight leading-tight truncate">{currentAgent?.name}</h3>
@@ -5981,74 +5968,77 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               <p className="text-xs text-muted-foreground truncate">{currentConversationTitle}</p>
             )}
           </div>
-          <Button
-            variant={canvasShown && !isMobile ? 'default' : 'ghost'}
-            size={isMobile || railMode ? 'icon' : 'sm'}
-            onClick={() => {
-              // Mobile: swap to the canvas pane. Desktop: dock/undock it.
-              if (isMobile) {
-                setCanvasHidden(false);
-                setChatCollapsed(true);
-              } else {
-                setCanvasHidden((v) => !v);
-              }
-            }}
-            className={cn('relative shrink-0', !isMobile && !railMode && 'gap-2')}
-            title={isMobile ? 'Open canvas' : canvasShown ? 'Hide canvas' : 'Show canvas'}
-            aria-label={isMobile ? 'Open canvas' : canvasShown ? 'Hide canvas' : 'Show canvas'}
-          >
-            <LayoutTemplate className="h-4 w-4" />
-            <span className={cn('hidden', !railMode && 'sm:inline')}>Canvas</span>
-            {canvasArtifacts.length > 0 && (
-              <span
-                className={cn(
-                  'inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold',
-                  // Icon-only (mobile, or the docked rail) — the count rides the
-                  // corner instead of widening a fixed-size button.
-                  isMobile || railMode
-                    ? 'absolute -right-0.5 -top-0.5 bg-primary text-primary-foreground'
-                    : 'bg-primary/20',
-                )}
-              >
-                {canvasArtifacts.length}
-              </span>
-            )}
-          </Button>
-          {canvasShown && !isMobile && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setChatCollapsed(true)}
-              className="shrink-0"
-              title="Collapse chat"
-              aria-label="Collapse chat"
-            >
-              <PanelRightClose className="h-4 w-4" />
-            </Button>
+          {/* Everything this conversation has produced. The tab strip used to be the only way
+              back to an earlier artifact; without it, this list is — so it enumerates the same
+              `canvasGroups` the modal draws from rather than keeping its own idea of what
+              exists. Hidden entirely when the conversation has produced nothing, which is the
+              common case and used to render as a "Canvas" button leading to welcome copy. */}
+          {canvasArtifacts.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size={isMobile ? 'icon' : 'sm'}
+                  className={cn('relative shrink-0', !isMobile && 'gap-2')}
+                  title="Everything this conversation produced"
+                  aria-label="Artifacts"
+                >
+                  <LayoutTemplate className="h-4 w-4" />
+                  <span className="hidden sm:inline">Artifacts</span>
+                  <span
+                    className={cn(
+                      'inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold',
+                      isMobile
+                        ? 'absolute -right-0.5 -top-0.5 bg-primary text-primary-foreground'
+                        : 'bg-primary/20',
+                    )}
+                  >
+                    {canvasArtifacts.length}
+                  </span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-72">
+                {canvasGroups.map((g) => {
+                  const lead = g.members[g.members.length - 1];
+                  const GroupIcon = artifactKindIcon(lead.kind);
+                  return (
+                    <DropdownMenuItem key={g.id} onClick={() => focusCanvas(lead.id)}>
+                      <GroupIcon className="mr-2 mt-0.5 h-4 w-4 shrink-0 self-start text-primary" />
+                      <span className="flex min-w-0 flex-col">
+                        <span className="truncate">{lead.title}</span>
+                        <span className="truncate text-xs text-muted-foreground">
+                          {artifactKindLabel(lead.kind)}
+                          {g.members.length > 1 && ` · ${g.members.length} steps`}
+                        </span>
+                      </span>
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
           <Button
             variant="ghost"
-            size={railMode ? 'icon' : 'sm'}
+            size="sm"
             onClick={() => setConvManagerOpen(true)}
-            className={cn('shrink-0', !railMode && 'gap-2')}
+            className="shrink-0 gap-2"
             title="Conversations (⌘K)"
             aria-label="Conversations"
           >
             <MessageSquare className="h-4 w-4" />
-            <span className={cn('hidden', !railMode && 'sm:inline')}>Conversations</span>
-            <kbd className={cn('hidden rounded border border-white/15 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground', !railMode && 'md:inline')}>⌘K</kbd>
+            <span className="hidden sm:inline">Conversations</span>
+            <kbd className="hidden rounded border border-hairline bg-surface-sunken px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground md:inline">⌘K</kbd>
           </Button>
           <Button
             variant="outline"
-            size={railMode ? 'icon' : 'sm'}
+            size="sm"
             onClick={handleNewConversation}
-            className={cn('shrink-0', !railMode && 'gap-1.5')}
-            style={{ borderColor: 'var(--glass-border)' }}
+            className="shrink-0 gap-1.5"
             title="New conversation"
             aria-label="New conversation"
           >
             <Plus className="h-4 w-4" />
-            <span className={cn('hidden', !railMode && 'sm:inline')}>New</span>
+            <span className="hidden sm:inline">New</span>
           </Button>
         </div>
         {/* Active moodboard context — products added from the agent land here */}
@@ -6077,13 +6067,22 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               Without this rendered above the empty/non-empty branch, booting
               a workflow locally would update state but show nothing because
               the empty state still wins until the first message arrives. */}
-          {canvasPaneVisible ? (
-            // The canvas is hosting the run card (plan, steps, the step's form). The rail is
-            // 400px and the run card is a page — rendering it twice side by side was never the
-            // ask — so here it is one line saying work is happening, one tap from the page.
-            displayRuns.some((r) => r.status === 'running') && (
+          {/* The run LINE — "the other line that shows details of generations". It stays, and
+              it is now the only thing a working turn puts on screen: one line saying what is
+              happening, one click from the full run page.
+
+              Shown while a run is working, and afterwards only if TOOLS ACTUALLY RAN. A turn
+              that answered in prose has an empty step list, and announcing "Ran 0 tools" under
+              every reply is the thing this rebuild set out to remove — the pane used to give
+              that turn a whole tab. */}
+          {(() => {
+            const worthShowing = displayRuns.filter(
+              (r) => r.status === 'running' || r.step_order.length > 0,
+            );
+            if (worthShowing.length === 0) return null;
+            return (
               <div className="space-y-2">
-                {displayRuns.filter((r) => r.status === 'running').map((run) => (
+                {worthShowing.map((run) => (
                   <RunChip
                     key={`chip-${run.run_id}`}
                     run={run}
@@ -6092,9 +6091,18 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   />
                 ))}
               </div>
-            )
-          ) : (
-            Object.values(workflows).filter((wf) => wf.status !== 'aborted' && wf.status !== 'done').map((wf) => (
+            );
+          })()}
+
+          {/* A workflow that is ASKING renders its form in the stream, where the user is. It
+              used to render here only when the canvas pane was hidden, because the open pane
+              carried the same form in `RunCanvas`'s `formSlot`. The modal still does — so this
+              skips a workflow whose run is open, which is the one case that would draw the same
+              form twice. */}
+          {Object.values(workflows)
+            .filter((wf) => wf.status !== 'aborted' && wf.status !== 'done')
+            .filter((wf) => activeCanvasId !== `run:${wf.run_id}`)
+            .map((wf) => (
               <WorkflowWizardCard
                 key={`wizard-${wf.run_id}`}
                 runtime={wf}
@@ -6102,16 +6110,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 onSkip={handleWizardSkip}
                 onDismiss={handleWizardDismiss}
               />
-            ))
-          )}
+            ))}
 
-          {/* Just-enabled toolkit onboarding card — the moment a toolkit is
-              enabled, surface its quick-starts. When the canvas is open and
-              empty, the starters live IN the canvas (renderAgentStarters), so
-              suppress the chat copy there; still show it in chat when the canvas
-              is hidden, or when the canvas already holds an artifact (mid-session
-              enable) and the empty state won't render. */}
-          {justEnabledToolkitId && messages.length > 0 && (!canvasPaneVisible || canvasArtifacts.length > 0) && (() => {
+          {/* Just-enabled toolkit onboarding card — the moment a toolkit is enabled, surface
+              its quick-starts. The condition used to also ask whether the canvas pane was
+              mounted, because an empty canvas hosted a second copy of these starters; there is
+              no empty canvas to host them any more, so the chat is simply where they live. */}
+          {justEnabledToolkitId && messages.length > 0 && (() => {
             const tk = TOOLKITS.find((t) => t.id === justEnabledToolkitId);
             if (!tk || !(tk.quick_starts?.length || 0)) return null;
             return (
@@ -6152,23 +6157,25 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           })()}
 
           {visibleMessages.length === 0 && Object.values(workflows).filter((wf) => wf.status !== 'aborted' && wf.status !== 'done').length === 0 ? (
-            // Canvas-first: when the canvas is open it hosts the welcome +
-            // starters (renderAgentStarters), so the chat rail stays clean.
-            // Only render the starters here when the canvas pane isn't mounted —
-            // which on mobile is the normal case (single-pane), so a fresh chat
-            // still opens on the welcome + starters instead of a blank screen.
-            canvasPaneVisible ? null : renderAgentStarters(true)
+            // A fresh conversation opens on the welcome + starters, full width. This used to be
+            // conditional on the canvas pane being unmounted, because an open-and-empty canvas
+            // hosted the same block; the modal is never open with nothing in it, so this is the
+            // one place the starters render.
+            renderAgentStarters(true)
           ) : visibleMessages.length === 0 ? (
             // Wizard is active but no messages yet — wizard already renders above.
             null
           ) : (
             <>
-              {/* Workflow trackers — pinned above messages, one per active run. Suppressed
-                  while the canvas holds the run card, which says all of this at full size. */}
-              {!canvasPaneVisible && Object.values(workflows).length > 0 && (
+              {/* Workflow trackers — pinned above messages, one per active run. Suppressed for
+                  a run the modal is currently holding, which says all of this at full size. */}
+              {Object.values(workflows).some((wf) => activeCanvasId !== `run:${wf.run_id}`) && (
                 <div className="space-y-2">
                   {Object.values(workflows)
                     .filter((wf) => wf.status !== 'aborted')
+                    // The modal is drawing this one at full size; a tracker under it would be
+                    // the same plan twice on one screen.
+                    .filter((wf) => activeCanvasId !== `run:${wf.run_id}`)
                     .map((wf) => {
                       const awaitingId = wf.awaiting_input_step_id;
                       const showForm = awaitingId && wf.awaiting_input_schema && wf.awaiting_input_schema.length > 0;
@@ -6235,7 +6242,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     return <AgentAvatar agentId={ma?.id} className={cn('w-8 h-8', ma?.color)} />;
                   })()}
                   <div
-                    className={`${message.demoData || message.materialData || message.worldData || message.videoData || message.virtualStagingData || message.materialsBoardData || message.inspirationData || message.sheetCanvasData || message.actionConfirmationData || message.sheetPdfData || message.mentionSummaryData || message.llmVisibilityData || message.mentionFeedData || message.seoResearchData || message.seoGenericData || message.catalogExtractionData || message.catalogImageCandidatesData || message.sourcingOptionsData || message.purchaseOrderCreatedData || message.purchaseOrderSentData || message.agentResultData || message.techRadarData || message.jobFindingsData || message.articleData ? 'max-w-full' : 'max-w-[88%] sm:max-w-[75%]'} min-w-0 ${canvasShown ? 'overflow-x-auto' : ''} rounded-2xl p-3.5 sm:p-5 ${
+                    className={`${message.demoData || message.materialData || message.worldData || message.videoData || message.virtualStagingData || message.materialsBoardData || message.inspirationData || message.sheetCanvasData || message.actionConfirmationData || message.sheetPdfData || message.mentionSummaryData || message.llmVisibilityData || message.mentionFeedData || message.seoResearchData || message.seoGenericData || message.catalogExtractionData || message.catalogImageCandidatesData || message.sourcingOptionsData || message.purchaseOrderCreatedData || message.purchaseOrderSentData || message.agentResultData || message.techRadarData || message.jobFindingsData || message.articleData ? 'max-w-full' : 'max-w-[88%] sm:max-w-[75%]'} min-w-0 overflow-x-auto rounded-2xl p-3.5 sm:p-5 ${
                       message.role === 'user'
                         ? 'bg-[#1f2937] text-white shadow-md'
                         : 'msg-assistant text-white shadow-sm'
@@ -6252,61 +6259,21 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     {message.demoData ? (
                       <div className="space-y-4">
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        {canvasShown ? (
-                          <ArtifactChip kind="demo" title="Demo results" active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
-                        ) : (
-                          <DemoAgentResults
-                            result={message.demoData}
-                            onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
-                            onGenerateVideo={(imageUrl) => handleGenerateVideo(imageUrl, message)}
-                            onUseIn3DScene={handleUseProductIn3DScene}
-                          />
-                        )}
+                        {renderArtifactChip(message)}
                       </div>
                     ) : message.inspirationData ? (
                       <div className="space-y-3">
-                        {canvasShown ? (
-                          <ArtifactChip
-                            kind="inspiration"
-                            title={message.inspirationData.page_title || 'Inspiration board'}
-                            active={activeCanvasId === message.id}
-                            onOpen={() => focusCanvas(message.id)}
-                          />
-                        ) : (
-                          <InspirationCard
-                            sourceUrl={message.inspirationData.source_url}
-                            pageTitle={message.inspirationData.page_title}
-                            heroImage={message.inspirationData.hero_image}
-                            colors={message.inspirationData.colors}
-                            colorHex={message.inspirationData.color_hex}
-                            materials={message.inspirationData.materials}
-                            textures={message.inspirationData.textures}
-                            styles={message.inspirationData.styles}
-                            roomType={message.inspirationData.room_type}
-                            focus={message.inspirationData.focus}
-                            products={message.inspirationData.products}
-                            searchQueryUsed={message.inspirationData.search_query_used}
-                            totalResults={message.inspirationData.total_results}
-                          />
-                        )}
+                        {renderArtifactChip(message)}
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                       </div>
                     ) : message.heatPumpData ? (
                       <div className="space-y-3">
-                        {canvasShown ? (
-                          <ArtifactChip kind="calc" title="Heat-pump sizing" active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
-                        ) : (
-                          <HeatPumpResultCard result={message.heatPumpData.result} />
-                        )}
+                        {renderArtifactChip(message)}
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                       </div>
                     ) : message.heatingCostData ? (
                       <div className="space-y-3">
-                        {canvasShown ? (
-                          <ArtifactChip kind="calc" title="Heating cost comparison" active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
-                        ) : (
-                          <HeatingCostResultCard result={message.heatingCostData.result} />
-                        )}
+                        {renderArtifactChip(message)}
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                       </div>
                     ) : message.kitchenCostData ? (
@@ -6316,399 +6283,130 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       </div>
                     ) : message.techRadarData ? (
                       <div className="space-y-3">
-                        {canvasShown ? (
-                          <ArtifactChip
-                            kind="radar"
-                            title="Tech radar"
-                            active={activeCanvasId === message.id}
-                            onOpen={() => focusCanvas(message.id)}
-                          />
-                        ) : (
-                          <TechRadarFindingsCard data={message.techRadarData} />
-                        )}
+                        {renderArtifactChip(message)}
                         {message.content && <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />}
                       </div>
                     ) : message.jobFindingsData ? (
                       <div className="space-y-3">
-                        {canvasShown ? (
-                          <ArtifactChip kind="jobs" title={message.jobFindingsData.tracked_job_label ? `Jobs · ${message.jobFindingsData.tracked_job_label}` : 'Job findings'} active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
-                        ) : renderDataCardBody(message)}
+                        {renderArtifactChip(message)}
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                       </div>
                     ) : message.inputRequestData ? (
                       // Canvas-first, like every other artifact: when the canvas pane is up the
                       // question lives THERE and the chat keeps a one-line chip, which is the
                       // behaviour the user asked for — a follow-up should not be a wall of prose.
-                      canvasShown ? (
-                        <ArtifactChip
-                          kind="clarify"
-                          title={message.inputRequestData.title}
-                          active={activeCanvasId === message.id}
-                          onOpen={() => focusCanvas(message.id)}
-                        />
-                      ) : (
-                        <ClarifyCard
-                          data={message.inputRequestData}
-                          onSubmit={(sentence, answers) => handleClarifySubmit(message.id, sentence, answers)}
-                          onDismiss={(sentence) => handleClarifyDismiss(message.id, sentence)}
-                        />
-                      )
-                    ) : message.actionConfirmationData ? (
+                      renderArtifactChip(message)) : message.actionConfirmationData ? (
                       // Same rule as the question above: one card, in one place. With the canvas
                       // up it lives THERE and the stream keeps a chip, so the gate is never drawn
                       // twice and never drawn only where the viewport is not.
-                      canvasShown ? (
-                        <ArtifactChip
-                          kind="confirm"
-                          title={message.actionConfirmationData.title || 'Needs your approval'}
-                          active={activeCanvasId === message.id}
-                          onOpen={() => focusCanvas(message.id)}
-                        />
-                      ) : (
-                        <ActionConfirmationCard
-                          title={message.actionConfirmationData.title}
-                          summary={message.actionConfirmationData.summary}
-                          danger={message.actionConfirmationData.danger}
-                          status={message.actionConfirmationData.status}
-                          onApprove={() => handleActionApprove(message.id, message.actionConfirmationData!)}
-                          onDecline={() => handleActionDecline(message.id)}
-                        />
-                      )
-                    ) : message.agentResultData ? (
+                      renderArtifactChip(message)) : message.agentResultData ? (
                       <div className="space-y-3">
-                        {canvasShown ? (
-                          <ArtifactChip
-                            kind="result"
-                            title={message.agentResultData.title || 'Result'}
-                            active={activeCanvasId === message.id}
-                            onOpen={() => focusCanvas(message.id)}
-                          />
-                        ) : (
-                          <AgentResultCard title={message.agentResultData.title} data={message.agentResultData.data} resultType={message.agentResultData.resultType} onAsk={handleCardAsk} access={recordLinkAccess} />
-                        )}
+                        {renderArtifactChip(message)}
                       </div>
                     ) : message.sourcingOptionsData ? (
                       <div className="space-y-3">
-                        {canvasShown ? (
-                          <ArtifactChip kind="sourcing" title="Supply options" active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
-                        ) : renderDataCardBody(message)}
+                        {renderArtifactChip(message)}
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                       </div>
                     ) : message.purchaseOrderCreatedData ? (
                       <div className="space-y-3">
-                        {canvasShown ? (
-                          <ArtifactChip kind="order" title="Purchase orders created" active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
-                        ) : renderDataCardBody(message)}
+                        {renderArtifactChip(message)}
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                       </div>
                     ) : message.purchaseOrderSentData ? (
                       <div className="space-y-3">
-                        {canvasShown ? (
-                          <ArtifactChip kind="order" title={message.purchaseOrderSentData.order_number ? `PO ${message.purchaseOrderSentData.order_number}` : 'Purchase order sent'} active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
-                        ) : renderDataCardBody(message)}
+                        {renderArtifactChip(message)}
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                       </div>
                     ) : message.mentionSummaryData ? (
                       <div className="space-y-3">
-                        {canvasShown ? (
-                          <ArtifactChip kind="mentions" title="Mention summary" active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
-                        ) : renderDataCardBody(message)}
+                        {renderArtifactChip(message)}
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                       </div>
                     ) : message.llmVisibilityData ? (
                       <div className="space-y-3">
-                        {canvasShown ? (
-                          <ArtifactChip kind="llm" title="LLM visibility" active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
-                        ) : renderDataCardBody(message)}
+                        {renderArtifactChip(message)}
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                       </div>
                     ) : message.mentionFeedData ? (
                       <div className="space-y-3">
-                        {canvasShown ? (
-                          <ArtifactChip kind="mentions" title="Mention feed" active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
-                        ) : renderDataCardBody(message)}
+                        {renderArtifactChip(message)}
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                       </div>
                     ) : message.seoResearchData ? (
                       <div className="space-y-3">
-                        {canvasShown ? (
-                          <ArtifactChip kind="seo" title="SEO research" active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
-                        ) : renderDataCardBody(message)}
+                        {renderArtifactChip(message)}
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                       </div>
                     ) : message.seoGenericData ? (
                       <div className="space-y-3">
-                        {canvasShown ? (
-                          <ArtifactChip kind="seo" title="SEO" active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
-                        ) : renderDataCardBody(message)}
+                        {renderArtifactChip(message)}
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                       </div>
                     ) : message.materialData ? (
                       <div className="space-y-4">
-                        {/* Explainable search spec — shows how KAI interpreted the query.
-                            When the canvas is shown, it rides with the products artifact there
-                            (renderCanvasArtifact), so suppress the inline copy to avoid a duplicate. */}
-                        {message.searchSpec && !(canvasShown && (message.materialData?.products?.length ?? 0) > 0) && (
+                        {/* Explainable search spec — how KAI interpreted the query. When there
+                            are products it rides with them inside the artifact
+                            (`renderCanvasArtifact`), so the inline copy would be a duplicate;
+                            with no products there is no artifact to carry it and this is the
+                            only place it can appear. */}
+                        {message.searchSpec && (message.materialData?.products?.length ?? 0) === 0 && (
                           <SearchSpecCard spec={message.searchSpec} query={message.searchSpec.query || ''} />
                         )}
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        {/* Products open in the canvas; the chip stands in when it's shown */}
+                        {/* Products open in the modal; the chip is how the chat names them */}
                         {message.materialData.products && message.materialData.products.length > 0 && (
-                          canvasShown ? (
-                            <ArtifactChip
-                              kind="products"
-                              title={message.materialData.title || `${message.materialData.products.length} products`}
-                              active={activeCanvasId === message.id}
-                              onOpen={() => focusCanvas(message.id)}
-                            />
-                          ) : (
-                            <DemoAgentResults
-                              result={{
-                                type: 'product_list',
-                                data: message.materialData.products,
-                                message: message.materialData.title || 'Material Results',
-                              }}
-                              onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
-                              onGenerateVideo={(imageUrl) => handleGenerateVideo(imageUrl, message)}
-                              onUseIn3DScene={handleUseProductIn3DScene}
-                            />
-                          )
-                        )}
+                          renderArtifactChip(message))}
                       </div>
                     ) : message.geminiImageData ? (
                       <div className="space-y-3">
                         <MarkdownRenderer content={normalizeContent(message.content).replace(/!\[.*?\]\(https?:\/\/[^)]+\)/g, '').trim()} className="text-sm" />
-                        {canvasShown ? (
-                          <ArtifactChip kind="image" title="Generated image" active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
-                        ) : message.videoData ? (
-                          <video
-                            src={message.videoData.video_url}
-                            controls
-                            className="w-full rounded-xl border border-white/20 shadow-md"
-                          />
-                        ) : (
-                          <div
-                            role="button"
-                            tabIndex={0}
-                            onKeyDown={onEnterOrSpace(() => setGeminiModalImage(message.geminiImageData!.image_url))}
-                           className="relative group cursor-pointer" onClick={() => setGeminiModalImage(message.geminiImageData!.image_url)}>
-                            <img
-                              src={message.geminiImageData.image_url}
-                              alt="Gemini interior design"
-                              className="w-full rounded-xl border border-white/20 shadow-md transition-opacity group-hover:opacity-90"
-                              loading="lazy"
-                            />
-                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                              <span className="bg-black/60 text-white text-xs font-medium px-3 py-1.5 rounded-full backdrop-blur-sm">
-                                Click to open
-                              </span>
-                            </div>
-                          </div>
-                        )}
+                        {renderArtifactChip(message)}
                       </div>
                     ) : message.materialsBoardData ? (
                       <div className="space-y-3">
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        {canvasShown ? (
-                          <ArtifactChip kind="board" title="Materials board" active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
-                        ) : (<>
-                        <img
-                          src={message.materialsBoardData.image_url}
-                          alt={`Materials Selection Board — ${message.materialsBoardData.board_mode}`}
-                          className="w-full rounded-xl border border-white/20 shadow-md object-contain"
-                          loading="lazy"
-                        />
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full capitalize">
-                            {message.materialsBoardData.board_mode.replace(/-/g, ' ')}
-                          </span>
-                          <span className="ml-auto">{message.materialsBoardData.credits_used} credits used</span>
-                        </div>
-                        <div className="flex items-center justify-end gap-2">
-                          <MoodboardSavePopover
-                            mediaUrl={message.materialsBoardData.image_url}
-                            mediaType="image"
-                            mediaTitle={`Materials Selection Board — ${message.materialsBoardData.board_mode.replace(/-/g, ' ')}`}
-                          />
-                          <a
-                            href={safeHref(message.materialsBoardData.image_url)}
-                            download
-                            title="Download board"
-                          >
-                            <Button variant="outline" size="sm" className="gap-2">
-                              <Download className="h-4 w-4" />
-                              Download
-                            </Button>
-                          </a>
-                        </div>
-                        </>)}
+                        {renderArtifactChip(message)}
                       </div>
                     ) : message.sheetCanvasData ? (
                       <div className="space-y-3">
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        {canvasShown ? (
-                          <ArtifactChip
-                            kind="sheet"
-                            title={message.sheetCanvasData.title || 'Presentation sheet'}
-                            active={activeCanvasId === message.id}
-                            onOpen={() => focusCanvas(message.id)}
-                          />
-                        ) : (
-                          <SheetCanvasCard
-                            sheetId={message.sheetCanvasData.sheet_id}
-                            sheetType={message.sheetCanvasData.sheet_type}
-                            moodboardId={message.sheetCanvasData.moodboard_id}
-                            initialData={message.sheetCanvasData.initial_data}
-                            title={message.sheetCanvasData.title}
-                          />
-                        )}
+                        {renderArtifactChip(message)}
                       </div>
                     ) : message.sheetPdfData ? (
                       <div className="space-y-3">
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        {canvasShown ? (
-                          <ArtifactChip
-                            kind="sheet"
-                            title={message.sheetPdfData.title || 'Presentation sheet'}
-                            active={activeCanvasId === message.id}
-                            onOpen={() => focusCanvas(message.id)}
-                          />
-                        ) : (
-                          <SheetPreviewCard
-                            sheetId={message.sheetPdfData.sheet_id}
-                            sheetType={message.sheetPdfData.sheet_type}
-                            title={message.sheetPdfData.title}
-                            pdfUrl={message.sheetPdfData.pdf_url}
-                            pageCount={message.sheetPdfData.page_count}
-                            creditsUsed={message.sheetPdfData.credits_used}
-                          />
-                        )}
+                        {renderArtifactChip(message)}
                       </div>
                     ) : message.quoteData ? (
                       <div className="space-y-3">
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        {canvasShown ? (
-                          <ArtifactChip
-                            kind="quote"
-                            title={message.quoteData.quote_number ? `Quote ${message.quoteData.quote_number}` : (message.quoteData.name || 'Quote')}
-                            active={activeCanvasId === message.id}
-                            onOpen={() => focusCanvas(message.id)}
-                          />
-                        ) : (
-                          <QuoteCanvasCard data={message.quoteData} />
-                        )}
+                        {renderArtifactChip(message)}
                       </div>
                     ) : message.catalogExtractionData ? (
                       <div className="space-y-3">
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        {canvasShown ? (
-                          <ArtifactChip kind="catalog" title="Catalog candidates" active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
-                        ) : renderDataCardBody(message)}
+                        {renderArtifactChip(message)}
                       </div>
                     ) : message.catalogImageCandidatesData ? (
                       <div className="space-y-3">
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        {canvasShown ? (
-                          <ArtifactChip kind="catalog" title={message.catalogImageCandidatesData.material_name ? `Images · ${message.catalogImageCandidatesData.material_name}` : 'Catalog images'} active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
-                        ) : renderDataCardBody(message)}
+                        {renderArtifactChip(message)}
                       </div>
                     ) : message.virtualStagingData ? (
                       <div className="space-y-3">
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        {canvasShown ? (
-                          <ArtifactChip
-                            kind="staging"
-                            title="Virtual staging"
-                            active={activeCanvasId === message.id}
-                            onOpen={() => focusCanvas(message.id)}
-                          />
-                        ) : (
-                        <VirtualStagingViewer
-                          resultImageUrl={message.virtualStagingData.image_url}
-                          sourceImageUrl={message.virtualStagingData.source_image_url}
-                          room={message.virtualStagingData.room}
-                          furnitureStyle={message.virtualStagingData.furniture_style}
-                          creditsUsed={message.virtualStagingData.credits_used}
-                          onAnalyzeQuality={() => {
-                            setInput('Analyze the quality of this virtual staging result. Compare the original empty room with the staged version. Assess: lighting consistency, perspective accuracy, furniture scale vs room size, material realism, and edge blending. Score each dimension 1-10.');
-                            if (message.virtualStagingData?.image_url) {
-                              setAttachedImages([message.virtualStagingData.image_url]);
-                            }
-                          }}
-                        />
-                        )}
+                        {renderArtifactChip(message)}
                       </div>
                     ) : message.videoData ? (
                       <div className="space-y-3">
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        {canvasShown ? (
-                          <ArtifactChip kind="video" title="Generated video" active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
-                        ) : (<>
-                        <video
-                          src={message.videoData.video_url}
-                          controls
-                          autoPlay
-                          loop
-                          className="w-full rounded-xl border border-white/20 shadow-md"
-                          style={{ maxHeight: '480px' }}
-                        />
-                        <div className="flex items-center justify-end gap-2">
-                          <MoodboardSavePopover
-                            mediaUrl={message.videoData.video_url}
-                            mediaType="video"
-                            mediaTitle="Generated Video"
-                          />
-                          <a
-                            href={safeHref(message.videoData.video_url)}
-                            download
-                            title="Download video"
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-full text-xs font-medium text-sky-700 transition-colors"
-                          >
-                            <Download className="h-3.5 w-3.5" />
-                            Download
-                          </a>
-                        </div>
-                        </>)}
+                        {renderArtifactChip(message)}
                       </div>
                     ) : message.worldData ? (
                       <div className="space-y-4">
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        {canvasShown ? (
-                          <ArtifactChip kind="world" title={message.worldData.caption || message.worldData.prompt || 'VR world'} active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
-                        ) : (<>
-                        {/* A lazy component MUST have a Suspense boundary above it. */}
-                        <Suspense fallback={<div className="flex h-64 items-center justify-center rounded-md border border-border/60 bg-muted/20 text-xs text-muted-foreground">Loading 3D viewer…</div>}>
-                          <WorldViewer
-                            vrWorldId={message.worldData.vrWorldId}
-                            initialStatus={message.worldData.status}
-                            splatUrls={{
-                              draft: message.worldData.splatUrl100k,
-                              standard: message.worldData.splatUrl500k,
-                              full: message.worldData.splatUrlFull,
-                            }}
-                            colliderUrl={message.worldData.colliderGlbUrl}
-                            caption={message.worldData.caption}
-                            onRetry={() => {
-                              if (message.worldData?.sourceImageUrl) {
-                                handleGenerateVR(
-                                  message.worldData.sourceImageUrl,
-                                  { prompt: message.worldData.prompt },
-                                  message,
-                                );
-                              }
-                            }}
-                          />
-                        </Suspense>
-                        {message.worldData.splatUrl100k && (
-                          <div className="flex justify-end">
-                            <MoodboardSavePopover
-                              mediaUrl={message.worldData.splatUrl100k}
-                              mediaType="vr_world"
-                              mediaTitle={message.worldData.caption || message.worldData.prompt || 'VR World'}
-                            />
-                          </div>
-                        )}
-                        </>)}
+                        {renderArtifactChip(message)}
                       </div>
                     ) : (
                       <div className="space-y-2">
@@ -6767,31 +6465,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
                         {/* Async 3D room-generation grid — full grid opens in the canvas (chip in chat) */}
                         {message.role === 'assistant' && message.generation_job && (
-                          canvasShown ? (
-                            <ArtifactChip
-                              kind="render"
-                              title={message.generation_job.room_type ? `Room · ${message.generation_job.room_type}` : 'Room generation'}
-                              active={activeCanvasId === message.id}
-                              onOpen={() => focusCanvas(message.id)}
-                            />
-                          ) : (
-                            <div className="mt-4">{renderGenerationGrid(message)}</div>
-                          )
-                        )}
+                          renderArtifactChip(message))}
 
-                        {/* SEO article pipeline — opens in the canvas; chip stands in when it's shown */}
+                        {/* SEO article pipeline — opens in the modal; the chip is how the chat names it */}
                         {message.role === 'assistant' && message.articleData && (
-                          canvasShown ? (
-                            <ArtifactChip
-                              kind="seo"
-                              title="SEO article"
-                              active={activeCanvasId === message.id}
-                              onOpen={() => focusCanvas(message.id)}
-                            />
-                          ) : (
-                            <SEOArticleViewer articleId={message.articleData.article_id} />
-                          )
-                        )}
+                          renderArtifactChip(message))}
 
                       </div>
                     )}

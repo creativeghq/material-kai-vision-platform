@@ -297,10 +297,22 @@ describe('the run is wired to the stream and to the canvas', () => {
     expect(canvas).toMatch(/run:\s*ListChecks/);
   });
 
-  it('the rail does not draw the same card the canvas is already drawing', () => {
-    // The chat rail is 400px and the run card is a page. Both at once was never the ask.
+  it('the chat draws the run LINE, and never the card the modal is already holding', () => {
+    // The run card is a page; the chat gets one line saying work is happening, one click from
+    // it. When the modal IS open on that run, the inline tracker and wizard would be the same
+    // plan twice on one screen — so both are filtered on the open id, not on a pane flag.
     expect(hub).toContain('<RunChip');
-    expect(hub).toMatch(/!canvasPaneVisible && Object\.values\(workflows\)\.length > 0/);
+    const suppressions = hub.split('activeCanvasId !== `run:${wf.run_id}`').length - 1;
+    expect(
+      suppressions,
+      'the wizard and the tracker each need their own suppression — one covers only one of them',
+    ).toBeGreaterThanOrEqual(2);
+  });
+
+  it('a turn that only produced PROSE puts nothing in the chat and opens nothing', () => {
+    // The whole point of the rebuild. A run with no steps is a turn that answered in words;
+    // announcing "Ran 0 tools" under every reply is what the canvas pane did with a whole tab.
+    expect(hub).toMatch(/r\.status === 'running' \|\| r\.step_order\.length > 0/);
   });
 
   it('an aborted workflow does not take its turn page down with it', () => {
@@ -310,28 +322,37 @@ describe('the run is wired to the stream and to the canvas', () => {
     expect(hub).toMatch(/drawn\.has\(r\.workflow_run_id\)/);
   });
 
-  it('focuses the page the turn actually draws, not the one it suppresses', () => {
-    expect(hub).toMatch(/setActiveCanvasId\(`run:\$\{boundWorkflowRunId \?\? runId\}`\)/);
-  });
-
-  it('REVEALS the canvas when a turn produces something, for every toolkit', () => {
-    // Selecting a tab in a canvas the user has closed changes nothing they can see:
-    // `canvasHidden` unmounts the pane. Without this, any toolkit that finished while the
-    // canvas was collapsed wrote its result into a surface that was not on screen, and the
-    // only clue was a chip in the chat — which is exactly the complaint the SEO article got
-    // its own `focusCanvas` line for. The yield is the general fix; keep them consistent.
-    const yieldEffect = hub.slice(hub.indexOf('yieldedRunsRef.current.add(runId);'));
-    const body = yieldEffect.slice(0, yieldEffect.indexOf('}, [canvasGroups'));
-    expect(body, 'the yield selects a tab without revealing the pane').toContain('setCanvasHidden(false)');
-  });
-
-  it('does NOT reveal the canvas on run START — that would fight a deliberate close', () => {
-    // Re-opening the pane on every turn takes away the escape hatch: someone who collapsed
-    // the canvas to read the chat full-width would have it reopened under them each time
-    // they typed. Producing a result is the event worth interrupting for; starting is not.
+  it('SENDING opens nothing — that is the whole rebuild', () => {
+    // The pane version selected the turn's run at the send site, before a single tool had
+    // reported, so every turn took the screen and a conversation of prose answers spent itself
+    // behind a checklist of nothing (conversation d3ec683e, four in a row).
     const send = hub.slice(hub.indexOf('const handleSendMessage = useCallback'));
-    const upToFocus = send.slice(0, send.indexOf('setActiveCanvasId(`run:'));
-    expect(upToFocus).not.toContain('setCanvasHidden(false)');
+    const body = send.slice(0, send.indexOf('}, [input, selectedAgent'));
+    expect(
+      body,
+      'handleSendMessage opens an artifact again — starting a turn is not a result',
+    ).not.toMatch(/setActiveCanvasId\(`run:/);
+  });
+
+  it('PRODUCING something opens it, once per run, for every toolkit', () => {
+    // The general fix for "a toolkit finished into a surface that was not on screen". Keyed on
+    // this session's RUNS, never on the artifact list alone: loading a conversation rebuilds
+    // every past artifact, and an effect that opened "the newest" would pop a modal over a
+    // thread the user had only just opened.
+    const yieldEffect = hub.slice(hub.indexOf('const yieldedRunsRef'));
+    const body = yieldEffect.slice(0, yieldEffect.indexOf('}, [canvasGroups'));
+    expect(body, 'the yield must iterate live runs, not canvasGroups alone').toContain('of displayRuns');
+    expect(body, 'the yield must be once per run, or the modal cannot be dismissed')
+      .toContain('yieldedRunsRef.current.add(run.run_id)');
+    expect(body, 'the yield must open the artifact the turn produced')
+      .toMatch(/setActiveCanvasId\(produced\[produced\.length - 1\]\.id\)/);
+  });
+
+  it('losing the open artifact CLOSES, and never re-points at an unrelated one', () => {
+    // The tab strip always had something selected, so it fell back to the newest. A modal that
+    // does that re-opens itself over the conversation the moment you delete what you were
+    // reading.
+    expect(hub).toMatch(/canvasArtifacts\.some\(\(a\) => a\.id === prev\) \? prev : null/);
   });
 
   it('consumes the workflow binding above the early returns', () => {
@@ -367,9 +388,12 @@ describe('the run is wired to the stream and to the canvas', () => {
   });
 
   it('a run page carries no Close / Delete — there is no saved row behind it', () => {
+    // Both items address a message id a run does not have, so Close toasted "still saved" over
+    // nothing and Delete returned in silence. Two guards, because a run reaches the menu from
+    // the header AND from the sub-tab strip.
     const canvas = stripComments(read(CANVAS));
-    expect(canvas).toMatch(/g\.members\.length === 1 && g\.kind !== 'run'/);
-    expect(canvas).toMatch(/\(onCloseArtifact \|\| onDeleteArtifact\) && m\.kind !== 'run'/);
+    expect(canvas).toMatch(/active && active\.kind !== 'run' \? active : null/);
+    expect(canvas).toMatch(/\{m\.kind !== 'run' && \(/);
   });
 
   it('never prints an elapsed time it did not measure', () => {

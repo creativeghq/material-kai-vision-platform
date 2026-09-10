@@ -1,23 +1,39 @@
 /**
- * CanvasPanel — the Agent Studio artifact canvas.
+ * The Agent Studio artifact canvas — the VOCABULARY of what an artifact is, the chip that
+ * stands for one in the chat, and the modal that opens one full size.
  *
- * A collapsible, left-docked workspace that renders the currently-selected
- * toolkit artifact (moodboard sheet, product results, virtual staging, …) at
- * full width, with a tab strip across the open artifacts. The heavy card
- * component is rendered by the parent and passed as `children` so all of its
- * handlers/state stay in the AgentHub closure — the panel is pure chrome.
+ * WHAT THIS REPLACED, AND WHY. The canvas used to be a permanent left-docked PANE, which made
+ * the chat a 400px right rail for the whole conversation. Every turn opened a page on it —
+ * `handleSendMessage` selected the turn's run before a single tool had reported — so a turn that
+ * only ever produced PROSE, which is most of them, put a tab on the strip, took the screen away
+ * from the answer, and left the reader a checklist of nothing beside a column of text a third of
+ * the window wide. Conversation d3ec683e is four of those in a row.
  *
- * When the canvas is open, the matching inline card in the chat collapses to an
- * `ArtifactChip` (below) so the artifact lives in exactly one place.
+ * So the canvas is no longer a place you live beside. It is a thing you OPEN: the chat is the
+ * whole window, an artifact is a chip in the stream, and clicking one — or producing one — opens
+ * it in a modal over the conversation. Nothing is lost, because the pane never showed the chat and
+ * an artifact at once either; what goes is the rail, the collapse handle, the mobile
+ * single-pane fork, and a tab strip that described work rather than results.
+ *
+ * The modal deliberately speaks the app's existing overlay language (`SocialPostEditorDialog`,
+ * `DocumentEditor`): the shared Radix `Dialog`, `bg-card` on a flat `bg-black/80` scrim, a
+ * hairline border, `shadow-overlay`, the primitive's own close affordance. A second overlay
+ * idiom invented here would be one more thing to keep in step with the rest of the app.
  */
 import React from 'react';
 import {
   FileText, Package, Camera, Globe, LayoutGrid, Image as ImageIcon, Video,
-  PanelRightClose, ArrowLeft, ArrowUpRight, LayoutPanelLeft, Sparkles, Radar, ClipboardList,
+  ArrowUpRight, Sparkles, Radar, ClipboardList,
   Briefcase, Boxes, PackageCheck, MessageSquare, Bot, TrendingUp, Images,
   Wand2, Calculator, MessageSquareQuote, ShieldQuestion, MoreHorizontal, X, Trash2,
-  ListChecks,
+  ListChecks, PanelRight, CornerDownLeft,
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/core/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,11 +58,9 @@ export interface CanvasArtifact {
 /**
  * One TURN of the conversation, not one message.
  *
- * The tab strip used to be one tab per artifact-bearing message, so a single request that
- * produced several artifacts opened several canvas pages: "generate an SEO article" ran
- * research, a keyword card and a volume card and put three pages on the strip, none of which
- * was the article. A turn is one piece of work and reads as one page — the members are its
- * sub-tabs.
+ * A single request that produces several artifacts is one piece of work: "generate an SEO
+ * article" runs research, a keyword card and a volume card, and those are the STEPS of the
+ * article, not three separate things the user asked for. They are the modal's sub-tabs.
  *
  * The group is titled by, and opens on, its LAST member: the final artifact of a turn is its
  * outcome, and the steps that produced it belong behind it rather than in front of it.
@@ -84,11 +98,10 @@ const KIND_ICON: Record<CanvasArtifactKind, React.ComponentType<{ className?: st
   // a follow-up had nowhere to live but the chat stream as prose (#370, Class D).
   clarify: MessageSquareQuote,
   // The Approve/Decline gate. `clarify` became an artifact in #370 and this did not, so the one
-  // card that BLOCKS the turn was the one that stayed in the chat rail — and on a phone the rail
-  // is unmounted whenever the canvas is up.
+  // card that BLOCKS the turn was the one that stayed in the chat rail.
   confirm: ShieldQuestion,
-  // The WORK, not its output. Every turn opens one of these, so the canvas says what is
-  // happening while it happens instead of holding its welcome copy for the whole run.
+  // The WORK, not its output. A run is openable — from its line in the chat — but it no longer
+  // opens ITSELF: watching a checklist is worth a click, never worth the screen.
   run: ListChecks,
 };
 
@@ -119,19 +132,84 @@ const KIND_LABEL: Record<CanvasArtifactKind, string> = {
   run: 'How it ran',
 };
 
-interface CanvasPanelProps {
-  /** One entry per TURN. A turn with several artifacts renders as one tab with sub-tabs. */
-  groups: CanvasArtifactGroup[];
-  /** The active MEMBER id — a message id, the same value `onSelect` emits. */
+/** The artifact's own label, for anything that needs to name a kind outside this file. */
+export const artifactKindLabel = (kind: CanvasArtifactKind): string => KIND_LABEL[kind];
+export const artifactKindIcon = (kind: CanvasArtifactKind) => KIND_ICON[kind];
+
+interface ArtifactMenuProps {
+  id: string;
+  title: string;
+  onCloseArtifact?: (id: string) => void;
+  onDeleteArtifact?: (id: string) => void;
+  className?: string;
+  iconClassName?: string;
+}
+
+/**
+ * Close-vs-delete, written once.
+ *
+ * Two different promises — "hide it here, it stays saved" and "remove it for good" — so they are
+ * two items with their own wording. A single "×" cannot say which one it is, and the strip used
+ * to carry two hand-written copies of this menu that had to be edited in step.
+ */
+const ArtifactMenu: React.FC<ArtifactMenuProps> = ({
+  id, title, onCloseArtifact, onDeleteArtifact, className, iconClassName,
+}) => {
+  if (!onCloseArtifact && !onDeleteArtifact) return null;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          title="Options"
+          aria-label={`Options for ${title}`}
+          className={cn(
+            'flex h-7 w-7 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-surface-sunken hover:text-foreground',
+            className,
+          )}
+        >
+          <MoreHorizontal className={cn('h-4 w-4', iconClassName)} />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-60">
+        {onCloseArtifact && (
+          <DropdownMenuItem onClick={() => onCloseArtifact(id)}>
+            <X className="mr-2 mt-0.5 h-4 w-4 shrink-0 self-start" />
+            <span className="flex flex-col">
+              <span>Close in chat</span>
+              <span className="text-xs text-muted-foreground">Hides it here. Stays saved.</span>
+            </span>
+          </DropdownMenuItem>
+        )}
+        {onCloseArtifact && onDeleteArtifact && <DropdownMenuSeparator />}
+        {onDeleteArtifact && (
+          <DropdownMenuItem
+            onClick={() => onDeleteArtifact(id)}
+            className="text-destructive focus:text-destructive"
+          >
+            <Trash2 className="mr-2 mt-0.5 h-4 w-4 shrink-0 self-start" />
+            <span className="flex flex-col">
+              <span>Delete entry</span>
+              <span className="text-xs text-muted-foreground">Removes it from this chat for good.</span>
+            </span>
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+};
+
+interface ArtifactModalProps {
+  /** The turn being shown. `null` closes the modal — there is nothing to draw. */
+  group: CanvasArtifactGroup | null;
+  /** The active MEMBER id — a message id, or `run:<id>`, the same value `onSelect` emits. */
   activeId: string | null;
   onSelect: (id: string) => void;
   onClose: () => void;
   /**
-   * Per-tab menu. `onCloseArtifact` drops the artifact from this conversation's
-   * VIEW (it stays saved and returns on reload); `onDeleteArtifact` deletes the
-   * saved entry. Two different promises, so they are two separate items with
-   * their own wording — a single "×" cannot say which one it is. Omit a handler
-   * and its item is not offered.
+   * Per-artifact menu. `onCloseArtifact` drops it from this conversation's VIEW (it stays saved
+   * and returns on reload); `onDeleteArtifact` deletes the saved entry. Omit a handler and its
+   * item is not offered. Never offered for a RUN — a run is not a saved entry, so both items
+   * addressed a message id that does not exist and did nothing in silence.
    */
   onCloseArtifact?: (id: string) => void;
   onDeleteArtifact?: (id: string) => void;
@@ -139,269 +217,253 @@ interface CanvasPanelProps {
   /** Contextual detail panel for the active artifact. */
   inspector?: React.ReactNode;
   /**
-   * Single-pane (mobile) mode. The canvas takes the whole screen instead of
-   * sharing it with the chat rail, so the close control reads as "back to chat"
-   * and the inspector stacks under the artifact instead of docking beside it.
+   * Ask a follow-up about what is open, without going back for the composer.
+   *
+   * A Radix dialog makes what is behind it inert, so the modal costs the one thing the two-pane
+   * layout genuinely gave you: reading a result and typing about it at the same time. This is
+   * that capability, not a second composer — it hands the sentence to the SAME
+   * `handleCardAsk` (set the input, send) every result card already uses, and closes on the way
+   * so the answer arrives somewhere the user can see it.
    */
-  singlePane?: boolean;
+  onAsk?: (text: string) => void;
 }
 
-export const CanvasPanel: React.FC<CanvasPanelProps> = ({ groups, activeId, onSelect, onClose, onCloseArtifact, onDeleteArtifact, children, inspector, singlePane }) => {
-  const activeGroup = groups.find((g) => g.members.some((m) => m.id === activeId)) ?? null;
-  // Sub-tabs only when there is genuinely more than one thing behind the tab. A single-artifact
-  // turn must look exactly as it did before, or every ordinary result grows a redundant strip.
-  const subTabs = activeGroup && activeGroup.members.length > 1 ? activeGroup.members : [];
+/**
+ * One artifact, full size, over the conversation.
+ *
+ * Sized like `DocumentEditor` — the app's existing full-workspace dialog — because an artifact
+ * here is a 3D world, a page of products or an article, not a form. Full-bleed below `sm`: an
+ * artifact on a phone wants the whole screen, and the 16px gutter a form dialog keeps would just
+ * be 16px less of it.
+ *
+ * The PANEL does not scroll; the body does. `DialogContent` puts `overflow-y-auto` on itself as a
+ * mobile-safety floor for content-sized dialogs, which for a fixed-height workspace would scroll
+ * the header and the sub-tabs off the top along with the content.
+ */
+export const ArtifactModal: React.FC<ArtifactModalProps> = ({
+  group, activeId, onSelect, onClose, onCloseArtifact, onDeleteArtifact, children, inspector, onAsk,
+}) => {
+  // Sub-tabs only when there is genuinely more than one thing behind this turn. A
+  // single-artifact turn must look exactly as it did before, or every ordinary result grows a
+  // redundant strip.
+  const members = group?.members ?? [];
+  const subTabs = members.length > 1 ? members : [];
+  const active = members.find((m) => m.id === activeId) ?? group ?? null;
+  const Icon = active ? KIND_ICON[active.kind] : ClipboardList;
+  // A run is not a saved entry; the menu addresses a message id it does not have.
+  const menuTarget = active && active.kind !== 'run' ? active : null;
+  const [inspectorOpen, setInspectorOpen] = React.useState(true);
+  const [ask, setAsk] = React.useState('');
+
+  const submitAsk = () => {
+    const text = ask.trim();
+    if (!text || !onAsk) return;
+    setAsk('');
+    // Close FIRST: the answer lands in the conversation, and a modal left over it would hide
+    // the thing the user just asked for. If the turn produces an artifact, the modal comes back
+    // on that one by itself.
+    onClose();
+    onAsk(text);
+  };
+
   return (
-    <div className={cn(
-      'flex min-w-0 flex-1 flex-col bg-background',
-      !singlePane && 'border-r border-border',
-    )}>
-      {/* Tab strip + close */}
-      <div className="flex h-[52px] shrink-0 items-center gap-1 border-b border-border px-2">
-        {singlePane ? (
+    <Dialog open={Boolean(group)} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent
+        className={cn(
+          'flex h-[92dvh] w-[96vw] max-w-6xl flex-col gap-0 overflow-hidden p-0',
+          // Full-bleed on a phone: an artifact wants the screen.
+          'max-sm:h-[100dvh] max-sm:w-full max-sm:max-w-none max-sm:rounded-none',
+        )}
+        // The header carries its own controls on one line; the primitive's floating X would
+        // land on top of them.
+        hideClose
+      >
+        {/* Header — what this is, and the ways out of it */}
+        <div className="flex h-[52px] shrink-0 items-center gap-2 border-b border-hairline px-3 sm:px-4">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-surface-sunken text-primary">
+            <Icon className="h-4 w-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <DialogTitle className="truncate text-sm font-semibold leading-tight">
+              {active?.title ?? 'Canvas'}
+            </DialogTitle>
+            <DialogDescription className="truncate text-[11px] leading-tight">
+              {active ? KIND_LABEL[active.kind] : 'Nothing open'}
+            </DialogDescription>
+          </div>
+          {inspector && (
+            <button
+              onClick={() => setInspectorOpen((v) => !v)}
+              title={inspectorOpen ? 'Hide details' : 'Show details'}
+              aria-label={inspectorOpen ? 'Hide details' : 'Show details'}
+              aria-pressed={inspectorOpen}
+              className={cn(
+                'hidden h-8 w-8 shrink-0 items-center justify-center rounded-sm transition-colors lg:flex',
+                inspectorOpen
+                  ? 'bg-surface-sunken text-foreground'
+                  : 'text-muted-foreground hover:bg-surface-sunken hover:text-foreground',
+              )}
+            >
+              <PanelRight className="h-4 w-4" />
+            </button>
+          )}
+          {menuTarget && (
+            <ArtifactMenu
+              id={menuTarget.id}
+              title={menuTarget.title}
+              onCloseArtifact={onCloseArtifact}
+              onDeleteArtifact={onDeleteArtifact}
+            />
+          )}
           <button
             onClick={onClose}
-            title="Back to chat"
-            aria-label="Back to chat"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"
+            title="Close"
+            aria-label="Close"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-surface-sunken hover:text-foreground"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <X className="h-4 w-4" />
           </button>
-        ) : (
-          <LayoutPanelLeft className="mx-1.5 h-4 w-4 shrink-0 text-muted-foreground" />
-        )}
-        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto custom-scrollbar">
-          {groups.length === 0 && (
-            <span className="px-1.5 text-sm font-medium text-muted-foreground">Canvas</span>
-          )}
-          {groups.map((g) => {
-            const a = g;
-            const Icon = KIND_ICON[g.kind];
-            const active = g === activeGroup;
-            // The kebab addresses ONE artifact. On a grouped tab the sub-strip carries it
-            // instead, so a "Delete entry" can never silently mean "delete four of them".
-            // A RUN page is not a saved entry: both items address a message id, so Close
-            // toasted "still saved" over nothing and Delete returned in silence.
-            const hasTabMenu = Boolean(
-              (onCloseArtifact || onDeleteArtifact) && g.members.length === 1 && g.kind !== 'run',
-            );
-            return (
-              // The tab is a container, not a button: the kebab is a second control
-              // and a button inside a button is invalid markup (and unclickable).
-              <div
-                key={a.id}
-                className={cn(
-                  'group flex h-9 shrink-0 items-center rounded-lg border text-sm transition-colors',
-                  hasTabMenu ? 'pr-1' : '',
-                  active
-                    ? 'border-border bg-accent text-foreground'
-                    : 'border-transparent text-muted-foreground hover:bg-accent hover:text-foreground',
-                )}
-              >
-                <button
-                  onClick={() => onSelect(a.id)}
-                  className="flex h-9 min-w-0 items-center gap-2 rounded-lg px-3"
-                  title={a.title}
-                >
-                  <Icon className="h-3.5 w-3.5 shrink-0 text-primary" />
-                  <span className="max-w-[140px] truncate sm:max-w-[180px]">{a.title}</span>
-                  {g.members.length > 1 && (
-                    // Says there is more behind this tab. Without it a grouped turn looks
-                    // like a single result and the sub-strip appears from nowhere on click.
-                    <span className="shrink-0 rounded-full bg-muted px-1.5 text-[10px] font-medium tabular-nums text-muted-foreground">
-                      {g.members.length}
-                    </span>
-                  )}
-                </button>
-                {hasTabMenu && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        title="Tab options"
-                        aria-label={`Options for ${a.title}`}
-                        className={cn(
-                          'flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground',
-                          // Always reachable on touch (no hover there) and on the tab
-                          // you are looking at; fades in on the rest so the strip stays quiet.
-                          active ? 'opacity-100' : 'opacity-60 group-hover:opacity-100',
-                        )}
-                      >
-                        <MoreHorizontal className="h-3.5 w-3.5" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-60">
-                      {onCloseArtifact && (
-                        <DropdownMenuItem onClick={() => onCloseArtifact(a.id)}>
-                          <X className="mr-2 mt-0.5 h-4 w-4 shrink-0 self-start" />
-                          <span className="flex flex-col">
-                            <span>Close in chat</span>
-                            <span className="text-xs text-muted-foreground">Hides it here. Stays saved.</span>
-                          </span>
-                        </DropdownMenuItem>
-                      )}
-                      {onCloseArtifact && onDeleteArtifact && <DropdownMenuSeparator />}
-                      {onDeleteArtifact && (
-                        <DropdownMenuItem
-                          onClick={() => onDeleteArtifact(a.id)}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="mr-2 mt-0.5 h-4 w-4 shrink-0 self-start" />
-                          <span className="flex flex-col">
-                            <span>Delete entry</span>
-                            <span className="text-xs text-muted-foreground">Removes it from this chat for good.</span>
-                          </span>
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-              </div>
-            );
-          })}
         </div>
-        {!singlePane && (
-          <button
-            onClick={onClose}
-            title="Close canvas"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"
+
+        {/* Sub-tabs: the other things this turn produced. Underline treatment, because the
+            platform's tab language is underline everywhere and a filled pill here would read
+            as a button sitting inside the page. */}
+        {subTabs.length > 0 && (
+          <div
+            role="tablist"
+            aria-label="Steps in this result"
+            className="flex h-10 shrink-0 items-center gap-1 overflow-x-auto border-b border-hairline bg-surface-sunken px-2 custom-scrollbar"
           >
-            <PanelRightClose className="h-4 w-4" />
-          </button>
-        )}
-      </div>
-
-      {/* Sub-tabs: everything else this turn produced. Underline treatment, because the
-          platform's tab language is underline everywhere and a filled pill here would read
-          as a button sitting inside the page. */}
-      {subTabs.length > 0 && (
-        <div
-          role="tablist"
-          aria-label="Steps in this result"
-          className="flex h-10 shrink-0 items-center gap-1 overflow-x-auto border-b border-border bg-surface-sunken px-2 custom-scrollbar"
-        >
-          {subTabs.map((m) => {
-            const MemberIcon = KIND_ICON[m.kind];
-            const active = m.id === activeId;
-            return (
-              <div key={m.id} className="group flex shrink-0 items-center">
-                <button
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => onSelect(m.id)}
-                  title={m.title}
-                  className={cn(
-                    'flex h-9 min-w-0 items-center gap-1.5 border-b-2 px-2.5 text-xs transition-colors',
-                    active
-                      ? 'border-primary font-medium text-foreground'
-                      : 'border-transparent text-muted-foreground hover:text-foreground',
+            {subTabs.map((m) => {
+              const MemberIcon = KIND_ICON[m.kind];
+              const isActive = m.id === activeId;
+              return (
+                <div key={m.id} className="group flex shrink-0 items-center">
+                  <button
+                    role="tab"
+                    aria-selected={isActive}
+                    onClick={() => onSelect(m.id)}
+                    title={m.title}
+                    className={cn(
+                      'flex h-9 min-w-0 items-center gap-1.5 border-b-2 px-2.5 text-xs transition-colors',
+                      isActive
+                        ? 'border-primary font-medium text-foreground'
+                        : 'border-transparent text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    <MemberIcon className="h-3 w-3 shrink-0" />
+                    <span className="max-w-[130px] truncate">{m.title}</span>
+                  </button>
+                  {m.kind !== 'run' && (
+                    <ArtifactMenu
+                      id={m.id}
+                      title={m.title}
+                      onCloseArtifact={onCloseArtifact}
+                      onDeleteArtifact={onDeleteArtifact}
+                      className={cn('h-5 w-5', isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100')}
+                      iconClassName="h-3 w-3"
+                    />
                   )}
-                >
-                  <MemberIcon className="h-3 w-3 shrink-0" />
-                  <span className="max-w-[130px] truncate">{m.title}</span>
-                </button>
-                {(onCloseArtifact || onDeleteArtifact) && m.kind !== 'run' && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        title="Step options"
-                        aria-label={`Options for ${m.title}`}
-                        className={cn(
-                          'flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground',
-                          active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
-                        )}
-                      >
-                        <MoreHorizontal className="h-3 w-3" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-60">
-                      {onCloseArtifact && (
-                        <DropdownMenuItem onClick={() => onCloseArtifact(m.id)}>
-                          <X className="mr-2 mt-0.5 h-4 w-4 shrink-0 self-start" />
-                          <span className="flex flex-col">
-                            <span>Close in chat</span>
-                            <span className="text-xs text-muted-foreground">Hides it here. Stays saved.</span>
-                          </span>
-                        </DropdownMenuItem>
-                      )}
-                      {onCloseArtifact && onDeleteArtifact && <DropdownMenuSeparator />}
-                      {onDeleteArtifact && (
-                        <DropdownMenuItem
-                          onClick={() => onDeleteArtifact(m.id)}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="mr-2 mt-0.5 h-4 w-4 shrink-0 self-start" />
-                          <span className="flex flex-col">
-                            <span>Delete entry</span>
-                            <span className="text-xs text-muted-foreground">Removes it from this chat for good.</span>
-                          </span>
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
+                </div>
+              );
+            })}
+          </div>
+        )}
 
-      {/* Active artifact + contextual inspector.
-          Below `lg` the inspector stacks UNDER the artifact instead of being
-          dropped entirely — on a phone it's the only way to reach an artifact's
-          details/actions. */}
-      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-        <div className="min-h-0 flex-1 overflow-auto p-3 sm:p-6 custom-scrollbar">
-          {children ?? (
-            <div className="flex h-full flex-col items-center justify-center px-6 text-center text-muted-foreground">
-              <LayoutPanelLeft className="mb-3 h-10 w-10 opacity-40" />
-              <p className="max-w-sm text-sm">
-                Your canvas. When the agent produces something — results, a document, a design —
-                it opens here full-size, with its details and actions alongside.
-              </p>
-            </div>
+        {/* The artifact + its inspector. Below `lg` the inspector stacks UNDER the artifact
+            instead of being dropped — on a phone it is the only way to reach an artifact's
+            details and actions. */}
+        <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+          <div className="min-h-0 flex-1 overflow-auto p-3 sm:p-6 custom-scrollbar">
+            {children}
+          </div>
+          {inspector && (
+            <aside
+              className={cn(
+                'max-h-[45%] shrink-0 overflow-auto border-t border-hairline bg-surface-sunken custom-scrollbar',
+                'lg:max-h-none lg:border-l lg:border-t-0',
+                inspectorOpen ? 'lg:w-[288px]' : 'lg:hidden',
+              )}
+            >
+              {inspector}
+            </aside>
           )}
         </div>
-        {inspector && (
-          <aside className="max-h-[45%] shrink-0 overflow-auto border-t border-border bg-muted/20 custom-scrollbar lg:max-h-none lg:w-[288px] lg:border-l lg:border-t-0">
-            {inspector}
-          </aside>
+
+        {/* Ask about what is open. See `onAsk` — this is the capability the docked pane had and
+            a modal otherwise takes away, not a second composer. */}
+        {onAsk && (
+          <div className="flex shrink-0 items-center gap-2 border-t border-hairline bg-surface-sunken px-3 py-2 sm:px-4">
+            <input
+              value={ask}
+              onChange={(e) => setAsk(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  submitAsk();
+                }
+              }}
+              placeholder={`Ask about this ${active ? KIND_LABEL[active.kind].toLowerCase() : 'result'}…`}
+              aria-label="Ask about this result"
+              className="h-9 min-w-0 flex-1 rounded-sm border border-hairline bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+            <button
+              onClick={submitAsk}
+              disabled={!ask.trim()}
+              className="flex h-9 shrink-0 items-center gap-1.5 rounded-sm bg-primary px-3 text-sm font-medium text-primary-foreground transition-opacity disabled:pointer-events-none disabled:opacity-50"
+            >
+              <CornerDownLeft className="h-3.5 w-3.5" />
+              Ask
+            </button>
+          </div>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 
 interface ArtifactChipProps {
-  kind: CanvasArtifactKind;
-  title: string;
+  artifact: CanvasArtifact;
+  /** True while this artifact is the one open in the modal. */
   active: boolean;
   onOpen: () => void;
 }
 
-/** Compact stand-in shown in the chat stream while the artifact lives in the canvas. */
-export const ArtifactChip: React.FC<ArtifactChipProps> = ({ kind, title, active, onOpen }) => {
-  const Icon = KIND_ICON[kind];
+/**
+ * The artifact, as it appears in the chat: a line you can click.
+ *
+ * Takes the ARTIFACT, not a kind and a title typed out at the call site. The stream used to
+ * hand-write thirty of these with their own `kind=` and `title=` strings — a second copy of the
+ * mapping `getCanvasArtifact` already makes, with nothing holding the two together, so a result
+ * could be called one thing on its chip and another on its tab.
+ *
+ * Tokens, not raw palette: this used to be `bg-black/20` / `text-white` / `border-white/10`,
+ * which reads on the dark themes' plum-black and turns into a grey smudge on the light themes'
+ * cream. It is the same defect class as the Inbox source tag.
+ */
+export const ArtifactChip: React.FC<ArtifactChipProps> = ({ artifact, active, onOpen }) => {
+  const Icon = KIND_ICON[artifact.kind];
   return (
     <button
       onClick={onOpen}
       className={cn(
-        'group flex w-full items-center gap-3 rounded-xl border bg-black/20 px-3 py-2.5 text-left transition-colors',
-        active ? 'border-primary/50' : 'border-white/10 hover:border-white/25',
+        'group flex w-full items-center gap-3 rounded-sm border bg-card px-3 py-2.5 text-left transition-colors',
+        active ? 'border-primary' : 'border-hairline hover:bg-surface-sunken',
       )}
     >
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white/90">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-surface-sunken text-primary">
         <Icon className="h-4 w-4" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium text-white">{title}</span>
-        <span className="block text-[11px] text-white/70">{KIND_LABEL[kind]}</span>
+        <span className="block truncate text-sm font-medium text-foreground">{artifact.title}</span>
+        <span className="block text-[11px] text-muted-foreground">{KIND_LABEL[artifact.kind]}</span>
       </span>
-      <span className="flex shrink-0 items-center gap-1 text-[11px] font-medium text-white/85">
-        {active ? 'In canvas' : 'Open in canvas'}
+      <span className="flex shrink-0 items-center gap-1 text-[11px] font-medium text-muted-foreground group-hover:text-foreground">
+        {active ? 'Open' : 'View'}
         <ArrowUpRight className="h-3.5 w-3.5" />
       </span>
     </button>
   );
 };
 
-export default CanvasPanel;
+export default ArtifactModal;
