@@ -12,8 +12,17 @@ const SKILLS = path.join(process.cwd(), 'supabase/functions/_shared/skills');
 const MARKER = 'DO NOT EDIT';
 const NOTE = `// ${MARKER} — generated from SKILL.md by scripts/gen-skill-ts.mjs. Edit the markdown.`;
 
-/** Provenance lines this script owns. Rewritten every run, so they cannot accumulate. */
-const OWNED = [MARKER, 'Generated from SKILL.md', 'String.raw', 'the text the model reads'];
+/**
+ * Provenance lines this script owns, rewritten every run so they cannot accumulate.
+ *
+ * Matching is per line and the old note wrapped over three of them, so every phrase it could
+ * have wrapped onto is listed — a marker that catches only the first line leaves the rest as a
+ * dangling fragment, which is exactly what `design-to-quote` ended up carrying.
+ */
+const OWNED = [
+  MARKER, 'Generated from SKILL.md', 'String.raw', 'the model reads', 'template literal',
+  'backtick, so', 'keeps the backslash',
+];
 
 const targets = process.argv.length > 2
   ? process.argv.slice(2)

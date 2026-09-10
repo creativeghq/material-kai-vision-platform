@@ -175,13 +175,14 @@ export const WorkspaceKeysTab: React.FC = () => {
             <p className="pt-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Checkout Providers — how buyers pay you</p>
             <VivaConfigCard workspaceId={activeWorkspaceId} />
             <RevolutMerchantSettingsPanel />
-            {/* The real Stripe Connect control, not a link to it. This row used to be a status
-                chip + a "Manage" button pointing at `/finance`, which is the Finance DASHBOARD:
-                it says nothing about Stripe and has no onboarding affordance, so the button read
-                as doing nothing. The onboarding surface it meant to reach is Finance → Settings →
-                Payments, and that sub-section is not URL-addressable, so no link could have got
-                there either. Mounting the card here matches Viva and Revolut above — every
-                checkout provider is configured in place. */}
+            {/*
+              * The real Stripe Connect control, not a link to it. This row used to be a status
+              * chip + a "Manage" button pointing at `/finance`, which is the Finance DASHBOARD:
+              * it says nothing about Stripe and has no onboarding affordance, so the button read
+              * as doing nothing. The onboarding surface it meant to reach is Finance → Settings →
+              * Payments, and that sub-section is not URL-addressable, so no link could have got
+              * there either.
+              */}
             <PaymentRoutingCard workspaceId={activeWorkspaceId} />
             <p className="pt-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Banking — your own account, feed & payouts</p>
             <RevolutConfigCard workspaceId={activeWorkspaceId} />

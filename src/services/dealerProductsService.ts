@@ -65,6 +65,9 @@ export const dealerProductsService = {
           // `is_global` is THE universal flag. This used to infer universality from an
           // EMPTY `applies_to_categories` instead, and never read is_global at all — two
           // conflicting conventions for one concept inside the registry Phase 3 unifies.
+          // The seed had 16 fields unscoped-and-not-global, so sanitary's bowl_shape and
+          // flush_type were offered on tiles, and wood_type / weave / upholstery on
+          // lighting.
           if (r.is_global === true) return true;
           const cats = r.applies_to_categories;
           return Array.isArray(cats) && cats.includes(materialCategory);

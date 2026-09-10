@@ -31,8 +31,7 @@ const DIRECTIONS = ['in', 'out', 'adjust'];
 // `barcode`, `cpv_code`, `taric_code`, `mydata_classification_type` and
 // `mydata_classification_category` — none of which are on this table. Because PostgREST
 // rejects the WHOLE statement on one unknown column, `create-item` failed 100% of the time
-// and `update-item` failed for any client that sent one of them. Fiscal identity belongs on
-// the PRODUCT (see warehouseService.updateProductFiscal), not on the stock row — the two
+// and `update-item` failed for any client that sent one of them.
 const ITEM_WRITABLE = [
   'name', 'sku', 'unit', 'reorder_point', 'location', 'serial_number',
   'width_mm', 'length_mm', 'thickness_mm', 'weight_kg',

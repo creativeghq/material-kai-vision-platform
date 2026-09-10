@@ -77,6 +77,10 @@ export class EmbeddingBackfillAgent implements AgentRunner {
     await heartbeat();
     try {
       // Services are excluded, and the exclusion is the point of the cap being finite.
+      // This agent repairs what the CREATE path was supposed to embed; services are written
+      // by servicesService with no ingest-core call, so an embedding was never owed on them
+      // and nothing searches one (`search_products_by_embedding` serves RAG + product
+      // enrichment, never the services list).
       let q = supabase.from('products').select('id')
         .is('text_embedding_1024', null)
         .neq('item_type', 'service')

@@ -192,9 +192,7 @@ Deno.serve(withApiLogging('kb-generate-embedding', async (req: Request) => {
     // Mark document as failed — but NEVER downgrade a document that already holds
     // a usable vector. The insert trigger and the backfill can both target the same
     // row, so a duplicate attempt that 500s used to overwrite `success` with
-    // `failed` on a doc that had embedded perfectly well moments earlier. The vector
-    // survived (nothing clears it), so the row stayed searchable while reporting
-    // failure forever: the backfill skips it (it selects on `text_embedding IS
+    // `failed` on a doc that had embedded perfectly well moments earlier.
     if (doc_id) {
       try {
         const { error: markError } = await supabaseAdmin

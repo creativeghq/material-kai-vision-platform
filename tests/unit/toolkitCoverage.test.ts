@@ -493,8 +493,7 @@ describe('quick-start agent resolution', () => {
   // lists the generalist FIRST (kai owns every toolkit), so reading `owners[0]` as the
   // target moved every click off the specialist the user had selected. That is not
   // cosmetic: the specialist's system prompt carries the tool doctrine, `forceToolCall`
-  // is keyed to its id, and the Haiku cost-router exempts it. On 2026-08-21 "Design a
-  // room" was launched from Vision, ran as kai on Haiku, and called `generate_gemini`
+  // is keyed to its id, and the Haiku cost-router exempts it.
   const AgentHubSrc = readFileSync(
     join(process.cwd(), 'src/components/features/ai/AgentHub.tsx'),
     'utf8',
@@ -860,7 +859,13 @@ describe('quick-start → chat sentence', () => {
   });
 });
 
-/** The bound-toolkit hint. agent-chat injects "[CONTEXT] Toolkits already loaded for this turn: */
+/**
+ * The bound-toolkit hint. agent-chat injects "[CONTEXT] Toolkits already loaded for this turn:
+ * …" so the agent does not spend a tool call and a model round trip re-loading a cluster it can
+ * already call. The list was built from what the USER SELECTED, while a curated specialist binds
+ * its WHOLE kit regardless of the selection — so the hint told Pepper that `b2b` was not loaded
+ * while it was holding every tool in it.
+ */
 describe('bound-toolkit hint', () => {
   const src = read(AGENT_CHAT);
 

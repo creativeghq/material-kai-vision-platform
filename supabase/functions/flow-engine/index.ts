@@ -434,8 +434,6 @@ async function executeAction(
       // customer-facing mail carries the tenant's own domain, not the platform's:
       //  • TENANT flow (is_global=false): strict BYOK from the flow's workspace — 503 if unset
       //    (never silently fall back to the platform domain for a tenant's own automation).
-      //  • OPERATOR/global flow: use the EVENT's workspace when it carries one (invoice/payment/
-      //    receipt events do) AND that workspace has BYOK → sends from that tenant's domain;
       const tenantWorkspaceId = !scope?.isGlobal ? (scope?.workspaceId || null) : null;
       const emailIsTenant = tenantWorkspaceId !== null;
       let emailWorkspaceId: string | null = null;
@@ -631,7 +629,6 @@ async function executeAction(
       // Module-gated price alert via the dispatcher service. The flow engine
       // delegates the actual fan-out to the Python backend so credit metering,
       // dedupe, and channel resolution stay in one place.
-      // Required resolved fields:
       const { data: moduleRow } = await supabase
         .from('modules')
         .select('enabled')
@@ -1596,9 +1593,7 @@ async function executeFlowGraph(
         // Keep BOTH shapes reachable from downstream templates. The run context
         // is initialised as { trigger: { data: triggerData } } (so seeded system
         // flows can template {{trigger.data.X}}), but storing this node's output
-        // below (`context[nodeId] = output`) overwrites context.trigger. If we
-        // only spread the fields flat here, {{trigger.data.X}} stops resolving and
-        // every create_notification skips with "unresolved_user_id" — which had
+        // below (`context[nodeId] = output`) overwrites context.trigger.
         output = { ...triggerData, data: triggerData };
       } else if (node.type === 'conditionNode' && node.data.conditionType === 'loop') {
         // Fan-out: run the directly-connected downstream action node(s) once per

@@ -92,6 +92,10 @@ export async function authenticate(
     }
 
     // Service-role / admin-secret on the Authorization BEARER (internal server-to-server).
+    // After the new-API-key migration the injected SUPABASE_SERVICE_ROLE_KEY is the opaque
+    // sb_secret_ key. Internal callers (MIVAA, agent-chat, other edge fns) send it as
+    // `Bearer <key>` WITHOUT an apikey header, so the apikey-secret path below misses it and
+    // they fall through to validateUserToken(getUser) → 401.
     if ((supabaseServiceKey && token === supabaseServiceKey) ||
         (supabaseSecretKey && token === supabaseSecretKey)) {
       return {
@@ -228,6 +232,9 @@ async function validateUserToken(
     }
 
     // Check roles if specified.
+    // Reconcile edge auth with the frontend persona model. Authority comes from
+    // TWO sources that must agree: the GLOBAL role (`user_profiles.role_id → roles`) AND
+    // the WORKSPACE role (`workspace_members.role`).
     if (allowedRoles && allowedRoles.length > 0) {
       const [{ data: userProfile }, { data: roles }, { data: memberships }] = await Promise.all([
         adminClient.from('user_profiles').select('role_id').eq('user_id', user.id).single(),

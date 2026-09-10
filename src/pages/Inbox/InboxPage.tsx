@@ -1591,16 +1591,14 @@ const InboxPage: React.FC = () => {
 
                 {activeThread.channel === 'whatsapp' && waWindow && !waWindow.open && !isNote && (
                   <div className="text-xs bg-[hsl(var(--warning-bg))] border border-warning/25 text-warning rounded-sm px-3 py-2">
-                    {/* SAY WHAT THIS IS BASED ON, AND WHAT STILL WORKS.
-                        The old copy asserted "the 24-hour reply window has closed" and stopped
-                        there. The operator who reported this had sent a message from their
-                        handset twenty minutes earlier and watched it get read, so the banner read
-                        as flatly false — and the reason it is not is an asymmetry nothing on
-                        screen mentioned. Meta: "Messages sent from the WhatsApp Business app are
-                        not subject to the customer service window and do not create, extend, or
-                        affect Cloud API conversation windows." The phone can always write. This
-                        composer goes through the API and cannot. Both halves have to be said, or
-                        the true one looks like a lie. */}
+                    {/*
+                      * SAY WHAT THIS IS BASED ON, AND WHAT STILL WORKS.
+                      * The old copy asserted "the 24-hour reply window has closed" and stopped
+                      * there. The operator who reported this had sent a message from their
+                      * handset twenty minutes earlier and watched it get read, so the banner read
+                      * as flatly false — and the reason it is not is an asymmetry nothing on
+                      * screen mentioned.
+                      */}
                     {waWindow.last_inbound_at ? (
                       <>
                         WhatsApp 24-hour reply window has closed — this customer last wrote on{' '}
@@ -3125,15 +3123,11 @@ const MessageBubble: React.FC<{
       <div className="flex flex-col items-center gap-1 shrink-0 mt-5">
       <Avatar className="h-9 w-9 shrink-0 ring-1 ring-hairline">
         {/*
-          A member's own photo, which was never selected from user_profiles — so every operator
-          in every thread rendered as initials no matter what they had uploaded. Failing that, a
-          generated mark: the customer's real photo is not obtainable from WhatsApp at all, so a
-          row of grey initials is the permanent state rather than a brief one.
-
-          The agent keeps its glyph — it is not a person and should not be given a person's mark.
-          Seeded on the participant id so one sender is one mark for the whole thread — and it is
-          the SAME key the header seeds on, which is the thing that was not true before.
-        */}
+          * A member's own photo, which was never selected from user_profiles — so every operator
+          * in every thread rendered as initials no matter what they had uploaded. Failing that, a
+          * generated mark: the customer's real photo is not obtainable from WhatsApp at all, so a
+          * row of grey initials is the permanent state rather than a brief one.
+          */}
         {!isAgent && (
           <AvatarImage
             src={info?.avatarUrl || castAvatarSrc(castSeedForSender(m, displayLabel), info?.avatarSlot)}

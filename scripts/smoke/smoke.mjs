@@ -220,7 +220,7 @@ await check('db.plpgsql-lint', ['DB_KEY'], async () => {
 //   nobody until someone grants it. PostgREST then refuses the WHOLE request naming it (42501),
 //   which is loud in a toast and silent in a `{ data }` destructure: `products.profile_user_id`
 //   broke Profile → Services, and `order_items.configured_options` made every order detail
-//   render with no lines for a week. `lint_column_grants()` lists such columns unless their
+//   render with no lines for a week.
 await check('db.column-grants', ['DB_KEY'], async () => {
   const { res, json } = await http(`${SUPABASE_URL}/rest/v1/rpc/lint_column_grants`, {
     method: 'POST',

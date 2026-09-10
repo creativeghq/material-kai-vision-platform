@@ -864,15 +864,12 @@ const App = () => (
                     </AuthGuard>
                   }
                 />
-                {/* Master catalog (#324). NOT behind AdminGuard: a confirmed manufacturer
-                    publishes their own products here. Both audiences are gated server-side —
-                    publishing by `supplier_publishing_allowed`, accepting a price by
-                    `is_platform_operator()` — so the page shows only what the caller may do.
-
-                    It lived at `/admin/catalog-master`, which was the one thing about it that
-                    WAS admin. The Profile card that sends a manufacturer here even said so:
-                    "they are not an admin, so the operator dashboard is not theirs to browse" —
-                    and then handed them an /admin URL. The address now matches the guard. */}
+                {/*
+                  * Master catalog (#324). NOT behind AdminGuard: a confirmed manufacturer
+                  * publishes their own products here. Both audiences are gated server-side —
+                  * publishing by `supplier_publishing_allowed`, accepting a price by
+                  * `is_platform_operator()` — so the page shows only what the caller may do.
+                  */}
                 <Route
                   path="/catalog-master"
                   element={

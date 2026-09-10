@@ -1,5 +1,8 @@
 // Novus Provider (myDATA/AADE) connector — REST API v2.3.
 // Docs: src/modules/myaade/NovusProvider/. Base URLs:
+//   sandbox    https://provider-dev.timologisi.online
+//   production https://provider.timologisi.online
+// Auth header: `API-KEY: {key}`.
 
 import type {
   FiscalConnector,
@@ -74,8 +77,6 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
   }
 
   // A MOVEMENT DOCUMENT (9.3) IS A DIFFERENT ENVELOPE, NOT AN INVOICE WITH ZERO TOTALS.
-  // AADE refuses it outright unless four things differ from every value-bearing type — verified
-  // against the sandbox 2026-09-06 (#319), where our 9.3 came back with all of these at once:
   const isMovement = header.movePurpose != null;
 
   // WHICH LEDGER THIS DOCUMENT CLASSIFIES INTO — income, expenses, or neither.
@@ -213,9 +214,7 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
   // THE SUMMARY CLASSIFICATION IS DERIVED FROM THE LINES, NEVER RESTATED.
   // AADE cross-checks the two: the summary must carry one entry per distinct
   // (classificationType, classificationCategory) present on the lines, each holding the SUM of
-  // those lines' net values. Emitting a single entry for the whole net value — which is what
-  // this did — is accepted only while every line happens to share one classification, and is
-  // rejected outright the moment two differ:
+  // those lines' net values.
   const byClassification = new Map<string, { classificationType: string; classificationCategory: string; amount: number }>();
   for (const l of lines) {
     if (!l.incomeClassificationType) continue;
@@ -608,7 +607,7 @@ export const novusConnector: FiscalConnector = {
     // ASP.NET's JSON binder DROPS members it does not know — so posting the B2G block there
     // transmitted a perfectly ordinary invoice with the contract reference, buyer reference,
     // budget and due date silently removed. No error, no warning, a valid MARK on a document
-    // missing everything that made it B2G. Route list read from the provider's own swagger
+    // missing everything that made it B2G.
     const route = input.b2g ? 'SendInvoicesB2G' : 'SendInvoices';
     const url = `${ctx.baseUrl}/api/v1/Provider/${route}?skipSignature=${skip}`;
     const payload = buildNovusPayload(input) as any;

@@ -492,10 +492,7 @@ Deno.serve(withApiLogging('myaade-rgwspublic2', async (req: Request) => {
 
     // Cache + mirror into structured columns. The write-back gate MUST match the LOOKUP gate: the
     // caller is already a verified finance-manager of body.workspace_id (isLookupMgr, else we 403'd
-    // above), and they just spent the TAXISnet quota + triggered the ΑΦΜ's audit notification. The old
-    // gate (created_by === user OR GLOBAL role admin/super_admin/owner) was STRICTER than the lookup, so
-    // a finance-role user or a workspace-admin member who didn't create the company passed the lookup but
-    // the cache never persisted → the 90-day short-circuit could never fire → every repeat re-burned the
+    // above), and they just spent the TAXISnet quota + triggered the ΑΦΜ's audit notification.
     if (body.company_id) {
       const { data: company } = await admin
         .from('crm_companies')

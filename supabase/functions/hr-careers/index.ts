@@ -70,6 +70,7 @@ Deno.serve(withApiLogging('hr-careers', async (req) => {
   // Greenhouse (/v1/boards/{board}/jobs), Lever and Ashby: a plain GET a human can
   // curl and an aggregator / no-code tool can poll. The POST+action envelope those
   // actions use is unusable for those consumers, which is the whole reason this exists.
+  //   GET ?slug=<company>             → { company, count, jobs: [...
   if (req.method === 'GET') {
     const reqUrl = new URL(req.url);
     const boardSlug = String(reqUrl.searchParams.get('slug') ?? '').trim();

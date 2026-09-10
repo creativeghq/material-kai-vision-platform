@@ -393,6 +393,8 @@ export const createFindJobsTool = (
 // 5) manage_job_sites — admin tool to curate the platform-wide job-board list
 // Three site types:
 //   - perplexity_domain     → Sonar search_domain_filter (cap 10)
+//   - rss_feed_default      → suggested RSS feeds for new tracked_jobs
+//   - careers_page_default  → suggested career pages for new tracked_jobs
 
 export const createManageJobSitesTool = (
   userId: string,

@@ -1,6 +1,7 @@
 // Stock Management agent toolkit. Lets a workspace owner/admin (or finance manager) ask the KAI agent
 // natural-language inventory questions ("what's low on stock?", "how many X do we have?", "receive 20
 // units of Y") from chat, instead of navigating the /stock module UI.
+// DESIGN: a thin natural-language front-end over the existing `stock-api` edge function.
 
 // deno-lint-ignore-file no-explicit-any
 

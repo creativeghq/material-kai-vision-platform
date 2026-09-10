@@ -64,6 +64,8 @@ describe('order settlement has exactly one derivation', () => {
     // The old pattern ended `[-−]\s*(settled|paid|net)\b`, requiring the word to start right
     // after the minus. A live reintroduction at OrdersPanel.tsx:1778 read
     //     Math.max(0, Math.round((Number(order.total) - orderSettled()) * 100) / 100)
+    // and sailed straight through, because `\bsettled` does not match inside the identifier
+    // `orderSettled`.
     const RE = /\btotal\b[^\n]{0,40}[-−]\s*[A-Za-z_$.]*(settled|paid|net)/i;
     for (const f of files) {
       const src = strippedSource(f);

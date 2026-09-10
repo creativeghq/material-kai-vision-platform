@@ -9,6 +9,10 @@ import { useToast } from '@/hooks/use-toast';
 /**
  * Websites tab (My Profile) — two-level surface:
  *   list of connected websites  →  per-website SEO dashboard.
+ * Also the landing spot for the Google Search Console OAuth return. The OAuth
+ * callback is handled SERVER-SIDE by gsc-api (Google redirects to the function,
+ * not here — see that function's header), which then 302s back to
+ * /profile?tab=websites&gsc=<connected|pick_property|error>&website=<id>.
  */
 export const WebsitesTab: React.FC = () => {
   const { toast } = useToast();

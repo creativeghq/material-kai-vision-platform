@@ -40,6 +40,10 @@ describe('reads of the products table are projected', () => {
     const offenders: string[] = [];
     for (const { rel, src } of FILES) {
       // `[^;]` — not `[\s\S]` — so the gap cannot run past the end of the query it belongs to.
+      // A PostgREST chain contains no semicolon, so this costs nothing and closes a false
+      // positive that depended on LINE ENDINGS: in `PDFDocumentDetails.tsx` a correctly
+      // projected products read sits 198 characters before an unrelated `document_chunks`
+      // `.select('*')`, so the old span matched under LF and missed under CRLF.
       const re = /\.from\(\s*['"]products['"]\s*\)[^;]{0,200}?\.select\(\s*['"]\*['"]([^)]*)\)/g;
       for (const m of src.matchAll(re)) {
         if (/head\s*:\s*true/.test(m[1])) continue;

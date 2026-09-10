@@ -649,9 +649,7 @@ async function buildAgentDraft(
   // ── The turn runs on JARVIS ──────────────────────────────────────────────
   // Everything that made this function clever used to live HERE — a persona, a hand-built tool
   // map, a hand-built system prompt, one `generateWithClaudeTools` call. All of it is gone, and
-  // that is the change: there is ONE assistant on this platform and the Inbox runs it. A customer
-  // conversation now gets the same 36k system prompt, the same shared operating doctrine, the same
-  // unconditional grounding in the workspace's own documents and the same reasoning the operator
+  // that is the change: there is ONE assistant on this platform and the Inbox runs it.
   const resp = await fetch(`${SUPABASE_URL}/functions/v1/agent-chat`, {
     method: 'POST',
     headers: {
@@ -3673,6 +3671,8 @@ async function handleJwtAction(
       // now a real JARVIS turn, agent-chat meters it against `userId` in `agent_usage_logs` and
       // refuses up front with a 402 when they cannot pay. Charging a fixed fee on top would bill
       // the same reply into two ledgers that then disagree.
+      // What the MEMBER wants the reply to do ("offer the oak decking", "say the order ships
+      // Monday").
       const instruction = typeof payload.instruction === 'string' ? payload.instruction.trim().slice(0, OPERATOR_INSTRUCTION_MAX) : '';
       const draft = await buildAgentDraft(db, thread, {
         userId, task: 'inbox_agent_suggest', operatorInstruction: instruction || undefined,

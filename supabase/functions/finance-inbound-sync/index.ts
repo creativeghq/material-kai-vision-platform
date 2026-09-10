@@ -406,8 +406,7 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
         // means by "new documents". It used to increment once per non-error upsert — and with
         // `ignoreDuplicates: true` an already-held document is not an error, so the counter was
         // identical to `found` on every run and the UI's "N new documents" toast reported the
-        // size of the WINDOW. Re-pulling September said "10 new documents" and added none; a
-        // window with genuinely nothing new was indistinguishable from one where everything was
+        // size of the WINDOW.
         if (newId) { inserted++; freshDocIds.push(newId); }
         if (Number(mark) > Number(maxMark)) maxMark = mark;
       }
@@ -476,7 +475,7 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
     // from myDATA" is waiting for the PULL, not for this. It is also the slow half — up to 30
     // model calls plus ΓΕΜΗ/ΑΑΔΕ name lookups — and Supabase's REQUEST IDLE TIMEOUT is 150s,
     // separate from the 400s wall clock: at 150s the gateway hands the caller a 504 while the
-    // worker runs happily on and finishes. On 2026-09-08 a run took 162s, so the browser got
+    // worker runs happily on and finishes.
     const enrich = async () => {
     // ── Background AI product extraction → pending-products queue (credit-gated) ──
     // For each not-yet-extracted inbound doc with line detail, run the cheapest model to
@@ -573,6 +572,8 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
             // A myDATA line is not just a description. It states the unit, the supplier's own
             // article code and the VAT category, and those are FACTS about the document — read
             // them rather than asking a model to re-derive them from prose that may not say.
+            // `src/lib/units.ts` puts it plainly: "wherever a code is present it is the
+            // authority — never infer the unit from a product description instead.
             const unitCode = l.measurement_unit != null ? Number(l.measurement_unit) : null;
             const itemCode = String(l.item_code ?? '').trim();
             // The product name ALONE. `size` and `attributes` are kept in their own columns and
@@ -638,7 +639,7 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
     // ~2/3 of received documents would otherwise show a bare VAT number. Resolved from the
     // ΓΕΜΗ public registry, then — only for the ΑΦΜ ΓΕΜΗ has no record of, and only when the
     // workspace opted in — from ΑΑΔΕ, which notifies the looked-up business (see
-    // resolve-issuer-names.ts). Best-effort: never fails the sync, and each run also chips
+    // resolve-issuer-names.ts).
     let issuers: unknown = null;
     try {
       issuers = await resolveInboundIssuerNames(supabase, workspaceId, gemiApiKey, {

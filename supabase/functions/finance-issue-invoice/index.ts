@@ -67,7 +67,7 @@ type Reservation =
  *  insufficient balance — the previous flow only pre-checked the balance then debited AFTER a
  *  successful (paid) submit while swallowing failures, so a debit that lost the race gave away
  *  a free myDATA transmission. Reserving first closes that race; the returned `refund()` gives
- *  the credits back if the submit fails or the document is not accepted. Operator root
+ *  the credits back if the submit fails or the document is not accepted.
  */
 async function reserveTransmission(
   // `string | null`, because that is what `auth.userId` IS at every call site — null at
@@ -147,7 +147,7 @@ async function buyerRiskBlocks(supabase: any, invoiceId: string): Promise<string
     // select listed only the four columns above, so an operator could enable
     // "Block issuance while the buyer has an unpaid / overdue invoice" and every
     // invoice issued regardless. A financial control that reported active while
-    // being absent. Default false: enabling stays an explicit operator choice, so
+    // being absent.
     block_min_order: s?.risk_block_min_order ?? false,
     block_unpaid: s?.risk_block_unpaid_invoice ?? false,
   };

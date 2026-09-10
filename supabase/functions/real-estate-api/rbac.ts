@@ -49,6 +49,8 @@ export const PROPERTY_WRITABLE = [
   // `syndicate_to` REMOVED from the allowlist 2026-08-01. It is typed
   // string[] and looks like a per-listing portal switch, but it has no reader and no writer
   // anywhere: real-estate-feed decides membership purely from feed_enabled + in_discovery.
+  // Leaving it writable let any manager put arbitrary strings into a column with no defined
+  // semantics, so whoever builds per-portal routing would inherit pre-existing garbage.
   'in_discovery', 'listing_expires_at',
   // AVM / derived-ish (manager-supplied)
   'estimated_value', 'avm_source', 'price_reduced', 'listing_date',

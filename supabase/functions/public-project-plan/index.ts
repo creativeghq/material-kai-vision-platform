@@ -1,4 +1,8 @@
 // public-project-plan — anonymous lead-gen estimator for /tools/project-plan.
+// In-repo public path for the Blueprint engine. The compute is PURE (no paid
+// upstream APIs) so it lives here, not in MIVAA. Turnstile-gated + metered against
+// the same `public_lookup_log` table the other public tools use (combined 2/day per
+// IP).
 
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { jsonResponse as json } from '../_shared/http.ts';

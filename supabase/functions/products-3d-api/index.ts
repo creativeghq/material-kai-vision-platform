@@ -902,9 +902,7 @@ Deno.serve(withApiLogging((req) => {
   }
 
   if (action === 'event') {
-    // The ONLY write this anonymous surface has. Three things make that safe, and all three are
-    // server-side because the caller is untrusted by construction:
-    //   • workspace_id comes from the key, never the body (invariant 1)
+    // The ONLY write this anonymous surface has.
     const productId = String(params.product_id ?? '').trim();
     const eventType = String(params.event_type ?? '').trim();
     if (!productId || !eventType) {
@@ -942,8 +940,7 @@ Deno.serve(withApiLogging((req) => {
     // analytics row would not write. But `console.error` + `{ ok: true }` meant an RLS or
     // schema regression left merchant analytics at exactly zero indefinitely while every
     // widget call reported success, which is the platform's dominant failure shape
-    // (`ops.silent_zero`, #361 `EG-21`). Two changes: the error is CAPTURED rather than
-    // logged into a stream nobody reads, and the response says plainly that the event was
+    // (`ops.silent_zero`, #361 `EG-21`).
     if (insErr) {
       console.error('[products-3d-api] event insert failed', insErr.message);
       void captureException(new Error(`3D embed analytics insert failed: ${insErr.message}`), {

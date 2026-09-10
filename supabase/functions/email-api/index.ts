@@ -351,6 +351,9 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         // Reject a malformed recipient BEFORE any provider work. A `to` of the literal string
         // "null" is what a flow template renders when its recipient variable is absent (the
         // seeded Order-Dispatched flow does this whenever the customer has no email on file).
+        // Handing that to Resend is a guaranteed rejection that surfaced as a 500 — an
+        // our-fault status for what is really a bad request — and left the row stuck at
+        // `queued` forever, retried on every re-run.
         const addrOf = (raw: string) => {
           const m = raw.match(/<([^>]+)>\s*$/);   // accept "Name <a@b.com>" as well as "a@b.com"
           return (m ? m[1] : raw).trim();
@@ -369,6 +372,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         // send from workspace B's verified domain — billed to B's key, counted against
         // B's quota, stamped to B. Require membership when a workspace_id is supplied
         // (server-to-server admin-secret callers are exempt — trusted system sends).
+        // Attribution is bound to the caller on exactly the same terms as the sender.
         const attributionWorkspaceId = body.workspace_id ?? body.attribution_workspace_id ?? null;
         if (!isAdminAccess(auth) && attributionWorkspaceId) {
           if (!(await userCanAccessWorkspace(supabaseClient, auth.userId, attributionWorkspaceId))) {
@@ -462,9 +466,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         // ── Email#1: opt-out enforcement + compliance merge-vars ────────────────────
         // The suppression check used to be nested inside `if (body.emailType === 'marketing')`,
         // and `emailType` is CLIENT-SUPPLIED with a 'transactional' default — so omitting the
-        // field skipped suppression entirely, and so did setting it. The one path the comment
-        // claimed to close ("the freeform / multi-`to` bypass") is precisely the path that
-        // declares itself transactional: SendEmailDialog sends free-text operator-composed mail
+        // field skipped suppression entirely, and so did setting it.
         let unsubHeaders: Record<string, string> | undefined;
 
         // Which sends may skip an opt-out, and it is NOT a caller-declared class.
@@ -545,6 +547,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           // and target exactly one recipient — otherwise the opt-out link would be minted for the wrong
           // person. Bulk marketing is fanned out one-recipient-per-send by campaign-processor, so this
           // never blocks that path.
+          // Read AFTER the suppression filter above, which may have rewritten body.to.
           const primaryTo = Array.isArray(body.to) ? body.to[0] : body.to;
           if (!body.workspace_id) {
             throw new HttpError(400, 'A marketing email requires workspace_id (for suppression + a workspace-scoped unsubscribe link).');
@@ -1174,6 +1177,10 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         }
 
         // DERIVED FROM email_logs, not from the `email_analytics` table.
+        // `email_analytics` has ZERO writers — no code, no trigger, no cron (repo grep: the
+        // generated types, this read, and reset-platform's truncate; pg_trigger and
+        // pg_proc: nothing). So every rate here read 0% forever while email_logs actually
+        // held 134 `failed` / 2 `queued` / 1 `delivered`.
         let query = supabaseClient
           .from('email_logs')
           .select('created_at, sent_at, delivered_at, opened_at, clicked_at, bounced_at, complained_at');

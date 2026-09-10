@@ -225,6 +225,9 @@ Deno.serve(withApiLogging('background-agent-runner', async (req: Request) => {
 
   // WHO this run is acting for (#363 `EE-9`). The dispatching user's id is recorded by
   // `dispatch_background_task` as `input_data.dispatched_by`, and until now nothing read it:
+  // the runner executed under the service role with no notion of an acting user at all, and
+  // the KAI task agent billed `background_agents.created_by` — the person who created the
+  // agent, who is often not the person who dispatched the task.
   const actingUserId: string | null =
     authedUserId ??
     ((run.input_data as Record<string, unknown> | null)?.dispatched_by as string | undefined) ??

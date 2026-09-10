@@ -474,18 +474,7 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
         </div>
       </div>
 
-      {/*
-        ONTOLOGY GAPS — the terms this queue uses that resolve to nothing.
-
-        Rungs 2 and 3 of the markup ladder match `products.brand_company_id` and
-        `products.supplier_company_id`. A maker or issuer with no CRM company means those rungs
-        are unreachable for every line carrying the name, so the ladder falls to the workspace
-        default. Ranked by how many lines each term blocks, because clearing the top of the list
-        is what unblocks the most of the queue.
-
-        Rendered rather than merely counted: a number nobody can act on is how the last version
-        of this idea sat unused for a week.
-      */}
+      {/* ONTOLOGY GAPS — the terms this queue uses that resolve to nothing. */}
       {ontologyGaps.length > 0 && (
         <div className="border-b border-hairline bg-amber-500/5 px-4 py-2.5">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">

@@ -6,6 +6,8 @@ import { hasCreds, serviceClient, createUser, createWorkspace, addMember, teardo
 // (which only catches white-screens) nor the plpgsql lint (which only catches broken refs) says
 // anything about whether the ARITHMETIC and the TENANCY GUARDS are right — and these are the
 // paths where being silently wrong costs real money.
+// record_payment_fx is called with a REAL user JWT (it reads auth.uid() and calls
+// assert_workspace_member).
 const suite = hasCreds ? describe : describe.skip;
 
 suite('money paths · payments + credits', () => {
@@ -121,6 +123,7 @@ suite('money paths · payments + credits', () => {
   // allocation (order_id NULL by the one-target constraint), and settlement only counted
   // order-DIRECT allocations — so the order read as unpaid, with spurious "Record payment /
   // Apply credit" prompts, while the money was in the bank. Static checks can't see this;
+  // only an end-to-end pay-then-assert can.
   it('settles an order when its linked invoice is paid in full', async () => {
     const ord = await svc.from('orders').insert({
       workspace_id: wsA, created_by: A.id, order_type: 'sales', status: 'confirmed',

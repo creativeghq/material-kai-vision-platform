@@ -66,7 +66,7 @@ export function invalidateInvoiceProviderCache(): void {
 // PAYMENT PROVIDERS — multi-provider registry
 // Different from invoicing: multiple payment providers can coexist (an
 // operator may take Stripe AND PayPal AND bank-transfer simultaneously and
-// offer the customer a choice at checkout). So the API returns an array, not
+// offer the customer a choice at checkout).
 
 export interface PaymentProvider {
   /** Module slug. */

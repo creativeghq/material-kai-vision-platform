@@ -1238,15 +1238,10 @@ export const ContactDetailPage: React.FC = () => {
                 </TabsContent>
               )}
               {/*
-                Work (#376) — the same shared element the company record mounts, plus the two
-                management panels it absorbed. Projects, Warranties and Property were three tabs
-                answering one question about one person.
-
-                Real estate stays behind its `ModuleTabGate`: the roll-up above will already list
-                a tenancy or a sale for a workspace that has the module, and the gate is what
-                upsells the ones that do not — so the section appears here rather than the whole
-                tab disappearing, which is what used to happen.
-              */}
+                * Work (#376) — the same shared element the company record mounts, plus the two
+                * management panels it absorbed. Projects, Warranties and Property were three tabs
+                * answering one question about one person.
+                */}
               <TabsContent value="work" className="space-y-4">
                 {contact.id ? (
                   <PartyWorkTab

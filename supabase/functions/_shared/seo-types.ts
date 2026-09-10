@@ -66,11 +66,7 @@ export interface ContentLandscapeSummary {
 
 /**
  * Mention-monitoring opportunity card. Mirror of `Opportunity.to_dict()` in
- * `mention_opportunity_service.py`. Surfaced inside `KeywordResearchResult`
- * via the parallel `/opportunities-stateless` call so the rest of the SEO
- * pipeline (plan / write / analyze) can read AI Overview text, featured-
- * snippet targets, PAA answers, related searches, video / news / shopping
- * carousels, knowledge-graph presence, and paid competition straight off
+ * `mention_opportunity_service.py`.
  */
 export interface MentionOpportunity {
   type: string;

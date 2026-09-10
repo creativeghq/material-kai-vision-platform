@@ -273,6 +273,11 @@ export async function handleCompanies(req: Request): Promise<Response> {
       }
 
       // Server-side dedupe (#366 BU-3). The client probe in QuickAddCompanyDialog is a courtesy:
+      // it is debounced, non-blocking and swallows its own errors, so Create could always win the
+      // race. This is the guarantee — one query, on the same folded key, immediately before the
+      // insert. `name_fold` is a generated column holding `crm_fold(name)`, so the match survives
+      // Greek case and accents: "Καρέλης ΑΕ" finds the stored "ΚΑΡΕΛΗΣ ΑΕ", which plain `ilike`
+      // on the raw column never did.
       const companyDuplicate = await guardDuplicateParty(
         supabase, 'crm_companies', targetWs, body.name, body.allow_duplicate === true, corsHeaders,
       );

@@ -882,14 +882,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   };
 
 
-  /**
-   * Delete a job and EVERYTHING tied to it via the backend cleanup service.
-   * This is the single source of truth for job deletion — calling MIVAA's
-   * DELETE /documents/jobs/{id} endpoint runs `CleanupService.delete_job_completely`,
-   * which:
-   *   - resolves products by source_job_id, source_document_id, AND product_processing_status (covers PDF/XML/scraping)
-   *   - cleans every product-side child table (layout_regions, tables, enrichments, image_product_associations)
-   */
+  /** Delete a job and EVERYTHING tied to it via the backend cleanup service. */
   const deleteJobWithAllData = async (jobId: string): Promise<{ success: boolean; stats: Record<string, number> }> => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -2840,6 +2833,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   //   1. process-alive  — `last_heartbeat` freshness (the
                   //      orchestrator writes this every ~30s as long as it's
                   //      running; staleness >2min = process likely dead).
+                  //   2.
                   const now = Date.now();
                   const lastHeartbeat = selectedJob.last_heartbeat ? new Date(selectedJob.last_heartbeat).getTime() : 0;
                   const heartbeatStaleMin = lastHeartbeat ? Math.floor((now - lastHeartbeat) / 60000) : 0;
@@ -3297,7 +3291,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   // — otherwise a running stage (e.g. the PaddleOCR structural pass,
                   // which emits an in_progress event before completed) renders as
                   // done and the "current stage" indicator jumps ahead to the
-                  // next stage. Marker checkpoints are written with status
+                  // next stage.
                   const latestStatusByStage: Record<string, string> = {};
                   jobCheckpoints.forEach(cp => {
                     if (cp.stage) {
@@ -4337,22 +4331,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                 </Card>
               </div>
 
-              {/* AI Model Cost & Usage Analytics — MEASURED, never estimated. (#365 AD-11)
-
-                  What was here: a second pricing table built entirely from invented constants —
-                  "~3k tokens per product", 0.5s of GPU per image, 2s per page, SLIG at $0.45/GPU-hr,
-                  PaddleOCR at $0.80/GPU-hr — multiplied out and rendered as "Total Cost … USD".
-                  Two of its rates were also simply wrong: Claude Opus priced at $3/$15 per 1M
-                  (that is Sonar Pro's rate; Opus is $5/$25) and `text-embedding-3-small`, an
-                  OpenAI model this platform removed and does not call. CLAUDE.md's rule is that
-                  ai_model_pricing is the ONE USD source; this was a fourth one, on the screen an
-                  operator uses to judge what a job cost.
-
-                  Real spend already has a home: `ai_usage_logs`, which carries a `job_id` column.
-                  So this now reads that, and when there is nothing to read it SAYS SO instead of
-                  computing a plausible number. That matters more than it sounds — `job_id` is
-                  currently NULL on all 8,809 rows, so no job's cost is attributable at all. The
-                  estimate was hiding that; the empty state is what makes it fixable. */}
+              {/* AI Model Cost & Usage Analytics — MEASURED, never estimated. (#365 AD-11) */}
               {(() => {
                 const spend = jobAiSpend;
 

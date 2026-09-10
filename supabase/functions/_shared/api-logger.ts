@@ -62,7 +62,7 @@ function getErrorStatus(err: unknown): number | undefined {
 // (e.g. scrape-* return 500 for "Missing required parameters"; email-api returns
 // 500 for "Domain is required"). We leave the HTTP response untouched but keep
 // these OUT of Sentry so the dashboard stays signal-only. Tunable — widen/narrow
-// as real noise vs. real bugs gets observed. Genuine server faults ("Cannot read
+// as real noise vs. real bugs gets observed.
 const CLIENT_ERROR_RE =
   /(unauthor|forbidden|not allowed|method not allowed|permission denied|\brequired\b|missing (required )?param|invalid (endpoint|request|param|parameter|input|body|json|argument|token|signature)|must be (a |an |provided|set)|not found|no .{0,40} found|bad request|malformed)/i;
 function isLikelyClientError(message: string | null): boolean {

@@ -35,6 +35,9 @@ export type Capability =
   | 'sales.team.view'       // sales manager: the WHOLE team's quote book, not just own rows.
                             // Backed server-side by is_workspace_sales_manager(workspace_id) in
                             // consolidated_quotes_select_public — this flag only unhides the UI.
+                            // SCOPE OF ROWS, NOT OF MARGIN: the cost basis and the applied markup
+                            // are gated separately by user_can_read_quote_costs(), which answers
+                            // only for the quote's CREATOR or a workspace owner/admin.
   | 'projects.use'          // projects + client views
   | 'moodboards.use'        // moodboards / design surfaces
   | 'agent.use'             // KAI agent / chat
@@ -98,8 +101,7 @@ export const PERSONA_CAPABILITIES: Record<Persona, Capability[]> = {
   // margins: cost and markup answer only to the quote's creator or a workspace owner/admin
   // (`user_can_read_quote_costs`), so a manager reviewing a rep's quote sees the lines and the
   // sell price with the cost column blank. Still NOT a workspace manager: no finance settings,
-  // pricing, network or warehouse. The team-wide read is enforced in RLS
-  // (is_workspace_sales_manager), so the extra capability only reveals UI the server would
+  // pricing, network or warehouse.
   sales_manager: ['sales.portal', 'sales.team.view', 'quotes.use', 'crm.view', 'marketplace.browse', 'agent.use', 'inbox.use'],
   // ── Functional team roles. Deliberately MINIMAL: each holds only its own module's capability
   //    plus agent.use, so a team member can never reach finance, pricing, the network or the team.
@@ -115,6 +117,8 @@ export const PERSONA_CAPABILITIES: Record<Persona, Capability[]> = {
   // documents. Deliberately NO crm.view / sales.portal / finance / anything else, so an employee
   // can never see another person's (e.g. a sales rep's) details. Data is further self-scoped in
   // hr-api's self- endpoints (the caller's own linked hr_employees row).
+  // `agent.use` is granted so the employee can reach My HR from chat via the self-scoped
+  // `manage_my_hr` tool ("how much leave do I have left?", "request 3 days off").
   employee: ['hr.self', 'agent.use'],
   // Invited property agent: the Real Estate surface only. Manages listings (shared team asset,
   // D1) and works their own leads/viewings (self-scoped via responsible_sales_user_ids / listing_agent_id
@@ -176,6 +180,10 @@ export function resolvePersona({ isPlatformOperator, rank, workspaceRole, accoun
 
   // 4. No workspace role at all (membership not resolved / a user outside any workspace). Only
   //    here does the global account tier speak.
+  //    NOTHING functional belongs in this switch. `public.roles` is the GLOBAL account tier — a
+  //    value set by a platform operator and true in EVERY workspace the user belongs to — so it
+  //    holds only `supplier` / `architect` (the tiers role_upgrade_requests accepts), `admin`, and
+  //    the `user` baseline.
   switch (accountRole) {
     case 'supplier':
     case 'dealer':   // legacy alias

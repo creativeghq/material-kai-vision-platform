@@ -2,7 +2,6 @@
 // Owns everything finance-related: invoices, payments, allocations,
 // purchase orders, supplier bills, credit notes, quote activities,
 // and report aggregations (AR/AP aging, P&L, cash flow, follow-up queue).
-// Heavy mutations go through Postgres SECURITY DEFINER RPCs so that:
 
 import { supabase } from '@/integrations/supabase/client';
 import { edgeError } from '@/utils/edgeError';

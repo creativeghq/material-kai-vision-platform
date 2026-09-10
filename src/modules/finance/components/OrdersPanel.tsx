@@ -1168,6 +1168,10 @@ export const NewOrderModal: React.FC<{
           const billId = await linkOrderToDocument({ id: prefill.inboundDocumentId }, orderId);
           if (paidNow && status !== 'draft') {
             // Pay what the BILL says, not what this form recomputed.
+            // The bill is created from the DOCUMENT by inbound_doc_to_supplier_bill, while
+            // `grossTotal` is recomputed from the form's lines — and orderLinesFromDoc rounds
+            // net/qty per line and defaults vat_code to 24% when myDATA omits vat_category, so the
+            // two disagree.
             const { data: billRow } = await supabase.from('supplier_bills')
               .select('amount_due, total').eq('id', billId).maybeSingle();
             const payable = Number((billRow as any)?.amount_due ?? (billRow as any)?.total ?? grossTotal);
@@ -1234,14 +1238,13 @@ export const NewOrderModal: React.FC<{
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            {/* One field for "what is this for?". A project, a customer (raising or attaching their
-                order), an existing order of the same kind to merge these lines into, or — for a
-                document-seeded cost that RIDES ALONG with a purchase already recorded (freight,
-                customs, an installer) — that order, which then gains this as an expense instead of
-                a second order being invented for it. Merge candidates need the counterparty, so
-                they only appear once a party is chosen; a document-seeded order is never a merge
-                source, because its lines are evidence for the document that produced it and must
-                stay on their own order. */}
+            {/*
+              * One field for "what is this for?". A project, a customer (raising or attaching their
+              * order), an existing order of the same kind to merge these lines into, or — for a
+              * document-seeded cost that RIDES ALONG with a purchase already recorded (freight,
+              * customs, an installer) — that order, which then gains this as an expense instead of
+              * a second order being invented for it.
+              */}
             <OrderLinkPicker
               workspaceId={workspaceId}
               value={link}
@@ -2352,6 +2355,8 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   // #3 — edit the order's line items. Lines freeze once a document has been DERIVED FROM them:
   //   · sales    → the invoice is built from these lines, so an invoice freezes them.
   //   · purchase → the supplier's bill is built from these lines too, so a bill freezes them.
+  // An expense attached to a SALES order is the cost side of the sale — transport, the goods
+  // bought in — and copies nothing from the sales lines.
   const derivedDocExists = (fin?.invoices.length ?? 0) > 0
     || (order?.order_type === 'purchase' && (fin?.supplierBills.length ?? 0) > 0);
   const editable = !!order && order.status !== 'cancelled' && order.status !== 'fulfilled'
@@ -2794,14 +2799,12 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
     <>
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-[1400px] w-[95vw] max-h-[92vh] overflow-y-auto">
-        {/* A DOCUMENT header, not a dialog caption: an icon tile, the order number, and ONE line
-            of facts under it — direction · party · date · what it is worth · how much of it is
-            settled. Everything the list row states about an order, in the list's own order, read
-            left to right in a single pass. The rule under it is what separates "what this is"
-            from the controls that act on it; before this the title stood alone and the type and
-            settlement verdict sat loose in the toolbar below as two bare words ("Sales  Paid"),
-            a status with no figure anywhere near it, sharing a line with the controls.
-            `pr-8` keeps the block clear of the dialog's own close button. */}
+        {/*
+          * A DOCUMENT header, not a dialog caption: an icon tile, the order number, and ONE line
+          * of facts under it — direction · party · date · what it is worth · how much of it is
+          * settled. Everything the list row states about an order, in the list's own order, read
+          * left to right in a single pass.
+          */}
         <DialogHeader className="space-y-0 pr-8 text-left">
           <div className="flex items-start gap-x-4 border-b border-border/60 pb-4">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -2916,15 +2919,12 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                   compact
                   disabled={saving}
                 />
-                {/* The expense card this order was won on. Its own control, next to Project and
-                    not folded into it: they write different columns and answer different
-                    questions, and the one control that tried to do two things printed a
-                    customer's order number under the word "Project".
-
-                    Reporting only — no total moves. What it buys is the half of a trip card that
-                    never existed: the card has always known what the trip COST, and this is the
-                    first thing that can say what it EARNED. Offered on purchases too, because a
-                    buying trip is the same question asked in the other direction. */}
+                {/*
+                  * The expense card this order was won on. Its own control, next to Project and
+                  * not folded into it: they write different columns and answer different
+                  * questions, and the one control that tried to do two things printed a
+                  * customer's order number under the word "Project".
+                  */}
                 <Label className="text-xs text-muted-foreground">Trip</Label>
                 <OrderLinkPicker
                   workspaceId={order.workspace_id}
@@ -3031,20 +3031,14 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                         : <ArrowDownLeft className="h-3.5 w-3.5 mr-2 text-emerald-500" />}
                       Record payment
                     </DropdownMenuItem>
-                    {/* A cost booked against this order. On a sales order that is the cost side of
-                        the sale (goods bought in, transport); on a purchase order it is the
-                        supplier's own bill and every extra that rides along with the goods —
-                        freight, customs, an installer, a second supplier on the same job. An order
-                        holds MANY expenses (`supplier_bills.order_id` is not unique), so this stays
-                        available after the first one exists — hence the label counts.
-
-                        It was SALES-only, to avoid duplicating a "Record supplier bill" action that
-                        generated the payable from the order's own lines. That action no longer
-                        exists in this menu (`generate_supplier_bill_from_order` has no caller left),
-                        so the gate stopped preventing a double entry and started preventing the ONLY
-                        one: a purchase order raised by hand rather than from the Inbox had no way to
-                        record what the supplier billed, which left 3-way match permanently at
-                        "awaiting bill". */}
+                    {/*
+                      * A cost booked against this order. On a sales order that is the cost side of
+                      * the sale (goods bought in, transport); on a purchase order it is the
+                      * supplier's own bill and every extra that rides along with the goods —
+                      * freight, customs, an installer, a second supplier on the same job. An order
+                      * holds MANY expenses (`supplier_bills.order_id` is not unique), so this stays
+                      * available after the first one exists — hence the label counts.
+                      */}
                     <DropdownMenuItem onClick={() => { setExpensePrefill({}); setExpenseOpen(true); }}>
                       <ArrowUpRight className="h-3.5 w-3.5 mr-2 text-red-400" />
                       Add {(fin?.supplierBills.length ?? 0) > 0 ? 'another expense' : 'expense'}
@@ -3290,21 +3284,13 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                     return (
                     <div key={it.id} className={`grid ${isSalesOrder ? 'grid-cols-[minmax(240px,1.7fr)_44px_52px_120px_82px_92px_84px_94px_88px_84px_96px]' : 'grid-cols-[minmax(240px,1.7fr)_44px_52px_120px_82px_92px_84px_96px]'} gap-2 border-t border-border/40 px-3 py-1.5 text-sm items-center ${isSalesOrder ? 'min-w-[1040px]' : 'min-w-[760px]'}`}>
                       <span className="min-w-0 flex items-start gap-1.5">
-                        {/* Everything the line used to say in a strip of chips under its
-                            description. Five of them rendered at once (catalog, supplier, VAT
-                            cause, warranty, supplier payment) turned a one-line row into a
-                            three-line paragraph and made the table unreadable at any real line
-                            count.
-
-                            Split in two inside, because they were never the same kind of thing:
-                            ACTIONS at the top, as verbs, and the line's STATE below a Details
-                            heading as plain text. As chips every fact looked like a button — the
-                            product name, the VAT cause and "paid on ORD-…" were all rendered as
-                            clickable, which is what buried the four things you can actually do.
-
-                            The amber dot on the trigger is what survives the collapse: the Details
-                            block is where a line says what is wrong with it, and the dot is that
-                            same signal at one pixel, so a blocking gap is visible on a closed row. */}
+                        {/*
+                          * Everything the line used to say in a strip of chips under its
+                          * description. Five of them rendered at once (catalog, supplier, VAT
+                          * cause, warranty, supplier payment) turned a one-line row into a
+                          * three-line paragraph and made the table unreadable at any real line
+                          * count.
+                          */}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <button type="button" title="Line actions"
@@ -3575,16 +3561,14 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
               </div>
             )}
 
-            {/* The customer's on-account credit is DELIBERATELY not offered here. An order
-                allocates the order: what its goods sold for, less what they cost. Cash of theirs
-                we are holding is a PARTY fact — it may be bank charges, or money sent ahead for
-                the next order, and it is settled across every order they have, not this one. So
-                the release lives on their finance record, and `customer_credit_releasable`
-                deep-links the bell notification straight there.
-
-                It used to sit right above the margin banner, both with a button, and the pair
-                read as one story in two steps: "the order made 823, so 446 is what you may
-                actually take." Nothing about the two numbers is related. */}
+            {/*
+              * The customer's on-account credit is DELIBERATELY not offered here. An order
+              * allocates the order: what its goods sold for, less what they cost. Cash of theirs
+              * we are holding is a PARTY fact — it may be bank charges, or money sent ahead for
+              * the next order, and it is settled across every order they have, not this one. So
+              * the release lives on their finance record, and `customer_credit_releasable`
+              * deep-links the bell notification straight there.
+              */}
 
             {/* The order's margin, as a DECISION rather than an observation.
                 Shown for any sales order that made something, whether or not it has been invoiced —
@@ -3877,15 +3861,14 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
               </TabsContent>
 
               <TabsContent value="expenses" className="mt-3 space-y-3">
-            {/* Does the costing agree with what has been booked? An order records its cost twice —
-                on the lines (which is the ONLY thing the margin reads) and as expense documents
-                (which is the payable) — and until this block nothing compared them. Each half is
-                individually valid, so a disagreement produced no error anywhere: a duplicated
-                expense reads as a live debt already settled through its twin, and a cost booked
-                only as an expense leaves the margin overstated by its whole amount.
-
-                Stated, never auto-corrected. Two identical instalments are a real thing; only the
-                operator can tell them from one cost entered twice. */}
+            {/*
+              * Does the costing agree with what has been booked? An order records its cost twice —
+              * on the lines (which is the ONLY thing the margin reads) and as expense documents
+              * (which is the payable) — and until this block nothing compared them. Each half is
+              * individually valid, so a disagreement produced no error anywhere: a duplicated
+              * expense reads as a live debt already settled through its twin, and a cost booked
+              * only as an expense leaves the margin overstated by its whole amount.
+              */}
             {costFindings.length > 0 && (
               <div className="rounded-md border border-amber-500/40 bg-amber-500/5">
                 <div className="flex items-center gap-1.5 border-b border-amber-500/30 px-3 py-1.5 text-[11px] font-medium text-amber-700 dark:text-amber-400">
@@ -3929,15 +3912,14 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
               </div>
             )}
 
-            {/* A purchase that looks like it bought the goods for this sale and says so nowhere.
-                The link is only ever written when the purchase is raised FROM the sale, so buying
-                first — the ordinary way round when a supplier has stock — leaves the two halves of
-                one trade on separate screens with nothing connecting them. Neither record is wrong,
-                which is why it stays that way: the sale reports no cost booked against it while the
-                money sits, paid, on the other order.
-
-                Offered, never applied automatically. Two orders from one supplier in the same week
-                are not necessarily the same trade. */}
+            {/*
+              * A purchase that looks like it bought the goods for this sale and says so nowhere.
+              * The link is only ever written when the purchase is raised FROM the sale, so buying
+              * first — the ordinary way round when a supplier has stock — leaves the two halves of
+              * one trade on separate screens with nothing connecting them. Neither record is wrong,
+              * which is why it stays that way: the sale reports no cost booked against it while the
+              * money sits, paid, on the other order.
+              */}
             {coverSuggestions.length > 0 && (
               <div className="rounded-md border border-border/60">
                 <div className="border-b border-border/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">
@@ -4211,15 +4193,12 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                       {/* Account only — the method is derived from it, so printing both said
                           "Postbank BG · Bank Payment" and taught the reader nothing twice. */}
                       <span className="text-[11px] text-muted-foreground">{formatDate(p.paid_at)} · {p.direction === 'in' ? 'Payment' : 'Expense'}{acctName ? ` · ${acctName}` : ''}</span>
-                      {/* What the cash actually settled. An expense opens its settlement ledger —
-                          the Expenses tab beside this one lists the same bill, and the two used to
-                          be unconnectable: cash that named no cost, next to a cost that named no
-                          cash.
-                          Three outcomes, and they are three different facts that all rendered as
-                          the same row before: it settled a document; it went straight against the
-                          order with no cost document in between (the commonest shape — "Record
-                          payment" books cash, "Add expense" books a bill); or it is allocated to
-                          nothing at all, which is the only one of the three that is a loose end. */}
+                      {/*
+                        * What the cash actually settled. An expense opens its settlement ledger —
+                        * the Expenses tab beside this one lists the same bill, and the two used to
+                        * be unconnectable: cash that named no cost, next to a cost that named no
+                        * cash.
+                        */}
                       <span className="block text-[11px] text-muted-foreground">
                         {p.settles.length === 0
                           ? (p.settled_on_order > 0.005

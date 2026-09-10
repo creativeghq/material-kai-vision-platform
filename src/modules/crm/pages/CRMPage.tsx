@@ -198,6 +198,8 @@ export const CRMManagement: React.FC = () => {
   // crm_company_contacts junction. Resolve it to a contact-id allowlist and reuse the
   // same server-side `ids` param as the category filters, rather than teaching the list
   // endpoint a junction join.
+  // Bounded lookup backing the company dropdowns (the contacts "company" filter, the bulk
+  // "Assign company" action, and the companies "Business activity" facet).
   const [companyLookup, setCompanyLookup] = useState<Array<{ id: string; name: string; profession: string | null }>>([]);
 
   // Per-tab selection (users keyed by user_id; contacts/companies by id)

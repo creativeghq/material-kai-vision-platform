@@ -1,4 +1,8 @@
 // Unwrap Supabase edge-function invocation errors into the REAL reason.
+// `supabase.functions.invoke()` converts any non-2xx response into a thrown
+// `FunctionsHttpError` whose `.message` is the useless generic string
+// "Edge Function returned a non-2xx status code". The actual reason the function
+// returned (e.g. "Statement sending is disabled in finance settings.
 
 /**
  * Resolve the human-readable message from a `supabase.functions.invoke` error.

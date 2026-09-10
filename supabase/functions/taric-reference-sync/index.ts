@@ -588,6 +588,8 @@ async function importGrid(
     // Both halves must be split BEFORE normalising: the concatenated digits are 12 long and
     // `normalizeCode` — correctly — rejects that, so splitting afterwards would have skipped
     // every row in the file.
+    // The suffix is not cosmetic. 80 is a declarable line; 10 is an intermediate one that exists
+    // only to carry the hierarchy and is rejected on a customs declaration.
     const rawCode = (at(r, 'code') ?? '').trim();
     const split = /^([0-9\s]+?)\s+(\d{2})$/.exec(rawCode);
     const splitCodeDigits = split ? split[1].replace(/[^0-9]/g, '') : '';

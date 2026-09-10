@@ -6,7 +6,7 @@ import { assertEntitled } from '../_shared/entitlement.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 
 // Public online storefront (public link / mini-store).
-// Anonymous, no auth. Three actions (discriminated by `action`):
+// Anonymous, no auth.
 
 
 const publicAppUrl = () => Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr';

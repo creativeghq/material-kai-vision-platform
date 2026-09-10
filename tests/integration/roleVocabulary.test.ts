@@ -1,8 +1,6 @@
 // The role vocabulary lives in FIVE places that must agree: the TypeScript catalog
 // (src/auth/workspaceRoles.ts), `workspace_members_role_check`, `workspace_invites_role_check`, and
-// the allowlists inside `create_workspace_invite` / `set_workspace_member_role`. The unit test
-// (tests/unit/workspaceRoles.test.ts) can only see the TypeScript side, which is exactly how two
-// real bugs survived it:
+// the allowlists inside `create_workspace_invite` / `set_workspace_member_role`.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {

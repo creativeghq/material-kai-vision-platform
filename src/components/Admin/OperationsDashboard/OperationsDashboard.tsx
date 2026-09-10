@@ -333,6 +333,7 @@ const OperationsDashboardInner: React.FC = () => {
       // `pdfJobs.data || []`, so a broken query rendered as a pipeline that processed nothing.
       // Zero and "could not read" are the two answers an operations dashboard most needs to keep
       // apart. (#365 AD-7)
+      // The web-scrape→product path was removed and `scraping_sessions` dropped.
       const [pdfJobs, xmlJobs] = await Promise.all([
         supabase.from('background_jobs').select('*').eq('job_type', 'pdf_processing'),
         supabase.from('data_import_jobs').select('*'),

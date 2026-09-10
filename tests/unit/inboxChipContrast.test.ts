@@ -268,9 +268,7 @@ describe('inbox chips are legible in all four themes', () => {
           // Pairing is a TEXT rule. What a theme changes is the GROUND a colour is read
           // against, and a fill is not read against the ground — it either IS the ground
           // (`bg-emerald-700`, opaque) or it is a wash of the chip's own hue that composites the
-          // same way over anything (`bg-amber-500/15`). Requiring `dark:bg-amber-500/15` beside
-          // `bg-amber-500/15` would be duplication asserting nothing, and where a chip really
-          // does drop its tint in one theme the ratio test below still measures its text against
+          // same way over anything (`bg-amber-500/15`).
           if (u.util !== 'text') continue;
           const k = `${u.util}-${u.color}`;
           const e = seen.get(k) ?? { light: [], dark: [] };

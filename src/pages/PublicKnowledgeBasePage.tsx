@@ -789,13 +789,13 @@ export const PublicKnowledgeBasePage: React.FC = () => {
           </section>
         ) : (
           <>
-            {/* Entry cards — the three ways to get an answer.
-                "Browse Articles" and "Most Popular" scroll to sections that are
-                themselves conditional on there being public articles, so they are
-                rendered only when their target exists. Left unconditional they were
-                dead buttons: a click that smooth-scrolls to `getElementById(...) ??
-                undefined` does nothing at all, silently, which is exactly what the
-                whole page did while every public category held zero articles. */}
+            {/*
+              * Entry cards — the three ways to get an answer.
+              * "Browse Articles" and "Most Popular" scroll to sections that are
+              * themselves conditional on there being public articles, so they are
+              * rendered only when their target exists. Left unconditional they were
+              * dead buttons: a click that smooth-scrolls to `getElementById(...) ??
+              */}
             <section
               className={`grid grid-cols-1 gap-4 -mt-20 relative z-10 ${
                 hasPublicArticles ? 'sm:grid-cols-3' : 'sm:grid-cols-1 sm:max-w-md sm:mx-auto'

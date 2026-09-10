@@ -323,14 +323,13 @@ export const PartyAccountSummary: React.FC<{
                     only {profitability.cost_coverage_pct}% of revenue has a cost
                   </div>
                 )}
-                {/* How much of it has actually been taken, and the way to take the rest. Rendered
-                    only once there is something to say, so a party with no orders carries no
-                    permanent "€0.00 taken" — but once one euro is either taken or takeable, both
-                    halves are stated, because "€420 margin" alone stops being the whole answer the
-                    moment part of it is spoken for.
-
-                    Figures from `profitPosition`, never from `profitability`: the button's cap and
-                    the printed number have to be the same derivation. */}
+                {/*
+                  * How much of it has actually been taken, and the way to take the rest. Rendered
+                  * only once there is something to say, so a party with no orders carries no
+                  * permanent "€0.00 taken" — but once one euro is either taken or takeable, both
+                  * halves are stated, because "€420 margin" alone stops being the whole answer the
+                  * moment part of it is spoken for.
+                  */}
                 {profitPosition && (profitPosition.allocated > 0.005 || profitPosition.available > 0.005) && (
                   <div className="mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground">
                     <span title="Margin you have taken as profit on this party's orders, and what is still on them. Taking it does not move cash and is not counted as income twice — the revenue and cost above already are the P&L.">
@@ -433,7 +432,7 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
         // The view returns one row per (customer, CURRENCY) — it no longer sums a EUR and a USD
         // invoice into one currency-less total (audit #287 T2-8). The service orders by
         // total_outstanding DESC, so [0] is the customer's LARGEST exposure rather than an
-        // arbitrary row. Every workspace is single-currency today so this picks the only row;
+        // arbitrary row.
         const buckets = await financeService.getCustomerAgingBuckets({ workspaceId: activeWorkspaceId, companyId, contactId });
         const b = buckets[0];
         if (buckets.length > 1) {

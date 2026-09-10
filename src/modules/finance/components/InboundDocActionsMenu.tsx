@@ -61,6 +61,8 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
   // became are the same arrival counted from two rows — nothing links them, so doing both added
   // the stock twice. Once the order exists it owns the receipt (it knows the catalog products,
   // the per-line delivered quantities and the customer allocations waiting on them).
+  // Payroll (17.x) rides in on the same RequestTransmittedDocs call as the foreign purchases —
+  // it is here to be VISIBLE, not to be actioned.
   const isPayroll = isPayrollDocument(doc.doc_type);
   // And nothing was delivered, so there is nothing to receive either.
   const canReceive = (doc.status === 'new' || doc.status === 'classified') && !hasOrder && !isPayroll;

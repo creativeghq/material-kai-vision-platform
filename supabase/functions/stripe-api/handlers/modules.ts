@@ -1,9 +1,6 @@
 // Module framework — owner self-serve module activation + add-on billing.
 // Actions (dispatched from stripe-api/index.ts):
-//   activate-module    { workspace_id, module_slug, successUrl?, cancelUrl? }
-//   deactivate-module  { workspace_id, module_slug }
-//   request-module     { workspace_id, module_slug }   (non-owner → notify owner)
-//   list-stripe-products                               (operator only)
+//   activate-module    { workspace_id, module_slug, successUrl?, cancelUrl?
 
 import type { DbClient } from '../../_shared/supabase-client.ts';
 import { grantBundle, revokeBundle } from '../../_shared/module-bundle.ts';

@@ -80,6 +80,7 @@ describe('Zernio secrets resolve through _shared/zernio.ts, not Deno.env', () =>
   it('every entry point that reads the key awaits ensureZernioSecrets first', () => {
     // A file that calls zernioKey()/zernioApi()/zernioWebhookSecret() but never awaits the
     // resolver silently falls back to env-only — the exact bug, reintroduced one file at a time.
+    // Every entry point into the Zernio client, not just the three low-level ones.
     const ENTRY_POINTS = [
       'zernioApi', 'zernioKey', 'zernioWebhookSecret',
       'sendWhatsAppMessage', 'sendWhatsAppReply',
@@ -136,6 +137,7 @@ describe('we only call Zernio endpoints that exist', () => {
   // Checked against the published OpenAPI spec (https://docs.zernio.com/api/openapi, v1.0.4,
   // 566 operations). Our ZERNIO_BASE_URL ends in /v1, so a call to `/accounts` is the spec's
   // `/v1/accounts`.
+  // The BARE path is the one with no GET.
   const BARE_ACCOUNT_GET = /zernioApi\(\s*['"]GET['"]\s*,\s*[`'"]\/accounts\/\$\{[^}]*\}(?!\/)/;
 
   it('the bare-account-read pattern still catches the shape it was written for', () => {
@@ -390,6 +392,7 @@ describe('social lands in the inbox, and public stays public', () => {
     // A comment reply goes out under our own post to the whole audience. An agent replying
     // unprompted is broadcasting on its own initiative, and a tool that returns a real balance
     // is one sentence from publishing it.
+    // Anchored on the CODE, not on the comment beside it.
     expect(handler.code).toMatch(/allowAgent: false,[\s\S]{0,400}?externalKey: `comments:/);
 
     // The second half moved. inbox-api no longer builds the reply itself — a customer turn runs

@@ -74,7 +74,7 @@ export const CAPABILITIES: readonly CapabilityDef[] = [
   // this platform makes is written by the agent into `social_posts`, and the only surface that
   // reads that table is the posts list on the social hub's Analytics section. With no route here
   // the caption card had nowhere to hand off to, so a drafted post was written, charged for, and
-  // then unreachable from the thing that made it. `openInLabel` because the landing is the
+  // then unreachable from the thing that made it.
   { id: 'social-post', label: 'Social Post', hub: 'marketing', openInLabel: 'Social Posts', pageRoute: '/profile?tab=social-accounts&section=analytics', agentId: 'social-media', agentTool: 'manage_social', toolkitId: 'social', recordTable: 'social_posts', moduleSlug: 'social-media' },
   { id: 'email-campaign', label: 'Email Campaign', hub: 'marketing', pageRoute: '/marketing/email', agentId: 'kai', agentTool: 'manage_email_campaign', toolkitId: 'email-marketing', recordTable: 'campaigns', moduleSlug: 'email-marketing' },
   // openInLabel, like contract/warehouse: /automations is its own page, not the Marketing Hub
@@ -176,6 +176,7 @@ export const RESULT_TYPE_CAPABILITY: Record<string, string> = {
   // was: it names findings, ranks actions, and offers no way to reach the project any of it is
   // about. `project` is a DETAIL_ROUTE capability, so the handoff deep-links to /projects/:id
   // when the payload carries `project_id` — which all three of these do.
+  // One chunk set, three subjects.
   assessment_report: 'project',
   assessment_actions: 'project',
   assessment_action_applied: 'project',

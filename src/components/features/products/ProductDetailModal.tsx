@@ -480,6 +480,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   // widgets, moodboards, quote lines, agent results, the 3D designer), so the viewer can be an
   // operator, a warehouse hand, a sales rep or a project client. Two axes decide, and BOTH must
   // pass — a capability alone is not enough:
+  //   1. OWNERSHIP.
   const isOwnProduct = !!activeWorkspaceId && product.workspace_id === activeWorkspaceId;
   /** Warehouse rows, locations, the movement ledger, listings. Operations data. */
   const canSeeStock = isOwnProduct && can('warehouse.manage');
@@ -948,6 +949,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   //   1. commercial.vision_variants  — Structured array produced by the Claude
   //      Vision spec extractor: [{sku, name, color, format, pattern?}].
   //      This is the canonical source when the spec vision pass has run.
+  //   2.
   interface Variant {
     sku: string;
     name: string;
@@ -1099,6 +1101,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
     // ─── Dedup pass ────────────────────────────────────────────────────
     // Multiple sources (vision_variants, sku_codes, commercial.product_table)
+    // can emit the same physical variant in different shapes — different SKU
+    // formats (compound "VALENOVA TAUPE LT/11,8X11,8" vs catalog "39661"),
+    // different casing ("taupe" vs "Taupe"), unit-trailing sizes
+    // ("11,8x11,8" vs "11,8x11,8 cm"), or partially-populated patterns
     const isMoreInformativeSku = (a: string, b: string): boolean => {
       // Prefer non-sentinel, then non-compound (no "/"), then numeric, then shorter
       if (a === DISPLAY_SENTINEL && b !== DISPLAY_SENTINEL) return false;
@@ -1450,8 +1456,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   // The Details tab must surface EVERY metadata field that has a value,
   // regardless of category. `consumedKeys` tracks every raw metadata key that
   // a curated/structured renderer has already shown, so the catch-all at the
-  // bottom can render literally everything else without duplication. Seeded
-  // with the keys consumed by the special cards (appearance / certifications /
+  // bottom can render literally everything else without duplication.
   const consumedKeys = new Set<string>([
     // Key Specs sidebar (summary) + packaging block
     'factory_name', 'factory_group_name', 'brand', 'origin', 'country_of_origin',
@@ -1704,14 +1709,13 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 />
               </div>
             )}
-            {/* Full description card — first thing on the Details tab so users
-                see the narrative before diving into specs. Falls back through:
-                  1. product.long_description
-                  2. product.description
-                  3. narrative paragraphs extracted from the product's chunks
-                     (catches cases where the PDF had a description but the
-                     AI extractor didn't populate the product column)
-                Hidden entirely if no description can be found anywhere. */}
+            {/*
+              * Full description card — first thing on the Details tab so users
+              * see the narrative before diving into specs. Falls back through:
+              * 1. product.long_description
+              * 2. product.description
+              * 3.
+              */}
             {(() => {
               // Product.long_description is optional and not in the TS type;
               // cast through Record<string, unknown> so we can read it safely.
@@ -2190,23 +2194,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 quote-based platform, retail/wholesale/stock aren't tracked.
                 Quick quote/moodboard actions live in the DialogHeader. */}
 
-            {/*
-              Place it in a room — ALWAYS offered, never gated on a handler (#378 F4).
-
-              This was `{onUseIn3DScene && …}`, and only the agent chat passed the handler. The
-              same product opened from the admin catalogue, a moodboard, the product strip, the
-              dashboard, Discover or a quote's lines showed no such button — not disabled, absent.
-              Nine hosts, one capability, and nothing anywhere reported the other eight.
-
-              It has a destination that does not need the chat: the Room Planner already accepts
-              `?product=`, creates a layout when the workspace has none, and places the item at the
-              centre of the room. So the default behaviour lives HERE and the prop is an OVERRIDE
-              — the chat still prefills its composer instead. A host cannot withhold it by
-              forgetting, because there is nothing to remember.
-
-              Both routes involved sit behind `AuthGuard` and `/room-planner` adds no capability
-              guard, so every surface that can open this modal can also follow the link.
-            */}
+            {/* Place it in a room — ALWAYS offered, never gated on a handler (#378 F4). */}
             <div className="flex flex-wrap gap-2">
               <Button
                 variant="outline"
@@ -2271,14 +2259,13 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 Test on a room
               </Button>
 
-              {/* Build with this product — the other direction.
-                  "Test on a room" applies this material TO the user's photo; these
-                  photograph the PRODUCT ITSELF. All three modes have existed in
-                  generate_gemini since it shipped, each with its own prompt builder,
-                  and nothing in the product could reach them until now.
-                  No product photo is required: the modes render from the name and spec,
-                  which is exactly the case worth serving — a catalogue item that has no
-                  photography yet. */}
+              {/*
+                * Build with this product — the other direction.
+                * "Test on a room" applies this material TO the user's photo; these
+                * photograph the PRODUCT ITSELF. All three modes have existed in
+                * generate_gemini since it shipped, each with its own prompt builder,
+                * and nothing in the product could reach them until now.
+                */}
               <Button
                 variant="outline"
                 size="sm"
@@ -2317,13 +2304,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           </div>
         </div>
 
-        {/* Metadata Sections — category-conditional rendering.
-            The category display registry defines which sections each
-            category should show. Sections with no data auto-hide via
-            renderMetadataCategory returning null. The registry acts as
-            a second filter: sections not in the registry for this category
-            are never rendered even if data exists (prevents showing
-            grout codes for lighting, PEI for furniture, etc.). */}
+        {/*
+          * Metadata Sections — category-conditional rendering.
+          * The category display registry defines which sections each
+          * category should show. Sections with no data auto-hide via
+          * renderMetadataCategory returning null.
+          */}
         {(() => {
           const sectionUploadCat = resolveProductCategory(product.metadata, product.type, product.category);
           const registrySections = fieldRegistry.sections(sectionUploadCat);
@@ -2439,7 +2425,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           // EVERY field that has a value — looked up across flat + nested
           // metadata. Special sections rendered by dedicated cards below are
           // skipped here. Each rendered key is marked consumed so the catch-all
-          // neither drops nor duplicates it. Driving this off the registry rather
+          // neither drops nor duplicates it.
           const SPECIAL_SECTION_KEYS = new Set(['appearance', 'certifications', 'compliance', 'packaging', 'commercial']);
           const registrySectionCards = registrySections
             .filter(section => !SPECIAL_SECTION_KEYS.has(section.key))
@@ -2533,25 +2519,19 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           );
         })()}
 
-          {/* ── Dynamic groups + completeness net ───────────────────────────
-              Fully data-driven. The registry above gives curated headlines for
-              the 10 known categories. THIS block handles anything the registry
-              doesn't know about:
-                • An unknown nested group the extractor invented (e.g.
-                  `acoustic_properties: {...}`) becomes its OWN card with a
-                  headline derived from the group key itself — so new section
-                  names appear automatically, no code change.
-                • Leftover inner fields of known groups + flat orphan fields
-                  collect into a single "Other Specifications" card.
-              `consumedKeys` (sidebar + special cards + registry sections)
-              guarantees no duplication and that nothing is ever dropped. */}
+          {/*
+            * ── Dynamic groups + completeness net ───────────────────────────
+            * Fully data-driven. The registry above gives curated headlines for
+            * the 10 known categories. THIS block handles anything the registry
+            * doesn't know about:
+            * • An unknown nested group the extractor invented (e.g.
+            */}
           {(() => {
             // ── Sensitivity (#368 PD-1) ──────────────────────────────────
             // Everything above this point is gated by SECTION: stock, cost, listings,
             // movements each ask whether this viewer may see that section. This block is not
             // a section — it is a walker over whatever keys the product happens to carry, so
-            // section gating does not reach it. `attributes` and `attributes_raw` are where
-            // supplier XML lands and where AI extraction writes, and extraction is explicitly
+            // section gating does not reach it.
             const canSeeInternalFields = canSeeCost;
             const withholdKey = (key: string): boolean => {
               if (canSeeInternalFields) return false;

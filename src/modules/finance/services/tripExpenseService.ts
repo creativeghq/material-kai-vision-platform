@@ -1,4 +1,8 @@
 // Trip Cards (sales-team expense reports) — service surface.
+// A trip card (`trip_expense_reports`) is owned by a sales rep and holds
+// day-by-day expense lines (`trip_expense_items`), each with an optional
+// receipt/invoice attachment. The rep builds it as a draft, submits it, and
+// finance approves/rejects each line.
 
 import { supabase } from '@/integrations/supabase/client';
 import { emitProjectLifecycle } from '@/modules/projects/services/projectsService';

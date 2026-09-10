@@ -3,6 +3,8 @@
  * customer/supplier statement can be acted on (Finance → Parties drill-down, the CRM
  * party page, the Sales portal):
  *   • Email    — email the statement to the party (errors clearly when no email on file)
+ *   • Download — generate the statement PDF (dry-run) and open it
+ *   • Share    — mint/copy a public /statement/{token} link the party unlocks with VAT+email
  */
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';

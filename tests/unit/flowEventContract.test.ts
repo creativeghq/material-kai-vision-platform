@@ -75,6 +75,7 @@ describe('flow event contract', () => {
     // Both halves must be non-trivial. If the union regex or the emit regex ever stops matching —
     // a refactor to an enum, a rename of emitFlowEvent — every assertion below would pass by
     // scanning nothing, which is the exact failure this whole test file exists to prevent.
+    // Floor sits just under the real member count (103 today), not near zero.
     expect(union.size, 'TriggerType union parsed short — the declaration format changed').toBeGreaterThan(90);
     expect(emits.length, 'no emitFlowEvent/emit call sites found — the call shape changed').toBeGreaterThan(30);
   });

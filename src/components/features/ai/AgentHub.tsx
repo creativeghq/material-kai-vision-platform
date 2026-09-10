@@ -1326,7 +1326,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
    * Order of resolution:
    *   1. switch agent if the quick-start belongs to a different one
    *   2. `form`         → open ToolkitFormModal to collect fields, then auto-send
-   *   3. `run`          → fire the target tool deterministically (no prompt)
+   *   3.
    */
   const handleQuickStart = useCallback((qs: ToolkitQuickStart, tk: ToolkitDefinition, agentId?: string) => {
     // `getToolkitOwnerAgents(tk)[0]` is ALWAYS the generalist (kai owns every toolkit),
@@ -2569,8 +2569,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       // full-text answer for a repeated question (keyed on query+agent+workspace, NOT the
       // conversation) WITHOUT ever calling agent-chat — so it served stale answers, ignored
       // fresh KB / live data, and short-circuited the agent entirely (even in a new
-      // conversation). A live-data agent MUST run every time. This directly caused the
-      // repeated "the KB has no Materials Hub content" replies that persisted after the KB
+      // conversation). A live-data agent MUST run every time.
       let data: any = null;
       let pendingGeminiData: Message['geminiImageData'] | null = null;
       // The server's id for this turn, carried on every chunk. Several card paths below build
@@ -2715,6 +2714,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 ]);
               } else if (chunk.type === 'status') {
                 // A status chunk carries its OWN message and there is more than one emitter:
+                // agent-chat opens the turn with "Initializing agent...", knowledge-grounding
+                // sends "Consulting the knowledge base…" partway through. This branch used to
+                // throw `chunk.message` away and push one hardcoded line for all of them, so two
+                // different things happening rendered as the same sentence twice in a row and
+                // read as a duplicate.
                 const raw = typeof chunk.message === 'string' ? chunk.message.trim() : '';
                 const message = STATUS_STEP_COPY[raw] ?? (raw || 'Systems online. Beginning analysis.');
                 setReasoningSteps((prev) => (
@@ -3625,7 +3629,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 // wizard kicked off without a server round-trip), the local
                 // run_id is a UUID generated on the frontend. The server-side
                 // tools emit chunks using their natural primary entity ID
-                // (catalog_id, sheet_id, tracked_mention_id, etc.). When the
+                // (catalog_id, sheet_id, tracked_mention_id, etc.).
                 const def = getWorkflowDefinition(chunk.definition_id);
                 if (def) {
                   const stepOrder = (chunk.step_overrides || def.steps).map((s: any) => s.id);
@@ -3900,7 +3904,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       // Nothing narrates a direct run: there is no model turn, so agent-chat falls
       // through to a placeholder and the chat said "Done — ran manage_appointments."
       // — an internal tool id, shown to a customer. The quick-start's own `done`
-      // copy replaces it. A tool that wrote its OWN message (the mutating ones:
+      // copy replaces it.
       if (directRun) {
         const toolResult = Array.isArray(data.tool_results) ? data.tool_results[0]?.result : undefined;
         const failed = toolResult && toolResult.success === false;
@@ -5953,17 +5957,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             </div>
           )}
 
-          {/* A workflow booted on an EMPTY chat — "Build my first catalog" — renders its ask
-              here, because the empty state below wins until the first message arrives and the
-              wizard would otherwise update state and show nothing.
-
-              Only while the chat is empty. Once there are messages the `WorkflowTracker` below
-              carries the same ask in its `bottomSlot`, and both at once is two identical forms
-              on screen, each auto-sending the same continuation. That pairing used to be
-              unreachable in practice because the canvas pane was open by default and this
-              branch only ran when it was hidden; making the chat the only surface made it the
-              default. Also skipped for a workflow the modal is holding, which draws the same
-              form a third way in `RunCanvas`'s `formSlot`. */}
+          {/*
+            * A workflow booted on an EMPTY chat — "Build my first catalog" — renders its ask
+            * here, because the empty state below wins until the first message arrives and the
+            * wizard would otherwise update state and show nothing.
+            */}
           {visibleMessages.length === 0 && Object.values(workflows)
             .filter((wf) => wf.status !== 'aborted' && wf.status !== 'done')
             .filter((wf) => activeCanvasId !== `run:${wf.run_id}`)
@@ -6123,13 +6121,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     </div>
                   );
                 })()}
-                {/* A bubble that would only repeat the card under it is not drawn.
-                    Three payloads carry no prose of their own — a pending question, an approval
-                    gate and a plain result — their `content` IS the string the card takes its
-                    title from, so the turn said "Delete 12 contacts?" twice, once as prose and
-                    once as the thing you press. Derived by comparing the two rather than by
-                    listing the payloads: a list is the per-payload branching this file just
-                    lost twenty-one copies of. */}
+                {/*
+                  * A bubble that would only repeat the card under it is not drawn.
+                  * Three payloads carry no prose of their own — a pending question, an approval
+                  * gate and a plain result — their `content` IS the string the card takes its
+                  * title from, so the turn said "Delete 12 contacts?" twice, once as prose and
+                  * once as the thing you press.
+                  */}
                 {!bubbleRepeatsTheCard(message) && (
                 <div
                   className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
@@ -6279,16 +6277,14 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   )}
                 </div>
                 )}
-                {/* The turn's artifact, OUTSIDE the bubble.
-                    It used to sit inside, which is why it could not be seen: `.msg-assistant` is
-                    `--primary` on the dark themes and `--card` on the light ones, so a card drawn
-                    in `bg-card` was a dark box on magenta in one and the bubble's own colour in
-                    the other. Out here it is an ordinary panel on the page ground, and the
-                    three-surface ladder works the way it does everywhere else.
-
-                    It is also the reason twenty-one branches of the bubble's ternary chain are
-                    gone: they were all "render the markdown, then the card", differing only in
-                    which came first. */}
+                {/*
+                  * The turn's artifact, OUTSIDE the bubble.
+                  * It used to sit inside, which is why it could not be seen: `.msg-assistant` is
+                  * `--primary` on the dark themes and `--card` on the light ones, so a card drawn
+                  * in `bg-card` was a dark box on magenta in one and the bubble's own colour in
+                  * the other. Out here it is an ordinary panel on the page ground, and the
+                  * three-surface ladder works the way it does everywhere else.
+                  */}
                 {(() => {
                   const card = renderArtifactCard(message);
                   if (!card) return null;
@@ -6343,14 +6339,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                                 {step.type === 'thinking' && '💭'}
                                 {step.type === 'iteration' && '→'}
                               </span>
-                              {/* min-w-0 is load-bearing, not defensive. This is a flex item in a
-                                  ROW container, so its min-width resolves to min-content — the
-                                  longest run with no break opportunity in it. Tool progress lines
-                                  carry raw URLs, and a query string has none: `?s=x&post_type=y`
-                                  gives the browser nowhere to wrap. Measured at a 420px panel, one
-                                  spilled 155px past the bubble's own border and took the page's
-                                  horizontal scrollbar with it. A hyphenated URL wraps fine, which
-                                  is why this survived: it depended on which site the agent read. */}
+                              {/*
+                                * min-w-0 is load-bearing, not defensive. This is a flex item in a
+                                * ROW container, so its min-width resolves to min-content — the
+                                * longest run with no break opportunity in it. Tool progress lines
+                                * carry raw URLs, and a query string has none: `?s=x&post_type=y`
+                                * gives the browser nowhere to wrap.
+                                */}
                               <span className="min-w-0 break-words">{step.message}</span>
                             </li>
                           ))

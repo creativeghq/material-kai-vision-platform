@@ -502,27 +502,7 @@ const FinancePage: React.FC = () => {
         )}
 
         <Tabs value={activeTab} onValueChange={onTabChange} orientation="vertical" className="flex flex-col gap-4 lg:flex-row lg:items-start">
-          {/* Left column: the two operational jump-offs, then the section rail.
-
-              Shortcuts out of Finance into POS and the Warehouse — icon-only so they read as
-              jump-offs, not as tabs of this page.
-
-              NO BORDER, and the separation below is a hairline rather than nothing:
-              everything under this row is a borderless underline rail, so an outlined pair
-              at the top was the only boxed object in the column — and its own left edge
-              landed in exactly the column the active tab's indicator uses, which is the one
-              vertical stroke in this rail that is supposed to carry meaning. The tint alone
-              says "these are not tabs"; the rule says where the page's own sections start.
-              Spacing was the other half: `gap-1` put them 4px from Dashboard, close enough
-              to read as the first two rows of the list they are meant to sit outside of.
-
-              OUTSIDE the `TabsList`, which is the other half of the same argument: the list
-              carries the rail's trailing rule (the lg-scoped vertical-orientation border), and
-              that rule belongs to the SECTIONS. Nested inside, it ran up the right of the two
-              buttons and closed the pair into a box — the one thing this row is styled not to
-              be. Being outside also means `hidden lg:block` rather than leaning on
-              `.section-rail > div`: the horizontal strip below lg has no room for them,
-              and both surfaces are one tap away in the bottom nav. */}
+          {/* Left column: the two operational jump-offs, then the section rail. */}
           <div className="w-full shrink-0 lg:w-56">
             {!isAccountant && (
               <div className="mb-2 hidden w-full border-b border-hairline pb-2 lg:block">
@@ -1657,14 +1637,14 @@ const PnlCard: React.FC<{ rows: PnlRow[] }> = ({ rows }) => (
       <CardTitle className="flex items-center gap-2"><Activity className="h-4 w-4" /> Monthly P&amp;L (last 12 months)</CardTitle>
     </CardHeader>
     <CardContent className="p-0">
-      {/* The ONLY element measured as clipping on the platform at 375px: 418px of table inside
-          a 365px content box, with Layout's `overflow-x-hidden` on <main> suppressing both the
-          scrollbar and the swipe — so 53px was simply unreachable. `%` vanished entirely and
-          `Margin` was cut, meaning a phone user opened Monthly P&L and could not see the margin
-          they came for. Note the issue's claim that "every other wide table on this page already
-          has this wrapper" does NOT hold for this file — this is its only overflow-x-auto. The 12
-          scrollers measured on /finance come from the child panels in src/modules/finance.
-          (audit #299 finding 1) */}
+      {/*
+        * The ONLY element measured as clipping on the platform at 375px: 418px of table inside
+        * a 365px content box, with Layout's `overflow-x-hidden` on <main> suppressing both the
+        * scrollbar and the swipe — so 53px was simply unreachable. `%` vanished entirely and
+        * `Margin` was cut, meaning a phone user opened Monthly P&L and could not see the margin
+        * they came for. Note the issue's claim that "every other wide table on this page already
+        * has this wrapper" does NOT hold for this file — this is its only overflow-x-auto.
+        */}
       <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead className="text-xs text-muted-foreground">

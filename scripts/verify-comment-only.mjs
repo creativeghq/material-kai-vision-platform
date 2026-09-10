@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Prove a working-tree change touched COMMENTS ONLY, by comparing each modified file's
+ * Prove a working-tree change touched COMMENTS ONLY, by comparing each changed file's
  * comment-stripped source against the same file at HEAD.
  *
  * Usage: node scripts/verify-comment-only.mjs [--normalize-eol] [--print-comment-only]
@@ -16,10 +16,10 @@ import { scanComments } from './lib/commentBudget.mjs';
 const EXT = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
 const NORMALIZE = process.argv.includes('--normalize-eol');
 
-function codeOnly(text) {
+function codeOnly(text, fileName) {
   const parts = [];
   let last = 0;
-  for (const c of scanComments(text)) {
+  for (const c of scanComments(text, fileName)) {
     parts.push(text.slice(last, c.start));
     last = c.end;
   }
@@ -40,22 +40,29 @@ function dominantEol(text) {
   return crlf > lf ? '\r\n' : '\n';
 }
 
-const changed = execSync('git diff --name-only --diff-filter=M', { encoding: 'utf8' })
-  .split('\n').map((s) => s.trim()).filter(Boolean);
+// `git diff HEAD` covers staged AND unstaged, and names added and deleted files too. Filtering to
+// modified-and-unstaged reported a clean tree for one that had a staged rewrite in it.
+const entries = execSync('git diff HEAD --name-status', { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+  .split('\n').map((line) => line.trim()).filter(Boolean)
+  .map((line) => {
+    const parts = line.split('\t');
+    return { status: parts[0][0], file: parts[parts.length - 1] };
+  });
 
 const commentOnly = [];
 const hasCode = [];
 const skipped = [];
 let renormalized = 0;
 
-for (const file of changed) {
+for (const { status, file } of entries) {
+  if (status === 'A' || status === 'D') { hasCode.push(`${file} (${status === 'A' ? 'added' : 'deleted'})`); continue; }
   if (!EXT.has(extname(file))) { skipped.push(file); continue; }
   let head;
   try {
     head = execSync(`git show HEAD:${JSON.stringify(file)}`, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   } catch { skipped.push(file); continue; }
   const now = readFileSync(file, 'utf8');
-  const same = codeOnly(head) === codeOnly(now);
+  const same = codeOnly(head, file) === codeOnly(now, file);
   (same ? commentOnly : hasCode).push(file);
 
   if (NORMALIZE && same) {
@@ -66,7 +73,7 @@ for (const file of changed) {
 }
 
 console.log(`comment-only: ${commentOnly.length}`);
-console.log(`CODE CHANGED: ${hasCode.length}`);
+console.log(`CODE CHANGED (or added/deleted): ${hasCode.length}`);
 for (const f of hasCode) console.log('  ' + f);
 if (skipped.length) {
   console.log(`not scannable: ${skipped.length}`);

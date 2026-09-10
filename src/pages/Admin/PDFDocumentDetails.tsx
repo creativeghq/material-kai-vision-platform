@@ -121,6 +121,11 @@ export const PDFDocumentDetails: React.FC = () => {
         .eq('source_document_id', documentId);
 
       // Count embeddings via the per-image flags on document_images.
+      // CORRECTION: the previous query against `document_vectors`
+      // is dead — the dual-store columns were dropped 2026-04 (CLAUDE.md
+      // "VECS-Only Architecture"). VECS is now the single source of truth and
+      // per-image presence is exposed via `has_slig_embedding` +
+      // `has_understanding_embedding` booleans for O(1) lookup.
       const { count: embeddingsCount } = await supabase
         .from('document_images')
         .select('id', { count: 'exact', head: true })

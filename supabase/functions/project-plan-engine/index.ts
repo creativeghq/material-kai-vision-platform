@@ -1,7 +1,7 @@
 // project-plan-engine — authoritative compute for the Blueprint estimating engine.
 // The ONLY writer of persisted plan-line prices, plan versions, and plan→quote items.
 // The frontend may edit plan_items directly (RLS-gated) for labels/quantities, then calls
-// this function to (re)compute authoritative money. Actions:
+// this function to (re)compute authoritative money.
 
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { jsonResponse as json } from '../_shared/http.ts';

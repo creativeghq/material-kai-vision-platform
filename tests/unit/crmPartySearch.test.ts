@@ -24,8 +24,7 @@ const RAW_ILIKE = new RegExp(
  * payee find-or-create — were exempted as "an exact-name lookup, deliberately not fuzzy". That
  * reasoning was right about the SHAPE and wrong about the result: `ilike` is case-insensitive but
  * NOT accent-insensitive, so "Καρέλης ΑΕ" never matched the stored "ΚΑΡΕΛΗΣ ΑΕ" and the probe
- * missed exactly the case the platform built folding machinery for (#366 BU-3). They now match a
- * generated `name_fold` column — `crm_fold(name)` alone, so it stays an equality lookup — and
+ * missed exactly the case the platform built folding machinery for (#366 BU-3).
  */
 const ALLOWED: Record<string, { text: string; why: string }[]> = {
   'src/components/Admin/DocumentFactoriesCrmLinker.tsx': [{

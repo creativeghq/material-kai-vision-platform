@@ -76,8 +76,7 @@ export function buildAgingFilters(
           // bucket field above cannot express it and neither can a due-date range: an
           // un-invoiced order ages against `effective_due_at` (order date + payment terms) while
           // `due_at` stays null, so a date filter would silently drop exactly the rows the
-          // buckets DO age. `isAgingRowOverdue` is the one definition, shared with the summary
-          // the dashboard's Overdue figure comes from — so the number and the list it links to
+          // buckets DO age.
           key: OVERDUE_KEY, type: 'bool', label: 'Past due',
           trueLabel: 'Past due only', falseLabel: 'Not yet due',
           accessor: (r: AgingRow) => isAgingRowOverdue(r),

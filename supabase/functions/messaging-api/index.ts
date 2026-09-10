@@ -332,6 +332,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       // releasing one cancels it (and disconnects the WhatsApp account on it). Those are the
       // platform's money and the platform's lifecycle, so they sit with the other operator
       // actions. Searching availability and listing what a workspace already has are reads.
+      // 'release-phone-number' is deliberately absent.
       'purchase-phone-number',
       // Operator maintenance: both read or repair platform-level billing state.
       'reconcile-phone-numbers', 'reconcile-whatsapp-costs', 'set-whatsapp-rate',
@@ -1699,6 +1700,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           // conversations = the listing failed; conversations but no pictures = the platform
           // withholds them; pictures but nothing stored = we already hold them, or those threads
           // were never imported.
+          // BOTH sources are named in the answer.
           message: conversations === 0
             ? 'Zernio returned no conversations for this number.'
             : (stored + fromContacts) > 0

@@ -16,6 +16,7 @@ import { recordPageEvent } from '../_shared/document-events.ts';
 // Two entry modes:
 //   1. Authenticated admin/finance: body { invoice_id }
 //      Mints (or rotates) a pay_token first if missing; returns checkout URL + pay link.
+//   2.
 
 interface AdminBody {
   invoice_id: string;

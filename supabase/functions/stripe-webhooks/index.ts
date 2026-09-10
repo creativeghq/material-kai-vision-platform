@@ -161,7 +161,7 @@ Deno.serve(withApiLogging('stripe-webhooks', async (req) => {
       // Reversals
       // These were entirely absent — `grep "refund\|dispute"` over this 715-line file
       // returned ZERO matches — so they fell into `default:` and were logged as
-      // "Unhandled event type". A refunded or charged-back invoice therefore read `paid`
+      // "Unhandled event type".
       case 'charge.refunded':
         await handleChargeReversed(event.data.object as Stripe.Charge, 'refund');
         break;

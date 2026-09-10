@@ -646,6 +646,7 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
   // on the row AND in the log, with the payload's own key names, so the shape we are missing is
   // recoverable from the next real one instead of staying a guess. (Pipeline convention #1:
   // explicit failure markers, never an empty return.)
+  // `[Unsupported message]` counts as no text — see isMediaPlaceholder.
   const hasRealText = !!msg.text && !isMediaPlaceholder(msg.text);
   const unresolvedMedia = !hasRealText && inboundAttachments.length === 0;
   if (unresolvedMedia) {
@@ -1377,6 +1378,9 @@ async function handleDeliveryStatus(supabase: any, event: string, payload: any):
 
   // Outbound inbox messages relayed over WhatsApp carry the wamid in metadata.
   // Goes through an RPC because PostgREST `.update` is a WHOLE-COLUMN ASSIGNMENT, not a merge.
+  // The previous `.update({ metadata: { delivery_status: status } })` wrote that object OVER the
+  // entire column, deleting `wamid`, `channel` and `relay` — so the first receipt (normally
+  // `delivered`) recorded itself AND made the row permanently unmatchable.
   let receiptRows: unknown = null;
   let receiptErr: { message: string } | null = null;
   for (const candidate of wamidCandidates) {
@@ -1665,7 +1669,7 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
       // 2026-08-23, one of them with no user activity anywhere near it), and the handler used
       // to notify on every delivery — so "linkedin connected" arrived again and again for a
       // connection made once. Only a real transition is news: an account we have never seen,
-      // or one that was sitting inactive after a disconnect. A repeat delivery still refreshes
+      // or one that was sitting inactive after a disconnect.
       let isNewConnection = false;
 
       if (!zernioAccountId || !workspaceId) {
@@ -1926,6 +1930,8 @@ Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
     // Return 5xx so Zernio retries the delivery; the upsert/find-or-create logic above
     // is idempotent enough for a retry to converge. Status-sync events (post.*, account.*,
     // delivery status) stay 200 to avoid pointless retry loops on best-effort updates.
+    // Anything carrying customer CONTENT is retried; a lost one is unrecoverable because
+    // Zernio does not resend on a 200.
     if (event === 'message.received' || event === 'message.edited'
         || event === 'message.deleted' || event === 'comment.received'
         // A review is customer CONTENT and Zernio does not resend after a 200, so a transient

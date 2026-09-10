@@ -114,6 +114,9 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
     const maxFixIterations = body.max_fix_iterations || 3;
 
     // Get workspace ID.
+    // Was `.single()`, which ERRORS (PGRST116, "multiple rows returned") for any user who
+    // belongs to more than one workspace — and the error was not destructured, so
+    // workspaceId silently became null.
     const requestedWs = typeof body.workspace_id === 'string' ? body.workspace_id : null;
     let memberQuery = supabase
       .from('workspace_members')

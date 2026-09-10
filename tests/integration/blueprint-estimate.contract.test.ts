@@ -6,6 +6,8 @@ import { computeLinePricing, evaluateFormula, round2 } from '../../supabase/func
 // returns each platform-starter WITH its full item list, and prices it server-side using the
 // SAME shared formula module this test imports. We re-run that exact computation over the live
 // payload to assert two contracts at once:
+//   1. the edge fn is deployed and returns the full pricing schema, and
+//   2.
 describe('contract · public blueprint estimator (money path)', () => {
   it('every platform starter stays priceable by the shared formula engine', async () => {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/public-project-plan`, {

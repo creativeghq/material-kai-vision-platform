@@ -351,9 +351,7 @@ export const createB2BManufacturerSearchTool = (
       // ONE resolution of what the country string means, at the boundary, so the scope clause, the
       // native-language clause, the progress line, the workflow card and the usage row all name the
       // same market. `country` is a free string by design — the model types whatever it has, and
-      // `Czechia` / `Türkiye` / `UK` are ours under another name. An unresolved one is NOT an
-      // error (any country is searchable), but it is worth a line in the log, because the visible
-      // symptom of getting this wrong is nothing at all: the search runs and quietly loses the
+      // `Czechia` / `Türkiye` / `UK` are ours under another name.
       const market = resolveMarket(markets, country);
       if (market) country = market.value;
       else if (country) console.warn(`[b2b_manufacturer_search] "${country}" is not a defined sourcing market — searching it in English only`);
@@ -647,7 +645,7 @@ export const createB2BManufacturerSearchTool = (
         // 2026-08-18 three real sweeps died on exactly that — `Tool 'b2b_manufacturer_search'
         // timed out after 90s`. A default of 30 could therefore never return: the call was
         // guaranteed to be killed before it answered, which reads to the agent as a broken tool
-        // rather than an over-large request. Ask for more than ~10 and you need the background
+        // rather than an over-large request.
         limit: z.number().optional().default(8).describe('Max manufacturers per call, hard-capped at 8. A larger number is silently clamped, not honoured — one call researches at most 8 companies. For more, run several calls (vary country/region/category) or dispatch a background task.'),
         _workflow_run_id: z.string().optional().describe('Workflow run_id from `[workflow:b2b-research/search:<run_id>]` prefix.'),
       }),
@@ -803,9 +801,7 @@ ${fenceUntrustedPage(markdown.substring(0, 15000))}`;
           // Cost log for the website-analysis pass. The rate is NOT written here: this block
           // charged 15.00/75.00 while the row it writes says claude-opus-4-8, whose real rate is
           // 5.00/25.00 — a 3x overcharge on every scrape, from a literal whose own comment named
-          // yet a third model (Opus 4.7). One derivation, from ai_model_pricing. The agent tool
-          // currently only debits the firecrawl scrape (~$0.001) but the Opus
-          // pass on a 15K-char page costs orders of magnitude more — without
+          // yet a third model (Opus 4.7). One derivation, from ai_model_pricing.
           try {
             const usage = (analysisResponse as any).usage_metadata
               ?? (analysisResponse as any).response_metadata?.usage

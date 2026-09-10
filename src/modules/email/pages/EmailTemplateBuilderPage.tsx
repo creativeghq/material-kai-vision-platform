@@ -243,6 +243,8 @@ function injectPreheader(html: string, text: string): string {
 // ── MH custom blocks for GrapesJS ──────────────────────────────────────────
 // Async: fetches material categories from DB to populate the category trait.
 // Visibility tiers:
+//   • Operator-only blocks carry the platform's own MaterialsHub / Material Kai
+//     branding (the "MH · Brand" group).
 async function addMhBlocks(editor: GrapesEditor, isPlatformOperator: boolean) {
 
   // SVG line icon helper — matches GrapesJS panel style

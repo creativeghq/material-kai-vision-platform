@@ -121,9 +121,7 @@ describe('buttons, tabs and chips are rectangular', () => {
   /**
    * THE GAP THIS CLOSES
    * `findPillControls` reads the OPENING TAG of the control itself, so it never saw a segmented
-   * control: there the `rounded-full` is on the track `<div>` and the segments are square. Four
-   * shipped that way — Documents, Business identity, GSC breakdown, Sourcing — each a separate
-   * hand-roll, each fully round, and each with a SQUARE accent fill sitting inside the round
+   * control: there the `rounded-full` is on the track `<div>` and the segments are square.
    */
   it('no rounded-full track wrapping segment buttons', () => {
     const tracks: string[] = [];

@@ -26,7 +26,7 @@ const CATEGORIES_CATEGORY_JPATH_SUFFIX = '.categories.category';
 // Supabase Edge Functions run on Deno Deploy with a 256 MB memory cap and ~2 s
 // of synchronous CPU per invocation. fast-xml-parser builds a full DOM in JS
 // memory (~2–5× the XML byte size) and holds the parsed products array until
-// they've been chunk-inserted into data_import_job_products. That's the true
+// they've been chunk-inserted into data_import_job_products.
 function envInt(name: string, defaultValue: number, min: number = 1): number {
   const raw = Deno.env.get(name);
   if (!raw) return defaultValue;
@@ -450,8 +450,7 @@ async function suggestFieldMappings(
       // classifier's verdict decides which product column every unrecognised supplier tag
       // writes into, so it drives a DB write and may not be parsed out of prose. What this
       // replaces was free-form text plus `content.match(/\{[\s\S]*\}/)` — a salvage regex
-      // that takes the first `{` to the last `}` and hopes. That greedy span happily
-      // swallows a preamble's example JSON, and any shape that parses is accepted: a
+      // that takes the first `{` to the last `}` and hopes.
       tools: [FIELD_MAPPING_TOOL],
       tool_choice: { type: 'tool', name: FIELD_MAPPING_TOOL.name },
     }, { task: 'xml_field_mapper', userId: userId ?? undefined, workspaceId });
@@ -1103,8 +1102,6 @@ const STRUCTURAL_TARGET_FIELDS = [
 
 // "Attribute" target fields. The Python embedding/canonicalization path reads
 // these as top-level on product_data (data_import_service.py:599, 605, 678).
-// Anything mapped to one of these targets MUST land both at the top level AND
-// in metadata under the canonical target name, so:
 const ATTRIBUTE_TARGET_FIELDS = [
   'price', 'color', 'colors', 'dimensions', 'size',
   'designer', 'collection', 'finish', 'material',

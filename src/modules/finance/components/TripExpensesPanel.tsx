@@ -935,21 +935,7 @@ const AddExpenseDialog: React.FC<{
             <span className="text-xs">Billable to client <span className="text-muted-foreground">— on-charge this cost to a project's client</span></span>
             <Checkbox checked={billable} onCheckedChange={(v) => setBillable(v === true)} className="h-4 w-4"  />
           </label>
-          {/*
-            What this cost is for — ONE control, the same one the rest of Finance uses (#378 D5).
-
-            This was two bare `<Select>`s, and L6 proposed swapping them for `OrderLinkPicker`. That
-            would have DELETED a capability: the picker's order rows all answered other questions
-            (`covers_order_id`, merge, cost-of-a-purchase-order) and none of them could say "this
-            cost is for that commitment". `search_order_link_targets` gained a filing `orders` group
-            first, so the swap adds reach instead of removing it — and the picker's legality rules,
-            its workspace scoping and its search come with it.
-
-            Project and order stay SEPARATE answers, deliberately: a job says which margin bears the
-            cost, an order says which commitment it lands against. An order may have no project and
-            a project has many orders, so deriving either from the other would attribute the cost to
-            something nobody chose.
-          */}
+          {/* What this cost is for — ONE control, the same one the rest of Finance uses (#378 D5). */}
           <div className="space-y-1">
             <span className="text-xs text-muted-foreground">
               Project <span className="text-muted-foreground">— which job bears this cost</span>

@@ -141,7 +141,7 @@ async function trackWebsite(supabase: any, website: { id: string; workspace_id: 
     // empty result, so a failed backlinks call wrote NULL backlinks/referring
     // domains/domain rank — and the dashboard, unable to tell that apart from a
     // site with no links, simply hid the row. Every stored snapshot for the one
-    // connected site is in exactly that state. Record WHICH source failed; the
+    // connected site is in exactly that state.
     const sourceErrors: Record<string, string> = {};
     const sourceStatus: Record<string, string> = {};
     const note = (key: string, e: unknown) => {

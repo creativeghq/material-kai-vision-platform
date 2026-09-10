@@ -238,6 +238,9 @@ export const vivaProvider: PaymentProvider = {
   // RF generation is confirmed against Viva demo (2026-08-03): the code + parser + the
   // {"rfPaymentCode":"RF…"} response shape are all verified live, and settlement reconciles
   // via order-state polling (retrieveVivaOrder, StateId===3) driven by the 2054 webhook.
+  // There is NO independent periodic sweep (audit H2) — settlement depends on the tenant's
+  // registered 2054 webhook; the `ops.payment_intents_stale` probe surfaces RF intents that
+  // sit pending on a payable invoice so a broken webhook cannot stay silent.
   methods: ['card', 'bank_reference'],
   currencies: VIVA_CURRENCIES,
 
@@ -255,8 +258,7 @@ export const vivaProvider: PaymentProvider = {
     // BYOK: no row, disabled, or incomplete credentials → this tenant cannot charge.
     // We deliberately do NOT fall back to any operator-level Viva account.
     // CRITICAL (settlement invariant): this gate is the AUTHORITATIVE "can Viva be offered?" check —
-    // the customer pay page offers a provider purely on resolveContext≠null. It MUST require everything
-    // the settlement loop needs, or a customer can pay a charge that can never be recorded:
+    // the customer pay page offers a provider purely on resolveContext≠null.
     if (!data || !data.enabled) return null;
     if (!data.client_id || !data.client_secret) return null;
     if (!data.merchant_id || !data.api_key || !data.webhook_verified_at) return null;

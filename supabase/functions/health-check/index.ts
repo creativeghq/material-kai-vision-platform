@@ -323,7 +323,7 @@ async function checkCloudflareWorkers(cfg: CloudflareConfig): Promise<Cloudflare
     // there with "Invalid API Token" and must go to /accounts/{id}/tokens/verify. Checking only
     // the user endpoint reports a perfectly good account token as REJECTED — a health check
     // inventing an outage, which is the same class of lie as reporting a green light that measures
-    // nothing. Confirmed against a live cfat_ token: /user/... says invalid while the account
+    // nothing. Confirmed against a live cfat_ token: /user/...
     const verifyUrls = accountId
       ? [`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/tokens/verify`,
          'https://api.cloudflare.com/client/v4/user/tokens/verify']

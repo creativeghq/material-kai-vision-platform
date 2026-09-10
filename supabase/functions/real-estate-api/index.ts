@@ -1558,7 +1558,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         // action returned 200 — leaving a viewing that appears in the Real Estate list but never
         // in the agent's calendar and never fires the 60-minute reminder, so the agent misses the
         // appointment. `update-viewing`'s sync block is gated on `data?.meeting_id`, so the
-        // mismatch stayed invisible forever. Note the sibling insert two statements down has
+        // mismatch stayed invisible forever.
         const { data: meeting, error: meetingErr } = await supabase.from('crm_meetings').insert({
           workspace_id: workspaceId, owner_user_id: agentId,
           target_kind: contactId ? 'contact' : null, target_id: contactId,

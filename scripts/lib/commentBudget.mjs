@@ -6,15 +6,24 @@
  * cannot disagree.
  */
 
+import { createRequire } from 'node:module';
+
 /** Prose lines allowed in one comment. `@tag` lines and their continuations do not count. */
 export const MAX_PROSE_LINES = 6;
+
+/** Optional: absent in a bare runtime, and the lexer fallback covers that case. */
+const ts = (() => {
+  try { return createRequire(import.meta.url)('typescript'); } catch { return null; }
+})();
 
 /** Comments carrying one of these are tooling directives, not prose. Never counted, never trimmed. */
 const DIRECTIVE =
   /eslint-disable|eslint-enable|@ts-|prettier-ignore|deno-lint-ignore|biome-ignore|@license|@preserve|vitest-environment|jest-environment|<reference\s|@jsx|istanbul ignore|[cv]8 ignore|webpackChunkName|@vite-ignore|@__PURE__|@generated|DO NOT EDIT/i;
 
 const TAG_LINE = /^@[a-zA-Z][\w-]*\b/;
-const SENTENCE_END = /[.!?:;)\]]\s*$/;
+
+/** A sentence really ending: `.`/`!`/`?` before whitespace. `:` and `;` end a clause, not a thought. */
+const SENTENCE_END = /[.!?](?=[\s"'`)\]]|$)/g;
 
 /** A file whose comments a generator owns. Fix the generator, not the output. */
 export function isGeneratedFile(relPath, source) {
@@ -27,10 +36,69 @@ export function isGeneratedFile(relPath, source) {
 /**
  * Every comment in `text`, as `{ start, end, kind, ownLine }` character ranges.
  *
- * Hand-rolled rather than regex because a `//` inside a template literal or a regex literal is
- * not a comment; the mode stack below is what keeps SQL and prompt strings out of the results.
+ * TypeScript's own parser when it is available, because only a real parser knows that `//` in
+ * JSX text is not a comment. The lexer below is the fallback and cannot see JSX at all.
  */
-export function scanComments(text) {
+export function scanComments(text, fileName = 'file.tsx') {
+  // Only a .tsx/.jsx file can hold JSX, and JSX is the one thing the lexer cannot see — so that
+  // is the only case worth a parse. Parsing everything cost 50s on the guard test alone.
+  if (!ts || !/\.[jt]sx$/.test(fileName)) return scanWithLexer(text);
+  let parsed;
+  try { parsed = scanWithTypeScript(text, fileName); } catch { return scanWithLexer(text); }
+
+  // The union, because each half misses something the other sees. The parser attaches a comment
+  // to a NODE, so `{/* … */}` and a comment alone in an empty block — both attached to a token —
+  // are invisible to it; the lexer finds those, and cannot see JSX at all, so a backtick in
+  // rendered text desyncs it. `jsxText` is the parser's answer for what is NOT code.
+  const merged = new Map();
+  for (const c of [...parsed.comments, ...scanWithLexer(text)]) {
+    if (parsed.jsxText.some(([from, to]) => c.start >= from && c.start < to)) continue;
+    if (!merged.has(c.start)) merged.set(c.start, c);
+  }
+  return [...merged.values()].sort((a, b) => a.start - b.start);
+}
+
+function scriptKindFor(fileName) {
+  if (fileName.endsWith('.tsx')) return ts.ScriptKind.TSX;
+  if (fileName.endsWith('.jsx')) return ts.ScriptKind.JSX;
+  if (fileName.endsWith('.ts')) return ts.ScriptKind.TS;
+  return ts.ScriptKind.JS;
+}
+
+function scanWithTypeScript(text, fileName) {
+  const source = ts.createSourceFile(
+    fileName, text, ts.ScriptTarget.Latest, true, scriptKindFor(fileName),
+  );
+  const found = new Map();
+  // `getLeadingCommentRanges` is a LEXICAL scan from an offset, not a contextual one: asked at the
+  // start of a JSX child it happily reports rendered text beginning `//` as a comment. Only the
+  // parser knows those spans, so collect them and drop anything landing inside one.
+  const jsxText = [];
+  const add = (ranges) => {
+    if (!ranges) return;
+    for (const range of ranges) found.set(range.pos, range);
+  };
+  const visit = (node) => {
+    if (node.kind === ts.SyntaxKind.JsxText) jsxText.push([node.getFullStart(), node.getEnd()]);
+    add(ts.getLeadingCommentRanges(text, node.getFullStart()));
+    add(ts.getTrailingCommentRanges(text, node.getEnd()));
+    node.forEachChild(visit);
+  };
+  visit(source);
+  if (source.endOfFileToken) add(ts.getLeadingCommentRanges(text, source.endOfFileToken.getFullStart()));
+
+  const comments = [...found.values()]
+    .sort((a, b) => a.pos - b.pos)
+    .map((range) => ({
+      start: range.pos,
+      end: range.end,
+      kind: range.kind === ts.SyntaxKind.SingleLineCommentTrivia ? 'line' : 'block',
+      ownLine: onOwnLine(text, range.pos),
+    }));
+  return { comments, jsxText };
+}
+
+function scanWithLexer(text) {
   const out = [];
   const n = text.length;
   const stack = [{ mode: 'code', brace: 0 }];
@@ -111,10 +179,19 @@ export function scanComments(text) {
   return out;
 }
 
+/**
+ * Nothing but whitespace before the comment on its line — or a lone `{`, because in JSX an
+ * own-line comment is written `{/* … *\/}` and treating that as trailing let essays through.
+ */
 function onOwnLine(text, start) {
   let k = start - 1;
+  let brace = false;
   while (k >= 0 && text[k] !== '\n') {
-    if (!/\s/.test(text[k])) return false;
+    const char = text[k];
+    if (!/\s/.test(char)) {
+      if (char === '{' && !brace) { brace = true; k--; continue; }
+      return false;
+    }
     k--;
   }
   return true;
@@ -159,14 +236,16 @@ function buildLineIndex(text) {
 /** The comment's text with its comment syntax stripped. */
 export function contentOf(raw, kind) {
   if (kind === 'line') {
-    return raw.split(/\r?\n/).map((l) => l.trim().replace(/^\/\/+ ?/, ''));
+    // `//:` is this codebase's "documents the next declaration" marker (the `#:` of the Python
+    // side). Leaving the colon in makes a separator line read as prose and ends up printed.
+    return raw.split(/\r?\n/).map((l) => l.trim().replace(/^\/\/+:? ?/, ''));
   }
   const lines = raw.split(/\r?\n/);
   return lines.map((l, k) => {
     let s = l;
     if (k === 0) s = s.replace(/^\s*\/\*+ ?/, '');
     if (k === lines.length - 1) s = s.replace(/\*\/\s*$/, '');
-    return s.trim().replace(/^\*+ ?/, '').trimEnd();
+    return s.trim().replace(/^\*+:? ?/, '').trimEnd();
   });
 }
 
@@ -213,20 +292,23 @@ export function collapseContent(content, max = MAX_PROSE_LINES) {
     head.push(l);
   }
   if (head.length > max) {
-    const window = head.slice(0, max);
-    let cut = -1;
-    for (let k = window.length - 1; k >= 0; k--) if (SENTENCE_END.test(window[k])) { cut = k; break; }
-    head = cut >= 0 ? window.slice(0, cut + 1) : window;
+    // Cut at the last sentence that ENDS inside the budget, mid-line if need be. Cutting only at
+    // line ends leaves the reader hanging on "…and called `generate_gemini`".
+    const text = head.slice(0, max).join('\n');
+    const ends = [...text.matchAll(SENTENCE_END)];
+    const last = ends.length ? ends[ends.length - 1].index + 1 : -1;
+    const kept = last > 0 ? text.slice(0, last).trimEnd() : '';
+    head = kept ? kept.split('\n') : head.slice(0, max);
   }
   head = head.filter((l) => /[A-Za-z0-9Ͱ-Ͽ]/.test(l));
   return { head, tags };
 }
 
 /** Re-emit a collapsed comment in its original style and indentation. */
-export function renderComment({ head, tags }, { kind, indent, jsdoc, width = 108 }) {
+export function renderComment({ head, tags }, { kind, indent, jsdoc, marker = '//', width = 108 }) {
   const body = [...head, ...tags];
   if (!body.length) return null;
-  if (kind === 'line') return body.map((l) => (l ? `${indent}// ${l}` : `${indent}//`)).join('\n');
+  if (kind === 'line') return body.map((l) => (l ? `${indent}${marker} ${l}` : `${indent}${marker}`)).join('\n');
   const open = jsdoc ? '/**' : '/*';
   if (body.length === 1 && !tags.length && `${indent}${open} ${body[0]} */`.length <= width) {
     return `${indent}${open} ${body[0]} */`;
@@ -235,8 +317,8 @@ export function renderComment({ head, tags }, { kind, indent, jsdoc, width = 108
 }
 
 /** Every comment in `source` that is over budget. The one definition of a violation. */
-export function findOverBudget(source) {
-  const groups = groupComments(source, scanComments(source));
+export function findOverBudget(source, fileName = 'file.tsx') {
+  const groups = groupComments(source, scanComments(source, fileName));
   const lineOf = buildLineIndex(source);
   const out = [];
   for (const g of groups) {

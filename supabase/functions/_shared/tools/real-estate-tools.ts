@@ -2,6 +2,7 @@
 // entitlement + realestate.* RBAC are enforced server-side in real-estate-api (this tool just calls
 // it with the caller's JWT). Read-only actions today (0 credits) — AI listing copy (draft_description)
 // lands with the P2 AI wave; syndicate lands with the P3 engine.
+// `tool` is typed non-generically ON PURPOSE.
 const { tool } = await import('npm:@langchain/core@1.2.9/tools') as {
   tool: <S extends { _output: unknown }>(
     fn: (input: S['_output']) => unknown,

@@ -1,9 +1,5 @@
 // Shared SOAP/XML/credential helpers for every ΑΑΔΕ web-service edge function.
-// Every ΑΑΔΕ service (RgWsPublic2, future myDATA endpoints, ICISnet customs, etc.) shares:
-//   - the same WS-Security UsernameToken auth header
-//   - the same credential storage (AADE_USERNAME + AADE_PASSWORD via resolveSecret)
-//   - the same XML-extraction quirks (multiple namespace prefixes, NULL/--- sentinels)
-// Functions that wrap a specific ΑΑΔΕ operation should:
+// Every ΑΑΔΕ service (RgWsPublic2, future myDATA endpoints, ICISnet customs, etc.
 
 import { resolveSecret, type ResolvedSecret } from '../secrets.ts';
 

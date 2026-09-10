@@ -643,8 +643,7 @@ Deno.serve(withApiLogging('crawl-user-website', async (req) => {
   // Firecrawl scrape fan-out (+ MIVAA Voyage embed per page) is paid upstream.
   // Interactive user calls debit_credits; the cron path charges the website
   // owner's PERSONAL balance (user_websites is user-scoped — no workspace, so
-  // chargeCronUser, not chargeCronWorkspace). NOTE: 'seo-website-crawl' must be
-  // registered in the cron cost registry for the cron charge to take effect;
+  // chargeCronUser, not chargeCronWorkspace).
   const WEBSITE_CRAWL_CREDIT_COST = mode === 'preview' ? 1 : 5;
   let billedUserId: string | null = null;
   let billedAmount = 0;

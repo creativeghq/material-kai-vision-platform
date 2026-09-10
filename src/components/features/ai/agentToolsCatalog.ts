@@ -1156,8 +1156,7 @@ export function findTool(toolId: string): AgentToolEntry | undefined {
 
 // TOOLKITS
 // Tools are grouped into named "toolkits" so the user can enable / disable a
-// whole capability cluster at once instead of ticking 50 checkboxes. The agent
-// gets only the LEAN core toolkit by default (massive token savings) and can
+// whole capability cluster at once instead of ticking 50 checkboxes.
 
 /**
  * One field in a quick-start's collect-then-send form. Rendered generically by
@@ -1299,14 +1298,12 @@ export interface ToolkitQuickStart {
    * step-by-step capture surface; on submit the captured photo(s) become the
    * message's attached images, the generation pipeline is forced via `mode`, the
    * `promptTemplate` is rendered from the remaining text fields, and ONE complete
-   * generation message is auto-sent. Mirrors `run`, but for the image pipelines
+   * generation message is auto-sent.
    */
   generation?: ToolkitQuickStartGeneration;
   /**
    * When set, clicking this quick-start opens an interactive design modal in
-   * AgentHub (a guided canvas) instead of just sending a prompt. The host maps
-   * the id to the right surface:
-   *   - 'new-design'      → from-scratch room designer (room/style/details)
+   * AgentHub (a guided canvas) instead of just sending a prompt.
    */
   opensModal?: 'new-design' | 'virtual-staging' | 'gemini-edit';
   /**
@@ -1413,10 +1410,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
   {
     // alwaysOn, and deliberately so. "Look it up" is not a specialist capability — it is the
     // thing every other capability turns out to need, the way `knowledge_base_search` is for the
-    // workspace's own documents. Leaving it behind a cluster the user has to remember to switch
-    // on reproduces the state this was built to fix: on 2026-08-25 an agent was asked to list a
-    // competitor's brands, had no tool that could read a web page, and burned its whole
-    // iteration budget inventing workarounds (Wayback CDX, the WordPress REST API, `site:`
+    // workspace's own documents.
     id: 'web-research',
     name: 'Web Research',
     description: 'Search the open web and read any page in full. Use for competitor and brand questions, distributor / "where to buy" lookups, sitemaps and product indexes — anything the workspace database does not already know.',
@@ -2402,10 +2396,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       {
         // Deliberately NOT a `run:` quick-start. `create` needs a structured
         // `actions: [{action_type, config}]` array and a `trigger_type` drawn from the
-        // tenant-safe vocabulary — neither is expressible as free text. It WAS a run
-        // quick-start, and it was broken two ways: `trigger` is not a param at all, and
-        // the field literally keyed `action` overwrote the pinned `action: 'create'`
-        // router verb with the user's prose (buildToolInput applies form values AFTER
+        // tenant-safe vocabulary — neither is expressible as free text.
         label: 'Create a flow', description: 'Trigger → action automation', icon: 'Plus',
         prompt: 'Create a new flow.',
         promptTemplate: 'Create a flow named "{{name}}" that runs when {{trigger}} and then {{what_it_does}}.',
@@ -2960,8 +2951,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       // generate_gemini has served `product-shot`, `product-lifestyle` and
       // `material-texture` since it shipped — each with its own prompt builder in
       // _shared/product-prompt-builder.ts — and NOTHING in the product could reach
-      // them. No quick-start, no button anywhere. Same shape as generate_3d: the
-      // capability existed and the entry point did not, so the only way in was
+      // them. No quick-start, no button anywhere.
       {
         label: 'Product shot',
         description: 'Render one product on seamless white — a catalog hero image',
@@ -3799,7 +3789,7 @@ export const TOOLKIT_AGENTS: Record<string, string[]> = {
   // its own) beside two utilities, and declaring Edith and Pepper its owners offered them a
   // cluster whose tools they mostly do not bind. The honest resolution is the other direction
   // from the clusters above: an ops grab-bag belongs to the operator, so it stays on the
-  // generalist. Pepper keeps `price_lookup` and `dispatch_background_task` as bound tools —
+  // generalist.
 };
 
 /**

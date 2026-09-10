@@ -1,4 +1,8 @@
 // Unified CRM API — REST resource routing.
+//   POST /crm-api/companies/...   → handleCompanies
+//   POST /crm-api/contacts/...    → handleContacts
+//   POST /crm-api/users/...       → handleUsers
+//   POST /crm-api/stripe/...
 
 import { corsHeaders } from '../_shared/cors.ts';
 import { handleCompanies } from './handlers/companies-api-handler.ts';

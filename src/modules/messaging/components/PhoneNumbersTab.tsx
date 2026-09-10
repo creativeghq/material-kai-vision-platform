@@ -71,6 +71,7 @@ export const PhoneNumbersTab: React.FC = () => {
   // Not `isOperator`. Giving up a number and settling a failed month are the tenant's own
   // business now — the edge function gates both on workspace owner/admin, and a UI that still
   // asked for operator would hide the button from everyone it was opened to.
+  // Two different gates, and they are not the same person.
   const { isOperator, isWorkspaceManager } = usePermissions();
   const { toast } = useToast();
 

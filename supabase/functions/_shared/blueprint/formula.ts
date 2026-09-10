@@ -1,4 +1,9 @@
 // Safe parametric-formula evaluator for the Blueprint estimating engine.
+// A blueprint/plan line may carry a `quantity_formula` like `= floor_area + wall_area`
+// or `= n_points * 1.1`. We evaluate it against the plan's named dimensions
+// ({floor_area: 6, wall_area: 24, ...}). NO arbitrary JS — only numbers, the named
+// dimensions, parentheses, the operators + - * / and a small whitelist of functions
+// (min, max, ceil, floor, round, abs, sqrt).
 
 export interface FormulaResult {
   value: number;

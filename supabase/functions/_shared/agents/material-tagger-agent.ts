@@ -63,8 +63,7 @@ export class MaterialTaggerAgent implements AgentRunner {
       // product-level image URL doesn't live on this row (images are in
       // document_images linked via image_product_associations). For now
       // we extract attributes from the available text — name + description
-      // + any pre-extracted facets already in metadata. The canonicalizer
-      // does the heavy lifting: even partial / messy values get normalized
+      // + any pre-extracted facets already in metadata.
       const metaSnippet = (() => {
         const m = (product.metadata || {}) as Record<string, unknown>;
         const keep = ['material_category', 'available_colors', 'finish', 'style', 'application', 'room', 'socket', 'light_color', 'mounting_type'];

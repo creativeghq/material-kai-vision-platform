@@ -44,7 +44,7 @@ const PLINTH_INSET = 0.13;
  * approaching half of that leaves no flat face at all: the box degenerates,
  * its smooth normals stretch across the whole surface, and it renders as a
  * glassy see-through blob. (That is exactly what the first reshape did to the
- * arms — 0.052 m of radius on a 0.11 m width.)
+ * arms — 0.052 m of radius on a 0.11 m width.
  */
 const soft = (w, h, d, r) =>
   new RoundedBoxGeometry(w, h, d, 3, Math.min(r, Math.min(w, h, d) * 0.28));

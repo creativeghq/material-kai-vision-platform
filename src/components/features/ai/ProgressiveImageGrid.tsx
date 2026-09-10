@@ -379,7 +379,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
       // starts its own catalog search the moment it lands. The old shape waited
       // ~40s for the complete zone array before showing anything OR searching
       // anything, so the two costs were strictly serial: 40s of blank screen,
-      // then 40s+ of matches filling in. Now the first zone is on screen in a
+      // then 40s+ of matches filling in.
       const CONCURRENCY = 3;
       const searchQueue: Array<{ seg: SegmentWithResults; i: number }> = [];
       const waiters: Array<() => void> = [];
@@ -583,9 +583,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
           // `|| null`, not `?? null`. AgentHub renders this component with jobId="" for the
           // Gemini single-image modal, and `??` only catches null/undefined — so an empty
           // string reached a uuid column and PostgREST rejected the WHOLE multi-row insert
-          // (22P02). The failure was only console.warn'd, so the cache never persisted and
-          // every open of the Products tab re-ran the full MIVAA segment call plus one
-          // /api/rag/search per zone: real backend spend and ~80s of wait, forever, with no
+          // (22P02).
           generation_id: jobId || null,
           model_id: s.model_id,
           source_image_url: s.source_image_url,

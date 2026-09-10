@@ -4,7 +4,7 @@
  * each tenant's OWN myDATA credentials (`workspace_inbound_credentials`); it must never
  * fall back to the platform master AADE Special-Access-Codes (`AADE_USERNAME` /
  * `AADE_PASSWORD`, used only by the myaade-rgwspublic2 lookup), nor the shared SOAP
- * credential resolver. This is a source-level guard: it fails loudly if a future change
+ * credential resolver.
  */
 // This import is what makes the file collectable. vitest.config.ts has no
 // `globals: true`, so without it the file ReferenceErrors on `describe` — and it

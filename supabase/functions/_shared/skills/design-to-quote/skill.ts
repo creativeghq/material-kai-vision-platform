@@ -1,7 +1,5 @@
 // Source of truth for the Design to Quote skill.
 // See note in b2b-manufacturer-research/skill.ts about .ts-not-.md.
-//
-// backtick, so the skill text the model reads comes out as \`tool_name\` rather than
 // DO NOT EDIT — generated from SKILL.md by scripts/gen-skill-ts.mjs. Edit the markdown.
 
 export default `---

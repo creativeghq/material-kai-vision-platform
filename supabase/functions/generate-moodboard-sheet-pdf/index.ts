@@ -255,7 +255,7 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
 
     // Refuse to render an empty/no-content PDF. Same content rules as the
     // agent tool's validator. Marks the row as failed and returns 422 instead
-    // of uploading a trash file to storage. Required content per type:
+    // of uploading a trash file to storage.
     const contentError = validatePdfContent(sheet.sheet_type, sheet.data);
     if (contentError) {
       await supabase

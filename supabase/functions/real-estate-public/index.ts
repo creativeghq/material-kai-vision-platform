@@ -384,6 +384,10 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
     }
 
     // Capture the seller lead (crm_contact + real-estate extension). property_id/workspace are server-set.
+    // The error MUST be checked. This used to destructure only `data`, so a
+    // failed insert left `contact` null, skipped the property_contacts_ext upsert AND the
+    // crm_contact_created event, and still returned 200 with the estimate — while
+    // ValuationWidget flips to its success screen on any resolved promise.
     const { data: contact, error: contactErr } = await supabase.from('crm_contacts').insert({
       workspace_id: workspaceId, name, email, phone: String(body?.phone ?? '').slice(0, 40) || null,
       contact_type: 'seller', lead_source: 'valuation_request', lead_status: 'new',

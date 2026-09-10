@@ -296,13 +296,12 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ variant = 'bar' }) =
                 </CommandGroup>
               ))}
 
-              {/* Last, and each named after where it goes.
-                  This palette answers LOOKUPS — a name, a title, a number — instantly and
-                  deterministically. A question ("unpaid invoices over 5k", "who supplied the
-                  tiles") is not a lookup, and the agent is where it belongs. Escalation is a
-                  choice the user makes here rather than a model turn charged to every keystroke:
-                  routing the whole palette through the agent would trade a ~50 ms answer for a
-                  multi-second one and an LLM call per search. */}
+              {/*
+                * Last, and each named after where it goes.
+                * This palette answers LOOKUPS — a name, a title, a number — instantly and
+                * deterministically. A question ("unpaid invoices over 5k", "who supplied the
+                * tiles") is not a lookup, and the agent is where it belongs.
+                */}
               {trimmed && (
                 <CommandGroup heading="Actions">
                   <CommandItem

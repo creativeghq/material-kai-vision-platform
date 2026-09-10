@@ -268,7 +268,7 @@ export class KaiTaskAgent implements AgentRunner {
     // here because its absence was measured. Handed a real dealer-mapping task with both of its
     // tools erroring, this agent did not stop and did not report the breakage as the result — it
     // wrote a polished 4,300-token report from training data, dated it, and returned it as
-    // research. For a question like "who already represents this brand in Greece", a confident
+    // research.
     const systemPrompt = agentConfig.system_prompt_override || [
       'You are KAI, a material intelligence agent working on a background task assigned by an admin user.',
       'Complete the task thoroughly, use your tools as needed, and produce a detailed structured report.',

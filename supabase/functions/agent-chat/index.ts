@@ -433,6 +433,8 @@ function createAgentGraph(
         // SECURITY INVARIANT 9 (#352 A1). These are MODEL-authored arguments, and this
         // subsystem ingests untrusted content by design — scraped pages, SERP results, supplier
         // PDFs, KB chunks. Seven tools implement the Approve/Decline gate as `if (!confirm)
+        // preview else act`, and all seven expose `confirm` in the schema the LLM sees, guarded
+        // only by a description asking it not to.
         const { args: safeArgs, removed: strippedApproval } = stripModelAuthoredApproval(toolCall.args);
         if (strippedApproval.length > 0) {
           // Worth seeing. A model asking to skip a human gate is either an injection attempt or
@@ -595,9 +597,7 @@ function createAgentGraph(
           // `fulfilled` only means the tool did not THROW. Nearly every tool here reports its
           // own failures by RETURNING `{success:false, error}` — a returned refusal is the
           // normal path, not the exceptional one — so keying the log on the promise state
-          // recorded them all as successes. A `generate_gemini` call that bailed in 1ms
-          // because it had no reference image logged `success:true, error_message:null`, and
-          // the conversation it failed in reads as 4/4 healthy tool calls on any dashboard
+          // recorded them all as successes.
           let success = settled.status === 'fulfilled';
           let resultCount: number | null = null;
           let zeroResult = false;
@@ -818,7 +818,6 @@ let modelOpus: any;
 // Two-tier router: route simple queries to Haiku (~15× cheaper than Opus),
 // reserve Opus for complex reasoning. Heuristic gate — no extra LLM call,
 // no added latency. Errs toward Opus when uncertain (recall over precision).
-// Routes to Haiku when ALL of:
 function shouldRouteToHaiku(agentId: string): boolean {
   // Only the sandbox agent. Everything a real user asks runs on the main model.
   if (agentId === 'demo') return true;
@@ -885,7 +884,7 @@ const ROUTABLE_SPECIALISTS: { slug: string; name: string; blurb: string }[] = [
   // "Product Management" category (discovery, roadmaps, JTBD, opportunity solution trees), and
   // every blurb here described product-as-GOODS — catalogs, manufacturers, SKUs. So "what is
   // product discovery?" matched no specialist, fell to the generalist, and the generalist
-  // answered from its own knowledge without searching. Asked directly, Pepper searched the KB
+  // answered from its own knowledge without searching.
   { slug: 'product-business', name: 'Pepper', blurb: 'building or publishing catalogs, B2B manufacturer research, company/contact enrichment and CRM, product knowledge-graph (provenance, brand, related products, specs), tech radar, job research; ALSO any question answerable from the workspace knowledge base — product-management practice, product discovery, roadmaps, frameworks, internal playbooks and "what do our docs say about X"' },
   { slug: 'marketing', name: 'Edith', blurb: 'SEO keyword/SERP research and audits, backlinks, site crawls, SEO article writing, brand-mention monitoring, LLM visibility' },
   { slug: 'erp', name: 'Trinity', blurb: 'creating client quotes and quote PDFs, pricing, customer or supplier financial overviews, price history, recording business expenses / supplier bills / payables (rent, utilities, fees)' },
@@ -1490,6 +1489,7 @@ async function executeAgent(
 }> {
   // Orchestrator: JARVIS routes this turn to the best specialist (or the generalist).
   // Runs before config lookup so the rest of the turn executes AS the chosen agent.
+  // Who was ASKED for, before routing rewrites `agentId`.
   const requestedAgentId = agentId;
   if (ORCHESTRATOR_IDS.has(agentId)) {
     const routed = await routeToSpecialist(supabase, userInput);
@@ -1591,9 +1591,7 @@ async function executeAgent(
   // ─── Per-turn tool gating ────────────────────────────────────────────────
   // The frontend sends `selected_toolkits` — the user's currently-active
   // toolkit IDs from the visual ToolkitPickerModal (always includes the Core
-  // toolkit). We resolve those to a set of tool IDs server-side using
-  // TOOLKIT_CLUSTERS, which is GENERATED from the same agentToolsCatalog.TOOLKITS
-  // the picker renders — not a second hand-written copy of it, which is what this
+  // toolkit).
 
   // Meta-tools: available to every agent regardless of toolkit selection, and homed in no
   // cluster. `request_input` is here rather than in a toolkit because asking the user something
@@ -2981,8 +2979,7 @@ async function executeAgent(
   // unreachable. Deleted rather than wired up (issue #266): it multiplied
   // products.metadata.price by products.metadata.quantity, a SECOND derivation of a
   // money quantity that bypasses get_product_price_for_workspace and its markup ladder
-  // entirely. `price_lookup` and `price_my_spec` are the derived answer — and
-  // price_my_spec deliberately returns NO price on an inexact match rather than
+  // entirely.
 
     return tools;
   } // ── end registerTools ──────────────────────────────────────────────────
@@ -3073,7 +3070,7 @@ async function executeAgent(
   // THREAD. Bound outside registerTools and outside every toolkit cluster on purpose: a cluster is
   // something a user or the model can ASK for, and these must be reachable only on this path, only
   // when the thread resolved to a real CRM contact, and only when the workspace allows account
-  // answers. `customerAccountScope` is null whenever any of those is untrue, and a null scope binds
+  // answers.
   if (forCustomer && customerAccountScope) {
     try {
       const { createCustomerAccountTools } = await import('../_shared/tools/customer-account-tools.ts');
@@ -3091,7 +3088,7 @@ async function executeAgent(
   // descriptor, it posts mode:'direct_tool' with structured args instead of a
   // chat message. We reuse the EXACT tool list built above — same toolkit
   // gating, same RBAC (admin-only tools never got pushed for non-admins), same
-  // onChunk wiring — then find the requested tool and invoke it directly. The
+  // onChunk wiring — then find the requested tool and invoke it directly.
   if (directTool) {
     const matched = tools.find((t: any) => t.name === directTool.name);
     if (!matched) {
@@ -3231,7 +3228,7 @@ async function executeAgent(
   // into a single SystemMessage, keeping the last 6 messages intact. The
   // summary call is ~$0.001 against Haiku rates; the savings on subsequent
   // Opus turns (where each old turn re-bills 200-2000 input tokens) pay for it
-  // many times over. Skipped when the user attaches images on this turn —
+  // many times over.
   const COMPACT_THRESHOLD = 12;
   const KEEP_RECENT = 6;
   if (
@@ -3803,8 +3800,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
     // Same shape as generate-interior-gemini / generate-region-edit /
     // generate-vr-world / crm-*-api: the sb_secret_* admin key is accepted
     // for trusted server-to-server callers, and the request body carries
-    // `user_id` to identify which user the operation runs as. Workspace,
-    // role/RBAC, credits, and conversation persistence are all anchored to
+    // `user_id` to identify which user the operation runs as.
     const isAdmin = isAdminAccess(auth);
     if (isAdmin) {
       if (!bodyUserId || typeof bodyUserId !== 'string') {
@@ -3862,6 +3858,8 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
     // Partners are gated above against a fixed per-turn cost. Internal (session-JWT and
     // admin-on-behalf) turns are billed POST-HOC by log_agent_usage — it computes a token-based
     // credit charge and routes it through debit_credits (workspace pool if funded, else personal).
+    // Without a pre-turn gate a user at zero/negative balance could keep sending Opus turns
+    // indefinitely: each turn burns real Anthropic $ and is never blocked.
     if (!isPartner) {
       try {
         const { data: pf, error: pfErr } = await auth.supabase.rpc('preflight_credits', {
@@ -4008,8 +4006,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
             // spendworthy. NON_SPEND_CHUNK_TYPES are orchestration noise emitted BEFORE the
             // first upstream call — status/heartbeat (keepalive), `iteration` (emitted at the
             // top of each agent loop, before model.invoke) and `agent_routed` (emitted by the
-            // two-tier router before the specialist runs). Counting them as "real content"
-            // (bug #2) meant a crash on the very first Anthropic call — which cost us nothing —
+            // two-tier router before the specialist runs).
             if (data?.type && !NON_SPEND_CHUNK_TYPES.has(data.type)) {
               hasStreamedRealContent = true;
             }

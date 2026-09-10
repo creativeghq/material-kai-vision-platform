@@ -226,6 +226,7 @@ const MyOfficeImpl: React.FC = () => {
   // is ALSO null for the first beat of every load, while the workspace resolves.
   // Returning null there rendered the dashboard's top row hero-only and then grew it
   // by this panel's height a moment later, shoving the widgets below down the page:
+  // the "grid starts smaller and then expands" blink.
   if (!activeWorkspaceId && !workspaceLoading) return null;
 
   return (
@@ -243,17 +244,10 @@ const MyOfficeImpl: React.FC = () => {
         </h2>
       </div>
 
-      {/* Operational blocks — every panel carries a figure, what it is made of, and a way into
-          the detail. Two rules hold here and nothing else checks them:
-
-          1. Every bucket counted in the headline is VISIBLE in the breakdown. Orders showed
-             Draft / Confirmed / Fulfilled under a headline of confirmed + partially_fulfilled, so
-             no combination of the rows on screen added up to the number above them — and the one
-             bucket that did (`partially_fulfilled`) was the only one not shown. Same for quotes:
-             `quoted` was counted and hidden while `accepted` was shown and not counted.
-          2. Every figure LINKS to the records it counted — the block to the list, each row to its
-             slice. Not to the module's front door: `/finance` opens the Dashboard pane and `/crm`
-             opens Users, which is not the CRM at all. */}
+      {/*
+        * Operational blocks — every panel carries a figure, what it is made of, and a way into
+        * the detail. Two rules hold here and nothing else checks them:
+        */}
       <div className="grid grid-cols-2 gap-2.5">
         <StatBlock
           icon={ShoppingCart}
@@ -341,19 +335,14 @@ const MyOfficeImpl: React.FC = () => {
           )}
         </div>
 
-        {/* FIXED height, not min-height, and it scrolls. Insights come from an LLM edge
-            function — the slowest thing on the dashboard — and the endpoint returns
-            anywhere from 2 to 5 of them with one-to-two-sentence bodies, so the resolved
-            height is genuinely unknowable at paint time: a reserve big enough for five
-            three-line insights would be mostly dead space, and anything smaller grows the
-            panel when the call lands. This panel is the tallest thing in the top grid row,
-            so its height IS the row's height — any growth here shoves LatestWidgets down
-            the page seconds into the load. The height steps with the breakpoint because
-            the COLUMN steps with it — a 3-insight set measures 263px in the 264px-wide
-            lg column and 214px in the 459px-wide one — so each step is the measured fit
-            for the typical set at that width, and anything longer scrolls. Still a
-            constant per width: nothing the endpoint returns can change it. All three
-            states (loading / pro-tip / resolved) occupy exactly this box. */}
+        {/*
+          * FIXED height, not min-height, and it scrolls. Insights come from an LLM edge
+          * function — the slowest thing on the dashboard — and the endpoint returns
+          * anywhere from 2 to 5 of them with one-to-two-sentence bodies, so the resolved
+          * height is genuinely unknowable at paint time: a reserve big enough for five
+          * three-line insights would be mostly dead space, and anything smaller grows the
+          * panel when the call lands.
+          */}
         <div className="h-[15.5rem] sm:h-[13.5rem] lg:h-[16.5rem] xl:h-[14.5rem] 2xl:h-[13.5rem] scroll-y-clean">
           {insightsLoading ? (
             /* Shaped like a real insight row (icon chip + title + two-line body), not thin

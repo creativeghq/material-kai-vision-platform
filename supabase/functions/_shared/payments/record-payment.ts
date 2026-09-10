@@ -220,6 +220,7 @@ export async function recordInvoicePayment(
   // ISSUED document to `paid`, not a draft. Until this step existed every storefront receipt and
   // every quote pre-invoice paid by card ended as a draft whose row said `paid`: no legal number,
   // no issue date, nothing filed with AADE — while the customer had a payment confirmation.
+  // A part payment (a deposit) legitimately leaves the pre-invoice a draft.
   let issued: RecordResult['issued'] = null;
   let issueError: string | undefined;
   if (inv.status === 'draft' && due > 0 && applied >= due - 0.005) {

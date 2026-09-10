@@ -926,8 +926,7 @@ export const userWebsitesService = {
    * audit). The domain comes from the website's URL, never from a text box: the tab
    * that offers this reads "tracking for this website's domain", and a free-text
    * form is how a competitor ends up filed under the wrong site. Locale matches
-   * the rank tracker's (Greek results). Idempotent — the table is unique on
-   * user + domain + country, so a second click hands back the existing row and,
+   * the rank tracker's (Greek results).
    */
   async trackOwnDomain(website: UserWebsite, countryCode = 'GR', languageCode = 'el'): Promise<SeoTrackedDomainRow> {
     const { data: userData } = await supabase.auth.getUser();

@@ -295,19 +295,7 @@ function AppointmentDetailDrawer({
             Open inbox
           </Button>
 
-          {/* What this appointment is ABOUT (#378 C4, completed by N10).
-
-              A site visit, a measure-up, a viewing and a handover are all appointments about
-              something. C4 gave the table four subject columns and this screen wrote two of them:
-              `deal_id` and `order_id` were declared, typed, CHECK-constrained and reachable from
-              nothing — the comment here even claimed they were "set from those records", and
-              nothing set them. One control offering all four now, shared with the CRM calendar so
-              the two surfaces cannot drift into supporting different subjects.
-
-              Written through `set_appointment_subject`, never as a direct column update:
-              `appointments` has no workspace_id and its RLS is keyed on professional_user_id, so
-              nothing about a plain UPDATE would stop attaching this to a job in a workspace the
-              caller has nothing to do with. The RPC resolves the workspace FROM the target. */}
+          {/* What this appointment is ABOUT (#378 C4, completed by N10). */}
           {activeWorkspaceId && (
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">

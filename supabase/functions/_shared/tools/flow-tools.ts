@@ -3,7 +3,6 @@
 // table via the SECURITY DEFINER RPCs create_simple_flow / delete_simple_flow /
 // toggle_simple_flow. The tenant-safe trigger/action vocabulary is enforced SERVER-SIDE in
 // those RPCs — the UI/tool restriction is not the security line.
-// SECURITY:
 
 // deno-lint-ignore-file no-explicit-any
 

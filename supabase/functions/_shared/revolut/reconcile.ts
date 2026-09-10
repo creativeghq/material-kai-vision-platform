@@ -263,7 +263,7 @@ export async function settleTransaction(
 /**
  * OUTGOING side (#315): match completed outgoing transfers to supplier bills, so a
  * drafted bill run (whose payment references carry the bill number) marks its bills
- * paid when it actually executes. AUTO-ONLY and conservative:
+ * paid when it actually executes.
  */
 export async function reconcileOutgoingRevolut(service: any, workspaceId: string): Promise<{ settled: number; unmatched: number; errors: string[] }> {
   const out = { settled: 0, unmatched: 0, errors: [] as string[] };

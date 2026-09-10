@@ -104,9 +104,7 @@ describe('country vocabularies are data, not constants', () => {
     // Named individually rather than by a generic pattern: `COUNTRY_CODES` is deliberately NOT on
     // this list, because two unrelated and legitimate vocabularies use that name — phone dial
     // codes in ProfileTab, and the EU VAT prefix set in vies-validate / role-upgrade-requests,
-    // which is defined by regulation rather than by preference. Banning the NAME would have
-    // pushed correct code around for nothing; the market-name scan above is what catches a real
-    // fourth country list, and it did — it found `SUPPORTED_MARKETS` in _shared/b2b-markets.ts,
+    // which is defined by regulation rather than by preference.
     for (const dead of ['B2B_REGIONS', 'B2B_ALL_COUNTRIES', 'COMMON_MARKETS', 'SUPPORTED_MARKETS']) {
       expect(
         new RegExp(`\\b${dead}\\b`).test(all),

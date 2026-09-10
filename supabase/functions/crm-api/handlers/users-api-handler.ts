@@ -454,7 +454,7 @@ export async function handleUsers(req: Request): Promise<Response> {
       //    conversations, generations, api keys, social accounts, tracked queries/mentions/
       //    jobs, notifications, preferences, reseller applications, …) and SET NULL on
       //    shared/business records they merely authored (catalog products/documents, KB docs,
-      //    CRM, finance). AFTER DELETE storage triggers fire during this cascade for
+      //    CRM, finance).
       const { error: authDeleteError } = await supabase.auth.admin.deleteUser(targetUserId);
       if (authDeleteError) {
         // Surface the real failure — do NOT report success on a failed delete.

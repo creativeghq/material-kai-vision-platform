@@ -54,6 +54,10 @@ serve(withApiLogging('auto-recovery-cron', async (req) => {
     console.log('[AutoRecoveryCron] Starting stuck job detection...');
 
     // Audit fix (this PR): sweep terminally-exhausted PDF jobs first.
+    // detect_stuck_pdf_jobs filters on recovery_attempts_after_genuine_failure
+    // < max_attempts, so a row that has already burned its 3-attempt budget
+    // is invisible to the recovery loop AND invisible to a future cron tick —
+    // it just sits at status='processing' forever.
     let exhaustedFailed = 0;
     try {
       const { data: failedCount, error: failExhaustedErr } = await supabase.rpc(
@@ -507,6 +511,8 @@ async function recoverPdfJob(supabase: any, job: StuckJob): Promise<boolean> {
   // Actively re-dispatch the PDF job to MIVAA. Previously the
   // RPC just flipped status='pending' and we relied on the orchestrator
   // restart hook to pick it up — which only fires on full service restart.
+  // Now we POST to MIVAA's /api/rag/documents/job/{job_id}/resume so recovery
+  // is immediate.
   const mivaaBaseUrl = Deno.env.get('MIVAA_BASE_URL') || 'https://v1api.materialshub.gr';
   const cronSecret = () => Deno.env.get('CRON_SECRET') || '';
   let dispatchOk = false;

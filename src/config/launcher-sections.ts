@@ -68,10 +68,7 @@ export interface LauncherSection {
   group?: string;
 }
 
-/**
- * Center-pane sections, keyed by SidebarNavItem.id (=== LauncherApp.id).
- * Tab values are the exact `<TabsTrigger value>` strings on each module's landing page:
- */
+/** Center-pane sections, keyed by SidebarNavItem.id (=== LauncherApp.id). */
 export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
   // Property Mgmt and Investments carry their own add-on slug — shown to a workspace that owns
   // them, hidden from one that doesn't. Syndication is `canManage`-gated (a role, not a purchase,
@@ -152,7 +149,7 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
   // high-value work is the AI presentation sheets — surface them as ONE agent deep-link so a click
   // opens the studio primed on the presentation-sheets toolkit (its picker offers all 9 sheet types,
   // incl. the "design breakdown" board) instead of hunting for the per-board Sheets tab.
-  // (sheets are an agent capability, not a page tab.) Deliberately a single entry:
+  // (sheets are an agent capability, not a page tab.
   moodboard: [
     { label: 'Presentation sheets', to: '/agent-hub?capability=presentation-sheet', icon: LayoutTemplate },
   ],
@@ -194,6 +191,7 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
   // clusters that existed in the picker and were reachable from no menu at all. `?capability=`
   // primes the toolkit and shows its quick-starts without firing one, which is what makes a chip
   // an entry point rather than a spend.
+  // Both gates are real, and they are different questions.
   'seo-websites': [
     { label: 'Connected websites', to: '/profile?tab=websites', icon: Globe },
     { label: 'Keyword research', to: '/agent-hub?capability=seo-research', icon: Search, moduleSlug: 'seo-toolkit', requireAnyCapability: ['agent.use'] },
@@ -253,10 +251,10 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
   // see LAUNCHER_ACTIONS below. Categories are free text typed per doc, not a fixed vocabulary, so
   // there is nothing stable to list here: a chip per category would be a different menu per
   // workspace and would break the moment someone renamed one.
+  // Sales/Inbox have no URL tabs → Open-only.
 };
 
-// Right-column context-aware quick-CREATE triggers, keyed by SidebarNavItem.id. Each `to` carries a
-// ?new= param that the target PAGE reads to open its real create modal/route:
+// Right-column context-aware quick-CREATE triggers, keyed by SidebarNavItem.id.
 export const LAUNCHER_ACTIONS: Record<string, LauncherSection[]> = {
   crm: [
     { label: 'New Contact', to: '/crm?new=contact', icon: UserPlus },

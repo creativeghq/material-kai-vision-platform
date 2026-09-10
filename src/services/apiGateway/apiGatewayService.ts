@@ -35,10 +35,10 @@ export interface ApiUsageLog {
  *  every request; no admin view needs more than this at once. */
 const DEFAULT_USAGE_LOG_LIMIT = 500;
 
-// : The columns a LIST needs. Deliberately not `select('*')` (#390): that returned
-// : `api_key`, which held the credential in directly usable form — so a global admin
-// : calling `getAllApiKeys()` dumped every partner's working key into a browser, and a
-// : user's own key came back on every list rather than once at creation.
+//: The columns a LIST needs. Deliberately not `select('*')` (#390): that returned
+//: `api_key`, which held the credential in directly usable form — so a global admin
+//: calling `getAllApiKeys()` dumped every partner's working key into a browser, and a
+//: user's own key came back on every list rather than once at creation.
 const API_KEY_LIST_COLUMNS =
   'id, user_id, key_name, key_prefix, is_active, rate_limit_override, allowed_endpoints, expires_at, last_used_at, created_at, updated_at';
 
@@ -181,8 +181,11 @@ class ApiGatewayService {
     return rows;
   }
 
-  // `generateSecureKey` was deleted here (#390), and it is worth saying why rather than
-  // just that it moved.
+  // `generateSecureKey` (#390) built partner keys from `Math.random()`, which is not a CSPRNG,
+  // so every key it ever issued is PREDICTABLE — hashing them is necessary but not sufficient,
+  // and the live ones need ROTATING, not just re-storing. Generation now happens in
+  // `create_api_key`, which uses `gen_random_bytes` and never lets the plaintext leave the one
+  // statement that returns it.
 }
 
 export const apiGatewayService = new ApiGatewayService();

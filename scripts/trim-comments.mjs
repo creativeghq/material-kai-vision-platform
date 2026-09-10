@@ -39,10 +39,10 @@ function walk(dir, out = []) {
 }
 
 /** The file with every comment removed. Two versions of this must match, or the splice was wrong. */
-function codeOnly(text) {
+function codeOnly(text, fileName) {
   const parts = [];
   let last = 0;
-  for (const c of scanComments(text)) {
+  for (const c of scanComments(text, fileName)) {
     parts.push(text.slice(last, c.start));
     last = c.end;
   }
@@ -78,7 +78,7 @@ for (const file of targets) {
   try { src = readFileSync(file, 'utf8'); } catch { continue; }
   if (isGeneratedFile(rel, src)) { skippedGenerated++; continue; }
 
-  const offenders = findOverBudget(src);
+  const offenders = findOverBudget(src, rel);
   if (!offenders.length) continue;
 
   if (LIST) {
@@ -94,10 +94,13 @@ for (const file of targets) {
 
   for (const o of [...offenders].sort((a, b) => b.start - a.start)) {
     const lineStart = out.lastIndexOf('\n', o.start - 1) + 1;
-    const indent = out.slice(lineStart, o.start);
+    // A JSX comment opens after a `{`. Blank it rather than repeating it on every wrapped line,
+    // which would emit a second brace and change the code.
+    const indent = out.slice(lineStart, o.start).replace(/\S/g, ' ');
     const jsdoc = o.raw.startsWith('/**');
+    const marker = o.raw.trimStart().startsWith('//:') ? '//:' : '//';
     const rendered = renderComment(collapseContent(o.content, MAX_PROSE_LINES), {
-      kind: o.kind, indent, jsdoc,
+      kind: o.kind, indent, jsdoc, marker,
     });
     const before = o.raw.split(/\r?\n/).length;
     if (rendered === null) {
@@ -114,7 +117,7 @@ for (const file of targets) {
   }
 
   if (out === src) continue;
-  if (codeOnly(out) !== codeOnly(src)) { refused.push(`${rel} (code changed)`); continue; }
+  if (codeOnly(out, rel) !== codeOnly(src, rel)) { refused.push(`${rel} (code changed)`); continue; }
   if (!syntaxOk(file, out)) { refused.push(`${rel} (syntax)`); continue; }
 
   if (!DRY) writeFileSync(file, out, 'utf8');

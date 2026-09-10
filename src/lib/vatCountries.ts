@@ -50,7 +50,11 @@ export const VAT_COUNTRY_OPTIONS: VatCountryOption[] = [
   { code: 'JP', name: 'Japan',           eu: false },
 ];
 
-/** ISO-3166 country code → the VAT prefix letters that belong on a VAT number. */
+/**
+ * ISO-3166 country code → the VAT prefix letters that belong on a VAT number.
+ * The two agree everywhere except Greece: `GR` in an address, `EL` on the VAT
+ * number.
+ */
 export const toVatPrefix = (code: string | null | undefined): string => {
   const u = (code ?? '').trim().toUpperCase();
   return u === 'GR' ? 'EL' : u;

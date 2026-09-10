@@ -583,6 +583,9 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
     // Debit BEFORE the paid Gemini call (invariant #10): the per-member cap is enforced atomically
     // at debit time, so concurrent over-cap requests can't all run paid compute before a debit lands.
     // Refunded in the catch below if generation fails.
+    // `modelLabel`, not `model`: `model` is only meaningful when the provider IS Gemini, so a
+    // Grok or Flux run wrote a ledger line reading "gemini-3.1-flash-image" beside the Grok
+    // charge.
     await deductCredits(supabase, resolvedUserId, credits, `Interior design generation (${modelLabel}, ${mode})`, body.workspace_id);
     debited = true;
 
@@ -591,6 +594,9 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
     // ── Provenance for the caller ─────────────────────────────────────────────────────────
     // What this run ACTUALLY edited. The agent never sees the picture it produced — it gets a
     // URL — so with nothing else in the response it can only assert or hedge. It did both:
+    // "the base photo was locked in as the edit source" on a run that had edited a tile swatch,
+    // then, once that was genuinely fixed, "I can't tell you whether the base photo actually got
+    // through this time" on a run that had worked (conversation b520cc11).
     let sourceSize: ImageSize | null = null;
     let outputSize: ImageSize | null = null;
 
@@ -1053,6 +1059,8 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
     // `request_type` is CHECK-constrained to exactly 'text_to_image' | 'image_to_image' |
     // 'hybrid'. This used to write the raw `mode` — 'text-to-image', 'image-edit',
     // 'product-shot', or 'materials_selection_board_<board_mode>' — none of which satisfy it.
+    // The insert therefore failed EVERY time, its result was never destructured, and the
+    // function still returned success:true.
     const REQUEST_TYPE_BY_MODE: Record<string, 'text_to_image' | 'image_to_image' | 'hybrid'> = {
       'text-to-image': 'text_to_image',
       'floor-plan-text': 'text_to_image',

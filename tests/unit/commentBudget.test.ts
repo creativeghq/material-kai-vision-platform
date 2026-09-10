@@ -99,6 +99,56 @@ describe('comment budget', () => {
       const src = '/** Fine. */\nexport const x = 1;\n';
       expect(findOverBudget(src)).toHaveLength(0);
     });
+
+    it('cuts at a sentence that ENDS, not at a colon or a line break', () => {
+      const content = [
+        'One. Two ends here.', 'Three runs on and on and on', 'and on and on and on',
+        'and on and on and on', 'and on and on and on', 'and on and on and on',
+        'and on and on and on', 'and finally stops.',
+      ];
+      const { head } = collapseContent(content, MAX_PROSE_LINES);
+      expect(head.join(' ')).toBe('One. Two ends here.');
+    });
+
+    it('keeps the budget rather than inventing one when nothing ends in the window', () => {
+      const content = Array.from({ length: 9 }, () => 'no terminator here');
+      const { head } = collapseContent(content, MAX_PROSE_LINES);
+      expect(head).toHaveLength(MAX_PROSE_LINES);
+    });
+
+    it('keeps the `//:` marker, which documents the declaration below it', () => {
+      const out = renderComment({ head: ['What this is.'], tags: [] }, {
+        kind: 'line', indent: '', marker: '//:',
+      });
+      expect(out).toBe('//: What this is.');
+    });
+
+    it('reads `//:` as a marker, so its separator line still ends the paragraph', () => {
+      const raw = ['//: First para.', '//:', '//: Second para.'].join('\n');
+      const { head } = collapseContent(contentOf(raw, 'line'), MAX_PROSE_LINES);
+      expect(head).toEqual(['First para.']);
+    });
+  });
+
+  describe('JSX, which a lexer cannot see on its own', () => {
+    it('does not read rendered text beginning // as a comment', () => {
+      const src = ['export const A = () => (', '  <pre>', ...Array.from(
+        { length: 8 }, (_, i) => `// rendered line ${i}`,
+      ), '  </pre>', ');'].join('\n');
+      expect(findOverBudget(src, 'a.tsx')).toHaveLength(0);
+    });
+
+    it('still catches an essay inside {/* … */}, which opens after a brace', () => {
+      const src = ['export const C = () => (', '  <div>', '    {/*', ...Array.from(
+        { length: 8 }, (_, i) => `      line ${i}`,
+      ), '    */}', '  </div>', ');'].join('\n');
+      expect(findOverBudget(src, 'c.tsx')).toHaveLength(1);
+    });
+
+    it('still catches a comment alone in an empty block', () => {
+      const src = `function f() {\n${Array.from({ length: 8 }, (_, i) => `  // line ${i}`).join('\n')}\n}`;
+      expect(findOverBudget(src, 'e.ts')).toHaveLength(1);
+    });
   });
 
   describe('the platform', () => {
@@ -111,7 +161,7 @@ describe('comment budget', () => {
         const rel = relative(ROOT, file).split('\\').join('/');
         const src = readFileSync(file, 'utf8');
         if (isGeneratedFile(rel, src)) continue;
-        for (const o of findOverBudget(src)) offenders.push(`${rel}:${o.line} (${o.prose} prose lines)`);
+        for (const o of findOverBudget(src, rel)) offenders.push(`${rel}:${o.line} (${o.prose} prose lines)`);
       }
 
       expect(

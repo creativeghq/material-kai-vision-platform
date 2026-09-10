@@ -77,6 +77,8 @@ Deno.serve(withApiLogging(
   // Answers success:false, NOT success:true. Report a deliberate no-op and a completed
   // refresh with the same response and a switched-off module reports healthy every hour,
   // indefinitely.
+  // Deliberately still HTTP 200: a skip is not a server error and must not burn the error
+  // budget, and 204 is not available because it forbids a response body.
   if (!(await isModuleEnabled(moduleSupabaseClient(), spec.module))) {
     console.log(`⏸️ ${spec.module} disabled — skipping ${task}`);
     return json({ success: false, task, skipped: 'module_disabled', module: spec.module,

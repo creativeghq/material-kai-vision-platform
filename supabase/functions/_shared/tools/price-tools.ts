@@ -67,7 +67,7 @@ async function loadCustomerDiscount(
       // pentest #250: "service-role client + trust a body-supplied id". Without this filter,
       // workspace A could pass a workspace B company UUID and get back B's name,
       // `discount_percent` and `discount_notes` — and A's pricing guidance was then computed
-      // from B's discount. Returning null on a mismatch is the 404-not-403 rule: it is
+      // from B's discount.
       .eq('workspace_id', workspaceId)
       .maybeSingle();
     if (!data) return null;

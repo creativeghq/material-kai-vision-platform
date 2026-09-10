@@ -442,7 +442,7 @@ describe('the anonymous starters payload carries every column the client reads',
   // client but not to that list fails in total silence — which is exactly what happened when
   // is_schedule and option_key shipped: hardware counts rendered as on/off switches, and
   // `opt_gola` was never published, so every gola line's formula failed and fell back to its
-  // default quantity of 0. No error, no empty result, just four fittings that quietly stopped
+  // default quantity of 0.
   const CLIENT = readFileSync('src/utils/blueprintCompute.ts', 'utf8');
 
   const columnsClientReads = Array.from(new Set(

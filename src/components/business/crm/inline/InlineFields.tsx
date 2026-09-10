@@ -368,7 +368,7 @@ interface InlineSelectProps {
  * box appears automatically once the list reaches `searchThreshold` options; short
  * lists stay a plain click-list. In view mode the trigger is borderless and reads
  * like text, with the chevron fading in on hover; `alwaysEdit` (create form) shows
- * a normal bordered control. Picking is a single closure (no reliance on cmdk's
+ * a normal bordered control.
  */
 export const InlineSelect: React.FC<InlineSelectProps> = ({
   value, onSave, options, label, hint, placeholder = 'Not set', displayValue, copyValue, alwaysEdit, searchThreshold = 6,

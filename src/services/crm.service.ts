@@ -723,7 +723,14 @@ export function formatAddressLine(a: AddressLike): string {
 }
 
 export const addressUnitsAPI = {
-  /** List the sub-units of a company OR contact (pass exactly one id). */
+  /**
+   * List the sub-units of a company OR contact (pass exactly one id).
+   * Read goes through the supabase client (table RLS = is_workspace_member), NOT the
+   * crm-api edge function: that function gates address-units to admin/factory, which is
+   * correct for writes but too strict for this read — the sub-unit picker is mounted in
+   * the project/quote client flows used by non-admin workspace members, where the strict
+   * gate produced a benign-but-noisy "Access denied" and hid the picker.
+   */
   async list(parent: { companyId?: string; contactId?: string }): Promise<AddressUnit[]> {
     let query = (supabase as any).from('crm_address_units').select('*');
     if (parent.companyId) query = query.eq('company_id', parent.companyId);

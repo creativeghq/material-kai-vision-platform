@@ -113,10 +113,7 @@ export async function handlePlan(req: Request, body: any): Promise<Response> {
 
     // Presence is not shape — the same lesson analyze.ts and write.ts already carry, and this
     // handler was the one that had not learned it. `buildPlanningUserPrompt` dereferences
-    // `research.contentGapOpportunities.slice(...)` and eight other fields directly, so a
-    // `keyword_research` that is a string (the tool's zod schema is `z.any()`, so anything the
-    // model sends arrives intact) threw `Cannot read properties of undefined (reading 'slice')`
-    // and surfaced as a 500 on a request that was merely malformed — AFTER the credits were
+    // `research.contentGapOpportunities.slice(...
     const research = body.keyword_research;
     if (typeof research !== 'object' || research === null || Array.isArray(research)) {
       return jsonResponse(

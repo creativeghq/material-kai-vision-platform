@@ -125,9 +125,7 @@ export async function generateStandardEmbedding(
       // POST the MIVAA ROUTE, not the gateway envelope. This used to send
       // `{action:'generate_embedding'}` to `${gatewayUrl}/api/mivaa/gateway` — but
       // `/api/mivaa/gateway` is the shape of the SUPABASE EDGE proxy, not a path MIVAA
-      // serves, and `generate_embedding` is not in that proxy's action map either. So the
-      // call 404'd on every attempt, from every caller, since it was written: agent
-      // long-term memory recall silently degraded to its recency fallback on every turn
+      // serves, and `generate_embedding` is not in that proxy's action map either.
       const response = await fetch(`${MIVAA_CONFIG.gatewayUrl}/api/embeddings/clip-text`, {
         method: 'POST',
         headers: {

@@ -1147,17 +1147,11 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
                       </div>
                     )}
                     {/*
-                      The period's closing position, NAMED — the same callout the printed Καρτέλα
-                      ends with, which until now existed only on the print. The Totals row above
-                      finishes with a bare signed number, so −€3,000.00 only read as "in their
-                      favour" if you already knew the sign convention.
-
-                      The direction word comes from `netPositionDirection`, shared with the account
-                      tiles and the print, so all three phrase one position identically — and none
-                      of them can drift back to "owes us" without the guard test failing. English
-                      only here: the print stays bilingual because a Καρτέλα is read by an
-                      accountant, but the app is English-default.
-                    */}
+                      * The period's closing position, NAMED — the same callout the printed Καρτέλα
+                      * ends with, which until now existed only on the print. The Totals row above
+                      * finishes with a bare signed number, so −€3,000.00 only read as "in their
+                      * favour" if you already knew the sign convention.
+                      */}
                     {!ledgerLoading && (
                       <div className="flex flex-wrap items-baseline justify-end gap-x-2 gap-y-0.5 border-t border-border/60 px-3 py-2">
                         <span className="text-xs text-muted-foreground">

@@ -99,7 +99,7 @@ describe('platform defaults — tenant surface', () => {
     // optimistic `setRows({ enabled, muted })` built from the local guess is a second copy of the
     // rule, and it fails in the quietest possible way: mute the only channel of an in-app-only
     // default and the row keeps its switch ON while the notification can no longer deliver
-    // anything. A wrong switch position is a valid switch position — nothing raises, and it looks
+    // anything.
     const src = readCode(SECTION);
     const save = src.slice(src.indexOf('const save = async'), src.indexOf('const toggleChannel'));
     expect(save.length, 'could not find the save() writer').toBeGreaterThan(0);

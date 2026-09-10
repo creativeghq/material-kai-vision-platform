@@ -397,7 +397,7 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
       // `project-site/…` precisely because a defect photo of the inside of a client's home was
       // openable by anyone holding the URL. Every internal reader moved with it; THIS one — the
       // client-facing handover list — was left building `getPublicUrl` against the old bucket, so
-      // it emitted URLs for a file that is not there. Not a leak any more: just every snag photo
+      // it emitted URLs for a file that is not there.
       photo_urls: (s.photo_paths || []).map((p: string) => snagPhotoUrls[p]).filter(Boolean),
     }));
 

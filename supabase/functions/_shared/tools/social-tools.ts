@@ -1,7 +1,6 @@
 // Social Media agent toolkit (Hermes). Lets the user list connected social accounts,
 // publish or schedule a post, and read analytics from chat — over the workspace's
 // already-connected accounts (via the zernio-api edge function).
-// DESIGN: read/list uses the service-role client scoped to the caller's workspace;
 
 // deno-lint-ignore-file no-explicit-any
 

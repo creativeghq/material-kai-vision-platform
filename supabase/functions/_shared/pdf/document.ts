@@ -450,8 +450,7 @@ function drawTotals(page: PDFPage, g: Geom, totals: BrandedTotals, y: number, fo
     // `round2(totals.subtotal * cash_discount_pct / 100)` and then `subtotal - discount` — which
     // is a second derivation of a money quantity in TypeScript, on a document that goes to a
     // customer. CLAUDE.md's rule is one derivation per money quantity: SQL derives, TypeScript
-    // formats. A percentage applied here cannot see line-level rounding, per-line discounts, or
-    // anything the invoice itself did, so the PDF could print a discount the ledger disagrees
+    // formats.
     line('Price', formatCurrency(totals.subtotal, cur));
   }
   line(`VAT (${totals.vat_rate}%)`, formatCurrency(totals.vat_amount, cur), false, true);

@@ -7,7 +7,7 @@ import { hasCreds, serviceClient, createUser, createWorkspace, addMember, teardo
 // ON DELETE CASCADE that `delete from workspaces` triggers. Postgres removes the parent row FIRST,
 // so by the time the child trigger ran `is_workspace_writable()` found no workspace and coalesced
 // the missing row to false: "already deleted" was indistinguishable from "disabled" and the guard
-// aborted its own cascade. Any workspace holding a single order became undeletable — offboarding
+// aborted its own cascade.
 const suite = hasCreds ? describe : describe.skip;
 
 suite('workspace delete · cascade past the disabled-workspace guard', () => {

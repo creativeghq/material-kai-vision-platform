@@ -142,7 +142,7 @@ Deno.serve(withApiLogging('catalog-translate-pdf', async (req) => {
     // unauthorized caller still burns the credits (invariant 10). `source_pdf_id` reaches a
     // download from the private `pdf-documents` bucket; `target_catalog_id` reaches an UPDATE of
     // someone else's catalog body. Both answer 404 rather than 403, so neither id can be
-    // enumerated. Level 'secret' is the backend caller and is exempt by design — it supplies
+    // enumerated.
     const { data: targetCatalog } = await supabase
       .from('presentation_catalogs')
       .select('id, workspace_id')

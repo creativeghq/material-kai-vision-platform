@@ -457,10 +457,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
       {type === 'payments' && canOperateFinance && (
         // Two directions of money, one action each: money in is a payment, money out is an
         // expense. "Add expense" opens the SAME dialog as the Expenses tab — it books the
-        // cost and (Paid now, on by default) the cash going out in one step. It used to open
-        // the payment form on a settle-only branch, which could pay an expense but never
-        // record one, so the label described something the form could not do — and it
-        // dead-ended ("nothing to pay") for the ordinary case where the bill doesn't exist
+        // cost and (Paid now, on by default) the cash going out in one step.
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             {/* The chevron is the only thing telling you this opens a choice rather than the

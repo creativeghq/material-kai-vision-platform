@@ -19,7 +19,7 @@ const RESET_CONFIRM_PHRASE = 'RESET PLATFORM';
 // any cleared table (discovered dynamically via the reset_lock_aware_tables
 // RPC). Lockable tables today are flows + facet_canonical_values (both already
 // preserved); the guard is future-proof for anything lockable that later lands
-// in the clear list. Knowledge Base CATEGORIES are preserved in full; KB DOCS
+// in the clear list.
 
 // Tables to clear (in order to respect foreign key constraints).
 // Order matters — delete child tables before parent tables.
@@ -239,9 +239,13 @@ const TABLES_TO_CLEAR = [
   // PRESERVED (not in this list — see header comment for full list):
   // - Knowledge Base (kb_*)
   // - CRM (crm_*)
+  // - Users / Profiles / Workspaces / Credits
+  // - Admin config: system_settings, prompts,
 ];
 
 // NEVER_CLEAR — hard guard against catastrophic future edits.
+// These tables hold legally-retained financial records, secrets, customer
+// API-key state, or long-running customer-facing observational data.
 const NEVER_CLEAR = new Set<string>([
   // Finance / fiscal (legally retained)
   'invoices', 'invoice_items', 'credit_notes', 'credit_note_items',
@@ -301,6 +305,8 @@ const IDLESS_DELETE_COLUMN: Record<string, string> = {
 };
 
 // Storage buckets to clear (AI/processing-generated content only)
+// Post-consolidation: 6 anchor buckets exist. We clear the two
+// that hold regenerable AI/processing output.
 const BUCKETS_TO_CLEAR = ['pdf-tiles', 'generation-images'];
 
 // Path prefixes inside a cleared bucket that hold SETTINGS / BRANDING assets,
@@ -527,6 +533,11 @@ Deno.serve(withApiLogging('reset-platform', async (req) => {
     }
 
     // STEP 1.5: Clean the Knowledge Base — delete UNPROTECTED kb_docs only.
+    // kb_* tables are intentionally NOT in TABLES_TO_CLEAR (their FK/lock model
+    // can't be expressed by the generic neq-delete). Instead we call a helper
+    // that mirrors kb_block_locked_doc_delete()'s effective_locked rule and drops
+    // only docs that are public/unlocked/non-auto-synced (the auto-extracted
+    // catalog docs in the per-material public categories).
     console.log('\n🗑️  STEP 1.5: Clean Knowledge Base (unprotected docs only)');
     results.knowledge_base = { deleted: 0 };
     try {
@@ -545,6 +556,9 @@ Deno.serve(withApiLogging('reset-platform', async (req) => {
     }
 
     // STEP 1.6: Purge ORPHANED Agent Fabric projects (workspace_id IS NULL).
+    // The Agent Fabric persistent layer (agent_projects + its CASCADE children
+    // secrets/deployments/snapshots) is in NEVER_CLEAR so legitimately
+    // workspace-owned, deployed agents + their secrets survive a reset.
     console.log('\n🗑️  STEP 1.6: Purge orphaned Agent Fabric projects (NULL workspace)');
     results.orphan_agent_fabric = [];
     for (const tableName of ['agent_projects']) {
@@ -625,7 +639,6 @@ Deno.serve(withApiLogging('reset-platform', async (req) => {
     const totalStorageDeleted = results.storage.reduce((sum: number, r: any) => sum + (r.deleted || 0), 0);
 
     // STEP 3: TRUNCATE high-volume / id-less tables + ALL VECS collections via RPC.
-    // None of these can go through the PostgREST delete-all path:
     console.log('\n🗑️  STEP 3: TRUNCATE VECS + high-volume/id-less tables (RPC)');
     results.truncated = { tables: [] };
     try {

@@ -789,7 +789,7 @@ async function handlePurchaseOrder(body: Body, admin: any, reader: any): Promise
     // `quantity * unit_cost` whenever `line_total` was null or stale — a second derivation of a
     // money quantity, in the renderer, which is the one place forbidden to derive. After a
     // discount, currency or tax edit that produced a document whose lines did not add up to its
-    // own total, with no error anywhere (#361 `EG-20`). A missing line total is a data defect:
+    // own total, with no error anywhere (#361 `EG-20`).
     lines: items.map((it: any) => {
       if (it.line_total === null || it.line_total === undefined) {
         throw new HttpError(

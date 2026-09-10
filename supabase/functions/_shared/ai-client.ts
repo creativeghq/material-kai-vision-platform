@@ -272,6 +272,9 @@ const DEFAULT_CLAUDE_MODEL = 'claude-opus-5';
 // ── Billing identity for the per-unit models ───────────────────────────────
 // `generation_models.id` values, NOT the provider strings this file passes to the SDKs. They
 // differ, and that is the whole reason these constants exist rather than reusing `modelId`:
+// the KlingAI SDK wants 'kling-v3.0-i2v', Veo's raw API wants 'veo-2.0-generate-001', and
+// xAI's endpoint wants the slug 'grok-imagine-image-quality' — none of which is a key the
+// pricing table knows.
 const MAX_VIDEO_DOWNLOAD_BYTES = 48 * 1024 * 1024;
 
 const VEO_PRICING_MODEL_ID = 'veo-2';
@@ -957,6 +960,10 @@ async function generateMultiImageWithGemini(
       return { inlineData: { mimeType, data: base64 } };
     }
     // URL — fetch and inline, through the shared SSRF guard (invariant 7, #363 `EE-4`).
+    // These URLs arrive from tool calls and stored product/moodboard rows, so this runtime
+    // resolves and fetches a URL on somebody else's say-so. The bare `fetch(img)` this
+    // replaces followed redirects, so a public URL could 302 to 169.254.169.254, and read
+    // the whole body with `arrayBuffer()` before anything looked at its size.
     const { bytes, mimeType } = await fetchImageGuarded(img);
     return { inlineData: { mimeType, data: toBase64(bytes) } };
   };
@@ -1040,7 +1047,7 @@ async function generateMultiImageWithGemini(
     // (output too close to memorised training data) is the common one and it is
     // deterministic per prompt: measured 0 images in 13 attempts for a flat,
     // repeating fabric macro, on both flash and pro, with and without a source
-    // image. Retrying does not help; the prompt has to change. Reporting only
+    // image. Retrying does not help; the prompt has to change.
     const cand = result.candidates?.[0];
     const reason = cand?.finishReason ?? 'unknown';
     const blocked = result.promptFeedback?.blockReason;

@@ -1,4 +1,9 @@
 // Connector registry + per-workspace resolution.
+// MASTER-KEY model: the Novus key belongs to the OPERATOR (master), under their
+// Novus subscription. A Novus account authorizes many issuer VAT numbers, so every
+// sub-tenant transmits THROUGH the master key with their OWN VAT as issuer.vatNumber
+// (the issuer identity comes from the submitting workspace's finance_settings, built
+// in invoice-builder.ts).
 
 import { novusConnector, novusBaseUrl } from './novus.ts';
 import { resolveSecret } from '../secrets.ts';

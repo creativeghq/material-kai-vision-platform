@@ -776,17 +776,7 @@ export default function PropertyWorkbench() {
               </div>
             )}
 
-            {/*
-              ── VR walkthrough (WorldLabs Marble from the cover photo) ──
-
-              `startWalkthrough` is hoisted out of the Create button because RETRY is the same act
-              (#378 F5). `WorldViewer` renders a Retry button only when it is handed `onRetry`, so
-              a host that omits it does not get a disabled button — a failed walkthrough simply
-              offers nothing but "Remove". The agent chat passed it and this page did not.
-
-              Gated on `editable`, deliberately: retrying spends 18 credits, which is why the
-              public listing page must keep withholding it.
-            */}
+            {/* ── VR walkthrough (WorldLabs Marble from the cover photo) ── */}
             <div className="mt-6">
               <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold"><Globe className="h-4 w-4" /> VR walkthrough</h3>
               {property.vr_world_id ? (

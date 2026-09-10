@@ -22,7 +22,7 @@ const MAX_PER_RUN = 60;
  * writes), so checking the 60-keyword cap one at a time needs ~19 minutes, and the
  * edge gateway cuts the request off at 150 s with a 504 `IDLE_TIMEOUT` — well before
  * pg_net's 280 s. A sweep over a 129-keyword set checked TEN, so each keyword came
- * round every ~13 days under a panel that said "checked daily". Nothing raised:
+ * round every ~13 days under a panel that said "checked daily".
  */
 const CONCURRENCY = 12;
 
@@ -326,6 +326,7 @@ async function trackKeywords(
       // land on the same Greek depth-100 tasks — so the shallower ask often answers
       // where three deep ones did not. "Not in the top 50" is a real answer and the row
       // carries the depth that produced it; unknown is not an answer at all.
+      // Nothing was observed — the run simply ended.
       if (e instanceof OutOfTime) return;
       try {
         if (triedShallow) throw e;

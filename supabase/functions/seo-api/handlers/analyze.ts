@@ -388,6 +388,7 @@ export function analyzeContent(
   // ASYMMETRIC ON PURPOSE. Keyword density has not been a positive ranking signal
   // for many years, but stuffing is still a penalty, so the two directions are not
   // mirror images:
+  //   - too LOW  → informational only (`low`, NOT auto-fixable).
   if (primaryDensity < 0.4) {
     fixes.push({
       category: 'keyword_density',
@@ -864,6 +865,8 @@ export function analyzeContent(
   }
 
   // HELPFUL-CONTENT CHECKS (Google "Who / How / Why" self-assessment)
+  // Neither is auto-fixable: both are answered by configuring the content brief,
+  // not by rewriting the draft.
 
   // ── Check 22: Provenance — who wrote this, and is the automation disclosed ──
   const prov = brief?.provenance;

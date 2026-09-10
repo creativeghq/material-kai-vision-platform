@@ -10,9 +10,7 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 
 // Sales/Finance — digest aggregator.
-// Replaces the standalone finance-send-digest function. Invoked via:
-//   - The 'Finance digest' flows row (cron='5 * * * *', single run_edge_function node) → mode='cron'
-//   - The Finance Settings 'Run now' / 'Send test' buttons → mode='now' (admin-auth)
+// Replaces the standalone finance-send-digest function.
 
 interface CronBody { mode: 'cron'; job?: 'digest' | 'followups' }
 interface NowBody {

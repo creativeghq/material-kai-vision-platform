@@ -216,8 +216,7 @@ export async function debitExternalServiceCredits(
       // also what a misconfigured row looks like — `firecrawl-scrape` carried its rate in
       // `cost_per_generation` while `billing_type` said `per_unit`, so `cost_per_unit` read 0
       // and every scrape was free AND unlogged, because this early return sits BEFORE the
-      // ai_usage_logs insert below. The two cases are indistinguishable from here, so say so
-      // rather than pass silently: a free call that should have cost money leaves a trace, and
+      // ai_usage_logs insert below.
       console.warn(
         `[credit-utils] ${serviceName} priced at 0 — charging nothing and writing no usage row. ` +
         `If this service is not actually free, its ai_model_pricing row is misconfigured ` +

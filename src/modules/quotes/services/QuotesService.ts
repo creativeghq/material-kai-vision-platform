@@ -682,6 +682,7 @@ export class QuotesService {
       if (quote?.workspace_id) {
         // Pass the quote's customer so the resolver applies their pricing-level discount.
         // audience='seller' → staff get cost_basis + margin (never exposed to the buyer).
+        // Quantity + unit so `product_price_breaks` can fire (#347 defect 16).
         const breakArgs = customUnit && qtyNow > 0
           ? { p_quantity: qtyNow, p_unit: customUnit }
           : {};

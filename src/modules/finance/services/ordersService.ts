@@ -2063,6 +2063,10 @@ export const ordersService = {
     if (bySup.size === 0) return [];
     // What has been PAID comes from the allocation ledger, not from payments that happen to carry
     // this order_id.
+    // The old query subtracted only payments tagged with BOTH order_id and a matching
+    // counterparty_company_id, so a bill settled from Payables, from the Expenses Inbox, or by
+    // on-account credit was invisible: "you still owe X" and a live Pay button persisted after the
+    // debt was already paid, inviting a second payment.
     const supplierIds = [...bySup.keys()];
     const paid = new Map<string, number>();
 

@@ -2,8 +2,7 @@
  * Manage internal finance categories scoped to one kind (income or expense). Surfaced
  * inline from the Income (invoices/receipts) and Expenses headers so an operator can
  * add / rename / remove the labels used to segment documents ("what / where a payment
- * goes"). Internal only — no ΑΑΔΕ/myDATA classification. A category of a kind applies
- * across every document of that side (invoices + receivable manual entries for income;
+ * goes"). Internal only — no ΑΑΔΕ/myDATA classification.
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Loader2, Plus, Trash2, Pencil, Check, X, Tags } from 'lucide-react';

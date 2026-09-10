@@ -130,6 +130,7 @@ async function step(
 
 // Best-effort teardown. Data first (FK), then memberships, workspaces, users. Never throws —
 // the email-prefix cron is the backstop if anything here fails.
+// It must never throw, but it MUST NOT be silent.
 export async function teardown(svc: SupabaseClient, opts: { wsIds?: string[]; userIds?: string[] }): Promise<void> {
   const explicitWs = (opts.wsIds || []).filter(Boolean);
   const userIds = (opts.userIds || []).filter(Boolean);

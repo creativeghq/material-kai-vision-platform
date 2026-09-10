@@ -316,6 +316,7 @@ class MoodBoardAPI {
   // FKs on moodboard_items.moodboard_id and moodboard_presentation_sheets.moodboard_id
   // are ON DELETE CASCADE, so every child row is removed in one transaction.
   // Storage files (moodboard images in generation-images, sheet PDFs in pdf-documents)
+  // are NOT deleted synchronously — there is no AFTER DELETE storage trigger.
   async deleteMoodBoard(id: string): Promise<void> {
     const { error } = await supabase.from('moodboards').delete().eq('id', id);
 
@@ -466,7 +467,7 @@ class MoodBoardAPI {
   // `generation-images/u/{user_id}/sessions/{conversation_id}/...`, which is
   // prefix-deleted when the originating chat is deleted. To make the image
   // survive that, we COPY the bytes into a moodboard-owned folder
-  // (`u/{user_id}/moodboards/{moodboard_id}/...`, outside any session prefix)
+  // (`u/{user_id}/moodboards/{moodboard_id}/...
   async addMediaFromChat(params: {
     moodboard_id: string;
     source_url: string;

@@ -27,6 +27,8 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 // job_research_sites. Fire-and-forget; if it fails the KB doc body lags by
 // the next refresh tick. We swallow errors silently — the source of truth is
 // the table, not the doc body.
+// Takes NO argument on purpose: `/sites/_resync` has no body and no query string, and the
+// backend re-syncs ALL sections.
 async function _kickSitesKbSync(): Promise<void> {
   try {
     await api('/api/v1/job-research/sites/_resync', { method: 'POST' });

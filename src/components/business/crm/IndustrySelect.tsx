@@ -4,7 +4,7 @@
  * memberships immediately via `setCompanyMembershipsWithinScope` (so it never
  * clobbers the company's other manual category memberships), and mirrors a
  * denormalized comma-joined label onto `crm_companies.industry` so existing
- * list/table readers keep rendering. Operators can add a new industry inline;
+ * list/table readers keep rendering.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { InlineMultiSelect } from '@/components/business/crm/inline/InlineFields';

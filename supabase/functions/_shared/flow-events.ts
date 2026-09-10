@@ -66,7 +66,7 @@ export async function emitAgentEvent(
  * single `user_id` and skips when it's absent, so a workspace event with no
  * per-recipient `user_id` silently delivers nothing. This resolves the recipients
  * and fires one enriched event per recipient (mirrors the `module_access_requested`
- * pattern). `buildData(recipientUserId)` must return the payload including
+ * pattern).
  */
 export async function emitFlowEventToWorkspaceRoles(
   workspaceId: string,

@@ -312,13 +312,14 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
                     <DropdownMenuContent align="end">
                       <DropdownMenuLabel className="text-xs">{Number(r.amount).toFixed(2)} {r.currency} · {PROVIDER_LABEL[r.provider] ?? r.provider}</DropdownMenuLabel>
                       <DropdownMenuSeparator />
-                      {/* `ignored` is how the auto-matcher stamps BOTH legs of an internal pocket
-                          transfer — not `matched` — so these actions stayed offered on money that
-                          never came from outside (#351 D1). Matching the inbound leg to an invoice
-                          of the same amount settles it though no customer paid.
-                          The server refuses it outright now; offering it here anyway would just be
-                          a button that always errors. Un-ignoring first is the deliberate act,
-                          and it is one item down this same menu. */}
+                      {/*
+                        * `ignored` is how the auto-matcher stamps BOTH legs of an internal pocket
+                        * transfer — not `matched` — so these actions stayed offered on money that
+                        * never came from outside (#351 D1). Matching the inbound leg to an invoice
+                        * of the same amount settles it though no customer paid.
+                        * The server refuses it outright now; offering it here anyway would just be
+                        * a button that always errors.
+                        */}
                       {revolut && r.direction === 'in' && r.match_status !== 'matched' && r.match_status !== 'ignored' && (
                         <>
                           <DropdownMenuItem onClick={() => { setPicking({ row: r, kind: 'invoice' }); setPickQuery(''); }}>Match to invoice…</DropdownMenuItem>

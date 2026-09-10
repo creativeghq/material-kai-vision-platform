@@ -150,6 +150,8 @@ export default [
         //   option — inside a <datalist>, `<option value="x" />` is the CORRECT idiom; the browser
         //     renders the value as the suggestion. "Fixing" those by adding label text would have
         //     been wrong, not merely unnecessary.
+        //   td     — a data cell is not a control, and an empty one is ordinary table structure
+        //     (spacers, alignment).
         ignoreElements: ['audio', 'canvas', 'embed', 'input', 'option', 'td', 'textarea', 'tr', 'video'],
         ignoreRoles: [
           'grid', 'listbox', 'menu', 'menubar', 'radiogroup', 'row',

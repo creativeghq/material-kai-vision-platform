@@ -36,6 +36,7 @@ const BINDS_TENANT = [
   // hole — it is the first half of the fix, pulling the owner so the caller can compare it against
   // the JWT. This is the single largest false-positive class (it dropped the finding count by more
   // than a third), and flagging it would train people to ignore the check.
+  // The trade: a site that fetches workspace_id and then never compares it is invisible here.
   /\.select\(\s*['"`][^'"`]*(?:workspace_id|created_by|uploaded_by|owner_id|user_id)/,
 ];
 

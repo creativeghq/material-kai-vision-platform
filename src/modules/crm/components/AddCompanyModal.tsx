@@ -23,7 +23,7 @@ type Role = 'customer' | 'supplier';
  * optionally researches the VAT number via VIES (EU) or ΑΑΔΕ (Greek ΑΦΜ) — the shared
  * `CompanyIdentityLookup`, the same control every other create-a-business surface uses. The
  * fetched identity prefills the create form so it can be reviewed before saving —
- * the row is NOT written here. On continue we navigate to the new-company form
+ * the row is NOT written here.
  */
 export const AddCompanyModal: React.FC<{
   open: boolean;

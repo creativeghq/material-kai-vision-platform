@@ -1,8 +1,6 @@
 // Module entitlement enforcement at the API boundary (the real security line; nav + route
 // guards are UX only). A paid-module edge function calls assertEntitled() after it resolves the
 // target workspace and refuses with a 402 when the workspace doesn't own the module.
-//   const ent = await assertEntitled(supabase, workspaceId, 'sales-finance');
-//   if (!ent.ok) return ent.response;
 import { corsHeaders } from './cors.ts';
 
 export async function isWorkspaceEntitled(

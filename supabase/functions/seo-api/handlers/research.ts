@@ -142,6 +142,10 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
     console.log(`[seo-research] Starting research for "${body.target_keyword}" (user: ${userId})`);
 
     // Run DataForSEO research + mention-monitoring opportunities IN PARALLEL.
+    // The opportunities call hits MIVAA's /opportunities-stateless endpoint,
+    // which fans out to DataForSEO SERP / Labs (PAA, AI Overview, featured
+    // snippet, related searches, top organic, video / news / shopping
+    // carousels, knowledge graph, paid bidders) on the SAME keyword.
     const client = new DataForSEOClient(dfs.login, dfs.password);
     const countryCode = dfsLocationToCountry(locationCode);
     const [research, serpSignals] = await Promise.all([
