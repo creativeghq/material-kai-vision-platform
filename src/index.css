@@ -1696,6 +1696,26 @@ html.light .msg-assistant [class*="border-white"] { border-color: hsl(var(--bord
 html.light .msg-assistant a { color: hsl(var(--primary)); }
 
 /* ============================================================
+   ARTIFACT PAGE — the modal body
+   ------------------------------------------------------------
+   Every artifact renderer draws its own card frame, because in the chat stream that frame is
+   what separated a result from the prose around it. Opened in the artifact modal the same
+   component IS the page, so the frame became a `bg-card` box with a hairline sitting inside a
+   `bg-card` panel — a card in a card, one surface more than the three-surface ladder has, and
+   the reason a three-row result looked like a stray box floating in a large empty sheet.
+
+   Flatten the OUTERMOST frame only (direct children). Anything nested deeper — a table, a
+   sub-panel, a row of chips — is real structure and keeps its own treatment. Un-layered so it
+   beats Tailwind's utilities layer, same as the `.msg-assistant` rules above.
+   ============================================================ */
+.artifact-page > [class*="bg-card"],
+.artifact-page > * > [class*="bg-card"]:only-child {
+  background-color: transparent;
+  border-color: transparent;
+  padding: 0;
+}
+
+/* ============================================================
    BRAND GRADIENT ON PRIMARY FILLS — global
    ------------------------------------------------------------
    Every solid `bg-primary` fill (primary buttons, active tabs,

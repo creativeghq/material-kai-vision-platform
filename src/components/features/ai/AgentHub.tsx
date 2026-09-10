@@ -5735,7 +5735,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       );
     }
     if (message.techRadarData) return <TechRadarFindingsCard data={message.techRadarData} />;
-    if (message.agentResultData) return <AgentResultCard title={message.agentResultData.title} data={message.agentResultData.data} resultType={message.agentResultData.resultType} onAsk={handleCardAsk} access={recordLinkAccess} />;
+    // `hideTitle`: the modal header already renders this exact string — the artifact title comes
+    // from `agentResultData.title` — and the sub-tab renders it a second time. Three copies of
+    // "Records found" above three rows of data.
+    if (message.agentResultData) return <AgentResultCard title={message.agentResultData.title} data={message.agentResultData.data} resultType={message.agentResultData.resultType} onAsk={handleCardAsk} access={recordLinkAccess} hideTitle />;
     return renderDataCardBody(message);
   };
 

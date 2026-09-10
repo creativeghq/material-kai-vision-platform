@@ -452,11 +452,19 @@ function KeyValues({ obj, depth = 0, inline = false }: { obj: any; depth?: numbe
   const entries = Object.entries(obj).filter(([k, v]) => !isPlumbing(k, v));
   if (entries.length === 0) return <span className="text-muted-foreground">Nothing to show</span>;
   return (
-    <div className={inline ? 'flex flex-wrap gap-x-4 gap-y-0.5' : 'space-y-1.5'}>
+    // A definition list is read across, so it is capped rather than stretched: at the artifact
+    // modal's width the `1fr` value column ran to ~900px and every value floated a third of the
+    // screen away from the label naming it. Reading distance, not available space, sets this.
+    <div className={inline ? 'flex flex-wrap gap-x-4 gap-y-0.5' : 'max-w-2xl divide-y divide-hairline'}>
       {entries.map(([k, v]) => (
-        <div key={k} className={inline ? 'text-xs' : 'grid grid-cols-[140px_1fr] gap-2 text-xs items-start'}>
+        <div
+          key={k}
+          className={inline
+            ? 'text-xs'
+            : 'grid grid-cols-[minmax(96px,180px)_1fr] items-start gap-x-4 py-1.5 text-xs first:pt-0 last:pb-0'}
+        >
           <span className="text-muted-foreground">{labelize(k)}{inline ? ': ' : ''}</span>
-          <div className="text-foreground"><Value v={v} depth={depth} listKey={k} /></div>
+          <div className="min-w-0 text-foreground"><Value v={v} depth={depth} listKey={k} /></div>
         </div>
       ))}
     </div>
@@ -488,7 +496,15 @@ export const AgentResultCard: React.FC<{
    * it, because a silently link-less card is exactly the "offered but not bound" shape that hides.
    */
   access?: RecordLinkAccess;
-}> = ({ title, data: rawData, resultType, onAsk, access }) => {
+  /**
+   * The surface already names this result, so the card should not name it again.
+   *
+   * True in the artifact modal, whose header renders the very same string — `getCanvasArtifact`
+   * takes the artifact title from `agentResultData.title`, which is this prop. Opened there, the
+   * title appeared THREE times: the modal header, the sub-tab, and this line.
+   */
+  hideTitle?: boolean;
+}> = ({ title, data: rawData, resultType, onAsk, access, hideTitle }) => {
   // A chunk that wraps its whole answer in one `data` key — `{data: {count: 6, expenses: […]}}`,
   // which is what half the tools emit — used to render as a field LABELLED "Data" with the real
   // answer nested inside it: the shape of the JSON showing through as a heading, exactly the leak
@@ -563,7 +579,7 @@ export const AgentResultCard: React.FC<{
   return (
     <RecordLinkContext.Provider value={linkCtx}>
     <div className="bg-card text-card-foreground rounded-xl p-4 border border-border">
-      <div className="text-xs text-muted-foreground mb-2">{title}</div>
+      {!hideTitle && <div className="text-xs text-muted-foreground mb-2">{title}</div>}
       {/*
         A payload that is just a wrapper around one list — `{ flows: [...] }`, `{ deals: [...] }` —
         renders the table directly. Otherwise the card reads "Workspace flows" and then, one line

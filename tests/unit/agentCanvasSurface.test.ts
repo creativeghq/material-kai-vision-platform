@@ -230,6 +230,33 @@ describe('there is one chat and no second layout', () => {
     expect(canvas).toMatch(/open=\{Boolean\(group\)\}/);
   });
 
+  it('the modal is the size of the thing in it', () => {
+    // `h-[92dvh]` made every artifact the same height, so a result with three key/value rows
+    // opened as ~130px of content above 800px of empty cream. A tall artifact still hits the
+    // cap and behaves identically; a small one shrinks to fit.
+    // Lookbehind, because `\bh-\[92dvh\]` also matches inside `max-h-[92dvh]` — the boundary
+    // sits between the `-` and the `h`, so the assertion failed on the fix for it.
+    expect(canvas, 'a fixed height gives every artifact the same empty sheet')
+      .not.toMatch(/(?<!max-)h-\[92dvh\]/);
+    expect(canvas).toMatch(/max-h-\[92dvh\]/);
+  });
+
+  it('the artifact is ONE surface, not a card inside a card', () => {
+    // Every renderer draws its own frame because in the chat that frame separated a result from
+    // the prose around it. In the modal the artifact IS the page, so the frame was a `bg-card`
+    // box with a hairline inside a `bg-card` panel — one surface more than the ladder has.
+    expect(canvas, 'the modal body must flatten the renderer’s own frame')
+      .toContain('artifact-page');
+    const css = read('src/index.css');
+    expect(css, 'the .artifact-page rule is gone — the double frame is back')
+      .toMatch(/\.artifact-page > \[class\*="bg-card"\]/);
+  });
+
+  it('the title is not printed three times', () => {
+    // The modal header, the sub-tab and the card all rendered `agentResultData.title`.
+    expect(hub).toMatch(/access=\{recordLinkAccess\} hideTitle/);
+  });
+
   it('the panel holds its height and the BODY scrolls', () => {
     // DialogContent puts `overflow-y-auto` on itself as a mobile-safety floor for content-sized
     // dialogs. On a fixed-height workspace that scrolls the header and the sub-tabs off the top

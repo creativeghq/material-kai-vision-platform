@@ -300,24 +300,35 @@ export const ArtifactModal: React.FC<ArtifactModalProps> = ({
     <Dialog open={Boolean(group)} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent
         className={cn(
-          'flex h-[92dvh] w-[96vw] max-w-6xl flex-col gap-0 overflow-hidden p-0',
+          /**
+           * MAX height, not a fixed one.
+           *
+           * `h-[92dvh]` made every artifact the same height, so a result with three key/value
+           * rows opened as ~130px of content above 800px of empty cream. A tall artifact still
+           * hits the cap and behaves exactly as before — header and sub-tabs pinned, body
+           * scrolling — but a small one is now the size of the thing in it.
+           */
+          'flex max-h-[92dvh] w-[96vw] max-w-5xl flex-col gap-0 overflow-hidden p-0',
           // Full-bleed on a phone: an artifact wants the screen.
-          'max-sm:h-[100dvh] max-sm:w-full max-sm:max-w-none max-sm:rounded-none',
+          'max-sm:max-h-[100dvh] max-sm:w-full max-sm:max-w-none max-sm:rounded-none',
         )}
         // The header carries its own controls on one line; the primitive's floating X would
         // land on top of them.
         hideClose
       >
         {/* Header — what this is, and the ways out of it */}
-        <div className="flex h-[52px] shrink-0 items-center gap-2 border-b border-hairline px-3 sm:px-4">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-surface-sunken text-primary">
-            <Icon className="h-4 w-4" />
+        <div className="flex h-14 shrink-0 items-center gap-3 border-b border-hairline px-4 sm:px-5">
+          {/* Accent-tinted, matching the card in the chat this was opened from — `surface-sunken`
+              on `card` is two barely-different creams on the light themes, so the tile read as an
+              empty square. */}
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm bg-primary/10 text-primary">
+            <Icon className="h-[18px] w-[18px]" />
           </span>
           <div className="min-w-0 flex-1">
-            <DialogTitle className="truncate text-sm font-semibold leading-tight">
+            <DialogTitle className="truncate text-sm font-semibold leading-snug">
               {active?.title ?? 'Canvas'}
             </DialogTitle>
-            <DialogDescription className="truncate text-[11px] leading-tight">
+            <DialogDescription className="truncate text-[11px] leading-snug">
               {active ? KIND_LABEL[active.kind] : 'Nothing open'}
             </DialogDescription>
           </div>
@@ -382,15 +393,22 @@ export const ArtifactModal: React.FC<ArtifactModalProps> = ({
                     )}
                   >
                     <MemberIcon className="h-3 w-3 shrink-0" />
-                    <span className="max-w-[130px] truncate">{m.title}</span>
+                    {/* 130px cut "CREATIVEG LTD — registration number, and status of the six
+                        invoices" down to "CREATIVEG LTD — r…", which names nothing. The strip
+                        scrolls, so it can afford the room. */}
+                    <span className="max-w-[220px] truncate">{m.title}</span>
                   </button>
+                  {/* On HOVER only — including on the active tab, which used to keep it visible
+                      and so put a permanent `···` in the strip that read as a third tab. Touch
+                      has no hover and needs no fallback here: the header carries the same menu
+                      for whichever artifact is active, which is the one a tap can address. */}
                   {m.kind !== 'run' && (
                     <ArtifactMenu
                       id={m.id}
                       title={m.title}
                       onCloseArtifact={onCloseArtifact}
                       onDeleteArtifact={onDeleteArtifact}
-                      className={cn('h-5 w-5', isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100')}
+                      className="h-5 w-5 opacity-0 focus-visible:opacity-100 group-hover:opacity-100 max-lg:hidden"
                       iconClassName="h-3 w-3"
                     />
                   )}
@@ -404,7 +422,12 @@ export const ArtifactModal: React.FC<ArtifactModalProps> = ({
             instead of being dropped — on a phone it is the only way to reach an artifact's
             details and actions. */}
         <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-          <div className="min-h-0 flex-1 overflow-auto p-3 sm:p-6 custom-scrollbar">
+          {/* `artifact-page` flattens the card frame each renderer draws for the chat. In the
+              chat that frame is what separates a result from the prose around it; here the
+              artifact IS the page, so it was a same-colour box with a hairline sitting inside a
+              same-colour panel — a card in a card, which is one surface more than the ladder
+              has. One rule rather than a prop on fifteen renderers. */}
+          <div className="artifact-page min-h-0 flex-1 overflow-auto p-4 sm:p-6 custom-scrollbar">
             {children}
           </div>
           {inspector && (
@@ -423,7 +446,7 @@ export const ArtifactModal: React.FC<ArtifactModalProps> = ({
         {/* Ask about what is open. See `onAsk` — this is the capability the docked pane had and
             a modal otherwise takes away, not a second composer. */}
         {onAsk && (
-          <div className="flex shrink-0 items-center gap-2 border-t border-hairline bg-surface-sunken px-3 py-2 sm:px-4">
+          <div className="flex shrink-0 items-center gap-2 border-t border-hairline bg-surface-sunken px-4 py-2.5 sm:px-5">
             <input
               value={ask}
               onChange={(e) => setAsk(e.target.value)}
