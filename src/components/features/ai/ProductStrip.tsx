@@ -5,7 +5,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { getOptimizedImageUrl } from '@/utils/imageUrl';
-import { Package } from 'lucide-react';
+import { Package, Replace, Pin, Boxes, Video, Box } from 'lucide-react';
 import { Badge } from '@/components/core/ui/badge';
 import { Product } from '@/components/features/products/types';
 import ProductDetailModal from '@/components/features/products/ProductDetailModal';
@@ -18,17 +18,58 @@ import { onEnterOrSpace } from '@/utils/a11y';
 interface ProductStripProps {
   products: Product[];
   title?: string;
+  /**
+   * Per-product actions. All optional; each renders a control only when it is passed, so a
+   * surface that cannot do the thing does not offer it.
+   *
+   * `onReplaceInImage` and `onPinMaterial` were declared here and NEVER DESTRUCTURED — the
+   * canvas has been passing both for as long as it has drawn this component, and neither has
+   * ever done anything. A prop a component accepts and ignores is the offered-vs-bound shape:
+   * the call site reads as wired, the button is simply absent, and nothing fails.
+   *
+   * The three generate actions came back with the artifact modal. They lived only in
+   * `DemoAgentResults`, which the chat stream rendered when the canvas pane was HIDDEN — i.e.
+   * almost never, since the pane was open by default — so a materials search has effectively
+   * never offered them. Collapsing the stream onto one renderer made that permanent, which is
+   * what surfaced it.
+   */
   onReplaceInImage?: (product: Product) => void;
   onPinMaterial?: (product: { id: string; name: string; imageUrl?: string }) => void;
+  onGenerateVR?: (imageUrl: string, context: { prompt?: string; roomType?: string; style?: string }) => void;
+  onGenerateVideo?: (imageUrl: string) => void;
+  onUseIn3DScene?: (imageUrl: string, productName: string) => void;
 }
 
 type ViewerPrice = { price: number | null; discount_pct: number; currency: string };
 
 const sym = (c: string) => (c === 'EUR' ? '€' : c === 'USD' ? '$' : c === 'GBP' ? '£' : `${c} `);
 
+/** One per-product action. Small, quiet, and it never opens the card it sits inside. */
+const ProductAction: React.FC<{
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  onClick: () => void;
+}> = ({ label, icon: Icon, onClick }) => (
+  <button
+    type="button"
+    title={label}
+    onClick={(e) => { e.stopPropagation(); onClick(); }}
+    onKeyDown={(e) => e.stopPropagation()}
+    className="inline-flex items-center gap-1 rounded-sm border border-hairline bg-surface-sunken px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
+  >
+    <Icon className="h-3 w-3" />
+    {label}
+  </button>
+);
+
 export const ProductStrip: React.FC<ProductStripProps> = ({
   products,
   title = 'Related Products',
+  onReplaceInImage,
+  onPinMaterial,
+  onGenerateVR,
+  onGenerateVideo,
+  onUseIn3DScene,
 }) => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -139,6 +180,42 @@ export const ProductStrip: React.FC<ProductStripProps> = ({
                     </p>
                   );
                 })()}
+                {/* Actions. `stopPropagation` on every one: the whole card is a button that
+                    opens the detail modal, so without it each action also opens the modal it
+                    was meant to act instead of. */}
+                {(onReplaceInImage || onPinMaterial || onGenerateVR || onGenerateVideo || onUseIn3DScene) && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {onReplaceInImage && (
+                      <ProductAction label="Replace in image" icon={Replace} onClick={() => onReplaceInImage(product)} />
+                    )}
+                    {onPinMaterial && (
+                      <ProductAction
+                        label="Pin"
+                        icon={Pin}
+                        onClick={() => onPinMaterial({ id: product.id, name: product.name, imageUrl: primaryImage?.url })}
+                      />
+                    )}
+                    {/* The three generate actions need a picture to work from; a product with
+                        no image would hand the model an empty URL. */}
+                    {onGenerateVR && primaryImage?.url && (
+                      <ProductAction
+                        label="VR"
+                        icon={Boxes}
+                        onClick={() => onGenerateVR(primaryImage.url, { prompt: product.name })}
+                      />
+                    )}
+                    {onGenerateVideo && primaryImage?.url && (
+                      <ProductAction label="Video" icon={Video} onClick={() => onGenerateVideo(primaryImage.url)} />
+                    )}
+                    {onUseIn3DScene && primaryImage?.url && (
+                      <ProductAction
+                        label="3D scene"
+                        icon={Box}
+                        onClick={() => onUseIn3DScene(primaryImage.url, product.name)}
+                      />
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           );

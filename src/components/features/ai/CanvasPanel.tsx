@@ -255,15 +255,24 @@ export const ArtifactModal: React.FC<ArtifactModalProps> = ({
   const [inspectorOpen, setInspectorOpen] = React.useState(true);
   const [ask, setAsk] = React.useState('');
 
+  // An abandoned sentence belongs to the artifact it was typed about. This component stays
+  // mounted across opens, so without this, text typed about one result reappears in the ask box
+  // of the next one — and it is one keypress from being sent about the wrong thing.
+  React.useEffect(() => { setAsk(''); }, [activeId]);
+
   const submitAsk = () => {
     const text = ask.trim();
     if (!text || !onAsk) return;
     setAsk('');
+    // NAME what is open. `handleCardAsk` sends the sentence as an ordinary message, and the
+    // agent reads it against the end of the conversation — so "is this priced right?" asked
+    // about a quote reopened from six turns ago gets answered about the latest turn instead.
+    const about = active ? `${KIND_LABEL[active.kind]} “${active.title}”` : 'this result';
     // Close FIRST: the answer lands in the conversation, and a modal left over it would hide
     // the thing the user just asked for. If the turn produces an artifact, the modal comes back
     // on that one by itself.
     onClose();
-    onAsk(text);
+    onAsk(`About the ${about}: ${text}`);
   };
 
   return (

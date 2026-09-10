@@ -4628,8 +4628,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     if (m.generation_job) return { id: m.id, kind: 'render', title: m.generation_job.room_type ? `Room · ${m.generation_job.room_type}` : 'Room generation' };
     if (m.worldData) return { id: m.id, kind: 'world', title: m.worldData.caption || m.worldData.prompt || 'VR world' };
     if (m.materialsBoardData) return { id: m.id, kind: 'board', title: 'Materials board' };
-    if (m.geminiImageData) return { id: m.id, kind: 'image', title: 'Generated image' };
+    // Video WINS when a message carries both. `renderCanvasArtifact` draws a `<video>` for a
+    // gemini message that also has `videoData` — the image was animated — so naming it
+    // "Generated image" put a still-image chip on a clip. The deleted inline branch handled
+    // that pairing explicitly; the derivation has to.
+    if (m.geminiImageData && !m.videoData) return { id: m.id, kind: 'image', title: 'Generated image' };
     if (m.videoData) return { id: m.id, kind: 'video', title: 'Generated video' };
+    if (m.geminiImageData) return { id: m.id, kind: 'image', title: 'Generated image' };
     if (m.inspirationData) return { id: m.id, kind: 'inspiration', title: m.inspirationData.page_title || 'Inspiration board' };
     if (m.techRadarData) return { id: m.id, kind: 'radar', title: 'Tech radar' };
     if (m.agentResultData) return { id: m.id, kind: 'result', title: m.agentResultData.title || 'Result' };
@@ -4760,6 +4765,23 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     [canvasGroups],
   );
 
+  /**
+   * What the conversation has actually PRODUCED — runs excluded.
+   *
+   * `canvasArtifacts` carries a `run:` member for every turn, because the modal has to be able
+   * to land on one. Counting those as artifacts made a conversation of pure prose announce
+   * "Artifacts 3" and offer a menu of "How it ran" entries — the exact state the header control
+   * exists to stay out of. A run is reached from its line in the stream, not from this list.
+   */
+  const producedArtifacts = useMemo(
+    () => canvasArtifacts.filter((a) => a.kind !== 'run'),
+    [canvasArtifacts],
+  );
+  const producedGroups = useMemo(
+    () => canvasGroups.filter((g) => g.members.some((m) => m.kind !== 'run')),
+    [canvasGroups],
+  );
+
   // Close an artifact from this conversation's view. The saved entry is untouched.
   const handleCloseArtifact = useCallback((id: string) => {
     setHiddenArtifactIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
@@ -4833,6 +4855,12 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const yieldedRunsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     for (const run of displayRuns) {
+      // WAIT FOR THE TURN TO FINISH. Opening on the first artifact a stream emits gets two
+      // things wrong at once: "generate an SEO article" would open on the research card and,
+      // being once-per-run, never advance to the article — and a Radix dialog makes what is
+      // behind it inert, so a modal thrown up mid-turn hides every later message, silences the
+      // composer, and covers an approve/decline gate for the rest of the run.
+      if (run.status === 'running') continue;
       if (yieldedRunsRef.current.has(run.run_id)) continue;
       const group = canvasGroups.find((g) => g.members.some((m) => m.id === `run:${run.run_id}`));
       const produced = group?.members.filter((m) => m.kind !== 'run') ?? [];
@@ -5555,6 +5583,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               setPendingReplacement({ id: product.id, name: product.name, imageUrl: primaryImage?.url });
             }}
             onPinMaterial={selectedAgent === 'interior-designer' ? handlePinMaterial : undefined}
+            // The three generate actions a materials search used to reach only through
+            // `DemoAgentResults`, which the stream drew when the canvas pane was hidden — so in
+            // practice never, the pane being open by default. They belong on the product, and
+            // this is the surface that shows products.
+            onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
+            onGenerateVideo={(imageUrl) => handleGenerateVideo(imageUrl, message)}
+            onUseIn3DScene={handleUseProductIn3DScene}
           />
         </div>
       );
@@ -5973,7 +6008,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               `canvasGroups` the modal draws from rather than keeping its own idea of what
               exists. Hidden entirely when the conversation has produced nothing, which is the
               common case and used to render as a "Canvas" button leading to welcome copy. */}
-          {canvasArtifacts.length > 0 && (
+          {producedArtifacts.length > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -5993,12 +6028,12 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                         : 'bg-primary/20',
                     )}
                   >
-                    {canvasArtifacts.length}
+                    {producedArtifacts.length}
                   </span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-72">
-                {canvasGroups.map((g) => {
+                {producedGroups.map((g) => {
                   const lead = g.members[g.members.length - 1];
                   const GroupIcon = artifactKindIcon(lead.kind);
                   return (
@@ -6067,39 +6102,38 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               Without this rendered above the empty/non-empty branch, booting
               a workflow locally would update state but show nothing because
               the empty state still wins until the first message arrives. */}
-          {/* The run LINE — "the other line that shows details of generations". It stays, and
-              it is now the only thing a working turn puts on screen: one line saying what is
-              happening, one click from the full run page.
+          {/* The run LINE while work is HAPPENING — "the other line that shows details of
+              generations". Pinned above the stream because it is about right now.
 
-              Shown while a run is working, and afterwards only if TOOLS ACTUALLY RAN. A turn
-              that answered in prose has an empty step list, and announcing "Ran 0 tools" under
-              every reply is the thing this rebuild set out to remove — the pane used to give
-              that turn a whole tab. */}
-          {(() => {
-            const worthShowing = displayRuns.filter(
-              (r) => r.status === 'running' || r.step_order.length > 0,
-            );
-            if (worthShowing.length === 0) return null;
-            return (
-              <div className="space-y-2">
-                {worthShowing.map((run) => (
-                  <RunChip
-                    key={`chip-${run.run_id}`}
-                    run={run}
-                    active={activeCanvasId === `run:${run.run_id}`}
-                    onOpen={() => focusCanvas(`run:${run.run_id}`)}
-                  />
-                ))}
-              </div>
-            );
-          })()}
+              A FINISHED run's line renders with its own turn instead (below, under the user
+              message that started it): left here it would detach from its turn and the strip
+              would grow by one every message, so a long conversation opens on a stack of
+              finished checklists. */}
+          {displayRuns.some((r) => r.status === 'running') && (
+            <div className="space-y-2">
+              {displayRuns.filter((r) => r.status === 'running').map((run) => (
+                <RunChip
+                  key={`chip-${run.run_id}`}
+                  run={run}
+                  active={activeCanvasId === `run:${run.run_id}`}
+                  onOpen={() => focusCanvas(`run:${run.run_id}`)}
+                />
+              ))}
+            </div>
+          )}
 
-          {/* A workflow that is ASKING renders its form in the stream, where the user is. It
-              used to render here only when the canvas pane was hidden, because the open pane
-              carried the same form in `RunCanvas`'s `formSlot`. The modal still does — so this
-              skips a workflow whose run is open, which is the one case that would draw the same
-              form twice. */}
-          {Object.values(workflows)
+          {/* A workflow booted on an EMPTY chat — "Build my first catalog" — renders its ask
+              here, because the empty state below wins until the first message arrives and the
+              wizard would otherwise update state and show nothing.
+
+              Only while the chat is empty. Once there are messages the `WorkflowTracker` below
+              carries the same ask in its `bottomSlot`, and both at once is two identical forms
+              on screen, each auto-sending the same continuation. That pairing used to be
+              unreachable in practice because the canvas pane was open by default and this
+              branch only ran when it was hidden; making the chat the only surface made it the
+              default. Also skipped for a workflow the modal is holding, which draws the same
+              form a third way in `RunCanvas`'s `formSlot`. */}
+          {visibleMessages.length === 0 && Object.values(workflows)
             .filter((wf) => wf.status !== 'aborted' && wf.status !== 'done')
             .filter((wf) => activeCanvasId !== `run:${wf.run_id}`)
             .map((wf) => (
@@ -6233,8 +6267,29 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 </div>
               )}
               {visibleMessages.map((message) => (
+                <React.Fragment key={message.id}>
+                {/* The FINISHED run's line, under the turn it belongs to.
+                    Pinning it above the stream with the live one would detach it from its turn
+                    and grow the strip by one every message, so a long conversation would open on
+                    a stack of finished checklists. A run with no steps draws nothing: that turn
+                    answered in words, and "Ran 0 tools" under every reply is exactly what this
+                    rebuild set out to remove. */}
+                {(() => {
+                  const run = runsByUserMessage.get(message.id);
+                  if (!run || run.status === 'running' || run.step_order.length === 0) return null;
+                  return (
+                    <div className="flex justify-start">
+                      <div className="w-full max-w-[88%] sm:max-w-[75%]">
+                        <RunChip
+                          run={run}
+                          active={activeCanvasId === `run:${run.run_id}`}
+                          onOpen={() => focusCanvas(`run:${run.run_id}`)}
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
                 <div
-                  key={message.id}
                   className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   {message.role === 'assistant' && (() => {
@@ -6521,6 +6576,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     </div>
                   )}
                 </div>
+                </React.Fragment>
               ))}
 
               {/* Loading/Thinking Animation - Reasoning Trace Style */}

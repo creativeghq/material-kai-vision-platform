@@ -312,7 +312,13 @@ describe('the run is wired to the stream and to the canvas', () => {
   it('a turn that only produced PROSE puts nothing in the chat and opens nothing', () => {
     // The whole point of the rebuild. A run with no steps is a turn that answered in words;
     // announcing "Ran 0 tools" under every reply is what the canvas pane did with a whole tab.
-    expect(hub).toMatch(/r\.status === 'running' \|\| r\.step_order\.length > 0/);
+    expect(hub).toMatch(/run\.status === 'running' \|\| run\.step_order\.length === 0\) return null/);
+  });
+
+  it('a finished run’s line sits with its own turn, not on a pile above the stream', () => {
+    // Keyed on the user message that started it, so it lands where the work happened. Left on
+    // the pinned strip it would detach from its turn and grow by one every message.
+    expect(hub).toMatch(/runsByUserMessage\.get\(message\.id\)/);
   });
 
   it('an aborted workflow does not take its turn page down with it', () => {

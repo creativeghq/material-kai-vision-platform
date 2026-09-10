@@ -132,10 +132,73 @@ describe('there is one chat and no second layout', () => {
   });
 });
 
+describe('the modal opens on the OUTCOME, and never mid-turn', () => {
+  it('waits for the turn to finish before opening anything', () => {
+    // Opening on the first artifact a stream emits gets two things wrong at once. It is
+    // once-per-run, so "generate an SEO article" would open on the research card and never
+    // advance to the article. And a Radix dialog makes what is behind it inert, so a modal
+    // thrown up mid-turn hides every later message, silences the composer, and covers an
+    // approve/decline gate for the rest of the run.
+    const yieldEffect = hub.slice(hub.indexOf('const yieldedRunsRef'));
+    const body = yieldEffect.slice(0, yieldEffect.indexOf('}, [canvasGroups'));
+    expect(body, 'the yield must skip a run that is still going').toContain("run.status === 'running'");
+    expect(body.indexOf("run.status === 'running'"))
+      .toBeLessThan(body.indexOf('yieldedRunsRef.current.add'));
+  });
+
+  it('a chip never names one thing and opens another', () => {
+    // `renderCanvasArtifact` draws a <video> for a gemini message that also carries videoData —
+    // the image was animated — so the derivation must not call that "Generated image".
+    const artifact = between(hub, 'const getCanvasArtifact', 'const visibleMessages');
+    expect(artifact).toMatch(/m\.geminiImageData && !m\.videoData/);
+  });
+});
+
 describe('the chat still says what is happening', () => {
   it('the run line survives the rebuild', () => {
     // "We keep the other line that shows details of generations" — this is that line.
     expect(hub).toContain('<RunChip');
+  });
+
+  it('only a RUNNING run is pinned above the stream', () => {
+    // Left pinned after it finishes, the strip grows by one every turn and a long conversation
+    // opens on a stack of finished checklists detached from the turns that made them.
+    expect(hub).toMatch(/displayRuns\.some\(\(r\) => r\.status === 'running'\)/);
+    expect(hub).toMatch(/displayRuns\.filter\(\(r\) => r\.status === 'running'\)/);
+  });
+
+  it('one workflow ask on screen, not two', () => {
+    // The top wizard exists for a workflow booted on an EMPTY chat, where the empty state
+    // would otherwise win. Once there are messages the tracker carries the same ask in its
+    // bottomSlot, and both at once is two identical forms each auto-sending the same
+    // continuation. The pairing was unreachable while the canvas pane was open by default;
+    // making the chat the only surface made it the default.
+    expect(hub).toMatch(/\{visibleMessages\.length === 0 && Object\.values\(workflows\)/);
+  });
+
+  it('the artifacts count excludes runs', () => {
+    // Every send makes a run, and runs are members of `canvasArtifacts` so the modal can land
+    // on one. Counting them made a conversation of pure prose announce "Artifacts 3" and offer
+    // a menu of "How it ran" — the exact state the control exists to stay out of.
+    expect(hub).toMatch(/canvasArtifacts\.filter\(\(a\) => a\.kind !== 'run'\)/);
+    expect(hub).toMatch(/\{producedArtifacts\.length > 0 && \(/);
+    expect(hub).toMatch(/\{producedGroups\.map\(\(g\) => \{/);
+  });
+
+  it('a per-product action a surface passes is a control the surface renders', () => {
+    // `ProductStrip` declared onReplaceInImage and onPinMaterial and never destructured them,
+    // so the canvas had been passing two handlers into nothing for as long as it had drawn the
+    // component. Offered-vs-bound, one component wide: the call site reads as wired and the
+    // button is simply absent.
+    const strip = stripComments(read('src/components/features/ai/ProductStrip.tsx'));
+    const declared = [...strip.matchAll(/^\s{2}(on[A-Z]\w*)\?:/gm)].map((m) => m[1]);
+    expect(declared.length, 'no action props found — re-point this guard').toBeGreaterThan(2);
+    const destructured = between(strip, 'export const ProductStrip', '}) => {');
+    for (const prop of declared) {
+      expect(destructured, `ProductStrip accepts ${prop} and never reads it`).toContain(prop);
+      expect(strip, `ProductStrip reads ${prop} but renders no control for it`)
+        .toContain(`{${prop} &&`);
+    }
   });
 
   it('you can still ask about what you are looking at', () => {
@@ -147,13 +210,20 @@ describe('the chat still says what is happening', () => {
     expect(hub).toMatch(/onAsk=\{handleCardAsk\}/);
     const submit = between(canvas, 'const submitAsk', '};');
     expect(submit, 'the modal must close before it sends, or the answer lands behind it')
-      .toMatch(/onClose\(\);\s*onAsk\(text\);/);
+      .toMatch(/onClose\(\);\s*onAsk\(/);
+    // The sentence goes into the conversation as an ordinary message, read against the END of
+    // it — so "is this priced right?" asked about a quote reopened from six turns ago would be
+    // answered about the latest turn unless the ask names what is open.
+    expect(submit, 'the ask must name the artifact it is about').toContain('About the ${about}');
+    // …and an abandoned sentence belongs to the artifact it was typed about: the component
+    // stays mounted across opens, so it is one keypress from being sent about the wrong thing.
+    expect(canvas).toMatch(/setAsk\(''\); \}, \[activeId\]\)/);
   });
 
   it('the artifacts list is the way back to an earlier result', () => {
     // The tab strip used to be the only way; without it this is, so it must enumerate the same
     // groups the modal draws from rather than keep its own idea of what exists.
-    expect(hub).toMatch(/canvasGroups\.map\(\(g\) => \{/);
+    expect(hub).toMatch(/producedGroups\.map\(\(g\) => \{/);
     expect(hub).toContain('artifactKindLabel(');
   });
 });
