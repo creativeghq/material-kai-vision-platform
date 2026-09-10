@@ -6130,7 +6130,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               would grow by one every message, so a long conversation opens on a stack of
               finished checklists. */}
           {displayRuns.some((r) => r.status === 'running') && (
-            <div className="space-y-2">
+            <div className="max-w-md space-y-2 pl-11">
               {displayRuns.filter((r) => r.status === 'running').map((run) => (
                 <RunChip
                   key={`chip-${run.run_id}`}
@@ -6297,9 +6297,12 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 {(() => {
                   const run = runsByUserMessage.get(message.id);
                   if (!run || run.status === 'running' || run.step_order.length === 0) return null;
+                  // Same shape as the artifact card below: indented past the avatar column, and
+                  // sized to its content. At the bubble's 75% it was a 1400px bar holding one
+                  // line of text.
                   return (
-                    <div className="flex justify-start">
-                      <div className="w-full max-w-[88%] sm:max-w-[75%]">
+                    <div className="flex justify-start pl-11">
+                      <div className="w-full max-w-md">
                         <RunChip
                           run={run}
                           active={activeCanvasId === `run:${run.run_id}`}
@@ -6478,11 +6481,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 {(() => {
                   const card = renderArtifactCard(message);
                   if (!card) return null;
-                  return (
-                    <div className="flex justify-start">
-                      <div className="w-full max-w-[88%] sm:max-w-[75%]">{card}</div>
-                    </div>
-                  );
+                  // Indented past the avatar column so it lines up with the message text rather
+                  // than sticking out to the left of every bubble in the thread: the avatar is
+                  // `w-8` and the row gap is `gap-3`, i.e. 32px + 12px. The card sizes itself —
+                  // a width imposed here is what stretched it into a full-bleed bar.
+                  return <div className="flex justify-start pl-11">{card}</div>;
                 })()}
                 </React.Fragment>
               ))}

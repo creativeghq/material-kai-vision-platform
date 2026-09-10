@@ -142,6 +142,21 @@ const KIND_LABEL: Record<CanvasArtifactKind, string> = {
 export const artifactKindLabel = (kind: CanvasArtifactKind): string => KIND_LABEL[kind];
 export const artifactKindIcon = (kind: CanvasArtifactKind) => KIND_ICON[kind];
 
+/**
+ * Kinds that are WAITING ON THE USER. They are not results — they are the turn asking, and the
+ * turn does not continue until they are answered.
+ *
+ * They shipped looking exactly like a finished result: same grey card, same passive "View". A
+ * question that blocks the conversation cannot be the quietest thing on screen.
+ */
+const PENDING_KINDS = new Set<CanvasArtifactKind>(['clarify', 'confirm']);
+
+/** The verb on the card's button. "View" is right for a result and wrong for a question. */
+const CTA_LABEL: Partial<Record<CanvasArtifactKind, string>> = {
+  clarify: 'Answer',
+  confirm: 'Review',
+};
+
 interface ArtifactMenuProps {
   id: string;
   title: string;
@@ -473,14 +488,28 @@ export const ArtifactCard: React.FC<ArtifactCardProps> = ({ artifact, active, on
   const [previewFailed, setPreviewFailed] = React.useState(false);
   React.useEffect(() => { setPreviewFailed(false); }, [artifact.preview]);
   const showPreview = Boolean(artifact.preview) && !previewFailed;
+  const pending = PENDING_KINDS.has(artifact.kind);
   return (
     <button
       onClick={onOpen}
       aria-label={`Open ${artifact.title}`}
       className={cn(
-        'panel-interactive group flex w-full items-center gap-3 rounded-md border bg-card p-2.5 text-left',
-        'transition-colors',
-        active ? 'border-primary' : 'border-hairline',
+        'panel-interactive group flex items-center gap-3 rounded-md border bg-card p-2.5 text-left transition-colors',
+        /**
+         * SIZED TO ITS CONTENT, not to the conversation.
+         *
+         * This was `w-full` inside a `max-w-[75%]` wrapper, which on a full-width chat is about
+         * 1400px — so a 48px tile and two short lines were stretched into an empty bar with the
+         * action pinned a whole viewport away from the title. A bubble can fill that width
+         * because it is full of text; a card has nothing to fill it with. The preview variant
+         * gets a little more room because it is carrying a picture.
+         */
+        showPreview ? 'w-full max-w-lg' : 'w-full max-w-md',
+        active
+          ? 'border-primary'
+          : pending
+            ? 'border-primary/40'
+            : 'border-hairline',
       )}
     >
       {showPreview ? (
@@ -495,28 +524,35 @@ export const ArtifactCard: React.FC<ArtifactCardProps> = ({ artifact, active, on
           onError={() => setPreviewFailed(true)}
         />
       ) : (
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-sm bg-surface-sunken text-primary">
+        // Accent-tinted, not `surface-sunken`: on the light themes a sunken square on a card is
+        // two barely-different creams, so the tile read as a blank box rather than as an icon.
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-sm bg-primary/10 text-primary">
           <Icon className="h-5 w-5" />
         </span>
       )}
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium text-foreground">{artifact.title}</span>
-        <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-          <Icon className="h-3 w-3 shrink-0" />
+        {/* No second copy of the icon here — the tile beside it is already the icon, and at this
+            width the pair read as two bullets on one card. */}
+        <span className={cn('block truncate text-[11px]', pending ? 'text-primary' : 'text-muted-foreground')}>
           {KIND_LABEL[artifact.kind]}
         </span>
       </span>
-      {/* A named action, not a bare chevron: the card is the only way into the modal now that
-          the tab strip is gone, so it should say what pressing it does. */}
+      {/* A named action, not a bare chevron: the card is the only way into the modal now that the
+          tab strip is gone, so it should say what pressing it does. A PENDING kind gets the solid
+          fill — the turn is waiting on it, and it had been rendering as the quietest thing on the
+          screen next to results nobody has to act on. */}
       <span
         className={cn(
           'flex shrink-0 items-center gap-1 rounded-sm px-2 py-1 text-[11px] font-medium transition-colors',
-          active
-            ? 'bg-primary/10 text-primary'
-            : 'bg-surface-sunken text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary',
+          pending
+            ? 'bg-primary text-primary-foreground'
+            : active
+              ? 'bg-primary/10 text-primary'
+              : 'bg-surface-sunken text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary',
         )}
       >
-        {active ? 'Open' : 'View'}
+        {CTA_LABEL[artifact.kind] ?? (active ? 'Open' : 'View')}
         <ArrowUpRight className="h-3.5 w-3.5" />
       </span>
     </button>

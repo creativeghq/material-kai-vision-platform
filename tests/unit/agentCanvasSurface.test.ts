@@ -129,6 +129,32 @@ describe('an artifact is named once', () => {
       .not.toMatch(/inputRequestData|actionConfirmationData|agentResultData/);
   });
 
+  it('the card sizes itself, and the stream does not stretch it', () => {
+    /**
+     * It shipped as `w-full` inside a `max-w-[75%]` wrapper. On a full-width chat that is about
+     * 1400px, so a 48px tile and two short lines became an empty bar with the action pinned a
+     * whole viewport away from the title. A bubble can carry that width because it is full of
+     * text; a card has nothing to fill it with.
+     */
+    expect(canvas, 'the card must carry its own max width').toMatch(/max-w-lg' : 'w-full max-w-md/);
+    const placement = between(hub, 'const card = renderArtifactCard(message)', '})()}');
+    expect(placement, 'a width imposed by the stream is what stretched it into a bar')
+      .not.toMatch(/max-w-\[88%\]|sm:max-w-\[75%\]/);
+    // …and lined up with the message text rather than sticking out to the left of every bubble.
+    expect(placement).toContain('pl-11');
+  });
+
+  it('a question that BLOCKS the turn does not look like a finished result', () => {
+    // `clarify` and `confirm` are the turn asking, and it does not continue until they are
+    // answered. They shipped as the same grey card with the same passive "View" as a result
+    // nobody has to act on — the quietest thing on screen was the one thing that stops.
+    expect(canvas).toMatch(/PENDING_KINDS = new Set<CanvasArtifactKind>\(\['clarify', 'confirm'\]\)/);
+    expect(canvas, 'a pending card must not read "View"').toMatch(/clarify: 'Answer'/);
+    expect(canvas).toMatch(/confirm: 'Review'/);
+    expect(canvas, 'the pending action needs the solid fill, not the quiet one')
+      .toMatch(/pending\s*\?\s*'bg-primary text-primary-foreground'/);
+  });
+
   it('the card is a panel that is itself the click target', () => {
     // The design system's own answer for a panel you click through on: the border goes to the
     // accent and the ground warms a step, with no translation. Not a bespoke hover here.
