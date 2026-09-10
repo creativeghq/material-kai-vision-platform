@@ -140,8 +140,11 @@ export const InboundDocPreviewDialog: React.FC<{
          [issuer.postal_code, issuer.city].filter(Boolean).join(' ')].filter(Boolean).join(', ')
       : null);
   const activity = issuer?.kad_primary_description ?? issuer?.profession ?? null;
-  const loading = doc.delivery_addresses?.loading;
-  const hasDispatch = !!(doc.dispatch_date || doc.vehicle_number || loading);
+  const loadingAddress = fmtAddress(doc.delivery_addresses?.loading);
+  // Gated on what the strip can PRINT, not on what the payload carries: a <loadingAddress> block
+  // holding nothing but placeholders formats to null, and the strip would otherwise be a bordered
+  // box containing the word "Dispatch" and no dispatch.
+  const hasDispatch = !!(doc.dispatch_date || doc.vehicle_number || loadingAddress);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -202,7 +205,7 @@ export const InboundDocPreviewDialog: React.FC<{
             </span>
             <Fact label="Date" value={doc.dispatch_date ? formatDate(doc.dispatch_date) : null} />
             <Fact label="Vehicle" value={doc.vehicle_number ? <span className="font-mono">{doc.vehicle_number}</span> : null} />
-            <Fact label="From" value={fmtAddress(loading)} />
+            <Fact label="From" value={loadingAddress} />
           </div>
         )}
 
