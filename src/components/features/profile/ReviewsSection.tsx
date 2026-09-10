@@ -1,9 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { Star, MessageSquare, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import {
+  Star, MessageSquare, ChevronDown, ChevronUp, Sparkles,
+  AlertTriangle, ExternalLink, Copy, Check, EyeOff,
+} from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Avatar, AvatarFallback } from '@/components/core/ui/avatar';
+import { Skeleton } from '@/components/core/ui/skeleton';
+import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { supabase } from '@/integrations/supabase/client';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { ReviewModal } from './ReviewModal';
@@ -59,6 +65,9 @@ export const ReviewsSection: React.FC<{
   const [summary, setSummary] = useState<string | null>(null);
   const [stats, setStats] = useState<AggregateStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isPublicProfile, setIsPublicProfile] = useState<boolean | null>(null);
+  const [copied, setCopied] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [myReview, setMyReview] = useState<ProfileReview | null>(null);
@@ -72,8 +81,9 @@ export const ReviewsSection: React.FC<{
 
   const load = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
-    const [{ data: reviewsData }, { data: summaryData }] = await Promise.all([
+    const [{ data: reviewsData, error: reviewsError }, { data: summaryData }] = await Promise.all([
       supabase
         .from('profile_reviews')
         .select('*')
@@ -85,6 +95,16 @@ export const ReviewsSection: React.FC<{
         .eq('user_id', profileUserId)
         .maybeSingle(),
     ]);
+
+    // A read that FAILED is not a profile with no reviews. Rendering the two the same way is
+    // how a broken list reads as a clean one — say which it is (anti-regression rule 3).
+    if (reviewsError) {
+      setLoadError(reviewsError.message || 'The reviews could not be read.');
+      setReviews([]);
+      setStats(null);
+      setSummary(null);
+      return;
+    }
 
     const list = (reviewsData ?? []) as ProfileReview[];
     setReviews(list);
@@ -105,11 +125,27 @@ export const ReviewsSection: React.FC<{
         dimensions[k] = v.sum / v.count;
       });
       setStats({ overall, count: list.length, dimensions });
+    } else {
+      setStats(null);
     }
 
     if (currentUserId) {
       const mine = list.find((r) => r.from_user_id === currentUserId) ?? null;
       setMyReview(mine);
+    }
+
+    // On your OWN reviews with none yet, the reason matters more than the fact: a private
+    // profile is one nobody can open, so no client can leave a review however many you serve.
+    // That is the difference between "share your link" and "you are not reachable".
+    if (isOwn && list.length === 0) {
+      const { data: prof, error: profError } = await supabase
+        .from('user_profiles')
+        .select('is_public')
+        .eq('user_id', profileUserId)
+        .maybeSingle();
+      // No row is not "unknown" — it is a profile that has never been published, which is the
+      // same dead end as a private one. Only a failed READ stays unknown.
+      setIsPublicProfile(profError ? null : (prof?.is_public ?? false));
     }
     } finally {
       // Never leave the section stuck loading on a network/RLS error.
@@ -117,24 +153,132 @@ export const ReviewsSection: React.FC<{
     }
   };
 
-  if (loading) return null;
-  if (reviews.length === 0 && !canReview) return null;
+  const copyProfileLink = () => {
+    navigator.clipboard.writeText(`${window.location.origin}/u/${profileUserId}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const header = !hideHeader ? (
+    <SectionHeader
+      icon={Star}
+      title="Reviews"
+      actions={stats ? (
+        <Badge variant="secondary" className="text-xs font-normal">
+          {stats.count} review{stats.count !== 1 ? 's' : ''}
+        </Badge>
+      ) : undefined}
+    />
+  ) : null;
+
+  if (loading) {
+    return (
+      <section aria-busy="true">
+        {header}
+        <div className="space-y-3">
+          <Skeleton className="h-24 w-full rounded-xl" />
+          <Skeleton className="h-20 w-full rounded-xl" />
+        </div>
+      </section>
+    );
+  }
+
+  // A failed read said nothing at all before this: the section returned `null`, so a broken
+  // query and a profile with no reviews were the same blank panel.
+  if (loadError) {
+    return (
+      <section>
+        {header}
+        <HubEmptyState
+          icon={AlertTriangle}
+          title="Reviews could not be loaded"
+          description={loadError}
+          action={<Button variant="outline" onClick={load}>Try again</Button>}
+        />
+      </section>
+    );
+  }
+
+  if (reviews.length === 0) {
+    return (
+      <section>
+        {header}
+        {canReview ? (
+          <HubEmptyState
+            icon={Star}
+            title="No reviews yet"
+            description="Nobody has reviewed this professional yet. Be the first to say what it was like to work with them."
+            action={(
+              <Button className="gap-2" onClick={() => setModalOpen(true)}>
+                <Star className="h-3.5 w-3.5" />
+                Write a Review
+              </Button>
+            )}
+          />
+        ) : isOwn && isPublicProfile === false ? (
+          <HubEmptyState
+            icon={EyeOff}
+            title="No reviews yet"
+            description="Your profile is private, so nobody can open it to leave a review. Make it public first, then share the link with clients you have worked with."
+            action={(
+              <Button variant="outline" asChild className="gap-2">
+                <Link to="/profile?tab=profile">
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Profile visibility
+                </Link>
+              </Button>
+            )}
+          />
+        ) : isOwn ? (
+          <HubEmptyState
+            icon={Star}
+            title="No reviews yet"
+            description="Reviews are written by clients from your public profile — you cannot add one yourself. Share the link with people you have worked with and their reviews appear here."
+            action={(
+              <>
+                <Button variant="outline" asChild className="gap-2">
+                  <Link to={`/u/${profileUserId}`} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    Preview my profile
+                  </Link>
+                </Button>
+                <Button variant="outline" onClick={copyProfileLink} className="gap-2">
+                  {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                  {copied ? 'Copied!' : 'Copy link'}
+                </Button>
+              </>
+            )}
+          />
+        ) : (
+          <HubEmptyState
+            icon={Star}
+            title="No reviews yet"
+            description="Nobody has reviewed this professional yet. Sign in to be the first."
+            action={(
+              <Button variant="outline" asChild>
+                <Link to="/auth">Sign in to review</Link>
+              </Button>
+            )}
+          />
+        )}
+
+        <ReviewModal
+          open={modalOpen}
+          onOpenChange={setModalOpen}
+          toUserId={profileUserId}
+          services={services}
+          existingReview={myReview}
+          onSaved={() => { setModalOpen(false); load(); }}
+        />
+      </section>
+    );
+  }
 
   const displayed = showAll ? reviews : reviews.slice(0, 3);
 
   return (
     <section>
-      {!hideHeader && (
-        <SectionHeader
-          icon={Star}
-          title="Reviews"
-          actions={stats && (
-            <Badge variant="secondary" className="text-xs font-normal">
-              {stats.count} review{stats.count !== 1 ? 's' : ''}
-            </Badge>
-          )}
-        />
-      )}
+      {header}
 
       {/* Aggregate row */}
       {stats && (
@@ -210,10 +354,6 @@ export const ReviewsSection: React.FC<{
             </button>
           )}
         </div>
-      )}
-
-      {reviews.length === 0 && canReview && (
-        <p className="text-sm text-muted-foreground">No reviews yet. Be the first to leave one.</p>
       )}
 
       <ReviewModal
