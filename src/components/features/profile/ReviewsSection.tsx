@@ -75,9 +75,15 @@ export const ReviewsSection: React.FC<{
   const isOwn = currentUserId === profileUserId;
   const canReview = !!currentUserId && !isOwn;
 
+  // `currentUserId` arrives AFTER the first paint on the public profile page and the Discover
+  // modal (it is `user?.id` off a session that is still resolving), and it decides three things
+  // this load computes: whether the profile is your own, whether the private-profile probe runs,
+  // and which review is yours to edit. Keyed on the id alone, all three froze at their
+  // signed-out values for the rest of the session.
   useEffect(() => {
     load();
-  }, [profileUserId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileUserId, currentUserId]);
 
   const load = async () => {
     setLoading(true);
@@ -147,6 +153,14 @@ export const ReviewsSection: React.FC<{
       // same dead end as a private one. Only a failed READ stays unknown.
       setIsPublicProfile(profError ? null : (prof?.is_public ?? false));
     }
+    } catch (e) {
+      // A rejection (offline, an aborted fetch) never reaches the PostgREST `error` field, so
+      // without this the section would render "nobody has reviewed this professional" on a read
+      // that never happened — the exact thing the error branch above exists to prevent.
+      setLoadError(e instanceof Error ? e.message : 'The reviews could not be read.');
+      setReviews([]);
+      setStats(null);
+      setSummary(null);
     } finally {
       // Never leave the section stuck loading on a network/RLS error.
       setLoading(false);
