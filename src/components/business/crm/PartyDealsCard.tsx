@@ -20,9 +20,15 @@ interface Props {
   workspaceId: string;
   contactId?: string | null;
   companyId?: string | null;
+  /**
+   * The host already carries a panel header saying "Deals". Repeating it inside the body
+   * gives one region two titles, which is what the old micro-heading-inside-a-header-less-Card
+   * shape produced everywhere it was used.
+   */
+  headless?: boolean;
 }
 
-export const PartyDealsCard: React.FC<Props> = ({ workspaceId, contactId, companyId }) => {
+export const PartyDealsCard: React.FC<Props> = ({ workspaceId, contactId, companyId, headless }) => {
   const navigate = useNavigate();
   const [deals, setDeals] = useState<PartyDeal[] | null>(null);
 
@@ -42,10 +48,12 @@ export const PartyDealsCard: React.FC<Props> = ({ workspaceId, contactId, compan
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-        <Kanban className="h-3.5 w-3.5" /> Deals
-        {deals.length > 0 && <span className="opacity-70">· {open.length} open</span>}
-      </div>
+      {!headless && (
+        <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+          <Kanban className="h-3.5 w-3.5" /> Deals
+          {deals.length > 0 && <span className="opacity-70">· {open.length} open</span>}
+        </div>
+      )}
 
       {deals.length === 0 ? (
         <p className="text-xs text-muted-foreground">No deals yet.</p>

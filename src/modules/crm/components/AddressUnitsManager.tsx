@@ -4,7 +4,7 @@ import { MapPin, Plus, Pencil, Trash2, Star } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { Switch } from '@/components/core/ui/switch';
 import {
@@ -15,6 +15,7 @@ import {
   addressUnitsAPI, formatAddressLine, type AddressUnit, type AddressUnitInput,
 } from '@/services/crm.service';
 import { HubEmptyState } from '@/components/core/hub';
+import { AddressMapLink } from '@/components/business/crm/AddressMapLink';
 
 interface Props {
   /** Exactly one of companyId / contactId identifies the parent party. */
@@ -109,22 +110,24 @@ export const AddressUnitsManager: React.FC<Props> = ({ companyId, contactId, rea
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="flex items-center gap-2">
-          <MapPin className="h-4 w-4" /> Additional Addresses
-          {units.length > 0 && <Badge variant="secondary">{units.length}</Badge>}
-        </CardTitle>
+      <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
+        <div className="min-w-0">
+          <CardTitle className="flex items-center gap-2">
+            <MapPin className="h-4 w-4 text-muted-foreground" /> Additional addresses
+            {units.length > 0 && <Badge variant="secondary">{units.length}</Badge>}
+          </CardTitle>
+          <CardDescription>
+            A warehouse, a branch, a site office — each with its own name. A quote, invoice,
+            project or delivery note can be addressed to any of them.
+          </CardDescription>
+        </div>
         {!readOnly && hasParent && (
-          <Button size="sm" variant="outline" onClick={openCreate}>
+          <Button size="sm" variant="outline" onClick={openCreate} className="shrink-0">
             <Plus className="h-4 w-4 mr-2" /> Add address
           </Button>
         )}
       </CardHeader>
       <CardContent className="space-y-3">
-        <p className="text-xs text-muted-foreground -mt-1">
-          Extra addresses beyond the main one — each with its own name (Warehouse, Branch A, Site office…).
-          A quote, invoice, project or delivery note can be addressed to any of them.
-        </p>
         {!hasParent && (
           <p className="text-sm text-muted-foreground">Save this record first to add addresses.</p>
         )}
@@ -152,16 +155,20 @@ export const AddressUnitsManager: React.FC<Props> = ({ companyId, contactId, rea
                 {formatAddressLine(u) || '—'}
               </div>
             </div>
-            {!readOnly && (
-              <div className="flex shrink-0 gap-1">
-                <Button size="icon" variant="ghost" onClick={() => openEdit(u)} aria-label="Edit address">
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button size="icon" variant="ghost" onClick={() => remove(u)} aria-label="Delete address">
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
+            <div className="flex shrink-0 items-center gap-1">
+              {/* The map link is NOT gated on `readOnly` — looking a unit up on a map is a read. */}
+              <AddressMapLink address={u} />
+              {!readOnly && (
+                <>
+                  <Button size="icon" variant="ghost" onClick={() => openEdit(u)} aria-label="Edit address">
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button size="icon" variant="ghost" onClick={() => remove(u)} aria-label="Delete address">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
         ))}
       </CardContent>

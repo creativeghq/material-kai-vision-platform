@@ -26,7 +26,10 @@
  */
 
 import { resolveWebsite, type ResolvedWebsite } from '../seo-website.ts';
-import { openSpendGate, dataForSeoTaskError, type SpendGate } from './dataforseo-spend-gate.ts';
+import { openSpendGate, dataForSeoTaskError } from './dataforseo-spend-gate.ts';
+// One dispatcher, shared with the CRM's Google Business lookup — a second copy of the
+// reserve → call → settle chain is a second place for invariant 10 to be got wrong.
+import { callDataForSEO, meteredAttribution } from './dataforseo-dispatch.ts';
 import { describeUpstreamError } from '../tool-result-shape.ts';
 // Invariant 7 — a model-supplied URL that OUR infrastructure will fetch (#352 A19).
 import { assertSafeUrl } from '../ssrf-guard.ts';
@@ -69,67 +72,6 @@ export interface SeoWebsiteCtx {
 // ─────────────────────────────────────────────────────────────────────────────
 
 type SeoAttribution = { user_id?: string; workspace_id?: string };
-
-/**
- * Tell MIVAA this call's credits are already reserved here.
- *
- * MIVAA's DataForSEO client charges a flat unit per call for callers that do not reserve (the
- * rank tracker, seo-api, crons with a payer). When the gate above HAS reserved — and settles
- * against the cost MIVAA reports back — that flat unit was a second charge for the same call:
- * 134 of them in the 30 days to 2026-09-05, one duplicate credit each. The flag rides on the
- * attribution because that is what the route turns into MIVAA's `CostAttribution`, and it is
- * set only when the gate actually metered, so a pass-through (no payer, no pricing row) still
- * pays MIVAA's unit rather than nothing.
- */
-function meteredAttribution(gate: SpendGate, attribution?: SeoAttribution): Record<string, unknown> | undefined {
-  if (!gate.metered || !attribution) return attribution;
-  return { ...attribution, metered_upstream: true };
-}
-
-/**
- * Generic dispatcher to MIVAA's `/api/v1/seo-agent/dataforseo/{kind}` endpoint.
- * Every Wave 1B+ tool routes through this. `kind` is the unified-client method
- * name; `params` is forwarded as **kwargs. Returns the normalized
- * `DataForSEOResult` shape: { items, raw, status_code, cost_usd, latency_ms, error }.
- */
-async function callDataForSEO(
-  kind: string,
-  params: Record<string, any>,
-  attribution?: SeoAttribution,
-): Promise<{ ok: boolean; data?: any; error?: string }> {
-  if (!CRON_SECRET) {
-    return { ok: false, error: 'CRON_SECRET not configured' };
-  }
-  // Invariant 10 — reserve the caller's credits BEFORE the operator pays DataForSEO (#365 AD-13).
-  const gate = await openSpendGate(kind, attribution?.user_id, params, attribution?.workspace_id);
-  if (!gate.ok) return { ok: false, error: gate.message };
-  try {
-    const resp = await fetch(
-      `${MIVAA_GATEWAY_URL}/api/v1/seo-agent/dataforseo/${kind}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET },
-        body: JSON.stringify({ params, attribution: meteredAttribution(gate, attribution) }),
-      },
-    );
-    const text = await resp.text();
-    let parsed: any = null;
-    try { parsed = JSON.parse(text); } catch { parsed = text; }
-    if (!resp.ok) {
-      await gate.settle(0);
-      return { ok: false, error: describeUpstreamError(resp.status, parsed) };
-    }
-    const data = parsed?.data;
-    await gate.settle(data?.cost_usd);
-    // HTTP 200 is not success at DataForSEO — the verdict is in status_code (#365 AD-14).
-    const taskError = dataForSeoTaskError(data);
-    if (taskError) return { ok: false, error: taskError };
-    return { ok: true, data };
-  } catch (e) {
-    await gate.settle(0);
-    return { ok: false, error: e instanceof Error ? e.message : 'network error' };
-  }
-}
 
 /** Composite-audit dispatcher (site-review, brand-search, keyword-gap, quick-page). */
 async function callSEOAgentRoute(

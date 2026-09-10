@@ -21,7 +21,8 @@ import { MoneyInput } from '@/components/core/ui/money-input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Badge } from '@/components/core/ui/badge';
-import { Card, CardContent } from '@/components/core/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { AddressMapLink } from '@/components/business/crm/AddressMapLink';
 import { Skeleton } from '@/components/core/ui/skeleton';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/core/ui/tabs';
@@ -545,7 +546,26 @@ export default function PropertyWorkbench() {
             )}
 
             {stepId === 'location' && (
-              <FormSection title="Location" icon={MapPin}>
+              <FormSection
+                title="Location"
+                icon={MapPin}
+                action={(
+                  <AddressMapLink
+                    address={{
+                      street: form.address as string | null,
+                      street_number: form.street_number as string | null,
+                      postal_code: form.postcode as string | null,
+                      city: (form.town || form.municipality) as string | null,
+                      state: form.prefecture as string | null,
+                      country_code: form.country_code as string | null,
+                    }}
+                    lat={form.lat as number | null}
+                    lng={form.lng as number | null}
+                    variant="button"
+                    label="Map"
+                  />
+                )}
+              >
                 <F label="Country code"><Input value={form.country_code ?? ''} onChange={(e) => set('country_code', e.target.value.toUpperCase())} placeholder="EL, GR, ES…" /></F>
                 <F label="Region"><Input value={form.region ?? ''} onChange={(e) => set('region', e.target.value)} /></F>
                 <F label="Prefecture (Νομός)"><Input value={form.prefecture ?? ''} onChange={(e) => set('prefecture', e.target.value)} /></F>
@@ -1726,11 +1746,29 @@ const BuyersForListing: React.FC<{ ws: string | null; propertyId: string }> = ({
 };
 
 // ── small form primitives ──
-const FormSection: React.FC<{ title: string; icon?: LucideIcon; children: React.ReactNode }> = ({ title, icon: Icon, children }) => (
-  <Card><CardContent className="p-4">
-    <h3 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{Icon && <Icon className="h-3.5 w-3.5 text-primary" />}{title}</h3>
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">{children}</div>
-  </CardContent></Card>
+/**
+ * A titled group of form fields.
+ *
+ * The title is a real `CardTitle` in a real `CardHeader`. It used to be an uppercase 12px
+ * micro-heading floating inside a header-less card — the same shape the CRM's "Main address"
+ * panel had, and uppercase on top of it, which destroys the word shape a reader scans a long
+ * form by. `action` is for a control that belongs to the whole group (the Location section's
+ * map link), not to any one field in it.
+ */
+const FormSection: React.FC<{
+  title: string; icon?: LucideIcon; action?: React.ReactNode; children: React.ReactNode;
+}> = ({ title, icon: Icon, action, children }) => (
+  <Card>
+    <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
+      <CardTitle className="flex items-center gap-2">
+        {Icon && <Icon className="h-4 w-4 text-muted-foreground" />}{title}
+      </CardTitle>
+      {action}
+    </CardHeader>
+    <CardContent>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">{children}</div>
+    </CardContent>
+  </Card>
 );
 const F: React.FC<{ label: string; wide?: boolean; children: React.ReactNode }> = ({ label, wide, children }) => (
   <div className={wide ? 'sm:col-span-2 lg:col-span-3' : ''}><Label className="mb-1 block text-xs text-muted-foreground">{label}</Label>{children}</div>

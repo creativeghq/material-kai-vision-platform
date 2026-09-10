@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Link as LinkIcon, Unlink, UserPlus, Receipt, Percent, Tag, Tags, Send, Wallet, Clock, MessageSquare, MessageCircle, X, ChevronDown, Sparkles, Loader2, RefreshCw, FolderKanban , Wrench, Home } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
 import { PartyAccountTabs } from '@/modules/finance/components/PartyAccountTabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -24,6 +24,9 @@ import { ContactTaxVatCard } from '@/components/business/crm/ContactTaxVatCard';
 import { CrmBankAccountsCard } from '@/components/business/crm/CrmBankAccountsCard';
 import { CrmPhonesCard } from '@/components/business/crm/CrmPhonesCard';
 import { AddressUnitsManager } from '@/modules/crm/components/AddressUnitsManager';
+import { GoogleBusinessCard } from '@/modules/crm/components/GoogleBusinessCard';
+import { AddressMapLink } from '@/components/business/crm/AddressMapLink';
+import { formatAddressOneLine } from '@/utils/address';
 import { Switch } from '@/components/core/ui/switch';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import {
@@ -215,6 +218,8 @@ export const ContactDetailPage: React.FC = () => {
   const bumpActivity = () => setActivityRefresh((n) => n + 1);
   /** Greek rows get their State/Province derived from the postal code by crm_normalize_country. */
   const isGreek = (contact?.country_code || '').toUpperCase() === 'EL';
+  /** One-line echo of the address in the panel header — the same derivation the map link uses. */
+  const addressSummary = contact ? formatAddressOneLine(contact) : '';
   const logActivity =(activity_type: string, title: string, description?: string, metadata?: Record<string, unknown>) => {
     if (!id || isNew) return;
     crmActivitiesService
@@ -883,7 +888,12 @@ export const ContactDetailPage: React.FC = () => {
 
                   <div className="min-w-0 w-full flex-1 space-y-4">
                     <TabsContent value="lead" className="mt-0">
-                      <Card><CardContent className="p-4 space-y-4">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-muted-foreground"/>Lead &amp; qualification</CardTitle>
+                          <CardDescription>Who they work for, how warm they are, and where they came from.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
                         <div>
                           <Label className="flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5" /> Company</Label>
                           <div className="mt-1.5 space-y-2">
@@ -970,12 +980,22 @@ export const ContactDetailPage: React.FC = () => {
                             <PartyDealsCard workspaceId={activeWorkspaceId} contactId={contact.id} />
                           </div>
                         )}
-                      </CardContent></Card>
+                        </CardContent>
+                      </Card>
                     </TabsContent>
 
                     <TabsContent value="address" className="mt-0 space-y-4">
-                      <Card><CardContent className="p-4">
-                        <div className="mb-3 text-xs font-medium text-muted-foreground">Main address</div>
+                      <Card>
+                        <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
+                          <div className="min-w-0">
+                            <CardTitle className="flex items-center gap-2"><MapPin className="h-4 w-4 text-muted-foreground"/>Main address</CardTitle>
+                            <CardDescription className="truncate">
+                              {addressSummary || 'The address every document for this contact is addressed to.'}
+                            </CardDescription>
+                          </div>
+                          <AddressMapLink address={contact} variant="button" label="Google Maps" className="shrink-0" />
+                        </CardHeader>
+                        <CardContent>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
                           <div className="sm:col-span-2">
                             <InlineText alwaysEdit={isNew} label="Street Address" value={contact.address} onSave={(v) => patchInline({ address: v })} placeholder="123 Main Street" />
@@ -992,8 +1012,16 @@ export const ContactDetailPage: React.FC = () => {
                           />
                           <InlineText alwaysEdit={isNew} label="Country" value={contact.country} onSave={(v) => patchInline({ country: v })} placeholder="United Kingdom" />
                         </div>
-                      </CardContent></Card>
+                        </CardContent>
+                      </Card>
                       <AddressUnitsManager contactId={isNew ? undefined : contact.id} />
+                      {activeWorkspaceId && !isNew && contact.id && (
+                        <GoogleBusinessCard
+                          contactId={contact.id}
+                          partyName={contact.name || contact.company || ''}
+                          address={contact}
+                        />
+                      )}
                       {activeWorkspaceId && (
                         <CrmPhonesCard workspaceId={activeWorkspaceId} contactId={isNew ? undefined : contact.id} />
                       )}
@@ -1001,14 +1029,25 @@ export const ContactDetailPage: React.FC = () => {
 
                     {contact.id && (
                       <TabsContent value="categories" className="mt-0">
-                        <Card><CardContent className="p-4">
-                          <CategoryAssignmentPicker bare target={{ kind: 'contact', id: contact.id }} />
-                        </CardContent></Card>
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><Tags className="h-4 w-4 text-muted-foreground"/>Categories</CardTitle>
+                            <CardDescription>How this contact is filed — the lists they appear on across the CRM.</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <CategoryAssignmentPicker bare target={{ kind: 'contact', id: contact.id }} />
+                          </CardContent>
+                        </Card>
                       </TabsContent>
                     )}
 
                     <TabsContent value="linked" className="mt-0">
-                      <Card><CardContent className="p-4">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2"><LinkIcon className="h-4 w-4 text-muted-foreground"/>Linked account</CardTitle>
+                          <CardDescription>The platform login this contact signs in with, if they have one.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
                         {linkedUser ? (
                           <div className="flex items-center justify-between gap-2 rounded-md border border-border/60 px-3 py-2">
                             <div className="flex items-center gap-2 min-w-0">
@@ -1027,13 +1066,18 @@ export const ContactDetailPage: React.FC = () => {
                             <UserSearchDropdown onSelect={handleLinkUser} placeholder="…or link an existing user" selectedUserId={null} />
                           </div>
                         )}
-                      </CardContent></Card>
+                        </CardContent>
+                      </Card>
                     </TabsContent>
 
                     {!hasCompany && (
                       <TabsContent value="commercial" className="mt-0 space-y-4">
-                        <Card><CardContent className="p-4 space-y-3">
-                          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground"><Tag className="h-3.5 w-3.5" /> Role</div>
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><Tag className="h-4 w-4 text-muted-foreground"/>Role</CardTitle>
+                            <CardDescription>Which side of the trade this contact is on, and the VAT treatment that follows.</CardDescription>
+                          </CardHeader>
+                          <CardContent className="space-y-3">
                           <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
                             <label htmlFor="is_client" className="flex items-center gap-2 text-sm cursor-pointer">
                               <Checkbox id="is_client" checked={!!contact.is_client} onCheckedChange={(v) => patchInline({ is_client: v === true })} />
@@ -1058,10 +1102,11 @@ export const ContactDetailPage: React.FC = () => {
                               </SelectContent>
                             </Select>
                           </div>
-                        </CardContent></Card>
+                          </CardContent>
+                        </Card>
 
                         <Card>
-                          <CardHeader><CardTitle className="flex items-center gap-2"><Percent className="h-4 w-4" />Pricing</CardTitle></CardHeader>
+                          <CardHeader><CardTitle className="flex items-center gap-2"><Percent className="h-4 w-4 text-muted-foreground" />Pricing</CardTitle></CardHeader>
                           <CardContent className="space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
                               <InlineSelect alwaysEdit={isNew} label="Pricing level" value={contact.user_level_key ?? undefined} unsetValue="__default__" placeholder="Standard" options={pricingLevels.map((l) => ({ value: l.level_key, label: l.label }))} onSave={(v) => savePricing({ user_level_key: v })} hint="Tier this customer buys at — discount applies off retail on quotes." />
@@ -1075,7 +1120,7 @@ export const ContactDetailPage: React.FC = () => {
                         </Card>
 
                         <Card>
-                          <CardHeader><CardTitle className="flex items-center gap-2"><Receipt className="h-4 w-4" />Invoicing &amp; VAT</CardTitle></CardHeader>
+                          <CardHeader><CardTitle className="flex items-center gap-2"><Receipt className="h-4 w-4 text-muted-foreground" />Invoicing &amp; VAT</CardTitle></CardHeader>
                           <CardContent className="space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
                               <InlineSelect alwaysEdit={isNew} label="Segment" value={contact.contact_group ?? undefined} unsetValue="none" placeholder="Unsegmented" options={[{ value: 'b2b', label: 'B2B' }, { value: 'retail', label: 'Retail' }, { value: 'wholesale', label: 'Wholesale' }, { value: 'public_sector', label: 'Public sector' }]} onSave={(v) => patchInline({ contact_group: v })} hint="Groups this party for filtering and statement batches." />

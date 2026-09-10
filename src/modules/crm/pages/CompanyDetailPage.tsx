@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
-import { ArrowLeft, Building2, MapPin, Globe, Save, Users, Trash2, Plus, Receipt, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, MessageSquare, Phone, ChevronDown, Clock, TrendingUp, RefreshCw, FolderKanban, Layers , Wrench } from 'lucide-react';
+import { ArrowLeft, Building2, MapPin, Globe, Save, Users, Trash2, Plus, Receipt, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, MessageSquare, Phone, ChevronDown, Clock, TrendingUp, RefreshCw, FolderKanban, Layers , Wrench, Kanban } from 'lucide-react';
 import { PartyProjectsCard } from '@/modules/projects/components/PartyProjectsCard';
 import { PartyWorkTab } from '@/modules/crm/components/PartyWorkTab';
 import { WarrantiesTab } from '@/components/business/crm/WarrantiesTab';
 import { resolveRecordTab } from '@/modules/crm/recordTabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
 import { PartyAccountTabs } from '@/modules/finance/components/PartyAccountTabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { TemplatePickerDialog } from '@/components/features/templates/TemplatePickerDialog';
 import { SaveAsTemplateDialog } from '@/components/features/templates/SaveAsTemplateDialog';
@@ -41,6 +41,8 @@ import { CrmRecordActivity, type CrmRecordActivityHandle } from '@/components/bu
 import { CrmBankAccountsCard } from '@/components/business/crm/CrmBankAccountsCard';
 import { CrmPhonesCard } from '@/components/business/crm/CrmPhonesCard';
 import { AddressUnitsManager } from '@/modules/crm/components/AddressUnitsManager';
+import { GoogleBusinessCard } from '@/modules/crm/components/GoogleBusinessCard';
+import { AddressMapLink } from '@/components/business/crm/AddressMapLink';
 import { FactoryLinkCard } from '@/modules/crm/components/FactoryLinkCard';
 import { IndustrySelect } from '@/components/business/crm/IndustrySelect';
 import { Switch } from '@/components/core/ui/switch';
@@ -64,6 +66,7 @@ import { VAT_COUNTRY_OPTIONS } from '@/lib/vatCountries';
 import { MYDATA_EXEMPTION_CATEGORIES } from '@/lib/mydataExemptionCategories';
 import { InlineText, InlineSelect } from '@/components/business/crm/inline/InlineFields';
 import { formatDate } from '@/utils/datetime';
+import { formatAddressOneLine } from '@/utils/address';
 
 interface Company {
   id: string;
@@ -506,6 +509,9 @@ export const CompanyDetailPage: React.FC = () => {
   /** Greek rows get their State/Province derived from the postal code by crm_normalize_country. */
   const isGreek = (company?.country_code || '').toUpperCase() === 'EL';
 
+  /** One-line echo of the address in the panel header — the same derivation the map link uses. */
+  const addressSummary = company ? formatAddressOneLine(company) : '';
+
   // Supplier↔factory pin. Persist the new pin list, then claim: re-point every matching
   // product's brand_company_id onto this company + fold in any duplicate auto-created brand
   // node. This makes the pin authoritative immediately (not just for future ingests) and keeps
@@ -825,8 +831,17 @@ export const CompanyDetailPage: React.FC = () => {
 
                   <div className="min-w-0 w-full flex-1 space-y-4">
                     <TabsContent value="address" className="mt-0 space-y-4">
-                      <Card><CardContent className="p-4">
-                        <div className="mb-3 text-xs font-medium text-muted-foreground">Main address</div>
+                      <Card>
+                        <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
+                          <div className="min-w-0">
+                            <CardTitle className="flex items-center gap-2"><MapPin className="h-4 w-4 text-muted-foreground"/>Main address</CardTitle>
+                            <CardDescription className="truncate">
+                              {addressSummary || 'The registered address every document is addressed to.'}
+                            </CardDescription>
+                          </div>
+                          <AddressMapLink address={company} variant="button" label="Google Maps" className="shrink-0" />
+                        </CardHeader>
+                        <CardContent>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
                           <InlineText alwaysEdit={isNew} label="Street Address" value={company.address} onSave={(v) => patchInline({ address: v })} placeholder="123 Main Street" />
                           <InlineText alwaysEdit={isNew} label="City" value={company.city} onSave={(v) => patchInline({ city: v })} placeholder="San Francisco" />
@@ -841,8 +856,12 @@ export const CompanyDetailPage: React.FC = () => {
                           <InlineText alwaysEdit={isNew} label="Postal Code" value={company.postal_code} onSave={(v) => patchInline({ postal_code: v })} placeholder="94102" />
                           <InlineText alwaysEdit={isNew} label="Country" value={company.country} onSave={(v) => patchInline({ country: v })} placeholder="United States" />
                         </div>
-                      </CardContent></Card>
+                        </CardContent>
+                      </Card>
                       <AddressUnitsManager companyId={isNew ? undefined : id} />
+                      {activeWorkspaceId && !isNew && id && (
+                        <GoogleBusinessCard companyId={id} partyName={company.name} address={company} />
+                      )}
                       {activeWorkspaceId && (
                         <CrmPhonesCard workspaceId={activeWorkspaceId} companyId={isNew ? undefined : id} />
                       )}
@@ -984,9 +1003,15 @@ export const CompanyDetailPage: React.FC = () => {
 
                     {company.id && (
                       <TabsContent value="categories" className="mt-0">
-                        <Card><CardContent className="p-4">
-                          <CategoryAssignmentPicker bare target={{ kind: 'company', id: company.id }}/>
-                        </CardContent></Card>
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><Tags className="h-4 w-4 text-muted-foreground"/>Categories</CardTitle>
+                            <CardDescription>How this company is filed — the lists it appears on across the CRM.</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <CategoryAssignmentPicker bare target={{ kind: 'company', id: company.id }}/>
+                          </CardContent>
+                        </Card>
                       </TabsContent>
                     )}
 
@@ -1031,9 +1056,15 @@ export const CompanyDetailPage: React.FC = () => {
             {/* Deals on this account — the reverse side of crm_deals.company_id, which was
                 otherwise a one-way link (#311). */}
             {company?.id && activeWorkspaceId && (
-              <Card><CardContent className="p-4">
-                <PartyDealsCard workspaceId={activeWorkspaceId} companyId={company.id} />
-              </CardContent></Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><Kanban className="h-4 w-4 text-muted-foreground"/>Deals</CardTitle>
+                  <CardDescription>Pipeline opportunities pointing at this account.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <PartyDealsCard workspaceId={activeWorkspaceId} companyId={company.id} headless />
+                </CardContent>
+              </Card>
             )}
             <Card>
               <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between gap-3 flex-wrap space-y-0">

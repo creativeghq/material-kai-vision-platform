@@ -3,6 +3,7 @@
 //   POST /crm-api/contacts/...    → handleContacts
 //   POST /crm-api/users/...       → handleUsers
 //   POST /crm-api/stripe/...      → handleCrmStripe
+//   POST /crm-api/google-business → handleGoogleBusiness
 // HTTP method (POST/GET/PUT/DELETE) and remaining path segments are preserved.
 // Each handler does its own auth + RLS.
 
@@ -12,6 +13,7 @@ import { handleContacts } from './handlers/contacts-api-handler.ts';
 import { handleUsers } from './handlers/users-api-handler.ts';
 import { handleCrmStripe } from './handlers/stripe-api-handler.ts';
 import { handleAddressUnits } from './handlers/address-units-api-handler.ts';
+import { handleGoogleBusiness } from './handlers/google-business-api-handler.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 
 const ROUTES: Record<string, (req: Request) => Promise<Response>> = {
@@ -20,6 +22,7 @@ const ROUTES: Record<string, (req: Request) => Promise<Response>> = {
   users: handleUsers,
   stripe: handleCrmStripe,
   'address-units': handleAddressUnits,
+  'google-business': handleGoogleBusiness,
 };
 
 Deno.serve(withApiLogging('crm-api', async (req) => {

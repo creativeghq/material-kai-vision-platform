@@ -26,6 +26,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { aadeService } from '@/modules/myaade';
 import { gemiService } from '@/services/gemiService';
+import { AddressMapLink } from '@/components/business/crm/AddressMapLink';
 
 type Lang = 'en' | 'gr';
 type Field = { key: string; label: string; bilingual?: boolean; textarea?: boolean; placeholder?: string };
@@ -251,9 +252,23 @@ export const BusinessIdentityCard: React.FC<{ workspaceId: string }> = ({ worksp
           <TabsContent value="billing">
             <div className="flex items-start justify-between gap-2 mb-3">
               <p className="text-xs text-muted-foreground">Shown when issuing e-invoices &amp; receipts and transmitted to myDATA — mandatory.</p>
-              <Button size="sm" variant="outline" onClick={lookupAade} disabled={aadeLoading} className="shrink-0">
-                {aadeLoading ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 mr-1" />} Fetch from ΑΑΔΕ + ΓΕΜΗ
-              </Button>
+              <div className="flex shrink-0 items-center gap-2">
+                {/* The registered address as it will be printed — checkable on a map in one click. */}
+                <AddressMapLink
+                  address={{
+                    street: data.business_address as string | null,
+                    street_number: data.business_street_number as string | null,
+                    postal_code: data.business_postal_code as string | null,
+                    city: data.business_city as string | null,
+                    country: data.business_country as string | null,
+                  }}
+                  variant="button"
+                  label="Map"
+                />
+                <Button size="sm" variant="outline" onClick={lookupAade} disabled={aadeLoading}>
+                  {aadeLoading ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 mr-1" />} Fetch from ΑΑΔΕ + ΓΕΜΗ
+                </Button>
+              </div>
             </div>
             <FieldGrid fields={BILLING} data={data} set={set} lang={lang} />
           </TabsContent>

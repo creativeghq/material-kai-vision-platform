@@ -12,10 +12,15 @@
  * Nothing failed. Ungated spend is a successful call: the tool works, the card renders, the answer
  * is correct, and the bill lands on the operator. It was found by looking, not by breaking.
  *
- * WHY A TEST AND NOT A CONVENTION. The gate lives in three dispatchers inside one file. Adding a
- * fifty-first tool means adding a call to one of them — fine — but adding a new *dispatcher*, or a
- * bare `fetch` to the SEO gateway, silently reopens the hole in exactly the way the previous four
- * audits had to find by hand. This test is the thing that notices.
+ * WHY A TEST AND NOT A CONVENTION. The gate lives in three dispatchers. Adding a fifty-first tool
+ * means adding a call to one of them — fine — but adding a new *dispatcher*, or a bare `fetch` to
+ * the SEO gateway, silently reopens the hole in exactly the way the previous four audits had to
+ * find by hand. This test is the thing that notices.
+ *
+ * The generic `dataforseo/{kind}` dispatcher now lives in its own module (`dataforseo-dispatch.ts`)
+ * because the CRM's Google Business lookup needs it too and cannot import the LangChain-bearing
+ * tools file. The scan follows it: a dispatcher that moves house must not fall out of coverage,
+ * which is the failure mode this suite's own floor assertion exists to catch.
  *
  * SCOPE. Edge side only. MIVAA is a separate repository (and is EMPTY in CI), so a green run says
  * nothing about what its `/seo-agent/*` routes do with the request once it arrives.
@@ -26,12 +31,20 @@ import { join } from 'node:path';
 
 const ROOT = process.cwd();
 const TOOLS = join(ROOT, 'supabase', 'functions', '_shared', 'tools', 'seo-agent-tools.ts');
+const DISPATCH = join(ROOT, 'supabase', 'functions', '_shared', 'tools', 'dataforseo-dispatch.ts');
 const GATE = join(ROOT, 'supabase', 'functions', '_shared', 'tools', 'dataforseo-spend-gate.ts');
 const RAW_CLIENT = join(ROOT, 'supabase', 'functions', '_shared', 'dataforseo-client.ts');
 
 const toolsSrc = readFileSync(TOOLS, 'utf8');
+const dispatchSrc = readFileSync(DISPATCH, 'utf8');
 const gateSrc = readFileSync(GATE, 'utf8');
 const rawSrc = readFileSync(RAW_CLIENT, 'utf8');
+
+/** Every module that may hold a dispatcher to the paid SEO backend. */
+const DISPATCHER_SOURCES: Array<{ file: string; src: string }> = [
+  { file: 'seo-agent-tools.ts', src: toolsSrc },
+  { file: 'dataforseo-dispatch.ts', src: dispatchSrc },
+];
 
 /**
  * Every top-level `async function` in the tools file, as `{ name, body }`.
@@ -42,7 +55,9 @@ const rawSrc = readFileSync(RAW_CLIENT, 'utf8');
  */
 function topLevelAsyncFunctions(src: string): Array<{ name: string; body: string }> {
   const out: Array<{ name: string; body: string }> = [];
-  const re = /^async function (\w+)\s*\(/gm;
+  // `export ` is optional: the shared dispatcher is exported, and a regex that only sees
+  // module-private declarations would silently stop covering it the moment it moved.
+  const re = /^(?:export )?async function (\w+)\s*\(/gm;
   let m: RegExpExecArray | null;
   const starts: Array<{ name: string; at: number }> = [];
   while ((m = re.exec(src)) !== null) starts.push({ name: m[1], at: m.index });
@@ -53,13 +68,17 @@ function topLevelAsyncFunctions(src: string): Array<{ name: string; body: string
   return out;
 }
 
-/** Functions that issue a network call to the paid SEO backend. */
+/** Functions that issue a network call to the paid SEO backend, across every dispatcher module. */
 function dispatchers(): Array<{ name: string; body: string }> {
-  return topLevelAsyncFunctions(toolsSrc).filter((f) => /await fetch\(/.test(f.body));
+  return DISPATCHER_SOURCES.flatMap(({ file, src }) =>
+    topLevelAsyncFunctions(src)
+      .filter((f) => /await fetch\(/.test(f.body))
+      .map((f) => ({ ...f, name: `${file}:${f.name}` })),
+  );
 }
 
 describe('DataForSEO spend gate', () => {
-  it('the tools file has dispatchers to check (the scan itself still finds something)', () => {
+  it('the dispatcher modules have dispatchers to check (the scan itself still finds something)', () => {
     // A rename or a refactor that empties this list would make every assertion below vacuous —
     // the silent-zero shape applied to a guard test. Pin the floor.
     expect(dispatchers().length).toBeGreaterThanOrEqual(3);
@@ -98,7 +117,7 @@ describe('DataForSEO spend gate', () => {
   it('HTTP 200 is not treated as success — the per-task status is checked', () => {
     // DataForSEO answers 200 for a failed task and puts the verdict in `status_code`, so an
     // unchecked body reads as a successful call that happened to return nothing (#365 AD-14).
-    expect(toolsSrc).toContain('dataForSeoTaskError');
+    expect(toolsSrc + dispatchSrc).toContain('dataForSeoTaskError');
     expect(gateSrc).toContain('export function dataForSeoTaskError');
     // The raw client (used by seo-api/handlers/research.ts) needs its own check.
     expect(rawSrc).toMatch(/taskStatusError\(/);

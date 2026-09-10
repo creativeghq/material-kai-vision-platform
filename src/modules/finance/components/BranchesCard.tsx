@@ -8,6 +8,8 @@ import { Badge } from '@/components/core/ui/badge';
 import { Loader2, Plus, Trash2, Building2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { invoicingSetupService, type FinanceBranch } from '@/services/invoicingSetupService';
+import { formatAddressOneLine } from '@/utils/address';
+import { AddressMapLink } from '@/components/business/crm/AddressMapLink';
 
 export const BranchesCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
   const { toast } = useToast();
@@ -68,14 +70,17 @@ export const BranchesCard: React.FC<{ workspaceId: string }> = ({ workspaceId })
           <div className="space-y-1">
             {rows.map((b) => (
               <div key={b.id} className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2 text-sm">
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 items-center gap-2">
                   <Badge variant="outline" className="text-[10px]">#{b.branch_code}</Badge>
                   <span className="font-medium">{b.name}</span>
-                  {[b.address, b.street_number, b.postal_code, b.city].some(Boolean) && (
-                    <span className="text-xs text-muted-foreground">{[b.address, b.street_number, b.postal_code, b.city].filter(Boolean).join(' ')}</span>
+                  {/* One address formatter for the platform — this row had its own, which put the
+                      street number after the street but before the postcode without a comma. */}
+                  {formatAddressOneLine(b) && (
+                    <span className="truncate text-xs text-muted-foreground">{formatAddressOneLine(b)}</span>
                   )}
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex shrink-0 items-center gap-3">
+                  <AddressMapLink address={b} />
                   <button type="button" className="text-[11px] text-muted-foreground hover:text-foreground" onClick={() => toggle(b)}>
                     {b.is_active ? 'Active' : 'Inactive'}
                   </button>

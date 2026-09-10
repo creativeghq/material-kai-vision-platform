@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { isValidIban, normalizeIban } from '@/utils/iban';
+import { formatAddressOneLine, type AddressLike } from '@/utils/address';
 
 // Get Supabase URL — lazy to avoid crash at module load time
 const getApiBase = (): string => {
@@ -708,13 +709,17 @@ export type AddressUnitInput = Partial<
   >
 >;
 
-/** Build a one-line human-readable summary of an address (unit or main). */
-export function formatAddressLine(a: {
-  street?: string | null; street_number?: string | null; address?: string | null;
-  postal_code?: string | null; city?: string | null; country?: string | null;
-}): string {
-  const streetPart = [a.street || a.address, a.street_number].filter(Boolean).join(' ');
-  return [streetPart, a.postal_code, a.city, a.country].filter(Boolean).join(', ');
+/**
+ * Build a one-line human-readable summary of an address (unit or main).
+ *
+ * The derivation itself lives in `@/utils/address` — the same parts also have to
+ * become a Google Maps query and a multi-line panel block, and three formatters
+ * disagreeing about whether the street number comes before the street is exactly
+ * how an address ends up rendered two ways on one screen. This stays exported
+ * because a dozen call sites import it from here.
+ */
+export function formatAddressLine(a: AddressLike): string {
+  return formatAddressOneLine(a);
 }
 
 export const addressUnitsAPI = {
@@ -784,6 +789,116 @@ export const addressUnitsAPI = {
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
       throw new Error(error.error || 'Failed to delete address unit');
+    }
+  },
+};
+
+// -------- Google Business Profile mirror --------
+
+/**
+ * What Google publishes about a counterparty. A MIRROR, deliberately kept beside our own
+ * record rather than folded into it: Google's address and ours are two independent claims,
+ * and seeing that they disagree is the entire point of having both.
+ */
+export interface GoogleBusinessProfile {
+  id: string;
+  workspace_id: string;
+  company_id: string | null;
+  contact_id: string | null;
+  /** What we asked Google — so a wrong match is explainable rather than mysterious. */
+  query: string;
+  location_country_code: string | null;
+  /**
+   * `ok` a listing came back · `no_match` Google answered and nothing matched ·
+   * `failed` we never got an answer. An absent row is a fourth state — never looked.
+   * Rendering all four as "no rating" is the silent-zero shape.
+   */
+  fetch_status: 'ok' | 'no_match' | 'failed';
+  source_error: string | null;
+  place_id: string | null;
+  cid: string | null;
+  title: string | null;
+  category: string | null;
+  additional_categories: string[] | null;
+  description: string | null;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  phone: string | null;
+  website: string | null;
+  maps_url: string | null;
+  rating: number | null;
+  reviews_count: number | null;
+  price_level: string | null;
+  is_claimed: boolean | null;
+  work_hours: Record<string, unknown> | null;
+  attributes: Record<string, unknown> | null;
+  main_image: string | null;
+  total_photos: number | null;
+  fetched_at: string;
+}
+
+export const googleBusinessAPI = {
+  /**
+   * The stored mirror for a party, plus the query we would search with. Free — reads only.
+   * `null` data means nobody has looked yet, which the panel must say out loud rather than
+   * rendering as an empty listing.
+   */
+  async get(parent: { companyId?: string; contactId?: string }): Promise<{
+    profile: GoogleBusinessProfile | null;
+    suggestedQuery: string;
+  }> {
+    const qs = parent.companyId ? `company_id=${parent.companyId}` : `contact_id=${parent.contactId}`;
+    const token = await getAuthToken();
+    const response = await fetch(`${getApiBase()}/crm-api/google-business?${qs}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'Failed to load the Google Business profile');
+    }
+    const body = await response.json();
+    return { profile: body.data ?? null, suggestedQuery: body.suggested_query || '' };
+  },
+
+  /**
+   * Run the lookup. THIS SPENDS CREDITS (DataForSEO Business Data), so it is only ever
+   * called from an explicit operator action — never on mount.
+   *
+   * A failed lookup still returns its row: the panel has to be able to say "we could not
+   * reach Google", which is a different statement from "this business has no listing".
+   */
+  async lookup(
+    parent: { companyId?: string; contactId?: string },
+    query?: string,
+  ): Promise<{ profile: GoogleBusinessProfile; error?: string }> {
+    const token = await getAuthToken();
+    const response = await fetch(`${getApiBase()}/crm-api/google-business`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        company_id: parent.companyId,
+        contact_id: parent.contactId,
+        query: query || undefined,
+      }),
+    });
+    const body = await response.json().catch(() => ({} as Record<string, unknown>));
+    if (!response.ok && !body?.data) {
+      throw new Error((body as { error?: string })?.error || 'Google Business lookup failed');
+    }
+    return { profile: (body as { data: GoogleBusinessProfile }).data, error: (body as { error?: string }).error };
+  },
+
+  /** Discard a wrong match so the party reads as "never looked" again. */
+  async remove(id: string): Promise<void> {
+    const token = await getAuthToken();
+    const response = await fetch(`${getApiBase()}/crm-api/google-business/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'Failed to remove the Google Business profile');
     }
   },
 };
