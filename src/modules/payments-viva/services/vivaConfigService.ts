@@ -95,17 +95,31 @@ export interface VivaConfigInput {
  * Upsert the workspace's Viva credentials. Blank fields are omitted rather than written,
  * so re-saving the form without retyping a secret does not wipe the stored one.
  */
+/**
+ * An RPC, not an upsert — see `save_workspace_revolut_config` for the full story.
+ *
+ * Short version: this table has no SELECT policy by design, and `INSERT ... ON CONFLICT DO UPDATE`
+ * cannot run without reading the conflicting row, so every save against an existing row failed
+ * with `new row violates row-level security policy`. The Viva row has existed since 18 Aug, so
+ * every edit since then — including the transfer credentials that make money-out possible — would
+ * have been refused. The RPC also allowlists the columns the UI may write, instead of handing the
+ * client the whole row.
+ */
 export async function saveVivaConfig(workspaceId: string, input: VivaConfigInput): Promise<void> {
-  const payload: Record<string, unknown> = { workspace_id: workspaceId, updated_at: new Date().toISOString() };
-  for (const [key, value] of Object.entries(input)) {
-    if (value === undefined) continue;
-    if (typeof value === 'string' && value.trim() === '') continue;
-    payload[key] = value;
-  }
-  // No .select() — the table intentionally has no SELECT policy for authenticated.
-  const { error } = await supabase
-    .from('workspace_viva_config')
-    .upsert(payload as never, { onConflict: 'workspace_id' });
+  const blank = (v: string | undefined) => (v === undefined || v.trim() === '' ? null : v);
+  const { error } = await supabase.rpc('save_workspace_viva_config', {
+    p_workspace_id: workspaceId,
+    p_client_id: blank(input.client_id),
+    p_client_secret: blank(input.client_secret),
+    p_merchant_id: blank(input.merchant_id),
+    p_api_key: blank(input.api_key),
+    p_source_code: blank(input.source_code),
+    p_environment: input.environment ?? null,
+    p_enabled: input.enabled ?? null,
+    p_methods: input.methods ?? null,
+    p_transfer_client_id: blank(input.transfer_client_id),
+    p_transfer_client_secret: blank(input.transfer_client_secret),
+  });
   if (error) throw new Error(error.message);
 }
 

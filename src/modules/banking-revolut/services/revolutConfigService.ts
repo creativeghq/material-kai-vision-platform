@@ -68,18 +68,33 @@ export interface RevolutConfigInput {
   revtag?: string;
 }
 
-/** Blank fields are omitted rather than written (re-save must not wipe stored values). */
+/**
+ * Save the non-secret fields. Blank means "leave the stored value alone".
+ *
+ * THIS IS AN RPC AND NOT AN UPSERT, and the difference is why the Revolut connection kept
+ * losing its client_id.
+ *
+ * The table has three policies — insert, update, delete — and deliberately NO select policy, so a
+ * stored private key can never reach the browser. `INSERT ... ON CONFLICT DO UPDATE` cannot run
+ * without reading the conflicting row, so with no select policy every save against an existing row
+ * failed with `new row violates row-level security policy` — while a plain UPDATE and a plain
+ * INSERT both worked, which is why this never looked like a policy problem. The row is created by
+ * `revolut-api?action=init` under the service role, so the browser's FIRST save already took the
+ * conflict path. The client_id was never once stored.
+ *
+ * The RPC also fixes what the upsert let through: the policy authorises the ROW, not the columns,
+ * so a finance manager could PATCH `private_key` or `refresh_token` straight through PostgREST.
+ * `save_workspace_revolut_config` takes one explicit parameter per field the UI owns (invariant 8).
+ */
 export async function saveRevolutConfig(workspaceId: string, input: RevolutConfigInput): Promise<void> {
-  const payload: Record<string, unknown> = { workspace_id: workspaceId, updated_at: new Date().toISOString() };
-  for (const [key, value] of Object.entries(input)) {
-    if (value === undefined) continue;
-    if (typeof value === 'string' && value.trim() === '') continue;
-    payload[key] = value;
-  }
-  // No .select() — the table intentionally has no SELECT policy for authenticated.
-  const { error } = await supabase
-    .from('workspace_revolut_config')
-    .upsert(payload as never, { onConflict: 'workspace_id' });
+  const blank = (v: string | undefined) => (v === undefined || v.trim() === '' ? null : v);
+  const { error } = await supabase.rpc('save_workspace_revolut_config', {
+    p_workspace_id: workspaceId,
+    p_client_id: blank(input.client_id),
+    p_environment: input.environment ?? null,
+    p_enabled: input.enabled ?? null,
+    p_revtag: blank(input.revtag),
+  });
   if (error) throw new Error(error.message);
 }
 

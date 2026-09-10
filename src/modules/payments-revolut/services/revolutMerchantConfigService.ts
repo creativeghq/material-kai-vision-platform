@@ -40,17 +40,23 @@ export interface RevolutMerchantInput {
   enabled?: boolean;
 }
 
-/** Blank fields are omitted rather than written (re-save must not wipe the stored key). */
+/**
+ * Blank means "leave the stored key alone". An RPC, not an upsert — see
+ * `save_workspace_revolut_config` for why.
+ *
+ * Short version: this table has no SELECT policy, and `INSERT ... ON CONFLICT DO UPDATE` cannot
+ * run without reading the conflicting row, so the save is refused with `new row violates row-level
+ * security policy` the moment a row exists. It had not bitten yet only because nobody has rotated
+ * these credentials since the row was created.
+ */
 export async function saveRevolutMerchantConfig(workspaceId: string, input: RevolutMerchantInput): Promise<void> {
-  const payload: Record<string, unknown> = { workspace_id: workspaceId, updated_at: new Date().toISOString() };
-  for (const [key, value] of Object.entries(input)) {
-    if (value === undefined) continue;
-    if (typeof value === 'string' && value.trim() === '') continue;
-    payload[key] = value;
-  }
-  const { error } = await supabase
-    .from('workspace_revolut_merchant_config')
-    .upsert(payload as never, { onConflict: 'workspace_id' });
+  const blank = (v: string | undefined) => (v === undefined || v.trim() === '' ? null : v);
+  const { error } = await supabase.rpc('save_workspace_revolut_merchant_config', {
+    p_workspace_id: workspaceId,
+    p_secret_key: blank(input.secret_key),
+    p_environment: input.environment ?? null,
+    p_enabled: input.enabled ?? null,
+  });
   if (error) throw new Error(error.message);
 }
 
