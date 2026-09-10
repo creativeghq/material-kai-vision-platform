@@ -56,6 +56,18 @@ const CURRENCY_NUMERIC: Record<string, number> = {
 export const VIVA_CURRENCIES = Object.keys(CURRENCY_NUMERIC);
 
 /**
+ * Viva's numeric currency code back to letters (978 → EUR).
+ *
+ * Derived from the same map rather than written out again: a wallet list that labelled 978 as GBP
+ * would send the operator's money out of the wrong balance, and two hand-kept tables is exactly
+ * how the myDATA payment codes ended up in two rotations at once.
+ */
+export function vivaCurrencyFromNumeric(numeric: number): string | null {
+  const hit = Object.entries(CURRENCY_NUMERIC).find(([, n]) => n === numeric);
+  return hit ? hit[0] : null;
+}
+
+/**
  * OAuth2 client-credentials token. Cached in-process for slightly less than its 3600s TTL
  * so a burst of charges doesn't re-authenticate per request. Keyed by client_id + host so
  * two tenants (or demo/prod) never share a token.
@@ -463,7 +475,7 @@ function extractOrderCodePascal(rawBody: string): string | null {
  * which is exactly why `webhook_event_types` records what really arrives instead.
  */
 export interface VivaCheck {
-  key: 'oauth' | 'merchant' | 'order' | 'source_code';
+  key: 'oauth' | 'merchant' | 'order' | 'source_code' | 'transfer';
   label: string;
   ok: boolean;
   detail: string;

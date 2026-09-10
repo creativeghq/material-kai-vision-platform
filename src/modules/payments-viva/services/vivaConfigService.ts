@@ -29,6 +29,17 @@ export interface VivaConfigStatus {
   last_webhook_at: string | null;
   /** Viva EventTypeId -> {count, last_at} actually delivered. Diagnostic only. */
   webhook_event_types: Record<string, { count: number; last_at: string }>;
+  /**
+   * Money OUT is a SECOND credential pair, not a capability of the first.
+   *
+   * Viva's bank-transfer scope belongs to the "Account Transactions" client in Settings → API
+   * Access; the Smart Checkout pair that charges cards cannot send. Reported separately, and
+   * `can_send_money` is derived in SQL rather than inferred from `configured` here — a card that
+   * inferred it would offer Send backed by credentials that will be refused.
+   */
+  has_transfer_client_id: boolean;
+  has_transfer_client_secret: boolean;
+  can_send_money: boolean;
 }
 
 const EMPTY: VivaConfigStatus = {
@@ -46,6 +57,9 @@ const EMPTY: VivaConfigStatus = {
   updated_at: null,
   last_webhook_at: null,
   webhook_event_types: {},
+  has_transfer_client_id: false,
+  has_transfer_client_secret: false,
+  can_send_money: false,
 };
 
 export async function getVivaStatus(workspaceId: string): Promise<VivaConfigStatus> {
@@ -72,6 +86,9 @@ export interface VivaConfigInput {
   environment?: VivaEnvironment;
   enabled?: boolean;
   methods?: VivaMethod[];
+  /** Viva "Account Transactions" credentials — the ONLY pair that can send money. */
+  transfer_client_id?: string;
+  transfer_client_secret?: string;
 }
 
 /**
@@ -116,12 +133,67 @@ export interface VivaCheck {
   detail: string;
 }
 
+/** A Viva wallet the merchant holds — a balance money can be SENT from. */
+export interface VivaWalletOption {
+  walletId: number;
+  /** Letters, resolved server-side from Viva's numeric code. Null if it is one we do not know. */
+  currency: string | null;
+  available: number;
+  isPrimary: boolean;
+  friendlyName: string | null;
+}
+
 export interface VivaTestResult {
   ok: boolean;
   incomplete: boolean;
   error?: string;
   checks: VivaCheck[];
   orderCode?: string | null;
+  /** Present when the Account Transactions credentials worked. Empty otherwise — never absent. */
+  wallets?: VivaWalletOption[];
+}
+
+/** One of OUR bank accounts, and the Viva wallet it currently sends from. */
+export interface VivaMappableAccount {
+  id: string;
+  name: string;
+  kind: string;
+  currency: string;
+  viva_wallet_id: number | null;
+  revolut_account_id: string | null;
+}
+
+/**
+ * The accounts a Viva wallet may be attached to.
+ *
+ * Read straight from the table because a finance manager already holds full RLS on it — the
+ * `.eq('workspace_id', …)` here is a filter for the picker, not the boundary.
+ */
+export async function listVivaMappableAccounts(workspaceId: string): Promise<VivaMappableAccount[]> {
+  const { data, error } = await supabase
+    .from('finance_bank_accounts')
+    .select('id, name, kind, currency, viva_wallet_id, revolut_account_id')
+    .eq('workspace_id', workspaceId)
+    .eq('is_active', true)
+    .order('sort_order');
+  if (error) throw new Error(error.message);
+  return (data ?? []) as VivaMappableAccount[];
+}
+
+/**
+ * Point one of our accounts at a Viva wallet — or unpoint it with `null`.
+ *
+ * This mapping is what makes an account able to SEND: `resolvePayoutSource` reads it, and without
+ * it the payment dialog correctly says the account can record but not instruct. Kept to one
+ * account at a time deliberately; two books accounts drawing on one wallet would show two
+ * balances for one pot.
+ */
+export async function mapVivaWallet(bankAccountId: string, walletId: number | null): Promise<void> {
+  const { error } = await supabase
+    .from('finance_bank_accounts')
+    .update({ viva_wallet_id: walletId, updated_at: new Date().toISOString() })
+    .eq('id', bankAccountId);
+  if (error) throw new Error(error.message);
 }
 
 /**

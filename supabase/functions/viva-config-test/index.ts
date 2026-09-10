@@ -18,7 +18,8 @@ import { HttpError, withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { jsonResponse } from '../_shared/http.ts';
-import { runVivaConnectionTest } from '../_shared/payments/viva-provider.ts';
+import { runVivaConnectionTest, vivaCurrencyFromNumeric } from '../_shared/payments/viva-provider.ts';
+import { listVivaWallets, resolveVivaTransferContext } from '../_shared/payments/viva-payout.ts';
 import type { PaymentProviderContext } from '../_shared/payments/types.ts';
 
 Deno.serve(withApiLogging('viva-config-test', async (req) => {
@@ -67,5 +68,70 @@ Deno.serve(withApiLogging('viva-config-test', async (req) => {
   };
 
   const result = await runVivaConnectionTest(ctx);
-  return jsonResponse({ ...result, incomplete: false });
+
+  /**
+   * The money-out half, tested SEPARATELY because it is a separate entitlement.
+   *
+   * It runs after `runVivaConnectionTest` rather than inside it for two reasons: that function
+   * returns early on a checkout failure, and the two halves are genuinely independent — a merchant
+   * whose card credentials are wrong may still have working transfer credentials, and reporting
+   * "not tested" for one because the other failed is the kind of missing verdict this codebase
+   * treats as a defect rather than a gap.
+   *
+   * Listing the wallets IS the test: it is the same scope every transfer needs, and the result is
+   * the list the operator has to choose a source account from, so a passing check hands back
+   * something usable instead of a tick.
+   */
+  const checks = [...result.checks];
+  // `currency` is resolved here, from the same table that encodes it on the way out — a wallet
+  // list that mislabelled 978 as GBP would have the operator paying out of the wrong balance.
+  let wallets: Array<{
+    walletId: number; currency: string | null; available: number; isPrimary: boolean; friendlyName: string | null;
+  }> = [];
+
+  const transferCtx = await resolveVivaTransferContext(auth.supabase, workspaceId);
+  if (!transferCtx) {
+    checks.push({
+      key: 'transfer',
+      label: 'Sending money',
+      ok: false,
+      detail: 'No Account Transactions credentials saved. Viva can take card payments but cannot send any — '
+        + 'add the second client pair from Settings → API Access.',
+    });
+  } else {
+    try {
+      wallets = (await listVivaWallets(transferCtx)).map((w) => ({
+        walletId: w.walletId,
+        currency: vivaCurrencyFromNumeric(w.currencyCode),
+        available: w.available,
+        isPrimary: w.isPrimary,
+        friendlyName: w.friendlyName,
+      }));
+      checks.push({
+        key: 'transfer',
+        label: 'Sending money',
+        ok: wallets.length > 0,
+        detail: wallets.length > 0
+          ? `${wallets.length} wallet${wallets.length === 1 ? '' : 's'} readable — map one to a bank account to pay from it.`
+          : 'The credentials authenticate but no wallet came back. Check that this client belongs to the account holding the money.',
+      });
+    } catch (err) {
+      checks.push({
+        key: 'transfer',
+        label: 'Sending money',
+        ok: false,
+        detail: `${err instanceof Error ? err.message : String(err)}`,
+      });
+    }
+  }
+
+  return jsonResponse({
+    ...result,
+    // The overall verdict has to account for the check just appended, or a failing transfer step
+    // renders under a green headline.
+    ok: checks.every((c) => c.ok),
+    checks,
+    wallets,
+    incomplete: false,
+  });
 }));

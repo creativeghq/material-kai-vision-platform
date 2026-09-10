@@ -27,6 +27,8 @@ import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/utils/datetime';
 import {
   getVivaStatus,
+  listVivaMappableAccounts,
+  mapVivaWallet,
   saveVivaConfig,
   testVivaConnection,
   vivaWebhookUrl,
@@ -34,6 +36,7 @@ import {
   VIVA_WEBHOOK_EVENTS,
   type VivaConfigStatus,
   type VivaEnvironment,
+  type VivaMappableAccount,
   type VivaMethod,
   type VivaTestResult,
 } from '../services/vivaConfigService';
@@ -64,6 +67,37 @@ export const VivaConfigCard: React.FC<Props> = ({ workspaceId }) => {
   const [apiKey, setApiKey] = useState('');
   const [sourceCode, setSourceCode] = useState('');
   const [environment, setEnvironment] = useState<VivaEnvironment>('demo');
+  // Money OUT. A SECOND client pair — Viva issues "Account Transactions" credentials separately,
+  // and the Smart Checkout pair above cannot send however well it charges cards.
+  const [transferClientId, setTransferClientId] = useState('');
+  const [transferClientSecret, setTransferClientSecret] = useState('');
+  // Which of our accounts draws on which Viva wallet.
+  const [mappableAccounts, setMappableAccounts] = useState<VivaMappableAccount[]>([]);
+  const [mapAccountId, setMapAccountId] = useState('');
+  const [mapWalletId, setMapWalletId] = useState('');
+  const mappedAccountIsRevolut = Boolean(
+    mappableAccounts.find((a) => a.id === mapAccountId)?.revolut_account_id,
+  );
+
+  const linkWallet = async () => {
+    setSaving(true);
+    try {
+      await mapVivaWallet(mapAccountId, Number(mapWalletId));
+      setMappableAccounts(await listVivaMappableAccounts(workspaceId));
+      toast({
+        title: 'Wallet linked',
+        description: 'That account can now send payments through Viva.',
+      });
+    } catch (err) {
+      toast({
+        title: 'Could not link the wallet',
+        description: err instanceof Error ? err.message : String(err),
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const refresh = useCallback(async () => {
     try {
@@ -71,6 +105,9 @@ export const VivaConfigCard: React.FC<Props> = ({ workspaceId }) => {
       setStatus(s);
       setSourceCode(s.source_code);
       setEnvironment(s.environment);
+      // Loaded unconditionally: the mapping is what an operator checks when the dialog says an
+      // account cannot send, so it has to be readable before the connection test has been run.
+      setMappableAccounts(await listVivaMappableAccounts(workspaceId).catch(() => []));
     } catch (err) {
       toast({
         title: 'Could not load Viva settings',
@@ -94,10 +131,13 @@ export const VivaConfigCard: React.FC<Props> = ({ workspaceId }) => {
         api_key: apiKey,
         source_code: sourceCode,
         environment,
+        transfer_client_id: transferClientId,
+        transfer_client_secret: transferClientSecret,
         ...extra,
       });
       setClientSecret('');
       setApiKey('');
+      setTransferClientSecret('');
       await refresh();
       toast({ title: 'Viva settings saved' });
     } catch (err) {
@@ -299,6 +339,128 @@ export const VivaConfigCard: React.FC<Props> = ({ workspaceId }) => {
                 <option value="production">Production (live money)</option>
               </select>
             </div>
+          </div>
+
+          {/*
+            MONEY OUT — a separate pair, stated as such.
+
+            The commonest way to get this wrong is to assume the credentials above cover it: they
+            authenticate perfectly and then every transfer is refused with a 401 that names neither
+            the scope nor the credential set. Viva issues these separately, under the same
+            Settings → API Access page, as "Account Transactions credentials".
+          */}
+          <div className="mt-4 space-y-3 rounded-sm border border-hairline bg-surface-sunken p-3">
+            <div>
+              <h4 className="text-sm font-medium">Sending money</h4>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                Paying suppliers out of your Viva balance needs a <strong>second</strong> client
+                pair — Viva&rsquo;s <em>Account Transactions</em> credentials, from the same
+                Settings&nbsp;→&nbsp;API&nbsp;Access page. The pair above takes card payments and
+                cannot send. You also have to tick <em>Allow transfers between accounts</em> in the
+                Viva banking app, or every transfer is refused.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs">
+                  Transfer Client ID{' '}
+                  {status?.has_transfer_client_id && <span className="text-success">· saved</span>}
+                </Label>
+                <Input
+                  value={transferClientId}
+                  onChange={(e) => setTransferClientId(e.target.value)}
+                  placeholder={status?.has_transfer_client_id ? 'leave blank to keep' : 'Account Transactions client id'}
+                  autoComplete="off"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">
+                  Transfer Client Secret{' '}
+                  {status?.has_transfer_client_secret && <span className="text-success">· saved</span>}
+                </Label>
+                <Input
+                  type="password"
+                  value={transferClientSecret}
+                  onChange={(e) => setTransferClientSecret(e.target.value)}
+                  placeholder={status?.has_transfer_client_secret ? 'leave blank to keep' : ''}
+                  autoComplete="new-password"
+                />
+              </div>
+            </div>
+            {/*
+              The verdict is DERIVED in SQL (`can_send_money`) and only formatted here. Saying
+              "ready" off the presence of two text fields would be a second answer to the same
+              question, and the one the server actually asks is the other one.
+            */}
+            <p className="text-[11px]">
+              {status?.can_send_money ? (
+                <span className="text-success">
+                  Ready — a Viva account mapped to a wallet can send payments.
+                </span>
+              ) : (
+                <span className="text-muted-foreground">
+                  Not set up. Viva can take card payments but cannot send any.
+                </span>
+              )}
+            </p>
+
+            {/*
+              THE SECOND HALF, and it is the one that gets forgotten.
+              Credentials alone do not make an account able to send: `resolvePayoutSource` reads
+              `finance_bank_accounts.viva_wallet_id`, so until a books account points at a wallet
+              the payment dialog correctly refuses. The wallet list comes from the connection test,
+              because listing wallets IS the test of these credentials.
+            */}
+            {testResult?.wallets && testResult.wallets.length > 0 && (
+              <div className="space-y-2 border-t border-hairline pt-3">
+                <Label className="text-xs">Pay from</Label>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <select
+                    className="h-9 w-full rounded-sm border border-hairline bg-card px-2 text-xs"
+                    value={mapAccountId}
+                    onChange={(e) => setMapAccountId(e.target.value)}
+                  >
+                    <option value="">— which of your accounts —</option>
+                    {mappableAccounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                        {a.viva_wallet_id ? ` · wallet ${a.viva_wallet_id}` : ''}
+                        {a.revolut_account_id ? ' · on Revolut' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className="h-9 w-full rounded-sm border border-hairline bg-card px-2 text-xs"
+                    value={mapWalletId}
+                    onChange={(e) => setMapWalletId(e.target.value)}
+                  >
+                    <option value="">— which Viva wallet —</option>
+                    {testResult.wallets.map((w) => (
+                      <option key={w.walletId} value={String(w.walletId)}>
+                        {w.friendlyName || `Wallet ${w.walletId}`}
+                        {w.isPrimary ? ' (primary)' : ''}
+                        {` · ${w.available.toFixed(2)}${w.currency ? ` ${w.currency}` : ''}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {/* An account already on a Revolut pocket must not silently become a Viva one:
+                    the rail is derived from whichever id is set, so two would be ambiguous. */}
+                {mappedAccountIsRevolut && (
+                  <p className="text-[11px] text-destructive">
+                    That account already sends through Revolut. Pick another, or unlink it there first.
+                  </p>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!mapAccountId || !mapWalletId || mappedAccountIsRevolut || saving}
+                  onClick={() => void linkWallet()}
+                >
+                  Use this wallet
+                </Button>
+              </div>
+            )}
           </div>
 
           <Button onClick={() => void save()} disabled={saving} size="sm">
