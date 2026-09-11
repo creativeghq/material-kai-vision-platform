@@ -127,7 +127,9 @@ function packagingsFrom(raw: unknown): FiscalPackaging[] {
     const packagingType = Number(p?.packagingType ?? p?.packaging_type ?? 0);
     const quantity = Number(p?.quantity ?? 0);
     if (!Number.isInteger(packagingType) || packagingType < 1 || packagingType > 6) return [];
-    if (!Number.isFinite(quantity) || quantity <= 0) return [];
+    // AADE types the count `xs:int`: half a pallet is not a package, and a fractional count
+    // would be rejected at the door rather than rounded into something nobody chose.
+    if (!Number.isInteger(quantity) || quantity <= 0) return [];
     const title = String(p?.otherPackagingTypeTitle ?? p?.other_packaging_type_title ?? '').trim();
     return [{ packagingType, quantity, ...(title ? { otherPackagingTypeTitle: title } : {}) }];
   });
@@ -696,9 +698,6 @@ export async function buildCreditNoteInputFromDb(
       // Cross-border commercial invoices are expected to carry it per line.
       commodityCode: it.taric_code ?? undefined,
       countryOfOrigin: it.country_of_origin ?? undefined,
-      // myDATA v2.0.2 per-line movement purpose, on a document that also carries the goods.
-      movePurposeLine: it.move_purpose_line ?? undefined,
-      otherMovePurposeLineTitle: it.other_move_purpose_line_title ?? undefined,
       unitPrice: Number(it.unit_price ?? 0),
       netValue: net,
       vatCategory: lineCat,

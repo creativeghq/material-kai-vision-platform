@@ -174,7 +174,7 @@ const LABELS: Record<Lang, Record<string, string>> = {
 import {
   type PaymentMethod, isPaymentMethod, mydataPaymentLabel,
 } from '../_shared/paymentVocabulary.generated.ts';
-import { movePurposeLabel, MYDATA_MOVE_PURPOSE_OTHER } from '../_shared/fiscal/fiscalVocabulary.generated.ts';
+import { movePurposeLabel, MYDATA_MOVE_PURPOSE_OTHER, receivingNotePurposeLabel, MYDATA_RECEIVING_NOTE_PURPOSE_OTHER } from '../_shared/fiscal/fiscalVocabulary.generated.ts';
 
 const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   bank_transfer: 'Bank transfer', cash: 'Cash', card: 'Card', check: 'Check', iris: 'IRIS', other: 'Other',
@@ -688,6 +688,16 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
    * The printed document states what the transmitted one states, whichever template was picked.
    */
   const movePurposeLine = (): string => {
+    // A ΔΠΠ states its reason as receivingNotePurpose, not movePurpose. It is stored and
+    // transmitted, so it is PRINTED (rule 1c) — otherwise the paper says nothing about why
+    // the goods were received while the envelope filed to AADE does.
+    if (inv.receiving_note_purpose != null) {
+      const label = receivingNotePurposeLabel(inv.receiving_note_purpose, lang);
+      const other = Number(inv.receiving_note_purpose) === MYDATA_RECEIVING_NOTE_PURPOSE_OTHER
+        ? String(inv.other_receiving_note_purpose_title ?? '').trim()
+        : '';
+      return `${L.purpose}: ${other ? `${label} — ${other}` : label}`;
+    }
     if (!inv.move_purpose) return '';
     const label = movePurposeLabel(inv.move_purpose, lang);
     const other = Number(inv.move_purpose) === MYDATA_MOVE_PURPOSE_OTHER

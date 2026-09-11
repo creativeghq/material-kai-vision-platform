@@ -13,6 +13,8 @@ import {
   MYDATA_MOVEMENT_DOC_TYPES, isMovementDocType, canBeDeliveryNote,
   MYDATA_SPECIAL_INVOICE_CATEGORIES, MYDATA_INVOICE_VARIATION_TYPES,
   MYDATA_REVERSE_DELIVERY_PURPOSES, MYDATA_ENTITY_TYPES, MYDATA_ENTITY_TYPE_TRANSPORTER,
+  MYDATA_ENTITY_TYPE_OTHER, MYDATA_DISPATCH_NOTE_TYPES, isDispatchNoteType,
+  MYDATA_THIRD_PARTY_COLLECTION_TYPES, MYDATA_NO_MULTIPLE_MARKS_TYPES,
   acceptsOnDocumentType,
 } from '@/services/fiscal/fiscalVocabulary';
 
@@ -238,10 +240,15 @@ describe('myDATA v2.0.2 — a document that IS the movement (ΤΔΑ)', () => {
     expect(canBeDeliveryNote(null)).toBe(false);
   });
 
-  it('the connector refuses isDeliveryNote on a type AADE does not accept it on', () => {
+  it('the list governs the PICKER, because AADE enumerates no accepting set', () => {
+    // The field table leaves isDeliveryNote's restriction column blank and gives only 1.1 as
+    // an example, so this list is inferred — it decides what we offer, never what we refuse.
+    // Same arrangement as a withdrawn move purpose: AADE is the authority on the rejection.
     const novus = read('supabase/functions/_shared/fiscal/novus.ts');
-    expect(novus).toMatch(/canBeDeliveryNote\(header\.invoiceType\)/);
-    expect(novus).toMatch(/isDeliveryNote/);
+    expect(novus, 'the connector must not refuse on an inferred list')
+      .not.toMatch(/canBeDeliveryNote/);
+    expect(canBeDeliveryNote('1.1')).toBe(true);
+    expect(canBeDeliveryNote('9.3')).toBe(false);
   });
 });
 
@@ -354,6 +361,107 @@ describe('the v2.0.2 code tables are declared once', () => {
     ]) {
       expect(source, `${name} missing from the source`).toContain(name);
       expect(mirror, `${name} missing from the Deno mirror — run npm run vocab:mirror`).toContain(name);
+    }
+  });
+});
+
+describe('the v2.0.2 envelope puts things where AADE looks for them', () => {
+  const novus = read('supabase/functions/_shared/fiscal/novus.ts');
+
+  it('the transport block belongs to every movement, not only one with a movePurpose', () => {
+    // Gating it on the purpose dropped a receiving note's addresses, shipping branches and
+    // transporter — a 10.x states `receivingNotePurpose` and carries no movePurpose at all.
+    expect(novus).not.toMatch(/\.\.\.\(header\.movePurpose != null\s*\n?\s*\?\s*\{\s*\n\s*vatPaymentSuspension: false/);
+    expect(novus).toMatch(/\.\.\.\(isMovement\s*\n?\s*\?\s*\{\s*\n\s*vatPaymentSuspension: false/);
+  });
+
+  it('a correlated entity is {type, entityData} on the HEADER, not a flat party nested inside', () => {
+    // Novus types `otherCorrelatedEntities` as EntityType[] on invoiceHeader, and ASP.NET
+    // drops unknown members silently — nested as a flat party none of it ever reached AADE.
+    expect(novus).toMatch(/entityData:\s*\{/);
+    expect(novus).toMatch(/type: e\.type \?\? MYDATA_ENTITY_TYPE_OTHER/);
+    const odn = novus.slice(novus.indexOf('otherDeliveryNoteHeader:'));
+    const odnBlock = odn.slice(0, odn.indexOf('},'));
+    expect(odnBlock, 'otherCorrelatedEntities must not sit inside otherDeliveryNoteHeader')
+      .not.toMatch(/otherCorrelatedEntities/);
+  });
+
+  it('each v2.0.2 indication is emitted only where AADE accepts it', () => {
+    // "Αποδεκτό μόνο για παραστατικά 9.1, 9.2 και 9.3".
+    expect(novus).toMatch(/header\.toWeigh && isDispatchNoteType\(header\.invoiceType\)/);
+    // "Αποδεκτό μόνο για παραστατικά διακίνησης" — a ΤΔΑ counts.
+    expect(novus).toMatch(/header\.nonObligatedRecipient && \(isMovement \|\| header\.isDeliveryNote\)/);
+    expect(novus).toMatch(/header\.withoutDigitalTransportTracking && \(isMovement \|\| header\.isDeliveryNote\)/);
+    // "Αποδεκτό μόνο για παραστατικά τύπων 8.4 και 8.5".
+    expect(novus).toMatch(/MYDATA_THIRD_PARTY_COLLECTION_TYPES\.includes\(header\.invoiceType\)/);
+    // "Δεν είναι αποδεκτό για τα παραστατικά των τύπων 1.6, 2.4 και 5.1".
+    expect(novus).toMatch(/!MYDATA_NO_MULTIPLE_MARKS_TYPES\.includes\(header\.invoiceType\)/);
+  });
+
+  it('the restricted code tables are REFUSED, not silently dropped', () => {
+    // Dropping a code the operator stated transmits a document saying less than the one they
+    // approved — the worse of the two failures.
+    expect(novus).toMatch(/is not an AADE code/);
+    expect(novus).toMatch(/AADE publishes it read-only/);
+    expect(novus).toMatch(/acceptsOnDocumentType\(row, header\.invoiceType\)/);
+  });
+
+  it('isDeliveryNote is refused only where it is provably contradictory', () => {
+    // AADE publishes no enumeration of the accepting types, so only "a movement document
+    // cannot also BE one" is ours to refuse — the rest is AADE's call, like a withdrawn
+    // move purpose. `canBeDeliveryNote` governs the picker, not the transmission.
+    expect(novus).toMatch(/header\.isDeliveryNote && isMovementDocType\(header\.invoiceType\)/);
+    expect(novus).not.toMatch(/!canBeDeliveryNote\(header\.invoiceType\)/);
+  });
+
+  it('the package count is an integer, because AADE types it xs:int', () => {
+    const builder = read('supabase/functions/_shared/fiscal/invoice-builder.ts');
+    expect(builder).toMatch(/!Number\.isInteger\(quantity\) \|\| quantity <= 0/);
+  });
+
+  it('toWeigh and the 8.4/8.5 pair are pinned to the types the spec names', () => {
+    expect(MYDATA_DISPATCH_NOTE_TYPES).toEqual(['9.1', '9.2', '9.3']);
+    expect(isDispatchNoteType('9.3')).toBe(true);
+    expect(isDispatchNoteType('10.1')).toBe(false);
+    expect(MYDATA_THIRD_PARTY_COLLECTION_TYPES).toEqual(['8.4', '8.5']);
+    expect(MYDATA_NO_MULTIPLE_MARKS_TYPES).toEqual(['1.6', '2.4', '5.1']);
+    expect(MYDATA_ENTITY_TYPE_OTHER).toBe(6);
+  });
+
+  it('the credit-note builder does not read a column credit_note_items has not got', () => {
+    const builder = read('supabase/functions/_shared/fiscal/invoice-builder.ts');
+    const cn = builder.slice(
+      builder.indexOf('buildCreditNoteInputFromDb'),
+      builder.indexOf('buildDeliveryNoteInputFromDb'),
+    );
+    expect(cn, 'credit_note_items has no move_purpose_line — the read is permanently undefined')
+      .not.toMatch(/move_purpose_line/);
+  });
+});
+
+describe('the printed movement says what the transmitted one says', () => {
+  it('a ΔΠΠ prints its receiving-note reason, not a blank purpose line', () => {
+    const pdf = read('supabase/functions/finance-invoice-pdf/index.ts');
+    expect(pdf).toMatch(/inv\.receiving_note_purpose != null/);
+    expect(pdf).toMatch(/receivingNotePurposeLabel\(inv\.receiving_note_purpose/);
+    expect(pdf).toMatch(/inv\.other_receiving_note_purpose_title/);
+  });
+
+  it('the printed document type follows the transmitted one', () => {
+    const pdf = read('supabase/functions/finance-invoice-pdf/index.ts');
+    expect(pdf).not.toMatch(/document_type:\s*['"]9\.3['"]/);
+    expect(pdf).toMatch(/row\.mydata_document_type \?\? \(row\.kind === ['"]receipt['"]/);
+  });
+
+  it('both label tables title the whole movement family, so none falls through to INVOICE', () => {
+    for (const f of [
+      'src/modules/finance/invoice-templates/labels.ts',
+      'supabase/functions/finance-invoice-pdf/index.ts',
+    ]) {
+      const src = read(f);
+      expect(src, `${f} does not title 9.1/9.2`).toMatch(/case '9\.1': case '9\.2': case '9\.3'/);
+      expect(src, `${f} does not title the ΔΠΠ pair`).toMatch(/case '10\.1': case '10\.2': return L\.receivingNote/);
+      expect(src, `${f} has no receivingNote label`).toMatch(/receivingNote:/);
     }
   });
 });

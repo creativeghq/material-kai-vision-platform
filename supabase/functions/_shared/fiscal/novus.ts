@@ -12,12 +12,20 @@ import type {
 } from './types.ts';
 import { isUncodedMydataUnit, isUnnamedLineName, mydataUnitCode } from './types.ts';
 import { mydataPaymentLabel } from '../paymentVocabulary.generated.ts';
+import type { MydataRestrictedCode } from './fiscalVocabulary.generated.ts';
 import {
+  MYDATA_ENTITY_TYPE_OTHER,
+  MYDATA_INVOICE_VARIATION_TYPES,
   MYDATA_PACKAGING_TYPE_OTHER,
   MYDATA_RECEIVING_NOTE_PURPOSE_OTHER,
-  canBeDeliveryNote,
+  MYDATA_NO_MULTIPLE_MARKS_TYPES,
+  MYDATA_SPECIAL_INVOICE_CATEGORIES,
+  MYDATA_THIRD_PARTY_COLLECTION_TYPES,
+  acceptsOnDocumentType,
+  isDispatchNoteType,
   isMovementDocType,
   isReceivingNoteType,
+  movementDocTypeLabel,
   mydataClassificationLedger,
   receivingNotePurposeLabel,
   selectableReceivingNotePurposes,
@@ -119,16 +127,43 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
     }
   }
 
-  // `isDeliveryNote` makes the document ITSELF the movement record (ΤΔΑ). AADE accepts it on a
-  // fixed set of types; on any other it is refused, so refuse it here where the type is named.
-  if (header.isDeliveryNote && !canBeDeliveryNote(header.invoiceType)) {
+  // `isDeliveryNote` makes the document ITSELF the movement record (ΤΔΑ). AADE publishes no
+  // enumeration of the types that accept it, so only the provably contradictory case is refused
+  // here — a movement document cannot also "be" one. Everything else is AADE's call, the same
+  // way a withdrawn move purpose is: see `canBeDeliveryNote`, which governs the picker.
+  if (header.isDeliveryNote && isMovementDocType(header.invoiceType)) {
     throw new Error(
-      `Refusing to transmit ${header.invoiceType} as a delivery note: myDATA does not accept ` +
-        `isDeliveryNote on this type. ` +
-        (isMovementDocType(header.invoiceType)
-          ? `${header.invoiceType} already IS a movement document — drop the flag.`
-          : `Issue a separate movement document (9.3) alongside it instead.`),
+      `Refusing to transmit ${header.invoiceType} with isDeliveryNote: ${header.invoiceType} ` +
+        `already IS a movement document (${movementDocTypeLabel(header.invoiceType)}) — drop the flag.`,
     );
+  }
+
+  // AADE restricts §8.19 and §8.18 per document type, and marks the two ΦΗΜ special categories
+  // read-only. A code this type refuses is a rejection we can see coming — named here rather
+  // than dropped, because a document that transmits saying less than the one the operator
+  // approved is the worse of the two failures.
+  const restricted: [number | undefined, readonly MydataRestrictedCode[], string][] = [
+    [header.specialInvoiceCategory, MYDATA_SPECIAL_INVOICE_CATEGORIES, 'special invoice category'],
+    [header.invoiceVariationType, MYDATA_INVOICE_VARIATION_TYPES, 'invoice variation type'],
+  ];
+  for (const [code, table, what] of restricted) {
+    if (code == null) continue;
+    const row = table.find((r) => r.code === code);
+    if (!row) {
+      throw new Error(`Refusing to transmit: ${what} ${code} is not an AADE code.`);
+    }
+    if (!row.submittable) {
+      throw new Error(
+        `Refusing to transmit ${what} ${code} (${row.en}): AADE publishes it read-only, so it ` +
+          `can be received but never sent.`,
+      );
+    }
+    if (!acceptsOnDocumentType(row, header.invoiceType)) {
+      throw new Error(
+        `Refusing to transmit ${what} ${code} (${row.en}) on a ${header.invoiceType}: AADE ` +
+          `accepts it only on ${row.validFor.join(', ')}.`,
+      );
+    }
   }
 
   // A package declaration is a COUNT, and code 6 (Λοιπά) has to name what it is.
@@ -386,8 +421,10 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
           ...(input.correlatedInvoices?.length
             ? { correlatedInvoices: input.correlatedInvoices }
             : {}),
-          // 9.3 delivery note: transport / movement block.
-          ...(header.movePurpose != null
+          // The transport block belongs to EVERY movement document, not only one that states a
+          // `movePurpose` — a Δελτίο Ποσοτικής Παραλαβής states `receivingNotePurpose` instead,
+          // and gating on the purpose dropped its addresses, shipping branches and transporter.
+          ...(isMovement
             ? {
                 vatPaymentSuspension: false,
                 dispatchDate: header.dispatchDate ?? header.issueDate,
@@ -401,45 +438,75 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
                   // the operator's own premises was filed as headquarters → headquarters.
                   startShippingBranch: header.loadingBranch ?? 0,
                   completeShippingBranch: header.deliveryBranch ?? 0,
-                  // Third parties on the movement (drop-ship: goods leaving a supplier's
-                  // warehouse for our customer). Omitted entirely when there are none, so the
-                  // envelope is byte-identical to before for an ordinary movement — the same
-                  // arrangement as the B2G block.
-                  ...(header.otherCorrelatedEntities?.length
-                    ? { otherCorrelatedEntities: header.otherCorrelatedEntities }
-                    : {}),
                 },
-                movePurpose: header.movePurpose,
-                ...(header.movePurposeLabel ? { movePurposeLabel: header.movePurposeLabel } : {}),
-                // AADE requires the free-text name when the purpose is 19 (Λοιπές Διακινήσεις).
-                ...(header.otherMovePurposeTitle ? { otherMovePurposeTitle: header.otherMovePurposeTitle } : {}),
+                ...(header.movePurpose != null
+                  ? {
+                      movePurpose: header.movePurpose,
+                      ...(header.movePurposeLabel ? { movePurposeLabel: header.movePurposeLabel } : {}),
+                      // AADE requires the free-text name when the purpose is 19 (Λοιπές Διακινήσεις).
+                      ...(header.otherMovePurposeTitle ? { otherMovePurposeTitle: header.otherMovePurposeTitle } : {}),
+                    }
+                  : {}),
+              }
+            : {}),
+          // Third parties on the movement (drop-ship: goods leaving a supplier's warehouse for
+          // our customer). AADE's `EntityType` is `{type, entityData}` and lives on the HEADER —
+          // nested inside `otherDeliveryNoteHeader` as a flat party it matched no member of
+          // either schema, and ASP.NET drops unknown members silently, so none of this has ever
+          // reached AADE. `type` (§8.20) is what makes a transporter recognisable as one.
+          ...(header.otherCorrelatedEntities?.length
+            ? {
+                otherCorrelatedEntities: header.otherCorrelatedEntities.map((e) => ({
+                  type: e.type ?? MYDATA_ENTITY_TYPE_OTHER,
+                  entityData: {
+                    vatNumber: e.vatNumber,
+                    country: e.country,
+                    branch: e.branch ?? 0,
+                    ...(e.name ? { name: e.name } : {}),
+                    ...(e.address ? { address: e.address } : {}),
+                  },
+                })),
               }
             : {}),
           // ── myDATA v2.0.2 ────────────────────────────────────────────────────────────
-          // Each is emitted only when the document states it: a flag we never set must reach
-          // AADE as absent, not as an asserted `false`, because the two are different claims.
+          // Each is emitted only when the document states it AND AADE accepts it on this type:
+          // a flag we never set must reach AADE as absent, not as an asserted `false`, and one
+          // AADE refuses on this type must not be sent at all. The restrictions are the spec's
+          // own ("Αποδεκτό μόνο για…"), not ours.
           ...(header.isDeliveryNote ? { isDeliveryNote: true } : {}),
-          ...(header.receivingNotePurpose != null
+          ...(header.receivingNotePurpose != null && isReceivingNoteType(header.invoiceType)
             ? { receivingNotePurpose: header.receivingNotePurpose }
             : {}),
           ...(header.otherReceivingNotePurposeTitle
+            && header.receivingNotePurpose === MYDATA_RECEIVING_NOTE_PURPOSE_OTHER
             ? { otherReceivingNotePurposeTitle: String(header.otherReceivingNotePurposeTitle).slice(0, 150) }
             : {}),
-          ...(header.nonObligatedRecipient ? { nonObligatedRecipient: true } : {}),
-          ...(header.withoutDigitalTransportTracking ? { withoutDigitalTransportTracking: true } : {}),
-          ...(header.toWeigh ? { toWeigh: true } : {}),
+          // Both are "αποδεκτό μόνο για παραστατικά διακίνησης" — a movement document, which a
+          // ΤΔΑ also is.
+          ...(header.nonObligatedRecipient && (isMovement || header.isDeliveryNote)
+            ? { nonObligatedRecipient: true } : {}),
+          ...(header.withoutDigitalTransportTracking && (isMovement || header.isDeliveryNote)
+            ? { withoutDigitalTransportTracking: true } : {}),
+          // "Αποδεκτό μόνο για παραστατικά 9.1, 9.2 και 9.3" — not on a ΔΠΠ, not on a ΤΔΑ.
+          ...(header.toWeigh && isDispatchNoteType(header.invoiceType) ? { toWeigh: true } : {}),
           ...(header.reverseDeliveryNote ? { reverseDeliveryNote: true } : {}),
           ...(header.reverseDeliveryNotePurpose != null
             ? { reverseDeliveryNotePurpose: header.reverseDeliveryNotePurpose }
             : {}),
+          // Both are validated above and refused rather than dropped: silently removing a code
+          // the operator stated would transmit a document that says less than the one they saw.
           ...(header.specialInvoiceCategory != null
             ? { specialInvoiceCategory: header.specialInvoiceCategory }
             : {}),
           ...(header.invoiceVariationType != null
             ? { invoiceVariationType: header.invoiceVariationType }
             : {}),
-          ...(header.thirdPartyCollection ? { thirdPartyCollection: true } : {}),
+          // "Αποδεκτό μόνο για παραστατικά τύπων 8.4 και 8.5" (the POS receipt pair).
+          ...(header.thirdPartyCollection && MYDATA_THIRD_PARTY_COLLECTION_TYPES.includes(header.invoiceType)
+            ? { thirdPartyCollection: true } : {}),
+          // "Δεν είναι αποδεκτό για τα παραστατικά των τύπων 1.6, 2.4 και 5.1."
           ...(header.multipleConnectedMarks?.length
+            && !MYDATA_NO_MULTIPLE_MARKS_TYPES.includes(header.invoiceType)
             ? { multipleConnectedMarks: header.multipleConnectedMarks }
             : {}),
         },

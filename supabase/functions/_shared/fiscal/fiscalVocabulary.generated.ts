@@ -212,6 +212,9 @@ export const MYDATA_ENTITY_TYPES: readonly MydataNamedCode[] = [
 /** The transporter — the party myDATA v2.0.2 validates `ConfirmDeliveryOutcome` against. */
 export const MYDATA_ENTITY_TYPE_TRANSPORTER = 3;
 
+/** Λοιπές Συσχετιζόμενες Οντότητες — what a party that states no category falls back to. */
+export const MYDATA_ENTITY_TYPE_OTHER = 6;
+
 export function entityTypeLabel(
   code: number | string | null | undefined,
   lang: 'el' | 'en' = 'en',
@@ -296,6 +299,13 @@ export function isMovementDocType(documentType: string | null | undefined): bool
   return MYDATA_MOVEMENT_DOC_TYPES.some((t) => t.code === String(documentType ?? ''));
 }
 
+/** The 9.x dispatch family. `toWeigh` is accepted on these three and nowhere else. */
+export const MYDATA_DISPATCH_NOTE_TYPES: readonly string[] = ['9.1', '9.2', '9.3'];
+
+export function isDispatchNoteType(documentType: string | null | undefined): boolean {
+  return MYDATA_DISPATCH_NOTE_TYPES.includes(String(documentType ?? ''));
+}
+
 export function movementDocTypeLabel(
   code: string | null | undefined,
   lang: 'el' | 'en' = 'en',
@@ -305,9 +315,11 @@ export function movementDocTypeLabel(
 }
 
 /**
- * Document types that may ALSO be a movement document (`isDeliveryNote`). myDATA v2.0.2 added
- * 1.4, 3.1, 3.2 and 11.5; the rest already carried goods this way, which is what makes a ΤΔΑ
- * one document rather than an invoice plus a separate 9.3.
+ * Document types a PICKER offers `isDeliveryNote` on. myDATA v2.0.2 names 1.4, 3.1, 3.2 and
+ * 11.5 as additions to the set, but AADE publishes no enumeration of it — the field table
+ * leaves the restriction column blank and only gives 1.1 as an example. So this list is
+ * INFERRED, and like `MydataMovePurpose.submittable` it governs what we offer, never a
+ * transmit-time refusal: AADE rejecting the combination is the authority, not us.
  */
 export const MYDATA_IS_DELIVERY_NOTE_TYPES: readonly string[] = [
   '1.1', '1.2', '1.3', '1.4', '1.5', '1.6',
@@ -321,3 +333,9 @@ export const MYDATA_IS_DELIVERY_NOTE_TYPES: readonly string[] = [
 export function canBeDeliveryNote(documentType: string | null | undefined): boolean {
   return MYDATA_IS_DELIVERY_NOTE_TYPES.includes(String(documentType ?? ''));
 }
+
+/** `thirdPartyCollection` — "αποδεκτό μόνο για παραστατικά τύπων 8.4 και 8.5" (POS receipts). */
+export const MYDATA_THIRD_PARTY_COLLECTION_TYPES: readonly string[] = ['8.4', '8.5'];
+
+/** `multipleConnectedMarks` — "δεν είναι αποδεκτό" on these three. */
+export const MYDATA_NO_MULTIPLE_MARKS_TYPES: readonly string[] = ['1.6', '2.4', '5.1'];

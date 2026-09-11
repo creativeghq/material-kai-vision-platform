@@ -53,9 +53,10 @@ export const NewDeliveryNoteDialog: React.FC<{
   const [toAddr, setToAddr] = useState({ ...emptyAddr });
   // Chosen customer sub-unit as the delivery point (null = main address).
   const [toUnitId, setToUnitId] = useState<string | null>(null);
-  // myDATA v2.0.2. A goods receipt is a Δελτίο Ποσοτικής Παραλαβής — 10.1 when it correlates to
-  // a document we hold, 10.2 when it does not — and AADE requires it to say WHY it was issued.
-  const [receiptType, setReceiptType] = useState<'10.1' | '10.2'>('10.2');
+  // myDATA v2.0.2. A goods receipt is a Δελτίο Ποσοτικής Παραλαβής. Only the NON-correlated
+  // note (10.2) is offered: 10.1 requires the MARK of the document it correlates to, and a
+  // delivery note carries no correlation yet — offering it would build a document AADE refuses.
+  const receiptType = '10.2' as const;
   const [receivingPurpose, setReceivingPurpose] = useState('');
   const [receivingPurposeTitle, setReceivingPurposeTitle] = useState('');
   const [nonObligatedRecipient, setNonObligatedRecipient] = useState(false);
@@ -64,20 +65,15 @@ export const NewDeliveryNoteDialog: React.FC<{
   const [packagings, setPackagings] = useState<{ packagingType: number; quantity: number; otherPackagingTypeTitle?: string }[]>([]);
   const [busy, setBusy] = useState(false);
 
+  // Code 5 (ΠΟΣΟΤΙΚΟΣ ΕΛΕΓΧΟΣ) is accepted on 10.1 only, so the picker for a 10.2 never shows it.
   const receivingPurposeOptions = selectableReceivingNotePurposes(receiptType);
-  // A code valid on 10.1 only must not survive a switch to 10.2 — it would be refused at AADE.
-  useEffect(() => {
-    if (receivingPurpose && !receivingPurposeOptions.some((p) => String(p.code) === receivingPurpose)) {
-      setReceivingPurpose('');
-    }
-  }, [receiptType, receivingPurpose, receivingPurposeOptions]);
 
   useEffect(() => {
     if (!open) return;
     setKind('dispatch'); setCustomer(''); setNotes(''); setLines([]); setBranchCode('0');
     setTransportDate(''); setVehicleNumber(''); setMovePurpose('1');
     setFromAddr({ ...emptyAddr }); setToAddr({ ...emptyAddr }); setToUnitId(null);
-    setReceiptType('10.2'); setReceivingPurpose(''); setReceivingPurposeTitle('');
+    setReceivingPurpose(''); setReceivingPurposeTitle('');
     setNonObligatedRecipient(false); setWithoutDigitalTracking(false); setToWeigh(false);
     setPackagings([]);
     (async () => {
@@ -158,7 +154,8 @@ export const NewDeliveryNoteDialog: React.FC<{
         mydataDocumentType: kind === 'receipt' ? receiptType : null,
         receivingNotePurpose: kind === 'receipt' ? Number(receivingPurpose) : null,
         otherReceivingNotePurposeTitle: kind === 'receipt' ? receivingPurposeTitle.trim() || null : null,
-        nonObligatedRecipient, withoutDigitalTransportTracking: withoutDigitalTracking, toWeigh,
+        nonObligatedRecipient, withoutDigitalTransportTracking: withoutDigitalTracking,
+        toWeigh: kind === 'dispatch' ? toWeigh : false,
         packagings: packagings.filter((p) => p.quantity > 0),
         shipFrom: [fromAddr.street, fromAddr.number].filter(Boolean).join(' ') || undefined,
         shipTo: [toAddr.street, toAddr.number].filter(Boolean).join(' ') || undefined,
@@ -266,18 +263,7 @@ export const NewDeliveryNoteDialog: React.FC<{
                   </SelectContent>
                 </Select>
               </div>
-            ) : (
-              <div className="space-y-1">
-                <Label className="text-xs">Receipt note type</Label>
-                <Select value={receiptType} onValueChange={(v: any) => setReceiptType(v)}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="10.1">10.1 — Correlated</SelectItem>
-                    <SelectItem value="10.2">10.2 — Non-correlated</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            ) : null}
           </div>
 
           {/* myDATA v2.0.2: a ΔΠΠ must state its issuance reason — AADE rejects one without. */}
@@ -339,9 +325,10 @@ export const NewDeliveryNoteDialog: React.FC<{
                     </SelectContent>
                   </Select>
                   <Input
-                    type="number" min={1} className="h-8 text-xs"
+                    type="number" min={1} step={1} className="h-8 text-xs"
                     value={p.quantity}
-                    onChange={(e) => setPackagings((ps) => ps.map((x, idx) => idx === i ? { ...x, quantity: Number(e.target.value) } : x))}
+                    onChange={(e) => setPackagings((ps) => ps.map((x, idx) => idx === i
+                      ? { ...x, quantity: Math.max(1, Math.trunc(Number(e.target.value) || 1)) } : x))}
                   />
                   {p.packagingType === MYDATA_PACKAGING_TYPE_OTHER ? (
                     <Input
@@ -358,10 +345,13 @@ export const NewDeliveryNoteDialog: React.FC<{
 
           {/* myDATA v2.0.2 movement indications. */}
           <div className="flex flex-wrap gap-4">
-            <label className="flex items-center gap-2 text-xs">
-              <Checkbox checked={toWeigh} onCheckedChange={(v) => setToWeigh(v === true)} />
-              To be weighed
-            </label>
+            {/* AADE: "αποδεκτό μόνο για παραστατικά 9.1, 9.2 και 9.3" — not on a ΔΠΠ. */}
+            {kind === 'dispatch' ? (
+              <label className="flex items-center gap-2 text-xs">
+                <Checkbox checked={toWeigh} onCheckedChange={(v) => setToWeigh(v === true)} />
+                To be weighed
+              </label>
+            ) : null}
             <label className="flex items-center gap-2 text-xs">
               <Checkbox checked={nonObligatedRecipient} onCheckedChange={(v) => setNonObligatedRecipient(v === true)} />
               Recipient not myDATA-obliged
