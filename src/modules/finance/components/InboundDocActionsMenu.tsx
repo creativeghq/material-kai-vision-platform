@@ -15,7 +15,7 @@ import {
 } from '@/components/core/ui/dropdown-menu';
 import { AddIssuerToCrmDialog } from '@/modules/finance/components/AddIssuerToCrmDialog';
 import type { InboundDocument } from '@/modules/finance/services/inboundService';
-import { docFamily, isPayrollDocument, needsLineDetail } from '@/modules/finance/utils/inboundProvenance';
+import { docFamily, isCancelledDocument, isPayrollDocument, needsLineDetail } from '@/modules/finance/utils/inboundProvenance';
 import { InboundDocPreviewDialog } from '@/modules/finance/components/InboundDocPreviewDialog';
 
 interface Props {
@@ -64,22 +64,25 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
   // Payroll (17.x) rides in on the same RequestTransmittedDocs call as the foreign purchases —
   // it is here to be VISIBLE, not to be actioned.
   const isPayroll = isPayrollDocument(doc.doc_type);
+  // AADE voided it. Nothing arrived, nothing is owed, and nothing may be itemised — the only
+  // thing left to do with it is dismiss it.
+  const isCancelled = isCancelledDocument(doc);
   // And nothing was delivered, so there is nothing to receive either.
-  const canReceive = (doc.status === 'new' || doc.status === 'classified') && !hasOrder && !isPayroll;
+  const canReceive = (doc.status === 'new' || doc.status === 'classified') && !hasOrder && !isPayroll && !isCancelled;
   const canDismiss = doc.status === 'new';
   /** Value-only lines: the money is known, what was bought is not. Blocks warehouse receive. */
   const needsDetail = needsLineDetail(doc);
   // Offered on `lines_source='none'` and nowhere else — a document whose lines arrived under the
   // supplier's own MARK must not be rewritten, or our records diverge from the tax record. Rent
   // and payroll have nothing to itemise, so they are not asked to.
-  const canAddDetail = needsDetail && !isPayroll && docFamily(doc.doc_type) !== '16'
+  const canAddDetail = needsDetail && !isPayroll && !isCancelled && docFamily(doc.doc_type) !== '16'
     && doc.status !== 'dismissed' && !!onAddLineDetail && (doc.total_net ?? 0) > 0;
   // Paying settles an expense that EXISTS. A document that hasn't been booked yet is settled by
   // booking it — "Add to Expenses" carries a "Mark as paid" tick — so there is one way in and it
   // always leaves an order behind the money. This item used to convert the document itself on
   // save, which produced a paid bill with no order to match it against: the exact shape the
   // Money section was reorganised to prevent.
-  const canPay = doc.status !== 'dismissed' && !!doc.created_supplier_bill_id;
+  const canPay = doc.status !== 'dismissed' && !isCancelled && !!doc.created_supplier_bill_id;
   const hasIssuer = !!(doc.issuer_vat || doc.issuer_name);
   /** Already a CRM company — adding again would only make a duplicate to merge later. */
   const inCrm = !!crmCompanyId;
@@ -146,11 +149,13 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
               to match it against, which is precisely what 3-way match exists to prevent. */}
           <DropdownMenuItem
             onClick={onCreateOrder}
-            disabled={hasOrder || isPayroll || doc.status === 'dismissed' || !onCreateOrder}
-            title={isPayroll ? 'Payroll is recorded in HR, never as a supplier bill — this document is here for visibility.' : undefined}
+            disabled={hasOrder || isPayroll || isCancelled || doc.status === 'dismissed' || !onCreateOrder}
+            title={isCancelled
+              ? 'Cancelled at AADE — a void document cannot become an expense.'
+              : isPayroll ? 'Payroll is recorded in HR, never as a supplier bill — this document is here for visibility.' : undefined}
           >
             <ShoppingCart className="h-4 w-4 mr-2" />
-            {isPayroll ? 'Payroll — recorded in HR' : hasOrder ? 'Already in Expenses' : 'Add to Expenses'}
+            {isCancelled ? 'Cancelled at AADE' : isPayroll ? 'Payroll — recorded in HR' : hasOrder ? 'Already in Expenses' : 'Add to Expenses'}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={onRecordPayment} disabled={!canPay}>
             <Wallet className="h-4 w-4 mr-2" /> Record payment

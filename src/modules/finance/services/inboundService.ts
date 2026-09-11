@@ -73,6 +73,15 @@ export interface InboundAddress {
   city: string | null;
 }
 
+/** One AADE expense classification (`ecls:*`) as the issuer transmitted it, per line. */
+export interface InboundExpenseClassification {
+  line_number: number | null;
+  classification_type: string | null;
+  classification_category: string | null;
+  amount: number | null;
+  id: number | null;
+}
+
 /**
  * The registry-sourced identity of an issuer, read off their CRM company record. Every field
  * here is one myDATA never sends — see [[inboundService.issuerProfile]].
@@ -144,6 +153,13 @@ export interface InboundDocument {
   counterpart_vat: string | null;
   counterpart_name: string | null;
   counterpart_address: InboundAddress | null;
+  /**
+   * MARK of the AADE cancellation that voided this document. Non-null IS the cancelled fact;
+   * there is no boolean twin to drift against it.
+   */
+  cancelled_by_mark: string | null;
+  /** Per-line `ecls:*` as transmitted. A line may carry more than one, so it is a flat array. */
+  expenses_classification: InboundExpenseClassification[] | null;
   /** ΕΙΝΑΙ & ΔΑ — the document doubles as a delivery note. */
   is_delivery_note: boolean | null;
   move_purpose: string | null;
@@ -244,6 +260,7 @@ export const inboundService = {
     'issuer_vat', 'issuer_name', 'issue_date', 'dispatch_date',
     'vehicle_number', 'doc_type', 'series', 'aa', 'uid', 'authentication_code', 'download_url',
     'issuer_country', 'issuer_branch', 'counterpart_vat', 'counterpart_name', 'is_delivery_note',
+    'cancelled_by_mark', 'expenses_classification',
     'move_purpose', 'vat_payment_suspension', 'total_withheld', 'total_fees', 'total_stamp_duty',
     'total_other_taxes', 'total_deductions', 'currency', 'total_net', 'total_vat', 'total_gross',
     'status', 'created_supplier_bill_id', 'category_id', 'created_at', 'updated_at',

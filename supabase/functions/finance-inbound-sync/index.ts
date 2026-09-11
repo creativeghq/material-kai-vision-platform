@@ -304,6 +304,20 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
           comments: pickTag(lb, 'lineComments') || null,
         }));
 
+        // What the issuer classified each line as (AADE `ecls:*`). Flat and keyed by line_number
+        // because a single line may carry MORE than one — 12 of ours do, and keeping one per line
+        // would drop the second exactly the way this whole field was being dropped.
+        const expensesClassification = pickAllTagBlocks(b, 'invoiceDetails').flatMap((lb) => {
+          const lineNumber = num(pickTag(lb, 'lineNumber'));
+          return pickAllTagBlocks(lb, 'expensesClassification').map((cb) => ({
+            line_number: lineNumber,
+            classification_type: pickTag(cb, 'classificationType'),
+            classification_category: pickTag(cb, 'classificationCategory'),
+            amount: num(pickTag(cb, 'amount')),
+            id: num(pickTag(cb, 'id')),
+          }));
+        });
+
         const paymentMethods = pickAllTagBlocks(b, 'paymentMethodDetails').map((pb) => ({
           type: num(pickTag(pb, 'type')),
           amount: num(pickTag(pb, 'amount')),
@@ -391,6 +405,12 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
           // 2.x Greek service billing. `none` is what gates the line editor, and what keeps AI
           // product extraction off documents where it could only invent something.
           lines_source: lines.some((l) => String(l.item_description ?? '').trim()) ? 'mydata' : 'none',
+          // AADE reports a cancellation on the document's OWN record, so a void invoice arrives
+          // looking like any other. Parsed away until 2026-09-11, which left 15 cancelled
+          // documents (EUR 6,986) sitting in the inbox offering "Add to Expenses". The mark IS
+          // the cancelled fact — `_inbound_doc_to_supplier_bill_core` refuses on it.
+          cancelled_by_mark: pickTag(b, 'cancelledByMark'),
+          expenses_classification: expensesClassification.length > 0 ? expensesClassification : null,
           category_id: defaultCategoryId,
           raw: { xml: b.slice(0, 20000) },
         };

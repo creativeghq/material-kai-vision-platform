@@ -44,6 +44,15 @@ export function inboundDetailLabel(linesSource: string | null | undefined): stri
 export const needsLineDetail = (doc: { lines_source?: string | null }): boolean =>
   (doc.lines_source ?? 'none') === 'none';
 
+/**
+ * AADE voided this document. Nothing may be booked, received or itemised against it — the
+ * refusal itself lives in `_inbound_doc_to_supplier_bill_core`, because PostgREST and the agent
+ * tools reach that function without passing this file; hiding the action here only spares the
+ * operator an error they cannot act on.
+ */
+export const isCancelledDocument = (doc: { cancelled_by_mark?: string | null }): boolean =>
+  String(doc.cancelled_by_mark ?? '').trim() !== '';
+
 /** myDATA `invoiceType` family — the part before the dot. `'14.1'` -> `'14'`. */
 export const docFamily = (docType: string | null | undefined): string =>
   String(docType ?? '').split('.')[0];
