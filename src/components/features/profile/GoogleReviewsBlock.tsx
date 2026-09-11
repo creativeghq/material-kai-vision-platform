@@ -7,6 +7,7 @@
  * attribution so a reader is never in doubt which they are looking at.
  */
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { ExternalLink, AlertTriangle, Star } from 'lucide-react';
 
 import { Card, CardContent } from '@/components/core/ui/card';
@@ -14,8 +15,20 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/core/ui/avatar
 import { PlatformIcon } from '@/components/core/icons/PlatformIcon';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { formatDate } from '@/utils/datetime';
+import { safeHref, safeImageSrc } from '@/utils/safeUrl';
+import { destinationRoute } from '@/config/appDestinations';
 import { StarRow } from './StarRow';
 import { showsGoogleReviews, type GoogleReviewsPayload, type PublishedGoogleReview } from './googleReviews';
+
+/**
+ * These URLs reach us through `social_accounts.metadata`, and that column is writable by any
+ * signed-in user on their own row — so on a page an anonymous visitor loads they are untrusted
+ * input, not Google's word. Anything that is not http(s) is dropped rather than linked: an empty
+ * fallback lets the caller render no link at all, which is the honest outcome for a bad URL.
+ */
+const httpLink = (url: string | null): string | null => (url ? safeHref(url, '') || null : null);
+
+const SOCIAL_ACCOUNTS_ROUTE = destinationRoute('social-accounts') ?? '/profile?tab=social-accounts';
 
 function initials(name: string | null): string {
   const t = (name ?? '').trim();
@@ -27,8 +40,8 @@ const ReviewRow: React.FC<{ review: PublishedGoogleReview }> = ({ review }) => (
   <div className="p-4 space-y-2.5">
     <div className="flex items-start gap-3">
       <Avatar className="h-8 w-8 shrink-0">
-        {review.reviewer_avatar_url && (
-          <AvatarImage src={review.reviewer_avatar_url} alt="" referrerPolicy="no-referrer" />
+        {safeImageSrc(review.reviewer_avatar_url) && (
+          <AvatarImage src={safeImageSrc(review.reviewer_avatar_url)!} alt="" referrerPolicy="no-referrer" />
         )}
         <AvatarFallback className="bg-primary/10 text-primary text-xs">
           {initials(review.reviewer_name)}
@@ -67,6 +80,9 @@ export const GoogleReviewsBlock: React.FC<{
   /** The profile's owner sees the states a visitor must not — a broken connection, and silence. */
   isOwn?: boolean;
 }> = ({ data, isOwn = false }) => {
+  const mapsUrl = httpLink(data.maps_url);
+  const reviewUrl = httpLink(data.review_url);
+
   // A connection that is opted in and broken is the owner's problem to fix and nobody else's
   // business. `unknown` lands here too: an unrecognised verdict withholds rather than guessing.
   if (data.status === 'not_shown') return null;
@@ -84,12 +100,12 @@ export const GoogleReviewsBlock: React.FC<{
               : 'The Google Business location this profile publishes is disconnected, switched off, or in a workspace you are no longer a member of. Nothing is being shown to visitors.'
           }
           action={(
-            <a
-              href="/social-media/accounts"
+            <Link
+              to={SOCIAL_ACCOUNTS_ROUTE}
               className="inline-flex items-center gap-1.5 text-sm underline underline-offset-2"
             >
               <ExternalLink className="h-3.5 w-3.5" /> Social accounts
-            </a>
+            </Link>
           )}
         />
       </section>
@@ -106,9 +122,9 @@ export const GoogleReviewsBlock: React.FC<{
           icon={Star}
           title="No Google reviews yet"
           description={`${data.location_name ?? 'Your Google Business location'} is connected and nothing has been left on it yet. New reviews appear here on their own.`}
-          action={data.review_url ? (
+          action={reviewUrl ? (
             <a
-              href={data.review_url}
+              href={reviewUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 text-sm underline underline-offset-2"
@@ -131,9 +147,9 @@ export const GoogleReviewsBlock: React.FC<{
             <span className="text-xs text-muted-foreground">· {data.location_name}</span>
           )}
         </div>
-        {data.maps_url && (
+        {mapsUrl && (
           <a
-            href={data.maps_url}
+            href={mapsUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
@@ -171,10 +187,10 @@ export const GoogleReviewsBlock: React.FC<{
             ))}
           </div>
 
-          {data.total > data.reviews.length && data.maps_url && (
+          {data.total > data.reviews.length && mapsUrl && (
             <div className="border-t border-hairline px-4 py-3 text-center">
               <a
-                href={data.maps_url}
+                href={mapsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-muted-foreground underline underline-offset-2 hover:text-foreground"

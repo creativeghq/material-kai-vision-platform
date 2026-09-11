@@ -100,6 +100,24 @@ export const SocialAccountsTab: React.FC = () => {
     const params = new URLSearchParams(window.location.search);
     const connected = params.get('connected');
     const accountId = params.get('accountId');
+
+    // Zernio can come back having FAILED the selection step rather than with an account — no
+    // locations on the Google account, a cancelled picker, a revoked grant. Bailing on a missing
+    // accountId alone left those redirects silent: no toast, and the error sitting in the URL
+    // bar. Google Business has more of these failure modes than any other platform.
+    const failure = params.get('error') || params.get('error_description');
+    if (failure && !accountId) {
+      toast({
+        title: 'Could not finish connecting',
+        description: failure.replace(/[_-]+/g, ' '),
+        variant: 'destructive',
+      });
+      const clean = new URL(window.location.href);
+      ['error', 'error_description', 'connected', 'platform', 'profileId'].forEach(k => clean.searchParams.delete(k));
+      window.history.replaceState({}, '', clean.toString());
+      return;
+    }
+
     if (!connected || !accountId) return;
 
     (async () => {
@@ -385,7 +403,18 @@ export const SocialAccountsTab: React.FC = () => {
                       They appear in their own section, clearly marked as Google reviews, and are
                       never mixed into the rating clients leave here.
                       {publishedAccountId && publishedAccountId !== account.id && (
-                        <> Another location is published right now — turning this on replaces it.</>
+                        // The opt-in is per USER and this list is per WORKSPACE, so the location
+                        // currently published may be one connected in a workspace that is not the
+                        // active one — in which case no toggle here is on and the replacement
+                        // would otherwise be silent. Say it either way; naming the other location
+                        // is not possible from this read.
+                        <>
+                          {' '}Another Google location is published on your profile right now
+                          {accounts.some((a) => a.id === publishedAccountId)
+                            ? ''
+                            : ', connected in a different workspace'}
+                          {' '}— turning this on replaces it.
+                        </>
                       )}
                     </p>
                   </div>

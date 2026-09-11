@@ -247,6 +247,19 @@ export async function handleZernioOauth(req: Request, body: any): Promise<Respon
       // what is missing is its name and public URLs, which nothing else would ever fetch.
       const gmb = platform === 'googlebusiness' ? await fetchGmbLocation(zernio_account_id) : null;
 
+      // The upsert REPLACES metadata, and the enrichment above is deliberately non-fatal — so a
+      // reconnect where Google was briefly unreachable would erase the stored location name and
+      // both public links, permanently and with only a console warning. Merge onto what is
+      // already there: a failed fetch must leave the last good answer standing.
+      const { data: existing } = await supabase
+        .from('social_accounts')
+        .select('metadata')
+        .eq('workspace_id', workspace_id)
+        .eq('platform', platform)
+        .eq('zernio_account_id', zernio_account_id)
+        .maybeSingle();
+      const priorMeta = ((existing as { metadata?: Record<string, unknown> } | null)?.metadata ?? {});
+
       const { data: savedAccount, error: upsertErr } = await supabase
         .from('social_accounts')
         .upsert({
@@ -260,7 +273,7 @@ export async function handleZernioOauth(req: Request, body: any): Promise<Respon
           followers_count: account.followersCount ?? 0,
           is_active: true,
           last_synced_at: new Date().toISOString(),
-          metadata: { ...(account.metadata ?? {}), ...(gmb ?? {}) },
+          metadata: { ...priorMeta, ...(account.metadata ?? {}), ...(gmb ?? {}) },
         }, {
           onConflict: 'workspace_id,platform,zernio_account_id',
         })

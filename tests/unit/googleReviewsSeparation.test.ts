@@ -43,6 +43,34 @@ describe('the two review sets never merge', () => {
     expect(src).not.toContain('.from(');
   });
 
+  it('every external URL reaching an href goes through the http(s) allowlist', () => {
+    const src = code(GOOGLE_BLOCK);
+    // `maps_url` / `review_url` arrive via `social_accounts.metadata`, and that table's FOR ALL
+    // policy has `WITH CHECK (user_id = auth.uid())` — so any signed-in user can write those on
+    // their own row, and this block renders them to every anonymous visitor of their profile.
+    // A raw one is a stored `javascript:` href on a public page.
+    expect(src).toContain('safeHref');
+    expect(src).not.toMatch(/href=\{\s*data\.(maps_url|review_url)\s*\}/);
+    expect(src).not.toMatch(/src=\{\s*review\.reviewer_avatar_url\s*\}/);
+  });
+
+  it('the Google links point at a registered destination, not a hand-written route', () => {
+    const src = code(GOOGLE_BLOCK);
+    expect(src).toContain('destinationRoute');
+    // /social-media/accounts is requireWorkspaceAdmin and has no publish control on it.
+    expect(src).not.toContain("'/social-media/accounts'");
+    expect(src).not.toContain('"/social-media/accounts"');
+  });
+
+  it('a failed location lookup cannot erase the location already stored', () => {
+    const src = code(OAUTH_HANDLER);
+    // The upsert REPLACES metadata and the enrichment is deliberately non-fatal, so the merge
+    // has to start from what is already in the row or a reconnect during a Google blip wipes
+    // the location name and both public links permanently.
+    expect(src).toMatch(/metadata:\s*\{\s*\.\.\.priorMeta/);
+    expect(src).toContain('.select(\'metadata\')');
+  });
+
   it('nothing on the public profile reads external_reviews directly', () => {
     for (const f of [REVIEWS_SECTION, GOOGLE_BLOCK, 'src/pages/PublicProfilePage.tsx']) {
       expect(code(f), `${f} must go through get_public_profile_google_reviews`)
