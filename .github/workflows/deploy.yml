@@ -591,18 +591,15 @@ jobs:
       - name: 🏥 Health check the live domain
         run: |
           set -euo pipefail
-          # The custom domain, which is exempt from SSO and is what users actually load. This
-          # step previously curled the *deployment* URL and accepted 302 — i.e. it asserted that
-          # Vercel's login redirect responds, and would have passed on a completely broken build.
-          # Measured 2026-08-02: deployment URL -> 302, app.materialshub.gr -> 200.
-          URL="https://app.materialshub.gr"
+          # A 200 on the DOCUMENT is not a working site, and this step used to stop there.
+          # The entry bundle imports the vendor chunks STATICALLY, so one asset 404 is a blank
+          # screen while index.html still answers 200 — which is exactly what shipped on
+          # 2026-09-11 after a deployment prune orphaned `vendor-utils-Da9XzF8z.js`. The probe
+          # fetches every asset the document references, on its PLAIN url and cache-busted, and
+          # fails on `x-vercel-mitigated` so a firewall challenge cannot read as healthy either.
+          # No bypass secret on purpose: this must see what a visitor sees.
           sleep 10
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL" --connect-timeout 30 --max-time 60 || echo "000")
-          echo "📊 HTTP $HTTP_STATUS — $URL"
-          case "$HTTP_STATUS" in
-            200) echo "✅ Live" ;;
-            *) echo "❌ Unhealthy after promote: HTTP $HTTP_STATUS"; exit 1 ;;
-          esac
+          node scripts/probe-live-frontend.mjs "https://app.materialshub.gr"
 
       - name: 📋 Summary
         if: always()
