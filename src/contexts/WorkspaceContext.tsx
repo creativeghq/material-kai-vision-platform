@@ -242,7 +242,17 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   useEffect(() => {
     if (authLoading) return;
-    load();
+    // `load` clears `loading` on every exit path it can SEE, but a REJECTED query — offline, CORS,
+    // an RLS policy that raises — throws straight past all of them and strands the flag at true.
+    // AdminGuard, WorkspaceAdminGuard and CapabilityGuard all render on it above the route
+    // <Suspense>, so one dropped request turned the whole app into a blank screen with nothing
+    // thrown into React and nothing reported. Failing soft HERE covers every await inside `load`,
+    // including ones added later.
+    void load().catch(() => {
+      setMemberships([]);
+      setActiveWorkspaceId(null);
+      setLoading(false);
+    });
   }, [authLoading, load]);
 
   const switchWorkspace = useCallback(
