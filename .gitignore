@@ -42,6 +42,8 @@ nul
 
 # Novus reference docs — local only, not deployed
 src/modules/myaade/NovusProvider/
+# AADE myDATA official spec (PDFs/XSDs) — local only, not deployed
+src/modules/myaade/AadeSpec/
 
 # Build / test / CLI artifacts — generated, never commit
 test-results/
