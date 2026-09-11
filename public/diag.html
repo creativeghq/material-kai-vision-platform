@@ -117,6 +117,10 @@
       jsRow.className = 'v ok';
       watchMount();
     };
+    // The router reads location, and /diag.html is not one of its routes — so the app mounted its
+    // 404 screen and a healthy boot read as "Oops Page not found". Point it at the real entry
+    // route first: only the address changes, the diagnostics DOM above is untouched.
+    try { history.replaceState(null, '', '/'); } catch (e) { /* history blocked */ }
     document.head.appendChild(s);
   };
 

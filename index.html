@@ -136,9 +136,18 @@
         var BOOT_CEILING_MS = 45000;
         var firstError = null;
 
+        // CAPTURE phase, because a <script>/<link> that fails to load fires on the element and
+        // does NOT bubble — so the plain listener recorded nothing for the one failure mode that
+        // matters most here, and the panel had no detail to show.
         window.addEventListener('error', function (e) {
-          if (!firstError) firstError = (e && e.message) || 'script error';
-        });
+          if (firstError) return;
+          var t = e && e.target;
+          if (t && t !== window && (t.src || t.href)) {
+            firstError = 'failed to load ' + (t.src || t.href);
+            return;
+          }
+          firstError = (e && e.message) || 'script error';
+        }, true);
         window.addEventListener('unhandledrejection', function (e) {
           var r = e && e.reason;
           if (!firstError) firstError = String((r && r.message) || r || 'promise rejection');
@@ -299,7 +308,41 @@
           }
           var tried = false;
           try { tried = sessionStorage.getItem(GUARD) === '1'; } catch (e) { /* storage blocked */ }
-          if (tried) { panel(firstError); return; }
+          probeEntry().then(function (netFault) {
+            if (netFault) { panel(networkDetail(netFault), NETWORK_BODY); return; }
+            if (tried) { panel(firstError); return; }
+            purgeAndReload();
+          });
+        }
+
+        /**
+         * A bundle that never DOWNLOADED is not a broken client. An edge challenge, a 5xx, a
+         * captive portal and a dead connection all present as "the app did not boot" — and
+         * purging there signs the user out to repair a fault that was never on their device.
+         * Vercel Attack Challenge Mode did exactly that on 2026-09-11. Ask the network first.
+         */
+        function probeEntry() {
+          var el = document.querySelector('script[type="module"][src]');
+          var url = el ? el.src : location.href;
+          if (!window.fetch) return Promise.resolve(null);
+          try {
+            return fetch(url, { cache: 'no-store', credentials: 'same-origin' })
+              .then(function (r) { return r.ok ? null : 'HTTP ' + r.status; })
+              .catch(function (e) { return String((e && e.message) || 'network error'); });
+          } catch (e) {
+            return Promise.resolve(null);
+          }
+        }
+
+        var NETWORK_BODY = 'We could not download the app itself — the request was refused before it '
+          + 'reached your browser. Nothing is wrong with this device or anything you have saved, so '
+          + 'clearing it would not help. This is on our side; please try again in a moment.';
+
+        function networkDetail(netFault) {
+          return (firstError ? firstError + ' · ' : '') + 'app bundle request: ' + netFault;
+        }
+
+        function purgeAndReload() {
           purge().then(function () {
             try { sessionStorage.setItem(GUARD, '1'); } catch (e) { /* storage blocked */ }
             location.reload();

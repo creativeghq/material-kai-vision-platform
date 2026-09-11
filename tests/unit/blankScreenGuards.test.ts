@@ -81,6 +81,33 @@ describe('the boot watchdog', () => {
     expect(block).toMatch(/document\.body\.appendChild\(host\)/);
   });
 
+  it('asks the NETWORK before wiping the device', () => {
+    const at = html.indexOf('function check()');
+    const block = html.slice(at, html.indexOf('function probeEntry', at));
+    // A bundle refused at the edge (Vercel Attack Challenge Mode, 2026-09-11), a 5xx, a captive
+    // portal and a dead connection all present as "did not boot". Purging there signs the user
+    // out to repair a fault that was never on their device, and does not fix it either.
+    const probeAt = block.indexOf('probeEntry()');
+    const purgeAt = block.indexOf('purgeAndReload()');
+    expect(probeAt).toBeGreaterThan(-1);
+    expect(purgeAt).toBeGreaterThan(-1);
+    expect(probeAt).toBeLessThan(purgeAt);
+  });
+
+  it('says so, rather than blaming the device, when the bundle never downloaded', () => {
+    const body = html.slice(html.indexOf('NETWORK_BODY ='), html.indexOf('function networkDetail'));
+    expect(body).toMatch(/clearing it would not help/i);
+  });
+
+  it('records a resource that failed to LOAD, which does not bubble', () => {
+    const at = html.indexOf("addEventListener('error'");
+    const block = html.slice(at, at + 600);
+    // Without the capture phase a dead <script>/<link> reached no listener, so the panel had no
+    // detail to show for the one failure mode it exists to explain.
+    expect(block).toMatch(/\}, true\)/);
+    expect(block).toContain('failed to load');
+  });
+
   it('reads the purge token back before reloading, or a blocked write loops forever', () => {
     const at = html.indexOf('function pushedPurge');
     const block = html.slice(at, at + 900);
@@ -108,6 +135,14 @@ describe('the diagnostics page tells the truth', () => {
     // Mounted-and-blank is the failure being hunted; a parse check cannot see it.
     expect(diag).toContain('__mkBooted');
     expect(diag).toMatch(/innerText/);
+  });
+
+  it('mounts the app on a route the router knows', () => {
+    // /diag.html is not one of the app's routes, so a healthy boot rendered the 404 screen and
+    // read as a failure to anyone looking at the page.
+    const at = diag.indexOf('history.replaceState');
+    expect(at).toBeGreaterThan(-1);
+    expect(at).toBeLessThan(diag.indexOf('document.head.appendChild(s)'));
   });
 
   it('distinguishes a signed-in device, because signed-out never runs those reads', () => {
