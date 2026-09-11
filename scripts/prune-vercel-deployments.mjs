@@ -40,12 +40,33 @@ async function call(method, path) {
   return { status: res.status, body };
 }
 
+/**
+ * Which scope this token can actually see. A token issued for a personal (Hobby) account 403s
+ * when handed a teamId, and the deploy's own VERCEL_TOKEN does exactly that — so ask, rather
+ * than assume the id that worked for a different token.
+ */
+let SCOPE = TEAM ? `teamId=${TEAM}` : '';
+async function resolveScope() {
+  for (const q of [TEAM ? `teamId=${TEAM}` : '', '']) {
+    const { status, body } = await call('GET', `/v9/projects/${PROJECT}${q ? `?${q}` : ''}`);
+    if (status === 200) {
+      SCOPE = q;
+      console.log(`scope: ${q || '(personal, no teamId)'}`);
+      return body;
+    }
+    console.log(`  project lookup ${q ? 'with' : 'without'} teamId → HTTP ${status}`);
+    if (q === '') break;
+  }
+  throw new Error('project lookup failed with and without teamId — VERCEL_TOKEN needs read access to this project');
+}
+const scoped = (sep) => (SCOPE ? `${sep}${SCOPE}` : '');
+
 /** Every deployment, newest first. `/v6/deployments` returns `uid`, not `id`. */
 async function allDeployments() {
   const out = [];
   let until = null;
   for (;;) {
-    let path = `/v6/deployments?projectId=${PROJECT}&teamId=${TEAM}&limit=100`;
+    let path = `/v6/deployments?projectId=${PROJECT}&limit=100${scoped('&')}`;
     if (until) path += `&until=${until}`;
     const { status, body } = await call('GET', path);
     if (status !== 200) throw new Error(`list failed: HTTP ${status} ${JSON.stringify(body).slice(0, 200)}`);
@@ -65,8 +86,7 @@ async function main() {
     process.exit(2);
   }
 
-  const { status, body: proj } = await call('GET', `/v9/projects/${PROJECT}?teamId=${TEAM}`);
-  if (status !== 200) throw new Error(`project lookup failed: HTTP ${status}`);
+  const proj = await resolveScope();
   const liveId = ((proj.targets || {}).production || {}).id || null;
   if (!liveId) throw new Error('could not identify the live production deployment — refusing to delete anything');
   console.log(`live production deployment: ${liveId}`);
@@ -108,7 +128,7 @@ async function main() {
   let deleted = 0;
   const failed = [];
   for (const d of batch) {
-    const r = await call('DELETE', `/v13/deployments/${id(d)}?teamId=${TEAM}`);
+    const r = await call('DELETE', `/v13/deployments/${id(d)}${scoped('?')}`);
     if (r.status >= 200 && r.status < 300) deleted++;
     else failed.push(`${id(d)} HTTP ${r.status}`);
     await sleep(250);
