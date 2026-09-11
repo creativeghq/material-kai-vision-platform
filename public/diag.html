@@ -20,9 +20,13 @@
 <body>
 <main>
   <h1>MaterialsHub diagnostics</h1>
-  <p class="sub">Plain HTML — no React, no router, no app bundle. If you can read this, the server and your connection are fine.</p>
+  <p class="sub">Plain HTML and CSS. If you can read this, the server and your connection are fine. The last three checks then load the real app bundle to see how far it gets on this device.</p>
   <div id="out"></div>
 </main>
+<!-- The app entry throws `Root element not found` without this, so the bundle test below
+     used to report a hard failure on every device including healthy ones. Hidden, because
+     the point is to learn whether the app MOUNTS, not to render it here. -->
+<div id="root" style="display:none"></div>
 <script>
 /* ES5 only, no Promise, no fetch at the top level — this must run on anything. */
 (function () {
@@ -56,9 +60,28 @@
     } else { swRow.textContent = 'not supported'; }
   } catch (e) { swRow.textContent = 'error: ' + e; }
 
-  /* The real question: does the app shell come back, and does its bundle parse? */
+  /* Signed OUT is a different app from signed IN — the workspace and profile reads only
+     run for a session, so a blank screen that only one of them sees narrows it a long way. */
+  var signedIn = 'no stored session';
+  try {
+    for (var i = 0; i < localStorage.length; i++) {
+      if (/^sb-.*-auth-token$/.test(localStorage.key(i))) { signedIn = 'YES — a session is stored'; break; }
+    }
+  } catch (e) { signedIn = 'cannot read storage: ' + e; }
+  row('Signed in on this device', signedIn);
+
+  /* The real question: does the app shell come back, and does the bundle actually MOUNT? */
   var appRow = row('App page (/) fetch', 'checking…');
   var jsRow = row('App bundle parses', 'waiting for the page…');
+  var mountRow = row('App mounts and renders', 'waiting for the bundle…');
+  var firstError = null;
+  window.addEventListener('error', function (e) {
+    if (!firstError) firstError = (e && e.message) || 'script error';
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e && e.reason;
+    if (!firstError) firstError = String((r && r.message) || r || 'promise rejection');
+  });
 
   var x = new XMLHttpRequest();
   x.open('GET', '/?diag=' + Date.now(), true);
@@ -70,7 +93,13 @@
     appRow.className = 'v ' + (x.status === 200 && hasRoot ? 'ok' : 'bad');
 
     var m = html.match(/assets\/index-[A-Za-z0-9_-]+\.js/);
-    if (!m) { jsRow.textContent = 'no entry bundle referenced in the HTML'; jsRow.className = 'v bad'; return; }
+    if (!m) {
+      jsRow.textContent = 'no entry bundle referenced in the HTML';
+      jsRow.className = 'v bad';
+      mountRow.textContent = 'not attempted — no bundle to run';
+      mountRow.className = 'v bad';
+      return;
+    }
 
     jsRow.textContent = 'loading ' + m[0] + ' …';
     var s = document.createElement('script');
@@ -79,19 +108,51 @@
     s.onerror = function () {
       jsRow.textContent = 'FAILED to load ' + m[0];
       jsRow.className = 'v bad';
+      mountRow.textContent = 'not attempted — the bundle never downloaded';
+      mountRow.className = 'v bad';
     };
-    window.addEventListener('error', function (e) {
-      if (jsRow.className.indexOf('ok') > -1) return;
-      jsRow.textContent = 'ERROR: ' + ((e && e.message) || 'script error');
-      jsRow.className = 'v bad';
-    });
     s.onload = function () {
       if (jsRow.className.indexOf('bad') > -1) return;
       jsRow.textContent = 'loaded and parsed OK';
       jsRow.className = 'v ok';
+      watchMount();
     };
     document.head.appendChild(s);
   };
+
+  /* Mounting is not rendering. A guard stranded on `loading` returns an empty tree, which is
+     the blank screen we are actually hunting — so poll for TEXT, not for a mount flag. */
+  function watchMount() {
+    var waited = 0;
+    var LIMIT = 30000;
+    var STEP = 500;
+    var tick = setInterval(function () {
+      waited += STEP;
+      var booted = window.__mkBooted === true;
+      var host = document.getElementById('root');
+      var text = host ? (host.innerText || host.textContent || '').trim() : '';
+
+      if (booted && text) {
+        clearInterval(tick);
+        mountRow.textContent = 'OK — rendered ' + text.length + ' characters: ' + text.slice(0, 80);
+        mountRow.className = 'v ok';
+        return;
+      }
+      if (waited < LIMIT) {
+        mountRow.textContent = (booted ? 'mounted, still empty after ' : 'waiting for mount, ') + (waited / 1000) + 's…';
+        return;
+      }
+
+      clearInterval(tick);
+      mountRow.className = 'v bad';
+      if (!booted) {
+        mountRow.textContent = 'the bundle ran but never mounted — ' + (firstError || 'no error was thrown');
+      } else {
+        mountRow.textContent = 'MOUNTED BUT BLANK — this is the bug. ' + (firstError || 'no error was thrown');
+      }
+    }, STEP);
+  }
+
   try { x.send(); } catch (e) { appRow.textContent = 'request failed: ' + e; appRow.className = 'v bad'; }
 })();
 </script>

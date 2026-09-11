@@ -83,6 +83,13 @@
   </head>
 
   <body>
+    <!-- FIRST node in the body, ahead of every inline script. The module in <head> is
+         deferred, so it runs against whatever the parser managed to build — and on a
+         truncated response (a phone that loses signal mid-document) a #root placed after
+         ~200 lines of inline script never arrives. main.tsx then throws `Root element not
+         found`, and the watchdog below cannot draw its panel either, because it needs the
+         same node. That is a blank screen that reports nothing. Keep it here. -->
+    <div id="root"></div>
     <!-- Apply the saved theme + accent before first paint to avoid a flash of the
          wrong colors. Mirrors src/contexts/ThemeContext.tsx (keys: mk-theme default
          dark, mk-accent default green). -->
@@ -175,8 +182,15 @@
          * error message and invariant 11 forbids assembling markup around one.
          */
         function panel(detail, body) {
+          // A missing #root is the very case that most needs saying out loud — a truncated
+          // document is exactly how the node goes missing — so build one rather than bail.
           var host = document.getElementById('root');
-          if (!host) return;
+          if (!host) {
+            if (!document.body) return;
+            host = document.createElement('div');
+            host.id = 'root';
+            document.body.appendChild(host);
+          }
           var dark = document.documentElement.classList.contains('dark');
           var fg = dark ? '#e8e6ea' : '#1b1a1f';
           var muted = dark ? '#a09daa' : '#5d5a66';
@@ -294,7 +308,6 @@
         setTimeout(check, BOOT_TIMEOUT_MS);
       })();
     </script>
-    <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

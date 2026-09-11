@@ -63,11 +63,54 @@ describe('the boot watchdog', () => {
     expect(blankBlock).not.toContain('location.reload');
   });
 
+  it('#root is parsed before any inline script, or a truncated document loses it', () => {
+    const body = html.slice(html.indexOf('<body>'));
+    const rootAt = body.indexOf('<div id="root"');
+    expect(rootAt).toBeGreaterThan(-1);
+    // The entry module is deferred, so it runs against whatever the parser built. A phone that
+    // loses signal mid-response delivers the head but not a #root sitting 200 lines down, and
+    // main.tsx then throws `Root element not found` with no panel to explain it.
+    expect(rootAt).toBeLessThan(body.indexOf('<script'));
+  });
+
+  it('draws its panel even when #root never arrived', () => {
+    const at = html.indexOf('function panel(');
+    const block = html.slice(at, at + 700);
+    // Bailing on a missing #root silenced the watchdog in exactly the case that most needed it.
+    expect(block).toMatch(/host\.id = 'root'/);
+    expect(block).toMatch(/document\.body\.appendChild\(host\)/);
+  });
+
   it('reads the purge token back before reloading, or a blocked write loops forever', () => {
     const at = html.indexOf('function pushedPurge');
     const block = html.slice(at, at + 900);
     expect(block).toContain('persisted');
     expect(block).toMatch(/persisted\s*=\s*localStorage\.getItem\(PURGE_KEY\) === PURGE_TOKEN/);
     expect(block).toMatch(/if \(persisted\) location\.reload\(\)/);
+  });
+});
+
+describe('the diagnostics page tells the truth', () => {
+  const diag = code('public/diag.html');
+
+  it('gives the entry bundle the #root it requires before running it', () => {
+    // Without this the app entry throws `Root element not found` the moment the probe injects
+    // it, so the page reported a hard failure on EVERY device — including a healthy one, which
+    // is the opposite of what a diagnostic is for.
+    // The ELEMENT, not the string: the probe already mentions `id="root"` in the JS that scans
+    // the app HTML, so matching the bare text passes against the very file this fixes.
+    const rootAt = diag.indexOf('<div id="root"');
+    expect(rootAt).toBeGreaterThan(-1);
+    expect(rootAt).toBeLessThan(diag.indexOf("s.type = 'module'"));
+  });
+
+  it('reports whether the app RENDERED, not just whether the bundle parsed', () => {
+    // Mounted-and-blank is the failure being hunted; a parse check cannot see it.
+    expect(diag).toContain('__mkBooted');
+    expect(diag).toMatch(/innerText/);
+  });
+
+  it('distinguishes a signed-in device, because signed-out never runs those reads', () => {
+    expect(diag).toMatch(/sb-.*-auth-token/);
   });
 });
