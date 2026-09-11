@@ -29,7 +29,10 @@ export default defineConfig({
     // three.js is BUNDLED, not external. There is no CDN import map on a merchant's page and no
     // guarantee they have three at all — a self-contained file is the entire point.
     rollupOptions: {},
-    sourcemap: true,
+    // NO source map. This file is served from `public/embed` on every deployment, so a 3.15 MB
+    // map is 12% of the whole build output multiplied by every deployment Vercel retains — and
+    // it publishes the bundled source, ours and three.js's, to any merchant page that loads it.
+    sourcemap: false,
     // three + GLTFLoader is legitimately ~500 kB raw. Warning on it every build trains people to
     // ignore build warnings, which is worse than the size.
     chunkSizeWarningLimit: 1200,
