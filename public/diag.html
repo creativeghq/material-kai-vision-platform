@@ -154,12 +154,12 @@
 
     for (var j = 0; j < names.length; j++) probeOne(names[j]);
 
-    function probeOne(name, isRetry) {
+    function probeOne(name, firstFail) {
       var q = new XMLHttpRequest();
       // The cache-buster goes on the RETRY only. The first request must be the exact URL the
       // module graph asks for; the second deliberately misses the edge cache, which is what
       // separates "this POP is serving a stale file set" from "the file is really gone".
-      q.open('GET', '/' + name + (isRetry ? '?retry=' + Date.now() : ''), true);
+      q.open('GET', '/' + name + (firstFail ? '?retry=' + Date.now() : ''), true);
       q.onreadystatechange = function () {
         if (q.readyState !== 4) return;
         var head = function (h) {
@@ -171,11 +171,13 @@
 
         // A 404 on one chunk is the whole failure — retry it past the cache before reporting,
         // so the line says whether it is transient or real.
-        if (q.status !== 200 && !isRetry) { probeOne(name, true); return; }
+        if (q.status !== 200 && !firstFail) { probeOne(name, 'HTTP ' + q.status); return; }
 
-        if (q.status !== 200) bad++;
+        // A chunk that only answers on a cache-bust is still a FAILED chunk: the plain URL is the
+        // one the module graph requests, so the row must read red even though the retry says 200.
+        if (q.status !== 200 || firstFail) bad++;
         lines.push(name.replace('assets/', '') + ' → HTTP ' + q.status
-          + (isRetry ? ' (also on cache-bust retry)' : '')
+          + (firstFail ? ' — PLAIN URL RETURNED ' + firstFail + ', this is the cache-bust retry' : '')
           + (mitigated ? ' [BLOCKED: ' + mitigated + ']' : '')
           + ' · ' + (q.responseText || '').length + ' bytes'
           + (cache ? ' · ' + cache : '')

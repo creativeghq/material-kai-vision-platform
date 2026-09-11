@@ -109,13 +109,18 @@ export default defineConfig(({ mode }) => {
               // PDF generation (dynamically imported on button click)
               'jspdf': 'vendor-pdf',
               'html2canvas': 'vendor-pdf',
-              // Utility libraries
-              'date-fns': 'vendor-utils',
-              'clsx': 'vendor-utils',
-              'tailwind-merge': 'vendor-utils',
-              'zod': 'vendor-utils',
-              'zustand': 'vendor-utils',
-              'immer': 'vendor-utils',
+              // Utility libraries. Renamed from `vendor-utils` on 2026-09-11: a Vercel edge node
+              // was serving a cached 404 for `vendor-utils-Da9XzF8z.js` while the file was
+              // present at origin and served 200 everywhere else. The entry bundle imports this
+              // chunk STATICALLY, so that one poisoned cache entry killed the whole app on the
+              // affected devices. The cache key is the filename, so renaming the chunk retires
+              // the poisoned key instead of waiting for it to expire.
+              'date-fns': 'vendor-lib',
+              'clsx': 'vendor-lib',
+              'tailwind-merge': 'vendor-lib',
+              'zod': 'vendor-lib',
+              'zustand': 'vendor-lib',
+              'immer': 'vendor-lib',
             };
 
             // Prefix-match all @radix-ui/* packages into vendor-ui

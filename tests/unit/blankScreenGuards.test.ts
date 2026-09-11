@@ -187,9 +187,12 @@ describe('the diagnostics page tells the truth', () => {
     const block = diag.slice(at, at + 1400);
     // Transient / half-propagated is a different answer from "the file is really gone", and the
     // first request must stay the exact URL the module graph asks for.
-    expect(block).toContain('isRetry');
+    expect(block).toContain('firstFail');
     expect(block).toContain('x-vercel-id');
     expect(block).toContain('x-vercel-cache');
+    // A chunk that answers only on the cache-bust is still a failed chunk — the plain URL is the
+    // one the module graph asks for, so the row must read red rather than a reassuring 200.
+    expect(block).toContain('q.status !== 200 || firstFail');
   });
 
   it('distinguishes a signed-in device, because signed-out never runs those reads', () => {
