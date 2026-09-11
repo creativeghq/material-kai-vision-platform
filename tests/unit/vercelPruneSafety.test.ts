@@ -60,8 +60,24 @@ describe('the Vercel deployment prune', () => {
     expect(workflow.split('probe-live-frontend.mjs').length - 1).toBeGreaterThanOrEqual(2);
   });
 
-  it('is not on a schedule yet — an unsupervised deleter caused the outage', () => {
+  it('runs weekly and can still be driven by hand', () => {
     expect(workflow).toContain('workflow_dispatch');
-    expect(workflow).not.toMatch(/^\s*schedule:/m);
+    expect(workflow).toMatch(/cron:\s*'0 9 \* \* 0'/);
+  });
+
+  it('never reads inputs.apply directly — they are EMPTY on a schedule', () => {
+    // The weekly run would otherwise resolve to a dry run, delete nothing, and report success:
+    // a cron that looks healthy and does no work, which is the silent-zero shape exactly.
+    const steps = workflow.slice(workflow.indexOf('jobs:'));
+    expect(steps).not.toMatch(/inputs\.apply\s*&&/);
+    expect(steps).toContain("steps.cfg.outputs.apply == 'true'");
+  });
+
+  it('gives the unattended run a wider margin than a watched one', () => {
+    const sched = workflow.slice(workflow.indexOf('github.event_name'), workflow.indexOf('else'));
+    // Nobody is looking on a Sunday, so the floors it prunes down to are deliberately higher
+    // than the manual defaults (keep 20 / 7 days).
+    expect(sched).toMatch(/keep=30/);
+    expect(sched).toMatch(/min_age=14/);
   });
 });

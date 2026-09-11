@@ -1,11 +1,15 @@
 # Vercel deployment-storage prune.
 #
-# Manual on purpose, and dry-run by default. Deleting deployments is what orphaned a static
-# vendor chunk on 2026-09-11 and took the app down, so this does not run on a schedule until
-# a few supervised runs have shown the probe staying green afterwards.
+# Deleting deployments orphaned a static vendor chunk on 2026-09-11 and took the app down, so
+# every run probes the live site before and after, and the scheduled run is deliberately more
+# conservative than a hand-driven one.
 name: Vercel storage prune
 
 on:
+  # Sunday 09:00 UTC = 12:00 Athens. Daytime ON PURPOSE: this can break production, and a 03:00
+  # cron means the failure email lands while nobody is reading it.
+  schedule:
+    - cron: '0 9 * * 0'
   workflow_dispatch:
     inputs:
       apply:
@@ -36,8 +40,30 @@ jobs:
         with:
           node-version: '20'
 
-      # Before, so a prune that breaks the site cannot be blamed on something that was already
-      # broken — and so the run aborts rather than pruning on top of an existing outage.
+      # `inputs.*` are EMPTY on a schedule event, so reading them directly would make the weekly
+      # run a dry run that deletes nothing and reports success — a cron that looks healthy and
+      # does no work. Resolve the settings per event instead, and print them.
+      - name: ⚙️ Settings for this run
+        id: cfg
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            # Unattended, so it leaves more rope than a run someone is watching: a wider
+            # newest-N floor and double the age floor.
+            echo "apply=true"      >> "$GITHUB_OUTPUT"
+            echo "keep=30"         >> "$GITHUB_OUTPUT"
+            echo "min_age=14"      >> "$GITHUB_OUTPUT"
+            echo "limit=200"       >> "$GITHUB_OUTPUT"
+            echo "weekly scheduled run: apply=true keep=30 min_age_days=14 limit=200"
+          else
+            echo "apply=${{ inputs.apply }}"         >> "$GITHUB_OUTPUT"
+            echo "keep=${{ inputs.keep }}"           >> "$GITHUB_OUTPUT"
+            echo "min_age=${{ inputs.min_age_days }}" >> "$GITHUB_OUTPUT"
+            echo "limit=${{ inputs.limit }}"         >> "$GITHUB_OUTPUT"
+            echo "manual run: apply=${{ inputs.apply }} keep=${{ inputs.keep }} min_age_days=${{ inputs.min_age_days }} limit=${{ inputs.limit }}"
+          fi
+
+      # Before, so a prune never runs on top of an existing outage and cannot be blamed for one.
       - name: 🔍 Live site BEFORE
         run: node scripts/probe-live-frontend.mjs "https://app.materialshub.gr"
 
@@ -45,23 +71,22 @@ jobs:
         run: |
           set -euo pipefail
           node scripts/prune-vercel-deployments.mjs \
-            ${{ inputs.apply && '--apply' || '' }} \
-            --keep "${{ inputs.keep }}" \
-            --min-age-days "${{ inputs.min_age_days }}" \
-            --limit "${{ inputs.limit }}"
+            ${{ steps.cfg.outputs.apply == 'true' && '--apply' || '' }} \
+            --keep "${{ steps.cfg.outputs.keep }}" \
+            --min-age-days "${{ steps.cfg.outputs.min_age }}" \
+            --limit "${{ steps.cfg.outputs.limit }}"
 
-      # The rule this repo already has for janitors: probe the world, not the exit code. A prune
-      # reports success for deletions that each returned 200 while the live site is now missing a
-      # chunk, because those are different facts.
+      # The rule this repo already has for janitors: probe the world, not the exit code. Every
+      # delete can return 200 while the live site is now missing a chunk — different facts.
       - name: 🔍 Live site AFTER
-        if: ${{ inputs.apply }}
+        if: ${{ steps.cfg.outputs.apply == 'true' }}
         run: |
           set -euo pipefail
           sleep 15
           node scripts/probe-live-frontend.mjs "https://app.materialshub.gr"
 
       - name: 🚨 If the site broke, say what to do
-        if: ${{ failure() && inputs.apply }}
+        if: ${{ failure() && steps.cfg.outputs.apply == 'true' }}
         run: |
           echo "The prune ran and the live site is now failing." >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
