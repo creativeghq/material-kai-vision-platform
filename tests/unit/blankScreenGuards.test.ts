@@ -145,6 +145,19 @@ describe('the diagnostics page tells the truth', () => {
     expect(at).toBeLessThan(diag.indexOf('document.head.appendChild(s)'));
   });
 
+  it('reports the chunk STATUS, because onerror only ever says "no"', () => {
+    // 403 is blocked at the edge, 404 is a stale build reference, 200 means look elsewhere —
+    // "FAILED to load" distinguishes none of them, which is the whole question.
+    expect(diag).toContain('x-vercel-mitigated');
+    expect(diag).toMatch(/HTTP ' \+ q\.status/);
+  });
+
+  it('probes the vendor chunks too — a failed static import reads as the entry failing', () => {
+    const at = diag.indexOf('function probeChunks');
+    expect(at).toBeGreaterThan(-1);
+    expect(diag.slice(at, at + 400)).toContain('vendor-');
+  });
+
   it('distinguishes a signed-in device, because signed-out never runs those reads', () => {
     expect(diag).toMatch(/sb-.*-auth-token/);
   });

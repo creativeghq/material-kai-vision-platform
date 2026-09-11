@@ -101,12 +101,17 @@
       return;
     }
 
+    /* `onerror` on a module script says only "no". The STATUS is the whole diagnosis — 403 is
+       blocked at the edge, 404 is a stale build reference, 200 means look further — and a module
+       whose static IMPORT fails reports as the ENTRY failing, so probe the vendor chunks too. */
+    probeChunks(html, m[0]);
+
     jsRow.textContent = 'loading ' + m[0] + ' …';
     var s = document.createElement('script');
     s.type = 'module';
     s.src = '/' + m[0];
     s.onerror = function () {
-      jsRow.textContent = 'FAILED to load ' + m[0];
+      jsRow.textContent = 'FAILED to load ' + m[0] + ' — see “Chunk fetch status” for the reason';
       jsRow.className = 'v bad';
       mountRow.textContent = 'not attempted — the bundle never downloaded';
       mountRow.className = 'v bad';
@@ -123,6 +128,48 @@
     try { history.replaceState(null, '', '/'); } catch (e) { /* history blocked */ }
     document.head.appendChild(s);
   };
+
+  /* One row per chunk, with the status code and any edge mitigation named. The exact URLs the
+     module graph would request — no cache-busting query, so this reproduces the real request
+     rather than a different one that might be routed differently. */
+  function probeChunks(html, entry) {
+    var names = [entry];
+    var vendors = html.match(/assets\/vendor-[A-Za-z0-9_-]+\.js/g) || [];
+    for (var i = 0; i < vendors.length; i++) {
+      if (names.indexOf(vendors[i]) === -1) names.push(vendors[i]);
+    }
+
+    var statusRow = row('Chunk fetch status', 'checking ' + names.length + ' files…');
+    statusRow.style.whiteSpace = 'pre-line';
+    var lines = [];
+    var pending = names.length;
+    var bad = 0;
+
+    function done() {
+      if (--pending > 0) return;
+      lines.sort();
+      statusRow.textContent = lines.join('\n');
+      statusRow.className = 'v ' + (bad ? 'bad' : 'ok');
+    }
+
+    for (var j = 0; j < names.length; j++) probeOne(names[j]);
+
+    function probeOne(name) {
+      var q = new XMLHttpRequest();
+      q.open('GET', '/' + name, true);
+      q.onreadystatechange = function () {
+        if (q.readyState !== 4) return;
+        var mitigated = '';
+        try { mitigated = q.getResponseHeader('x-vercel-mitigated') || ''; } catch (e) { /* opaque */ }
+        if (q.status !== 200) bad++;
+        lines.push(name.replace('assets/', '') + ' → HTTP ' + q.status
+          + (mitigated ? ' [BLOCKED: ' + mitigated + ']' : '')
+          + ' · ' + (q.responseText || '').length + ' bytes');
+        done();
+      };
+      try { q.send(); } catch (e) { bad++; lines.push(name + ' → request failed: ' + e); done(); }
+    }
+  }
 
   /* Mounting is not rendering. A guard stranded on `loading` returns an empty tree, which is
      the blank screen we are actually hunting — so poll for TEXT, not for a mount flag. */
