@@ -9,13 +9,21 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { MoneyInput } from '@/components/core/ui/money-input';
 import { Label } from '@/components/core/ui/label';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
-import { Loader2, Trash2, Truck } from 'lucide-react';
+import { Loader2, Package, Trash2, Truck } from 'lucide-react';
+import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { deliveryNotesService, type WarehousePick, type DeliveryLineInput } from '@/modules/finance/services/deliveryNotesService';
-import { SELECTABLE_MOVE_PURPOSES } from '@/services/fiscal/fiscalVocabulary';
+import {
+  SELECTABLE_MOVE_PURPOSES,
+  MYDATA_PACKAGING_TYPES,
+  MYDATA_PACKAGING_TYPE_OTHER,
+  MYDATA_RECEIVING_NOTE_PURPOSE_OTHER,
+  selectableReceivingNotePurposes,
+} from '@/services/fiscal/fiscalVocabulary';
 import { invoicingSetupService, type FinanceBranch } from '@/services/invoicingSetupService';
 import { AddressUnitSelect } from '@/modules/crm/components/AddressUnitSelect';
 
@@ -45,13 +53,33 @@ export const NewDeliveryNoteDialog: React.FC<{
   const [toAddr, setToAddr] = useState({ ...emptyAddr });
   // Chosen customer sub-unit as the delivery point (null = main address).
   const [toUnitId, setToUnitId] = useState<string | null>(null);
+  // myDATA v2.0.2. A goods receipt is a Δελτίο Ποσοτικής Παραλαβής — 10.1 when it correlates to
+  // a document we hold, 10.2 when it does not — and AADE requires it to say WHY it was issued.
+  const [receiptType, setReceiptType] = useState<'10.1' | '10.2'>('10.2');
+  const [receivingPurpose, setReceivingPurpose] = useState('');
+  const [receivingPurposeTitle, setReceivingPurposeTitle] = useState('');
+  const [nonObligatedRecipient, setNonObligatedRecipient] = useState(false);
+  const [withoutDigitalTracking, setWithoutDigitalTracking] = useState(false);
+  const [toWeigh, setToWeigh] = useState(false);
+  const [packagings, setPackagings] = useState<{ packagingType: number; quantity: number; otherPackagingTypeTitle?: string }[]>([]);
   const [busy, setBusy] = useState(false);
+
+  const receivingPurposeOptions = selectableReceivingNotePurposes(receiptType);
+  // A code valid on 10.1 only must not survive a switch to 10.2 — it would be refused at AADE.
+  useEffect(() => {
+    if (receivingPurpose && !receivingPurposeOptions.some((p) => String(p.code) === receivingPurpose)) {
+      setReceivingPurpose('');
+    }
+  }, [receiptType, receivingPurpose, receivingPurposeOptions]);
 
   useEffect(() => {
     if (!open) return;
     setKind('dispatch'); setCustomer(''); setNotes(''); setLines([]); setBranchCode('0');
     setTransportDate(''); setVehicleNumber(''); setMovePurpose('1');
     setFromAddr({ ...emptyAddr }); setToAddr({ ...emptyAddr }); setToUnitId(null);
+    setReceiptType('10.2'); setReceivingPurpose(''); setReceivingPurposeTitle('');
+    setNonObligatedRecipient(false); setWithoutDigitalTracking(false); setToWeigh(false);
+    setPackagings([]);
     (async () => {
       const [{ data: cos }, wh, { data: fs }, br] = await Promise.all([
         supabase.from('crm_companies').select('id, name').eq('workspace_id', workspaceId).order('name').limit(500),
@@ -89,16 +117,49 @@ export const NewDeliveryNoteDialog: React.FC<{
     if (!w) return;
     setLines((ls) => [...ls, { warehouse_item_id: w.id, product_id: w.product_id, description: w.name, sku: w.sku, quantity: 1, unit: w.unit }]);
   };
+  /** Declared once: it is both the toolbar control and the empty state's way out. */
+  const addItemSelect = (
+    <Select value="" onValueChange={addItem}>
+      <SelectTrigger className="h-8 w-44 text-xs"><SelectValue placeholder="+ Add warehouse item" /></SelectTrigger>
+      <SelectContent>
+        {warehouse.length === 0
+          ? <div className="px-2 py-1 text-xs text-muted-foreground">Nothing in the warehouse</div>
+          : warehouse.map((w) => <SelectItem key={w.id} value={w.id}>{w.name}{w.qty_on_hand != null ? ` (${w.qty_on_hand})` : ''}</SelectItem>)}
+      </SelectContent>
+    </Select>
+  );
   const setQty = (i: number, q: number) => setLines((ls) => ls.map((l, idx) => idx === i ? { ...l, quantity: q } : l));
   const removeLine = (i: number) => setLines((ls) => ls.filter((_, idx) => idx !== i));
 
   const submit = async (issue: boolean) => {
     if (lines.length === 0) { toast({ title: 'Add at least one item', variant: 'destructive' }); return; }
+    // myDATA v2.0.2 requires the reason on a ΔΠΠ. Caught here so the operator fixes it in the
+    // form rather than reading the connector refusal back off a failed transmission.
+    if (kind === 'receipt' && !receivingPurpose) {
+      toast({ title: 'Pick an issuance reason', description: 'myDATA requires a reason on a goods-receipt note.', variant: 'destructive' });
+      return;
+    }
+    if (kind === 'receipt' && Number(receivingPurpose) === MYDATA_RECEIVING_NOTE_PURPOSE_OTHER && !receivingPurposeTitle.trim()) {
+      toast({ title: 'Name the reason', description: 'Reason 7 (Other cases) has to say what it is.', variant: 'destructive' });
+      return;
+    }
+    const untitledPackaging = packagings.some((p) => p.packagingType === MYDATA_PACKAGING_TYPE_OTHER && !p.otherPackagingTypeTitle?.trim());
+    if (untitledPackaging) {
+      toast({ title: 'Name the packaging', description: 'Packaging type 6 (Other) has to say what it is.', variant: 'destructive' });
+      return;
+    }
     setBusy(true);
     try {
       const id = await deliveryNotesService.create(workspaceId, {
         kind, customerCompanyId: customer || null, branchCode: parseInt(branchCode, 10) || 0, notes, lines,
-        transportDate, vehicleNumber, movePurpose,
+        transportDate, vehicleNumber,
+        // A receipt note states `receivingNotePurpose`; only a dispatch carries a move purpose.
+        movePurpose: kind === 'dispatch' ? movePurpose : undefined,
+        mydataDocumentType: kind === 'receipt' ? receiptType : null,
+        receivingNotePurpose: kind === 'receipt' ? Number(receivingPurpose) : null,
+        otherReceivingNotePurposeTitle: kind === 'receipt' ? receivingPurposeTitle.trim() || null : null,
+        nonObligatedRecipient, withoutDigitalTransportTracking: withoutDigitalTracking, toWeigh,
+        packagings: packagings.filter((p) => p.quantity > 0),
         shipFrom: [fromAddr.street, fromAddr.number].filter(Boolean).join(' ') || undefined,
         shipTo: [toAddr.street, toAddr.number].filter(Boolean).join(' ') || undefined,
         shipFromStreet: fromAddr.street || undefined, shipFromNumber: fromAddr.number || undefined,
@@ -193,17 +254,122 @@ export const NewDeliveryNoteDialog: React.FC<{
               <Label className="text-xs">Vehicle no.</Label>
               <Input className="h-8 text-xs" value={vehicleNumber} onChange={(e) => setVehicleNumber(e.target.value)} placeholder="ABC-1234" />
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Purpose</Label>
-              <Select value={movePurpose} onValueChange={setMovePurpose}>
-                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {SELECTABLE_MOVE_PURPOSES.map((p) => (
-                    <SelectItem key={p.code} value={String(p.code)}>{p.code} — {p.en}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            {kind === 'dispatch' ? (
+              <div className="space-y-1">
+                <Label className="text-xs">Purpose</Label>
+                <Select value={movePurpose} onValueChange={setMovePurpose}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {SELECTABLE_MOVE_PURPOSES.map((p) => (
+                      <SelectItem key={p.code} value={String(p.code)}>{p.code} — {p.en}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <Label className="text-xs">Receipt note type</Label>
+                <Select value={receiptType} onValueChange={(v: any) => setReceiptType(v)}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10.1">10.1 — Correlated</SelectItem>
+                    <SelectItem value="10.2">10.2 — Non-correlated</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+
+          {/* myDATA v2.0.2: a ΔΠΠ must state its issuance reason — AADE rejects one without. */}
+          {kind === 'receipt' ? (
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-1">
+                <Label className="text-xs">Issuance reason <span className="text-destructive">*</span></Label>
+                <Select value={receivingPurpose} onValueChange={setReceivingPurpose}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Required by myDATA" /></SelectTrigger>
+                  <SelectContent>
+                    {receivingPurposeOptions.map((p) => (
+                      <SelectItem key={p.code} value={String(p.code)}>{p.code} — {p.en}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {Number(receivingPurpose) === MYDATA_RECEIVING_NOTE_PURPOSE_OTHER ? (
+                <div className="space-y-1">
+                  <Label className="text-xs">Name the reason <span className="text-destructive">*</span></Label>
+                  <Input
+                    className="h-8 text-xs"
+                    maxLength={150}
+                    value={receivingPurposeTitle}
+                    onChange={(e) => setReceivingPurposeTitle(e.target.value)}
+                    placeholder="What the table cannot express"
+                  />
+                </div>
+              ) : null}
             </div>
+          ) : null}
+
+          {/* AADE PackingsDeclaration — a COUNT of packages, never a price. */}
+          <div className="space-y-2 rounded-md border border-border/60 p-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-medium">Packaging (optional)</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => setPackagings((ps) => [...ps, { packagingType: 1, quantity: 1 }])}
+              >
+                Add packaging
+              </Button>
+            </div>
+            {/* No empty-state copy: "Add packaging" sits in the header above and is the only
+                way out of empty, so a second line saying nothing is declared adds no exit. */}
+            {packagings.map((p, i) => (
+                <div key={i} className="grid gap-2 md:grid-cols-[1fr_5rem_1fr_2rem] items-end">
+                  <Select
+                    value={String(p.packagingType)}
+                    onValueChange={(v) => setPackagings((ps) => ps.map((x, idx) => idx === i ? { ...x, packagingType: Number(v) } : x))}
+                  >
+                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {MYDATA_PACKAGING_TYPES.map((t) => (
+                        <SelectItem key={t.code} value={String(t.code)}>{t.code} — {t.en}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    type="number" min={1} className="h-8 text-xs"
+                    value={p.quantity}
+                    onChange={(e) => setPackagings((ps) => ps.map((x, idx) => idx === i ? { ...x, quantity: Number(e.target.value) } : x))}
+                  />
+                  {p.packagingType === MYDATA_PACKAGING_TYPE_OTHER ? (
+                    <Input
+                      className="h-8 text-xs" maxLength={150}
+                      placeholder="Name the packaging"
+                      value={p.otherPackagingTypeTitle ?? ''}
+                      onChange={(e) => setPackagings((ps) => ps.map((x, idx) => idx === i ? { ...x, otherPackagingTypeTitle: e.target.value } : x))}
+                    />
+                  ) : <span />}
+                  <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => setPackagings((ps) => ps.filter((_, idx) => idx !== i))}>×</Button>
+                </div>
+            ))}
+          </div>
+
+          {/* myDATA v2.0.2 movement indications. */}
+          <div className="flex flex-wrap gap-4">
+            <label className="flex items-center gap-2 text-xs">
+              <Checkbox checked={toWeigh} onCheckedChange={(v) => setToWeigh(v === true)} />
+              To be weighed
+            </label>
+            <label className="flex items-center gap-2 text-xs">
+              <Checkbox checked={nonObligatedRecipient} onCheckedChange={(v) => setNonObligatedRecipient(v === true)} />
+              Recipient not myDATA-obliged
+            </label>
+            <label className="flex items-center gap-2 text-xs">
+              <Checkbox checked={withoutDigitalTracking} onCheckedChange={(v) => setWithoutDigitalTracking(v === true)} />
+              Without digital transport tracking
+            </label>
           </div>
 
           {/* Structured from/to addresses (myDATA 9.3) */}
@@ -226,16 +392,17 @@ export const NewDeliveryNoteDialog: React.FC<{
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label>Items</Label>
-              <Select value="" onValueChange={addItem}>
-                <SelectTrigger className="h-8 w-44 text-xs"><SelectValue placeholder="+ Add warehouse item" /></SelectTrigger>
-                <SelectContent>
-                  {warehouse.length === 0 ? <div className="px-2 py-1 text-xs text-muted-foreground">No warehouse items</div>
-                    : warehouse.map((w) => <SelectItem key={w.id} value={w.id}>{w.name}{w.qty_on_hand != null ? ` (${w.qty_on_hand})` : ''}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              {addItemSelect}
             </div>
             {lines.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No items yet.</p>
+              // The picker IS the way out of empty, so the empty state carries the same one
+              // rather than naming a control the reader then has to go and find.
+              <HubEmptyState
+                icon={Package}
+                title="No items yet"
+                description="Pick a warehouse item to put on this note."
+                action={addItemSelect}
+              />
             ) : (
               <div className="space-y-1">
                 {lines.map((l, i) => (

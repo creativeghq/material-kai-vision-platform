@@ -12,7 +12,16 @@ import type {
 } from './types.ts';
 import { isUncodedMydataUnit, isUnnamedLineName, mydataUnitCode } from './types.ts';
 import { mydataPaymentLabel } from '../paymentVocabulary.generated.ts';
-import { mydataClassificationLedger } from './fiscalVocabulary.generated.ts';
+import {
+  MYDATA_PACKAGING_TYPE_OTHER,
+  MYDATA_RECEIVING_NOTE_PURPOSE_OTHER,
+  canBeDeliveryNote,
+  isMovementDocType,
+  isReceivingNoteType,
+  mydataClassificationLedger,
+  receivingNotePurposeLabel,
+  selectableReceivingNotePurposes,
+} from './fiscalVocabulary.generated.ts';
 
 export const NOVUS_SANDBOX_BASE = 'https://provider-dev.timologisi.online';
 export const NOVUS_PRODUCTION_BASE = 'https://provider.timologisi.online';
@@ -76,8 +85,62 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
     }
   }
 
-  // A MOVEMENT DOCUMENT (9.3) IS A DIFFERENT ENVELOPE, NOT AN INVOICE WITH ZERO TOTALS.
-  const isMovement = header.movePurpose != null;
+  // A MOVEMENT DOCUMENT IS A DIFFERENT ENVELOPE, NOT AN INVOICE WITH ZERO TOTALS. The type
+  // decides, not the presence of a purpose: a Δελτίο Ποσοτικής Παραλαβής (10.1 / 10.2) states
+  // its reason in `receivingNotePurpose` and carries no `movePurpose` at all, so keying off
+  // that alone sent every receiving note down the invoice path.
+  const isMovement = header.movePurpose != null || isMovementDocType(header.invoiceType);
+
+  // A ΔΠΠ MUST SAY WHY IT WAS ISSUED — AADE Appendix §8.24, mandatory from myDATA v2.0.2.
+  // There is no defensible default: the codes are different tax facts about the same goods.
+  if (isReceivingNoteType(header.invoiceType)) {
+    const allowed = selectableReceivingNotePurposes(header.invoiceType);
+    const purpose = header.receivingNotePurpose;
+    if (purpose == null) {
+      throw new Error(
+        `Refusing to transmit a ${header.invoiceType} receiving note with no issuance reason: ` +
+          `myDATA v2.0.2 requires receivingNotePurpose. Valid here: ` +
+          `${allowed.map((p) => `${p.code} ${p.en}`).join(', ')}.`,
+      );
+    }
+    if (!allowed.some((p) => p.code === purpose)) {
+      throw new Error(
+        `Refusing to transmit a ${header.invoiceType} receiving note: issuance reason ` +
+          `${purpose} (${receivingNotePurposeLabel(purpose)}) is not accepted on this type. ` +
+          `Valid here: ${allowed.map((p) => `${p.code} ${p.en}`).join(', ')}.`,
+      );
+    }
+    if (purpose === MYDATA_RECEIVING_NOTE_PURPOSE_OTHER && !header.otherReceivingNotePurposeTitle) {
+      throw new Error(
+        `Refusing to transmit a ${header.invoiceType} receiving note: reason ` +
+          `${MYDATA_RECEIVING_NOTE_PURPOSE_OTHER} (Λοιπές Περιπτώσεις) requires the free-text ` +
+          `title that names it — naming it is the alternative to approximating it with another code.`,
+      );
+    }
+  }
+
+  // `isDeliveryNote` makes the document ITSELF the movement record (ΤΔΑ). AADE accepts it on a
+  // fixed set of types; on any other it is refused, so refuse it here where the type is named.
+  if (header.isDeliveryNote && !canBeDeliveryNote(header.invoiceType)) {
+    throw new Error(
+      `Refusing to transmit ${header.invoiceType} as a delivery note: myDATA does not accept ` +
+        `isDeliveryNote on this type. ` +
+        (isMovementDocType(header.invoiceType)
+          ? `${header.invoiceType} already IS a movement document — drop the flag.`
+          : `Issue a separate movement document (9.3) alongside it instead.`),
+    );
+  }
+
+  // A package declaration is a COUNT, and code 6 (Λοιπά) has to name what it is.
+  const untitledPackaging = (input.packingsDeclarations ?? []).filter(
+    (p) => p.packagingType === MYDATA_PACKAGING_TYPE_OTHER && !p.otherPackagingTypeTitle,
+  );
+  if (untitledPackaging.length) {
+    throw new Error(
+      `Refusing to transmit a packaging declaration of type ${MYDATA_PACKAGING_TYPE_OTHER} ` +
+        `(Λοιπά / Other) with no title: AADE requires otherPackagingTypeTitle to name it.`,
+    );
+  }
 
   // WHICH LEDGER THIS DOCUMENT CLASSIFIES INTO — income, expenses, or neither.
   // Emitting `incomeClassification` unconditionally is why three document families could never
@@ -138,6 +201,16 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
       ? { itemDescr: l.description, measurementUnit: mydataUnitCode(l.measurementUnitLabel) }
       : {}),
     lineCode: l.code ?? undefined,
+    // The customs commodity code, snapshotted on the line by the builder from `taric_code`.
+    // It was captured, guarded by a test and documented, and then dropped here — so a
+    // cross-border document went to AADE with no tariff classification on any line.
+    ...(l.commodityCode ? { taricNo: String(l.commodityCode) } : {}),
+    // Per-line movement purpose (myDATA v2.0.2). Emitted whenever the line states one, so a
+    // consignment whose lines travel for different reasons can say so.
+    ...(l.movePurposeLine ? { movePurposeLine: l.movePurposeLine } : {}),
+    ...(l.otherMovePurposeLineTitle
+      ? { otherMovePurposeLineTitle: String(l.otherMovePurposeLineTitle).slice(0, 150) }
+      : {}),
     quantity: l.quantity,
     measurementUnitLabel: l.measurementUnitLabel ?? 'ΤΜΧ',
     // 1.5 third-party-sales clearance: 1 = clearance line, 2 = commission-fee line.
@@ -342,7 +415,51 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
                 ...(header.otherMovePurposeTitle ? { otherMovePurposeTitle: header.otherMovePurposeTitle } : {}),
               }
             : {}),
+          // ── myDATA v2.0.2 ────────────────────────────────────────────────────────────
+          // Each is emitted only when the document states it: a flag we never set must reach
+          // AADE as absent, not as an asserted `false`, because the two are different claims.
+          ...(header.isDeliveryNote ? { isDeliveryNote: true } : {}),
+          ...(header.receivingNotePurpose != null
+            ? { receivingNotePurpose: header.receivingNotePurpose }
+            : {}),
+          ...(header.otherReceivingNotePurposeTitle
+            ? { otherReceivingNotePurposeTitle: String(header.otherReceivingNotePurposeTitle).slice(0, 150) }
+            : {}),
+          ...(header.nonObligatedRecipient ? { nonObligatedRecipient: true } : {}),
+          ...(header.withoutDigitalTransportTracking ? { withoutDigitalTransportTracking: true } : {}),
+          ...(header.toWeigh ? { toWeigh: true } : {}),
+          ...(header.reverseDeliveryNote ? { reverseDeliveryNote: true } : {}),
+          ...(header.reverseDeliveryNotePurpose != null
+            ? { reverseDeliveryNotePurpose: header.reverseDeliveryNotePurpose }
+            : {}),
+          ...(header.specialInvoiceCategory != null
+            ? { specialInvoiceCategory: header.specialInvoiceCategory }
+            : {}),
+          ...(header.invoiceVariationType != null
+            ? { invoiceVariationType: header.invoiceVariationType }
+            : {}),
+          ...(header.thirdPartyCollection ? { thirdPartyCollection: true } : {}),
+          ...(header.multipleConnectedMarks?.length
+            ? { multipleConnectedMarks: header.multipleConnectedMarks }
+            : {}),
         },
+        // The packages the goods travel in (AADE PackingsDeclaration). A declaration of none
+        // is silence, not a zero — so the key is absent unless the document states packages.
+        ...(input.packingsDeclarations?.length
+          ? {
+              packingsDeclarations: [
+                {
+                  packages: input.packingsDeclarations.map((p) => ({
+                    packagingType: p.packagingType,
+                    quantity: p.quantity,
+                    ...(p.otherPackagingTypeTitle
+                      ? { otherPackagingTypeTitle: String(p.otherPackagingTypeTitle).slice(0, 150) }
+                      : {}),
+                  })),
+                },
+              ],
+            }
+          : {}),
         // 205 "Payment Methods is forbidden for this invoice type" — nothing is paid on a
         // movement, and the `[{type:5}]` fallback below was inventing one for every 9.3.
         ...(isMovement ? {} : { paymentMethods: paymentMethods.map((pm: any) => ({

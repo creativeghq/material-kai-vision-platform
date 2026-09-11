@@ -113,6 +113,16 @@ export const deliveryNotesService = {
     shipFromAddressUnitId?: string | null; shipToAddressUnitId?: string | null;
     relatedDocument?: string;
     invoiceId?: string | null;
+    // ── myDATA v2.0.2 ─────────────────────────────────────────────────────────────────
+    /** 9.1/9.2/9.3 dispatch or 10.1/10.2 quantitative receipt. Unset follows `kind`. */
+    mydataDocumentType?: string | null;
+    /** AADE §8.24 (1-7) — MANDATORY on 10.1/10.2, refused by the connector when absent. */
+    receivingNotePurpose?: number | null;
+    otherReceivingNotePurposeTitle?: string | null;
+    nonObligatedRecipient?: boolean;
+    withoutDigitalTransportTracking?: boolean;
+    toWeigh?: boolean;
+    packagings?: { packagingType: number; quantity: number; otherPackagingTypeTitle?: string }[];
   }): Promise<string> {
     const { data: dn, error } = await supabase
       .from('delivery_notes')
@@ -142,6 +152,15 @@ export const deliveryNotesService = {
         ship_from_address_unit_id: input.shipFromAddressUnitId ?? null,
         ship_to_address_unit_id: input.shipToAddressUnitId ?? null,
         related_document: input.relatedDocument || null,
+        // myDATA v2.0.2. An allowlisted payload, never a spread of the caller's object.
+        mydata_document_type: input.mydataDocumentType || null,
+        receiving_note_purpose: input.receivingNotePurpose ?? null,
+        other_receiving_note_purpose_title: input.otherReceivingNotePurposeTitle || null,
+        non_obligated_recipient: input.nonObligatedRecipient ?? false,
+        without_digital_transport_tracking: input.withoutDigitalTransportTracking ?? false,
+        to_weigh: input.toWeigh ?? false,
+        // A declaration of no packages is silence, not an empty array.
+        packagings: input.packagings?.length ? input.packagings : null,
       } as any)
       .select('id')
       .single();

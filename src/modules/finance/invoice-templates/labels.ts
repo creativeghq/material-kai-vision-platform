@@ -10,6 +10,7 @@ export const INVOICE_LABELS: Record<Lang, Record<string, string>> = {
   el: {
     invoice: 'ΤΙΜΟΛΟΓΙΟ ΠΩΛΗΣΗΣ', service: 'ΤΙΜΟΛΟΓΙΟ ΠΑΡΟΧΗΣ ΥΠΗΡΕΣΙΩΝ',
     receipt: 'ΑΠΟΔΕΙΞΗ ΛΙΑΝΙΚΗΣ', creditNote: 'ΠΙΣΤΩΤΙΚΟ ΤΙΜΟΛΟΓΙΟ', deliveryNote: 'ΔΕΛΤΙΟ ΑΠΟΣΤΟΛΗΣ',
+    receivingNote: 'ΔΕΛΤΙΟ ΠΟΣΟΤΙΚΗΣ ΠΑΡΑΛΑΒΗΣ',
     retailCreditNote: 'ΠΙΣΤΩΤΙΚΟ ΣΤΟΙΧΕΙΟ ΛΙΑΝΙΚΗΣ',
     issuer: 'ΕΚΔΟΤΗΣ', customer: 'ΠΕΛΑΤΗΣ', vatNo: 'ΑΦΜ', taxOffice: 'ΔΟΥ', profession: 'Δραστηριότητα',
     phone: 'Τηλ.', email: 'Email', establishment: 'Εγκατάσταση',
@@ -40,6 +41,7 @@ export const INVOICE_LABELS: Record<Lang, Record<string, string>> = {
   en: {
     invoice: 'SALES INVOICE', service: 'SERVICE INVOICE',
     receipt: 'RETAIL RECEIPT', creditNote: 'CREDIT NOTE', deliveryNote: 'DELIVERY NOTE',
+    receivingNote: 'GOODS RECEIPT NOTE',
     retailCreditNote: 'RETAIL CREDIT NOTE',
     issuer: 'ISSUER', customer: 'CUSTOMER', vatNo: 'VAT No.', taxOffice: 'Tax office', profession: 'Activity',
     phone: 'Tel.', email: 'Email', establishment: 'Establishment',
@@ -85,7 +87,10 @@ export function invoiceDocTitle(
     case '11.4': return L.retailCreditNote;
     case '11.1': case '11.2': case '11.3': case '11.5': return L.receipt;
     case '5.1': case '5.2': return L.creditNote;
-    case '9.3': return L.deliveryNote;
+    // The whole 9.x dispatch family prints as a delivery note; 10.x is a QUANTITATIVE
+    // RECEIPT, a different document — falling through to L.invoice titled it 'INVOICE'.
+    case '9.1': case '9.2': case '9.3': return L.deliveryNote;
+    case '10.1': case '10.2': return L.receivingNote;
     default: return L.invoice;
   }
 }

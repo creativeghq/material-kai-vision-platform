@@ -87,6 +87,7 @@ const LABELS: Record<Lang, Record<string, string>> = {
   el: {
     invoice: 'ΤΙΜΟΛΟΓΙΟ ΠΩΛΗΣΗΣ', service: 'ΤΙΜΟΛΟΓΙΟ ΠΑΡΟΧΗΣ ΥΠΗΡΕΣΙΩΝ',
     receipt: 'ΑΠΟΔΕΙΞΗ ΛΙΑΝΙΚΗΣ', creditNote: 'ΠΙΣΤΩΤΙΚΟ ΤΙΜΟΛΟΓΙΟ', deliveryNote: 'ΔΕΛΤΙΟ ΑΠΟΣΤΟΛΗΣ',
+    receivingNote: 'ΔΕΛΤΙΟ ΠΟΣΟΤΙΚΗΣ ΠΑΡΑΛΑΒΗΣ',
     retailCreditNote: 'ΠΙΣΤΩΤΙΚΟ ΣΤΟΙΧΕΙΟ ΛΙΑΝΙΚΗΣ',
     issuer: 'ΕΚΔΟΤΗΣ', customer: 'ΠΕΛΑΤΗΣ', vatNo: 'ΑΦΜ', taxOffice: 'ΔΟΥ', profession: 'Δραστηριότητα',
     phone: 'Τηλ.', email: 'Email', establishment: 'Εγκατάσταση',
@@ -127,6 +128,7 @@ const LABELS: Record<Lang, Record<string, string>> = {
   en: {
     invoice: 'SALES INVOICE', service: 'SERVICE INVOICE',
     receipt: 'RETAIL RECEIPT', creditNote: 'CREDIT NOTE', deliveryNote: 'DELIVERY NOTE',
+    receivingNote: 'GOODS RECEIPT NOTE',
     retailCreditNote: 'RETAIL CREDIT NOTE',
     issuer: 'ISSUER', customer: 'CUSTOMER', vatNo: 'VAT No.', taxOffice: 'Tax office', profession: 'Activity',
     phone: 'Tel.', email: 'Email', establishment: 'Establishment',
@@ -196,7 +198,10 @@ function docTitle(documentType: string | null, L: Record<string, string>, status
     case '11.4': return L.retailCreditNote;
     case '11.1': case '11.2': case '11.3': case '11.5': return L.receipt;
     case '5.1': case '5.2': return L.creditNote;
-    case '9.3': return L.deliveryNote;
+    // The whole 9.x dispatch family prints as a delivery note; 10.x is a QUANTITATIVE
+    // RECEIPT, a different document — falling through to L.invoice titled it 'INVOICE'.
+    case '9.1': case '9.2': case '9.3': return L.deliveryNote;
+    case '10.1': case '10.2': return L.receivingNote;
     default: return L.invoice;
   }
 }
@@ -437,7 +442,12 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
       const { data } = await supabase.from('delivery_note_items').select('*').eq('delivery_note_id', docId).order('created_at');
       items = (data ?? []).map((it: any) => ({ ...it, unit_price: 0, net_value: 0, line_total: 0, vat_category: 8 }));
       inv = {
-        ...row, internal_number: row.delivery_note_number, document_type: '9.3', total: 0, currency: 'EUR',
+        ...row, internal_number: row.delivery_note_number,
+        // The PRINTED document must say what the TRANSMITTED one says (rule 1c). Hardcoding
+        // 9.3 printed every goods-receipt note as a Δελτίο Αποστολής while it was transmitted
+        // as a 10.x ΔΠΠ. Same derivation as `buildDeliveryNoteInputFromDb`.
+        document_type: row.mydata_document_type ?? (row.kind === 'receipt' ? '10.2' : '9.3'),
+        total: 0, currency: 'EUR',
         has_shipping: true, vat_rate: 0,
       };
     }

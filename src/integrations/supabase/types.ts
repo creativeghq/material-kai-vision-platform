@@ -6134,7 +6134,9 @@ export type Database = {
           delivery_note_id: string
           description: string
           id: string
+          move_purpose_line: number | null
           net_mass_kg: number | null
+          other_move_purpose_line_title: string | null
           product_id: string | null
           quantity: number
           sku: string | null
@@ -6148,7 +6150,9 @@ export type Database = {
           delivery_note_id: string
           description?: string
           id?: string
+          move_purpose_line?: number | null
           net_mass_kg?: number | null
+          other_move_purpose_line_title?: string | null
           product_id?: string | null
           quantity?: number
           sku?: string | null
@@ -6162,7 +6166,9 @@ export type Database = {
           delivery_note_id?: string
           description?: string
           id?: string
+          move_purpose_line?: number | null
           net_mass_kg?: number | null
+          other_move_purpose_line_title?: string | null
           product_id?: string | null
           quantity?: number
           sku?: string | null
@@ -6212,13 +6218,20 @@ export type Database = {
           issued_at: string | null
           kind: string
           move_purpose: string | null
+          mydata_document_type: string | null
+          non_obligated_recipient: boolean
           notes: string | null
           order_id: string | null
+          other_receiving_note_purpose_title: string | null
+          packagings: Json | null
           pdf_generated_at: string | null
           pdf_generation_status: string | null
           pdf_storage_path: string | null
+          receiving_note_purpose: number | null
           related_document: string | null
           responsible: string | null
+          reverse_delivery_note: boolean
+          reverse_delivery_note_purpose: number | null
           series: string | null
           series_number: number | null
           ship_from: string | null
@@ -6234,10 +6247,12 @@ export type Database = {
           ship_to_postal: string | null
           ship_to_street: string | null
           status: string
+          to_weigh: boolean
           transport_date: string | null
           transport_time: string | null
           updated_at: string
           vehicle_number: string | null
+          without_digital_transport_tracking: boolean
           workspace_id: string
         }
         Insert: {
@@ -6264,13 +6279,20 @@ export type Database = {
           issued_at?: string | null
           kind?: string
           move_purpose?: string | null
+          mydata_document_type?: string | null
+          non_obligated_recipient?: boolean
           notes?: string | null
           order_id?: string | null
+          other_receiving_note_purpose_title?: string | null
+          packagings?: Json | null
           pdf_generated_at?: string | null
           pdf_generation_status?: string | null
           pdf_storage_path?: string | null
+          receiving_note_purpose?: number | null
           related_document?: string | null
           responsible?: string | null
+          reverse_delivery_note?: boolean
+          reverse_delivery_note_purpose?: number | null
           series?: string | null
           series_number?: number | null
           ship_from?: string | null
@@ -6286,10 +6308,12 @@ export type Database = {
           ship_to_postal?: string | null
           ship_to_street?: string | null
           status?: string
+          to_weigh?: boolean
           transport_date?: string | null
           transport_time?: string | null
           updated_at?: string
           vehicle_number?: string | null
+          without_digital_transport_tracking?: boolean
           workspace_id: string
         }
         Update: {
@@ -6316,13 +6340,20 @@ export type Database = {
           issued_at?: string | null
           kind?: string
           move_purpose?: string | null
+          mydata_document_type?: string | null
+          non_obligated_recipient?: boolean
           notes?: string | null
           order_id?: string | null
+          other_receiving_note_purpose_title?: string | null
+          packagings?: Json | null
           pdf_generated_at?: string | null
           pdf_generation_status?: string | null
           pdf_storage_path?: string | null
+          receiving_note_purpose?: number | null
           related_document?: string | null
           responsible?: string | null
+          reverse_delivery_note?: boolean
+          reverse_delivery_note_purpose?: number | null
           series?: string | null
           series_number?: number | null
           ship_from?: string | null
@@ -6338,10 +6369,12 @@ export type Database = {
           ship_to_postal?: string | null
           ship_to_street?: string | null
           status?: string
+          to_weigh?: boolean
           transport_date?: string | null
           transport_time?: string | null
           updated_at?: string
           vehicle_number?: string | null
+          without_digital_transport_tracking?: boolean
           workspace_id?: string
         }
         Relationships: [
@@ -12103,6 +12136,8 @@ export type Database = {
       }
       invoice_items: {
         Row: {
+          move_purpose_line: number | null
+          other_move_purpose_line_title: string | null
           rec_type: number | null
           added_at: string
           cost_code_id: string | null
@@ -12148,6 +12183,8 @@ export type Database = {
           withheld_category: number | null
         }
         Insert: {
+          move_purpose_line?: number | null
+          other_move_purpose_line_title?: string | null
           rec_type?: number | null
           added_at?: string
           cost_code_id?: string | null
@@ -12193,6 +12230,8 @@ export type Database = {
           withheld_category?: number | null
         }
         Update: {
+          move_purpose_line?: number | null
+          other_move_purpose_line_title?: string | null
           rec_type?: number | null
           added_at?: string
           cost_code_id?: string | null
@@ -12415,6 +12454,11 @@ export type Database = {
       }
       invoices: {
         Row: {
+          invoice_variation_type: number | null
+          is_delivery_note: boolean
+          non_obligated_recipient: boolean
+          packagings: Json | null
+          special_invoice_category: number | null
           tax_payable_delta: number
           amount_credited: number
           amount_due: number | null
@@ -12494,6 +12538,8 @@ export type Database = {
           subtotal_net: number
           template_colors: Json | null
           template_id: string | null
+          third_party_collection: boolean
+          to_weigh: boolean
           total: number
           total_deductions_amount: number
           total_fees_amount: number
@@ -12507,9 +12553,15 @@ export type Database = {
           vat_payment_suspension: boolean
           vat_rate: number
           vehicle_number: string | null
+          without_digital_transport_tracking: boolean
           workspace_id: string
         }
         Insert: {
+          invoice_variation_type?: number | null
+          is_delivery_note?: boolean
+          non_obligated_recipient?: boolean
+          packagings?: Json | null
+          special_invoice_category?: number | null
           tax_payable_delta?: number
           amount_credited?: number
           amount_due?: number | null
@@ -12589,6 +12641,8 @@ export type Database = {
           subtotal_net?: number
           template_colors?: Json | null
           template_id?: string | null
+          third_party_collection?: boolean
+          to_weigh?: boolean
           total?: number
           total_deductions_amount?: number
           total_fees_amount?: number
@@ -12602,9 +12656,15 @@ export type Database = {
           vat_payment_suspension?: boolean
           vat_rate?: number
           vehicle_number?: string | null
+          without_digital_transport_tracking?: boolean
           workspace_id: string
         }
         Update: {
+          invoice_variation_type?: number | null
+          is_delivery_note?: boolean
+          non_obligated_recipient?: boolean
+          packagings?: Json | null
+          special_invoice_category?: number | null
           tax_payable_delta?: number
           amount_credited?: number
           amount_due?: number | null
@@ -12684,6 +12744,8 @@ export type Database = {
           subtotal_net?: number
           template_colors?: Json | null
           template_id?: string | null
+          third_party_collection?: boolean
+          to_weigh?: boolean
           total?: number
           total_deductions_amount?: number
           total_fees_amount?: number
@@ -12697,6 +12759,7 @@ export type Database = {
           vat_payment_suspension?: boolean
           vat_rate?: number
           vehicle_number?: string | null
+          without_digital_transport_tracking?: boolean
           workspace_id?: string
         }
         Relationships: [

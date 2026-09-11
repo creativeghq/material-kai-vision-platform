@@ -172,6 +172,25 @@ export interface FiscalLine {
    * product line, which states a different fact to AADE.
    */
   recType?: number;
+  /**
+   * myDATA `movePurposeLine` (AADE Σκοπός Διακίνησης, 1..20) — the reason THIS line is on the
+   * lorry, when it differs from the document's. A consolidated dispatch carrying stock to a
+   * branch alongside goods going back under warranty cannot state both with the header alone.
+   */
+  movePurposeLine?: number;
+  /** Required by AADE when `movePurposeLine` is 19 (Λοιπές Διακινήσεις). Max 150 chars. */
+  otherMovePurposeLineTitle?: string;
+}
+
+/**
+ * One row of myDATA `packingsDeclarations` — how many packages of a kind are moving.
+ * A COUNT, never a price: nothing here reaches a total, and the schedule is the point.
+ */
+export interface FiscalPackaging {
+  /** AADE Appendix §8.23, 1..6. 6 (Λοιπά) requires `otherPackagingTypeTitle`. */
+  packagingType: number;
+  quantity: number;
+  otherPackagingTypeTitle?: string;
 }
 
 /** One row of myDATA `taxesTotals` — a tax declared at DOCUMENT level instead of on a line. */
@@ -240,8 +259,50 @@ export interface FiscalInvoiceInput {
       branch: number;
       name?: string;
       address?: { street: string; number: string; postalCode: string; city: string };
+      /** AADE Appendix §8.20 (1..6). 3 = Μεταφορέας, the party v2.0.2 validates delivery
+       *  confirmations against — an untyped entity cannot be recognised as the transporter. */
+      type?: number;
     }[];
+    // ── myDATA v2.0.2 (live 2026-09-10) ──────────────────────────────────────────────────
+    /**
+     * `isDeliveryNote` — this document IS also the movement document (ΤΔΑ), rather than an
+     * invoice with a separate 9.3 beside it. v2.0.2 widened the types that may carry it to
+     * include 1.4, 3.1, 3.2 and 11.5; `canBeDeliveryNote` in the fiscal vocabulary is the set.
+     */
+    isDeliveryNote?: boolean;
+    /**
+     * AADE Appendix §8.24, 1..7 — MANDATORY on a Δελτίο Ποσοτικής Παραλαβής (10.1 / 10.2)
+     * from v2.0.2. Code 5 is accepted on 10.1 only. There is no sensible default: the
+     * connector refuses a 10.x with no purpose rather than picking one.
+     */
+    receivingNotePurpose?: number;
+    /** Required by AADE when `receivingNotePurpose` is 7 (Λοιπές Περιπτώσεις). */
+    otherReceivingNotePurposeTitle?: string;
+    /** `nonObligatedRecipient` — the goods are going to someone with no myDATA obligation. */
+    nonObligatedRecipient?: boolean;
+    /** `withoutDigitalTransportTracking` — Χωρίς Ψηφιακή Παρακολούθηση Διακίνησης. */
+    withoutDigitalTransportTracking?: boolean;
+    /** `toWeigh` — Ένδειξη Προς Ζύγιση: the quantity is settled at the weighbridge, not here. */
+    toWeigh?: boolean;
+    /** `reverseDeliveryNote` — the RECIPIENT issued this movement, not the supplier. */
+    reverseDeliveryNote?: boolean;
+    /** AADE Appendix §8.21, 1..5 — why the recipient had to issue it. */
+    reverseDeliveryNotePurpose?: number;
+    /** AADE Appendix §8.19, 1..13. Codes 8 and 9 are read-only ΦΗΜ values AADE refuses. */
+    specialInvoiceCategory?: number;
+    /** AADE Appendix §8.18, 1..4 — an omission/variance transmitted by the other party. */
+    invoiceVariationType?: number;
+    /** `thirdPartyCollection` — the money is collected by a third party, not the issuer. */
+    thirdPartyCollection?: boolean;
+    /** myDATA MARKs of the delivery notes a consolidated document (9.2) gathers up. */
+    multipleConnectedMarks?: number[];
   };
+  /**
+   * myDATA `packingsDeclarations` — the packages the goods travel in. Present only on a
+   * movement document or a ΤΔΑ; a document that states none declares none, which is not the
+   * same as declaring zero packages.
+   */
+  packingsDeclarations?: FiscalPackaging[];
   /** myDATA MARK(s) of the invoice(s) this document corrects — required for a 5.1 credit note. */
   correlatedInvoices?: number[];
   /** B2G (public-sector) extras — emitted as `providerB2gAdditionalInvoiceDetails`

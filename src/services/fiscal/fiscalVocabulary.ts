@@ -102,3 +102,218 @@ export function mydataClassificationLedger(
   if (opts.selfPricing) return 'none';
   return String(documentType ?? '').startsWith('3.') ? 'expenses' : 'income';
 }
+
+/**
+ * myDATA `receivingNotePurpose` — AADE Appendix §8.24, added in myDATA v2.0.2 and MANDATORY on
+ * a Δελτίο Ποσοτικής Παραλαβής (10.1 / 10.2). `validFor` is AADE's own per-type restriction:
+ * code 5 is accepted on the correlated note only.
+ */
+export interface MydataReceivingNotePurpose {
+  code: number;
+  en: string;
+  el: string;
+  validFor: readonly string[];
+}
+
+export const MYDATA_RECEIVING_NOTE_PURPOSES: readonly MydataReceivingNotePurpose[] = [
+  { code: 1, validFor: ['10.1', '10.2'], en: 'Recipient not obliged to issue',           el: 'ΔΠΠ - ΜΗ ΥΠΟΧΡΕΟΣ ΕΚΔΟΣΗΣ' },
+  { code: 2, validFor: ['10.1', '10.2'], en: 'Refusal to issue / inadvertent non-issue', el: 'ΔΠΠ - ΑΡΝΗΣΗ ΕΚΔΟΣΗΣ/ΕΚ ΠΑΡΑΔΡΟΜΗΣ ΜΗ ΕΚΔΟΣΗ' },
+  { code: 3, validFor: ['10.1', '10.2'], en: 'Intra-Community acquisition',              el: 'ΔΠΠ - ΕΝΔΟΚΟΙΝΟΤΙΚΗ ΑΠΟΚΤΗΣΗ' },
+  { code: 4, validFor: ['10.1', '10.2'], en: 'Third-country acquisition',                el: 'ΔΠΠ - ΑΠΟΚΤΗΣΗ ΤΡΙΤΗ ΧΩΡΑ' },
+  { code: 5, validFor: ['10.1'],         en: 'Quantity check',                           el: 'ΔΠΠ - ΠΟΣΟΤΙΚΟΣ ΕΛΕΓΧΟΣ' },
+  { code: 6, validFor: ['10.1', '10.2'], en: 'Non-delivery / partial delivery',          el: 'ΔΠΠ - ΜΗ/ΜΕΡΙΚΗ ΠΑΡΑΔΟΣΗ' },
+  { code: 7, validFor: ['10.1', '10.2'], en: 'Other cases',                              el: 'ΔΠΠ - ΛΟΙΠΕΣ ΠΕΡΙΠΤΩΣΕΙΣ' },
+];
+
+/** The code that takes a free-text title (`otherReceivingNotePurposeTitle`). */
+export const MYDATA_RECEIVING_NOTE_PURPOSE_OTHER = 7;
+
+/** What a picker offers for a receiving note of this type — code 5 is 10.1 only. */
+export function selectableReceivingNotePurposes(
+  documentType: string | null | undefined,
+): readonly MydataReceivingNotePurpose[] {
+  const t = String(documentType ?? '');
+  return MYDATA_RECEIVING_NOTE_PURPOSES.filter((p) => p.validFor.includes(t));
+}
+
+export function receivingNotePurposeLabel(
+  code: number | string | null | undefined,
+  lang: 'el' | 'en' = 'en',
+): string {
+  if (code == null || code === '') return '';
+  const n = Number(code);
+  const row = MYDATA_RECEIVING_NOTE_PURPOSES.find((p) => p.code === n);
+  return row ? row[lang] : String(code);
+}
+
+/** A myDATA code table that is nothing but a numeric code and its two names. */
+export interface MydataNamedCode {
+  code: number;
+  en: string;
+  el: string;
+}
+
+/** myDATA `packagingType` — AADE Appendix §8.23. A COUNT of packages, never a price. */
+export const MYDATA_PACKAGING_TYPES: readonly MydataNamedCode[] = [
+  { code: 1, en: 'Pallet', el: 'Παλέτα' },
+  { code: 2, en: 'Carton', el: 'Κούτα' },
+  { code: 3, en: 'Crate',  el: 'Κιβώτιο' },
+  { code: 4, en: 'Barrel', el: 'Βαρέλι' },
+  { code: 5, en: 'Sack',   el: 'Σάκος' },
+  { code: 6, en: 'Other',  el: 'Λοιπά' },
+];
+
+/** The code that takes a free-text title (`otherPackagingTypeTitle`, max 150 chars). */
+export const MYDATA_PACKAGING_TYPE_OTHER = 6;
+
+export function packagingTypeLabel(
+  code: number | string | null | undefined,
+  lang: 'el' | 'en' = 'en',
+): string {
+  if (code == null || code === '') return '';
+  const n = Number(code);
+  const row = MYDATA_PACKAGING_TYPES.find((p) => p.code === n);
+  return row ? row[lang] : String(code);
+}
+
+/** myDATA `reverseDeliveryNotePurpose` — AADE Appendix §8.21, why the RECIPIENT issued it. */
+export const MYDATA_REVERSE_DELIVERY_PURPOSES: readonly MydataNamedCode[] = [
+  { code: 1, en: 'Issuer not obliged to issue',              el: 'ΜΗ ΥΠΟΧΡΕΟΣ ΕΚΔΟΣΗΣ' },
+  { code: 2, en: 'Refusal to issue / inadvertent non-issue', el: 'ΑΡΝΗΣΗ ΕΚΔΟΣΗΣ/ΕΚ ΠΑΡΑΔΡΟΜΗΣ ΜΗ ΕΚΔΟΣΗ' },
+  { code: 3, en: 'Intra-Community acquisition',              el: 'ΕΝΔΟΚΟΙΝΟΤΙΚΗ ΑΠΟΚΤΗΣΗ' },
+  { code: 4, en: 'Third-country acquisition',                el: 'ΑΠΟΚΤΗΣΗ ΤΡΙΤΗ ΧΩΡΑ' },
+  { code: 5, en: 'Reverse charge',                           el: 'ΑΝΤΙΣΤΡΟΦΗ ΥΠΟΧΡΕΩΣΗΣ' },
+];
+
+export function reverseDeliveryPurposeLabel(
+  code: number | string | null | undefined,
+  lang: 'el' | 'en' = 'en',
+): string {
+  if (code == null || code === '') return '';
+  const n = Number(code);
+  const row = MYDATA_REVERSE_DELIVERY_PURPOSES.find((p) => p.code === n);
+  return row ? row[lang] : String(code);
+}
+
+/** myDATA `entityType` — AADE Appendix §8.20, what an `otherCorrelatedEntities` party IS. */
+export const MYDATA_ENTITY_TYPES: readonly MydataNamedCode[] = [
+  { code: 1, en: 'Tax representative',      el: 'Φορολογικός Εκπρόσωπος' },
+  { code: 2, en: 'Intermediary',            el: 'Διαμεσολαβητής' },
+  { code: 3, en: 'Transporter',             el: 'Μεταφορέας' },
+  { code: 4, en: 'Recipient of the sender', el: 'Λήπτης του Αποστολέα (Πωλητή)' },
+  { code: 5, en: 'Sender (seller)',         el: 'Αποστολέας (Πωλητής)' },
+  { code: 6, en: 'Other correlated entity', el: 'Λοιπές Συσχετιζόμενες Οντότητες' },
+];
+
+/** The transporter — the party myDATA v2.0.2 validates `ConfirmDeliveryOutcome` against. */
+export const MYDATA_ENTITY_TYPE_TRANSPORTER = 3;
+
+export function entityTypeLabel(
+  code: number | string | null | undefined,
+  lang: 'el' | 'en' = 'en',
+): string {
+  if (code == null || code === '') return '';
+  const n = Number(code);
+  const row = MYDATA_ENTITY_TYPES.find((p) => p.code === n);
+  return row ? row[lang] : String(code);
+}
+
+/**
+ * A myDATA code table whose rows AADE restricts to certain document types, and may mark
+ * read-only. An empty `validFor` means every type accepts the code.
+ */
+export interface MydataRestrictedCode {
+  code: number;
+  en: string;
+  el: string;
+  submittable: boolean;
+  validFor: readonly string[];
+}
+
+/** myDATA `specialInvoiceCategory` — AADE Appendix §8.19. */
+export const MYDATA_SPECIAL_INVOICE_CATEGORIES: readonly MydataRestrictedCode[] = [
+  { code: 1,  submittable: true,  validFor: [], en: 'Subsidies / grants',                         el: 'Επιδοτήσεις – Επιχορηγήσεις' },
+  { code: 2,  submittable: true,  validFor: [], en: 'Hotel retail income – room charges',         el: 'Έσοδα Λιανικής Ξενοδοχείων – Χρεώσεις Δωματίου' },
+  { code: 3,  submittable: true,  validFor: [], en: 'Accounting entry',                           el: 'Λογιστική Εγγραφή' },
+  { code: 4,  submittable: true,  validFor: [], en: 'Tax free',                                   el: 'Tax Free' },
+  { code: 5,  submittable: true,  validFor: [], en: 'Composite domestic / foreign transactions',  el: 'Σύνθετες συναλλαγές ημεδαπής – αλλοδαπής' },
+  { code: 6,  submittable: true,  validFor: [], en: 'Beneficiaries of art. 3, KYA 139818 ΕΞ2022', el: 'Δικαιούχοι του άρθρου 3 της ΚΥΑ 139818 ΕΞ2022' },
+  { code: 7,  submittable: true,  validFor: [], en: 'Purchase of agricultural goods and services (VAT Code art. 41)', el: 'Αγορά αγροτικών αγαθών υπηρεσιών Άρθρο 41 του Κώδικα ΦΠΑ' },
+  { code: 8,  submittable: false, validFor: [], en: 'Retail income, AADE ΦΗΜ_1',                  el: 'Έσοδα Λιανικών ΦΗΜ ΑΑΔΕ_1' },
+  { code: 9,  submittable: false, validFor: [], en: 'Retail income, AADE ΦΗΜ_2',                  el: 'Έσοδα Λιανικών ΦΗΜ ΑΑΔΕ_2' },
+  { code: 10, submittable: true,  validFor: [], en: 'Retail income, business ΦΗΜ variance',       el: 'Έσοδα Λιανικών ΦΗΜ Επιχείρησης Απόκλιση' },
+  { code: 11, submittable: true,  validFor: [], en: 'Heating allowance',                          el: 'Επίδομα Θέρμανσης' },
+  { code: 12, submittable: true,  validFor: [], en: 'Food-service transactions',                  el: 'Συναλλαγές εστίασης' },
+  { code: 13, submittable: true,  validFor: ['11.4', '14.30'], en: 'Correlation difficulty indicator', el: 'Ένδειξη Δυσχέρεια Συσχέτισης' },
+];
+
+/**
+ * myDATA `invoiceVariationType` — AADE Appendix §8.18. Each code names WHO is transmitting a
+ * document the other party omitted or reported differently, and AADE accepts it only on the
+ * types listed against it.
+ */
+export const MYDATA_INVOICE_VARIATION_TYPES: readonly MydataRestrictedCode[] = [
+  { code: 1, submittable: true, validFor: ['1.1', '1.6', '2.1', '2.4', '5.2', '8.1', '8.2'], en: 'Omission transmitted by the recipient', el: 'Διαβίβαση Παράλειψης από Λήπτη' },
+  { code: 2, submittable: true, validFor: ['11.3', '11.4', '13.1', '13.31'],                 en: 'Omission transmitted by the issuer',    el: 'Διαβίβαση Παράλειψης από Εκδότη' },
+  { code: 3, submittable: true, validFor: ['11.3', '11.4', '13.1', '13.31'],                 en: 'Variance transmitted by the recipient', el: 'Διαβίβαση Απόκλισης από Λήπτη' },
+  { code: 4, submittable: true, validFor: ['11.3', '11.4', '13.1', '13.31'],                 en: 'Variance transmitted by the issuer',    el: 'Διαβίβαση Απόκλισης από Εκδότη' },
+];
+
+/** True when AADE accepts this code on that document type. An empty `validFor` accepts any. */
+export function acceptsOnDocumentType(
+  row: { validFor: readonly string[] },
+  documentType: string | null | undefined,
+): boolean {
+  if (!row.validFor.length) return true;
+  return row.validFor.includes(String(documentType ?? ''));
+}
+
+/**
+ * The myDATA types that ARE a movement document rather than one that happens to carry goods.
+ * 9.x dispatch them, 10.x record a quantitative receipt, and it is the 10.x pair that makes
+ * `receivingNotePurpose` mandatory from v2.0.2.
+ */
+export const MYDATA_MOVEMENT_DOC_TYPES: readonly { code: string; en: string; el: string }[] = [
+  { code: '9.1',  en: 'Correlated delivery note',      el: 'Δελτίο Αποστολής Συσχετιζόμενο' },
+  { code: '9.2',  en: 'Consolidated delivery note',    el: 'Συγκεντρωτικό Δελτίο Αποστολής' },
+  { code: '9.3',  en: 'Delivery note',                 el: 'Δελτίο Αποστολής' },
+  { code: '10.1', en: 'Correlated receiving note',     el: 'Δελτίο Ποσοτικής Παραλαβής Συσχετιζόμενο' },
+  { code: '10.2', en: 'Non-correlated receiving note', el: 'Δελτίο Ποσοτικής Παραλαβής Μη Συσχετιζόμενο' },
+];
+
+/** The Δελτίο Ποσοτικής Παραλαβής pair — the types that REQUIRE a `receivingNotePurpose`. */
+export const MYDATA_RECEIVING_NOTE_TYPES: readonly string[] = ['10.1', '10.2'];
+
+export function isReceivingNoteType(documentType: string | null | undefined): boolean {
+  return MYDATA_RECEIVING_NOTE_TYPES.includes(String(documentType ?? ''));
+}
+
+export function isMovementDocType(documentType: string | null | undefined): boolean {
+  return MYDATA_MOVEMENT_DOC_TYPES.some((t) => t.code === String(documentType ?? ''));
+}
+
+export function movementDocTypeLabel(
+  code: string | null | undefined,
+  lang: 'el' | 'en' = 'en',
+): string {
+  const row = MYDATA_MOVEMENT_DOC_TYPES.find((t) => t.code === String(code ?? ''));
+  return row ? row[lang] : String(code ?? '');
+}
+
+/**
+ * Document types that may ALSO be a movement document (`isDeliveryNote`). myDATA v2.0.2 added
+ * 1.4, 3.1, 3.2 and 11.5; the rest already carried goods this way, which is what makes a ΤΔΑ
+ * one document rather than an invoice plus a separate 9.3.
+ */
+export const MYDATA_IS_DELIVERY_NOTE_TYPES: readonly string[] = [
+  '1.1', '1.2', '1.3', '1.4', '1.5', '1.6',
+  '2.1', '2.2', '2.3', '2.4',
+  '3.1', '3.2',
+  '5.1', '5.2',
+  '6.1', '6.2',
+  '11.1', '11.2', '11.3', '11.4', '11.5',
+];
+
+export function canBeDeliveryNote(documentType: string | null | undefined): boolean {
+  return MYDATA_IS_DELIVERY_NOTE_TYPES.includes(String(documentType ?? ''));
+}

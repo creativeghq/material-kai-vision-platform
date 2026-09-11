@@ -5,11 +5,19 @@
 // myDATA type / income-classification use sensible defaults that the caller can
 // override (they are business-activity specific and become a per-workspace config later).
 
-import type { FiscalInvoiceInput, FiscalLine, FiscalParty, FiscalTaxTotal } from './types.ts';
+import type {
+  FiscalInvoiceInput,
+  FiscalLine,
+  FiscalPackaging,
+  FiscalParty,
+  FiscalTaxTotal,
+} from './types.ts';
 import { isUnnamedLineName } from './types.ts';
 import {
   movePurposeLabel,
   isMydataMovePurpose,
+  isReceivingNoteType,
+  movementDocTypeLabel,
   mydataIncomeClassificationType,
   mydataIncomeClassificationCategory,
 } from './fiscalVocabulary.generated.ts';
@@ -101,9 +109,28 @@ function correlatedEntitiesFrom(raw: unknown): FiscalInvoiceInput['header']['oth
       branch: Number(e?.branch ?? e?.branch_code ?? 0) || 0,
       ...(e?.name ? { name: String(e.name) } : {}),
       ...(address ? { address } : {}),
+      // AADE §8.20. Without it the transporter is just another party, and myDATA v2.0.2
+      // validates a delivery confirmation against the entity typed as one.
+      ...(e?.type ?? e?.entity_type ? { type: Number(e.type ?? e.entity_type) } : {}),
     }];
   });
   return out.length ? out : undefined;
+}
+
+/**
+ * The packages a movement declares (AADE PackingsDeclaration). A row with no positive quantity
+ * declares nothing and is dropped: an empty declaration is silence, and a zero is a claim.
+ */
+function packagingsFrom(raw: unknown): FiscalPackaging[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((p: any) => {
+    const packagingType = Number(p?.packagingType ?? p?.packaging_type ?? 0);
+    const quantity = Number(p?.quantity ?? 0);
+    if (!Number.isInteger(packagingType) || packagingType < 1 || packagingType > 6) return [];
+    if (!Number.isFinite(quantity) || quantity <= 0) return [];
+    const title = String(p?.otherPackagingTypeTitle ?? p?.other_packaging_type_title ?? '').trim();
+    return [{ packagingType, quantity, ...(title ? { otherPackagingTypeTitle: title } : {}) }];
+  });
 }
 
 /** The stated purpose of a movement, or a refusal. */
@@ -385,6 +412,9 @@ export async function buildInvoiceInputFromDb(
       // Cross-border commercial invoices are expected to carry it per line.
       commodityCode: it.taric_code ?? undefined,
       countryOfOrigin: it.country_of_origin ?? undefined,
+      // myDATA v2.0.2 per-line movement purpose, on a document that also carries the goods.
+      movePurposeLine: it.move_purpose_line ?? undefined,
+      otherMovePurposeLineTitle: it.other_move_purpose_line_title ?? undefined,
       unitPrice: Number(it.unit_price ?? 0),
       netValue: net,
       vatCategory: lineCat,
@@ -473,6 +503,13 @@ export async function buildInvoiceInputFromDb(
             street: inv.ship_to || counterpart.address?.street || '',
             number: counterpart.address?.number ?? '', postalCode: counterpart.address?.postalCode ?? '', city: counterpart.address?.city ?? '',
           },
+          // myDATA v2.0.2 movement facts. `isDeliveryNote` is what makes this ONE document
+          // (ΤΔΑ) rather than an invoice with a separate 9.3 beside it; the connector refuses
+          // it on a type AADE does not accept it on.
+          ...(inv.is_delivery_note ? { isDeliveryNote: true } : {}),
+          ...(inv.to_weigh ? { toWeigh: true } : {}),
+          ...(inv.non_obligated_recipient ? { nonObligatedRecipient: true } : {}),
+          ...(inv.without_digital_transport_tracking ? { withoutDigitalTransportTracking: true } : {}),
         };
       })()
     : null;
@@ -510,7 +547,19 @@ export async function buildInvoiceInputFromDb(
       selfPricing: !!inv.self_pricing,
       exchangeRate: inv.exchange_rate ?? undefined,
       ...(movement ?? {}),
+      // AADE §8.19 / §8.18 — stated on any invoice, not only one carrying goods.
+      ...(inv.special_invoice_category != null
+        ? { specialInvoiceCategory: Number(inv.special_invoice_category) }
+        : {}),
+      ...(inv.invoice_variation_type != null
+        ? { invoiceVariationType: Number(inv.invoice_variation_type) }
+        : {}),
+      ...(inv.third_party_collection ? { thirdPartyCollection: true } : {}),
     },
+    // The packages the goods travel in — only ever set on a document that carries them.
+    ...(movement && packagingsFrom(inv.packagings).length
+      ? { packingsDeclarations: packagingsFrom(inv.packagings) }
+      : {}),
     ...(b2g ? { b2g } : {}),
     // Payment method captured on the invoice (myDATA requires at least one).
     // A POS/IRIS override wins — it carries the EFT-POS terminal + NSP for the signature.
@@ -647,6 +696,9 @@ export async function buildCreditNoteInputFromDb(
       // Cross-border commercial invoices are expected to carry it per line.
       commodityCode: it.taric_code ?? undefined,
       countryOfOrigin: it.country_of_origin ?? undefined,
+      // myDATA v2.0.2 per-line movement purpose, on a document that also carries the goods.
+      movePurposeLine: it.move_purpose_line ?? undefined,
+      otherMovePurposeLineTitle: it.other_move_purpose_line_title ?? undefined,
       unitPrice: Number(it.unit_price ?? 0),
       netValue: net,
       vatCategory: lineCat,
@@ -797,6 +849,13 @@ export async function buildDeliveryNoteInputFromDb(
     description: it.description ?? 'Item',
     quantity: Number(it.quantity ?? 1),
     measurementUnitLabel: it.unit ?? 'ΤΜΧ',
+    // Customs facts already snapshotted on the movement line — a cross-border consignment is
+    // expected to carry the commodity code per line, and the column was being read by nobody.
+    commodityCode: it.taric_code ?? undefined,
+    countryOfOrigin: it.country_of_origin ?? undefined,
+    // myDATA v2.0.2 per-line movement purpose, when this line travels for its own reason.
+    movePurposeLine: it.move_purpose_line ?? undefined,
+    otherMovePurposeLineTitle: it.other_move_purpose_line_title ?? undefined,
     unitPrice: 0,
     netValue: 0,
     vatCategory: 8, // without VAT — movement doc carries no value
@@ -804,7 +863,22 @@ export async function buildDeliveryNoteInputFromDb(
     vatAmount: 0,
   }));
 
-  const movePurpose = assertMovePurpose(dn.move_purpose, `delivery note ${deliveryNoteId}`);
+  // WHICH myDATA DOCUMENT THIS MOVEMENT IS. `kind` has always distinguished a dispatch from a
+  // receipt, and the type was hardcoded to 9.3 regardless — so every receipt note was filed as
+  // a Δελτίο Αποστολής. A receipt defaults to the NON-correlated note (10.2) because 10.1
+  // requires the MARK of the document it correlates to, which a note does not yet carry.
+  const mydataType: string = overrides.invoiceType
+    ?? dn.mydata_document_type
+    ?? (dn.kind === 'receipt' ? '10.2' : '9.3');
+
+  // A Δελτίο Ποσοτικής Παραλαβής states its reason as `receivingNotePurpose` (AADE §8.24) and
+  // carries no `movePurpose`; only the 9.x dispatch family needs one, and there it is refused
+  // rather than defaulted — `move_purpose ? … : 1` filed every unclassified movement as a SALE.
+  const isReceivingNote = isReceivingNoteType(mydataType);
+  const movePurpose = isReceivingNote
+    ? undefined
+    : assertMovePurpose(dn.move_purpose, `delivery note ${deliveryNoteId}`);
+  const packagings = packagingsFrom(dn.packagings);
   // Optional sub-units chosen as the loading / delivery point.
   const [fromUnit, toUnit] = await Promise.all([
     loadAddressUnit(supabase, dn.ship_from_address_unit_id),
@@ -833,14 +907,33 @@ export async function buildDeliveryNoteInputFromDb(
       series: overrides.series ?? (dn.series || fs?.invoice_number_prefix || 'A'),
       aa: overrides.aa ?? String(dn.series_number ?? dn.delivery_note_number ?? ''),
       issueDate,
-      invoiceType: overrides.invoiceType ?? '9.3',
+      invoiceType: mydataType,
       currency: 'EUR',
       dispatchDate: dn.transport_date ? String(dn.transport_date).slice(0, 10) : issueDate,
       dispatchTime: dn.transport_time || undefined,
       vehicleNumber: dn.vehicle_number || undefined,
-      movePurpose,
-      movePurposeLabel: movePurposeLabel(movePurpose),
-      ...(dn.other_move_purpose_title ? { otherMovePurposeTitle: String(dn.other_move_purpose_title) } : {}),
+      ...(movePurpose != null
+        ? {
+            movePurpose,
+            movePurposeLabel: movePurposeLabel(movePurpose),
+            ...(dn.other_move_purpose_title ? { otherMovePurposeTitle: String(dn.other_move_purpose_title) } : {}),
+          }
+        : {}),
+      // myDATA v2.0.2. The receiving-note reason is MANDATORY on 10.x and the connector refuses
+      // a note without one — recorded on the document rather than decided at transmission time.
+      ...(dn.receiving_note_purpose != null
+        ? { receivingNotePurpose: Number(dn.receiving_note_purpose) }
+        : {}),
+      ...(dn.other_receiving_note_purpose_title
+        ? { otherReceivingNotePurposeTitle: String(dn.other_receiving_note_purpose_title) }
+        : {}),
+      ...(dn.non_obligated_recipient ? { nonObligatedRecipient: true } : {}),
+      ...(dn.without_digital_transport_tracking ? { withoutDigitalTransportTracking: true } : {}),
+      ...(dn.to_weigh ? { toWeigh: true } : {}),
+      ...(dn.reverse_delivery_note ? { reverseDeliveryNote: true } : {}),
+      ...(dn.reverse_delivery_note_purpose != null
+        ? { reverseDeliveryNotePurpose: Number(dn.reverse_delivery_note_purpose) }
+        : {}),
       loadingBranch: dn.ship_from_branch_code ?? Number(dn.branch_code ?? 0) ?? 0,
       ...(dn.ship_to_branch_code != null ? { deliveryBranch: Number(dn.ship_to_branch_code) } : {}),
       ...(correlatedEntitiesFrom(dn.correlated_entities) ? { otherCorrelatedEntities: correlatedEntitiesFrom(dn.correlated_entities) } : {}),
@@ -848,8 +941,9 @@ export async function buildDeliveryNoteInputFromDb(
       deliveryAddress,
     },
     lines,
+    ...(packagings.length ? { packingsDeclarations: packagings } : {}),
     summary: { totalNetValue: 0, totalVatAmount: 0, totalGrossValue: 0 },
-    documentLabel: overrides.documentLabel ?? 'Δελτίο Αποστολής',
+    documentLabel: overrides.documentLabel ?? movementDocTypeLabel(mydataType, 'el'),
     documentComments: dn.notes ?? undefined,
     // Delivery notes carry no per-document language, so they follow the workspace default.
     documentLanguageCode: String(fs?.default_doc_language ?? 'en').toUpperCase(),
