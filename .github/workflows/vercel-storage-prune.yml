@@ -1,0 +1,71 @@
+# Vercel deployment-storage prune.
+#
+# Manual on purpose, and dry-run by default. Deleting deployments is what orphaned a static
+# vendor chunk on 2026-09-11 and took the app down, so this does not run on a schedule until
+# a few supervised runs have shown the probe staying green afterwards.
+name: Vercel storage prune
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Actually delete (unchecked = dry run)'
+        type: boolean
+        default: false
+      keep:
+        description: 'Always spare the newest N deployments'
+        default: '20'
+      min_age_days:
+        description: 'Never delete anything younger than this many days'
+        default: '7'
+      limit:
+        description: 'Maximum deletions in one run'
+        default: '200'
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Before, so a prune that breaks the site cannot be blamed on something that was already
+      # broken — and so the run aborts rather than pruning on top of an existing outage.
+      - name: 🔍 Live site BEFORE
+        run: node scripts/probe-live-frontend.mjs "https://app.materialshub.gr"
+
+      - name: 🧹 Prune
+        run: |
+          set -euo pipefail
+          node scripts/prune-vercel-deployments.mjs \
+            ${{ inputs.apply && '--apply' || '' }} \
+            --keep "${{ inputs.keep }}" \
+            --min-age-days "${{ inputs.min_age_days }}" \
+            --limit "${{ inputs.limit }}"
+
+      # The rule this repo already has for janitors: probe the world, not the exit code. A prune
+      # reports success for deletions that each returned 200 while the live site is now missing a
+      # chunk, because those are different facts.
+      - name: 🔍 Live site AFTER
+        if: ${{ inputs.apply }}
+        run: |
+          set -euo pipefail
+          sleep 15
+          node scripts/probe-live-frontend.mjs "https://app.materialshub.gr"
+
+      - name: 🚨 If the site broke, say what to do
+        if: ${{ failure() && inputs.apply }}
+        run: |
+          echo "The prune ran and the live site is now failing." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "A deleted deployment most likely orphaned a static chunk the live build still" >> "$GITHUB_STEP_SUMMARY"
+          echo "references. Fix by RENAMING the affected chunk in vite.config.ts manualChunks" >> "$GITHUB_STEP_SUMMARY"
+          echo "(the edge cache key is the filename) and redeploying. Deleted deployments are" >> "$GITHUB_STEP_SUMMARY"
+          echo "also restorable for 30 days from the Vercel dashboard." >> "$GITHUB_STEP_SUMMARY"

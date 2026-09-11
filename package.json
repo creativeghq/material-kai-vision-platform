@@ -36,7 +36,8 @@
     "finance:mirror": "node scripts/gen-finance-mirrors.mjs",
     "vocab:mirror": "node scripts/gen-vocabularies.mjs",
     "crm:translit-sql": "node scripts/gen-crm-translit-sql.mjs",
-    "probe:live": "node scripts/probe-live-frontend.mjs"
+    "probe:live": "node scripts/probe-live-frontend.mjs",
+    "prune:vercel": "node scripts/prune-vercel-deployments.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
