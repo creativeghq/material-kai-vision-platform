@@ -150,6 +150,9 @@ root.render(
 (window as unknown as { __mkBooted?: boolean }).__mkBooted = true;
 try {
   sessionStorage.removeItem('mk-boot-recovered');
+  // The network-fault retry is released for the same reason: a client that recovers from one
+  // half-propagated deploy must still get its free reload the next time a chunk goes missing.
+  sessionStorage.removeItem('mk-boot-retried');
 } catch {
   /* storage blocked — the watchdog falls back to its visible panel */
 }

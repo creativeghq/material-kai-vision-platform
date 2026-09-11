@@ -154,17 +154,32 @@
 
     for (var j = 0; j < names.length; j++) probeOne(names[j]);
 
-    function probeOne(name) {
+    function probeOne(name, isRetry) {
       var q = new XMLHttpRequest();
-      q.open('GET', '/' + name, true);
+      // The cache-buster goes on the RETRY only. The first request must be the exact URL the
+      // module graph asks for; the second deliberately misses the edge cache, which is what
+      // separates "this POP is serving a stale file set" from "the file is really gone".
+      q.open('GET', '/' + name + (isRetry ? '?retry=' + Date.now() : ''), true);
       q.onreadystatechange = function () {
         if (q.readyState !== 4) return;
-        var mitigated = '';
-        try { mitigated = q.getResponseHeader('x-vercel-mitigated') || ''; } catch (e) { /* opaque */ }
+        var head = function (h) {
+          try { return q.getResponseHeader(h) || ''; } catch (e) { return ''; }
+        };
+        var mitigated = head('x-vercel-mitigated');
+        var edge = head('x-vercel-id');
+        var cache = head('x-vercel-cache');
+
+        // A 404 on one chunk is the whole failure — retry it past the cache before reporting,
+        // so the line says whether it is transient or real.
+        if (q.status !== 200 && !isRetry) { probeOne(name, true); return; }
+
         if (q.status !== 200) bad++;
         lines.push(name.replace('assets/', '') + ' → HTTP ' + q.status
+          + (isRetry ? ' (also on cache-bust retry)' : '')
           + (mitigated ? ' [BLOCKED: ' + mitigated + ']' : '')
-          + ' · ' + (q.responseText || '').length + ' bytes');
+          + ' · ' + (q.responseText || '').length + ' bytes'
+          + (cache ? ' · ' + cache : '')
+          + (edge ? ' · ' + edge : ''));
         done();
       };
       try { q.send(); } catch (e) { bad++; lines.push(name + ' → request failed: ' + e); done(); }

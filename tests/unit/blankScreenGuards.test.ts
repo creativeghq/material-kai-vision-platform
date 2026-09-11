@@ -108,6 +108,30 @@ describe('the boot watchdog', () => {
     expect(block).toContain('failed to load');
   });
 
+  it('probes the whole module graph, not just the entry', () => {
+    const at = html.indexOf('function probeEntry');
+    const block = html.slice(at, at + 900);
+    // A static import that 404s takes the entry down with it and reports as the ENTRY failing,
+    // so probing one file names the wrong one. vendor-utils was the missing chunk; the entry it
+    // killed served 200.
+    expect(block).toContain('modulepreload');
+  });
+
+  it('retries once before it purges, and never purges a missing file', () => {
+    const at = html.indexOf('function check()');
+    const block = html.slice(at, html.indexOf('function probeEntry', at));
+    // Clearing a device cannot conjure a chunk the server will not serve, so the network branch
+    // reloads once and then reports. It must never reach the purge.
+    const netBranch = block.slice(block.indexOf('if (netFault)'), block.indexOf('if (tried)'));
+    expect(netBranch).toContain('RELOAD_KEY');
+    expect(netBranch).toContain('location.reload()');
+    expect(netBranch).not.toContain('purgeAndReload');
+  });
+
+  it('releases the retry flag on a successful boot', () => {
+    expect(code('src/main.tsx')).toContain("sessionStorage.removeItem('mk-boot-retried')");
+  });
+
   it('reads the purge token back before reloading, or a blocked write loops forever', () => {
     const at = html.indexOf('function pushedPurge');
     const block = html.slice(at, at + 900);
@@ -156,6 +180,16 @@ describe('the diagnostics page tells the truth', () => {
     const at = diag.indexOf('function probeChunks');
     expect(at).toBeGreaterThan(-1);
     expect(diag.slice(at, at + 400)).toContain('vendor-');
+  });
+
+  it('retries a failed chunk past the edge cache before calling it missing', () => {
+    const at = diag.indexOf('function probeOne');
+    const block = diag.slice(at, at + 1400);
+    // Transient / half-propagated is a different answer from "the file is really gone", and the
+    // first request must stay the exact URL the module graph asks for.
+    expect(block).toContain('isRetry');
+    expect(block).toContain('x-vercel-id');
+    expect(block).toContain('x-vercel-cache');
   });
 
   it('distinguishes a signed-in device, because signed-out never runs those reads', () => {

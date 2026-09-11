@@ -122,6 +122,7 @@
     <script>
       (function () {
         var GUARD = 'mk-boot-recovered';
+        var RELOAD_KEY = 'mk-boot-retried';
         /**
          * Bump this to push a state clean to EVERY client on its next load. The watchdog below
          * only catches a bundle that dies; a client that mounts and then renders blank keeps its
@@ -309,7 +310,18 @@
           var tried = false;
           try { tried = sessionStorage.getItem(GUARD) === '1'; } catch (e) { /* storage blocked */ }
           probeEntry().then(function (netFault) {
-            if (netFault) { panel(networkDetail(netFault), NETWORK_BODY); return; }
+            // A file the server would not serve is not stale client state, so the ladder is:
+            // plain reload once (fixes a transient or half-propagated deploy, and costs nothing),
+            // then SAY which file and stop. Purging cannot conjure a missing chunk, and signing
+            // someone out to not-fix it is the harm this replaced.
+            if (netFault) {
+              var retried = false;
+              try { retried = sessionStorage.getItem(RELOAD_KEY) === '1'; } catch (e) { /* storage blocked */ }
+              if (retried) { panel(networkDetail(netFault), NETWORK_BODY); return; }
+              try { sessionStorage.setItem(RELOAD_KEY, '1'); } catch (e) { /* storage blocked */ }
+              location.reload();
+              return;
+            }
             if (tried) { panel(firstError); return; }
             purgeAndReload();
           });
@@ -322,17 +334,30 @@
          * Vercel Attack Challenge Mode did exactly that on 2026-09-11. Ask the network first.
          */
         function probeEntry() {
+          // The whole initial graph, not just the entry. A STATIC import that 404s takes the
+          // entry down with it and reports as the entry failing, so probing one file names the
+          // wrong one — `vendor-utils` was missing while the entry it killed served 200.
+          var urls = [];
           var el = document.querySelector('script[type="module"][src]');
-          var url = el ? el.src : location.href;
-          if (!window.fetch) return Promise.resolve(null);
+          if (el) urls.push(el.src);
+          var pre = document.querySelectorAll('link[rel="modulepreload"][href]');
+          for (var i = 0; i < pre.length; i++) urls.push(pre[i].href);
+          if (!window.fetch || !urls.length) return Promise.resolve(null);
           try {
-            return fetch(url, { cache: 'no-store', credentials: 'same-origin' })
-              .then(function (r) { return r.ok ? null : 'HTTP ' + r.status; })
-              .catch(function (e) { return String((e && e.message) || 'network error'); });
+            return Promise.all(urls.map(function (u) {
+              return fetch(u, { cache: 'no-store', credentials: 'same-origin' })
+                .then(function (r) { return r.ok ? null : basename(u) + ' HTTP ' + r.status; })
+                .catch(function (e) { return basename(u) + ' ' + String((e && e.message) || 'network error'); });
+            })).then(function (rs) {
+              for (var j = 0; j < rs.length; j++) { if (rs[j]) return rs[j]; }
+              return null;
+            });
           } catch (e) {
             return Promise.resolve(null);
           }
         }
+
+        function basename(u) { return String(u).split('/').pop(); }
 
         var NETWORK_BODY = 'We could not download the app itself — the request was refused before it '
           + 'reached your browser. Nothing is wrong with this device or anything you have saved, so '
