@@ -13,6 +13,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import type { Capability } from '@/auth/capabilities';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
+import { PageLoader } from '@/components/core/PageLoader';
 
 interface Props {
   /** Single required capability. */
@@ -27,7 +28,11 @@ export const CapabilityGuard: React.FC<Props> = ({ capability, anyOf, children, 
   const { can, loading, persona } = usePermissions();
   const navigate = useNavigate();
 
-  if (loading) return null;
+  // A guard that renders null while it decides is a blank SCREEN, not a blank slot: these sit
+  // above the route <Suspense>, so nothing else is on the page to carry the wait. A permission
+  // check that never resolves then looks exactly like a dead app — dark ground, no spinner, no
+  // error, and nothing reported, because the app mounted perfectly well.
+  if (loading) return <PageLoader />;
   const allowed = (capability ? can(capability) : false) || (anyOf ? anyOf.some(can) : false);
   if (allowed) return <>{children}</>;
 

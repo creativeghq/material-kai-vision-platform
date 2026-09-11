@@ -174,7 +174,7 @@
          * Built with DOM calls, never an HTML string: `detail` carries an arbitrary
          * error message and invariant 11 forbids assembling markup around one.
          */
-        function panel(detail) {
+        function panel(detail, body) {
           var host = document.getElementById('root');
           if (!host) return;
           var dark = document.documentElement.classList.contains('dark');
@@ -193,8 +193,8 @@
           h.style.cssText = 'margin:0 0 10px;font-size:19px;font-weight:600';
 
           var p = document.createElement('p');
-          p.textContent = 'We cleared this device’s saved data and tried again, and the app still '
-            + 'did not load. This is a fault on our side, not something you did wrong.';
+          p.textContent = body || ('We cleared this device’s saved data and tried again, and the app '
+            + 'still did not load. This is a fault on our side, not something you did wrong.');
           p.style.cssText = 'margin:0 0 16px;color:' + muted;
 
           var btn = document.createElement('button');
@@ -253,6 +253,27 @@
             if (persisted) location.reload();
           });
         })();
+
+        /**
+         * Mounted and still showing nothing. The watchdog below only ever asked whether the
+         * bundle ran, so an app that mounts and renders an empty tree — a guard stuck on
+         * `loading`, a redirect that never lands — stayed invisible to it and to Sentry, and
+         * presented as a dark blank screen forever. Text is the test: every real screen in this
+         * app has some. Never purges, because wiping storage cannot fix a render fault; it
+         * states the fault instead so there is something to report.
+         */
+        var BLANK_TIMEOUT_MS = 20000;
+        setTimeout(function () {
+          if (!window.__mkBooted) return;
+          var host = document.getElementById('root');
+          if (!host) return;
+          if ((host.innerText || '').trim() !== '') return;
+          panel(
+            firstError || 'No error was thrown — the app mounted and rendered an empty screen.',
+            'The app loaded but never showed anything. Clearing this device will not help, because '
+              + 'nothing is wrong with the stored data — this is a fault on our side.',
+          );
+        }, BLANK_TIMEOUT_MS);
 
         var waitedMs = 0;
         function check() {

@@ -36,7 +36,11 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
   }
 
   if (!user) {
-    return null; // Will redirect via useEffect
+    // The redirect above is an EFFECT, so this renders first and renders again on every pass
+    // where the navigation has not landed yet. Bare null made that a black screen with no
+    // spinner and no error — indistinguishable from a dead app, and invisible to Sentry
+    // because nothing threw. Show the same loader the signed-in wait uses.
+    return <PageLoader />;
   }
 
   return <>{children}</>;
