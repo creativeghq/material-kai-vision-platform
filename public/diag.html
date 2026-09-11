@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MaterialsHub diagnostics</title>
+<style>
+  /* Deliberately light: if this page renders BLACK, the fault is not our CSS. */
+  html,body{margin:0;background:#fff;color:#111;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  main{max-width:640px;margin:0 auto;padding:20px}
+  h1{font-size:19px;margin:0 0 4px}
+  p.sub{margin:0 0 16px;color:#555}
+  .row{border-bottom:1px solid #e5e5e5;padding:9px 0}
+  .k{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#666}
+  .v{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;word-break:break-all}
+  .ok{color:#0a7d32;font-weight:600}
+  .bad{color:#b3261e;font-weight:600}
+</style>
+</head>
+<body>
+<main>
+  <h1>MaterialsHub diagnostics</h1>
+  <p class="sub">Plain HTML — no React, no router, no app bundle. If you can read this, the server and your connection are fine.</p>
+  <div id="out"></div>
+</main>
+<script>
+/* ES5 only, no Promise, no fetch at the top level — this must run on anything. */
+(function () {
+  var out = document.getElementById('out');
+  function row(k, v, cls) {
+    var d = document.createElement('div'); d.className = 'row';
+    var a = document.createElement('div'); a.className = 'k'; a.textContent = k;
+    var b = document.createElement('div'); b.className = 'v' + (cls ? ' ' + cls : '');
+    b.textContent = v;
+    d.appendChild(a); d.appendChild(b); out.appendChild(d);
+    return b;
+  }
+
+  row('This page rendered', 'YES — static HTML and CSS work', 'ok');
+  row('Browser', navigator.userAgent);
+  row('Screen', window.innerWidth + ' x ' + window.innerHeight + ' @' + (window.devicePixelRatio || 1) + 'x');
+  row('Standalone (installed app)', (window.navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'YES — opened from home screen' : 'no — normal browser tab');
+
+  var ls;
+  try { localStorage.setItem('__d', '1'); ls = localStorage.getItem('__d') === '1' ? 'works' : 'reads but will not persist'; localStorage.removeItem('__d'); }
+  catch (e) { ls = 'BLOCKED: ' + e; }
+  row('localStorage', ls, ls === 'works' ? 'ok' : 'bad');
+
+  row('Service workers registered', 'checking…');
+  var swRow = out.lastChild.querySelector('.v');
+  try {
+    if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+      navigator.serviceWorker.getRegistrations().then(function (rs) {
+        swRow.textContent = rs.length === 0 ? 'none' : rs.length + ' registered';
+      })['catch'](function () { swRow.textContent = 'could not read'; });
+    } else { swRow.textContent = 'not supported'; }
+  } catch (e) { swRow.textContent = 'error: ' + e; }
+
+  /* The real question: does the app shell come back, and does its bundle parse? */
+  var appRow = row('App page (/) fetch', 'checking…');
+  var jsRow = row('App bundle parses', 'waiting for the page…');
+
+  var x = new XMLHttpRequest();
+  x.open('GET', '/?diag=' + Date.now(), true);
+  x.onreadystatechange = function () {
+    if (x.readyState !== 4) return;
+    var html = x.responseText || '';
+    var hasRoot = html.indexOf('id="root"') > -1;
+    appRow.textContent = 'HTTP ' + x.status + ' · ' + html.length + ' bytes · #root ' + (hasRoot ? 'present' : 'MISSING');
+    appRow.className = 'v ' + (x.status === 200 && hasRoot ? 'ok' : 'bad');
+
+    var m = html.match(/assets\/index-[A-Za-z0-9_-]+\.js/);
+    if (!m) { jsRow.textContent = 'no entry bundle referenced in the HTML'; jsRow.className = 'v bad'; return; }
+
+    jsRow.textContent = 'loading ' + m[0] + ' …';
+    var s = document.createElement('script');
+    s.type = 'module';
+    s.src = '/' + m[0];
+    s.onerror = function () {
+      jsRow.textContent = 'FAILED to load ' + m[0];
+      jsRow.className = 'v bad';
+    };
+    window.addEventListener('error', function (e) {
+      if (jsRow.className.indexOf('ok') > -1) return;
+      jsRow.textContent = 'ERROR: ' + ((e && e.message) || 'script error');
+      jsRow.className = 'v bad';
+    });
+    s.onload = function () {
+      if (jsRow.className.indexOf('bad') > -1) return;
+      jsRow.textContent = 'loaded and parsed OK';
+      jsRow.className = 'v ok';
+    };
+    document.head.appendChild(s);
+  };
+  try { x.send(); } catch (e) { appRow.textContent = 'request failed: ' + e; appRow.className = 'v bad'; }
+})();
+</script>
+</body>
+</html>
