@@ -106,6 +106,139 @@
         }
       })();
     </script>
+    <!-- Boot watchdog. A bundle that throws before React mounts leaves #root empty and
+         reports NOTHING, because Sentry initialises inside that same bundle — which is
+         exactly how a client with stale storage presents as a white screen. Purge the
+         client once and reload; if it is still blank after that, say what happened
+         rather than showing a blank page. The HTML is `no-store`, so this script
+         reaches a broken client even when every module on the page fails. -->
+    <script>
+      (function () {
+        var GUARD = 'mk-boot-recovered';
+        var BOOT_TIMEOUT_MS = 12000;
+        var BOOT_POLL_MS = 2000;
+        var BOOT_CEILING_MS = 45000;
+        var firstError = null;
+
+        window.addEventListener('error', function (e) {
+          if (!firstError) firstError = (e && e.message) || 'script error';
+        });
+        window.addEventListener('unhandledrejection', function (e) {
+          var r = e && e.reason;
+          if (!firstError) firstError = String((r && r.message) || r || 'promise rejection');
+        });
+
+        function settled(p) { return p.catch(function () {}); }
+
+        /** Everything this origin can hold that survives a reload. */
+        function purge() {
+          var jobs = [];
+          try {
+            if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+              jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) {
+                return Promise.all(rs.map(function (r) { return r.unregister(); }));
+              }));
+            }
+          } catch (e) { /* no service worker API */ }
+          try {
+            if (window.caches) {
+              jobs.push(caches.keys().then(function (ks) {
+                return Promise.all(ks.map(function (k) { return caches.delete(k); }));
+              }));
+            }
+          } catch (e) { /* no Cache Storage */ }
+          try {
+            if (window.indexedDB && indexedDB.databases) {
+              jobs.push(indexedDB.databases().then(function (dbs) {
+                return Promise.all(dbs.map(function (d) {
+                  return d && d.name ? indexedDB.deleteDatabase(d.name) : null;
+                }));
+              }));
+            }
+          } catch (e) { /* Safari exposes no databases() before 14 */ }
+          try { localStorage.clear(); } catch (e) { /* storage blocked */ }
+          try { sessionStorage.clear(); } catch (e) { /* storage blocked */ }
+          return Promise.all(jobs.map(settled));
+        }
+
+        /**
+         * Built with DOM calls, never an HTML string: `detail` carries an arbitrary
+         * error message and invariant 11 forbids assembling markup around one.
+         */
+        function panel(detail) {
+          var host = document.getElementById('root');
+          if (!host) return;
+          var dark = document.documentElement.classList.contains('dark');
+          var fg = dark ? '#e8e6ea' : '#1b1a1f';
+          var muted = dark ? '#a09daa' : '#5d5a66';
+
+          host.style.cssText = 'min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;'
+            + 'background:' + (dark ? '#0a090e' : '#faf9f5') + ';color:' + fg
+            + ';font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif';
+
+          var box = document.createElement('div');
+          box.style.cssText = 'max-width:420px;width:100%';
+
+          var h = document.createElement('h1');
+          h.textContent = 'MaterialsHub could not start';
+          h.style.cssText = 'margin:0 0 10px;font-size:19px;font-weight:600';
+
+          var p = document.createElement('p');
+          p.textContent = 'We cleared this device’s saved data and tried again, and the app still '
+            + 'did not load. This is a fault on our side, not something you did wrong.';
+          p.style.cssText = 'margin:0 0 16px;color:' + muted;
+
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.textContent = 'Try again';
+          btn.style.cssText = 'appearance:none;border:0;border-radius:4px;padding:10px 18px;font:inherit;'
+            + 'font-weight:600;cursor:pointer;background:#d81b74;color:#fff';
+          btn.addEventListener('click', function () {
+            try { sessionStorage.removeItem(GUARD); } catch (e) { /* storage blocked */ }
+            location.reload();
+          });
+
+          box.appendChild(h);
+          box.appendChild(p);
+          box.appendChild(btn);
+
+          if (detail) {
+            var code = document.createElement('p');
+            code.textContent = detail;
+            code.style.cssText = 'margin:16px 0 0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;'
+              + 'font-size:11px;color:' + muted + ';word-break:break-word';
+            box.appendChild(code);
+          }
+
+          host.appendChild(box);
+        }
+
+        /**
+         * Slowness is not failure. A phone on a bad connection is still DOWNLOADING the
+         * bundle at 12s, and purging it there would log real users out for the crime of
+         * poor reception — so wait for `readyState === 'complete'` (every resource
+         * fetched, the module script run or thrown) and only then call an empty #root a
+         * dead boot. The ceiling covers a resource that never settles at all.
+         */
+        var waitedMs = 0;
+        function check() {
+          if (window.__mkBooted) return;
+          if (document.readyState !== 'complete' && waitedMs < BOOT_CEILING_MS) {
+            waitedMs += BOOT_POLL_MS;
+            setTimeout(check, BOOT_POLL_MS);
+            return;
+          }
+          var tried = false;
+          try { tried = sessionStorage.getItem(GUARD) === '1'; } catch (e) { /* storage blocked */ }
+          if (tried) { panel(firstError); return; }
+          purge().then(function () {
+            try { sessionStorage.setItem(GUARD, '1'); } catch (e) { /* storage blocked */ }
+            location.reload();
+          });
+        }
+        setTimeout(check, BOOT_TIMEOUT_MS);
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

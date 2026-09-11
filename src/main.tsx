@@ -143,6 +143,17 @@ root.render(
   </StrictMode>,
 );
 
+// Answers the boot watchdog in index.html, which treats an empty #root as a dead
+// bundle and purges the client once. Reaching this line means the bundle evaluated,
+// so the one-shot guard is released too — a client that recovers today must still be
+// able to recover from a different fault tomorrow.
+(window as unknown as { __mkBooted?: boolean }).__mkBooted = true;
+try {
+  sessionStorage.removeItem('mk-boot-recovered');
+} catch {
+  /* storage blocked — the watchdog falls back to its visible panel */
+}
+
 /** Attach the HEAVY Sentry integrations after first paint. */
 const attachHeavySentryIntegrations = () => {
   void import('@sentry/react')
