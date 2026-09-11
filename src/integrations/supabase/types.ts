@@ -31346,6 +31346,7 @@ export type Database = {
             | Database["public"]["Enums"]["professional_type"]
             | null
           profile_views: number | null
+          public_google_review_account_id: string | null
           role_id: string
           services: string[] | null
           show_listings: boolean
@@ -31392,6 +31393,7 @@ export type Database = {
             | Database["public"]["Enums"]["professional_type"]
             | null
           profile_views?: number | null
+          public_google_review_account_id?: string | null
           role_id: string
           services?: string[] | null
           show_listings?: boolean
@@ -31438,6 +31440,7 @@ export type Database = {
             | Database["public"]["Enums"]["professional_type"]
             | null
           profile_views?: number | null
+          public_google_review_account_id?: string | null
           role_id?: string
           services?: string[] | null
           show_listings?: boolean
@@ -37026,6 +37029,10 @@ export type Database = {
       }
       get_query_cache_stats: { Args: never; Returns: Json }
       get_quote_expiration_days: { Args: never; Returns: number }
+      get_public_profile_google_reviews: {
+        Args: { p_user_id: string }
+        Returns: Json
+      }
       get_public_profile_services: {
         Args: { p_user_id: string }
         Returns: {
@@ -39408,6 +39415,10 @@ export type Database = {
       set_profile_service_listing: {
         Args: { p_listed: boolean; p_product_id: string }
         Returns: undefined
+      }
+      set_public_google_review_account: {
+        Args: { p_account_id: string | null }
+        Returns: Json
       }
       set_quote_public_share: {
         Args: { p_enabled: boolean; p_quote_id: string }

@@ -13,6 +13,11 @@ import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { supabase } from '@/integrations/supabase/client';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { ReviewModal } from './ReviewModal';
+import { StarRow } from './StarRow';
+import { GoogleReviewsBlock } from './GoogleReviewsBlock';
+import {
+  NO_GOOGLE_REVIEWS, normalizeGoogleReviews, showsGoogleReviews, type GoogleReviewsPayload,
+} from './googleReviews';
 
 export interface ProfileReview {
   id: string;
@@ -40,20 +45,6 @@ const DIMENSIONS: { key: string; label: string }[] = [
   { key: 'value', label: 'Value' },
 ];
 
-function StarRow({ rating, size = 'sm' }: { rating: number; size?: 'sm' | 'lg' }) {
-  const px = size === 'lg' ? 'h-5 w-5' : 'h-3.5 w-3.5';
-  return (
-    <span className="flex items-center gap-0.5">
-      {[1, 2, 3, 4, 5].map((i) => (
-        <Star
-          key={i}
-          className={`${px} ${i <= Math.round(rating) ? 'text-amber-400 fill-amber-400' : 'text-muted-foreground/30 fill-muted-foreground/10'}`}
-        />
-      ))}
-    </span>
-  );
-}
-
 export const ReviewsSection: React.FC<{
   profileUserId: string;
   currentUserId?: string;
@@ -71,6 +62,10 @@ export const ReviewsSection: React.FC<{
   const [showAll, setShowAll] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [myReview, setMyReview] = useState<ProfileReview | null>(null);
+  // A SECOND reputation, kept separate on purpose — see googleReviews.ts. Fetched here rather
+  // than inside the block so this section can stop telling the owner nobody has reviewed them
+  // while a wall of Google reviews sits directly underneath.
+  const [google, setGoogle] = useState<GoogleReviewsPayload>(NO_GOOGLE_REVIEWS);
 
   const isOwn = currentUserId === profileUserId;
   const canReview = !!currentUserId && !isOwn;
@@ -89,7 +84,7 @@ export const ReviewsSection: React.FC<{
     setLoading(true);
     setLoadError(null);
     try {
-    const [{ data: reviewsData, error: reviewsError }, { data: summaryData }] = await Promise.all([
+    const [{ data: reviewsData, error: reviewsError }, { data: summaryData }, googleResult] = await Promise.all([
       supabase
         .from('profile_reviews')
         .select('*')
@@ -100,7 +95,13 @@ export const ReviewsSection: React.FC<{
         .select('summary_text')
         .eq('user_id', profileUserId)
         .maybeSingle(),
+      supabase.rpc('get_public_profile_google_reviews', { p_user_id: profileUserId }),
     ]);
+
+    // The Google block is secondary: a failure there withholds that block and must not take the
+    // profile's own reviews down with it. `unknown` is what the normaliser degrades to, and the
+    // block renders nothing for it rather than a number it cannot vouch for.
+    setGoogle(googleResult.error ? { ...NO_GOOGLE_REVIEWS, status: 'unknown' } : normalizeGoogleReviews(googleResult.data));
 
     // A read that FAILED is not a profile with no reviews. Rendering the two the same way is
     // how a broken list reads as a clean one — say which it is (anti-regression rule 3).
@@ -185,6 +186,11 @@ export const ReviewsSection: React.FC<{
     />
   ) : null;
 
+  // With a Google block rendering directly underneath, "nobody has reviewed this professional" is
+  // read as a statement about the whole page and contradicts it, and two unlabelled averages sit
+  // one above the other. Every state below therefore says WHICH set it is talking about.
+  const alsoGoogle = showsGoogleReviews(google);
+
   if (loading) {
     return (
       <section aria-busy="true">
@@ -214,6 +220,8 @@ export const ReviewsSection: React.FC<{
   }
 
   if (reviews.length === 0) {
+    const elsewhere = alsoGoogle ? ' Their Google reviews are shown separately below.' : '';
+
     return (
       <section>
         {header}
@@ -221,7 +229,7 @@ export const ReviewsSection: React.FC<{
           <HubEmptyState
             icon={Star}
             title="No reviews yet"
-            description="Nobody has reviewed this professional yet. Be the first to say what it was like to work with them."
+            description={`Nobody has reviewed this professional here yet. Be the first to say what it was like to work with them.${elsewhere}`}
             action={(
               <Button className="gap-2" onClick={() => setModalOpen(true)}>
                 <Star className="h-3.5 w-3.5" />
@@ -247,7 +255,10 @@ export const ReviewsSection: React.FC<{
           <HubEmptyState
             icon={Star}
             title="No reviews yet"
-            description="Reviews are written by clients from your public profile — you cannot add one yourself. Share the link with people you have worked with and their reviews appear here."
+            description={`Reviews here are written by clients from your public profile — you cannot add one yourself. Share the link with people you have worked with and their reviews appear here.${
+              alsoGoogle
+                ? ' Your Google reviews are shown separately below; they are not written here and do not count towards this rating.'
+                : ''}`}
             action={(
               <>
                 <Button variant="outline" asChild className="gap-2">
@@ -267,7 +278,7 @@ export const ReviewsSection: React.FC<{
           <HubEmptyState
             icon={Star}
             title="No reviews yet"
-            description="Nobody has reviewed this professional yet. Sign in to be the first."
+            description={`Nobody has reviewed this professional here yet. Sign in to be the first.${elsewhere}`}
             action={(
               <Button variant="outline" asChild>
                 <Link to="/auth">Sign in to review</Link>
@@ -275,6 +286,8 @@ export const ReviewsSection: React.FC<{
             )}
           />
         )}
+
+        <GoogleReviewsBlock data={google} isOwn={isOwn} />
 
         <ReviewModal
           open={modalOpen}
@@ -301,7 +314,9 @@ export const ReviewsSection: React.FC<{
           <div className="flex flex-col items-center justify-center bg-primary/10 rounded-2xl px-8 py-5 min-w-[120px]">
             <span className="text-4xl font-light text-primary">{stats.overall.toFixed(1)}</span>
             <StarRow rating={stats.overall} size="lg" />
-            <span className="text-xs text-muted-foreground mt-1">{stats.count} review{stats.count !== 1 ? 's' : ''}</span>
+            <span className="text-xs text-muted-foreground mt-1">
+              {stats.count} review{stats.count !== 1 ? 's' : ''}{alsoGoogle ? ' on this profile' : ''}
+            </span>
           </div>
 
           {/* Right: AI summary + dimensions */}
@@ -369,6 +384,8 @@ export const ReviewsSection: React.FC<{
           )}
         </div>
       )}
+
+      <GoogleReviewsBlock data={google} isOwn={isOwn} />
 
       <ReviewModal
         open={modalOpen}

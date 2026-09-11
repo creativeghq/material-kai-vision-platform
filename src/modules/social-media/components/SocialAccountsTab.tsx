@@ -10,6 +10,8 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { supabaseConfig } from '@/config/apis/supabaseConfig';
 import { PlatformIcon, SOCIAL_PLATFORMS, platformLabel } from '@/components/core/icons/PlatformIcon';
+import { Switch } from '@/components/core/ui/switch';
+import { platformHasReviews } from '@/config/socialPlatforms';
 
 const SUPABASE_FUNCTIONS_URL = `${supabaseConfig.projectUrl}/functions/v1`;
 
@@ -58,6 +60,10 @@ export const SocialAccountsTab: React.FC = () => {
   // buttons. Ask up front and say so instead.
   const [configured, setConfigured] = useState<boolean | null>(null);
   const { isOperator } = usePermissions();
+  // Which connected location (if any) this user publishes on their public profile. NULL is the
+  // default and publishes nothing — see `user_profiles.public_google_review_account_id`.
+  const [publishedAccountId, setPublishedAccountId] = useState<string | null>(null);
+  const [publishing, setPublishing] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -154,7 +160,42 @@ export const SocialAccountsTab: React.FC = () => {
     } else {
       setAccounts(data || []);
     }
+
+    // Read the opt-in rather than assume it off: the toggle must show what is actually published,
+    // and a failed read leaves it at its last known value rather than silently reading as "off"
+    // next to a profile that is showing the reviews.
+    const { data: prof, error: profErr } = await supabase
+      .from('user_profiles')
+      .select('public_google_review_account_id')
+      .eq('user_id', user!.id)
+      .maybeSingle();
+    if (!profErr) setPublishedAccountId(prof?.public_google_review_account_id ?? null);
+
     setLoading(false);
+  };
+
+  /** Publish (or stop publishing) one location's reviews on the user's public profile. */
+  const togglePublished = async (accountId: string, next: boolean) => {
+    setPublishing(accountId);
+    const previous = publishedAccountId;
+    // Only one location can be published at a time — the profile holds a single id, so turning
+    // one on turns any other off. Said plainly below rather than discovered.
+    setPublishedAccountId(next ? accountId : null);
+    const { error } = await supabase.rpc('set_public_google_review_account', {
+      p_account_id: next ? accountId : null,
+    });
+    setPublishing(null);
+    if (error) {
+      setPublishedAccountId(previous);
+      toast({ title: 'Could not change this', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({
+      title: next ? 'Shown on your public profile' : 'No longer shown on your public profile',
+      description: next
+        ? 'These Google reviews now appear on your profile, separately from reviews written here.'
+        : undefined,
+    });
   };
 
   const handleConnect = async (platform: string) => {
@@ -297,8 +338,10 @@ export const SocialAccountsTab: React.FC = () => {
           <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Connected</h3>
           {accounts.map(account => {
             const label = platformLabel(account.platform);
+            const canPublish = platformHasReviews(account.platform);
             return (
-              <div key={account.id} className="dashboard-card flex items-center gap-4">
+              <div key={account.id} className="dashboard-card">
+              <div className="flex items-center gap-4">
                 <PlatformIcon platform={account.platform} className="h-6 w-6 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -329,6 +372,31 @@ export const SocialAccountsTab: React.FC = () => {
                     ? <Loader2 className="h-3 w-3 animate-spin" />
                     : <Trash2 className="h-3 w-3" />}
                 </Button>
+              </div>
+
+              {/* Publishing a place's reviews on a personal profile is a disclosure, so it is an
+                  explicit choice that defaults to off — never something connecting an account
+                  does on the owner's behalf. */}
+              {canPublish && (
+                <div className="mt-3 flex items-start justify-between gap-4 border-t border-hairline pt-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Show these reviews on my public profile</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      They appear in their own section, clearly marked as Google reviews, and are
+                      never mixed into the rating clients leave here.
+                      {publishedAccountId && publishedAccountId !== account.id && (
+                        <> Another location is published right now — turning this on replaces it.</>
+                      )}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={publishedAccountId === account.id}
+                    disabled={publishing === account.id}
+                    onCheckedChange={(next) => togglePublished(account.id, next)}
+                    aria-label="Show these reviews on my public profile"
+                  />
+                </div>
+              )}
               </div>
             );
           })}
