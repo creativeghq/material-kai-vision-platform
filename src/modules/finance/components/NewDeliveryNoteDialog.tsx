@@ -154,9 +154,12 @@ export const NewDeliveryNoteDialog: React.FC<{
         mydataDocumentType: kind === 'receipt' ? receiptType : null,
         receivingNotePurpose: kind === 'receipt' ? Number(receivingPurpose) : null,
         otherReceivingNotePurposeTitle: kind === 'receipt' ? receivingPurposeTitle.trim() || null : null,
-        nonObligatedRecipient, withoutDigitalTransportTracking: withoutDigitalTracking,
+        // A receiving note states its purpose and nothing about transport — AADE refuses
+        // packages, the two tracking flags and the weigh indication on one (205).
+        nonObligatedRecipient: kind === 'dispatch' ? nonObligatedRecipient : false,
+        withoutDigitalTransportTracking: kind === 'dispatch' ? withoutDigitalTracking : false,
         toWeigh: kind === 'dispatch' ? toWeigh : false,
-        packagings: packagings.filter((p) => p.quantity > 0),
+        packagings: kind === 'dispatch' ? packagings.filter((p) => p.quantity > 0) : [],
         shipFrom: [fromAddr.street, fromAddr.number].filter(Boolean).join(' ') || undefined,
         shipTo: [toAddr.street, toAddr.number].filter(Boolean).join(' ') || undefined,
         shipFromStreet: fromAddr.street || undefined, shipFromNumber: fromAddr.number || undefined,
@@ -295,7 +298,9 @@ export const NewDeliveryNoteDialog: React.FC<{
             </div>
           ) : null}
 
-          {/* AADE PackingsDeclaration — a COUNT of packages, never a price. */}
+          {/* AADE PackingsDeclaration — a COUNT of packages, never a price. A ΔΠΠ records what
+              QUANTITY arrived, not how it travelled, so AADE refuses packages on one (205). */}
+          {kind === 'dispatch' ? (
           <div className="space-y-2 rounded-md border border-border/60 p-3">
             <div className="flex items-center justify-between">
               <Label className="text-xs font-medium">Packaging (optional)</Label>
@@ -342,16 +347,16 @@ export const NewDeliveryNoteDialog: React.FC<{
                 </div>
             ))}
           </div>
+          ) : null}
 
-          {/* myDATA v2.0.2 movement indications. */}
+          {/* myDATA v2.0.2 movement indications — all three are transport facts, and AADE
+              refuses every one of them on a receiving note. */}
+          {kind === 'dispatch' ? (
           <div className="flex flex-wrap gap-4">
-            {/* AADE: "αποδεκτό μόνο για παραστατικά 9.1, 9.2 και 9.3" — not on a ΔΠΠ. */}
-            {kind === 'dispatch' ? (
-              <label className="flex items-center gap-2 text-xs">
-                <Checkbox checked={toWeigh} onCheckedChange={(v) => setToWeigh(v === true)} />
-                To be weighed
-              </label>
-            ) : null}
+            <label className="flex items-center gap-2 text-xs">
+              <Checkbox checked={toWeigh} onCheckedChange={(v) => setToWeigh(v === true)} />
+              To be weighed
+            </label>
             <label className="flex items-center gap-2 text-xs">
               <Checkbox checked={nonObligatedRecipient} onCheckedChange={(v) => setNonObligatedRecipient(v === true)} />
               Recipient not myDATA-obliged
@@ -361,6 +366,7 @@ export const NewDeliveryNoteDialog: React.FC<{
               Without digital transport tracking
             </label>
           </div>
+          ) : null}
 
           {/* Structured from/to addresses (myDATA 9.3) */}
           <div className="grid gap-3 md:grid-cols-2">

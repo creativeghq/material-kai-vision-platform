@@ -17,6 +17,7 @@ import {
   MYDATA_THIRD_PARTY_COLLECTION_TYPES, MYDATA_NO_MULTIPLE_MARKS_TYPES,
   acceptsOnDocumentType,
 } from '@/services/fiscal/fiscalVocabulary';
+import { normalizeTaricInput } from '@/lib/taric';
 
 const ROOT = join(__dirname, '..', '..');
 const read = (p: string) => stripComments(readFileSync(join(ROOT, p), 'utf8'));
@@ -372,7 +373,7 @@ describe('the v2.0.2 envelope puts things where AADE looks for them', () => {
     // Gating it on the purpose dropped a receiving note's addresses, shipping branches and
     // transporter — a 10.x states `receivingNotePurpose` and carries no movePurpose at all.
     expect(novus).not.toMatch(/\.\.\.\(header\.movePurpose != null\s*\n?\s*\?\s*\{\s*\n\s*vatPaymentSuspension: false/);
-    expect(novus).toMatch(/\.\.\.\(isMovement\s*\n?\s*\?\s*\{\s*\n\s*vatPaymentSuspension: false/);
+    expect(novus).toMatch(/\.\.\.\(carriesTransport\s*\n?\s*\?\s*\{\s*\n\s*vatPaymentSuspension: false/);
   });
 
   it('a correlated entity is {type, entityData} on the HEADER, not a flat party nested inside', () => {
@@ -389,9 +390,10 @@ describe('the v2.0.2 envelope puts things where AADE looks for them', () => {
   it('each v2.0.2 indication is emitted only where AADE accepts it', () => {
     // "Αποδεκτό μόνο για παραστατικά 9.1, 9.2 και 9.3".
     expect(novus).toMatch(/header\.toWeigh && isDispatchNoteType\(header\.invoiceType\)/);
-    // "Αποδεκτό μόνο για παραστατικά διακίνησης" — a ΤΔΑ counts.
-    expect(novus).toMatch(/header\.nonObligatedRecipient && \(isMovement \|\| header\.isDeliveryNote\)/);
-    expect(novus).toMatch(/header\.withoutDigitalTransportTracking && \(isMovement \|\| header\.isDeliveryNote\)/);
+    // "Αποδεκτό μόνο για παραστατικά διακίνησης". The sandbox narrowed this further: AADE
+    // refuses both on a ΔΠΠ (205), so they follow the transport block, not the movement family.
+    expect(novus).toMatch(/header\.nonObligatedRecipient && carriesTransport/);
+    expect(novus).toMatch(/header\.withoutDigitalTransportTracking && carriesTransport/);
     // "Αποδεκτό μόνο για παραστατικά τύπων 8.4 και 8.5".
     expect(novus).toMatch(/MYDATA_THIRD_PARTY_COLLECTION_TYPES\.includes\(header\.invoiceType\)/);
     // "Δεν είναι αποδεκτό για τα παραστατικά των τύπων 1.6, 2.4 και 5.1".
@@ -463,5 +465,71 @@ describe('the printed movement says what the transmitted one says', () => {
       expect(src, `${f} does not title the ΔΠΠ pair`).toMatch(/case '10\.1': case '10\.2': return L\.receivingNote/);
       expect(src, `${f} has no receivingNote label`).toMatch(/receivingNote:/);
     }
+  });
+});
+
+describe('what the sandbox taught us that reading the spec did not', () => {
+  const novus = read('supabase/functions/_shared/fiscal/novus.ts');
+
+  it('TaricNo is padded to the 10 characters AADE types it as', () => {
+    // `xs:length value="10"` — exactly, not a maximum. An 8-digit CN code came back as
+    // "The actual length is not equal to the specified length" (101 XMLSyntaxError), which
+    // rejects the WHOLE document, not just the line.
+    expect(normalizeTaricInput('69072100')).toBe('6907210000');
+    expect(normalizeTaricInput('6907 21 00 90')).toBe('6907210090');
+    expect(normalizeTaricInput('6907')).toBe('6907000000');
+    // Not a nomenclature level — padding it would invent a subheading.
+    expect(normalizeTaricInput('6907210')).toBeNull();
+    expect(normalizeTaricInput('')).toBeNull();
+    expect(normalizeTaricInput(null)).toBeNull();
+    expect(novus).toMatch(/normalizeTaricInput\(l\.commodityCode\)/);
+    expect(novus, 'the raw code must never go on the wire').not.toMatch(/taricNo: String\(l\.commodityCode\)/);
+  });
+
+  it('a document that carries goods is not the same fact as one that carries MONEY', () => {
+    // Conflating them stripped the currency and payment methods off every invoice with
+    // shipping details, which Novus refuses with "Invoice needs to have payment methods".
+    expect(novus).toMatch(/const isMovementDoc = isMovementDocType\(header\.invoiceType\)/);
+    expect(novus).toMatch(/\.\.\.\(isMovementDoc \? \{\} : \{ currency: header\.currency \}\)/);
+    expect(novus).toMatch(/\.\.\.\(isMovementDoc \? \{\} : \{ paymentMethods:/);
+  });
+
+  it('a ΔΠΠ states a purpose, never a transport block', () => {
+    // AADE 205: DispatchDate, DispatchTime, otherDeliveryNoteHeader, PackingsDeclarations and
+    // NonObligatedRecipient are all "forbidden for this invoice type" on a 10.x. It records
+    // what QUANTITY arrived, not how it travelled.
+    expect(novus).toMatch(/const carriesTransport =\s*\n?\s*isDispatchNoteType\(header\.invoiceType\) \|\| header\.movePurpose != null \|\| !!header\.isDeliveryNote/);
+    expect(novus).toMatch(/\.\.\.\(carriesTransport && input\.packingsDeclarations\?\.length/);
+    expect(novus).toMatch(/header\.nonObligatedRecipient && carriesTransport/);
+    expect(novus).toMatch(/header\.withoutDigitalTransportTracking && carriesTransport/);
+  });
+
+  it('but a ΔΠΠ still names its goods and both parties', () => {
+    // 204 wants the issuer and counterpart named on anything about goods, and a quantitative
+    // receipt obviously needs the unit — so the LINE facts are wider than the transport block.
+    expect(novus).toMatch(/const statesGoods = isMovementDoc \|\| carriesTransport/);
+    expect(novus).toMatch(/const unresolvedUnits = statesGoods/);
+    expect(novus).toMatch(/counterpart: \(counterpart\.vatNumber \|\| statesGoods\)/);
+  });
+
+  it('the address guard covers what the transport block actually emits', () => {
+    expect(novus).toMatch(/isDispatchNoteType\(header\.invoiceType\) \|\| header\.movePurpose != null \|\| header\.isDeliveryNote\) \{/);
+  });
+
+  it('the dialog does not offer a receiving note what AADE refuses on one', () => {
+    const dialog = read('src/modules/finance/components/NewDeliveryNoteDialog.tsx');
+    expect(dialog).toMatch(/packagings: kind === 'dispatch' \? packagings\.filter/);
+    expect(dialog).toMatch(/nonObligatedRecipient: kind === 'dispatch' \? nonObligatedRecipient : false/);
+    expect(dialog).toMatch(/withoutDigitalTransportTracking: kind === 'dispatch' \? withoutDigitalTracking : false/);
+    expect(dialog).toMatch(/toWeigh: kind === 'dispatch' \? toWeigh : false/);
+  });
+
+  it('the taric helper is the generated twin, never a second copy', () => {
+    const mirror = readFileSync(
+      join(ROOT, 'supabase/functions/_shared/fiscal/taric.generated.ts'), 'utf8',
+    );
+    expect(mirror).toContain('normalizeTaricInput');
+    expect(novus, 'the connector must import the mirror, not re-implement padding')
+      .not.toMatch(/padEnd\(10/);
   });
 });

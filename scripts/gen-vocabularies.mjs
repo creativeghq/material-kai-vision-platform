@@ -136,6 +136,13 @@ export const VOCABULARIES = [
     'supabase/functions/_shared/fiscal/fiscalVocabulary.generated.ts',
   ],
   [
+    // AADE types `TaricNo` as xs:string with length EXACTLY 10, so an 8-digit CN code is a
+    // hard XMLSyntaxError that kills the whole document. The padding rule is the nomenclature's
+    // own and already lived here; the connector needs it too.
+    'src/lib/taric.ts',
+    'supabase/functions/_shared/fiscal/taric.generated.ts',
+  ],
+  [
     // #391 — the tech-radar ring, written out three times across two files. NOT under
     // `_shared/tools/`: `check-edge-functions.mjs` globs that directory as entrypoints
     // ("every agent tool body"), so a vocabulary dropped there becomes a typecheck

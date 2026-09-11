@@ -12,6 +12,7 @@ import type {
 } from './types.ts';
 import { isUncodedMydataUnit, isUnnamedLineName, mydataUnitCode } from './types.ts';
 import { mydataPaymentLabel } from '../paymentVocabulary.generated.ts';
+import { normalizeTaricInput } from './taric.generated.ts';
 import type { MydataRestrictedCode } from './fiscalVocabulary.generated.ts';
 import {
   MYDATA_ENTITY_TYPE_OTHER,
@@ -79,7 +80,7 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
   // So a customer with no address on file produced a 9.3 with a blank delivery point — and the
   // counterpart block below fills a missing postcode with '0' and a missing city with 'NONE',
   // which is worse than blank: it is a plausible-looking placeholder on a registered document.
-  if (header.movePurpose != null) {
+  if (isDispatchNoteType(header.invoiceType) || header.movePurpose != null || header.isDeliveryNote) {
     const incomplete = ([['loading', header.loadingAddress], ['delivery', header.deliveryAddress]] as const)
       .filter(([, a]) => !a || !String(a.street ?? '').trim() || !String(a.city ?? '').trim() || !String(a.postalCode ?? '').trim())
       .map(([which]) => which);
@@ -93,11 +94,18 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
     }
   }
 
-  // A MOVEMENT DOCUMENT IS A DIFFERENT ENVELOPE, NOT AN INVOICE WITH ZERO TOTALS. The type
-  // decides, not the presence of a purpose: a Δελτίο Ποσοτικής Παραλαβής (10.1 / 10.2) states
-  // its reason in `receivingNotePurpose` and carries no `movePurpose` at all, so keying off
-  // that alone sent every receiving note down the invoice path.
-  const isMovement = header.movePurpose != null || isMovementDocType(header.invoiceType);
+  // THREE FACTS, not one. `isMovementDoc` (9.x/10.x) carries no money — no currency, no
+  // payment methods, no income type. `carriesTransport` states HOW goods travelled, which a
+  // ΔΠΠ does not: it records what quantity arrived, and AADE refuses dispatchDate,
+  // otherDeliveryNoteHeader, packingsDeclarations and nonObligatedRecipient on one (205).
+  // `statesGoods` is either, and governs the line and party facts 204 asks for.
+  // Conflating the first two is why no invoice with shipping could ever be transmitted.
+  const isMovementDoc = isMovementDocType(header.invoiceType);
+  const carriesTransport =
+    isDispatchNoteType(header.invoiceType) || header.movePurpose != null || !!header.isDeliveryNote;
+  // Either way the document is ABOUT goods, so its lines name the item and its unit, and both
+  // parties must be named (204).
+  const statesGoods = isMovementDoc || carriesTransport;
 
   // A ΔΠΠ MUST SAY WHY IT WAS ISSUED — AADE Appendix §8.24, mandatory from myDATA v2.0.2.
   // There is no defensible default: the codes are different tax facts about the same goods.
@@ -181,7 +189,7 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
   // Emitting `incomeClassification` unconditionally is why three document families could never
   // be transmitted: a self-billed invoice (231), a Τίτλος Κτήσης (231) and a self-delivery (331)
   // are all refused by AADE for declaring the wrong ledger. See `mydataClassificationLedger`.
-  const ledger = isMovement ? 'income' : mydataClassificationLedger(header.invoiceType, { selfPricing: header.selfPricing });
+  const ledger = isMovementDoc ? 'income' : mydataClassificationLedger(header.invoiceType, { selfPricing: header.selfPricing });
 
   // An expense document has to SAY what kind of expense it was — `category2_1` (goods bought)
   // and `category2_3` (a service received) are different tax facts about the same money, and
@@ -206,7 +214,7 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
   // and the counterpart is resolved from that customer, so the combination is reachable from the
   // UI and comes back as a bare 286 nobody can act on. Name it instead: either the purpose is
   // wrong or the recipient is.
-  if (isMovement && header.movePurpose === 8 && counterpart.vatNumber !== issuer.vatNumber) {
+  if (carriesTransport && header.movePurpose === 8 && counterpart.vatNumber !== issuer.vatNumber) {
     throw new Error(
       `Refusing to transmit a movement document: purpose 8 (Ενδοδιακίνηση / internal transfer) ` +
         `moves goods between the issuer's own establishments, so myDATA requires the recipient to ` +
@@ -217,7 +225,7 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
   }
 
   // The numeric unit code is mandatory on a movement line and we must not guess it.
-  const unresolvedUnits = isMovement
+  const unresolvedUnits = statesGoods
     ? lines.filter((l) => mydataUnitCode(l.measurementUnitLabel) == null)
         .map((l) => `${l.lineNumber} (${l.measurementUnitLabel ?? 'no unit'})`)
     : [];
@@ -232,14 +240,17 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
   const invoiceDetails = lines.map((l) => ({
     lineNumber: l.lineNumber,
     // Movement-only, both mandatory there and absent from every other type's template.
-    ...(isMovement
+    ...(statesGoods
       ? { itemDescr: l.description, measurementUnit: mydataUnitCode(l.measurementUnitLabel) }
       : {}),
     lineCode: l.code ?? undefined,
-    // The customs commodity code, snapshotted on the line by the builder from `taric_code`.
-    // It was captured, guarded by a test and documented, and then dropped here — so a
-    // cross-border document went to AADE with no tariff classification on any line.
-    ...(l.commodityCode ? { taricNo: String(l.commodityCode) } : {}),
+    // The customs code, snapshotted from `taric_code` by the builder and then dropped here, so
+    // no line has ever carried a tariff classification. AADE types `TaricNo` as xs:string of
+    // length EXACTLY 10: the 8-digit CN code we usually hold is an XMLSyntaxError that rejects
+    // the whole document. `normalizeTaricInput` pads to 10 and returns null for anything that
+    // is not a nomenclature level — omitted rather than sent, since an optional customs field
+    // must not cost the document.
+    ...(normalizeTaricInput(l.commodityCode) ? { taricNo: normalizeTaricInput(l.commodityCode) } : {}),
     // Per-line movement purpose (myDATA v2.0.2). Emitted whenever the line states one, so a
     // consignment whose lines travel for different reasons can say so.
     ...(l.movePurposeLine ? { movePurposeLine: l.movePurposeLine } : {}),
@@ -274,7 +285,7 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
     lineDescription: l.description,
     // A movement classifies as Transport (`category3`) and carries NO classificationType —
     // an income type on a zero-valued transport line is error 331.
-    incomeClassification: isMovement
+    incomeClassification: isMovementDoc
       ? [{ classificationCategory: 'category3', amount: 0 }]
       : ledger === 'income' && l.incomeClassificationType
         ? [
@@ -332,7 +343,7 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
     if (acc) acc.amount += l.netValue;
     else byClassification.set(key, { classificationType: l.incomeClassificationType, classificationCategory: category, amount: l.netValue });
   }
-  const summaryClassification = isMovement
+  const summaryClassification = isMovementDoc
     ? [{ classificationCategory: 'category3', amount: 0 }]
     // A self-billed document declares NEITHER ledger — see `mydataClassificationLedger`.
     : ledger !== 'income'
@@ -375,7 +386,7 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
           country: issuer.country,
           branch: issuer.branch ?? 0,
           // Mandatory on a movement document (204), absent from every other type's template.
-          ...(isMovement
+          ...(statesGoods
             ? {
                 name: issuer.name ?? '',
                 address: {
@@ -391,13 +402,13 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
         // retail. A MOVEMENT document always has one, because AADE requires the recipient's name
         // on it (204) and goods are always going TO somebody: a delivery note to a private
         // customer has no VAT number, and gating the whole block on one filed it to nobody.
-        counterpart: (counterpart.vatNumber || isMovement)
+        counterpart: (counterpart.vatNumber || statesGoods)
           ? {
               vatNumber: counterpart.vatNumber,
               country: counterpart.country,
               branch: counterpart.branch ?? 0,
               // Mandatory on a movement document (204).
-              ...(isMovement ? { name: counterpart.name ?? '' } : {}),
+              ...(statesGoods ? { name: counterpart.name ?? '' } : {}),
               address: {
                 street: counterpart.address?.street ?? '',
                 number: counterpart.address?.number ?? '',
@@ -413,7 +424,7 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
           invoiceType: header.invoiceType,
           // 205 "Currency is forbidden for this invoice type" — a movement carries no value,
           // so it carries no currency either.
-          ...(isMovement ? {} : { currency: header.currency }),
+          ...(isMovementDoc ? {} : { currency: header.currency }),
           ...(header.vatPaymentSuspension != null ? { vatPaymentSuspension: header.vatPaymentSuspension } : {}),
           ...(header.selfPricing ? { selfPricing: true } : {}),
           ...(header.exchangeRate ? { exchangeRate: header.exchangeRate } : {}),
@@ -424,7 +435,7 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
           // The transport block belongs to EVERY movement document, not only one that states a
           // `movePurpose` — a Δελτίο Ποσοτικής Παραλαβής states `receivingNotePurpose` instead,
           // and gating on the purpose dropped its addresses, shipping branches and transporter.
-          ...(isMovement
+          ...(carriesTransport
             ? {
                 vatPaymentSuspension: false,
                 dispatchDate: header.dispatchDate ?? header.issueDate,
@@ -483,9 +494,9 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
             : {}),
           // Both are "αποδεκτό μόνο για παραστατικά διακίνησης" — a movement document, which a
           // ΤΔΑ also is.
-          ...(header.nonObligatedRecipient && (isMovement || header.isDeliveryNote)
+          ...(header.nonObligatedRecipient && carriesTransport
             ? { nonObligatedRecipient: true } : {}),
-          ...(header.withoutDigitalTransportTracking && (isMovement || header.isDeliveryNote)
+          ...(header.withoutDigitalTransportTracking && carriesTransport
             ? { withoutDigitalTransportTracking: true } : {}),
           // "Αποδεκτό μόνο για παραστατικά 9.1, 9.2 και 9.3" — not on a ΔΠΠ, not on a ΤΔΑ.
           ...(header.toWeigh && isDispatchNoteType(header.invoiceType) ? { toWeigh: true } : {}),
@@ -512,7 +523,7 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
         },
         // The packages the goods travel in (AADE PackingsDeclaration). A declaration of none
         // is silence, not a zero — so the key is absent unless the document states packages.
-        ...(input.packingsDeclarations?.length
+        ...(carriesTransport && input.packingsDeclarations?.length
           ? {
               packingsDeclarations: [
                 {
@@ -529,7 +540,7 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
           : {}),
         // 205 "Payment Methods is forbidden for this invoice type" — nothing is paid on a
         // movement, and the `[{type:5}]` fallback below was inventing one for every 9.3.
-        ...(isMovement ? {} : { paymentMethods: paymentMethods.map((pm: any) => ({
+        ...(isMovementDoc ? {} : { paymentMethods: paymentMethods.map((pm: any) => ({
           type: pm.type, amount: pm.amount,
           ...(pm.info ? { paymentMethodInfo: pm.info } : {}),
           // Law 5155 — card(7)/IRIS(8) carry the EFT-POS terminal + NSP for the signature.
