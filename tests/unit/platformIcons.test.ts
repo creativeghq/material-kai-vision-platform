@@ -4,6 +4,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 import { PLATFORM_BRANDS, SOCIAL_PLATFORMS, platformLabel } from '../../src/components/core/icons/PlatformIcon';
+import { CONNECTABLE_PLATFORM_IDS, SOCIAL_PLATFORM_SPECS } from '../../src/config/socialPlatforms';
 
 const ROOT = process.cwd();
 const SRC = join(ROOT, 'src');
@@ -24,10 +25,13 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-/** Every network Zernio can hand back on `social_accounts.platform`. */
-const CONNECTABLE = [
-  'instagram', 'facebook', 'linkedin', 'tiktok', 'pinterest', 'youtube', 'twitter', 'threads',
-];
+/**
+ * Every network Zernio can hand back on `social_accounts.platform`, READ from the vocabulary the
+ * edge validates against rather than re-typed. The hand-written copy that used to sit here agreed
+ * with the connect grid and disagreed with the edge, so it passed while Google Business had no
+ * button anywhere in the app.
+ */
+const CONNECTABLE = [...CONNECTABLE_PLATFORM_IDS];
 
 describe('platform icons — the registry covers every network we offer', () => {
   it('every connectable network has a real mark', () => {
@@ -80,7 +84,7 @@ describe('platform icons — nobody keeps a private copy', () => {
    * prose is not the defect: an SEO card whose subtitle counts Reddit "threads" is not a platform
    * map, and matching it would make this case unrunnable rather than strict.
    */
-  const IDS = 'instagram|facebook|linkedin|tiktok|pinterest|youtube|twitter|threads';
+  const IDS = CONNECTABLE_PLATFORM_IDS.join('|');
   const KEYED = new RegExp(`['"\`](?:${IDS})['"\`]|\\b(?:${IDS})\\s*:`);
 
   it('no component labels a network with an emoji again', () => {

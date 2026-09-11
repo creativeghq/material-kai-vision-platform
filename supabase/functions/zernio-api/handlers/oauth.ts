@@ -7,20 +7,45 @@ import { authenticate } from '../../_shared/auth.ts';
 import { assertEntitled } from '../../_shared/entitlement.ts';
 import { checkChannelSeat } from '../../_shared/channel-seats.ts';
 import { zernioApi, zernioKey, ensureZernioSecrets, publicAppUrl, resolveWorkspaceProfile, fetchZernioAccount } from '../zernio.ts';
+import { CONNECTABLE_PLATFORM_IDS } from '../../_shared/socialPlatforms.generated.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
-// Platforms we surface in the UI — all supported by Zernio.
-const SUPPORTED_PLATFORMS = [
-  'instagram', 'facebook', 'linkedin', 'tiktok',
-  'pinterest', 'youtube', 'twitter', 'threads',
-  // Google Business. Unlike every other platform this one has a SECOND step after OAuth: an
-  // account can own many locations, and reviews belong to a location rather than to the account,
-  // so `connect/googlebusiness/locations` + `select-location` decide which one this workspace is.
-  // Connecting without choosing leaves an account that receives nothing.
-  'googlebusiness',
-];
+/**
+ * Platforms we surface in the UI — READ from the shared vocabulary rather than re-typed. The
+ * hand-written copy that used to sit here listed `googlebusiness` and the connect grid did not,
+ * so this function accepted a platform no button in the app could ask for.
+ */
+const SUPPORTED_PLATFORMS = CONNECTABLE_PLATFORM_IDS;
+
+/**
+ * The public facts about a connected Google Business location: its name, its Maps page and the
+ * "write a review" URL Google mints for it. Stored at connect time because a review is about a
+ * PLACE, and a profile that prints reviews has to be able to name and link the place they are
+ * about. Failure is non-fatal — an account with no details is still a connected account, so this
+ * returns null rather than failing the connection that already succeeded.
+ */
+async function fetchGmbLocation(zernioAccountId: string): Promise<Record<string, unknown> | null> {
+  try {
+    const data = await zernioApi('GET', `/accounts/${encodeURIComponent(zernioAccountId)}/gmb-location-details`);
+    const loc = (data?.location ?? null) as Record<string, unknown> | null;
+    if (!loc) return null;
+    return {
+      gbp_location_id: data?.locationId ?? null,
+      gbp_location_name: loc.name ?? null,
+      gbp_place_id: loc.placeId ?? null,
+      gbp_maps_url: loc.mapsUri ?? null,
+      gbp_review_url: loc.reviewUrl ?? null,
+      // Google withholds placeId/reviewUrl/mapsUri until a location is verified, so an
+      // unverified location legitimately has nulls above — recorded, not inferred from them.
+      gbp_is_verified: loc.isVerified === true,
+    };
+  } catch (err) {
+    console.warn('[zernio-oauth] gmb-location-details failed (continuing):', err);
+    return null;
+  }
+}
 
 
 export async function handleZernioOauth(req: Request, body: any): Promise<Response> {
@@ -217,6 +242,11 @@ export async function handleZernioOauth(req: Request, body: any): Promise<Respon
         metadata?: Record<string, unknown>;
       };
 
+      // Google Business is the one platform whose account is really a PLACE. Zernio hosts the
+      // location picker in the standard flow, so by the time we get here one is already chosen —
+      // what is missing is its name and public URLs, which nothing else would ever fetch.
+      const gmb = platform === 'googlebusiness' ? await fetchGmbLocation(zernio_account_id) : null;
+
       const { data: savedAccount, error: upsertErr } = await supabase
         .from('social_accounts')
         .upsert({
@@ -230,7 +260,7 @@ export async function handleZernioOauth(req: Request, body: any): Promise<Respon
           followers_count: account.followersCount ?? 0,
           is_active: true,
           last_synced_at: new Date().toISOString(),
-          metadata: account.metadata ?? {},
+          metadata: { ...(account.metadata ?? {}), ...(gmb ?? {}) },
         }, {
           onConflict: 'workspace_id,platform,zernio_account_id',
         })

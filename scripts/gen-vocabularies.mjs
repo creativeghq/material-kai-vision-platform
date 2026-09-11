@@ -17,6 +17,13 @@ export const VOCABULARIES = [
     'supabase/functions/_shared/catalogPublicUrl.generated.ts',
   ],
   [
+    // Which networks can be connected, and which need a second step after OAuth. The edge
+    // refuses an unknown platform and the client draws the Connect buttons: two hand-kept
+    // copies, and the one that had drifted made Google Business unreachable from the UI.
+    'src/config/socialPlatforms.ts',
+    'supabase/functions/_shared/socialPlatforms.generated.ts',
+  ],
+  [
     'src/services/flows/tenantVocabulary.ts',
     'supabase/functions/_shared/tools/tenantVocabulary.generated.ts',
   ],
