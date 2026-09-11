@@ -14,6 +14,7 @@ import { blankComments } from '../helpers/stripComments';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 const prune = blankComments(read('scripts/prune-vercel-deployments.mjs'));
+const report = blankComments(read('scripts/report-job-run.mjs'));
 const workflow = read('.github/workflows/vercel-storage-prune.yml');
 
 describe('the Vercel deployment prune', () => {
@@ -75,6 +76,26 @@ describe('the Vercel deployment prune', () => {
     expect(prune).toContain('probeDeletePermission');
     expect(prune).toContain('dpl_000000000000000000000000');
     expect(prune).toContain('status !== 401 && status !== 403');
+  });
+
+  it('reports the run to the platform, which cannot otherwise see it', () => {
+    // CronJobsPanel reads cron.job_run_details and structurally cannot show a GitHub Actions
+    // schedule, so without this row a disabled workflow looks exactly like a healthy one.
+    expect(workflow).toContain('report-job-run.mjs vercel-storage-prune');
+    const at = workflow.indexOf('Report the run to the platform');
+    const step = workflow.slice(at, at + 500);
+    // always(), or a FAILED prune — the case worth seeing — would report nothing at all.
+    expect(step).toContain('always()');
+    expect(step).toContain("steps.cfg.outputs.apply == 'true'");
+  });
+
+  it('a missing heartbeat secret never turns a good prune red', () => {
+    // The stalled probe notices an absent heartbeat within its own window; failing the build on
+    // a misconfigured secret would instead throw away a prune that actually worked.
+    const at = report.indexOf('not set');
+    expect(at).toBeGreaterThan(-1);
+    expect(report.slice(at, at + 200)).toContain('process.exit(0)');
+    expect(report).toContain('record_external_job_run');
   });
 
   it('runs weekly and can still be driven by hand', () => {

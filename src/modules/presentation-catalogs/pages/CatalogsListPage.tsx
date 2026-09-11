@@ -5,7 +5,10 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { Input } from '@/components/core/ui/input';
 import { catalogsService, type PresentationCatalog } from '@/services/catalogsService';
+import { normalizeWorkspaceHandle } from '@/config/catalogPublicUrl';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { CreateCatalogModal } from '../../../components/business/catalogs/CreateCatalogModal';
 import { humanizeLabel } from '@/utils/humanize';
 import { statusTone } from '@/utils/statusTone';
@@ -14,21 +17,25 @@ import { formatDate } from '@/utils/datetime';
 export const CatalogsListPage: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { activeWorkspaceId } = useWorkspace();
   const [catalogs, setCatalogs] = useState<PresentationCatalog[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [handle, setHandle] = useState<string | null>(null);
+  const [savingHandle, setSavingHandle] = useState(false);
 
   const load = useCallback(async () => {
     try {
       setLoading(true);
       const rows = await catalogsService.list();
       setCatalogs(rows);
+      setHandle(activeWorkspaceId ? await catalogsService.publicHandle(activeWorkspaceId) : null);
     } catch (err) {
       toast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to load catalogs', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, activeWorkspaceId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -42,6 +49,20 @@ export const CatalogsListPage: React.FC = () => {
       toast({ title: 'Error', description: err instanceof Error ? err.message : 'Delete failed', variant: 'destructive' });
     }
   }, [load, toast]);
+
+  const handleSaveHandle = useCallback(async (raw: string) => {
+    const next = normalizeWorkspaceHandle(raw);
+    if (!activeWorkspaceId || !next || next === handle) return;
+    setSavingHandle(true);
+    try {
+      setHandle(await catalogsService.setPublicHandle(activeWorkspaceId, next));
+      toast({ title: 'Public address updated', description: `Catalogs now publish under /c/${next}/…` });
+    } catch (err) {
+      toast({ title: 'Could not save', description: err instanceof Error ? err.message : 'Failed', variant: 'destructive' });
+    } finally {
+      setSavingHandle(false);
+    }
+  }, [handle, toast, activeWorkspaceId]);
 
   const handleOpenAgent = useCallback((catalog: PresentationCatalog) => {
     const seed = `Continue building catalog ${catalog.id} (\"${catalog.title}\"). Use the catalog tools to extract sections, add materials, find images, and generate the PDF when ready.`;
@@ -70,6 +91,38 @@ export const CatalogsListPage: React.FC = () => {
       />
 
       <div className="px-3 sm:px-6 py-4 sm:py-8 space-y-6">
+      {/* The first segment of every public catalog URL this workspace owns. It lives here rather
+          than in a settings screen nobody visits: this is the only page where it has consequences,
+          and a catalog cannot be published without one. */}
+      <Card>
+        <CardContent className="p-4 flex flex-wrap items-center gap-3">
+          <div className="min-w-0">
+            <div className="text-sm font-medium">Public address</div>
+            <p className="text-xs text-muted-foreground">
+              Customers see this in every catalog link you share.
+            </p>
+          </div>
+          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <span className="tabular-nums">/c/</span>
+            <Input
+              key={handle ?? 'unset'}
+              defaultValue={handle ?? ''}
+              disabled={savingHandle}
+              aria-label="Workspace public handle"
+              placeholder="your-brand"
+              className="h-9 w-56"
+              onBlur={(e) => handleSaveHandle(e.target.value)}
+            />
+            <span>/catalog-name</span>
+          </div>
+          {!handle && (
+            <span className="text-xs text-destructive">
+              Set one before publishing — a catalog has no public URL without it.
+            </span>
+          )}
+        </CardContent>
+      </Card>
+
       {loading ? (
         <div className="flex items-center gap-2 py-12 justify-center text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" /> Loading catalogs…
@@ -115,8 +168,8 @@ export const CatalogsListPage: React.FC = () => {
                     <Button size="sm" variant="outline" onClick={() => navigate(`/catalogs/${c.id}`)}>
                       <Eye className="mr-1 h-4 w-4" /> Open
                     </Button>
-                    {c.status === 'published' && c.slug && (
-                      <Button size="sm" variant="ghost" onClick={() => window.open(`/c/${c.slug}`, '_blank')} title="Open public page">
+                    {c.status === 'published' && catalogsService.publicPathFor(c.public_handle ?? null, c.slug) && (
+                      <Button size="sm" variant="ghost" onClick={() => window.open(catalogsService.publicPathFor(c.public_handle ?? null, c.slug)!, '_blank')} title="Open public page">
                         <ExternalLink className="h-4 w-4" />
                       </Button>
                     )}

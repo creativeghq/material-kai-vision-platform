@@ -1,6 +1,7 @@
 /** catalog-send-to-customers */
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../_shared/http.ts';
+import { catalogPublicUrl } from '../_shared/catalogPublicUrl.generated.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
@@ -124,7 +125,14 @@ Deno.serve(withApiLogging('catalog-send-to-customers', async (req) => {
 
     const sendBatchId = crypto.randomUUID();
     const subject = body.subject?.trim() || `${catalog.title} — new catalog`;
-    const publicUrl = `${PUBLIC_APP_URL}/c/${catalog.slug}`;
+    // The link a CUSTOMER receives. A handle-less workspace would otherwise mail out
+    // `/c/undefined/<slug>` — a dead link, in a message that cannot be unsent.
+    const { data: sendWs } = await supabase
+      .from('workspaces').select('public_handle').eq('id', catalog.workspace_id).maybeSingle();
+    const publicUrl = catalogPublicUrl(PUBLIC_APP_URL, sendWs?.public_handle ?? null, catalog.slug);
+    if (!publicUrl) {
+      return jsonResponse({ error: 'This workspace has no public handle yet, so the catalog has no public URL to send. Set one at Catalogs → Public address.' }, 400);
+    }
 
     // Sender display name (user) + workspace brand identity (finance_settings, Option A).
     const { data: senderProfile } = await supabase

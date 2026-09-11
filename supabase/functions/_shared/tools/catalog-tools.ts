@@ -19,6 +19,7 @@ const { createClient } = await import('npm:@supabase/supabase-js@2');
 
 // One derivation for catalog line money (#352 A13).
 import { scaleToTargetNet } from '../catalog-repricing.ts';
+import { catalogPublicPath, catalogPublicUrl } from '../catalogPublicUrl.generated.ts';
 import { moduleGate } from './module-gate.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -96,12 +97,14 @@ function slugify(input: string): string {
     .slice(0, 80) || 'catalog';
 }
 
-async function ensureUniqueSlug(supabase: any, base: string): Promise<string> {
+/** Unique WITHIN the workspace. Platform-wide is what handed tenant two `…-4821`. */
+async function ensureUniqueSlug(supabase: any, workspaceId: string, base: string): Promise<string> {
   let slug = base;
   for (let i = 0; i < 50; i++) {
     const { data, error } = await supabase
       .from('presentation_catalogs')
       .select('id')
+      .eq('workspace_id', workspaceId)
       .eq('slug', slug)
       .maybeSingle();
     if (error) throw error;
@@ -1214,10 +1217,22 @@ export const createPublishCatalogTool = (userId: string, workspaceId: string | n
           return JSON.stringify({ error: 'Cannot publish an empty catalog. Add materials first.' });
         }
 
+        // The workspace handle is the other half of the address. No handle, no link — refused
+        // rather than published to `/c/undefined/…`, which is a 404 with a slug attached.
+        const { data: ws } = await supabase
+          .from('workspaces').select('public_handle').eq('id', catalog.workspace_id).maybeSingle();
+        const handle = ws?.public_handle ?? null;
+        if (!handle) {
+          const msg = 'This workspace has no public handle yet, so a public URL cannot be minted. '
+            + 'Set one at Catalogs → Public address, then publish again.';
+          emitWorkflowStep(onChunk, { catalog_id: input.catalog_id, step_id: 'publish', status: 'failed', error_message: msg });
+          return JSON.stringify({ error: msg });
+        }
+
         let slug = catalog.slug;
         if (!slug || input.desired_slug) {
           const base = slugify(input.desired_slug || catalog.title);
-          slug = await ensureUniqueSlug(supabase, base);
+          slug = await ensureUniqueSlug(supabase, catalog.workspace_id, base);
         }
 
         const { error: pubErr } = await supabase
@@ -1232,7 +1247,7 @@ export const createPublishCatalogTool = (userId: string, workspaceId: string | n
         if (pubErr) return JSON.stringify({ error: pubErr.message });
 
         const publicBase = Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr';
-        const publicUrl = `${publicBase}/c/${slug}`;
+        const publicUrl = catalogPublicUrl(publicBase, handle, slug);
 
         emit(onChunk, {
           type: 'catalog_published',
@@ -1243,7 +1258,7 @@ export const createPublishCatalogTool = (userId: string, workspaceId: string | n
 
         emitWorkflowStep(onChunk, {
           catalog_id: input.catalog_id, step_id: 'publish', status: 'done',
-          status_line: `Published at /c/${slug}`,
+          status_line: `Published at ${catalogPublicPath(handle, slug)}`,
           output: { slug, public_url: publicUrl },
         });
         emit(onChunk, {

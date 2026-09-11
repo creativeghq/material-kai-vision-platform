@@ -6,6 +6,7 @@ import {
   ExternalLink, User as UserIcon,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
+import { catalogPublicPath } from '@/config/catalogPublicUrl';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { FilterBar, applyFilters, type FilterValues } from '@/components/core/filters';
@@ -200,8 +201,8 @@ export const CatalogOperationsTab: React.FC = () => {
                         <td className="px-3 py-2 text-xs text-muted-foreground">{s.last_event_at ? formatDate(s.last_event_at, { withTime: true }) : '—'}</td>
                         <td className="px-3 py-2 flex justify-end gap-1">
                           <Button size="sm" variant="ghost" onClick={() => navigate(`/catalogs/${s.id}`)}>Open</Button>
-                          {s.slug && (
-                            <Button size="sm" variant="ghost" onClick={() => window.open(`/c/${s.slug}`, '_blank')}>
+                          {catalogPublicPath(s.public_handle ?? null, s.slug) && (
+                            <Button size="sm" variant="ghost" onClick={() => window.open(catalogPublicPath(s.public_handle ?? null, s.slug)!, '_blank')}>
                               <ExternalLink className="h-3 w-3" />
                             </Button>
                           )}

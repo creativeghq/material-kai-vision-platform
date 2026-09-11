@@ -11,6 +11,12 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 /** [source, target] pairs, repo-relative. One line per vocabulary. */
 export const VOCABULARIES = [
   [
+    // The public catalog URL. Nine sites built `/c/${slug}` by hand across both runtimes, so
+    // making it workspace-scoped would otherwise have meant nine independent edits that agree.
+    'src/config/catalogPublicUrl.ts',
+    'supabase/functions/_shared/catalogPublicUrl.generated.ts',
+  ],
+  [
     'src/services/flows/tenantVocabulary.ts',
     'supabase/functions/_shared/tools/tenantVocabulary.generated.ts',
   ],

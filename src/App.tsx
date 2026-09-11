@@ -1010,6 +1010,11 @@ const App = () => (
                 <Route path="/ar/:productId" element={<PageErrorBoundary name="AR Preview"><ARPage /></PageErrorBoundary>} />
 
                 {/* Public Presentation Catalog (email-gated, no layout) */}
+                {/* A catalog slug is unique within its WORKSPACE, so the handle is part of the
+                    address. The one-segment form is every link shared before that was true: the
+                    page resolves it and redirects onto the canonical URL rather than 404-ing on
+                    something a customer already has in their inbox. */}
+                <Route path="/c/:handle/:slug" element={<PageErrorBoundary name="Public Catalog"><PublicCatalogPage /></PageErrorBoundary>} />
                 <Route path="/c/:slug" element={<PageErrorBoundary name="Public Catalog"><PublicCatalogPage /></PageErrorBoundary>} />
 
                 {/* Public invoice payment (token-gated, no auth, no layout) */}

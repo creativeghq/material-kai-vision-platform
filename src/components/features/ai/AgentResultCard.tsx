@@ -41,16 +41,16 @@ const URL_RE = /^https?:\/\//i;
 const IMG_URL_RE = /^https?:\/\/\S+\.(png|jpe?g|webp|gif)(\?\S*)?$/i;
 
 // Plumbing the payload carries for the CLIENT's benefit, never the reader's.
-// ~20 tools echo `workspace_id` back in their chunk (it is how they scoped the
-// query), and this card renders whatever it is handed — so every one of them
-// printed a raw tenant UUID as the first row of the canvas. Tenancy/identity is
-// ambient here: the user is *in* that workspace, signed in as that user. Filtered
-// at EVERY depth, since nested rows echo the same fields.
+// ~20 tools echo `workspace_id` back in their chunk and this card renders whatever
+// it is handed, so every one of them printed a raw tenant UUID as the canvas's first
+// row; agent-chat stamps `turn_id` on every chunk there is. Tenancy and identity are
+// ambient here — the user is *in* that workspace, signed in as that user. Filtered at
+// EVERY depth, since nested rows echo the same fields.
 const HIDDEN_KEYS = new Set([
   'timestamp', 'type',
   'workspace_id', 'user_id', 'tenant_id', 'org_id', 'organization_id', 'account_id',
   'created_by', 'updated_by', 'owner_id',
-  'session_id', 'request_id', 'correlation_id', 'trace_id',
+  'session_id', 'request_id', 'correlation_id', 'trace_id', 'turn_id',
   'jwt', 'access_token', 'refresh_token', 'api_key',
 ]);
 
@@ -180,12 +180,16 @@ const isNumericCol = (rows: any[], k: string) =>
  * Peel a chunk that wraps its whole answer in ONE `data` or `result` key, up to two levels.
  *
  * Half the tools emit `{data: {count: 6, expenses: […]}}`, which would otherwise render as a
- * field labelled "Data" with the real answer nested inside it.
+ * field labelled "Data" with the real answer nested inside it. "One key" means one key the READER
+ * would see: agent-chat stamps `turn_id` on every chunk, so a literal `keys.length === 1` peeled
+ * nothing on the live platform and the wrapper always survived.
  */
 export function unwrapResultData(raw: any): any {
   let d = raw;
   for (let i = 0; i < 2; i++) {
-    const keys = d && typeof d === 'object' && !Array.isArray(d) ? Object.keys(d) : [];
+    const keys = d && typeof d === 'object' && !Array.isArray(d)
+      ? Object.keys(d).filter((k) => !isPlumbing(k, (d as any)[k]))
+      : [];
     const inner = keys.length === 1 && (keys[0] === 'data' || keys[0] === 'result') ? (d as any)[keys[0]] : null;
     if (!inner || typeof inner !== 'object' || Array.isArray(inner)) break;
     d = inner;
@@ -341,7 +345,10 @@ function RecordTable({ rows, columns, listKey }: { rows: any[]; columns: string[
           preview: the body scrolls the page, and a table that scrolled with it took its own column
           names off the screen by row twenty. */}
       <div className="custom-scrollbar max-h-[26rem] overflow-x-auto overflow-y-auto rounded-sm border border-hairline">
-      <table className="w-full border-collapse text-xs">
+      {/* `w-max min-w-full`, never a bare `w-full`: inside a scroller `w-full` means "compress to
+          the container", so a long cell wrapped to ONE WORD PER LINE while the nowrap headers
+          still pushed the last column past the edge — a table that fits and is unreadable. */}
+      <table className="w-max min-w-full border-collapse text-xs">
         <thead>
           <tr>
             {shown.map((c) => (
@@ -374,7 +381,12 @@ function RecordTable({ rows, columns, listKey }: { rows: any[]; columns: string[
                   return (
                     <td
                       key={c}
-                      className={`px-2.5 py-2 ${numeric ? 'text-right tabular-nums' : 'text-left'}`}
+                      // A prose column (a subtitle, a description) is capped at a readable measure
+                      // and wraps inside it; a number never wraps at all. Without the cap, sizing
+                      // the table to content lets one long cell run the width of the screen.
+                      className={`px-2.5 py-2 ${numeric
+                        ? 'whitespace-nowrap text-right tabular-nums'
+                        : 'max-w-[22rem] break-words text-left'}`}
                     >
                       {openable && isName && isScalar(r?.[c]) && r?.[c] != null && r?.[c] !== '' ? (
                         selfHref ? (

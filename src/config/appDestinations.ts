@@ -61,6 +61,14 @@ export const APP_DESTINATIONS: readonly AppDestination[] = [
   { id: 'credits', breadcrumb: 'Profile → Credits', route: '/profile?tab=credits' },
   { id: 'subscription', breadcrumb: 'Profile → Subscription', route: '/profile?tab=subscription' },
   { id: 'profile-reviews', breadcrumb: 'Profile → Reviews', route: '/profile?tab=reviews' },
+  // Where the workspace's public handle is set — the first segment of every catalog link it
+  // shares. On the catalogs page itself, because that is the only place it has consequences.
+  {
+    id: 'catalog-public-address',
+    breadcrumb: 'Catalogs → Public address',
+    route: '/catalogs',
+    aliases: ['Catalogs → Public URL'],
+  },
 
   // ── Module pages ──
   // WhatsApp connect lives on the profile's channels rail, beside the social accounts — same

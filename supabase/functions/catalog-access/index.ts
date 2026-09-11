@@ -16,6 +16,8 @@ const TOKEN_TTL_MS = TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000;
 
 interface RequestBody {
   action: 'request' | 'verify' | 'public_meta' | 'track_view' | 'track_download';
+  /** Workspace segment of `/c/<handle>/<slug>`. Absent on a link shared before the URL was scoped. */
+  handle?: string;
   slug?: string;
   email?: string;
   token?: string;
@@ -131,6 +133,41 @@ function projectCatalogForViewer(catalog: Record<string, any>, pdfUrl: string | 
   };
 }
 
+
+/**
+ * The catalog behind `/c/<handle>/<slug>`.
+ *
+ * A slug is unique WITHIN a workspace, so the handle is part of the key. `handle` is absent only
+ * on a link shared before the URL carried one: those still resolve, by slug alone, and the caller
+ * redirects to the canonical URL. Once two workspaces share a slug that lookup is genuinely
+ * ambiguous, and an ambiguous legacy link resolves to NOTHING rather than to a coin flip — serving
+ * one tenant's catalog to the other's customer is the failure this scoping exists to prevent.
+ */
+async function resolveCatalog(
+  supabase: any,
+  handle: string | undefined,
+  slug: string,
+  columns: string,
+): Promise<{ catalog: any | null; canonicalHandle: string | null }> {
+  if (handle) {
+    const { data: ws } = await supabase
+      .from('workspaces').select('id, public_handle').ilike('public_handle', handle).maybeSingle();
+    if (!ws) return { catalog: null, canonicalHandle: null };
+    const { data } = await supabase
+      .from('presentation_catalogs').select(columns)
+      .eq('workspace_id', ws.id).eq('slug', slug).maybeSingle();
+    return { catalog: data ?? null, canonicalHandle: ws.public_handle ?? null };
+  }
+
+  const { data: rows } = await supabase
+    .from('presentation_catalogs').select(columns)
+    .eq('slug', slug).eq('status', 'published').limit(2);
+  if (!rows || rows.length !== 1) return { catalog: null, canonicalHandle: null };
+  const { data: ws } = await supabase
+    .from('workspaces').select('public_handle').eq('id', rows[0].workspace_id).maybeSingle();
+  return { catalog: rows[0], canonicalHandle: ws?.public_handle ?? null };
+}
+
 Deno.serve(withApiLogging('catalog-access', async (req) => {
   await bootstrapForFunction();
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -143,15 +180,15 @@ Deno.serve(withApiLogging('catalog-access', async (req) => {
     if (!body.action || !body.slug) return jsonResponse({ error: 'action and slug are required' }, 400);
 
     const slug = body.slug.toLowerCase().trim();
+    // `verify` / `track_*` resolve the catalog from the TOKEN and only check the slug matches, so
+    // the handle is a resolution input for `public_meta` and `request` alone.
+    const handle = body.handle?.toLowerCase().trim() || undefined;
 
     if (body.action === 'public_meta') {
-      const { data: catalog } = await supabase
-        .from('presentation_catalogs')
-        .select('id, owner_user_id, workspace_id, title, subtitle, description, cover_data, status')
-        .eq('slug', slug)
-        .eq('status', 'published')
-        .maybeSingle();
-      if (!catalog) return jsonResponse({ error: 'Not found' }, 404);
+      const { catalog, canonicalHandle } = await resolveCatalog(
+        supabase, handle, slug,
+        'id, owner_user_id, workspace_id, title, subtitle, description, cover_data, status');
+      if (!catalog || catalog.status !== 'published') return jsonResponse({ error: 'Not found' }, 404);
 
       const [branding, art] = await Promise.all([
         resolveOwnerBranding(supabase, catalog.workspace_id ?? null),
@@ -159,6 +196,9 @@ Deno.serve(withApiLogging('catalog-access', async (req) => {
       ]);
 
       return jsonResponse({
+        // What the URL SHOULD be. A legacy `/c/<slug>` link redirects onto it rather than living
+        // on as a second address for the same page.
+        canonical_handle: canonicalHandle,
         title: catalog.title,
         subtitle: catalog.subtitle,
         cover_image_url: catalog.cover_data?.cover_image_url || art.cover_image_url || null,
@@ -175,11 +215,8 @@ Deno.serve(withApiLogging('catalog-access', async (req) => {
       }
       const email = body.email.toLowerCase().trim();
 
-      const { data: catalog } = await supabase
-        .from('presentation_catalogs')
-        .select('id, status, owner_user_id, workspace_id')
-        .eq('slug', slug)
-        .maybeSingle();
+      const { catalog } = await resolveCatalog(
+        supabase, handle, slug, 'id, status, owner_user_id, workspace_id');
       if (!catalog || catalog.status !== 'published') {
         return jsonResponse({ granted_access: false });
       }

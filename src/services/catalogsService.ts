@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { EmailSendError } from '@/modules/email/services/emailService';
 import { unwrapEmailSendError } from '@/modules/email/lib/emailSenderGate';
 import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
+import { catalogPublicPath, catalogPublicUrl, normalizeWorkspaceHandle } from '@/config/catalogPublicUrl';
 
 export type CatalogStatus = 'draft' | 'generating' | 'ready' | 'published' | 'archived' | 'failed';
 
@@ -54,6 +55,8 @@ export interface PresentationCatalog {
   unique_email_count: number;
   created_at: string;
   updated_at: string;
+  /** Its workspace's public handle — the first segment of the public URL. Joined, not stored. */
+  public_handle?: string | null;
 }
 
 export interface CatalogTemplate {
@@ -125,6 +128,7 @@ export interface CatalogOperationsSummary {
   page_views: number;
   pdf_downloads: number;
   last_event_at: string | null;
+  public_handle: string | null;
 }
 
 export interface CatalogViewEventRow {
@@ -199,24 +203,36 @@ export interface DispatchSendResponse {
   failed_count: number;
 }
 
+/**
+ * PostgREST returns an embedded `workspaces: { public_handle }`. Flattened on the way in so no
+ * consumer has to know the row was assembled from a join.
+ */
+function flattenHandle(row: any): any {
+  if (!row) return row;
+  const { workspaces, ...rest } = row;
+  return { ...rest, public_handle: workspaces?.public_handle ?? null };
+}
+
 class CatalogsService {
   async list(): Promise<PresentationCatalog[]> {
     const { data, error } = await supabase
       .from('presentation_catalogs')
-      .select('*')
+      // The workspace handle is half of the public address, so it travels WITH the row. Fetching
+      // it per catalog at each of the four render sites is how three of them ended up without it.
+      .select('*, workspaces(public_handle)')
       .order('updated_at', { ascending: false });
     if (error) throw error;
-    return (data || []) as PresentationCatalog[];
+    return (data || []).map(flattenHandle) as PresentationCatalog[];
   }
 
   async get(catalogId: string): Promise<PresentationCatalog | null> {
     const { data, error } = await supabase
       .from('presentation_catalogs')
-      .select('*')
+      .select('*, workspaces(public_handle)')
       .eq('id', catalogId)
       .maybeSingle();
     if (error) throw error;
-    return data as PresentationCatalog | null;
+    return data ? (flattenHandle(data) as PresentationCatalog) : null;
   }
 
   async create(input: {
@@ -579,6 +595,20 @@ class CatalogsService {
     return this.update(catalogId, { body_data: { sections } } as any);
   }
 
+  /**
+   * Every body edit goes through ONE of the five `catalog_*_node` RPCs, each of which patches the
+   * node inside `body_data` in a single statement.
+   *
+   * These used to read the whole document, edit it in TypeScript and write it back. That is a lost
+   * update the moment two edits overlap — and the builder now saves on every blur while the KAI
+   * agent writes the same document from the other side.
+   */
+  private async applyBodyRpc(fn: string, args: Record<string, unknown>): Promise<CatalogSection[]> {
+    const { data, error } = await supabase.rpc(fn as any, args as any);
+    if (error) throw error;
+    return (data || []) as CatalogSection[];
+  }
+
   async setMaterialImage(catalogId: string, sectionId: string, materialId: string, image: { url: string; source: 'db' | 'web'; metadata?: Record<string, any> }): Promise<PresentationCatalog> {
     const cat = await this.get(catalogId);
     if (!cat) throw new Error('Catalog not found');
@@ -593,34 +623,81 @@ class CatalogsService {
     return this.update(catalogId, { body_data: { sections } } as any);
   }
 
-  async removeMaterial(catalogId: string, sectionId: string, materialId: string): Promise<PresentationCatalog> {
-    const cat = await this.get(catalogId);
-    if (!cat) throw new Error('Catalog not found');
-    const sections = (cat.body_data?.sections || []).map((s) => {
-      if (s.id !== sectionId) return s;
-      return { ...s, materials: s.materials.filter((m) => m.id !== materialId) };
+  async removeMaterial(catalogId: string, sectionId: string, materialId: string): Promise<CatalogSection[]> {
+    return this.applyBodyRpc('catalog_remove_node', {
+      p_catalog_id: catalogId, p_section_id: sectionId, p_material_id: materialId,
     });
-    return this.update(catalogId, { body_data: { sections } } as any);
   }
 
-  async removeSection(catalogId: string, sectionId: string): Promise<PresentationCatalog> {
-    const cat = await this.get(catalogId);
-    if (!cat) throw new Error('Catalog not found');
-    const sections = (cat.body_data?.sections || []).filter((s) => s.id !== sectionId);
-    return this.update(catalogId, { body_data: { sections } } as any);
+  async removeSection(catalogId: string, sectionId: string): Promise<CatalogSection[]> {
+    return this.applyBodyRpc('catalog_remove_node', {
+      p_catalog_id: catalogId, p_section_id: sectionId, p_material_id: null,
+    });
   }
 
-  async updateSection(catalogId: string, sectionId: string, patch: { title?: string; intro?: string | null }): Promise<PresentationCatalog> {
-    const cat = await this.get(catalogId);
-    if (!cat) throw new Error('Catalog not found');
-    const sections = (cat.body_data?.sections || []).map((s) => s.id === sectionId ? { ...s, ...patch } : s);
-    return this.update(catalogId, { body_data: { sections } } as any);
+  async updateSection(catalogId: string, sectionId: string, patch: { title?: string; intro?: string | null }): Promise<CatalogSection[]> {
+    return this.applyBodyRpc('catalog_update_node', {
+      p_catalog_id: catalogId, p_section_id: sectionId, p_material_id: null, p_patch: patch,
+    });
   }
 
-  publicUrlFor(slug: string | null): string | null {
-    if (!slug) return null;
-    const base = (typeof window !== 'undefined' ? window.location.origin : '').replace(/\/$/, '');
-    return `${base}/c/${slug}`;
+  /** The fields a person may type. Image and price PROVENANCE are the server's and are refused there. */
+  async updateMaterial(
+    catalogId: string,
+    sectionId: string,
+    materialId: string,
+    patch: { name?: string; description?: string | null; price?: number | null; currency?: string | null; sku?: string | null },
+  ): Promise<CatalogSection[]> {
+    return this.applyBodyRpc('catalog_update_node', {
+      p_catalog_id: catalogId, p_section_id: sectionId, p_material_id: materialId, p_patch: patch,
+    });
+  }
+
+  async addSection(catalogId: string, title: string): Promise<CatalogSection[]> {
+    return this.applyBodyRpc('catalog_add_section', { p_catalog_id: catalogId, p_title: title });
+  }
+
+  async addMaterial(catalogId: string, sectionId: string, name: string): Promise<CatalogSection[]> {
+    return this.applyBodyRpc('catalog_add_material', {
+      p_catalog_id: catalogId, p_section_id: sectionId, p_name: name,
+    });
+  }
+
+  /** One place up (-1) or down (+1). At the edge of its travel this is a no-op, not an error. */
+  async moveNode(catalogId: string, sectionId: string, materialId: string | null, delta: -1 | 1): Promise<CatalogSection[]> {
+    return this.applyBodyRpc('catalog_move_node', {
+      p_catalog_id: catalogId, p_section_id: sectionId, p_material_id: materialId, p_delta: delta,
+    });
+  }
+
+  // ── The public link ────────────────────────────────────────────────
+
+  /** The workspace handle that is the first segment of every public catalog URL it owns. */
+  async publicHandle(workspaceId: string): Promise<string | null> {
+    const { data, error } = await supabase
+      .from('workspaces')
+      .select('public_handle')
+      .eq('id', workspaceId)
+      .maybeSingle();
+    if (error) throw error;
+    return (data as any)?.public_handle ?? null;
+  }
+
+  async setPublicHandle(workspaceId: string, handle: string): Promise<string> {
+    const { data, error } = await supabase.rpc('set_workspace_public_handle' as any, {
+      p_workspace_id: workspaceId, p_handle: normalizeWorkspaceHandle(handle),
+    } as any);
+    if (error) throw error;
+    return data as unknown as string;
+  }
+
+  publicPathFor(handle: string | null, slug: string | null): string | null {
+    return catalogPublicPath(handle, slug);
+  }
+
+  publicUrlFor(handle: string | null, slug: string | null): string | null {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    return catalogPublicUrl(origin, handle, slug);
   }
 
   // ── Operations / analytics ─────────────────────────────────────────

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Loader2, Mail, Lock, FileDown } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -10,8 +10,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { edgeError } from '@/utils/edgeError';
 import { useShowPrices } from '@/hooks/useShowPrices';
 import { formatDate } from '@/utils/datetime';
+import { catalogPublicPath } from '@/config/catalogPublicUrl';
 
 interface PublicMeta {
+  /** The workspace segment this catalog SHOULD be served under. */
+  canonical_handle: string | null;
   title: string;
   subtitle: string | null;
   cover_image_url: string | null;
@@ -73,8 +76,12 @@ function writeTokenForSlug(slug: string, token: string, expiresAt: string) {
 }
 
 export const PublicCatalogPage: React.FC = () => {
-  const { slug } = useParams<{ slug: string }>();
+  // `handle` is absent on a link shared before the URL was workspace-scoped. Those still work:
+  // the meta call resolves them by slug and answers with the canonical handle, and the effect
+  // below rewrites the address so the old form does not live on as a second one.
+  const { handle, slug } = useParams<{ handle?: string; slug: string }>();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const [meta, setMeta] = useState<PublicMeta | null>(null);
   const [loadingMeta, setLoadingMeta] = useState(true);
@@ -98,13 +105,17 @@ export const PublicCatalogPage: React.FC = () => {
     (async () => {
       try {
         setLoadingMeta(true);
-        const data = await callAccess({ action: 'public_meta', slug });
+        const data = await callAccess({ action: 'public_meta', slug, handle });
         if (cancelled) return;
         if (data?.error || !data?.title) {
           setNotFound(true);
           return;
         }
         setMeta(data);
+        // Canonicalise a legacy one-segment link in place. `replace`, not `push`: the old address
+        // should not sit in the visitor's back button as somewhere to return to.
+        const canonical = handle ? null : catalogPublicPath(data.canonical_handle, slug);
+        if (canonical) navigate(canonical, { replace: true });
 
         const existingToken = readTokenForSlug(slug);
         if (existingToken) {
@@ -128,7 +139,7 @@ export const PublicCatalogPage: React.FC = () => {
       }
     })();
     return () => { cancelled = true; };
-  }, [slug, callAccess]);
+  }, [slug, handle, navigate, callAccess]);
 
   const handleTrackedDownload = useCallback(async (pdfUrl: string) => {
     const token = slug ? readTokenForSlug(slug) : null;
@@ -144,7 +155,7 @@ export const PublicCatalogPage: React.FC = () => {
     if (!slug || !email.trim()) return;
     setSubmitting(true);
     try {
-      const data = await callAccess({ action: 'request', slug, email: email.trim() });
+      const data = await callAccess({ action: 'request', slug, handle, email: email.trim() });
       if (!data?.granted_access) {
         toast({
           title: 'Access denied',

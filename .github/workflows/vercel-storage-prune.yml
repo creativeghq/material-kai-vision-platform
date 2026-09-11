@@ -34,6 +34,8 @@ jobs:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -84,6 +86,16 @@ jobs:
           set -euo pipefail
           sleep 15
           node scripts/probe-live-frontend.mjs "https://app.materialshub.gr"
+
+      # `always()`, and only for a run that actually applied: a dry run has nothing to report and
+      # would reset the clock on a job that never did any work. The platform reads this row at
+      # /admin/data-health — GitHub's own green tick is not visible from inside the app.
+      - name: 📟 Report the run to the platform
+        if: ${{ always() && steps.cfg.outputs.apply == 'true' }}
+        run: |
+          node scripts/report-job-run.mjs vercel-storage-prune \
+            "${{ job.status == 'success' && 'succeeded' || 'failed' }}" \
+            "{\"run\":\"${{ github.run_id }}\",\"event\":\"${{ github.event_name }}\",\"job_status\":\"${{ job.status }}\"}"
 
       - name: 🚨 If the site broke, say what to do
         if: ${{ failure() && steps.cfg.outputs.apply == 'true' }}

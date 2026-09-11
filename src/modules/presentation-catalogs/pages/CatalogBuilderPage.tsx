@@ -17,6 +17,8 @@ import {
   Send,
   Mail,
   FileText,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { getErrorMessage } from '@/core/errors/utils';
@@ -38,6 +40,7 @@ import {
   type CatalogViewEventRow,
   type CatalogSendBatchSummary,
   type CatalogEmailSendRow,
+  type CatalogSection,
 } from '@/services/catalogsService';
 import { SendToCustomersModal } from '@/components/business/catalogs/SendToCustomersModal';
 import { CatalogSourcesPanel } from '@/components/business/catalogs/CatalogSourcesPanel';
@@ -75,6 +78,9 @@ export const CatalogBuilderPage: React.FC = () => {
   // Fresh signed URL re-derived from pdf_storage_path. The persisted catalog.pdf_url is
   // a 7-day signed URL that 403s once expired — never serve it directly.
   const [pdfSignedUrl, setPdfSignedUrl] = useState<string | null>(null);
+  // First segment of the public URL. A catalog with no handle cannot be published, so the
+  // publish button says so rather than minting a link with a hole in it.
+  const [publicHandle, setPublicHandle] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!catalogId) return;
@@ -82,6 +88,7 @@ export const CatalogBuilderPage: React.FC = () => {
       setLoading(true);
       const cat = await catalogsService.get(catalogId);
       setCatalog(cat);
+      setPublicHandle(cat?.workspace_id ? await catalogsService.publicHandle(cat.workspace_id) : null);
       const [g, log, ev, batches] = await Promise.all([
         catalogsService.listEmailGrants(catalogId),
         catalogsService.listAccessLog(catalogId),
@@ -148,11 +155,17 @@ export const CatalogBuilderPage: React.FC = () => {
     if (!catalog) return;
     setBusyAction('publish');
     try {
-      // Use the collision-safe publish (retries on the global slug unique-violation) — the plain
-      // slugify used to hard-fail the second catalog with the same title.
+      if (!publicHandle) {
+        throw new Error('This workspace has no public handle yet — set one at Catalogs → Public address before publishing.');
+      }
+      // Collision-safe: the slug is unique WITHIN the workspace, so a retry only fires when this
+      // workspace already published something under the same title.
       const base = catalog.slug || (await proposeSlug(catalog.title));
       const published = await catalogsService.publish(catalog.id, base);
-      toast({ title: 'Published', description: `/c/${published.slug}` });
+      toast({
+        title: 'Published',
+        description: catalogsService.publicPathFor(publicHandle, published.slug) ?? 'Published',
+      });
       load();
     } catch (err) {
       toast({ title: 'Publish failed', description: getErrorMessage(err), variant: 'destructive' });
@@ -208,26 +221,53 @@ export const CatalogBuilderPage: React.FC = () => {
     }
   };
 
-  const handleRemoveMaterial = async (sectionId: string, materialId: string) => {
+  /**
+   * Every body edit returns the WHOLE sections array from the RPC that wrote it, and that array
+   * replaces what is on screen. Patching local state optimistically would let the page and the
+   * document disagree the first time the KAI agent edited the same catalog from the chat.
+   */
+  const applySections = (sections: CatalogSection[]) => {
+    setCatalog((prev) => (prev ? { ...prev, body_data: { ...prev.body_data, sections } } : prev));
+  };
+
+  const runBodyEdit = async (op: () => Promise<CatalogSection[]>, okTitle?: string) => {
     if (!catalog) return;
     try {
-      const updated = await catalogsService.removeMaterial(catalog.id, sectionId, materialId);
-      setCatalog(updated);
+      applySections(await op());
+      if (okTitle) toast({ title: okTitle });
     } catch (err) {
       toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
     }
   };
 
+  const handleRemoveMaterial = (sectionId: string, materialId: string) =>
+    runBodyEdit(() => catalogsService.removeMaterial(catalog!.id, sectionId, materialId));
+
   const handleRemoveSection = async (sectionId: string) => {
     if (!catalog) return;
     if (!window.confirm('Remove this section and all its materials?')) return;
-    try {
-      const updated = await catalogsService.removeSection(catalog.id, sectionId);
-      setCatalog(updated);
-    } catch (err) {
-      toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
-    }
+    await runBodyEdit(() => catalogsService.removeSection(catalog.id, sectionId));
   };
+
+  /** Saves on blur, and only when the value actually CHANGED — otherwise tabbing through the
+   *  form writes the document once per field and each write is a version in its history. */
+  const handleSectionField = (sectionId: string, patch: { title?: string; intro?: string | null }) =>
+    runBodyEdit(() => catalogsService.updateSection(catalog!.id, sectionId, patch));
+
+  const handleMaterialField = (
+    sectionId: string,
+    materialId: string,
+    patch: { name?: string; description?: string | null; price?: number | null },
+  ) => runBodyEdit(() => catalogsService.updateMaterial(catalog!.id, sectionId, materialId, patch));
+
+  const handleAddSection = () =>
+    runBodyEdit(() => catalogsService.addSection(catalog!.id, 'New section'), 'Section added');
+
+  const handleAddMaterial = (sectionId: string) =>
+    runBodyEdit(() => catalogsService.addMaterial(catalog!.id, sectionId, 'New material'));
+
+  const handleMove = (sectionId: string, materialId: string | null, delta: -1 | 1) =>
+    runBodyEdit(() => catalogsService.moveNode(catalog!.id, sectionId, materialId, delta));
 
   if (loading || !catalog) {
     return (
@@ -239,7 +279,7 @@ export const CatalogBuilderPage: React.FC = () => {
     );
   }
 
-  const publicUrl = catalog.slug ? `/c/${catalog.slug}` : null;
+  const publicUrl = catalogsService.publicPathFor(publicHandle, catalog.slug);
 
   return (
     <div>
@@ -298,51 +338,144 @@ export const CatalogBuilderPage: React.FC = () => {
         </TabsList>
 
         <TabsContent value="builder" className="space-y-3 mt-4">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <p className="text-xs text-muted-foreground">
+              Every field here saves when you leave it. Changes reach the public page next time you publish.
+            </p>
+            <Button size="sm" variant="outline" onClick={handleAddSection}>
+              <Plus className="mr-2 h-4 w-4" /> Add section
+            </Button>
+          </div>
+
           {(catalog.body_data?.sections || []).length === 0 ? (
             <Card>
               <CardContent className="p-12 text-center space-y-2">
                 <div className="font-medium">No sections yet</div>
-                <p className="text-sm text-muted-foreground">Upload a source PDF and extract products in the Sources tab, or let the KAI agent build it for you.</p>
-                <div className="flex gap-2 justify-center pt-1">
-                  <Button onClick={() => setActiveTab('sources')}><FileText className="mr-2 h-4 w-4" /> Go to Sources</Button>
+                <p className="text-sm text-muted-foreground">Add one by hand, extract products from a source PDF, or let the KAI agent build it for you.</p>
+                <div className="flex gap-2 justify-center pt-1 flex-wrap">
+                  <Button onClick={handleAddSection}><Plus className="mr-2 h-4 w-4" /> Add section</Button>
+                  <Button variant="outline" onClick={() => setActiveTab('sources')}><FileText className="mr-2 h-4 w-4" /> Go to Sources</Button>
                   <Button variant="outline" onClick={handleOpenAgent}><MessageSquare className="mr-2 h-4 w-4" /> Open in KAI</Button>
                 </div>
               </CardContent>
             </Card>
           ) : (
-            (catalog.body_data?.sections || []).map((section) => (
+            (catalog.body_data?.sections || []).map((section, sIdx, allSections) => (
               <Card key={section.id} className="dashboard-card">
-                <CardHeader className="pb-2 flex-row items-center justify-between">
-                  <CardTitle>
-                    {section.title}
-                    <span className="ml-2 text-xs text-muted-foreground font-normal">{section.materials.length} materials</span>
-                  </CardTitle>
-                  <Button size="sm" variant="ghost" onClick={() => handleRemoveSection(section.id)}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                <CardHeader className="pb-2 gap-2">
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <Input
+                        defaultValue={section.title}
+                        aria-label="Section title"
+                        className="h-9 text-base font-medium"
+                        onBlur={(e) => e.target.value.trim() !== section.title
+                          && handleSectionField(section.id, { title: e.target.value.trim() })}
+                      />
+                      <Textarea
+                        defaultValue={section.intro || ''}
+                        aria-label="Section intro"
+                        rows={2}
+                        placeholder="Intro paragraph for this section (optional)"
+                        onBlur={(e) => (e.target.value.trim() || null) !== (section.intro || null)
+                          && handleSectionField(section.id, { intro: e.target.value.trim() || null })}
+                      />
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Button size="sm" variant="ghost" disabled={sIdx === 0}
+                        title="Move section up" onClick={() => handleMove(section.id, null, -1)}>
+                        <ChevronUp className="h-4 w-4" />
+                      </Button>
+                      <Button size="sm" variant="ghost" disabled={sIdx === allSections.length - 1}
+                        title="Move section down" onClick={() => handleMove(section.id, null, 1)}>
+                        <ChevronDown className="h-4 w-4" />
+                      </Button>
+                      <Button size="sm" variant="ghost" title="Remove section" onClick={() => handleRemoveSection(section.id)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">
+                      {section.materials.length} {section.materials.length === 1 ? 'material' : 'materials'}
+                    </span>
+                    <Button size="sm" variant="ghost" onClick={() => handleAddMaterial(section.id)}>
+                      <Plus className="mr-1 h-3 w-3" /> Add material
+                    </Button>
+                  </div>
                 </CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {section.materials.map((m) => (
-                    <div key={m.id} className="border rounded p-3 flex gap-3 items-start">
-                      <div className="w-20 h-20 rounded bg-muted shrink-0 overflow-hidden">
+                <CardContent className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                  {section.materials.length === 0 ? (
+                    <div className="col-span-full rounded-sm border border-dashed border-hairline p-6 text-center">
+                      <p className="text-sm text-muted-foreground">Nothing in this section yet.</p>
+                      <Button size="sm" variant="outline" className="mt-2" onClick={() => handleAddMaterial(section.id)}>
+                        <Plus className="mr-1 h-3 w-3" /> Add the first material
+                      </Button>
+                    </div>
+                  ) : section.materials.map((m, mIdx) => (
+                    <div key={m.id} className="border border-hairline rounded-sm p-3 flex gap-3 items-start">
+                      <div className="w-20 h-20 rounded-sm bg-surface-sunken shrink-0 overflow-hidden">
                         {m.image_url ? (
                           <img src={m.image_url} alt={m.name} className="w-full h-full object-cover" />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">no img</div>
+                          <div className="w-full h-full flex items-center justify-center px-1 text-center text-[10px] text-muted-foreground">
+                            no image
+                          </div>
                         )}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm truncate">{m.name}</div>
-                        {m.description && <div className="text-xs text-muted-foreground line-clamp-2">{m.description}</div>}
-                        <div className="flex gap-2 mt-1 text-xs">
-                          {m.price != null && <span className="font-medium">{formatPrice(m.price, m.currency)}</span>}
-                          {m.price_source && m.price_source !== 'manual' && <Badge variant="outline" className="text-[10px] py-0">{m.price_source.replace(/_/g, ' ')}</Badge>}
+                      <div className="flex-1 min-w-0 space-y-2">
+                        <Input
+                          defaultValue={m.name}
+                          aria-label="Material name"
+                          className="h-8 text-sm font-medium"
+                          onBlur={(e) => e.target.value.trim() !== m.name
+                            && handleMaterialField(section.id, m.id, { name: e.target.value.trim() })}
+                        />
+                        <Textarea
+                          defaultValue={m.description || ''}
+                          aria-label="Material description"
+                          rows={2}
+                          placeholder="Description"
+                          className="text-xs"
+                          onBlur={(e) => (e.target.value.trim() || null) !== (m.description || null)
+                            && handleMaterialField(section.id, m.id, { description: e.target.value.trim() || null })}
+                        />
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-xs text-muted-foreground">{currencySymbol(m.currency)}</span>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            inputMode="decimal"
+                            defaultValue={m.price ?? ''}
+                            aria-label="Price"
+                            placeholder="Price"
+                            className="h-8 w-28 text-right text-sm tabular-nums"
+                            onBlur={(e) => {
+                              const raw = e.target.value.trim();
+                              const next = raw === '' ? null : Number(raw);
+                              if (next !== null && !Number.isFinite(next)) return;
+                              if (next !== (m.price ?? null)) handleMaterialField(section.id, m.id, { price: next });
+                            }}
+                          />
+                          {m.price_source && m.price_source !== 'manual' && (
+                            <Badge variant="outline" className="text-[10px] py-0">{m.price_source.replace(/_/g, ' ')}</Badge>
+                          )}
                           {!m.image_url && <Badge variant="outline" className="text-[10px] py-0">needs image</Badge>}
                         </div>
                       </div>
-                      <Button size="sm" variant="ghost" onClick={() => handleRemoveMaterial(section.id, m.id)}>
-                        <Trash2 className="h-3 w-3 text-destructive" />
-                      </Button>
+                      <div className="flex shrink-0 flex-col gap-1">
+                        <Button size="sm" variant="ghost" disabled={mIdx === 0}
+                          title="Move up" onClick={() => handleMove(section.id, m.id, -1)}>
+                          <ChevronUp className="h-3 w-3" />
+                        </Button>
+                        <Button size="sm" variant="ghost" disabled={mIdx === section.materials.length - 1}
+                          title="Move down" onClick={() => handleMove(section.id, m.id, 1)}>
+                          <ChevronDown className="h-3 w-3" />
+                        </Button>
+                        <Button size="sm" variant="ghost" title="Remove material" onClick={() => handleRemoveMaterial(section.id, m.id)}>
+                          <Trash2 className="h-3 w-3 text-destructive" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </CardContent>
@@ -685,7 +818,11 @@ async function proposeSlug(title: string): Promise<string> {
     .slice(0, 80) || 'catalog';
 }
 
-function formatPrice(amount: number, currency: string | null): string {
-  const symbol = currency === 'EUR' ? '€' : currency === 'USD' ? '$' : currency === 'GBP' ? '£' : (currency ? `${currency} ` : '');
-  return `${symbol}${amount.toFixed(2)}`;
+/** Which money the price field is in. The catalog stores a currency per material and the editor
+ *  must say which one, or a 129.50 typed into a USD line reads as euros to whoever priced it. */
+function currencySymbol(currency: string | null): string {
+  if (currency === 'EUR') return '€';
+  if (currency === 'USD') return '$';
+  if (currency === 'GBP') return '£';
+  return currency || '€';
 }

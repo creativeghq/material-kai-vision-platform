@@ -87,6 +87,54 @@ describe('AgentResultCard leaves non-tabular payloads alone', () => {
 });
 
 /**
+ * The live `record_search_results` chunk, verbatim from a saved message — `{data: {...}, turn_id}`.
+ * It rendered as a field labelled "Data" holding the whole answer, which put the table inside a
+ * definition list's value column: two rows, one word per line, last column clipped.
+ */
+describe('a stamped chunk renders its table at full width', () => {
+  const RECORD_SEARCH = {
+    data: {
+      count: 2,
+      query: 'Monoblock Air Conditioner',
+      records: [
+        { kind: 'catalog', id: '50ca3454-2f10-4efb-90bd-beff565b9979', title: 'Monoblock Air Conditioner', subtitle: '8,000 BTU window-mounted — cooling and heating, no outdoor unit', badge: 'draft' },
+        { kind: 'catalog', id: '92662814-b95d-4dea-89cb-c093554a9a3d', title: 'Monoblock Air Conditioners', subtitle: 'YWD-08CD/3-W-2 — 8,000 BTU cooling & heating, R-290', badge: 'published' },
+      ],
+    },
+    turn_id: '665aa85b-57a6-4884-83ef-2da96d4540d3',
+  };
+  const html = render(RECORD_SEARCH, 'record_search_results', 'Records found');
+
+  it('peels the wrapper instead of labelling it "Data"', () => {
+    expect(html).not.toMatch(/>Data</);
+    expect(html).toContain('<table');
+  });
+
+  it('never prints the turn id', () => {
+    expect(html).not.toContain('665aa85b');
+  });
+
+  it('keeps the scalars that give the table its context', () => {
+    expect(html).toContain('Monoblock Air Conditioner');
+    expect(html).toMatch(/>Query</);
+  });
+
+  /**
+   * `w-full` inside an `overflow-x-auto` scroller means "compress to the container", so the
+   * browser resolves a long cell by wrapping it one word per line while the nowrap headers still
+   * push the last column past the edge. The table must size to its CONTENT and let the scroller
+   * show the overflow — with a cap so one long cell cannot run the width of the screen.
+   */
+  it('sizes to content rather than compressing into the container', () => {
+    expect(html).toContain('<table class="w-max min-w-full');
+    // Not a `\bw-full\b` regex: that word boundary sits inside `min-w-full` too, so it matches
+    // the fix as readily as the bug and the assertion proves nothing.
+    expect(html).not.toContain('<table class="w-full');
+    expect(html).toContain('max-w-[22rem] break-words');
+  });
+});
+
+/**
  * The commonest real payload on this platform is an EMPTY list.
  *
  * Measured across saved agent result messages: `{contracts: []}`, `{appointments: [], days: 7}`,
@@ -303,6 +351,10 @@ describe('the count on the chat card is the count in the table', () => {
     ['wrapped in `data`', { data: FLOWS }],
     ['wrapped in `result`', { result: FLOWS }],
     ['wrapped twice', { data: { result: FLOWS } }],
+    // The shape that actually reaches this card: agent-chat stamps `turn_id` on every chunk, so
+    // a wrapped payload NEVER arrives as a sole key. Counting `keys.length` instead of the keys a
+    // reader would see peeled nothing on the live platform.
+    ['wrapped in `data` beside a stamped turn_id', { data: FLOWS, turn_id: '665aa85b-57a6-4884-83ef-2da96d4540d3' }],
     // NOT a sole-key wrapper: `data` sits beside a peer, so nothing is peeled and the first
     // array still wins. Peeling here would count a different list from the one on screen.
     ['a `data` key that is not a wrapper', { flows: FLOWS.flows, data: { other: [1, 2, 3, 4, 5] } }],

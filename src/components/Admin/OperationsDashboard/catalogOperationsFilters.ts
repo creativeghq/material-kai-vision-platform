@@ -10,6 +10,7 @@
 import { BookOpen, CalendarDays, Users } from 'lucide-react';
 import { optionsFromRows, type FilterGroupDef } from '@/components/core/filters';
 import { humanizeLabel } from '@/utils/humanize';
+import { catalogPublicPath } from '@/config/catalogPublicUrl';
 import type { CatalogAccessLogRow, CatalogOperationsSummary, CatalogViewEventRow } from '@/services/catalogsService';
 
 export function buildCatalogOperationsFilters(
@@ -30,7 +31,7 @@ export function buildCatalogOperationsFilters(
           options: summary.map((s) => ({
             value: s.id,
             label: s.title,
-            hint: s.slug ? `/c/${s.slug}` : undefined,
+            hint: catalogPublicPath(s.public_handle ?? null, s.slug) ?? undefined,
           })),
           column: 'catalog_id',
         },

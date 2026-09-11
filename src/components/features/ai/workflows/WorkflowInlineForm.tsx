@@ -7,6 +7,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, Send, ArrowDownToLine, X } from 'lucide-react';
 import { getErrorMessage } from '@/core/errors/utils';
+import { catalogPublicPath } from '@/config/catalogPublicUrl';
 import { Button } from '@/components/core/ui/button';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Input } from '@/components/core/ui/input';
@@ -318,6 +319,6 @@ async function loadCatalogs(statusFilter?: Array<string>): Promise<PickerOption[
   return (data || []).map((r: any) => ({
     value: r.id,
     label: r.title,
-    description: [r.status, r.slug ? `/c/${r.slug}` : null].filter(Boolean).join(' · '),
+    description: [r.status, catalogPublicPath(r.workspaces?.public_handle ?? null, r.slug)].filter(Boolean).join(' · '),
   }));
 }
