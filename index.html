@@ -115,6 +115,15 @@
     <script>
       (function () {
         var GUARD = 'mk-boot-recovered';
+        /**
+         * Bump this to push a state clean to EVERY client on its next load. The watchdog below
+         * only catches a bundle that dies; a client that mounts and then renders blank keeps its
+         * broken state forever, and the only fix was clearing website data by hand on the device.
+         * This is the deployable version of that. Costs everyone one sign-in, so bump it
+         * deliberately — not on every release.
+         */
+        var PURGE_TOKEN = '2026-09-11.1';
+        var PURGE_KEY = 'mk-purge-token';
         var BOOT_TIMEOUT_MS = 12000;
         var BOOT_POLL_MS = 2000;
         var BOOT_CEILING_MS = 45000;
@@ -220,6 +229,31 @@
          * fetched, the module script run or thrown) and only then call an empty #root a
          * dead boot. The ceiling covers a resource that never settles at all.
          */
+        /**
+         * The pushed clean. Runs before the bundle, so it repairs a client whose app mounts and
+         * then renders blank — which the watchdog below cannot see, because that client booted.
+         * The token is read back after writing: where storage is blocked the write silently
+         * no-ops, and reloading on a token that can never persist is an infinite reload loop.
+         */
+        (function pushedPurge() {
+          var stored;
+          try { stored = localStorage.getItem(PURGE_KEY); } catch (e) { return; }
+          if (stored === PURGE_TOKEN) return;
+          // Nothing stored yet is a first visit, not a broken client: stamp it and spare them
+          // a reload they would otherwise take on every first load, forever.
+          try {
+            if (localStorage.length === 0) { localStorage.setItem(PURGE_KEY, PURGE_TOKEN); return; }
+          } catch (e) { return; }
+          purge().then(function () {
+            var persisted = false;
+            try {
+              localStorage.setItem(PURGE_KEY, PURGE_TOKEN);
+              persisted = localStorage.getItem(PURGE_KEY) === PURGE_TOKEN;
+            } catch (e) { persisted = false; }
+            if (persisted) location.reload();
+          });
+        })();
+
         var waitedMs = 0;
         function check() {
           if (window.__mkBooted) return;
