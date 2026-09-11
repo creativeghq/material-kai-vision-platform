@@ -122,7 +122,13 @@ async function main() {
       console.log(`  would delete ${id(d)}  ${new Date(d.created).toISOString().slice(0, 10)}  ${d.state}`);
     }
     if (batch.length > 10) console.log(`  …and ${batch.length - 10} more`);
-    return { deleted: 0, eligible: doomed.length };
+    const perm = await probeDeletePermission();
+    console.log(
+      perm.ok
+        ? `delete permission: OK (probe returned HTTP ${perm.status} for an id that cannot exist)`
+        : `delete permission: DENIED (HTTP ${perm.status}) — a real run would clear NOTHING`,
+    );
+    return { deleted: 0, eligible: doomed.length, failed: 0, denied: !perm.ok };
   }
 
   let deleted = 0;
@@ -138,18 +144,38 @@ async function main() {
     console.log(`failed ${failed.length}:`);
     for (const f of failed.slice(0, 10)) console.log(`  ${f}`);
   }
-  return { deleted, eligible: doomed.length };
+  return { deleted, eligible: doomed.length, failed: failed.length, denied: false };
+}
+
+/**
+ * Can this token actually delete? A read-scoped token lists happily and 403s every DELETE, which
+ * would otherwise surface only on the first real run. The id is well-formed and cannot exist, so
+ * 404 is the healthy answer — 401/403 is the one worth knowing about, and nothing is removed.
+ */
+async function probeDeletePermission() {
+  const { status } = await call('DELETE', `/v13/deployments/dpl_000000000000000000000000${scoped('?')}`);
+  return { ok: status !== 401 && status !== 403, status };
 }
 
 main()
   .then((r) => {
     // The janitor reports what it actually cleared, not that it ran. A prune that deleted
     // nothing while hundreds were eligible is the silent-zero shape and must be visible.
-    console.log(`\nRESULT eligible=${r.eligible} deleted=${r.deleted} applied=${APPLY}`);
+    console.log(`\nRESULT eligible=${r.eligible} deleted=${r.deleted} failed=${r.failed} applied=${APPLY}`);
     console.log('Deleted deployments stay restorable for 30 days.');
     if (APPLY && r.deleted > 0) {
       console.log('\nNOW VERIFY THE LIVE SITE: npm run probe:live');
       console.log('A prune can orphan an asset the live deployment still serves.');
+    }
+    // A janitor that was REFUSED is not a janitor that had nothing to do, and exiting 0 on both
+    // is how a weekly cron reports green for months while clearing nothing.
+    if (r.failed > 0) {
+      console.error(`\n${r.failed} deletion(s) were refused — the prune did not do its job.`);
+      process.exit(1);
+    }
+    if (r.denied) {
+      console.error('\nVERCEL_TOKEN cannot delete deployments — the weekly run would clear nothing.');
+      process.exit(1);
     }
     process.exit(0);
   })

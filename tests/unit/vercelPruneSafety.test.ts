@@ -60,6 +60,23 @@ describe('the Vercel deployment prune', () => {
     expect(workflow.split('probe-live-frontend.mjs').length - 1).toBeGreaterThanOrEqual(2);
   });
 
+  it('exits non-zero when its deletions were REFUSED', () => {
+    // Reporting success for "deleted 0 of 180, all 403" is the same silent-zero shape this whole
+    // janitor exists to avoid — a weekly cron green for months while clearing nothing.
+    expect(prune).toContain('r.failed > 0');
+    expect(prune).toContain('r.denied');
+    const exits = prune.slice(prune.indexOf('RESULT eligible='));
+    expect(exits.indexOf('process.exit(1)')).toBeLessThan(exits.lastIndexOf('process.exit(0)'));
+  });
+
+  it('a dry run proves the token could actually delete', () => {
+    // A read-scoped token lists happily and 403s every DELETE, which would otherwise surface
+    // only on the first real run. The probe id is well-formed and cannot exist.
+    expect(prune).toContain('probeDeletePermission');
+    expect(prune).toContain('dpl_000000000000000000000000');
+    expect(prune).toContain('status !== 401 && status !== 403');
+  });
+
   it('runs weekly and can still be driven by hand', () => {
     expect(workflow).toContain('workflow_dispatch');
     expect(workflow).toMatch(/cron:\s*'0 9 \* \* 0'/);
