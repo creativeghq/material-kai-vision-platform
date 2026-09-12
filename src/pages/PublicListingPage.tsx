@@ -15,11 +15,7 @@ const money = (n: number | null, ccy: string) => formatMoney(n, ccy || 'EUR', { 
 // Lazy: the Spark/Three splat renderer loads only when the listing actually carries a VR world.
 const WorldViewer = React.lazy(() => import('@/components/features/ai/WorldViewer').then((m) => ({ default: m.WorldViewer })));
 
-/** Only ever link to http(s) — a stored `javascript:` URL must render as nothing, not a live link. */
-function safeHttpUrl(raw: unknown): string | null {
-  if (typeof raw !== 'string' || !raw) return null;
-  try { const u = new URL(raw); return u.protocol === 'https:' || u.protocol === 'http:' ? raw : null; } catch { return null; }
-}
+import { httpUrlOrNull } from '@/utils/safeUrl';
 
 /** Privacy-friendly embed URL for the two providers we support; anything else renders as a link.
  *  The id is constrained to [\w-] so the built URL can only point at the provider's player. */
@@ -113,13 +109,13 @@ export default function PublicListingPage() {
               </div>
             )}
 
-            {safeHttpUrl(l.video_url) && (videoEmbedUrl(l.video_url)
+            {httpUrlOrNull(l.video_url) && (videoEmbedUrl(l.video_url)
               ? <div><h2 className="mb-2 font-semibold">Video</h2><iframe src={videoEmbedUrl(l.video_url)!} title="Property video" className="aspect-video w-full rounded-xl border" allow="fullscreen; picture-in-picture" sandbox="allow-scripts allow-same-origin allow-presentation" /></div>
-              : <Button asChild variant="outline"><a href={safeHttpUrl(l.video_url)!} target="_blank" rel="noopener noreferrer"><ExternalLink className="mr-2 h-4 w-4" /> Watch video</a></Button>)}
+              : <Button asChild variant="outline"><a href={httpUrlOrNull(l.video_url)!} target="_blank" rel="noopener noreferrer"><ExternalLink className="mr-2 h-4 w-4" /> Watch video</a></Button>)}
 
-            {safeHttpUrl(l.virtual_tour_url) && (
+            {httpUrlOrNull(l.virtual_tour_url) && (
               <Button asChild variant="outline">
-                <a href={safeHttpUrl(l.virtual_tour_url)!} target="_blank" rel="noopener noreferrer"><ExternalLink className="mr-2 h-4 w-4" /> Open virtual tour</a>
+                <a href={httpUrlOrNull(l.virtual_tour_url)!} target="_blank" rel="noopener noreferrer"><ExternalLink className="mr-2 h-4 w-4" /> Open virtual tour</a>
               </Button>
             )}
 

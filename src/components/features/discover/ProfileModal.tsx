@@ -25,6 +25,7 @@ import type { Ambassadorship } from '@/lib/ambassadorships';
 import { listAmbassadorships } from '@/services/ambassadorService';
 import { AmbassadorShowcase } from '@/components/features/profile/AmbassadorShowcase';
 import { formatNumber, formatMoney } from '@/utils/decimal';
+import { httpUrlOrNull } from '@/utils/safeUrl';
 
 const CARD_COLORS = [
   'from-violet-950/60 to-indigo-950/40',
@@ -100,8 +101,8 @@ function ServiceRow({ service, onHire, isLast }: { service: ServiceItem; onHire:
               </p>
               {service.previous_work!.map((w, i) => (
                 <div key={i} className="text-xs">
-                  {w.url ? (
-                    <a href={w.url} target="_blank" rel="noopener noreferrer"
+                  {httpUrlOrNull(w.url) ? (
+                    <a href={httpUrlOrNull(w.url)!} target="_blank" rel="noopener noreferrer"
                       className="text-primary hover:underline flex items-center gap-1">
                       {w.title}<ExternalLink className="h-2.5 w-2.5" />
                     </a>
@@ -456,8 +457,8 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
                                   <MapPin className="h-4 w-4 text-primary shrink-0" />{profile.location}
                                 </p>
                               )}
-                              {profile.website_url && (
-                                <a href={profile.website_url} target="_blank" rel="noopener noreferrer"
+                              {httpUrlOrNull(profile.website_url) && (
+                                <a href={httpUrlOrNull(profile.website_url)!} target="_blank" rel="noopener noreferrer"
                                   className="text-sm text-primary hover:underline flex items-center gap-2">
                                   <Globe className="h-4 w-4 shrink-0" />
                                   {profile.website_url}

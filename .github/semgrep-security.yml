@@ -58,6 +58,59 @@ rules:
       - pattern: const escapeHtml = (...) => { ... }
       - pattern: const escapeHtml = function (...) { ... }
 
+  # A URL out of the database in an `href`/`src` is a live `javascript:` link if nobody checked
+  # the scheme. `social_accounts.metadata` proved the point: one FOR ALL policy whose WITH CHECK
+  # is only `user_id = auth.uid()`, so any signed-in user writes it, and the public profile put it
+  # straight into an anchor for every anonymous visitor. Scoped to the surfaces a STRANGER can
+  # open — the authenticated screens have the same shape and a backlog, and a rule nobody can
+  # keep green gets disabled rather than obeyed.
+  - id: no-unguarded-url-on-public-page
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >
+      XSS (invariant 11): a stored URL reaches an href/src on an anonymously-reachable page
+      without a scheme check. Wrap it in `httpUrlOrNull` (renders no link at all) or
+      `safeHref` (inert fallback) from `@/utils/safeUrl`.
+    paths:
+      include:
+        - "src/pages/Public*.tsx"
+        - "src/pages/DiscoverPage.tsx"
+        - "src/pages/Careers/*.tsx"
+        - "src/components/features/profile/*.tsx"
+        - "src/components/features/discover/*.tsx"
+    # `href` on any element, but `src` only on an IFRAME. A `javascript:` URL in an <img src>
+    # does not execute in any current browser, so matching img/AvatarImage would have added 15
+    # findings that are not the bug -- and a rule with a false-positive backlog gets switched
+    # off. Use safeImageSrc on images because a data:/file: src is still wrong, not unsafe.
+    pattern-either:
+      - pattern: <$EL ... href={$OBJ.$FIELD} ... />
+      - pattern: <$EL ... href={$OBJ.$FIELD} ...>...</$EL>
+      - pattern: <iframe ... src={$OBJ.$FIELD} ... />
+      - pattern: <iframe ... src={$OBJ.$FIELD} ...>...</iframe>
+    metavariable-regex:
+      metavariable: $FIELD
+      regex: '^(url|website|link|.*_url|.*Url)$'
+
+  # The other half, mirroring no-local-escape-html: one rule, one module. A per-file copy is how
+  # the escapers drifted to three different strengths, and PublicListingPage had duly grown its
+  # own `safeHttpUrl` that skipped the control-character strip the canonical one does first.
+  - id: no-local-url-scheme-guard
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >
+      XSS (invariant 11): hand-rolled URL-scheme guard. Import `httpUrlOrNull` / `safeHref` /
+      `safeImageSrc` from `@/utils/safeUrl` (or `_shared/safeUrl.generated.ts` on Deno).
+      Local copies drift.
+    paths:
+      exclude:
+        - "src/utils/safeUrl.ts"
+        - "supabase/functions/_shared/safeUrl.generated.ts"
+    pattern-either:
+      - pattern: function safeHttpUrl(...) { ... }
+      - pattern: const safeHttpUrl = (...) => { ... }
+      - pattern: function httpUrlOrNull(...) { ... }
+      - pattern: const httpUrlOrNull = (...) => { ... }
+
   # ── H · Which client makes the model call ──────────────────────────────────
   # `_shared/ai-client.ts` is the ONE place an edge function reaches a model provider, because
   # it is where two things happen that a direct SDK import silently skips: the providers are

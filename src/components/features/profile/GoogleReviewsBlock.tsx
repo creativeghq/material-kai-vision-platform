@@ -15,18 +15,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/core/ui/avatar
 import { PlatformIcon } from '@/components/core/icons/PlatformIcon';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { formatDate } from '@/utils/datetime';
-import { safeHref, safeImageSrc } from '@/utils/safeUrl';
+import { httpUrlOrNull, safeImageSrc } from '@/utils/safeUrl';
 import { destinationRoute } from '@/config/appDestinations';
 import { StarRow } from './StarRow';
 import { showsGoogleReviews, type GoogleReviewsPayload, type PublishedGoogleReview } from './googleReviews';
-
-/**
- * These URLs reach us through `social_accounts.metadata`, and that column is writable by any
- * signed-in user on their own row — so on a page an anonymous visitor loads they are untrusted
- * input, not Google's word. Anything that is not http(s) is dropped rather than linked: an empty
- * fallback lets the caller render no link at all, which is the honest outcome for a bad URL.
- */
-const httpLink = (url: string | null): string | null => (url ? safeHref(url, '') || null : null);
 
 const SOCIAL_ACCOUNTS_ROUTE = destinationRoute('social-accounts') ?? '/profile?tab=social-accounts';
 
@@ -80,8 +72,10 @@ export const GoogleReviewsBlock: React.FC<{
   /** The profile's owner sees the states a visitor must not — a broken connection, and silence. */
   isOwn?: boolean;
 }> = ({ data, isOwn = false }) => {
-  const mapsUrl = httpLink(data.maps_url);
-  const reviewUrl = httpLink(data.review_url);
+  // These arrive via `social_accounts.metadata`, which any signed-in user can write on their own
+  // row — so on a page an anonymous visitor loads they are untrusted input, not Google's word.
+  const mapsUrl = httpUrlOrNull(data.maps_url);
+  const reviewUrl = httpUrlOrNull(data.review_url);
 
   // A connection that is opted in and broken is the owner's problem to fix and nobody else's
   // business. `unknown` lands here too: an unrecognised verdict withholds rather than guessing.

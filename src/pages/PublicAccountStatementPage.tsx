@@ -7,6 +7,7 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { financeService, formatMoney } from '@/modules/finance/services/financeService';
 import { formatDate } from '@/utils/datetime';
+import { httpUrlOrNull } from '@/utils/safeUrl';
 
 // Public, no-auth account-statement page reached via a shared /statement/:token link.
 // The recipient unlocks it with their VAT + email (verified server-side against the CRM
@@ -111,8 +112,8 @@ const PublicAccountStatementPage: React.FC = () => {
                   <h1 className="text-xl font-semibold">{data.title ?? 'Account statement'}</h1>
                   <p className="text-xs text-muted-foreground">{data.from} → {data.to} · {data.currency}</p>
                 </div>
-                {data.pdf_url && (
-                  <a href={data.pdf_url} target="_blank" rel="noopener noreferrer">
+                {httpUrlOrNull(data.pdf_url) && (
+                  <a href={httpUrlOrNull(data.pdf_url)!} target="_blank" rel="noopener noreferrer">
                     <Button variant="outline" size="sm"><Download className="h-4 w-4 mr-2" /> Download PDF</Button>
                   </a>
                 )}
@@ -149,8 +150,8 @@ const PublicAccountStatementPage: React.FC = () => {
                   <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{data.closing_label ?? 'Closing balance'}</div>
                   <div className={`text-2xl font-semibold ${data.owes ? 'text-destructive' : ''}`}>{m(Math.abs(Number(data.closing ?? 0)))}</div>
                 </div>
-                {data.payment_link_url && Number(data.outstanding ?? 0) > 0 && (
-                  <a href={data.payment_link_url}>
+                {httpUrlOrNull(data.payment_link_url) && Number(data.outstanding ?? 0) > 0 && (
+                  <a href={httpUrlOrNull(data.payment_link_url)!}>
                     <Button size="lg"><CreditCard className="h-4 w-4 mr-2" /> Pay balance {formatMoney(Number(data.outstanding), data.currency)}</Button>
                   </a>
                 )}
@@ -188,8 +189,8 @@ const PublicAccountStatementPage: React.FC = () => {
                           <td className="px-4 py-2 font-mono">{i.internal_number ?? '—'}</td>
                           <td className="px-4 py-2 text-right tabular-nums">{formatMoney(i.amount_due, i.currency)}</td>
                           <td className="px-4 py-2 text-right">
-                            {i.pay_url
-                              ? <a href={i.pay_url}><Button size="sm" variant="outline"><CreditCard className="h-3.5 w-3.5 mr-1" /> Pay</Button></a>
+                            {httpUrlOrNull(i.pay_url)
+                              ? <a href={httpUrlOrNull(i.pay_url)!}><Button size="sm" variant="outline"><CreditCard className="h-3.5 w-3.5 mr-1" /> Pay</Button></a>
                               : <span className="text-xs text-muted-foreground">—</span>}
                           </td>
                         </tr>

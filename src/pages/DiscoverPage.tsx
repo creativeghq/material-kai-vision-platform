@@ -44,6 +44,7 @@ import {
   getProductName,
 } from '@/utils/productMetadata';
 import { onEnterOrSpace } from '@/utils/a11y';
+import { httpUrlOrNull } from '@/utils/safeUrl';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -628,8 +629,8 @@ export const DiscoverPage: React.FC = () => {
                           {!!creator.follower_count && (
                             <span>{creator.follower_count} follower{creator.follower_count !== 1 ? 's' : ''}</span>
                           )}
-                          {creator.website_url && (
-                            <a href={creator.website_url} target="_blank" rel="noopener noreferrer"
+                          {httpUrlOrNull(creator.website_url) && (
+                            <a href={httpUrlOrNull(creator.website_url)!} target="_blank" rel="noopener noreferrer"
                               className="hover:text-primary" role="presentation" onClick={(e) => e.stopPropagation()}>
                               <Globe className="h-3.5 w-3.5" />
                             </a>

@@ -63,6 +63,7 @@ const LIGHTING_PRESETS: { label: string; filter: string }[] = [
 ];
 
 import { formatMoney as money } from '@/utils/decimal';
+import { httpUrlOrNull } from '@/utils/safeUrl';
 
 export default function PublicClientViewPage() {
   const { token } = useParams<{ token: string }>();
@@ -170,14 +171,14 @@ export default function PublicClientViewPage() {
 
       <main className="max-w-5xl mx-auto px-4 sm:px-8 py-8 space-y-10">
         {/* Deck PDF */}
-        {view.pdf_url ? (
+        {httpUrlOrNull(view.pdf_url) ? (
           <section>
             <div className="aspect-[1190/842] w-full border border-border rounded-lg overflow-hidden bg-muted">
-              <iframe title="Presentation deck" src={view.pdf_url} className="w-full h-full" />
+              <iframe title="Presentation deck" src={httpUrlOrNull(view.pdf_url)!} className="w-full h-full" />
             </div>
             <div className="mt-3">
               <Button asChild variant="outline" size="sm">
-                <a href={view.pdf_url} target="_blank" rel="noreferrer">
+                <a href={httpUrlOrNull(view.pdf_url)!} target="_blank" rel="noreferrer">
                   <FileText className="h-4 w-4 mr-1" /> Download PDF
                 </a>
               </Button>

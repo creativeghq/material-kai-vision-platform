@@ -49,7 +49,10 @@ describe('the two review sets never merge', () => {
     // policy has `WITH CHECK (user_id = auth.uid())` — so any signed-in user can write those on
     // their own row, and this block renders them to every anonymous visitor of their profile.
     // A raw one is a stored `javascript:` href on a public page.
-    expect(src).toContain('safeHref');
+    expect(src, 'the guard must come from @/utils/safeUrl, never a local copy').toMatch(
+      /from '@\/utils\/safeUrl'/,
+    );
+    expect(src).toMatch(/httpUrlOrNull|safeHref/);
     expect(src).not.toMatch(/href=\{\s*data\.(maps_url|review_url)\s*\}/);
     expect(src).not.toMatch(/src=\{\s*review\.reviewer_avatar_url\s*\}/);
   });

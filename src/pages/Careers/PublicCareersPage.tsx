@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Briefcase, MapPin, Loader2, Globe } from 'lucide-react';
 import { Badge } from '@/components/core/ui/badge';
+import { httpUrlOrNull } from '@/utils/safeUrl';
 import { publicCareersService, type CareersMeta } from '@/services/publicCareersService';
 import { CompanyHeader, EMPLOYMENT_LABELS, locationTypeLabel, summarySalary } from './careersShared';
 
@@ -52,8 +53,8 @@ export default function PublicCareersPage() {
           <h2 className="text-3xl font-display font-semibold tracking-tight">Open positions</h2>
           <p className="text-muted-foreground mt-1">
             {meta.jobs.length === 0 ? 'No open positions right now.' : `${meta.jobs.length} role${meta.jobs.length === 1 ? '' : 's'} we’re hiring for.`}
-            {company.website && (
-              <> <a href={company.website} target="_blank" rel="noreferrer" className="text-primary hover:underline inline-flex items-center gap-1 ml-1">
+            {httpUrlOrNull(company.website) && (
+              <> <a href={httpUrlOrNull(company.website)!} target="_blank" rel="noreferrer" className="text-primary hover:underline inline-flex items-center gap-1 ml-1">
                 <Globe className="h-3.5 w-3.5" />Company site
               </a></>
             )}

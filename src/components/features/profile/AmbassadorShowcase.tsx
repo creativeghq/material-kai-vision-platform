@@ -12,6 +12,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { BadgeCheck, ExternalLink, Layers, Star } from 'lucide-react';
 import { Badge } from '@/components/core/ui/badge';
+import { httpUrlOrNull } from '@/utils/safeUrl';
 import {
   groupByCategory, relationshipDef, sortForDisplay,
   type Ambassadorship,
@@ -50,9 +51,9 @@ function BrandLine({ a, publicMoodboardIds }: { a: Ambassadorship; publicMoodboa
               <Layers className="h-3 w-3" />See the work
             </Link>
           )}
-          {a.brand_url && (
+          {httpUrlOrNull(a.brand_url) && (
             <a
-              href={a.brand_url} target="_blank" rel="noopener noreferrer nofollow"
+              href={httpUrlOrNull(a.brand_url)!} target="_blank" rel="noopener noreferrer nofollow"
               className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
             >
               <ExternalLink className="h-3 w-3" />Brand site

@@ -71,6 +71,39 @@ describe('semgrep security ruleset', () => {
     expect(pats).toContain('dangerouslySetInnerHTML');
   });
 
+  it('the public-page URL rule matches the sinks that execute, and only those', () => {
+    // A `javascript:` URL executes from an href and from an <iframe src>. It does NOT execute
+    // from an <img src> -- matching those added 15 findings that were not the bug, and a rule
+    // carrying a false-positive backlog gets switched off rather than obeyed.
+    const doc = parse(raw) as {
+      rules: Array<{ id: string; paths?: { include?: string[]; exclude?: string[] }; 'pattern-either'?: Array<{ pattern: string }> }>;
+    };
+    const rule = doc.rules.find((r) => r.id === 'no-unguarded-url-on-public-page');
+    expect(rule, 'the public-page URL rule is gone').toBeTruthy();
+    const pats = (rule!['pattern-either'] ?? []).map((p) => p.pattern);
+    const joined = pats.join(' ');
+    expect(joined, 'pattern must anchor to a JSX element or it matches nothing').toContain('<$EL');
+    expect(joined, 'href is the sink this rule exists for').toContain('href={$OBJ.$FIELD}');
+    expect(joined, 'an iframe src executes in the page origin too').toContain('<iframe');
+    // The img case: no pattern may take `src` on an unconstrained element.
+    expect(
+      pats.filter((x) => x.includes('src={$OBJ.$FIELD}') && !x.includes('<iframe')),
+      'src must be constrained to <iframe> -- an <img src> is not a script sink',
+    ).toEqual([]);
+    // Scoped to what a stranger can open; the authenticated screens are a known backlog.
+    expect(rule!.paths?.include?.length, 'the rule must stay scoped, or it lands on a backlog').toBeGreaterThan(0);
+  });
+
+  it('the URL guard has one home, and the rule does not fire on it', () => {
+    const doc = parse(raw) as { rules: Array<{ id: string; paths?: { exclude?: string[] } }> };
+    const rule = doc.rules.find((r) => r.id === 'no-local-url-scheme-guard');
+    expect(rule, 'the local-copy rule is gone').toBeTruthy();
+    // Same shape as no-local-escape-html: the canonical module is the one place allowed to
+    // define it. PublicListingPage had grown its own copy that skipped the control-character
+    // strip the canonical one does first.
+    expect(rule!.paths?.exclude ?? []).toContain('src/utils/safeUrl.ts');
+  });
+
   /**
    * Patterns that semgrep REJECTS. A rule whose pattern fails to parse is not skipped quietly at
    * the rule level — semgrep reports a "Rule parse error" and the rule matches nothing, which on

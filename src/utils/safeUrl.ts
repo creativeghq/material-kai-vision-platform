@@ -28,3 +28,17 @@ export function safeImageSrc(url: unknown): string | null {
   if (!raw) return null;
   return /^https?:/i.test(raw) ? raw : null;
 }
+
+/**
+ * For a LINK on a page rather than in an email: http(s) only, and `null` when it is anything
+ * else, so the caller can render no link at all. On a page `#` is not inert — it is a live
+ * anchor that looks like a working link and goes nowhere, which is worse than an absent one.
+ *
+ * `mailto:` is excluded deliberately: the callers are "the website this person typed in", and a
+ * mailto there is a mistake rather than a destination. Use `safeHref` where mail is legitimate.
+ */
+export function httpUrlOrNull(url: unknown): string | null {
+  const raw = String(url ?? '').replace(STRIP_INVISIBLE, '');
+  if (!raw) return null;
+  return /^https?:\/\//i.test(raw) ? raw : null;
+}
