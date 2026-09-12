@@ -136,6 +136,36 @@ function projectCatalogForViewer(catalog: Record<string, any>, pdfUrl: string | 
 
 
 /**
+ * A live download link for the catalog's PDF, rebuilding the file first if the storage-retention
+ * sweep purged it.
+ *
+ * Shared by the email-gated path and the open one. Left inline in `verify`, an open catalog whose
+ * PDF had been reaped would hand its reader a dead link while the gated catalog beside it healed
+ * itself on the first view. Best-effort throughout: the page renders from `body_data` regardless.
+ */
+async function resolveCatalogPdfUrl(supabase: any, catalog: any): Promise<string | null> {
+  let path: string | null = catalog.pdf_storage_path;
+  if (!path) {
+    try {
+      // The renderer accepts the service-role key (cross-tenant 'secret' level); credit-free.
+      await fetch(`${supabaseUrl}/functions/v1/generate-catalog-pdf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supabaseServiceKey}` },
+        body: JSON.stringify({ catalog_id: catalog.id, regenerate: true }),
+      });
+      const { data: fresh } = await supabase
+        .from('presentation_catalogs').select('pdf_storage_path').eq('id', catalog.id).maybeSingle();
+      path = fresh?.pdf_storage_path ?? null;
+    } catch (_) {
+      /* best-effort */
+    }
+  }
+  if (!path) return catalog.pdf_url ?? null;
+  const signed = await supabase.storage.from('pdf-documents').createSignedUrl(path, 604800);
+  return signed?.data?.signedUrl ?? catalog.pdf_url ?? null;
+}
+
+/**
  * A view of an OPEN catalog — the same three writes the gated path makes, minus the identity it
  * does not have. `email`/`matched_user_id` are null and `matched_kind` is 'open': a visitor we
  * genuinely cannot name, recorded as such rather than left out of the funnel. An open catalog
@@ -502,28 +532,7 @@ Deno.serve(withApiLogging('catalog-access', async (req) => {
         return jsonResponse({ granted_access: false, reason: 'access_revoked' });
       }
 
-      // Rebuild the catalog PDF if the storage-retention sweep purged it. The page
-      // renders from body_data regardless, but the download link needs a live file.
-      // The renderer accepts the service-role key (cross-tenant 'secret' level);
-      // credit-free. Best-effort — self-heals on the first view after a purge.
-      let catalogPdfPath: string | null = catalog.pdf_storage_path;
-      if (!catalogPdfPath) {
-        try {
-          await fetch(`${supabaseUrl}/functions/v1/generate-catalog-pdf`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supabaseServiceKey}` },
-            body: JSON.stringify({ catalog_id: catalog.id, regenerate: true }),
-          });
-          const { data: fresh } = await supabase
-            .from('presentation_catalogs').select('pdf_storage_path').eq('id', catalog.id).maybeSingle();
-          catalogPdfPath = fresh?.pdf_storage_path ?? null;
-        } catch (_) {
-          /* best-effort */
-        }
-      }
-      const catalogPdfUrl = catalogPdfPath
-        ? (await supabase.storage.from('pdf-documents').createSignedUrl(catalogPdfPath, 604800))?.data?.signedUrl ?? catalog.pdf_url
-        : catalog.pdf_url;
+      const catalogPdfUrl = await resolveCatalogPdfUrl(supabase, catalog);
 
       const [branding, art] = await Promise.all([
         resolveOwnerBranding(supabase, catalog.workspace_id ?? null),
