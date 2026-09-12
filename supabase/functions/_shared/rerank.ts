@@ -6,6 +6,7 @@ import {
 } from './ai-client.ts';
 import { z, type ZodType } from 'npm:zod@3';
 import { loadPrompt } from './prompt-utils.ts';
+import { resolveSecret } from './secrets.ts';
 import type { DbClient } from './supabase-client.ts';
 
 /**
@@ -141,12 +142,20 @@ export async function rerankResults<T>(
   if (!trimmed) {
     return degraded('no query text to rank against');
   }
-  // Voyage gives no per-result rationale, so a caller that asked for explanations is
-  // answered by Claude whatever the flag says. Dropping the field silently would be a
-  // feature that disappears when an env var changes.
-  const useVoyage = rerankProvider() === 'voyage' && !opts.includeExplanations && !opts.model;
+  // Voyage returns no per-result rationale, so a caller asking for explanations gets
+  // Claude whatever the flag says — a feature must not vanish when an env var changes.
+  // A PINNED Claude model also keeps Claude, but the default is not a pin: `ai-rerank`
+  // passes `body.model || RERANK_MODEL` on every call, so treating any value as a pin
+  // made the flag unreachable from the platform's own rerank endpoint.
+  const pinnedToClaude = Boolean(opts.model) && opts.model !== RERANK_MODEL;
+  const useVoyage = rerankProvider() === 'voyage' && !opts.includeExplanations && !pinnedToClaude;
   if (useVoyage) {
-    if (!Deno.env.get('VOYAGE_API_KEY')) return degraded('VOYAGE_API_KEY not configured');
+    // Through resolveSecret, not Deno.env: VOYAGE_API_KEY has a `platform_secrets` row,
+    // and an env-only precheck degrades every rerank with "not configured" for a key the
+    // call itself would have resolved fine.
+    if (!opts.supabase) return degraded('no supabase client to resolve VOYAGE_API_KEY');
+    const voyageKey = (await resolveSecret(opts.supabase, 'VOYAGE_API_KEY')).value;
+    if (!voyageKey) return degraded('VOYAGE_API_KEY not configured');
   } else if (!Deno.env.get('ANTHROPIC_API_KEY')) {
     return degraded('ANTHROPIC_API_KEY not configured');
   }

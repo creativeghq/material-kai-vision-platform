@@ -21,11 +21,22 @@ const VOYAGE_KEY = process.env.VOYAGE_API_KEY;
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 
 const argv = process.argv.slice(2);
+/** A flag with no value is a typo, and this run costs real money — refuse it up front. */
 const argOf = (flag, fallback) => {
   const i = argv.indexOf(flag);
-  return i === -1 ? fallback : argv[i + 1];
+  if (i === -1) return fallback;
+  const value = argv[i + 1];
+  if (value === undefined || value.startsWith('--')) {
+    console.error(`${flag} needs a value.`);
+    process.exit(1);
+  }
+  return value;
 };
 const LIMIT = Number(argOf('--limit', '50'));
+if (!Number.isFinite(LIMIT) || LIMIT < 1) {
+  console.error('--limit must be a positive number.');
+  process.exit(1);
+}
 const JSON_OUT = argOf('--json', null);
 
 const VOYAGE_RERANK_MODEL = process.env.VOYAGE_RERANK_MODEL || 'rerank-3-lite';
@@ -97,12 +108,20 @@ async function retrieve(question, workspaceId) {
 
 // ── the two rankers ─────────────────────────────────────────────────────────
 
-// `kb_hybrid_doc_chunks` returns `document_title` / `heading` / `content`, and keys the
-// chunk's document as `kb_doc_id`. Verified by running this against the live RPC: the
-// obvious guesses (`title`, `document_id`) are all absent, and reading an absent field
-// scores every case as "relevant chunk never retrieved" with nothing raising.
-const docText = (row) => [row.document_title, row.heading, row.content]
-  .filter(Boolean).join('\n').replace(/\s+/g, ' ').trim().slice(0, 1200);
+// `kb_hybrid_doc_chunks` returns `document_title` / `heading` / `content` and keys the
+// chunk's document as `kb_doc_id` — verified against the live RPC, because the obvious
+// guesses (`title`, `document_id`) are all absent and reading an absent field scores
+// every case as "never retrieved" with nothing raising. The projection and the 400-char
+// clip mirror `_shared/rerank.ts`: a gate that shows the rankers more text than
+// production does is not measuring the thing it gates.
+const MAX_FIELD_CHARS = 400;
+const clip = (s) => (s ?? '').replace(/\s+/g, ' ').trim().slice(0, MAX_FIELD_CHARS);
+
+const docText = (row) => [
+  clip(row.document_title),
+  row.heading ? `category: ${clip(row.heading)}` : null,
+  row.content ? clip(row.content) : null,
+].filter(Boolean).join('\n').trim();
 
 /**
  * Candidates that carry text.
@@ -128,10 +147,38 @@ async function rankVoyage(question, rows) {
   const json = await res.json();
   // `data`, not `results`: the wrong key yields an empty ranking with no error, which
   // reads downstream as "the source order was already right".
-  return (json?.data ?? [])
-    .filter((h) => Number.isInteger(h?.index))
-    .map((h) => rows[h.index])
-    .filter(Boolean);
+  const seen = new Set();
+  const out = [];
+  for (const h of (json?.data ?? [])) {
+    if (!Number.isInteger(h?.index) || h.index < 0 || h.index >= rows.length) continue;
+    if (seen.has(h.index)) continue;
+    seen.add(h.index);
+    out.push(rows[h.index]);
+  }
+  // Unreturned rows keep their position at the end — the SAME contract the Claude arm and
+  // production both apply. Dropping them here instead would score a partial response as a
+  // miss for one arm only, which measures the harness, not the ranker.
+  rows.forEach((r, i) => { if (!seen.has(i)) out.push(r); });
+  return out;
+}
+
+/**
+ * The system prompt production actually uses. Hardcoding a paraphrase here would make the
+ * gate measure a prompt nobody ships — and this row is admin-editable, so the two would
+ * drift the first time someone tuned it.
+ */
+let _rerankPrompt = null;
+async function productionRerankPrompt() {
+  if (_rerankPrompt) return _rerankPrompt;
+  const rows = await sb(
+    'prompts?prompt_type=eq.tool&category=eq.ai_rerank&is_active=eq.true'
+    + '&select=prompt_text,system_prompt&limit=1',
+  );
+  const row = rows?.[0];
+  const text = row?.system_prompt || row?.prompt_text;
+  if (!text) die('no active tool/ai_rerank prompt row — the gate would measure a prompt production does not use.');
+  _rerankPrompt = text;
+  return text;
 }
 
 async function rankClaude(question, rows) {
@@ -147,9 +194,7 @@ async function rankClaude(question, rows) {
       model: CLAUDE_RERANK_MODEL,
       max_tokens: 2048,
       temperature: 0,
-      system:
-        'You rank retrieved passages by how well they answer the user query. Return every '
-        + 'candidate id exactly once, best first.',
+      system: await productionRerankPrompt(),
       // The block is DATA. Same fencing the production path uses (invariant 9).
       messages: [{
         role: 'user',

@@ -843,12 +843,17 @@ export async function rerankWithVoyage(
     workspaceId: opts.workspaceId,
   });
 
+  // Sorted on the score we parsed, not left in arrival order. Voyage documents the array
+  // as descending and it is — but a reranker that silently rebuilt the SOURCE order would
+  // still report `reranked: true`, which is the whole failure this feature exists to
+  // avoid. Sorting what we actually read makes the order ours.
   return rows
     .map((row) => {
       const r = row as { index?: unknown; relevance_score?: unknown };
       return { index: Number(r?.index), score: Number(r?.relevance_score) };
     })
-    .filter((h) => Number.isInteger(h.index) && Number.isFinite(h.score));
+    .filter((h) => Number.isInteger(h.index) && Number.isFinite(h.score))
+    .sort((a, b) => b.score - a.score);
 }
 
 // ── Claude: the raw Messages API, through the chokepoint ─────────────────────
