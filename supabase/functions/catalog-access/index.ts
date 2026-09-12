@@ -175,7 +175,11 @@ async function recordOpenView(supabase: any, req: Request, catalog: any, trusted
   const ip = trustedIp === 'unknown' ? null : trustedIp;
   const ua = req.headers.get('user-agent') || null;
 
-  await supabase.from('catalog_view_events').insert({
+  // supabase-js RETURNS `{error}`, it does not throw. Unread, a rejected insert here is the
+  // silent-zero shape exactly: `catalog_increment_view_count` below still bumps, so the tile
+  // reports views next to a Visitors table that stayed empty. It did — the `open` value was
+  // missing from the catalog_access_match_kind enum and two views vanished without a sound.
+  const { error: viewErr } = await supabase.from('catalog_view_events').insert({
     catalog_id: catalog.id,
     access_log_id: null,
     event_type: 'page_view',
@@ -187,6 +191,7 @@ async function recordOpenView(supabase: any, req: Request, catalog: any, trusted
     user_agent: ua,
     metadata: {},
   });
+  if (viewErr) console.error('[catalog-access] open view event insert failed:', viewErr.message);
 
   recordPageEvent(supabase, req, 'viewed', {
     entityType: 'catalog',
