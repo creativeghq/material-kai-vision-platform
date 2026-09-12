@@ -17,6 +17,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/core/ui/select';
 import { FilterBar, useFilters } from '@/components/core/filters';
+import { HubSegmented, type HubSegment } from '@/components/core/hub';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -49,6 +50,19 @@ import { httpUrlOrNull } from '@/utils/safeUrl';
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const PER_PAGE = 20;
+
+type ProductMode = 'browse' | 'smart';
+
+const PRODUCT_MODES: readonly HubSegment<ProductMode>[] = [
+  {
+    value: 'browse',
+    label: <><LayoutList className="h-3.5 w-3.5" aria-hidden="true" /> Browse</>,
+  },
+  {
+    value: 'smart',
+    label: <><Sparkles className="h-3.5 w-3.5" aria-hidden="true" /> Smart search</>,
+  },
+];
 
 function toProduct(p: RawProduct): Product {
   const imageUrl = p.imageUrl || null;
@@ -351,7 +365,7 @@ export const DiscoverPage: React.FC = () => {
   // Products tab has two modes: "browse" (the filterable catalog list) and "smart" (the
   // 7-vector fusion search moved here from the old /search page). `?mode=smart&q=…` deep-links
   // (Spotlight action, /search redirect, capability links) open smart mode pre-searched.
-  const [productMode, setProductMode] = useState<'browse' | 'smart'>(
+  const [productMode, setProductMode] = useState<ProductMode>(
     searchParams.get('mode') === 'smart' ? 'smart' : 'browse',
   );
   const smartInitialQuery = searchParams.get('q') || undefined;
@@ -651,24 +665,12 @@ export const DiscoverPage: React.FC = () => {
           <TabsContent value="products" className="mt-6 space-y-4">
             {/* Browse the catalog, or run the 7-vector "smart" search (text / image / color /
                 texture / style / material) — both live here now that /search folded in. */}
-            <div className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/30 p-1">
-              <Button
-                variant={productMode === 'browse' ? 'default' : 'ghost'}
-                size="sm"
-                className="h-7 px-3 text-xs"
-                onClick={() => setProductMode('browse')}
-              >
-                <LayoutList className="h-3.5 w-3.5 mr-1.5" /> Browse
-              </Button>
-              <Button
-                variant={productMode === 'smart' ? 'default' : 'ghost'}
-                size="sm"
-                className="h-7 px-3 text-xs"
-                onClick={() => setProductMode('smart')}
-              >
-                <Sparkles className="h-3.5 w-3.5 mr-1.5" /> Smart search
-              </Button>
-            </div>
+            <HubSegmented
+              aria-label="Product view"
+              value={productMode}
+              onChange={setProductMode}
+              options={PRODUCT_MODES}
+            />
 
             {productMode === 'smart' ? (
               <UnifiedSearchInterface
