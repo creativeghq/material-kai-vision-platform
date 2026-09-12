@@ -12070,6 +12070,35 @@
                       }
                     },
                     "description": "Returns: {success: boolean, data: {article_id: string, markdown_content: string, question: string, answer: string, created_section: boolean, heading: string, analysis: ContentAnalysisResult|null, can_revert: true, credits_used: number}}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "url"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "score_url"
+                        ],
+                        "description": "Score a page that already exists on the web: fetch it, run the same 23-category content analysis and 10-signal GEO score the pipeline runs on its own drafts, and return both. 1 credit per page, refunded whenever no score is produced. Plan-dependent checks (planned sections, target word count, planned FAQ, recommended schema, snippet target, secondary/LSI coverage) are SKIPPED and listed in checks_skipped — a live page has no plan and must not be marked down for missing one. A page that cannot be fetched returns success:false with a stated status, never a score of 0."
+                      },
+                      "url": {
+                        "type": "string",
+                        "description": "The page to score. Validated by the shared SSRF guard before a paid fetch is spent on it."
+                      },
+                      "keyword": {
+                        "type": "string",
+                        "description": "Keyword to score against. Defaults to the page's highest-impression Search Console query; required when Search Console has none, because Google withholds low-volume queries and scoring against an empty keyword yields a confident number about nothing."
+                      },
+                      "user_id": {
+                        "type": "string",
+                        "description": "Honoured only for secret-level callers; a JWT caller is pinned to its own verified id."
+                      }
+                    },
+                    "description": "Returns: {success: boolean, url: string, fetched: {title, description, http_status, word_count}, keyword: string, keyword_source: string, analysis: ContentAnalysisResult, checks_skipped: string[], credits_charged: number}"
                   }
                 ],
                 "discriminator": {

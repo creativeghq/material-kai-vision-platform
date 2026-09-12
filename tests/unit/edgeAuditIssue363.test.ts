@@ -212,8 +212,21 @@ describe('#363 EE-13/14/18/19 — the crawler', () => {
   const src = read(CRAWLER);
 
   it('validates sitemap-derived URLs before spending a Firecrawl call on them', () => {
-    const body = functionBody(src, 'firecrawlScrape');
-    expect(body).toContain('assertSafeUrl(url)');
+    // EE-13. The guard did live in the crawler's own `firecrawlScrape`; the Firecrawl call moved
+    // into `_shared/scrape-markdown.ts` so the page scorer could reuse it (#401 G4), and the guard
+    // moved with it. Assert where the fetch IS, and assert the ORDER — a URL validated after the
+    // request is a URL we already paid to aim wherever the sitemap pointed.
+    const crawler = read(CRAWLER);
+    expect(crawler, 'the crawler must delegate rather than keep a second Firecrawl call')
+      .not.toContain('api.firecrawl.dev');
+    expect(crawler).toContain("_shared/scrape-markdown.ts");
+
+    const shared = read('supabase/functions/_shared/scrape-markdown.ts');
+    const guard = shared.search(/await assertSafeUrl\(url\)/);
+    const spend = shared.search(/fetch\('https:\/\/api\.firecrawl\.dev/);
+    expect(guard, 'no SSRF guard in the shared fetch').toBeGreaterThan(-1);
+    expect(spend, 'no Firecrawl call in the shared fetch').toBeGreaterThan(-1);
+    expect(guard).toBeLessThan(spend);
   });
 
   it('caps the response body while reading it', () => {

@@ -13,6 +13,7 @@ import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
+import { scrapeMarkdown, excerptFromMarkdown } from '../_shared/scrape-markdown.ts';
 import { chargeCronUser } from '../_shared/cron-billing.ts';
 import { userCanAccessWorkspace } from '../_shared/auth.ts';
 import { generateStandardEmbedding } from '../_shared/embedding-utils.ts';
@@ -20,7 +21,6 @@ import { generateStandardEmbedding } from '../_shared/embedding-utils.ts';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 // Lazy reads so platform_secrets bootstrap (run at handler entry) is honored.
-const FIRECRAWL_API_KEY = () => Deno.env.get('FIRECRAWL_API_KEY') || '';
 const CRON_SECRET = () => Deno.env.get('CRON_SECRET') || '';
 const MIVAA_API_KEY = () => Deno.env.get('MIVAA_API_KEY') || '';
 
@@ -243,70 +243,22 @@ interface ScrapeResult {
   retry_after_ms?: number;
 }
 
-/** Retry-After header in seconds, else a reset hint in Firecrawl's message, else the default. */
-function retryAfterMs(res: Response, message: string): number {
-  const header = Number(res.headers.get('retry-after'));
-  if (Number.isFinite(header) && header > 0) return Math.min(header * 1000, 60_000);
-  const inSecs = /reset(?:s)?\s+in:?\s*(\d+)\s*s/i.exec(message)?.[1] ?? /retry (?:after|in)\s*(\d+)\s*s/i.exec(message)?.[1];
-  if (inSecs) return Math.min(Number(inSecs) * 1000 + 500, 60_000);
-  const at = /reset(?:s)?\s+at:?\s*([0-9T:.+-]+Z?)/i.exec(message)?.[1];
-  if (at) {
-    const t = Date.parse(at);
-    if (Number.isFinite(t) && t > Date.now()) return Math.min(t - Date.now() + 500, 60_000);
-  }
-  return RATE_LIMIT_DEFAULT_WAIT_MS;
-}
-
+/**
+ * The fetch itself lives in `_shared/scrape-markdown.ts` — the sitemap indexer and the page
+ * scorer must not hold two copies of "call Firecrawl and read the status correctly". This wrapper
+ * keeps the indexer's own shape: an excerpt, because that is all a sitemap row stores.
+ */
 async function firecrawlScrape(url: string): Promise<ScrapeResult> {
-  const firecrawlKey = FIRECRAWL_API_KEY();
-  if (!firecrawlKey) {
-    return { url, title: null, description: null, content_excerpt: null, http_status: null, error: 'FIRECRAWL_API_KEY not configured' };
-  }
-  // The URL came out of a `<loc>` in a document the crawled site wrote, so the target set is
-  // chosen by the site being crawled, not by us (#363 `EE-13`). Handing it to Firecrawl
-  // unchecked outsources the fetch — a request we paid for, aimed wherever the sitemap
-  // pointed, including hosts the SSRF guard exists to refuse. Validate before we spend.
-  try {
-    await assertSafeUrl(url);
-  } catch (e: any) {
-    return {
-      url, title: null, description: null, content_excerpt: null, http_status: null,
-      error: `blocked by URL guard: ${e?.message || 'unsafe URL'}`,
-    };
-  }
-  try {
-    const res = await fetch('https://api.firecrawl.dev/v2/scrape', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${firecrawlKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url, formats: ['markdown'], onlyMainContent: true, timeout: 20_000 }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data?.success) {
-      const message = String(data?.error || `firecrawl ${res.status}`);
-      // Firecrawl's status is OUR quota or its outage, not the page's: storing it as
-      // http_status filed 72 live pages as "429" on 2026-09-05. Unknown stays null.
-      if (res.status === 429) {
-        return {
-          url, title: null, description: null, content_excerpt: null, http_status: null,
-          error: `rate limited: ${message}`, rate_limited: true, retry_after_ms: retryAfterMs(res, message),
-        };
-      }
-      return { url, title: null, description: null, content_excerpt: null, http_status: null, error: message };
-    }
-    const md = (data.data?.markdown || '') as string;
-    const meta = data.data?.metadata || {};
-    const excerpt = md.replace(/^#.*$/gm, '').replace(/\s+/g, ' ').trim().slice(0, 600);
-    return {
-      url,
-      title: meta.title || meta.ogTitle || null,
-      description: meta.description || meta.ogDescription || null,
-      content_excerpt: excerpt || null,
-      http_status: meta.statusCode || 200,
-      error: null,
-    };
-  } catch (e: any) {
-    return { url, title: null, description: null, content_excerpt: null, http_status: null, error: e?.message || 'fetch failed' };
-  }
+  const page = await scrapeMarkdown(url);
+  return {
+    url: page.url,
+    title: page.title,
+    description: page.description,
+    content_excerpt: excerptFromMarkdown(page.markdown),
+    http_status: page.http_status,
+    error: page.error,
+    ...(page.rate_limited ? { rate_limited: true, retry_after_ms: page.retry_after_ms } : {}),
+  };
 }
 
 /**
