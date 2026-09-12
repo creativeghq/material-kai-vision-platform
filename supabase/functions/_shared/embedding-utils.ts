@@ -53,10 +53,27 @@ export const MIVAA_CONFIG = {
   retryDelay: 1000,
 } as const;
 
+/**
+ * The two Voyage text models, declared ONCE for the whole edge runtime.
+ *
+ * Indexing and searching run different models and that is safe only because the voyage-4
+ * series is ONE latent space — a `voyage-4` query ranks `voyage-4-large` rows correctly,
+ * which is why this upgrade needed no reindex. Never point either at a model outside the
+ * series: both are 1024D, so a wrong-space vector is stored, indexed and ranked without
+ * anything raising. Mirrors MIVAA's `voyage_document_model` / `voyage_query_model`.
+ */
+export const VOYAGE_DOCUMENT_MODEL = 'voyage-4-large';
+export const VOYAGE_QUERY_MODEL = 'voyage-4';
+
+/** The model one call runs on. `'query'` searches; everything else indexes. */
+export function voyageModelFor(inputType?: string): string {
+  return inputType === 'query' ? VOYAGE_QUERY_MODEL : VOYAGE_DOCUMENT_MODEL;
+}
+
 // Unified embedding configuration for consistency across platform
 // Updated to use Voyage AI as primary provider
 export const EMBEDDING_CONFIG = {
-  model: 'voyage-4',
+  model: VOYAGE_DOCUMENT_MODEL,
   dimensions: 1024,
   maxTokens: 8000,
   inputType: 'document', // 'document' for indexing, 'query' for search

@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isAdminAccess, isCronAuthorized } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { VOYAGE_DOCUMENT_MODEL } from '../_shared/embedding-utils.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -57,7 +58,7 @@ async function embedOne(row: BacklogRow): Promise<'success' | 'skipped' | 'faile
       headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET() },
       body: JSON.stringify({
         text: row.source_text.substring(0, 8000),
-        model: 'voyage-4',
+        model: VOYAGE_DOCUMENT_MODEL,
         // 'document' — these are stored vectors. The lookalike search never embeds a
         // query: it reads the seed company's own stored vector, so both sides of the
         // comparison are document-side and Voyage's asymmetric contract is respected.
@@ -81,7 +82,7 @@ async function embedOne(row: BacklogRow): Promise<'success' | 'skipped' | 'faile
       text_embedding_1024: result.embedding,
       embedding_status: 'success',
       embedding_source_hash: row.source_hash,
-      embedding_model: 'voyage-4',
+      embedding_model: VOYAGE_DOCUMENT_MODEL,
       embedding_error_message: null,
       embedding_updated_at: new Date().toISOString(),
     }).eq('id', row.id);

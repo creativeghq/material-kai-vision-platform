@@ -6,6 +6,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { resolveSecrets } from '../_shared/secrets.ts';
+import { VOYAGE_QUERY_MODEL } from '../_shared/embedding-utils.ts';
 
 const ANTHROPIC_API_KEY = () => Deno.env.get('ANTHROPIC_API_KEY') || '';
 const SLIG_MODAL_URL = () => Deno.env.get('SLIG_MODAL_URL') || 'https://basilakis--slig-sligservice-web.modal.run';
@@ -143,7 +144,7 @@ async function checkVoyageAI(): Promise<ServiceResult> {
     const res = await fetch('https://api.voyageai.com/v1/embeddings', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${VOYAGE_API_KEY()}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'voyage-4', input: 'ping' }),
+      body: JSON.stringify({ model: VOYAGE_QUERY_MODEL, input: 'ping' }),
       signal: AbortSignal.timeout(10000),
     });
     const latency_ms = Date.now() - start;

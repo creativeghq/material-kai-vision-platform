@@ -800,6 +800,9 @@ async function executeAction(
     }
 
     case 'web_search':
+    // `perplexity_search` is a legacy alias kept because stored flows reference it by that
+    // id; both run Anthropic Haiku + the web_search server tool, and neither calls
+    // Perplexity. Renaming the id would silently break every flow already using it (#400 W7).
     case 'perplexity_search': {
       const country = String(resolved.country || '');
       const regionId = String(resolved.region || '');
@@ -856,6 +859,8 @@ async function executeAction(
             model: 'claude-haiku-4-5',
             max_tokens: 4096,
             system: systemPrompt,
+            // Basic web_search variant on purpose: web_search_20260209 needs Opus 4.6+ or
+            // Sonnet 4.6+ and this path is Haiku, so a version bump here is a 400 (#400 W7).
             tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }],
             messages: [{ role: 'user', content: query }],
           }, {

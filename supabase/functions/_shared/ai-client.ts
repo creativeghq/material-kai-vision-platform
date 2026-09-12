@@ -1539,6 +1539,115 @@ export async function generateVideoWithWan(
   }
 }
 
+// ── Gemini Omni 1.1 Flash (Google) ─────────────────────────────────────────
+// GA id. Google bills video output by TOKEN — $17.50/1M at 5,792 tokens per second of
+// 720p — so the per-second rows in `ai_model_pricing` are that rate expressed per second
+// at each resolution's token scale (360p ⅓, 1080p 1.5x, 4K 3x of 720p).
+const GEMINI_OMNI_MODEL_ID = 'gemini-omni-1.1-flash';
+
+export type GeminiOmniResolution = '360p' | '720p' | '1080p' | '4k';
+
+const GEMINI_OMNI_PRICING_MODEL_ID: Record<GeminiOmniResolution, string> = {
+  '360p': 'gemini-omni-1.1-flash-360p',
+  '720p': 'gemini-omni-1.1-flash-720p',
+  '1080p': 'gemini-omni-1.1-flash-1080p',
+  '4k': 'gemini-omni-1.1-flash-4k',
+};
+
+export interface GeminiOmniVideoResult {
+  bytes: Uint8Array;
+  mimeType: string;
+  model: string;
+  durationSeconds: number;
+  resolution: GeminiOmniResolution;
+}
+
+export async function generateVideoWithGeminiOmni(
+  prompt: string,
+  config?: UnitBillingConfig & {
+    /** First frame, for image-to-video. Omit for text-to-video. */
+    imageUrl?: string;
+    durationSeconds?: number;
+    resolution?: GeminiOmniResolution;
+    aspectRatio?: '16:9' | '9:16' | '1:1';
+    pollTimeoutMs?: number;
+    /** See generateVideoWithSeedance — false when the caller writes its own richer row. */
+    logUsage?: boolean;
+  },
+): Promise<GeminiOmniVideoResult> {
+  const _start = Date.now();
+  const resolution = config?.resolution ?? '720p';
+  const seconds = Math.max(2, Math.min(30, Math.round(config?.durationSeconds ?? 5)));
+  const modelKey = GEMINI_OMNI_PRICING_MODEL_ID[resolution];
+
+  // Lazy and via resolveSecret for the usual reason: `Deno.env.set` is a no-op on edge,
+  // so a module-load capture never sees an admin-configured key.
+  const apiKey = _logSupabase
+    ? (await resolveSecret(_logSupabase, 'GOOGLE_GENERATIVE_AI_API_KEY')).value
+    : Deno.env.get('GOOGLE_GENERATIVE_AI_API_KEY');
+  if (!apiKey) {
+    throw new Error(
+      'GOOGLE_GENERATIVE_AI_API_KEY is not configured — cannot generate with Gemini Omni',
+    );
+  }
+
+  // Same floor as every other video path: the prompt is free text a user typed.
+  const verdict = assertTransferAllowed([prompt], {
+    destinationIsEea: false,
+    providerLabel: 'Gemini Omni 1.1 Flash (Google)',
+  });
+  if (!verdict.allowed) {
+    throw new Error(verdict.message ?? 'Blocked: personal data may not leave the EEA.');
+  }
+
+  try {
+    const { video } = await generateVideo({
+      model: google.video(GEMINI_OMNI_MODEL_ID),
+      prompt,
+      duration: seconds,
+      providerOptions: {
+        google: {
+          resolution,
+          aspectRatio: config?.aspectRatio ?? '16:9',
+          ...(config?.imageUrl ? { image: { url: config.imageUrl } } : {}),
+        },
+      },
+      pollTimeoutMs: config?.pollTimeoutMs ?? 600_000,
+    } as any);
+
+    const bytes: Uint8Array = (video as any).uint8Array;
+    if (!bytes?.length) throw new Error('Gemini Omni returned an empty video');
+
+    if (config?.logUsage !== false) void _logUnitCall({
+      task: config?.task ?? 'gemini_omni_video_generation',
+      modelKey,
+      units: seconds,
+      latencyMs: Date.now() - _start,
+      userId: config?.userId,
+      workspaceId: config?.workspaceId,
+    });
+
+    return {
+      bytes,
+      mimeType: (video as any).mediaType ?? 'video/mp4',
+      model: GEMINI_OMNI_MODEL_ID,
+      durationSeconds: seconds,
+      resolution,
+    };
+  } catch (err) {
+    void _logUnitCall({
+      task: config?.task ?? 'gemini_omni_video_generation',
+      modelKey,
+      units: 0,
+      latencyMs: Date.now() - _start,
+      errorMessage: err instanceof Error ? err.message : String(err),
+      userId: config?.userId,
+      workspaceId: config?.workspaceId,
+    });
+    throw err;
+  }
+}
+
 // ── Seedance 2.5 (ByteDance, via BytePlus ModelArk) ────────────────────────
 const SEEDANCE_BASE_URL = 'https://ark.ap-southeast.bytepluses.com/api/v3';
 const SEEDANCE_MODEL_ID = 'dreamina-seedance-2-5-260628';

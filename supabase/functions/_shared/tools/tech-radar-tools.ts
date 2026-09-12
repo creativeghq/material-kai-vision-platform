@@ -156,11 +156,14 @@ export async function researchSolution(
 
   const r1 = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: anthropicHeaders('web-search-2025-03-05'),
+    // web_search_20260209 is GA and takes no beta header. It needs Opus 4.6+ or
+    // Sonnet 4.6+, which RESEARCH_MODEL is — the two Haiku 4.5 call sites cannot
+    // follow and stay on the basic variant deliberately (#400 W7).
+    headers: anthropicHeaders(),
     body: JSON.stringify({
       model: RESEARCH_MODEL,
       max_tokens: 4096,
-      tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: maxWebUses }],
+      tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: maxWebUses }],
       messages: [{ role: 'user', content: researchPrompt }],
     }),
   });

@@ -627,6 +627,29 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "sort_order": 194
   },
   {
+    "id": "gemini-omni-1.1-flash-360p",
+    "display_name": "Gemini Omni 1.1 Flash 360p",
+    "capability": "video",
+    "sub_capability": "image-to-video",
+    "provider": "google",
+    "slug": "gemini-omni-1.1-flash",
+    "version": null,
+    "adapter": "gemini_omni",
+    "input_requirements": {
+      "max_images": 1,
+      "min_images": 1,
+      "image_roles": [
+        "source"
+      ],
+      "needs_prompt": true
+    },
+    "pricing_key": "gemini-omni-1.1-flash-360p",
+    "tier": "budget",
+    "status": "active",
+    "enabled": true,
+    "sort_order": 196
+  },
+  {
     "id": "seedance-2.5-480p",
     "display_name": "Seedance 2.5 480P",
     "capability": "video",
@@ -652,6 +675,29 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "sort_order": 196
   },
   {
+    "id": "gemini-omni-1.1-flash-720p",
+    "display_name": "Gemini Omni 1.1 Flash 720p",
+    "capability": "video",
+    "sub_capability": "image-to-video",
+    "provider": "google",
+    "slug": "gemini-omni-1.1-flash",
+    "version": null,
+    "adapter": "gemini_omni",
+    "input_requirements": {
+      "max_images": 1,
+      "min_images": 1,
+      "image_roles": [
+        "source"
+      ],
+      "needs_prompt": true
+    },
+    "pricing_key": "gemini-omni-1.1-flash-720p",
+    "tier": "standard",
+    "status": "active",
+    "enabled": true,
+    "sort_order": 197
+  },
+  {
     "id": "h3-max-480p",
     "display_name": "H3 Max 480p",
     "capability": "video",
@@ -674,6 +720,29 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "status": "active",
     "enabled": true,
     "sort_order": 197
+  },
+  {
+    "id": "gemini-omni-1.1-flash-1080p",
+    "display_name": "Gemini Omni 1.1 Flash 1080p",
+    "capability": "video",
+    "sub_capability": "image-to-video",
+    "provider": "google",
+    "slug": "gemini-omni-1.1-flash",
+    "version": null,
+    "adapter": "gemini_omni",
+    "input_requirements": {
+      "max_images": 1,
+      "min_images": 1,
+      "image_roles": [
+        "source"
+      ],
+      "needs_prompt": true
+    },
+    "pricing_key": "gemini-omni-1.1-flash-1080p",
+    "tier": "premium",
+    "status": "active",
+    "enabled": true,
+    "sort_order": 198
   },
   {
     "id": "seedance-2.5-720p",
@@ -879,7 +948,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
  * from the array above; a hand-edit changes the rows and not this constant, and the build fails.
  * Between the two, both directions of drift are covered without a secret in CI.
  */
-export const PROJECTION_FINGERPRINT = '1ce8b24257f14e23ba8d99e08bcbe80b';
+export const PROJECTION_FINGERPRINT = '080151b230937ae1c017eebf292e5796';
 
 /** Model ids the registry knows about, for O(1) membership checks. */
 export const GENERATION_MODEL_IDS: ReadonlySet<string> = new Set(

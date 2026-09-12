@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { VOYAGE_DOCUMENT_MODEL } from '../_shared/embedding-utils.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -116,7 +117,7 @@ Deno.serve(withApiLogging('kb-generate-embedding', async (req: Request) => {
       headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET() },
       body: JSON.stringify({
         text: textToEmbed.substring(0, 8000),
-        model: 'voyage-4',
+        model: VOYAGE_DOCUMENT_MODEL,
         input_type: 'document',
         dimensions: 1024,
         // Attribution only (MIVAA authenticates this route by x-cron-secret, not by
@@ -145,7 +146,7 @@ Deno.serve(withApiLogging('kb-generate-embedding', async (req: Request) => {
       .update({
         text_embedding: embedding,
         embedding_status: 'success',
-        embedding_model: 'voyage-4',
+        embedding_model: VOYAGE_DOCUMENT_MODEL,
         embedding_dimension: embedding.length,
         embedding_generated_at: new Date().toISOString(),
         embedding_generation_time_ms: elapsedMs,
@@ -180,7 +181,7 @@ Deno.serve(withApiLogging('kb-generate-embedding', async (req: Request) => {
         success: true,
         doc_id,
         dimensions: embedding.length,
-        model: 'voyage-4',
+        model: VOYAGE_DOCUMENT_MODEL,
         generation_time_ms: elapsedMs,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

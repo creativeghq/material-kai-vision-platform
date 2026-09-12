@@ -453,7 +453,8 @@ export class AgentMemory {
   }
 
   /**
-   * voyage-4, 1024D — the same text space as `products.text_embedding_1024`.
+   * The voyage-4 series, 1024D — the same text space as `products.text_embedding_1024`.
+   * Documents embed with voyage-4-large and queries with voyage-4; one space, so they mix.
    * Returns null on failure. NULL MEANS NO VECTOR: there is no fallback embedder, because
    * a same-dimension model is the same SHAPE in a different SPACE and a substituted vector
    * would rank confidently and wrongly with nothing raising.

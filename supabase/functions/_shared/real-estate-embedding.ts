@@ -7,6 +7,8 @@
 // A missing embedding only means the listing is invisible to the SEMANTIC query in
 // Discovery until the next publish/save refreshes it — facet search still finds it.
 
+import { voyageModelFor } from './embedding-utils.ts';
+
 /** Flatten the searchable facts of a listing into one embedding document. */
 export function buildEmbeddingText(p: any): string {
   const i18n = p.description_i18n ?? {};
@@ -55,7 +57,7 @@ export async function embedText(
     // when the others had stopped.
     body: JSON.stringify({
       text,
-      model: 'voyage-4',
+      model: voyageModelFor(inputType),
       input_type: inputType,
       dimensions: 1024,
       workspace_id: workspaceId ?? null,

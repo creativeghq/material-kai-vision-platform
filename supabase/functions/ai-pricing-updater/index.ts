@@ -33,6 +33,11 @@ const PROVIDER_PRICING_SOURCES: Record<string, {
     // https://docs.voyageai.com/docs/pricing
     fallback_prices: {
       'voyage-4': { input: 0.06, output: 0.00 },
+      // The document/indexing model — 2x voyage-4. Omitting it left every
+      // voyage-4-large row resolving to nothing on a pricing refresh.
+      'voyage-4-large': { input: 0.12, output: 0.00 },
+      // Page embeddings. TEXT half only; the pixel term is the larger part.
+      'voyage-multimodal-3.5': { input: 0.12, output: 0.00 },
     },
   },
   google: {

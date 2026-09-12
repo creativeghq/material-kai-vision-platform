@@ -175,7 +175,10 @@ async function enrichViaWebSearch(
 
   let inTok = 0, outTok = 0;
 
-  // Step 1 — web research (free-form text)
+  // Step 1 — web research (free-form text).
+  // Stays on the basic web_search variant: web_search_20260209 (dynamic filtering) needs
+  // Opus 4.6+ or Sonnet 4.6+, and this path is deliberately Haiku. Bumping the tool without
+  // the model is a 400, not a no-op (#400 W7).
   const research = await anthropic({
     model: 'claude-haiku-4-5',
     max_tokens: 2048,
