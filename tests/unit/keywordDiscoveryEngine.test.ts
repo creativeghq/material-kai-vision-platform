@@ -9,6 +9,10 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+// Comments say what the code IS; a rule satisfied only by prose is not satisfied.
+// The shared scanner, not a local regex: ten copies at several strengths preceded it
+// and thirty of them ate real code (tests/unit/stripCommentsHelper.test.ts).
+import { blankComments } from '../helpers/stripComments';
 
 const root = join(__dirname, '..', '..');
 const read = (p: string) => readFileSync(join(root, p), 'utf8');
@@ -17,13 +21,6 @@ const SERVICE = read('src/services/userWebsitesService.ts');
 const CARD = read('src/components/core/Profile/seo/KeywordDiscoveryCard.tsx');
 const PANEL = read('src/components/core/Profile/WebsiteRankTrackerPanel.tsx');
 const GSC_FN = read('supabase/functions/gsc-api/index.ts');
-
-/** Comments say what the code IS; a rule satisfied only by prose is not satisfied. */
-function blankComments(src: string): string {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
-    .replace(/(^|[^:])\/\/[^\n]*/g, (_m, p1) => p1);
-}
 
 describe('keyword discovery engine', () => {
   it('untracking is ONE rpc, never a delete that a later sweep can undo', () => {
