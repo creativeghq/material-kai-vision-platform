@@ -22,7 +22,13 @@ const PROBEABLE_PROVIDERS = ['replicate'];
  * (Kling signs a JWT), all of them must resolve or the provider is unreachable.
  */
 const PROVIDER_KEYS: Record<string, string[]> = {
-  google:    ['GEMINI_API_KEY'],
+  // `GOOGLE_GENERATIVE_AI_API_KEY`, NOT `GEMINI_API_KEY`. Every path that actually calls
+  // Google reads the long name — ai-client (so Veo and Gemini Omni), generate-interior-gemini,
+  // company-enrich, kai-task-agent — and it is the name in ai-client's bootstrap list. This
+  // asked for the short one, found nothing, and reported a WORKING provider as
+  // `not_configured`: a health check that is wrong in the reassuring direction is worse than
+  // no health check, because it sends the reader to set a key that is already set.
+  google:    ['GOOGLE_GENERATIVE_AI_API_KEY'],
   alibaba:   ['DASHSCOPE_API_KEY'],
   bytedance: ['ARK_API_KEY'],
   fal:       ['FAL_KEY'],
@@ -63,6 +69,88 @@ interface ModelProbeResult {
   durationMs: number;
   error?: string;
   predictionId?: string;
+}
+
+/**
+ * A 16x16 PNG, inline. Replicate accepts a `data:` URI wherever it accepts a file URL, and
+ * inlining it means the probe does not depend on any bucket or CDN staying up to answer
+ * "can we reach this provider" — a probe that fails because its own fixture 404s reports
+ * the wrong thing about the model.
+ */
+const PROBE_IMAGE_DATA_URI =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAKUlEQVR4nO3'
+  + 'MMQEAAADCoPVPbQwfoAAAAAAAAAAAAAAAAAAAAOBtQAABAAEfAAAAAElFTkSuQmCC';
+
+/** Required inputs for one Replicate model, from the model's own published schema. */
+interface ReplicateInputSchema {
+  required: string[];
+  properties: Record<string, { type?: string; format?: string }>;
+}
+
+/**
+ * The model's own input schema, or null.
+ *
+ * The probe used to send `{prompt}` to everything. Every Replicate model in the registry
+ * that REQUIRES an image was therefore rejected 422 and recorded `schema_rejected` — 8 of
+ * them, a perfect correlation with `min_images >= 1`, and all of them fine. Guessing the
+ * field name does not work either: across those 8 it is `image`, `input`, `control_image`
+ * AND `image_base`. Replicate publishes the answer, so the probe asks.
+ */
+async function fetchReplicateInputSchema(
+  slug: string | null,
+  version: string | null,
+  apiKey: string,
+  timeoutMs: number,
+): Promise<ReplicateInputSchema | null> {
+  if (!slug) return null;
+  const url = version
+    ? `https://api.replicate.com/v1/models/${slug}/versions/${version}`
+    : `https://api.replicate.com/v1/models/${slug}`;
+  try {
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), timeoutMs);
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        signal: ac.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+    if (!res.ok) { await res.body?.cancel(); return null; }
+    const body = await res.json();
+    const schema = (version ? body : body?.latest_version)
+      ?.openapi_schema?.components?.schemas?.Input;
+    if (!schema) return null;
+    return {
+      required: Array.isArray(schema.required) ? schema.required : [],
+      properties: schema.properties ?? {},
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Fill every required input, so a 422 means the MODEL refused rather than the probe. */
+function buildProbeInput(
+  schema: ReplicateInputSchema | null,
+  testPrompt: string,
+): Record<string, unknown> {
+  const input: Record<string, unknown> = { prompt: testPrompt };
+  if (!schema) return input;
+
+  for (const field of schema.required) {
+    if (field in input) continue;
+    const spec = schema.properties[field] ?? {};
+    // A file input is a string with `format: uri`, or a name that says so. Everything else
+    // required gets the prompt text; a wrong TYPE still reads as schema_rejected, which is
+    // honest, where a MISSING field was previously read as the model being broken.
+    const looksLikeFile = spec.format === 'uri'
+      || /image|img|photo|mask|frame|video|audio|file/i.test(field);
+    input[field] = looksLikeFile ? PROBE_IMAGE_DATA_URI : testPrompt;
+  }
+  return input;
 }
 
 /** Map an HTTP status from the provider onto a verdict we can act on. */
@@ -200,9 +288,17 @@ export class ModelHealthCheckAgent implements AgentRunner {
       let result: ModelProbeResult;
 
       try {
+        // Read the model's own schema first, so every REQUIRED input is supplied. Without
+        // this the probe sent `{prompt}` to everything and every image-to-image model in
+        // the registry answered 422 — which is the probe's payload being wrong, not the
+        // model being broken. The fetch is free of the create rate limit and falls back to
+        // prompt-only, so a schema we cannot read is no worse than before.
+        const inputSchema = await fetchReplicateInputSchema(
+          model.slug ?? null, model.version ?? null, replicateApiKey, timeoutMs,
+        );
         // A versioned model MUST be called by version — several 404 without it, which would be
         // misread as "deleted upstream". Unversioned models use the model-scoped endpoint.
-        const body: Record<string, unknown> = { input: { prompt: testPrompt } };
+        const body: Record<string, unknown> = { input: buildProbeInput(inputSchema, testPrompt) };
         let url = 'https://api.replicate.com/v1/predictions';
         if (model.version) {
           body.version = model.version;
@@ -294,7 +390,11 @@ export class ModelHealthCheckAgent implements AgentRunner {
       // leave status alone: the model is fine, the account is empty, and disabling it would mean
       // funding the account did not bring it back.
       if (result.probeStatus === 'not_found') patch.status = 'dead';
-      else if (result.probeStatus === 'ok' && model.status === 'dead') patch.status = 'active';
+      // A model that ANSWERS is active, whatever it was marked before. This used to recover
+      // `dead` only, so a `degraded` row stayed degraded forever — nothing in this agent
+      // writes `degraded`, so nothing could clear it either, and the registry kept showing a
+      // warning for a model that had been accepting predictions for months.
+      else if (result.probeStatus === 'ok' && model.status !== 'active') patch.status = 'active';
 
       const { error: upErr } = await supabase.from('generation_models').update(patch).eq('id', model.id);
       if (upErr) await log('warn', `Could not record probe for ${model.id}`, { error: upErr.message });

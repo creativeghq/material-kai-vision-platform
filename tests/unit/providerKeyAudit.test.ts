@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { stripComments } from '../helpers/stripComments';
+import { sourceIndex, posix } from '../helpers/sourceIndex';
 
 const ROOT = join(__dirname, '..', '..');
 const src = stripComments(
@@ -58,5 +59,57 @@ describe('the provider key audit cannot invent or destroy a verdict', () => {
     // `Deno.env.get` misses anything an admin set in platform_secrets, so a key that IS
     // configured would be reported missing — the exact inversion this audit exists to prevent.
     expect(src).toMatch(/resolveSecret\(supabase, key\)/);
+  });
+});
+
+describe('the audit asks for the SAME key name the callers read', () => {
+  /**
+   * A probe that asks for a key nobody sets reports a WORKING provider as unreachable, and
+   * that is worse than no probe: it sends the reader to configure something already
+   * configured. `google` asked for `GEMINI_API_KEY` while every Google caller — ai-client
+   * (so Veo and Gemini Omni), generate-interior-gemini, company-enrich, kai-task-agent —
+   * reads `GOOGLE_GENERATIVE_AI_API_KEY`, so every Google model read `not_configured`
+   * while image generation was working.
+   */
+  const CALLER_KEY_BY_PROVIDER: Record<string, string> = {
+    google: 'GOOGLE_GENERATIVE_AI_API_KEY',
+    alibaba: 'DASHSCOPE_API_KEY',
+    bytedance: 'ARK_API_KEY',
+    luma: 'LUMA_API_KEY',
+    fal: 'FAL_KEY',
+    xai: 'XAI_API_KEY',
+  };
+
+  const aiClient = stripComments(
+    readFileSync(join(ROOT, 'supabase/functions/_shared/ai-client.ts'), 'utf8'),
+  );
+
+  it('every audited key is one ai-client actually reads', () => {
+    const map = src.slice(src.indexOf('const PROVIDER_KEYS'));
+    const block = map.slice(0, map.indexOf('};') + 2);
+
+    for (const [provider, expected] of Object.entries(CALLER_KEY_BY_PROVIDER)) {
+      const row = block.split('\n').find((l) => l.trim().startsWith(`${provider}:`));
+      expect(row, `PROVIDER_KEYS has no row for ${provider}`).toBeTruthy();
+      expect(row, `the audit asks ${provider} for a key ai-client never reads`).toContain(expected);
+      expect(aiClient, `ai-client does not read ${expected}, so the audit is asking for a name nobody sets`)
+        .toContain(expected);
+    }
+  });
+
+  it('no Google caller is left on the short key name', () => {
+    // `GEMINI_API_KEY` is set nowhere in this deployment. A file reading it can only run
+    // unauthenticated, and will say "no key" about a provider that has one.
+    //
+    // Through the shared sourceIndex, which caches its walk and skips vendored trees. A
+    // hand-rolled walk of `supabase/functions` reads 27k files, not the ~200 that are ours.
+    const PATTERN = /Deno\.env\.get\('GEMINI_API_KEY'\)|resolveSecret\([^)]*'GEMINI_API_KEY'/;
+    const offenders = sourceIndex({ roots: ['supabase/functions'] })
+      .stripped()
+      .filter(([, body]) => PATTERN.test(body))
+      .map(([file]) => posix(file));
+
+    expect(offenders, 'these read GEMINI_API_KEY; the deployed name is GOOGLE_GENERATIVE_AI_API_KEY')
+      .toEqual([]);
   });
 });

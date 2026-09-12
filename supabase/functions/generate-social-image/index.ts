@@ -13,7 +13,11 @@ import { fetchImageGuarded } from '../_shared/fetch-image.ts';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const XAI_API_KEY = () => Deno.env.get('XAI_API_KEY') || '';
-const GEMINI_API_KEY = () => Deno.env.get('GEMINI_API_KEY') || '';
+// `GOOGLE_GENERATIVE_AI_API_KEY`, not `GEMINI_API_KEY` — the long name is what every other
+// Google caller reads and what ai-client bootstraps. This was the last holder of the short
+// name outside the health probe, and the short name is set nowhere, so this function could
+// only ever have run unauthenticated. (It has no `api_usage_logs` rows at all.)
+const GEMINI_API_KEY = () => Deno.env.get('GOOGLE_GENERATIVE_AI_API_KEY') || '';
 
 type ImageModel = 'aurora' | 'gemini' | 'flux' | 'auto';
 type ImageType = 'lifestyle' | 'product' | 'interior' | 'artistic';
