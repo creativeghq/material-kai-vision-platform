@@ -15,7 +15,7 @@ const TOKEN_TTL_DAYS = 30;
 const TOKEN_TTL_MS = TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000;
 
 interface RequestBody {
-  action: 'request' | 'verify' | 'public_meta' | 'track_view' | 'track_download';
+  action: 'request' | 'verify' | 'public_meta' | 'public_body' | 'track_view' | 'track_download';
   /** Workspace segment of `/c/<handle>/<slug>`. Absent on a link shared before the URL was scoped. */
   handle?: string;
   slug?: string;
@@ -134,6 +134,46 @@ function projectCatalogForViewer(catalog: Record<string, any>, pdfUrl: string | 
 }
 
 
+
+/**
+ * A view of an OPEN catalog — the same three writes the gated path makes, minus the identity it
+ * does not have. `email`/`matched_user_id` are null and `matched_kind` is 'open': a visitor we
+ * genuinely cannot name, recorded as such rather than left out of the funnel. An open catalog
+ * whose Visitors tab stayed empty would read as a page nobody opened.
+ */
+async function recordOpenView(supabase: any, req: Request, catalog: any, trustedIp: string) {
+  const ip = trustedIp === 'unknown' ? null : trustedIp;
+  const ua = req.headers.get('user-agent') || null;
+
+  await supabase.from('catalog_view_events').insert({
+    catalog_id: catalog.id,
+    access_log_id: null,
+    event_type: 'page_view',
+    email: null,
+    matched_user_id: null,
+    matched_kind: 'open',
+    cookie_token: null,
+    ip_address: ip,
+    user_agent: ua,
+    metadata: {},
+  });
+
+  recordPageEvent(supabase, req, 'viewed', {
+    entityType: 'catalog',
+    entityId: catalog.id,
+    workspaceId: catalog.workspace_id,
+    ownerUserId: catalog.workspace_id ? null : catalog.owner_user_id,
+    actorEmail: null,
+    actorUserId: null,
+    metadata: { surface: 'public_catalog', matched_kind: 'open' },
+  }).catch(() => {});
+
+  await supabase.rpc('catalog_increment_view_count', { p_catalog_id: catalog.id })
+    .then(({ error }: { error: unknown }) => {
+      if (error) console.warn('[catalog-access] open view_count bump failed:', error);
+    });
+}
+
 /**
  * The catalog behind `/c/<handle>/<slug>`.
  *
@@ -187,7 +227,7 @@ Deno.serve(withApiLogging('catalog-access', async (req) => {
     if (body.action === 'public_meta') {
       const { catalog, canonicalHandle } = await resolveCatalog(
         supabase, handle, slug,
-        'id, owner_user_id, workspace_id, title, subtitle, description, cover_data, status');
+        'id, owner_user_id, workspace_id, title, subtitle, description, cover_data, status, access_mode');
       if (!catalog || catalog.status !== 'published') return jsonResponse({ error: 'Not found' }, 404);
 
       const [branding, art] = await Promise.all([
@@ -199,6 +239,9 @@ Deno.serve(withApiLogging('catalog-access', async (req) => {
         // What the URL SHOULD be. A legacy `/c/<slug>` link redirects onto it rather than living
         // on as a second address for the same page.
         canonical_handle: canonicalHandle,
+        // The page draws an email form for 'allowlist'/'any_email' and none for 'open'. Reported
+        // rather than inferred: the client must never be the thing that decides this.
+        access_mode: catalog.access_mode ?? 'allowlist',
         title: catalog.title,
         subtitle: catalog.subtitle,
         cover_image_url: catalog.cover_data?.cover_image_url || art.cover_image_url || null,
@@ -209,6 +252,43 @@ Deno.serve(withApiLogging('catalog-access', async (req) => {
       });
     }
 
+    /**
+     * The whole document, for a catalog whose owner has opened it. Re-reads `access_mode` from the
+     * row and refuses anything but 'open' — the absence of a token is not what makes this safe,
+     * the server-side mode check is, and a client asking for it proves nothing.
+     *
+     * Returns the SAME `projectCatalogForViewer` projection the gated path returns, so opening a
+     * catalog can never expose a field the email-gated one withholds.
+     */
+    if (body.action === 'public_body') {
+      const { catalog } = await resolveCatalog(
+        supabase, handle, slug,
+        'id, owner_user_id, workspace_id, slug, title, subtitle, description, cover_data, '
+        + 'body_data, back_cover_data, status, pdf_url, pdf_storage_path, access_mode');
+      if (!catalog || catalog.status !== 'published') return jsonResponse({ error: 'Not found' }, 404);
+      if (catalog.access_mode !== 'open') {
+        // Not 403: a catalog that is not open should look, to an unauthenticated caller, exactly
+        // like one that does not exist.
+        return jsonResponse({ error: 'Not found' }, 404);
+      }
+
+      const [pdfUrl, art, branding] = await Promise.all([
+        resolveCatalogPdfUrl(supabase, catalog),
+        resolveTemplateArt(supabase, catalog.workspace_id ?? null),
+        resolveOwnerBranding(supabase, catalog.workspace_id ?? null),
+      ]);
+
+      const trustedIp = getTrustedClientIp(req);
+      await recordOpenView(supabase, req, catalog, trustedIp);
+
+      return jsonResponse({
+        granted_access: true,
+        access_mode: 'open',
+        catalog: projectCatalogForViewer(catalog, pdfUrl, art),
+        branding,
+      });
+    }
+
     if (body.action === 'request') {
       if (!body.email || !isLikelyEmail(body.email)) {
         return jsonResponse({ error: 'Valid email is required' }, 400);
@@ -216,7 +296,7 @@ Deno.serve(withApiLogging('catalog-access', async (req) => {
       const email = body.email.toLowerCase().trim();
 
       const { catalog } = await resolveCatalog(
-        supabase, handle, slug, 'id, status, owner_user_id, workspace_id');
+        supabase, handle, slug, 'id, status, owner_user_id, workspace_id, access_mode');
       if (!catalog || catalog.status !== 'published') {
         return jsonResponse({ granted_access: false });
       }
@@ -260,7 +340,20 @@ Deno.serve(withApiLogging('catalog-access', async (req) => {
         return jsonResponse({ error: 'Too many attempts. Please wait a few minutes and try again.' }, 429);
       }
 
-      const match = await resolveEmailMatch(supabase, catalog.id, email, catalog.workspace_id ?? null);
+      /**
+       * `any_email` captures the visitor instead of checking them. The address is still recorded
+       * and still rate-limited above — it just stops being a credential.
+       *
+       * Deliberately NOT expressed as "resolveEmailMatch, then override on denial": that shape
+       * loses which of the four rules matched, so a CRM contact opening an `any_email` catalog
+       * would be filed as an anonymous lead and the Visitors tab would stop naming customers we
+       * know. Match first, and only rescue the denial.
+       */
+      const matched = await resolveEmailMatch(supabase, catalog.id, email, catalog.workspace_id ?? null);
+      const mode = catalog.access_mode ?? 'allowlist';
+      const match = (!matched.granted && (mode === 'any_email' || mode === 'open'))
+        ? { ...matched, granted: true, kind: 'lead' as const }
+        : matched;
 
       const tokenStr = match.granted ? generateToken() : null;
       const expiresAt = match.granted ? new Date(Date.now() + TOKEN_TTL_MS).toISOString() : null;
@@ -458,7 +551,10 @@ Deno.serve(withApiLogging('catalog-access', async (req) => {
 
 interface MatchResult {
   granted: boolean;
-  kind: 'platform_user' | 'crm_contact' | 'crm_company' | 'email_grant' | 'denied';
+  // 'lead' is a stranger let through by an `any_email` catalog — granted, but named by
+  // nothing except the address they typed. Kept distinct from the four allowlist rules so
+  // the Visitors tab can still say which customers we already knew.
+  kind: 'platform_user' | 'crm_contact' | 'crm_company' | 'email_grant' | 'lead' | 'denied';
   userId: string | null;
   crmContactId: string | null;
   crmCompanyId: string | null;

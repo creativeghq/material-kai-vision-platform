@@ -6,6 +6,15 @@ import { catalogPublicPath, catalogPublicUrl, normalizeWorkspaceHandle } from '@
 
 export type CatalogStatus = 'draft' | 'generating' | 'ready' | 'published' | 'archived' | 'failed';
 
+/**
+ * Who may read the published page.
+ *  - `allowlist` known contacts only: a workspace member, a CRM contact or company, or an
+ *    explicit grant. Everyone else is refused. The default, and what every catalog had.
+ *  - `any_email` the form stays, but a stranger is captured as a lead instead of refused.
+ *  - `open`     no form. Anyone with the link reads it.
+ */
+export type CatalogAccessMode = 'allowlist' | 'any_email' | 'open';
+
 export interface CatalogMaterial {
   id: string;
   name: string;
@@ -57,6 +66,7 @@ export interface PresentationCatalog {
   updated_at: string;
   /** Its workspace's public handle — the first segment of the public URL. Joined, not stored. */
   public_handle?: string | null;
+  access_mode: CatalogAccessMode;
 }
 
 export interface CatalogTemplate {
@@ -681,6 +691,15 @@ class CatalogsService {
       .maybeSingle();
     if (error) throw error;
     return (data as any)?.public_handle ?? null;
+  }
+
+  /** Widening access is an admin act, so it goes through an RPC rather than a column patch. */
+  async setAccessMode(catalogId: string, mode: CatalogAccessMode): Promise<CatalogAccessMode> {
+    const { data, error } = await supabase.rpc('set_catalog_access_mode' as any, {
+      p_catalog_id: catalogId, p_mode: mode,
+    } as any);
+    if (error) throw error;
+    return data as unknown as CatalogAccessMode;
   }
 
   async setPublicHandle(workspaceId: string, handle: string): Promise<string> {

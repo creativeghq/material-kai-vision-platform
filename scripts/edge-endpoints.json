@@ -414,8 +414,8 @@
   {
     "name": "catalog-access",
     "tag": "Catalogs",
-    "summary": "Public email-gate for shared catalog pages (/c/:slug)",
-    "description": "Handles access requests, token verification, public metadata, and view/download tracking for published catalogs. No authentication header required; uses service role internally.",
+    "summary": "Public gate for shared catalog pages (/c/:handle/:slug)",
+    "description": "Handles access requests, token verification, public metadata, and view/download tracking for published catalogs. A catalog's access_mode decides the gate: allowlist (known contacts only), any_email (anyone, address captured) or open (no email asked, read via public_body). No authentication header required; uses service role internally.",
     "security": [
       "public"
     ],
@@ -435,7 +435,26 @@
             "desc": "Catalog slug"
           }
         ],
-        "response": "{title, subtitle, cover_image_url, branding:{logo_url,company_name}}"
+        "response": "{canonical_handle, access_mode, title, subtitle, cover_image_url, branding:{logo_url,company_name}}"
+      },
+      {
+        "name": "public_body",
+        "summary": "Return the full catalog document, for a catalog whose access_mode is 'open'",
+        "params": [
+          {
+            "name": "slug",
+            "type": "string",
+            "required": true,
+            "desc": "Catalog slug"
+          },
+          {
+            "name": "handle",
+            "type": "string",
+            "required": false,
+            "desc": "Workspace public handle. Omit only for a legacy one-segment link."
+          }
+        ],
+        "response": "{granted_access, access_mode, catalog, branding} — 404 unless the catalog is published AND access_mode is 'open'"
       },
       {
         "name": "request",

@@ -15,6 +15,8 @@ import { catalogPublicPath } from '@/config/catalogPublicUrl';
 interface PublicMeta {
   /** The workspace segment this catalog SHOULD be served under. */
   canonical_handle: string | null;
+  /** Who may read this. Decided by the SERVER; the page only chooses whether to draw a form. */
+  access_mode: 'allowlist' | 'any_email' | 'open';
   title: string;
   subtitle: string | null;
   cover_image_url: string | null;
@@ -116,6 +118,15 @@ export const PublicCatalogPage: React.FC = () => {
         // should not sit in the visitor's back button as somewhere to return to.
         const canonical = handle ? null : catalogPublicPath(data.canonical_handle, slug);
         if (canonical) navigate(canonical, { replace: true });
+
+        // An OPEN catalog has no gate to pass: fetch the document straight away. The server
+        // re-checks the mode on the row, so a client that asked for this on a gated catalog gets
+        // the same 404 as one asking for a catalog that does not exist.
+        if (data.access_mode === 'open') {
+          const openBody = await callAccess({ action: 'public_body', slug, handle });
+          if (!cancelled && openBody?.granted_access) setVerified(openBody);
+          return;
+        }
 
         const existingToken = readTokenForSlug(slug);
         if (existingToken) {

@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (144)
+## 1. Supabase Edge Functions (145)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -183,7 +183,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 
 | Function | Auth | Summary |
 |---|---|---|
-| `catalog-access` | public | Public email-gate for shared catalog pages (/c/:slug) |
+| `catalog-access` | public | Public gate for shared catalog pages (/c/:handle/:slug) |
 | `catalog-extract-from-pdfs` | JWT | Claude Sonnet vision pass over source PDFs to find materials matching a query |
 | `catalog-image-search` | JWT | Find candidate images for a catalog material via platform DB then web fallback |
 | `catalog-render-pdf-page` | cron | Proxy to MIVAA rasterize-pdf-page; returns signed URL to a PNG crop of a PDF page |
@@ -344,6 +344,12 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 |---|---|---|
 | `embed-agent` _(GET + POST)_ | public | Public agent surface for the website embed SDK — allowlisted tools, no model turn |
 | `products-3d-api` _(GET + POST)_ | public | Public product + 3D model read for the website embed SDK |
+
+**Profiles**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `profile-review-summary` | JWT | Regenerates the AI summary printed above a professional's public reviews. |
 
 **Projects**
 

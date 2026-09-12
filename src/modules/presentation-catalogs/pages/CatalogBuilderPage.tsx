@@ -25,7 +25,7 @@ import { getErrorMessage } from '@/core/errors/utils';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { statusTone } from '@/utils/statusTone';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
@@ -41,11 +41,37 @@ import {
   type CatalogSendBatchSummary,
   type CatalogEmailSendRow,
   type CatalogSection,
+  type CatalogAccessMode,
 } from '@/services/catalogsService';
 import { SendToCustomersModal } from '@/components/business/catalogs/SendToCustomersModal';
 import { CatalogSourcesPanel } from '@/components/business/catalogs/CatalogSourcesPanel';
 import { formatDate } from '@/utils/datetime';
 import { formatNumber } from '@/utils/decimal';
+
+/**
+ * The three answers to "who can read this", in the order they widen. Written out here rather
+ * than assembled from the type so each one can say what it COSTS the reader: the difference
+ * between the first two is whether a stranger is refused or recorded, and that is the whole
+ * decision. Enforced server-side by `set_catalog_access_mode` + catalog-access; this list only
+ * offers them.
+ */
+const ACCESS_MODES: Array<{ id: CatalogAccessMode; label: string; description: string }> = [
+  {
+    id: 'allowlist',
+    label: 'Known contacts only',
+    description: 'The reader must already be a workspace member, a CRM contact or company, or on the allowlist below. Anyone else is turned away.',
+  },
+  {
+    id: 'any_email',
+    label: 'Any email — captured as a lead',
+    description: 'The form still asks, and the address is still recorded, but nobody is refused. Use this when the link is going somewhere you do not control.',
+  },
+  {
+    id: 'open',
+    label: 'Open — no email asked',
+    description: 'Anyone with the link reads it straight away. Views are still counted, but you will not know who they were.',
+  },
+];
 
 const STATUS_VARIANT: Record<CatalogStatus, 'default' | 'secondary' | 'outline' | 'destructive'> = {
   draft: 'secondary',
@@ -196,6 +222,18 @@ export const CatalogBuilderPage: React.FC = () => {
     } catch (err) {
       toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
     }
+  };
+
+  const handleSetAccessMode = async (mode: CatalogAccessMode) => {
+    if (!catalog || mode === catalog.access_mode) return;
+    setBusyAction('access');
+    try {
+      await catalogsService.setAccessMode(catalog.id, mode);
+      setCatalog((prev) => (prev ? { ...prev, access_mode: mode } : prev));
+      toast({ title: 'Access updated', description: ACCESS_MODES.find((m) => m.id === mode)?.label });
+    } catch (err) {
+      toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
+    } finally { setBusyAction(null); }
   };
 
   const handleAddGrant = async () => {
@@ -553,6 +591,41 @@ export const CatalogBuilderPage: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="access" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Who can read this</CardTitle>
+              <CardDescription>Applies the moment you change it, on the already-published page.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {ACCESS_MODES.map((m) => {
+                const active = catalog.access_mode === m.id;
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    disabled={busyAction === 'access'}
+                    onClick={() => handleSetAccessMode(m.id)}
+                    className={`w-full rounded-sm border p-3 text-left transition-colors ${active
+                      ? 'border-primary bg-primary/5'
+                      : 'border-hairline hover:bg-surface-sunken'}`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{m.label}</span>
+                      {active && <Badge variant="secondary" className="text-[10px] py-0">Current</Badge>}
+                    </div>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{m.description}</p>
+                  </button>
+                );
+              })}
+              {catalog.access_mode === 'open' && catalog.status === 'published' && (
+                <p className="text-xs text-warning-foreground">
+                  Anyone with the link can read this catalog and its prices, with no email asked.
+                  It stays out of search engines either way.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader><CardTitle>Email Allowlist</CardTitle></CardHeader>
             <CardContent className="space-y-3">

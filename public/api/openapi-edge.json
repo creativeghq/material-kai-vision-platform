@@ -148,6 +148,10 @@
       "description": "Products functions."
     },
     {
+      "name": "Profiles",
+      "description": "Profiles functions."
+    },
+    {
       "name": "Projects",
       "description": "Projects functions."
     },
@@ -871,9 +875,9 @@
         "tags": [
           "Catalogs"
         ],
-        "summary": "Public email-gate for shared catalog pages (/c/:slug)",
+        "summary": "Public gate for shared catalog pages (/c/:handle/:slug)",
         "operationId": "post_catalog_access",
-        "description": "Handles access requests, token verification, public metadata, and view/download tracking for published catalogs. No authentication header required; uses service role internally.",
+        "description": "Handles access requests, token verification, public metadata, and view/download tracking for published catalogs. A catalog's access_mode decides the gate: allowlist (known contacts only), any_email (anyone, address captured) or open (no email asked, read via public_body). No authentication header required; uses service role internally.",
         "security": [],
         "responses": {
           "200": {
@@ -932,7 +936,32 @@
                         "description": "Catalog slug"
                       }
                     },
-                    "description": "Returns: {title, subtitle, cover_image_url, branding:{logo_url,company_name}}"
+                    "description": "Returns: {canonical_handle, access_mode, title, subtitle, cover_image_url, branding:{logo_url,company_name}}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "slug"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "public_body"
+                        ],
+                        "description": "Return the full catalog document, for a catalog whose access_mode is 'open'"
+                      },
+                      "slug": {
+                        "type": "string",
+                        "description": "Catalog slug"
+                      },
+                      "handle": {
+                        "type": "string",
+                        "description": "Workspace public handle. Omit only for a legacy one-segment link."
+                      }
+                    },
+                    "description": "Returns: {granted_access, access_mode, catalog, branding} — 404 unless the catalog is published AND access_mode is 'open'"
                   },
                   {
                     "type": "object",
@@ -27197,6 +27226,73 @@
                 "oneOf": [],
                 "discriminator": {
                   "propertyName": "action"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/profile-review-summary": {
+      "post": {
+        "tags": [
+          "Profiles"
+        ],
+        "summary": "Regenerates the AI summary printed above a professional's public reviews.",
+        "operationId": "post_profile_review_summary",
+        "description": "Reads the non-hidden reviews written about user_id, and when at least three carry written comments and the stored summary is stale, asks Claude for a 2-3 sentence summary and stores it in review_summaries.summary_text. Every gate runs before the model call, so a fresh summary costs nothing. Review text is fenced as data, not instructions. Not credit-metered: the summary is a marketplace surface the operator owns, and neither the reviewer nor the professional asked for it. Records summary_status (ok / not_enough_reviews / generation_failed) so an empty summary can say which it is.\n\n**Response:** `{status: 'ok'|'fresh'|'not_enough_reviews'|'cooling_down', summary_text?: string, reviews_summarised?: number}`",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
