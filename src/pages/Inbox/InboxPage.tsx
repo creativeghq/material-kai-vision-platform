@@ -8,7 +8,7 @@ import {
   User as UserIcon, MessagesSquare, Settings2, ArrowLeft, CheckCircle2, Wallet, EyeOff, Eye, Reply,
   Archive, ArchiveRestore, Trash2, Sparkles, Check, CheckCheck, Link2,
   MoreHorizontal, Forward, Pin, PinOff, Star, StickyNote as StickyNoteIcon,
-  BellRing, CalendarClock,
+  BellRing, CalendarClock, Clock,
   ShoppingCart, AlertTriangle, ExternalLink, Image as ImageIcon, CookingPot,
   Smile, Copy, Download, Package, Wrench, Slash,
 } from 'lucide-react';
@@ -1334,6 +1334,19 @@ const InboxPage: React.FC = () => {
                           {t.status !== 'open' && !t.archived_at && <span className={`text-[11px] capitalize ${statusTone(t.status)}`}>{t.status}</span>}
                           {t.agent_state === 'active' && (
                             <span className="inline-flex items-center gap-1 text-[11px] leading-none text-primary"><Bot className="w-3 h-3" />AI</span>
+                          )}
+                          {/* Same reasoning as the order badge below: "the customer spoke last and
+                              nobody answered" is a JOB, not a description, and it was invisible
+                              from the list — `unread` only says whether anyone LOOKED. That is how
+                              33 conversations reached a week without a reply while the mailbox
+                              showed 67 identically-open threads. The age is measured from the
+                              FIRST unanswered message, so it is how long they have really waited. */}
+                          {t.waiting_on === 'us' && (
+                            <Badge variant="warning" className="text-[10px] py-0">
+                              <Clock className="w-2.5 h-2.5" />
+                              Waiting {timeAgo(t.waiting_since || t.last_message_at)}
+                              {(t.unanswered_count ?? 0) > 1 ? ` · ${t.unanswered_count} msgs` : ''}
+                            </Badge>
                           )}
                           {/* #342: an order waiting for approval is the one thing worth seeing
                               from the list — otherwise it is only discoverable by opening the

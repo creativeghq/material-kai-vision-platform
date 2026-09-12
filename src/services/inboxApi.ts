@@ -45,6 +45,21 @@ export interface InboxThread {
   /** Denormalized snippet of the latest visible message (for mailbox list rows). */
   last_message_preview?: string | null;
   unread?: boolean;
+  /**
+   * Who owes a reply, DERIVED by `inbox_thread_reply_state` — never recomputed on the client.
+   * `unread` answers "have I looked at this", which is a different question: a thread can be
+   * read and still be waiting on us, which is exactly how 33 conversations went a week without
+   * an answer while the mailbox showed nothing unusual.
+   *
+   * `null` means the derivation did not run (older deploy, or the RPC failed). Treat it as
+   * UNKNOWN and say so — never render it as "no reply needed".
+   */
+  waiting_on?: 'us' | 'them' | 'nobody' | null;
+  /** When the FIRST unanswered inbound arrived — not the latest one. */
+  waiting_since?: string | null;
+  /** Inbound messages since our last reply. */
+  unanswered_count?: number;
+  needs_reply?: boolean | null;
   /** Labels assigned to this thread (returned by list_threads). */
   labels?: InboxLabel[];
   /**

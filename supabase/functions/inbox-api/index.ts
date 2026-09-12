@@ -2446,6 +2446,22 @@ async function handleJwtAction(
         }
       }
 
+      // Who owes a reply. DERIVED in SQL (`inbox_thread_reply_state`), never recomputed here:
+      // `unread` answers "have I looked at this", which is not the same question and was the only
+      // one the mailbox could ask. `status` cannot answer it either — every thread is 'open'.
+      type ReplyState = {
+        thread_id: string; waiting_on: string; last_message_from: string | null;
+        last_message_at: string | null; waiting_since: string | null; unanswered_count: number;
+      };
+      const replyStateByThread = new Map<string, ReplyState>();
+      if (threadIds.length) {
+        const { data: rs, error: rsErr } = await db.rpc('inbox_thread_reply_state', { p_thread_ids: threadIds });
+        // A failed derivation must not silently read as "nobody is waiting" — that is the exact
+        // shape this feature exists to fix. Log it and leave the field absent rather than false.
+        if (rsErr) console.error('[inbox-api] inbox_thread_reply_state failed:', rsErr.message);
+        for (const r of (rs || []) as ReplyState[]) replyStateByThread.set(r.thread_id, r);
+      }
+
       const enriched = (threads || []).map((t: Record<string, unknown>) => {
         const id = String(t.id);
         // Threads visible only via workspace membership (not an explicit participant) start unread.
@@ -2453,8 +2469,13 @@ async function handleJwtAction(
         const unread = lastReadByThread.has(id)
           ? (!lr || new Date(String(t.last_message_at)) > new Date(lr))
           : true;
+        const rs = replyStateByThread.get(id);
         return {
           ...t, unread,
+          waiting_on: rs?.waiting_on ?? null,
+          waiting_since: rs?.waiting_since ?? null,
+          unanswered_count: rs?.unanswered_count ?? 0,
+          needs_reply: rs ? rs.waiting_on === 'us' : null,
           labels: labelsByThread.get(id) || [],
           assignees: assigneesByThread.get(id) || [],
           counterparty_participant_id: counterpartyByThread.get(id) ?? null,

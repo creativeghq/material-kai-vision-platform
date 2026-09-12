@@ -56,6 +56,15 @@ export function buildInboxFilters(labels: InboxLabel[], threads: InboxThread[] =
           trueLabel: 'Unread only', falseLabel: 'Read only',
           accessor: (t: InboxThread) => !!t.unread,
         },
+        {
+          // A DIFFERENT question from Unread, and the one the mailbox could not previously ask:
+          // a thread can be read and still owe the customer an answer. Derived server-side by
+          // `inbox_thread_reply_state`; an unknown verdict is not "no".
+          key: 'needs_reply', type: 'bool', label: 'Waiting on us',
+          description: 'The customer spoke last and nobody has answered.',
+          trueLabel: 'Needs a reply', falseLabel: 'Answered',
+          accessor: (t: InboxThread) => t.waiting_on === 'us',
+        },
       ],
     },
     {
