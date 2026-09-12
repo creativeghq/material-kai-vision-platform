@@ -744,6 +744,113 @@ export async function generateStructuredWithClaude<T>(
   }
 }
 
+// ── Voyage: reranking (a trained cross-encoder, not a model reading a prompt) ─
+//
+// Through this file because it is the chokepoint: a raw fetch here is a provider call
+// with no `ai_usage_logs` row, which is the silent-zero shape. There is no AI SDK
+// provider for Voyage rerank, so the HTTP call lives here and nowhere else.
+
+/** Default. `-lite` is the cheap tier; both are priced in `ai_model_pricing`. */
+export const VOYAGE_RERANK_MODEL = 'rerank-3-lite';
+
+export interface VoyageRerankHit {
+  /** Position in the `documents` array that was sent. */
+  index: number;
+  /** 0-1. Comparable within one call only. */
+  score: number;
+}
+
+/**
+ * Score `documents` against `query`. Returns hits in the provider's order (best first).
+ *
+ * Verified live 2026-09-12: `rerank-3-lite`, `rerank-3`, `rerank-2.5` and `rerank-2.5-lite`
+ * all answer. The published API reference still lists only the 2.5 pair — the 3 series is
+ * priced and serving but undocumented there, so the model name is a parameter, not a
+ * constant, and an unknown one must fail loudly rather than fall back to another model.
+ */
+export async function rerankWithVoyage(
+  query: string,
+  documents: string[],
+  opts: {
+    model?: string;
+    topK?: number;
+    task?: string;
+    userId?: string;
+    workspaceId?: string;
+    timeoutMs?: number;
+  } = {},
+): Promise<VoyageRerankHit[]> {
+  const model = opts.model || VOYAGE_RERANK_MODEL;
+  const started = Date.now();
+
+  const apiKey = _logSupabase
+    ? (await resolveSecret(_logSupabase, 'VOYAGE_API_KEY')).value
+    : Deno.env.get('VOYAGE_API_KEY');
+  if (!apiKey) throw new Error('VOYAGE_API_KEY is not configured — cannot rerank');
+
+  let res: Response;
+  try {
+    res = await fetch('https://api.voyageai.com/v1/rerank', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query,
+        documents,
+        model,
+        ...(opts.topK ? { top_k: opts.topK } : {}),
+        // Voyage truncates to the context limit rather than refusing. A refusal would be
+        // better here, but a silently shortened document still ranks — the alternative is
+        // the whole call failing on one long description.
+        truncation: true,
+      }),
+      signal: AbortSignal.timeout(opts.timeoutMs ?? 15_000),
+    });
+  } catch (err) {
+    void _logTrackedCall({
+      task: opts.task ?? 'search_rerank', model, inputTokens: 0, outputTokens: 0,
+      latencyMs: Date.now() - started,
+      errorMessage: err instanceof Error ? err.message : String(err),
+      userId: opts.userId, workspaceId: opts.workspaceId,
+    });
+    throw err;
+  }
+
+  if (!res.ok) {
+    const body = (await res.text().catch(() => '')).slice(0, 300);
+    void _logTrackedCall({
+      task: opts.task ?? 'search_rerank', model, inputTokens: 0, outputTokens: 0,
+      latencyMs: Date.now() - started,
+      errorMessage: `voyage rerank ${res.status}: ${body}`,
+      userId: opts.userId, workspaceId: opts.workspaceId,
+    });
+    throw new Error(`voyage rerank ${res.status}: ${body}`);
+  }
+
+  const data = await res.json();
+  // `data`, not `results` — reading the wrong key yields an empty ranking with no error,
+  // which a reranker reports as "the source order was already right".
+  const rows: unknown[] = Array.isArray(data?.data) ? data.data : [];
+
+  // Billed on total_tokens, which covers the query AND every document. There is no output
+  // side, so the whole cost sits on the input half.
+  void _logTrackedCall({
+    task: opts.task ?? 'search_rerank',
+    model,
+    inputTokens: Number(data?.usage?.total_tokens ?? 0) || 0,
+    outputTokens: 0,
+    latencyMs: Date.now() - started,
+    userId: opts.userId,
+    workspaceId: opts.workspaceId,
+  });
+
+  return rows
+    .map((row) => {
+      const r = row as { index?: unknown; relevance_score?: unknown };
+      return { index: Number(r?.index), score: Number(r?.relevance_score) };
+    })
+    .filter((h) => Number.isInteger(h.index) && Number.isFinite(h.score));
+}
+
 // ── Claude: the raw Messages API, through the chokepoint ─────────────────────
 /** The Messages API verbatim, with the two things a hand-rolled `fetch` keeps forgetting. */
 export interface ClaudeMessagesResponse {

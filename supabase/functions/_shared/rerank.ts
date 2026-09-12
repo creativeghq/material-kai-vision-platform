@@ -1,5 +1,9 @@
 /** Cross-encoder style reranking for search results. */
-import { generateStructuredWithClaude } from './ai-client.ts';
+import {
+  generateStructuredWithClaude,
+  rerankWithVoyage,
+  VOYAGE_RERANK_MODEL,
+} from './ai-client.ts';
 import { z, type ZodType } from 'npm:zod@3';
 import { loadPrompt } from './prompt-utils.ts';
 import type { DbClient } from './supabase-client.ts';
@@ -13,6 +17,21 @@ import type { DbClient } from './supabase-client.ts';
  * and dashboard disagreed, and the dashboard was right.
  */
 export const RERANK_MODEL = 'claude-haiku-4-5';
+
+/**
+ * Which reranker runs. `claude` is the default and stays the default until the gate in
+ * `scripts/eval-rerank.mjs` says otherwise on 50 real queries — a trained cross-encoder
+ * SHOULD beat a model reading a prompt, but "should" is not a measurement, and this is
+ * the busiest AI operation on the platform.
+ *
+ * Read at call time, never captured at module load: the secrets bootstrap populates env
+ * at handler entry, so a module-load capture reads undefined.
+ */
+export type RerankProvider = 'claude' | 'voyage';
+
+export function rerankProvider(): RerankProvider {
+  return Deno.env.get('SEARCH_RERANK_PROVIDER') === 'voyage' ? 'voyage' : 'claude';
+}
 
 /** How many candidates are worth sending. Beyond this the prompt cost stops paying for itself. */
 const MAX_CANDIDATES = 40;
@@ -122,7 +141,13 @@ export async function rerankResults<T>(
   if (!trimmed) {
     return degraded('no query text to rank against');
   }
-  if (!Deno.env.get('ANTHROPIC_API_KEY')) {
+  // Voyage gives no per-result rationale, so a caller that asked for explanations is
+  // answered by Claude whatever the flag says. Dropping the field silently would be a
+  // feature that disappears when an env var changes.
+  const useVoyage = rerankProvider() === 'voyage' && !opts.includeExplanations && !opts.model;
+  if (useVoyage) {
+    if (!Deno.env.get('VOYAGE_API_KEY')) return degraded('VOYAGE_API_KEY not configured');
+  } else if (!Deno.env.get('ANTHROPIC_API_KEY')) {
     return degraded('ANTHROPIC_API_KEY not configured');
   }
   // Kill switch. Reranking adds one model call to every search that has something to rank, so
@@ -168,6 +193,79 @@ export async function rerankResults<T>(
       ].filter(Boolean).join('\n');
     })
     .join('\n');
+
+  /**
+   * Put the ranked items in front, then everything the ranker did not mention, then the
+   * candidates past MAX_CANDIDATES that were never sent. Shared by both providers because
+   * it is the contract, not an implementation detail: a result must NEVER disappear from a
+   * search because the reranker failed to name it.
+   */
+  const assemble = (
+    orderedIds: string[],
+    byId: Map<string, T>,
+    explanations?: Record<string, string>,
+  ): RerankOutcome<T> => {
+    const ordered: T[] = [];
+    const used = new Set<string>();
+    for (const id of orderedIds) {
+      const hit = byId.get(id);
+      if (!hit || used.has(id)) continue;
+      used.add(id);
+      ordered.push(hit);
+    }
+    considered.forEach((item, i) => { if (!used.has(ids[i])) ordered.push(item); });
+    const finalItems = [...ordered, ...items.slice(MAX_CANDIDATES)];
+    return {
+      items: opts.maxResults ? finalItems.slice(0, opts.maxResults) : finalItems,
+      reranked: true,
+      ...(explanations && Object.keys(explanations).length ? { explanations } : {}),
+    };
+  };
+
+  if (useVoyage) {
+    // One document per candidate, from the SAME fields the Claude path shows the model —
+    // otherwise an A/B between the two measures the text, not the ranker.
+    //
+    // The empty-string guard is not defensive padding: Voyage rejects the WHOLE request
+    // with a 400 if any single document is empty, so one untitled candidate would take
+    // the ranking off every result in that search. A candidate with no text cannot be
+    // ranked anyway, so it is held out and `assemble` puts it back at the end.
+    const rankable: string[] = [];
+    const rankableIds: string[] = [];
+    candidates.forEach((c, i) => {
+      const text = [
+        clip(c.name),
+        c.category ? `category: ${clip(c.category)}` : null,
+        c.description ? clip(c.description) : null,
+      ].filter(Boolean).join('\n').trim();
+      if (text) { rankable.push(text); rankableIds.push(ids[i]); }
+    });
+    if (rankable.length < 2) return degraded('fewer than 2 candidates carry any text');
+    const documents = rankable;
+
+    try {
+      const hits = await rerankWithVoyage(trimmed, documents, {
+        model: VOYAGE_RERANK_MODEL,
+        task: opts.task ?? 'search_rerank',
+        userId: opts.userId,
+        workspaceId: opts.workspaceId,
+      });
+      if (hits.length === 0) return degraded('voyage returned no ranking');
+
+      const byId = new Map<string, T>();
+      considered.forEach((item, i) => byId.set(ids[i], item));
+      // Indices are into the RANKABLE array, not the candidate array — they differ
+      // whenever a text-less candidate was held out above. An index outside it is
+      // dropped rather than allowed to fabricate a hit.
+      const orderedIds = hits
+        .filter((h) => h.index >= 0 && h.index < rankableIds.length)
+        .map((h) => rankableIds[h.index]);
+      return assemble(orderedIds, byId);
+    } catch (err) {
+      console.error('voyage rerank failed, returning source order:', err);
+      return degraded(err instanceof Error ? err.message : 'voyage rerank failed');
+    }
+  }
 
   // The prompt is prompt_type='tool', not 'generation'. This asked getGenerationPrompt for
   // generation/ai_rerank, which matched zero rows on EVERY call — so re-ranking ran on a
@@ -220,30 +318,17 @@ export async function rerankResults<T>(
     const byId = new Map<string, T>();
     considered.forEach((item, i) => byId.set(ids[i], item));
 
-    const ordered: T[] = [];
+    // An id we never sent is a hallucination; `assemble` drops it rather than fabricate a
+    // result, and both providers share that reassembly so they cannot drift on it.
     const explanations: Record<string, string> = {};
-    const used = new Set<string>();
     for (const row of ranked) {
-      const hit = byId.get(row?.id);
-      // An id we never sent is a hallucination; drop it rather than fabricate a result.
-      if (!hit || used.has(row.id)) continue;
-      used.add(row.id);
-      ordered.push(hit);
-      if (row.explanation) explanations[row.id] = row.explanation;
+      if (row?.explanation && byId.has(row.id)) explanations[row.id] = row.explanation;
     }
-
-    // Anything the model forgot keeps its original relative position at the end. A result must
-    // never disappear from a search because the reranker did not mention it.
-    considered.forEach((item, i) => { if (!used.has(ids[i])) ordered.push(item); });
-    // Candidates past MAX_CANDIDATES were never ranked; they follow, still in source order.
-    const tail = items.slice(MAX_CANDIDATES);
-
-    const finalItems = [...ordered, ...tail];
-    return {
-      items: opts.maxResults ? finalItems.slice(0, opts.maxResults) : finalItems,
-      reranked: true,
-      ...(opts.includeExplanations && Object.keys(explanations).length ? { explanations } : {}),
-    };
+    return assemble(
+      ranked.map((row) => row?.id).filter((id): id is string => typeof id === 'string'),
+      byId,
+      opts.includeExplanations ? explanations : undefined,
+    );
   } catch (err) {
     // Ranking degraded; search did not. Logged rather than swallowed so a persistently failing
     // reranker is visible in the function logs instead of looking like "the model just agrees
