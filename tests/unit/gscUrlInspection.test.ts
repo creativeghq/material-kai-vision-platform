@@ -28,6 +28,22 @@ describe('the collector respects a quota it does not own', () => {
       .toMatch(/await sleep\(MIN_INTERVAL_MS\)/);
   });
 
+  it('spends the quota against URLs HANDED OUT, not replies received', () => {
+    // Measured on the first live run: one inspection takes ~6.5s, so the collector runs a pool.
+    // With ten in flight, counting completions would let the pool overshoot the day's allowance
+    // by whatever is outstanding. The cursor is the spend.
+    expect(COLLECTOR).toMatch(/INSPECT_CONCURRENCY/);
+    expect(COLLECTOR).toMatch(/cursor >= remaining/);
+    expect(COLLECTOR, 'the hand-out guard must not key off completions')
+      .not.toMatch(/inspected >= remaining/);
+  });
+
+  it('keeps the pool under the published per-minute ceiling', () => {
+    // MIN_INTERVAL_MS scales with concurrency for exactly this reason: N workers sleeping the
+    // single-caller interval would be N times the intended rate.
+    expect(COLLECTOR).toMatch(/MIN_INTERVAL_MS\s*=\s*Math\.ceil\(\(60_000 \/ INSPECT_QPM\) \* INSPECT_CONCURRENCY\)/);
+  });
+
   it('counts the day from what was WRITTEN, not from a counter', () => {
     // A counter is wrong the moment a run dies halfway. The rows are the truth.
     expect(COLLECTOR).toMatch(/from\('gsc_url_inspection'\)[\s\S]{0,200}?count: 'exact'/);

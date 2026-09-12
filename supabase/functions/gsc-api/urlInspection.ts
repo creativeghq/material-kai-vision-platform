@@ -16,8 +16,16 @@ const INSPECT_URL = 'https://searchconsole.googleapis.com/v1/urlInspection/index
  */
 export const INSPECT_QUOTA_PER_DAY = 2000;
 const INSPECT_QPM = 600;
-/** 100ms between calls keeps us under 600/min with room for retries. */
-const MIN_INTERVAL_MS = Math.ceil(60_000 / INSPECT_QPM) + 10;
+
+/**
+ * Measured, not guessed: one inspection takes ~6.5s, because it is a live index lookup rather
+ * than a table read. Serial, that is 13 URLs in a 90s run — 5,351 pages would take ~100 days
+ * while using 3% of the quota. The limit here is LATENCY, so the fix is concurrency, not pacing.
+ * 10 in flight is ~92 req/min against a 600 QPM ceiling, and fills a run with ~138 URLs.
+ */
+const INSPECT_CONCURRENCY = 10;
+/** Floor between a worker's calls, so a fast reply cannot push the pool past the QPM ceiling. */
+const MIN_INTERVAL_MS = Math.ceil((60_000 / INSPECT_QPM) * INSPECT_CONCURRENCY);
 
 /** The edge gateway cuts a request at 150s, so a run does what it can and the cron continues. */
 const RUN_BUDGET_MS = 90_000;
@@ -111,10 +119,19 @@ export async function inspectSiteUrls(
   let failed = 0;
   let budgetExhausted = false;
 
-  for (const url of urlsToInspect) {
-    if (inspected >= remaining) break;
-    if (Date.now() > deadline) { budgetExhausted = true; break; }
+  // One shared cursor across the workers, so the quota and the deadline are enforced against the
+  // POOL rather than per worker — ten workers each counting to `remaining` would spend it tenfold.
+  let cursor = 0;
+  const takeNext = (): string | null => {
+    // `cursor`, not `inspected`: a URL handed to a worker is already spent against the quota
+    // whether or not its reply has landed yet. Counting completions would let ten in-flight
+    // calls overshoot the day's allowance.
+    if (cursor >= urlsToInspect.length || cursor >= remaining) return null;
+    if (Date.now() > deadline) { budgetExhausted = true; return null; }
+    return urlsToInspect[cursor++];
+  };
 
+  const inspectAndStore = async (url: string) => {
     const row = await inspectOne(token, conn.property, url);
     if (row.source_error) failed++;
 
@@ -147,8 +164,18 @@ export async function inspectSiteUrls(
     }, { onConflict: 'website_id,url' });
 
     inspected++;
-    await sleep(MIN_INTERVAL_MS);
-  }
+  };
+
+  await Promise.all(
+    Array.from({ length: Math.min(INSPECT_CONCURRENCY, urlsToInspect.length) }, async () => {
+      for (;;) {
+        const url = takeNext();
+        if (url === null) return;
+        await inspectAndStore(url);
+        await sleep(MIN_INTERVAL_MS);
+      }
+    }),
+  );
 
   return {
     inspected,
