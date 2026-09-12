@@ -412,6 +412,58 @@ export const createSEOGscStrikingDistanceTool = (
   );
 };
 
+/**
+ * #401 G2 — the one ranked answer to "what should I work on for this site".
+ *
+ * The inputs all existed and sat in six separate tabs with nothing ranking them. Derived in SQL
+ * by get_website_opportunities so this tool and any tile read the same list and cannot disagree.
+ */
+export const createSEOOpportunitiesTool = (
+  _userId: string, onChunk?: (chunk: any) => void, ctx?: SeoWebsiteCtx,
+) => {
+  return tool(
+    async ({ website_id }) => {
+      const r = await resolveGscWebsite(ctx, website_id);
+      if (!r.ok) return JSON.stringify({ success: false, error: r.error });
+      onChunk?.({ type: 'tool_progress', status: `Ranking opportunities for ${r.site.domain}…`, timestamp: Date.now() });
+      const { data, error } = await ctx!.supabase.rpc('get_website_opportunities', { p_website_id: r.site.id });
+      if (error) return JSON.stringify({ success: false, error: error.message });
+
+      const rows = (data as any[]) || [];
+      const actionable = rows.filter((x) => x.status === 'ok');
+      // Rows we could NOT evaluate travel with the answer rather than being filtered out: a list
+      // showing only what it happens to have is how a missing collector looks like a clean site.
+      const unavailable = rows.filter((x) => x.status !== 'ok');
+
+      onChunk?.({
+        type: 'seo_opportunities_card',
+        website: r.site.domain,
+        items: actionable,
+        unavailable,
+        timestamp: Date.now(),
+      });
+
+      return JSON.stringify({
+        success: true,
+        website: r.site.domain,
+        count: actionable.length,
+        top: actionable.slice(0, 10).map((i: any) => ({
+          kind: i.kind, subject: i.subject, affected: i.affected, reason: i.reason,
+        })),
+        // Named for the MODEL too, so it cannot present the list as complete.
+        not_evaluated: unavailable.map((u: any) => ({ kind: u.kind, why: u.reason })),
+      });
+    },
+    {
+      name: 'seo_opportunities',
+      description: 'What to work on next for a site, as ONE ranked list derived in SQL: pages Google has never crawled or has crawled and declined, queries ranking 4–20 that are close, and queries several of our own pages compete for. Each row states the reason it exists. Coverage counts are OBSERVED over the URLs inspected so far and never extrapolated to the whole site. Kinds that cannot be evaluated yet are returned with a stated reason rather than omitted.',
+      schema: z.object({
+        website_id: z.string().optional().describe('Connected website id. Omit to use the workspace default.'),
+      }),
+    },
+  );
+};
+
 export const createSEOGscTopMoversTool = (
   _userId: string, onChunk?: (chunk: any) => void, ctx?: SeoWebsiteCtx,
 ) => {

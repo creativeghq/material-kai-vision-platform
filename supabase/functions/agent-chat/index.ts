@@ -1005,7 +1005,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'seo_site_review', 'seo_brand_search_audit',
       // First-party: the workspace's own rank tracker + Google Search Console + every report
       // the Websites dashboard derives (health, crawl, AI visibility, …)
-      'seo_my_rankings', 'seo_site_report', 'seo_gsc_striking_distance', 'seo_gsc_top_movers',
+      'seo_my_rankings', 'seo_site_report', 'seo_gsc_striking_distance', 'seo_opportunities', 'seo_gsc_top_movers',
       // Gap-fillers (DataForSEO data GSC can't provide)
       'seo_onpage_issues', 'seo_backlinks_timeseries', 'seo_backlinks_competitors',
       'seo_historical_rank_overview', 'seo_keywords_for_site', 'seo_keyword_ideas',
@@ -1251,7 +1251,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'seo_domain_whois', 'seo_llm_mentions_search', 'seo_youtube_search', 'seo_local_pack', 'seo_google_trends',
       'seo_amazon_asin', 'seo_app_keywords', 'seo_trustpilot_search', 'seo_pinterest_search', 'seo_reddit_search',
       'seo_site_review', 'seo_brand_search_audit', 'seo_dataforseo_call',
-      'seo_my_rankings', 'seo_site_report', 'seo_gsc_striking_distance', 'seo_gsc_top_movers',
+      'seo_my_rankings', 'seo_site_report', 'seo_gsc_striking_distance', 'seo_opportunities', 'seo_gsc_top_movers',
       // Core record search (see Pepper's note): every specialist the router can pick gets it.
       'find_records',
       'seo_onpage_issues', 'seo_backlinks_timeseries', 'seo_backlinks_competitors',
@@ -1949,7 +1949,7 @@ async function executeAgent(
     'seo_trustpilot_search', 'seo_pinterest_search', 'seo_reddit_search',
     'seo_site_review', 'seo_brand_search_audit',
     'seo_dataforseo_call',
-    'seo_my_rankings', 'seo_site_report', 'seo_gsc_striking_distance', 'seo_gsc_top_movers',
+    'seo_my_rankings', 'seo_site_report', 'seo_gsc_striking_distance', 'seo_opportunities', 'seo_gsc_top_movers',
     'seo_onpage_issues', 'seo_backlinks_timeseries', 'seo_backlinks_competitors',
     'seo_historical_rank_overview', 'seo_keywords_for_site', 'seo_keyword_ideas',
     'seo_related_keywords', 'seo_search_volume', 'seo_domain_intersection',
@@ -2100,6 +2100,7 @@ async function executeAgent(
   const createSEOSiteReviewTool = seoAgentMod?.createSEOSiteReviewTool;
   const createSEOBrandSearchAuditTool = seoAgentMod?.createSEOBrandSearchAuditTool;
   const createSEOGscStrikingDistanceTool = seoAgentMod?.createSEOGscStrikingDistanceTool;
+  const createSEOOpportunitiesTool = seoAgentMod?.createSEOOpportunitiesTool;
   const createSEOGscTopMoversTool = seoAgentMod?.createSEOGscTopMoversTool;
   const createSEOMyRankingsTool = seoAgentMod?.createSEOMyRankingsTool;
   const createSEOSiteReportTool = seoAgentMod?.createSEOSiteReportTool;
@@ -2407,6 +2408,9 @@ async function executeAgent(
     tools.push(createSEOBrandSearchAuditTool(userId, onChunk));
   }
   // Google Search Console — reads first-party gsc_performance for the connected website.
+  if (config.tools.includes('seo_opportunities') && createSEOOpportunitiesTool) {
+    tools.push(createSEOOpportunitiesTool(userId, onChunk, { supabase, workspaceId, defaultWebsite: seoDefaultWebsite }));
+  }
   if (config.tools.includes('seo_gsc_striking_distance') && createSEOGscStrikingDistanceTool) {
     tools.push(createSEOGscStrikingDistanceTool(userId, onChunk, { supabase, workspaceId, defaultWebsite: seoDefaultWebsite }));
   }

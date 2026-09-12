@@ -2028,6 +2028,15 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'seo_opportunities',
+    file: 'supabase/functions/_shared/tools/seo-agent-tools.ts',
+    factory: 'createSEOOpportunitiesTool',
+    description: 'What to work on next for a site, as ONE ranked list derived in SQL: pages Google has never crawled or has crawled and declined, queries ranking 4–20 that are close, and queries several of our own pages compete for. Ea…',
+    params: [
+      { name: 'website_id', type: 'string', optional: true, description: 'Connected website id. Omit to use the workspace default.' },
+    ],
+  },
+  {
     name: 'seo_pinterest_search',
     file: 'supabase/functions/_shared/tools/seo-agent-tools.ts',
     factory: 'createSEOPinterestSearchTool',

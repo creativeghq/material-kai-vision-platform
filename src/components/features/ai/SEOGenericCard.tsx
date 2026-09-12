@@ -572,6 +572,50 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
     );
   }
 
+  // ── What to work on next (#401 G2) ────────────────────
+  if (t === 'seo_opportunities_card') {
+    const items: any[] = data.items || [];
+    const unavailable: any[] = data.unavailable || [];
+    const KIND_LABEL: Record<string, string> = {
+      not_crawled: 'Not crawled', crawled_not_indexed: 'Crawled, not indexed',
+      quick_win: 'Quick win', consolidate: 'Consolidate', refresh: 'Refresh', fix_page: 'Fix page',
+    };
+    return (
+      <Card className="space-y-3">
+        <Header icon="🎯" title="What to work on" subtitle={data.website} />
+        <Primer>
+          One ranked list, derived in SQL from Search Console, the crawl and Google&apos;s own index
+          coverage. Every row states why it is here. Counts are what we have actually observed —
+          never scaled up to the whole site.
+        </Primer>
+        {items.length === 0 && <div className="text-sm text-muted-foreground">Nothing actionable found yet.</div>}
+        <div className="space-y-2">
+          {items.slice(0, 12).map((o, i) => (
+            <div key={i} className="border border-border rounded p-2 bg-muted/30">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Pill tone={o.kind === 'quick_win' ? 'green' : o.kind === 'consolidate' ? 'amber' : undefined}>
+                  {KIND_LABEL[o.kind] || o.kind}
+                </Pill>
+                <span className="text-sm font-medium truncate">{o.subject}</span>
+                {o.affected > 1 && <span className="text-[11px] text-muted-foreground tabular-nums">×{o.affected}</span>}
+              </div>
+              <div className="text-[12px] text-muted-foreground mt-1">{o.reason}</div>
+            </div>
+          ))}
+        </div>
+        {unavailable.length > 0 && (
+          // Rows we could NOT evaluate are shown, not filtered: a list rendering only what it
+          // happens to have is how a collector that never ran looks identical to a clean site.
+          <div className="text-[11px] text-muted-foreground border-t border-border pt-2 space-y-0.5">
+            {unavailable.map((u, i) => (
+              <div key={i}><strong>{KIND_LABEL[u.kind] || u.kind}:</strong> {u.reason}</div>
+            ))}
+          </div>
+        )}
+      </Card>
+    );
+  }
+
   // ── Score a live URL (#401 G4) ────────────────────────
   if (t === 'seo_score_url_card') {
     // A page we could not read has NO score. Rendering 0 here would read as "this page is
