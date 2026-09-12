@@ -3,6 +3,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { authenticate, userCanAccessWorkspace, isCronAuthorized } from '../_shared/auth.ts';
+import { inspectSiteUrls, buildInspectionQueue, INSPECT_QUOTA_PER_DAY } from './urlInspection.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
@@ -382,6 +383,32 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
   try { body = await req.json(); } catch { /* empty */ }
   const action = String(body?.action || '');
 
+  // ── Cron: ask Google what it has crawled and indexed ──
+  // Separate from cron-sync on purpose: performance rows are a 5-day window refreshed daily,
+  // while inspection is a 2,000/day-per-site backfill that takes days to walk a real sitemap.
+  // Sharing a schedule would either starve the backfill or re-pull performance data hourly.
+  if (action === 'cron-inspect') {
+    if (!isCronAuthorized(req)) return json({ error: 'Unauthorized' }, 401);
+    const { data: conns } = await supabase.from('website_gsc_connections')
+      .select('website_id, workspace_id, property, access_token, refresh_token, token_expires_at')
+      .eq('is_active', true).not('property', 'is', null).not('refresh_token', 'is', null);
+    const results: unknown[] = [];
+    for (const c of conns || []) {
+      try {
+        const token = await validAccessToken(supabase, c);
+        const queue = await buildInspectionQueue(supabase, c.website_id, INSPECT_QUOTA_PER_DAY);
+        const r = await inspectSiteUrls(supabase, c, token, queue);
+        results.push({ website_id: c.website_id, ...r });
+      } catch (e) {
+        const msg = String(e instanceof Error ? e.message : e).slice(0, 500);
+        // Recorded against the connection, not swallowed: a collector that fails silently is
+        // indistinguishable from one that found nothing.
+        await supabase.from('website_gsc_connections').update({ last_sync_error: msg }).eq('website_id', c.website_id);
+        results.push({ website_id: c.website_id, error: msg });
+      }
+    }
+    return json({ ok: true, sites: results });
+  }
   // ── Cron: refresh every active, property-bound connection ──
   if (action === 'cron-sync') {
     if (!isCronAuthorized(req)) return json({ error: 'Unauthorized' }, 401);
@@ -546,6 +573,23 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
         }
       }
 
+      case 'inspect_urls': {
+        const { data: conn } = await supabase.from('website_gsc_connections')
+          .select('website_id, workspace_id, property, access_token, refresh_token, token_expires_at').eq('website_id', websiteId).maybeSingle();
+        if (!conn?.refresh_token) return json({ error: 'Not connected' }, 400);
+        if (!conn.property) return json({ error: 'No Search Console property selected for this site yet.' }, 400);
+        const want = Math.min(Math.max(Number(body?.limit) || 50, 1), INSPECT_QUOTA_PER_DAY);
+        try {
+          const token = await validAccessToken(supabase, conn);
+          const queue = await buildInspectionQueue(supabase, websiteId, want);
+          const r = await inspectSiteUrls(supabase, conn, token, queue);
+          return json({ ok: true, ...r });
+        } catch (e) {
+          const msg = String(e instanceof Error ? e.message : e).slice(0, 500);
+          await supabase.from('website_gsc_connections').update({ last_sync_error: msg }).eq('website_id', websiteId);
+          return json({ ok: false, error: msg }, 400);
+        }
+      }
       case 'sync': {
         const { data: conn } = await supabase.from('website_gsc_connections')
           .select('website_id, workspace_id, property, access_token, refresh_token, token_expires_at').eq('website_id', websiteId).maybeSingle();

@@ -2779,6 +2779,30 @@
         "description": "x-cron-secret only — nightly refresh of every active connection + 180-day retention prune.",
         "params": [],
         "response": "{ ok, synced, failed, rows }"
+      },
+      {
+        "action": "inspect_urls",
+        "description": "Ask Search Console what it has CRAWLED and INDEXED, per URL, for this website. gsc_performance only holds pages that earned an impression, which is two steps downstream: \"5,351 URLs and 42 with impressions\" has three explanations with three different fixes (never crawled / crawled and declined / indexed but never matched) and nothing else can tell them apart. Walks the stalest URLs first, never-inspected ahead of all. Quota is 2,000 per day PER SITE and is counted from what was actually written today, so a failed run cannot leave a counter wrong. Google's strings are stored verbatim; crawl_status is derived in SQL by gsc_crawl_status() and falls through to \"unknown\" for wording we do not recognise.",
+        "params": [
+          {
+            "name": "website_id",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "limit",
+            "type": "number",
+            "required": false,
+            "desc": "URLs to inspect this call (1–2000, default 50). Capped by the day's remaining quota and a 90s run budget."
+          }
+        ],
+        "response": "{ ok, inspected, failed, quota_used_today, quota_remaining, budget_exhausted, queue_remaining }"
+      },
+      {
+        "action": "cron-inspect",
+        "description": "Cron (x-cron-secret): run inspect_urls for every active, property-bound connection. Scheduled separately from cron-sync because performance rows are a 5-day window refreshed daily while inspection is a multi-day backfill; sharing a schedule would starve one of them. A per-site failure is recorded on the connection, never swallowed.",
+        "params": [],
+        "response": "{ ok, sites: [{ website_id, inspected, failed, quota_used_today, quota_remaining, budget_exhausted, queue_remaining } | { website_id, error }] }"
       }
     ]
   },
