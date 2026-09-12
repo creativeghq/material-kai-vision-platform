@@ -1356,17 +1356,31 @@ export const userWebsitesService = {
   /**
    * Turn the nightly engine on or off for a site, and set its ceiling.
    *
-   * The ceiling is the spending control: every active keyword is a paid SERP call on
-   * every rotation, so an engine with no upper bound bills without one either.
+   * Only what is PASSED is written: sending the switch during a ceiling edit carries a
+   * stale copy of it back over a change made a moment earlier. And `user_websites` is
+   * writable by the workspace ADMIN or the site's owner only, so a member's update
+   * matches no row and still returns success — the `select` is what catches that.
    */
-  async setKeywordAutotrack(websiteId: string, on: boolean, limit?: number): Promise<void> {
-    const patch: Record<string, unknown> = { keyword_autotrack: on };
-    if (limit != null) patch.keyword_autotrack_limit = Math.max(0, Math.min(500, Math.round(limit)));
-    const { error } = await supabase
+  async setKeywordAutotrack(
+    websiteId: string, patch: { on?: boolean; limit?: number },
+  ): Promise<void> {
+    const body: Record<string, unknown> = {};
+    if (patch.on != null) body.keyword_autotrack = patch.on;
+    if (patch.limit != null) {
+      body.keyword_autotrack_limit = Math.max(0, Math.min(500, Math.round(patch.limit)));
+    }
+    if (Object.keys(body).length === 0) return;
+    const { data, error } = await supabase
       .from('user_websites' as any)
-      .update(patch as any)
-      .eq('id', websiteId);
+      .update(body as any)
+      .eq('id', websiteId)
+      .select('id');
     if (error) throw error;
+    if (!data || data.length === 0) {
+      throw new Error(
+        'That change was refused — only a workspace admin or the person who added this website can change its keyword settings.',
+      );
+    }
   },
 
   async runRankCheck(websiteId: string): Promise<{ checked: number; ranking: number; failed: number }> {

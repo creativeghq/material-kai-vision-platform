@@ -72,11 +72,14 @@ const BANDS: { key: string; label: string; tone: string }[] = [
 ];
 
 /**
- * The band a row sits in — the same five the distribution bar counts, plus the sixth
- * the bar cannot show: a check that FAILED is unknown, and must never be filed under
- * "not ranking" just because both of them lack a number.
+ * The band a row sits in — the same five the distribution bar counts, plus the two it
+ * cannot show. Both matter: the bar counts "not ranking" only where a check ACTUALLY
+ * RAN (`captured_at is not null and error is null`), so folding a failed check or a
+ * never-checked keyword in there would make this funnel disagree with the bar above it
+ * — and every freshly promoted keyword is never-checked until the next rotation.
  */
 function bandOf(r: TrackedKeywordRow): string {
+  if (!r.captured_at) return 'never_checked';
   if (r.error) return 'unknown';
   if (r.position == null) return 'not_ranking';
   if (r.position <= 3) return 'top_3';
@@ -87,14 +90,22 @@ function bandOf(r: TrackedKeywordRow): string {
 const BAND_LABELS: Record<string, string> = {
   ...Object.fromEntries(BANDS.map((b) => [b.key, b.label])),
   unknown: 'Could not check',
+  never_checked: 'Not checked yet',
 };
-const BAND_ORDER = [...BANDS.map((b) => b.key), 'unknown'];
+const BAND_ORDER = [...BANDS.map((b) => b.key), 'unknown', 'never_checked'];
 
+/**
+ * `change` is null whenever EITHER capture lacks a position, which on this platform is
+ * most of the set — so reading it as "no previous check" reported 128 of 129 keywords as
+ * never measured. A pair that ranked in neither check is unchanged and known; only a
+ * keyword with no capture at all has never been measured.
+ */
 function movementOf(r: TrackedKeywordRow): string {
+  if (!r.captured_at) return 'first';
   if (r.error) return 'unknown';
   if (r.entered) return 'entered';
   if (r.lost) return 'lost';
-  if (r.change == null) return 'first';
+  if (r.change == null) return r.position == null ? 'still_unranked' : 'first_position';
   if (r.change > 0) return 'up';
   if (r.change < 0) return 'down';
   return 'flat';
@@ -102,9 +113,12 @@ function movementOf(r: TrackedKeywordRow): string {
 const MOVE_LABELS: Record<string, string> = {
   up: 'Moved up', down: 'Moved down', flat: 'Unchanged',
   entered: 'Entered the top 100', lost: 'Lost its position',
-  first: 'No previous check', unknown: 'Could not check',
+  still_unranked: 'Still not ranking', first_position: 'First position recorded',
+  first: 'Not checked yet', unknown: 'Could not check',
 };
-const MOVE_ORDER = ['up', 'down', 'flat', 'entered', 'lost', 'first', 'unknown'];
+const MOVE_ORDER = [
+  'up', 'down', 'flat', 'entered', 'lost', 'still_unranked', 'first_position', 'first', 'unknown',
+];
 
 /** Who put the keyword in the set. Only the engine's own may be auto-retired. */
 const SOURCE_LABELS: Record<string, string> = {

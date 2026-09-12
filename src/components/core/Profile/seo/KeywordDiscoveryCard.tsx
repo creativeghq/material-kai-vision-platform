@@ -72,6 +72,7 @@ export const KeywordDiscoveryCard: React.FC<{
 }> = ({ website, onTracked }) => {
   const { toast } = useToast();
   const [data, setData] = useState<KeywordCandidates | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(28);
   const [busy, setBusy] = useState<string | null>(null);
@@ -87,9 +88,15 @@ export const KeywordDiscoveryCard: React.FC<{
     try {
       const d = await userWebsitesService.keywordCandidates(website.id, days, 200);
       setData(d);
+      setLoadError(null);
       setLimitDraft(String(d?.autotrack_limit ?? 40));
-    } catch {
+      // A list that empties while a filter is set leaves no toolbar to clear it from.
+      if ((d?.candidates.length ?? 0) === 0) { setSearch(''); setReasons([]); }
+    } catch (e: any) {
+      // Swallowing this removed the whole card from the page, so a failing RPC looked
+      // exactly like a feature that does not exist here.
       setData(null);
+      setLoadError(e?.message || 'The candidate list could not be loaded.');
     } finally {
       setLoading(false);
     }
@@ -135,7 +142,7 @@ export const KeywordDiscoveryCard: React.FC<{
   const setAutotrack = async (on: boolean) => {
     setBusy('autotrack');
     try {
-      await userWebsitesService.setKeywordAutotrack(website.id, on);
+      await userWebsitesService.setKeywordAutotrack(website.id, { on });
       toast({
         title: on ? 'Auto-tracking on' : 'Auto-tracking off',
         description: on
@@ -151,15 +158,24 @@ export const KeywordDiscoveryCard: React.FC<{
   };
 
   const saveLimit = async () => {
+    // An emptied field is not a ceiling of zero — `Number('')` is 0, which passes every
+    // numeric guard and silently stops the engine. Put the stored value back instead.
+    if (limitDraft.trim() === '') {
+      setLimitDraft(String(data?.autotrack_limit ?? 40));
+      return;
+    }
     const n = Number(limitDraft);
     if (!Number.isFinite(n) || n < 0) return;
     if (n === data?.autotrack_limit) return;
     setBusy('limit');
     try {
-      await userWebsitesService.setKeywordAutotrack(website.id, data?.autotrack ?? false, n);
+      // Only the ceiling: sending the switch too would write back the copy this render
+      // captured, undoing a change made between the field losing focus and this request.
+      await userWebsitesService.setKeywordAutotrack(website.id, { limit: n });
       await load();
     } catch (e: any) {
       toast({ title: 'Could not save the limit', description: e?.message, variant: 'destructive' });
+      setLimitDraft(String(data?.autotrack_limit ?? 40));
     } finally {
       setBusy(null);
     }
@@ -184,6 +200,14 @@ export const KeywordDiscoveryCard: React.FC<{
       if (sort.key === 'reason') {
         return (REASON_ORDER.indexOf(reasonKey(a) as never) - REASON_ORDER.indexOf(reasonKey(b) as never)) * dir;
       }
+      if (sort.key === 'position') {
+        // A query with no average position has none — sorted as 0 it would rank as the
+        // best result on the page, which is the exact defect the tracked table avoids.
+        const ap = a.position ?? Number.POSITIVE_INFINITY;
+        const bp = b.position ?? Number.POSITIVE_INFINITY;
+        if (ap === bp) return a.keyword.localeCompare(b.keyword, 'el');
+        return ap < bp ? -dir : dir;
+      }
       const av = Number(a[sort.key] ?? 0);
       const bv = Number(b[sort.key] ?? 0);
       return (av - bv) * dir;
@@ -193,7 +217,6 @@ export const KeywordDiscoveryCard: React.FC<{
   const currentPage = clampPage(page, sorted.length);
   const visible = paginate(sorted, currentPage);
   const eligibleNow = filtered.filter((c) => c.reason).map((c) => c.keyword);
-  const filtering = search.trim().length > 0 || reasons.length > 0;
 
   if (loading) {
     return (
@@ -204,7 +227,26 @@ export const KeywordDiscoveryCard: React.FC<{
       </Card>
     );
   }
-  if (!data) return null;
+  if (!data) {
+    return (
+      <Card className="dashboard-card">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Sparkles className="h-4 w-4 text-primary" aria-hidden="true" />
+            Found in Search Console
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <HubEmptyState
+            icon={AlertTriangle}
+            title="Could not load the candidates"
+            description={loadError ?? 'The candidate list could not be loaded.'}
+            action={<Button size="sm" variant="outline" onClick={() => void load()}>Try again</Button>}
+          />
+        </CardContent>
+      </Card>
+    );
+  }
 
   // Not connected / never collected / nothing in the window: say which, never show an
   // empty table that reads as "Google has nothing on you".
@@ -418,7 +460,10 @@ export const KeywordDiscoveryCard: React.FC<{
               </div>
             )}
 
-            {rows.length === 0 && !filtering && (
+            {/* Not `&& !filtering`: when the list empties while a filter is set, the
+                toolbar above is gone too, so that combination rendered nothing at all
+                and left no way to clear the filter. `load` clears it; this is the net. */}
+            {rows.length === 0 && (
               <HubEmptyState
                 variant="empty"
                 title="Nothing new to offer"
