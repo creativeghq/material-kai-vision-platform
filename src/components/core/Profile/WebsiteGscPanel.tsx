@@ -5,8 +5,12 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
-import { HubSegmented } from '@/components/core/hub';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
+import { HubSegmented, HubToolbar, HubEmptyState } from '@/components/core/hub';
+import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/core/ui/table';
+import { TablePagination, clampPage, paginate } from '@/components/core/ui/table-pagination';
+import {
+  TableColumnHeader, nextSort, type TableSort,
+} from '@/components/core/ui/table-column-header';
 import { useToast } from '@/hooks/use-toast';
 import { sourceStatusPresentation } from '@/components/core/Profile/seo/seoMetrics';
 import { formatNumber } from '@/utils/decimal';
@@ -16,6 +20,20 @@ import {
 
 
 const fmt = (n: number) => formatNumber((n ?? 0));
+
+/**
+ * The windows, in days INCLUDING the anchor day.
+ *
+ * "Today" is the most recent day Search Console has REPORTED, which is two or three
+ * days ago — Google's reporting lag is real and the panel says which day it landed on
+ * rather than showing a guaranteed-empty window for the actual calendar day.
+ */
+const WINDOWS: { value: string; label: string; title: string }[] = [
+  { value: '1', label: 'Day', title: 'The most recent day Search Console has reported' },
+  { value: '7', label: 'Week', title: 'Seven reported days, ending on the most recent' },
+  { value: '28', label: 'Month', title: 'Twenty-eight reported days, ending on the most recent' },
+  { value: '90', label: 'Quarter', title: 'Ninety reported days, ending on the most recent' },
+];
 
 /** Search Console figures are a VALUE or a stated REASON (CLAUDE.md rule 3). */
 function GscMetric({ label, value, status }: { label: string; value: string; status: string | undefined }) {
@@ -50,16 +68,15 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
   const [syncing, setSyncing] = useState(false);
   const [props, setProps] = useState<{ property: string; permission?: string }[] | null>(null);
   const [view, setView] = useState<'queries' | 'pages' | 'countries' | 'appearance'>('queries');
+  const [days, setDays] = useState<number>(28);
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   // Click a header to sort by it; click again to flip. Search Console's own order
   // (by clicks) is the default, but the question is usually "where do I have
   // impressions and no clicks" — which is a sort by impressions or by position.
   type SortKey = 'label' | 'clicks' | 'impressions' | 'ctr' | 'position';
-  const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'clicks', dir: 'desc' });
-  const toggleSort = (key: SortKey) =>
-    setSort((s) => (s.key === key
-      ? { key, dir: s.dir === 'desc' ? 'asc' : 'desc' }
-      // A numeric column starts high-to-low; the label column starts A→Z.
-      : { key, dir: key === 'label' ? 'asc' : 'desc' }));
+  const [sort, setSort] = useState<TableSort<SortKey>>({ key: 'clicks', dir: 'desc' });
+  const toggleSort = (key: SortKey) => setSort((s) => nextSort(s, key, ['label']));
 
   const load = async () => {
     setLoading(true);
@@ -67,7 +84,7 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
       const st = await userWebsitesService.gscStatus(website.id);
       setStatus(st);
       if (st.connected && st.property) {
-        setSummary(await userWebsitesService.gscSummary(website.id, 28));
+        setSummary(await userWebsitesService.gscSummary(website.id, days));
       } else {
         setSummary(null);
       }
@@ -78,7 +95,7 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
     }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [website.id]);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [website.id, days]);
 
   const connect = async () => {
     setConnecting(true);
@@ -116,7 +133,10 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
   const sync = async () => {
     setSyncing(true);
     try {
-      const r = await userWebsitesService.gscSync(website.id, 28);
+      // Pull at least the window being looked at — choosing Quarter and pressing Sync
+      // should backfill a quarter — but never less than 28 days, so switching to Day
+      // cannot quietly shorten the stored history everything else reads.
+      const r = await userWebsitesService.gscSync(website.id, Math.max(days, 28));
       toast({ title: 'Synced from Search Console', description: `${r.rows} rows updated` });
       load();
     } catch (e: any) {
@@ -209,25 +229,18 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
     appearance: () => summary?.appearances || [],
   };
   const labelOf = (r: any): string => String(view === 'queries' ? r.query : view === 'pages' ? r.page : r.value) ?? '';
-  const rows = [...VIEW_ROWS[view]()].sort((a, b) => {
-    const dir = sort.dir === 'asc' ? 1 : -1;
-    if (sort.key === 'label') return labelOf(a).localeCompare(labelOf(b), 'el') * dir;
-    return ((Number(a[sort.key]) || 0) - (Number(b[sort.key]) || 0)) * dir;
-  });
+  const q = search.trim().toLowerCase();
+  const allRows = VIEW_ROWS[view]();
+  const rows = allRows
+    .filter((r) => !q || labelOf(r).toLowerCase().includes(q))
+    .sort((a, b) => {
+      const dir = sort.dir === 'asc' ? 1 : -1;
+      if (sort.key === 'label') return labelOf(a).localeCompare(labelOf(b), 'el') * dir;
+      return ((Number(a[sort.key]) || 0) - (Number(b[sort.key]) || 0)) * dir;
+    });
+  const currentPage = clampPage(page, rows.length);
+  const visibleRows = paginate(rows, currentPage);
   const firstColLabel = view === 'queries' ? 'Query' : view === 'pages' ? 'Page' : view === 'countries' ? 'Country' : 'Appearance';
-  const SortHead = ({ k, children, className }: { k: SortKey; children: React.ReactNode; className?: string }) => (
-    <TableHead className={className}>
-      <button
-        type="button"
-        onClick={() => toggleSort(k)}
-        aria-sort={sort.key === k ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
-        className={`inline-flex items-center gap-1 hover:text-foreground ${sort.key === k ? 'text-foreground' : ''}`}
-      >
-        {children}
-        <span aria-hidden="true" className="text-[10px]">{sort.key === k ? (sort.dir === 'asc' ? '▲' : '▼') : ''}</span>
-      </button>
-    </TableHead>
-  );
   const devices = summary?.devices || [];
   const trend = summary?.trend || [];
   return (
@@ -238,10 +251,16 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
             <CardTitle className="flex items-center gap-2 text-base"><CheckCircle2 className="w-4 h-4 text-[hsl(var(--success))]" />Search Performance</CardTitle>
             <CardDescription>
               {status.property} · {status.google_email} · last sync {timeAgo(status.last_sync_at)}
-              {summary ? <> · last {summary.days} days</> : null}
+              {summary ? <> · {summary.from} → {summary.to}</> : null}
             </CardDescription>
           </div>
-          <div className="flex items-center gap-1 flex-shrink-0">
+          <div className="flex items-center gap-1 flex-shrink-0 flex-wrap justify-end">
+            <HubSegmented
+              aria-label="Date range"
+              value={String(days)}
+              onChange={(v) => { setDays(Number(v)); setPage(1); }}
+              options={WINDOWS.map((w) => ({ value: w.value, label: w.label, title: w.title }))}
+            />
             <Button variant="outline" size="sm" onClick={sync} disabled={syncing}>
               {syncing ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />}Sync
             </Button>
@@ -258,9 +277,17 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
             <GscMetric label="Avg CTR" value={`${(t?.ctr ?? 0).toFixed(1)}%`} status={summary?.status} />
             <GscMetric label="Avg position" value={(t?.position ?? 0).toFixed(1)} status={summary?.status} />
           </div>
+          {summary?.note && (
+            // Which day this actually ends on, and whether the stored history is
+            // shorter than the window asked for. Both are invisible otherwise — a
+            // 90-day view of 57 days of data just looks like a quiet quarter.
+            <p className="mt-3 text-xs leading-snug text-muted-foreground">{summary.note}</p>
+          )}
           {trend.length > 1 && (
             <div className="mt-4">
-              <p className="text-xs text-muted-foreground mb-1">Clicks · last {summary?.days} days</p>
+              <p className="text-xs text-muted-foreground mb-1">
+                Clicks · {summary?.days === 1 ? 'the reported day' : `${summary?.days} days to ${summary?.to}`}
+              </p>
               <Sparkline points={trend.map((p) => p.clicks)} />
             </div>
           )}
@@ -299,7 +326,9 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
           <HubSegmented
             aria-label="Breakdown dimension"
             value={view}
-            onChange={setView}
+            // A search typed against queries means nothing against countries, and a
+            // carried-over one leaves the new dimension looking empty.
+            onChange={(v) => { setView(v); setSearch(''); setPage(1); }}
             className="flex-wrap"
             options={[
               { value: 'queries', label: 'Queries' },
@@ -310,22 +339,27 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
           />
         </CardHeader>
         <CardContent className="p-0">
-          {rows.length === 0 ? (
+          {allRows.length === 0 ? (
             <Empty text="No data yet — Search Console has a 2–3 day reporting lag. Hit Sync tomorrow, or once the nightly pull runs." />
           ) : (
-            <div className="overflow-x-auto">
+            <>
+              <HubToolbar
+                search={search}
+                onSearchChange={(v) => { setSearch(v); setPage(1); }}
+                searchPlaceholder={`Search ${firstColLabel.toLowerCase()}s…`}
+              />
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <SortHead k="label">{firstColLabel}</SortHead>
-                    <SortHead k="clicks" className="text-right">Clicks</SortHead>
-                    <SortHead k="impressions" className="text-right">Impr.</SortHead>
-                    <SortHead k="ctr" className="text-right">CTR</SortHead>
-                    <SortHead k="position" className="text-right">Pos.</SortHead>
+                    <TableColumnHeader sortKey="label" sort={sort} onSort={toggleSort}>{firstColLabel}</TableColumnHeader>
+                    <TableColumnHeader align="right" sortKey="clicks" sort={sort} onSort={toggleSort}>Clicks</TableColumnHeader>
+                    <TableColumnHeader align="right" sortKey="impressions" sort={sort} onSort={toggleSort}>Impr.</TableColumnHeader>
+                    <TableColumnHeader align="right" sortKey="ctr" sort={sort} onSort={toggleSort}>CTR</TableColumnHeader>
+                    <TableColumnHeader align="right" sortKey="position" sort={sort} onSort={toggleSort}>Pos.</TableColumnHeader>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map((r, i) => (
+                  {visibleRows.map((r, i) => (
                     <TableRow key={i}>
                       <TableCell className="max-w-[340px] truncate font-medium">
                         {view === 'pages' && r.page ? (
@@ -344,7 +378,19 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
                   ))}
                 </TableBody>
               </Table>
-            </div>
+              {rows.length === 0 && (
+                <HubEmptyState
+                  variant="filtered"
+                  title={`No ${firstColLabel.toLowerCase()} matches “${search.trim()}”`}
+                  description={`Search Console reported ${allRows.length} in this window — the search box is excluding them.`}
+                  action={<Button size="sm" variant="outline" onClick={() => setSearch('')}>Clear search</Button>}
+                />
+              )}
+              <TablePagination
+                page={currentPage} total={rows.length} onPageChange={setPage}
+                label={`${firstColLabel.toLowerCase()}s`}
+              />
+            </>
           )}
         </CardContent>
       </Card>

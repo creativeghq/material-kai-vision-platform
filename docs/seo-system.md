@@ -42,7 +42,7 @@ Crawled pages land in `user_website_pages` (`crawl-user-website`, every 6 h) and
 | `set_property` | Bind a property manually when auto-match didn't. |
 | `sync` | Pull the last N days now (default 28). |
 | `disconnect` | Deactivate + clear tokens. History is kept. |
-| `cron-sync` | Nightly refresh (03:30 UTC) of every active connection + 180-day retention prune. |
+| `cron-sync` | Nightly refresh (03:30 UTC) of every active connection + 180-day retention prune, then `seo_autotrack_sweep` (§4.2) now that the day's rows have landed. |
 
 ---
 
@@ -342,6 +342,44 @@ which would report a place or two below what Search Console and every other trac
 action calls `authenticate()` + `userCanAccessWorkspace()` and asserts the `seo-toolkit`
 entitlement **before** spending (invariant 10).
 
+### 4.2 Discovery — Search Console queries → the tracked set (2026-09-12)
+
+Search Console already knows every query the site is **visible** for; the tracked set only knows
+the ones somebody typed in. `seo_keyword_candidates` closes that gap, and the whole design is about
+*not* closing it wholesale: of 57 real queries on materialshub.gr, 3 were search operators from
+somebody else's scraper (`-site:facebook.com … "shell"`), two spellings of one Greek phrase were
+reported as two rows, and 42 had a single impression on a single day. Every active keyword is a
+paid SERP call on every rotation, so "track everything Google reports" buys noise with money and
+slows the rotation for the keywords that matter.
+
+**One derivation, two readers.** `seo_keyword_candidate_rows(website, days)` is the source: it
+folds by normalised spelling, scores, and returns a verdict per query. The panel renders it and
+`seo_promote_keyword_candidates` writes from it — never a second query, or the screen describes a
+decision made on different numbers.
+
+| Piece | Does |
+|---|---|
+| `seo_normalize_keyword(text)` | lower + Greek/Latin accent fold + whitespace collapse. `μονωτικά υλικά` and `μονωτικα υλικα` are ONE keyword and one SERP call. |
+| `seo_keyword_candidate_rows` | The derivation: evidence, junk verdict, qualification reason, already-tracked / dismissed / brand flags. |
+| `seo_keyword_candidates` | Presentation wrapper: counts, the limited list, and the status/note when there is nothing to show. |
+| `seo_promote_keyword_candidates` | The write. Named keywords → `source='manual'` (a person decided). None named → the engine takes the best that qualify, `source='gsc_auto'`, bounded by the site's ceiling. |
+| `seo_retire_auto_keywords` | The other half of the loop: deactivates `gsc_auto` keywords with no impressions AND no top-100 position for 60 days. Never touches `manual`. |
+| `seo_autotrack_sweep` | Nightly, service-role only. Called by `gsc-api` `cron-sync` once the day's rows land. Writes `user_websites.keyword_autotrack_{at,note}` per site — including on failure. |
+| `seo_untrack_keyword` | Delete + dismissal in ONE transaction, so removing a keyword cannot be undone by tonight's sweep. |
+
+**Qualification**, strongest evidence first: `earning_clicks` (≥1 click) → `recurring_impressions`
+(≥10 impressions on ≥3 separate days) → `striking_distance` (position ≤20, ≥3 impressions, ≥2
+days). Anything else is listed as *watching* — visible, offered, but not auto-taken.
+
+**Off by default** (`user_websites.keyword_autotrack`), with a ceiling
+(`keyword_autotrack_limit`, default 40) counting only `gsc_auto` rows: a person adding a keyword by
+hand is making a decision, not spending an allowance. Turning the engine on is a spending decision
+and the switch says so.
+
+**Watched by `seo.keyword_autotrack_stalled`**, which probes the janitor's *output* — keywords that
+meet the retirement rule and are still billing, a sweep older than three days, or a recorded
+failure — because a sweep that quietly stops leaves a growing pile under a panel that looks normal.
+
 ---
 
 ## 5. Content pipeline
@@ -451,7 +489,7 @@ allow-set so the two files cannot contradict each other again.
 | Job | Schedule (UTC) | Does |
 |---|---|---|
 | `seo-toolkit-audit-hourly` | `45 * * * *` | Toolkit audit queue. |
-| `gsc-performance-sync-daily` | 03:30 | GSC pull + 180-day prune. |
+| `gsc-performance-sync-daily` | 03:30 | GSC pull + 180-day prune + the keyword discovery sweep (§4.2). |
 | `seo-domain-tracker-weekly` | Mon 03:30 | Rankings + backlinks snapshot. |
 | `seo-site-health-weekly` | Sun 04:00 | Lighthouse + on-page audit sweep. |
 | `user-website-recrawl-every-6h` | `0 */6 * * *` | Re-crawl connected sites into `user_website_pages`. |

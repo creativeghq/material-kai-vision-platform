@@ -5,9 +5,13 @@ import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Textarea } from '@/components/core/ui/textarea';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
+import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/core/ui/table';
 import { TablePagination, clampPage, paginate } from '@/components/core/ui/table-pagination';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
+import { HubToolbar } from '@/components/core/hub';
+import {
+  TableColumnHeader, nextSort, segmentOptions, type TableSort,
+} from '@/components/core/ui/table-column-header';
 import { useToast } from '@/hooks/use-toast';
 import { timeAgo } from '@/utils/datetime';
 import {
@@ -18,6 +22,7 @@ import {
 } from '@/services/userWebsitesService';
 import { Sparkline } from './seo/Sparkline';
 import { compact } from './seo/seoMetrics';
+import { KeywordDiscoveryCard } from './seo/KeywordDiscoveryCard';
 
 /** Websites → Rankings. */
 
@@ -66,6 +71,51 @@ const BANDS: { key: string; label: string; tone: string }[] = [
   { key: 'not_ranking', label: 'Not ranking', tone: 'bg-muted-foreground/35' },
 ];
 
+/**
+ * The band a row sits in — the same five the distribution bar counts, plus the sixth
+ * the bar cannot show: a check that FAILED is unknown, and must never be filed under
+ * "not ranking" just because both of them lack a number.
+ */
+function bandOf(r: TrackedKeywordRow): string {
+  if (r.error) return 'unknown';
+  if (r.position == null) return 'not_ranking';
+  if (r.position <= 3) return 'top_3';
+  if (r.position <= 10) return 'top_10';
+  if (r.position <= 30) return 'top_30';
+  return 'top_100';
+}
+const BAND_LABELS: Record<string, string> = {
+  ...Object.fromEntries(BANDS.map((b) => [b.key, b.label])),
+  unknown: 'Could not check',
+};
+const BAND_ORDER = [...BANDS.map((b) => b.key), 'unknown'];
+
+function movementOf(r: TrackedKeywordRow): string {
+  if (r.error) return 'unknown';
+  if (r.entered) return 'entered';
+  if (r.lost) return 'lost';
+  if (r.change == null) return 'first';
+  if (r.change > 0) return 'up';
+  if (r.change < 0) return 'down';
+  return 'flat';
+}
+const MOVE_LABELS: Record<string, string> = {
+  up: 'Moved up', down: 'Moved down', flat: 'Unchanged',
+  entered: 'Entered the top 100', lost: 'Lost its position',
+  first: 'No previous check', unknown: 'Could not check',
+};
+const MOVE_ORDER = ['up', 'down', 'flat', 'entered', 'lost', 'first', 'unknown'];
+
+/** Who put the keyword in the set. Only the engine's own may be auto-retired. */
+const SOURCE_LABELS: Record<string, string> = {
+  manual: 'Chosen',
+  gsc_auto: 'Found in Search Console',
+};
+
+type SortKey = 'keyword' | 'position' | 'change' | 'features' | 'url';
+/** Sorting a table of positions on anything but position is how you lose your place. */
+const TEXT_SORT_KEYS = ['keyword', 'url'] as const;
+
 function Change({ row }: { row: TrackedKeywordRow }) {
   if (row.error) {
     return <span className="text-xs text-amber-800 dark:text-amber-300" title={row.error}>unknown</span>;
@@ -103,6 +153,13 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
   const [adding, setAdding] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  // One filter per column, each set from that column's own header.
+  const [bands, setBands] = useState<string[]>([]);
+  const [moves, setMoves] = useState<string[]>([]);
+  const [sources, setSources] = useState<string[]>([]);
+  const [features, setFeatures] = useState<string[]>([]);
+  const [sort, setSort] = useState<TableSort<SortKey>>({ key: 'position', dir: 'asc' });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -180,10 +237,56 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
 
   const s = data?.summary;
   const rows = data?.keywords ?? [];
+
+  // Search matches the keyword and the page that ranks for it — "which keyword brings
+  // people to /products/etics" is the same question asked from the other end.
+  const q = search.trim().toLowerCase();
+  const filteredRows = rows.filter((r) => {
+    if (bands.length && !bands.includes(bandOf(r))) return false;
+    if (moves.length && !moves.includes(movementOf(r))) return false;
+    if (sources.length && !sources.includes(r.source || 'manual')) return false;
+    if (features.length && !features.some((f) => (r.serp_features ?? []).includes(f))) return false;
+    if (!q) return true;
+    return r.keyword.toLowerCase().includes(q) || (r.url ?? '').toLowerCase().includes(q);
+  });
+
+  const sortedRows = [...filteredRows].sort((a, b) => {
+    const dir = sort.dir === 'asc' ? 1 : -1;
+    if (sort.key === 'keyword') return a.keyword.localeCompare(b.keyword, 'el') * dir;
+    if (sort.key === 'url') return (a.url ?? '').localeCompare(b.url ?? '') * dir;
+    if (sort.key === 'features') {
+      return ((a.serp_features?.length ?? 0) - (b.serp_features?.length ?? 0)) * dir;
+    }
+    if (sort.key === 'change') {
+      // No change to report sorts last in both directions: it is an absence, not a zero.
+      const av = a.change ?? null; const bv = b.change ?? null;
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      return (av - bv) * dir;
+    }
+    // Position: an unranked or unknown keyword has no position, and must not sort as 0
+    // — that would put every keyword we do NOT rank for at the top of "best first".
+    const av = a.position ?? Number.POSITIVE_INFINITY;
+    const bv = b.position ?? Number.POSITIVE_INFINITY;
+    if (av === bv) return a.keyword.localeCompare(b.keyword, 'el');
+    return av < bv ? -dir : dir;
+  });
+
+  const filtering = q.length > 0 || bands.length > 0 || moves.length > 0
+    || sources.length > 0 || features.length > 0;
+  const clearFilters = () => { setSearch(''); setBands([]); setMoves([]); setSources([]); setFeatures([]); };
+
+  // Counted over the WHOLE set, not the page: a filter menu that only lists what
+  // survives the current filter cannot be used to widen one.
+  const featureFilterOptions = FEATURE_LABELS
+    .map((f) => ({ value: f.key, label: f.label, count: rows.filter((r) => (r.serp_features ?? []).includes(f.key)).length }))
+    .filter((o) => o.count > 0);
+
   // Clamped on every render so removing the last keyword on the last page does not
   // leave the reader on an empty page with no way back.
-  const currentPage = clampPage(page, rows.length);
-  const visibleRows = paginate(rows, currentPage);
+  const currentPage = clampPage(page, sortedRows.length);
+  const visibleRows = paginate(sortedRows, currentPage);
   const bandTotal = s ? BANDS.reduce((t, b) => t + (s.distribution[b.key] ?? 0), 0) || 1 : 1;
   const addForm = (
     <div className="space-y-2">
@@ -369,27 +472,117 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
         <Card className="dashboard-card">
           <CardHeader>
             <CardTitle className="text-base">Tracked keywords</CardTitle>
-            <CardDescription>Best position first. Change is against the previous check — up means up the page.</CardDescription>
+            <CardDescription>
+              Best position first. Change is against the previous check — up means up the page.
+              Click a column to sort by it; the funnel on a column filters by what is in it.
+            </CardDescription>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
+            <HubToolbar
+              search={search}
+              onSearchChange={(v) => { setSearch(v); setPage(1); }}
+              searchPlaceholder="Search keywords and ranking pages…"
+              actions={
+                filtering ? (
+                  <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span className="tabular-nums">{sortedRows.length} of {rows.length}</span>
+                    <Button variant="link" size="sm" className="h-8 px-0 text-xs" onClick={clearFilters}>
+                      Clear filters
+                    </Button>
+                  </span>
+                ) : null
+              }
+            />
+            <div>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Keyword</TableHead>
-                    <TableHead className="text-right">Position</TableHead>
-                    <TableHead className="text-right">Change</TableHead>
-                    <TableHead className="w-28">Trend</TableHead>
-                    <TableHead>SERP blocks</TableHead>
-                    <TableHead>Ranking page</TableHead>
-                    <TableHead className="w-10" />
+                    <TableColumnHeader
+                      sortKey="keyword"
+                      sort={sort}
+                      onSort={(k) => setSort((v) => nextSort(v, k, TEXT_SORT_KEYS))}
+                      segment={{
+                        label: 'Source',
+                        options: segmentOptions(rows, (r) => r.source || 'manual', SOURCE_LABELS, ['manual', 'gsc_auto']),
+                        selected: sources,
+                        onChange: (v) => { setSources(v); setPage(1); },
+                      }}
+                    >
+                      Keyword
+                    </TableColumnHeader>
+                    <TableColumnHeader
+                      align="right"
+                      sortKey="position"
+                      sort={sort}
+                      onSort={(k) => setSort((v) => nextSort(v, k, TEXT_SORT_KEYS))}
+                      segment={{
+                        label: 'Position band',
+                        options: segmentOptions(rows, bandOf, BAND_LABELS, BAND_ORDER),
+                        selected: bands,
+                        onChange: (v) => { setBands(v); setPage(1); },
+                      }}
+                    >
+                      Position
+                    </TableColumnHeader>
+                    <TableColumnHeader
+                      align="right"
+                      sortKey="change"
+                      sort={sort}
+                      onSort={(k) => setSort((v) => nextSort(v, k, TEXT_SORT_KEYS))}
+                      segment={{
+                        label: 'Movement',
+                        options: segmentOptions(rows, movementOf, MOVE_LABELS, MOVE_ORDER),
+                        selected: moves,
+                        onChange: (v) => { setMoves(v); setPage(1); },
+                      }}
+                    >
+                      Change
+                    </TableColumnHeader>
+                    <TableColumnHeader className="w-28">Trend</TableColumnHeader>
+                    <TableColumnHeader
+                      sortKey="features"
+                      sort={sort}
+                      onSort={(k) => setSort((v) => nextSort(v, k, TEXT_SORT_KEYS))}
+                      segment={{
+                        label: 'SERP blocks',
+                        options: featureFilterOptions,
+                        selected: features,
+                        onChange: (v) => { setFeatures(v); setPage(1); },
+                      }}
+                    >
+                      SERP blocks
+                    </TableColumnHeader>
+                    <TableColumnHeader
+                      sortKey="url"
+                      sort={sort}
+                      onSort={(k) => setSort((v) => nextSort(v, k, TEXT_SORT_KEYS))}
+                    >
+                      Ranking page
+                    </TableColumnHeader>
+                    <TableColumnHeader className="w-10"><span className="sr-only">Stop tracking</span></TableColumnHeader>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {visibleRows.map((r) => (
                     <TableRow key={r.id}>
                       <TableCell className="max-w-[220px]">
-                        <div className="truncate font-medium">{r.keyword}</div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="truncate font-medium">{r.keyword}</span>
+                          {r.source === 'gsc_auto' && (
+                            <Badge
+                              variant="info"
+                              title={
+                                `Added automatically from Search Console${
+                                  r.source_detail?.impressions != null
+                                    ? ` — ${r.source_detail.impressions} impressions on ${r.source_detail.days_seen ?? '?'} days at position ${r.source_detail.position ?? '?'}`
+                                    : ''
+                                }. It is retired again if it stops earning impressions and stops ranking.`
+                              }
+                            >
+                              auto
+                            </Badge>
+                          )}
+                        </div>
                         <div className="text-[11px] text-muted-foreground">
                           {r.country_code} · {r.device}
                           {r.search_volume != null ? ` · ${compact(r.search_volume)}/mo` : ''}
@@ -425,7 +618,8 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
                       </TableCell>
                       <TableCell>
                         <Button size="icon" variant="ghost" className="h-7 w-7"
-                          onClick={() => remove(r.id)} aria-label={`Stop tracking ${r.keyword}`}>
+                          onClick={() => remove(r.id)} aria-label={`Stop tracking ${r.keyword}`}
+                          title="Stop tracking this — and stop the discovery engine offering it back">
                           <Trash2 className="h-3.5 w-3.5 text-destructive" />
                         </Button>
                       </TableCell>
@@ -434,10 +628,23 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
                 </TableBody>
               </Table>
             </div>
-            <TablePagination page={currentPage} total={rows.length} onPageChange={setPage} label="keywords" />
+            {sortedRows.length === 0 && (
+              // `filtered`, never `empty`: the keywords are all still tracked, and
+              // offering "add keywords" to somebody who has 130 of them and a typo in
+              // the search box is how duplicates get made.
+              <HubEmptyState
+                variant="filtered"
+                title="No tracked keyword matches"
+                description="All of them are still being tracked — the search box or a column filter is hiding them."
+                action={<Button size="sm" variant="outline" onClick={clearFilters}>Clear filters</Button>}
+              />
+            )}
+            <TablePagination page={currentPage} total={sortedRows.length} onPageChange={setPage} label="keywords" />
           </CardContent>
         </Card>
       )}
+
+      <KeywordDiscoveryCard website={website} onTracked={() => { void load(); }} />
     </div>
   );
 };

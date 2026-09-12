@@ -404,7 +404,22 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
     const cutoff = ymd(new Date(Date.now() - 180 * 86400000));
     await supabase.from('gsc_performance').delete().lt('date', cutoff);
     await supabase.from('gsc_breakdown').delete().lt('date', cutoff);
-    return json({ ok: true, synced: ok, failed, rows });
+
+    // The day's rows have landed, so this is the moment the keyword engine has
+    // something new to judge: promote the queries that now clear the bar, retire the
+    // automatic ones whose evidence is gone. Runs only for sites that opted in, and
+    // records its own outcome per site — a sweep that says nothing is indistinguishable
+    // from one that never ran.
+    let autotrack: unknown = null;
+    try {
+      const { data: sweep, error: sweepErr } = await supabase.rpc('seo_autotrack_sweep', { p_website_id: null });
+      if (sweepErr) throw new Error(sweepErr.message);
+      autotrack = sweep;
+    } catch (e) {
+      autotrack = { error: String(e instanceof Error ? e.message : e).slice(0, 300) };
+      console.warn('[gsc-api] autotrack sweep failed:', autotrack);
+    }
+    return json({ ok: true, synced: ok, failed, rows, autotrack });
   }
 
   // ── User actions require a JWT ──

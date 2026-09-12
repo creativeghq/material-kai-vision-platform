@@ -23,6 +23,12 @@ export interface UserWebsite {
   last_crawl_error: string | null;
   page_count: number;
   max_pages: number;
+  /** Whether the nightly engine may promote Search Console queries into tracking. */
+  keyword_autotrack?: boolean;
+  /** Ceiling on ACTIVE automatic keywords — the spend the engine is allowed to add. */
+  keyword_autotrack_limit?: number;
+  keyword_autotrack_at?: string | null;
+  keyword_autotrack_note?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -388,12 +394,27 @@ export interface CannibalReport {
   note: string | null;
 }
 
+/** Who decided to track it. Only `gsc_auto` rows are in reach of automatic retirement. */
+export type TrackedKeywordSource = 'manual' | 'gsc_auto';
+
 export interface TrackedKeywordRow {
   id: string;
   keyword: string;
   country_code: string;
   device: string;
   tags: string[];
+  source: TrackedKeywordSource | string;
+  /** The Search Console evidence that promoted it, frozen at that moment. */
+  source_detail: {
+    reason?: string | null;
+    score?: number | null;
+    clicks?: number | null;
+    impressions?: number | null;
+    position?: number | null;
+    days_seen?: number | null;
+    promoted_at?: string | null;
+    variants?: string[] | null;
+  } | null;
   /** Date of THIS keyword's most recent check — a capped run leaves part of the set on an older day. */
   captured_at: string | null;
   /** Non-organic blocks on the page that cite or show us (featured_snippet, ai_overview, people_also_ask, local_pack…). */
@@ -413,6 +434,66 @@ export interface TrackedKeywordRow {
   entered: boolean;
   lost: boolean;
   series: { date: string; v: number }[];
+}
+
+/** Why the engine would take a query. Null = visible, but not yet worth a daily check. */
+export type CandidateReason = 'earning_clicks' | 'recurring_impressions' | 'striking_distance';
+
+export interface KeywordCandidate {
+  keyword: string;
+  norm: string;
+  /** Spellings Google reported separately that fold to one query (accents, case). */
+  variants: string[];
+  variant_count: number;
+  clicks: number;
+  impressions: number;
+  position: number | null;
+  days_seen: number;
+  first_seen: string;
+  last_seen: string;
+  score: number;
+  reason: CandidateReason | null;
+  brand: boolean;
+  country_code: string;
+  language_code: string;
+}
+
+export interface KeywordCandidates {
+  status: 'ok' | 'no_data' | 'not_collected' | 'not_connected' | string;
+  note: string | null;
+  window_days: number;
+  to: string;
+  latest_date: string | null;
+  connected: boolean;
+  autotrack: boolean;
+  autotrack_limit: number;
+  auto_active: number;
+  auto_remaining: number;
+  last_sweep_at: string | null;
+  last_sweep_note: string | null;
+  country_code: string;
+  language_code: string;
+  /** Every query in the window accounted for — none of them silently dropped. */
+  counts: {
+    queries: number;
+    tracked: number;
+    dismissed: number;
+    junk: number;
+    eligible: number;
+    watching: number;
+  };
+  candidates: KeywordCandidate[];
+  dismissed_list: { keyword: string; norm: string; impressions: number; clicks: number; position: number | null }[];
+}
+
+export interface PromoteResult {
+  added: number;
+  keywords: string[];
+  eligible_remaining: number;
+  budget_remaining: number;
+  source: TrackedKeywordSource;
+  /** Why nothing was added. Present exactly when `added` is 0. */
+  note: string | null;
 }
 
 export interface RankSummary {
@@ -621,7 +702,15 @@ export interface WebsiteHealth {
 export interface GscSummary {
   days: number;
   from: string;
+  /** The window's last day — the most recent day Search Console has REPORTED, not today. */
   to: string;
+  latest_date?: string | null;
+  /** Earliest stored day: a window reaching past it covers fewer days than it asks for. */
+  first_date?: string | null;
+  /** How far behind Google is right now, in days. */
+  lag_days?: number;
+  /** Why the dates are what they are — the reader cannot see the lag otherwise. */
+  note?: string | null;
   /** The SQL's verdict on whether `totals` means anything (CLAUDE.md rule 3). */
   status?: 'ok' | 'no_data' | 'not_collected' | string;
   /** Source rows behind the window — the evidence for `status`. */
@@ -1200,8 +1289,83 @@ export const userWebsitesService = {
     return clean.length;
   },
 
-  async removeTrackedKeyword(id: string): Promise<void> {
-    const { error } = await supabase.from('seo_tracked_keywords' as any).delete().eq('id', id);
+  /**
+   * Stop tracking a keyword. `dismiss` also tells the discovery engine not to offer it
+   * back — one RPC, because the delete and the decision are one intent and a delete
+   * that lands alone gets undone by tonight's sweep.
+   */
+  async removeTrackedKeyword(id: string, dismiss = true): Promise<void> {
+    const { error } = await supabase.rpc(
+      'seo_untrack_keyword' as any, { p_keyword_id: id, p_dismiss: dismiss } as any,
+    );
+    if (error) throw error;
+  },
+
+  // ── The discovery engine: Search Console queries → the tracked set ───────────────
+
+  /** Queries this site is visible for that nothing covers yet, with the evidence. */
+  async keywordCandidates(websiteId: string, days = 28, limit = 50): Promise<KeywordCandidates | null> {
+    const { data, error } = await supabase.rpc(
+      'seo_keyword_candidates' as any,
+      { p_website_id: websiteId, p_days: days, p_limit: limit } as any,
+    );
+    if (error) throw error;
+    return (data as KeywordCandidates) ?? null;
+  },
+
+  /**
+   * Start tracking candidates. Naming them is a person's decision and is stored as
+   * `manual`; passing none lets the engine take the best that qualify, within the
+   * site's budget, stamped `gsc_auto` so it can retire them again later.
+   */
+  async promoteKeywordCandidates(
+    websiteId: string, keywords?: string[], limit?: number, days = 28,
+  ): Promise<PromoteResult> {
+    const { data, error } = await supabase.rpc(
+      'seo_promote_keyword_candidates' as any,
+      {
+        p_website_id: websiteId,
+        p_keywords: keywords && keywords.length ? keywords : null,
+        p_limit: limit ?? null,
+        p_days: days,
+      } as any,
+    );
+    if (error) throw error;
+    return data as PromoteResult;
+  },
+
+  /** Stop offering a query. `undo` puts it back in the running. */
+  async dismissKeywordCandidate(websiteId: string, keyword: string, undo = false): Promise<void> {
+    const { error } = await supabase.rpc(
+      'seo_dismiss_keyword_candidate' as any,
+      { p_website_id: websiteId, p_keyword: keyword, p_undo: undo } as any,
+    );
+    if (error) throw error;
+  },
+
+  /** Deactivate automatic keywords whose Search Console evidence has gone. */
+  async retireAutoKeywords(websiteId: string, days = 60): Promise<{ retired: number; keywords: string[] }> {
+    const { data, error } = await supabase.rpc(
+      'seo_retire_auto_keywords' as any,
+      { p_website_id: websiteId, p_days: days } as any,
+    );
+    if (error) throw error;
+    return data as { retired: number; keywords: string[] };
+  },
+
+  /**
+   * Turn the nightly engine on or off for a site, and set its ceiling.
+   *
+   * The ceiling is the spending control: every active keyword is a paid SERP call on
+   * every rotation, so an engine with no upper bound bills without one either.
+   */
+  async setKeywordAutotrack(websiteId: string, on: boolean, limit?: number): Promise<void> {
+    const patch: Record<string, unknown> = { keyword_autotrack: on };
+    if (limit != null) patch.keyword_autotrack_limit = Math.max(0, Math.min(500, Math.round(limit)));
+    const { error } = await supabase
+      .from('user_websites' as any)
+      .update(patch as any)
+      .eq('id', websiteId);
     if (error) throw error;
   },
 
