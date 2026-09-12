@@ -53,6 +53,7 @@ function summarise(provider: string, rows: ModelRow[]): ProviderSummary {
   const gone   = byStatus.not_found ?? 0;
   const never  = byStatus.never ?? 0;
   const unset  = byStatus.not_configured ?? 0;
+  const noProbe = byStatus.no_probe_implemented ?? 0;
 
   let verdict: ProviderSummary['verdict'];
   // FIRST, ahead of every other verdict: if the token is not deployed we never reached the
@@ -85,6 +86,18 @@ function summarise(provider: string, rows: ModelRow[]): ProviderSummary {
       headline: `${gone} model${gone === 1 ? '' : 's'} deleted upstream`,
       action: 'Remove them from the registry and from any picker still offering them. Funding changes nothing here.',
     };
+  } else if (noProbe > 0) {
+    // Ahead of the `else` below, which would otherwise read this as "Reachable": the row carries a
+    // last_probe_at because we stamped the ABSENCE of a probe, not a successful one. Nothing has
+    // asked this provider anything, so there is no verdict to report — only a stated reason.
+    verdict = {
+      tone: 'unknown',
+      headline: `No probe written — ${noProbe} of ${rows.length} models were never asked`,
+      action: 'The credential is deployed, but this provider\'s submit shape has never been '
+        + 'implemented, so nothing has called it. This is our gap, not the provider\'s: add it to '
+        + 'PROBEABLE_PROVIDERS in the model-health-check agent. Nothing here says the provider is '
+        + 'unhealthy — or healthy.',
+    };
   } else if (never === rows.length) {
     verdict = {
       tone: 'unknown',
@@ -112,6 +125,7 @@ const PROBE_LABEL: Record<ProbeStatus | 'never', string> = {
   schema_rejected: 'input rejected',
   auth_failed: 'credentials rejected',
   not_configured: 'no token deployed',
+  no_probe_implemented: 'no probe written',
   error: 'error',
   timeout: 'timed out',
   never: 'never probed',

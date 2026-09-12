@@ -38,7 +38,7 @@ const DB = {
   capability:
     "CHECK ((capability = ANY (ARRAY['legal_invoice'::text, 'pre_invoice_notice'::text, 'pdf_render'::text, 'tax_submission'::text, 'numbering'::text, 'payment_reconciliation'::text])))",
   probe:
-    "CHECK (((last_probe_status IS NULL) OR (last_probe_status = ANY (ARRAY['ok'::text, 'credit_exhausted'::text, 'not_found'::text, 'schema_rejected'::text, 'auth_failed'::text, 'error'::text, 'timeout'::text, 'not_configured'::text]))))",
+    "CHECK (((last_probe_status IS NULL) OR (last_probe_status = ANY (ARRAY['ok'::text, 'credit_exhausted'::text, 'not_found'::text, 'schema_rejected'::text, 'auth_failed'::text, 'error'::text, 'timeout'::text, 'not_configured'::text, 'no_probe_implemented'::text]))))",
   inquiry:
     "CHECK ((status = ANY (ARRAY['new'::text, 'contacted'::text, 'qualified'::text, 'viewing_booked'::text, 'closed'::text, 'spam'::text])))",
   party:
@@ -137,6 +137,9 @@ describe('#391 — derived subsets stay derived', () => {
     // and it is the reason the status exists: it was written as `auth_failed`, which claims the
     // opposite (that we asked and were refused) and cost a real investigation on 2026-08-30.
     expect(AUTHORITATIVE_PROBE_STATUSES).not.toContain('not_configured');
+    // Same reason: `no_probe_implemented` means nobody wrote this provider's submit shape, so
+    // nothing has asked it anything. It is the absence of a verdict, never a verdict.
+    expect(AUTHORITATIVE_PROBE_STATUSES).not.toContain('no_probe_implemented');
   });
 
   it('a missing token and a rejected token are different statuses', () => {
@@ -144,6 +147,14 @@ describe('#391 — derived subsets stay derived', () => {
     // sends someone to rotate a key that is fine, or to top up an account that was never asked.
     expect(PROBE_STATUSES as readonly string[]).toContain('not_configured');
     expect(PROBE_STATUSES as readonly string[]).toContain('auth_failed');
+  });
+
+  it('no credential and no probe implementation are different statuses', () => {
+    // openai and worldlabs had a deployed key and no probe, which fit neither existing value, so
+    // the agent stamped nothing at all and they sat at last_probe_at NULL for months — read
+    // downstream as "never probed" and answered with "enable the agent" that ran 737 times.
+    expect(PROBE_STATUSES as readonly string[]).toContain('no_probe_implemented');
+    expect(PROBE_STATUSES as readonly string[]).toContain('not_configured');
   });
 });
 

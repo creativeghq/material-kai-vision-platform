@@ -112,15 +112,26 @@ export class ModelHealthCheckAgent implements AgentRunner {
         const r = await resolveSecret(supabase, key);
         if (!r?.value) missing.push(key);
       }
-      if (missing.length === 0) continue;
-      const why = `No credential for ${prov}: ${missing.join(' + ')} is not set in this deployment.`;
+      // A provider whose credential IS deployed but that nobody probes must still SAY so. Saying
+      // nothing leaves last_probe_at NULL, which reads downstream as "never probed" and sends the
+      // reader to enable an agent that has been running hourly all along.
+      const configured = missing.length === 0;
+      if (configured && PROBEABLE_PROVIDERS.includes(prov)) continue;
+      const why = configured
+        ? `No probe is implemented for ${prov}: the credential is deployed, but this provider's `
+          + `submit shape has never been written, so nothing has asked it anything.`
+        : `No credential for ${prov}: ${missing.join(' + ')} is not set in this deployment.`;
       await supabase
         .from('generation_models')
-        .update({ last_probe_at: new Date().toISOString(), last_probe_status: 'not_configured', last_probe_error: why })
+        .update({
+          last_probe_at: new Date().toISOString(),
+          last_probe_status: configured ? 'no_probe_implemented' : 'not_configured',
+          last_probe_error: why,
+        })
         .eq('provider', prov)
         .eq('enabled', true)
         .neq('status', 'dead')
-        .or('last_probe_status.is.null,last_probe_status.eq.not_configured');
+        .or('last_probe_status.is.null,last_probe_status.eq.not_configured,last_probe_status.eq.no_probe_implemented');
     }
 
     // The registry is the roster. The hardcoded ALL_MODELS list this used to carry drifted from the

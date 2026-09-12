@@ -12,6 +12,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isCronAuthorized } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { captureMessage } from '../_shared/sentry.ts';
 
 interface RequestBody {
   action?:
@@ -34,6 +35,62 @@ const svc = () =>
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
+/**
+ * Page the sweep's own results to Sentry. `withApiLogging` reports a request that FAILED; a sweep
+ * that ran clean and found ten critical problems is a 200, so nothing here reaches Sentry on its
+ * own — the findings sit in a table nobody opens until something breaks. One event per finding,
+ * fingerprinted on its identity, so each is an issue you resolve individually and a recurrence
+ * reopens rather than duplicates.
+ */
+async function reportRunToSentry(supabase: ReturnType<typeof svc>, runId: string): Promise<void> {
+  const [{ data: run }, { data: criticals }] = await Promise.all([
+    supabase.from('data_integrity_runs')
+      .select('error, checks_run, findings_open').eq('id', runId).maybeSingle(),
+    supabase.from('data_integrity_findings')
+      .select('check_key, entity_id, detail')
+      .eq('status', 'open').eq('severity', 'critical'),
+  ]);
+
+  // A detector that raised is now isolated and the sweep carries on — which is the fix, and also
+  // exactly why it needs its own alarm: the run is a 200 with one fewer check in it.
+  let failures: Array<{ check?: string; detect_fn?: string; sqlstate?: string; error?: string }> = [];
+  if (run?.error) {
+    try { failures = JSON.parse(run.error); } catch { /* malformed: covered by the summary below */ }
+  }
+  for (const f of failures) {
+    await captureMessage(
+      `Data integrity detector failed: ${f.check ?? f.detect_fn ?? 'unknown'}`,
+      'error',
+      {
+        tags: { area: 'data-integrity', kind: 'detector_failed', check: f.check ?? 'unknown' },
+        extra: { ...f, run_id: runId },
+        fingerprint: ['data-integrity', 'detector-failed', f.check ?? f.detect_fn ?? 'unknown'],
+      },
+    );
+  }
+  if (run?.error && failures.length === 0) {
+    await captureMessage('Data integrity sweep recorded an unparseable error', 'error', {
+      tags: { area: 'data-integrity', kind: 'detector_failed' },
+      extra: { run_id: runId, error: run.error },
+      fingerprint: ['data-integrity', 'detector-failed', 'unparseable'],
+    });
+  }
+
+  for (const c of criticals ?? []) {
+    const d = (c.detail ?? {}) as Record<string, unknown>;
+    const gist = (d.label ?? d.reason ?? d.why ?? '') as string;
+    await captureMessage(
+      `Data integrity CRITICAL: ${c.check_key} — ${c.entity_id}`,
+      'error',
+      {
+        tags: { area: 'data-integrity', kind: 'critical_finding', check: c.check_key },
+        extra: { entity_id: c.entity_id, gist, detail: d, run_id: runId },
+        fingerprint: ['data-integrity', c.check_key, String(c.entity_id)],
+      },
+    );
+  }
+}
+
 Deno.serve(withApiLogging('data-integrity-runner', async (req) => {
   await bootstrapForFunction();
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -46,6 +103,8 @@ Deno.serve(withApiLogging('data-integrity-runner', async (req) => {
         p_autoheal: true, p_domains: null, p_triggered_by: 'cron',
       });
       if (error) return json({ error: error.message }, 500);
+      // Only the cron path pages. An admin pressing Run is already looking at the results.
+      await reportRunToSentry(supabase, data as string);
       return json({ ok: true, run_id: data });
     }
 
