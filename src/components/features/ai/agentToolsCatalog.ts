@@ -494,6 +494,15 @@ const KAI_TOOLS: AgentToolEntry[] = [
     ],
   },
   {
+    id: 'seo_score_url', name: 'Page Score', category: 'SEO Research',
+    adminOnly: true, credits: 1,
+    desc: 'Score a page that is already live — the same 23-category content analysis and AI-citation (GEO) score we run on our own drafts. Plan-dependent checks are skipped and listed, because a live page has no article plan.',
+    examples: [
+      'Score https://materialshub.gr/materials/porcelain-tiles',
+      'How good is https://example.com/guide for the keyword porcelain tile thickness',
+    ],
+  },
+  {
     id: 'seo_audit_url', name: 'URL Audit', category: 'SEO Research',
     adminOnly: true,
     desc: 'Audit any public URL — Lighthouse (perf / a11y / best-practices / SEO scores) + on-page issues + content parsing. Works on competitor pages too.',
@@ -3087,7 +3096,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       'seo_my_rankings', 'seo_site_report',
       'seo_research_keyword', 'seo_keyword_difficulty', 'seo_keyword_suggestions',
       'seo_search_intent', 'seo_keyword_overview', 'seo_ai_keyword_volume',
-      'seo_serp_audit', 'seo_audit_url', 'seo_historical_serps',
+      'seo_serp_audit', 'seo_audit_url', 'seo_score_url', 'seo_historical_serps',
       'seo_gsc_striking_distance', 'seo_gsc_top_movers',
       'seo_keyword_ideas', 'seo_related_keywords', 'seo_search_volume', 'seo_ai_overview',
     ],

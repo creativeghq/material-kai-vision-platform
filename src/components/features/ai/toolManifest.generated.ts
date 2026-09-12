@@ -2111,6 +2111,16 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'seo_score_url',
+    file: 'supabase/functions/_shared/tools/seo-tools.ts',
+    factory: 'createSEOScoreUrlTool',
+    description: 'Score a page that is already published on the web.',
+    params: [
+      { name: 'url', type: 'string', optional: false, description: 'Full https URL of the page to score.' },
+      { name: 'keyword', type: 'string', optional: true, description: 'Keyword to score against. Defaults to the page\'s highest-impression Search Console query; required when Search Console has none for it, because Google withholds low-volume queries.' },
+    ],
+  },
+  {
     name: 'seo_search_intent',
     file: 'supabase/functions/_shared/tools/seo-agent-tools.ts',
     factory: 'createSEOSearchIntentTool',

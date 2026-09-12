@@ -343,6 +343,81 @@ export const createSEOContentAnalyzerTool = (userId: string, onProgress?: (statu
 };
 
 /**
+ * SEO Tool: score a page that ALREADY EXISTS on the web (#401 G4).
+ *
+ * `seo_content_analyzer` above needs the markdown and the plan in hand, so it only ever ran on
+ * drafts this pipeline generated. This one takes a URL.
+ */
+export const createSEOScoreUrlTool = (userId: string, onProgress?: (status: string) => void, onChunk?: ChunkSink) => {
+  return tool(
+    async ({ url, keyword }) => {
+      try {
+        onProgress?.(`Scoring ${url}...`);
+        const result = await callSEOFunction('seo-score-url', { url, keyword, user_id: userId }, 120_000);
+
+        if (!result.success) {
+          // Pass the handler's own sentence through. It distinguishes "we could not fetch the
+          // page" from "Search Console has no query for it" from "you are out of credits", and
+          // flattening those into one failure is how a reader concludes the page is bad.
+          onChunk?.({
+            type: 'seo_score_url_card',
+            url, status: result.status || 'failed',
+            error: result.error || 'Could not score that page.',
+            timestamp: Date.now(),
+          });
+          return JSON.stringify({ success: false, status: result.status, error: result.error });
+        }
+
+        const a = result.analysis;
+        onChunk?.({
+          type: 'seo_score_url_card',
+          url: result.url,
+          status: 'ok',
+          fetched: result.fetched,
+          keyword: result.keyword,
+          keyword_source: result.keyword_source,
+          overall_score: a?.overallScore,
+          seo_score: a?.seoScore,
+          readability_score: a?.readabilityScore,
+          geo_score: a?.geoScore,
+          fixes: a?.fixes || [],
+          section_scores: a?.sectionScores,
+          checks_skipped: result.checks_skipped || [],
+          timestamp: Date.now(),
+        });
+        onProgress?.(`Scored ${result.url}: ${a?.overallScore ?? '—'}/100`);
+
+        return JSON.stringify({
+          success: true,
+          url: result.url,
+          keyword: result.keyword,
+          keyword_source: result.keyword_source,
+          overall_score: a?.overallScore,
+          seo_score: a?.seoScore,
+          geo_score: a?.geoScore,
+          issues_count: a?.fixes?.length || 0,
+          critical_issues: a?.fixes?.filter((f: any) => f.severity === 'critical')?.length || 0,
+          fixes: a?.fixes?.slice(0, 10),
+          // Tell the MODEL what was not measured, so it cannot present this as a complete audit.
+          checks_skipped: result.checks_skipped || [],
+        });
+      } catch (error: any) {
+        console.error('SEO score-url error:', error);
+        return JSON.stringify({ success: false, error: error.message });
+      }
+    },
+    {
+      name: 'seo_score_url',
+      description: 'Score a page that is already published on the web. Fetches the URL and runs the same 23-category content analysis and GEO (AI-citation) score used on our own drafts. Works on your pages and on competitors\'. Costs 1 credit per page, refunded if no score is produced. Checks that depend on an article plan (planned sections, target word count, planned FAQ, recommended schema) are skipped and listed — a live page has no plan and is not marked down for it.',
+      schema: z.object({
+        url: z.string().url().describe('Full https URL of the page to score.'),
+        keyword: z.string().optional().describe('Keyword to score against. Defaults to the page\'s highest-impression Search Console query; required when Search Console has none for it, because Google withholds low-volume queries.'),
+      }),
+    }
+  );
+};
+
+/**
  * SEO Tool: Full Pipeline (Async)
  * Calls seo-pipeline edge function → runs all stages, returns article_id immediately
  * Emits article_generation_started chunk for frontend polling

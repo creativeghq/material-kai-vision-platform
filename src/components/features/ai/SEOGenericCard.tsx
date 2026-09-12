@@ -572,6 +572,67 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
     );
   }
 
+  // ── Score a live URL (#401 G4) ────────────────────────
+  if (t === 'seo_score_url_card') {
+    // A page we could not read has NO score. Rendering 0 here would read as "this page is
+    // terrible" rather than "we never saw it", which is the whole failure this tool avoids.
+    if (data.status && data.status !== 'ok') {
+      const why = data.status === 'no_keyword'
+        ? 'Search Console has no recorded query for this page, so there is nothing to score it against. Google withholds low-volume queries, so this is not proof the page has no traffic — pass a keyword to score it anyway.'
+        : data.error || 'This page could not be fetched, so it has no score.';
+      return (
+        <Card className="space-y-2">
+          <Header icon="📄" title="Not scored" subtitle={data.url} />
+          <Primer>{why}</Primer>
+        </Card>
+      );
+    }
+    const scores: Array<[string, number | null | undefined]> = [
+      ['Overall', data.overall_score], ['SEO', data.seo_score],
+      ['Readability', data.readability_score], ['AI citation', data.geo_score],
+    ];
+    const critical = (data.fixes || []).filter((f: any) => f.severity === 'critical').length;
+    return (
+      <Card className="space-y-3">
+        <Header icon="📄" title="Page score" subtitle={data.url} />
+        <Primer>
+          The same 23-category content analysis and AI-citation score we run on our own drafts,
+          pointed at a page that is already live. Scored against{' '}
+          <strong>{data.keyword || '—'}</strong>
+          {data.keyword_source === 'gsc_top_query' ? ' (its top Search Console query).' : '.'}
+        </Primer>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          {scores.map(([label, v]) => {
+            const tone: any = v == null ? undefined : v >= 90 ? 'green' : v >= 70 ? 'amber' : 'red';
+            return (
+              <div key={label} className="bg-muted/40 rounded p-2 border border-border">
+                <div className="text-[10px] text-muted-foreground">{label}</div>
+                <div className="text-2xl font-medium leading-tight">
+                  <Pill tone={tone}>{v ?? 'n/a'}</Pill>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {data.fetched && (
+          <div className="grid grid-cols-3 gap-2">
+            <Stat label="Words" value={fmtNum(data.fetched.word_count)} />
+            <Stat label="Status" value={String(data.fetched.http_status ?? '—')} />
+            <Stat label="Critical issues" value={String(critical)} />
+          </div>
+        )}
+        <FailedChecksAccordion checks={data.fixes} label="Issues found" />
+        {(data.checks_skipped || []).length > 0 && (
+          // Named, never hidden: a reader comparing this to a generated article's score must be
+          // able to see which categories were not part of it.
+          <div className="text-[11px] text-muted-foreground">
+            Not measured (a live page has no article plan): {(data.checks_skipped || []).join(', ')}.
+          </div>
+        )}
+      </Card>
+    );
+  }
+
   // ── Domain snapshot ───────────────────────────────────
   if (t === 'seo_domain_snapshot_card') {
     const it: any = (data.items || [])[0] || {};

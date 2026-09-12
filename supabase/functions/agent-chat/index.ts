@@ -981,7 +981,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // SEO toolkit — Wave 1B+ (all users; 0 user credits, internal DataForSEO routing)
       'seo_keyword_difficulty', 'seo_keyword_suggestions', 'seo_search_intent',
       'seo_keyword_overview', 'seo_ai_keyword_volume',
-      'seo_serp_audit', 'seo_historical_serps', 'seo_audit_url',
+      'seo_serp_audit', 'seo_historical_serps', 'seo_audit_url', 'seo_score_url',
       // Domain intel
       'seo_domain_snapshot', 'seo_ranked_keywords', 'seo_domain_competitors',
       'seo_keyword_gap', 'seo_traffic_estimation', 'seo_subdomains',
@@ -1243,7 +1243,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     tools: [
       'knowledge_base_search', 'read_document_section', 'material_search', 'analyze_inspiration_url',
       'seo_research_keyword', 'seo_keyword_difficulty', 'seo_keyword_suggestions', 'seo_search_intent',
-      'seo_keyword_overview', 'seo_ai_keyword_volume', 'seo_serp_audit', 'seo_historical_serps', 'seo_audit_url',
+      'seo_keyword_overview', 'seo_ai_keyword_volume', 'seo_serp_audit', 'seo_historical_serps', 'seo_audit_url', 'seo_score_url',
       'seo_domain_snapshot', 'seo_ranked_keywords', 'seo_domain_competitors', 'seo_keyword_gap',
       'seo_traffic_estimation', 'seo_subdomains', 'seo_relevant_pages', 'seo_categories_for_domain',
       'seo_backlinks_summary', 'seo_backlinks_anchors', 'seo_referring_domains',
@@ -1936,7 +1936,7 @@ async function executeAgent(
     'seo_research_keyword',
     'seo_keyword_difficulty', 'seo_keyword_suggestions', 'seo_search_intent',
     'seo_keyword_overview', 'seo_ai_keyword_volume',
-    'seo_serp_audit', 'seo_historical_serps', 'seo_audit_url',
+    'seo_serp_audit', 'seo_historical_serps', 'seo_audit_url', 'seo_score_url',
     'seo_domain_snapshot', 'seo_ranked_keywords', 'seo_domain_competitors',
     'seo_keyword_gap', 'seo_traffic_estimation', 'seo_subdomains',
     'seo_relevant_pages', 'seo_categories_for_domain',
@@ -2072,6 +2072,7 @@ async function executeAgent(
   const createSEOArticlePlannerTool = seoMod?.createSEOArticlePlannerTool;
   const createSEOArticleWriterTool = seoMod?.createSEOArticleWriterTool;
   const createSEOContentAnalyzerTool = seoMod?.createSEOContentAnalyzerTool;
+  const createSEOScoreUrlTool = seoMod?.createSEOScoreUrlTool;
   const createSEOPipelineTool = seoMod?.createSEOPipelineTool;
   const createSEOResearchKeywordTool = seoAgentMod?.createSEOResearchKeywordTool;
   // Wave 1B+ SEO agent toolkit
@@ -2915,6 +2916,9 @@ async function executeAgent(
     }
     if (config.tools.includes('seo_content_analyzer')) {
       tools.push(createSEOContentAnalyzerTool(userId, sendProgress, onChunk));
+    }
+    if (config.tools.includes('seo_score_url')) {
+      tools.push(createSEOScoreUrlTool(userId, sendProgress, onChunk));
     }
     if (config.tools.includes('create_seo_article')) {
       tools.push(createSEOPipelineTool(userId, onChunk));

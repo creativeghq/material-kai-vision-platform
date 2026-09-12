@@ -92,3 +92,34 @@ describe('the route is reachable', () => {
     expect(ROUTER).toMatch(/from '\.\/handlers\/score-url\.ts'/);
   });
 });
+
+describe('the agent can actually reach it', () => {
+  const CHAT = read('supabase/functions/agent-chat/index.ts');
+  const CARD = read('src/components/features/ai/SEOGenericCard.tsx');
+
+  it('is LISTED by an agent, not merely pushed', () => {
+    // A perfect `if (config.tools.includes('x'))` push reaches nobody when no agent lists x —
+    // both binding paths clamp to AGENT_CONFIGS[agentId].tools. price_my_spec and generate_video
+    // were both live in exactly that state.
+    const listed = (CHAT.match(/'seo_score_url'(\s*[,\]])/g) || []).length;
+    expect(listed, 'no agent lists seo_score_url').toBeGreaterThan(0);
+    expect(CHAT).toMatch(/config\.tools\.includes\('seo_score_url'\)/);
+    expect(CHAT).toMatch(/tools\.push\(createSEOScoreUrlTool\(/);
+  });
+
+  it('its card has a BRANCH, not just a titles entry', () => {
+    // AgentHub routes every seo_*_card to SEOGenericCard before AGENT_RESULT_TITLES is consulted,
+    // so a titles entry renders nothing. 14 of 51 SEO card types reached chat as JSON.stringify
+    // exactly this way.
+    expect(CARD).toMatch(/t === 'seo_score_url_card'/);
+  });
+
+  it('a page with no score renders a reason, not a zero', () => {
+    // The card must branch on status BEFORE it renders any number.
+    const statusBranch = CARD.search(/data\.status && data\.status !== 'ok'/);
+    const firstScore = CARD.search(/data\.overall_score/);
+    expect(statusBranch, 'no failure branch in the card').toBeGreaterThan(-1);
+    expect(statusBranch, 'the card renders scores before checking whether there are any')
+      .toBeLessThan(firstScore);
+  });
+});
