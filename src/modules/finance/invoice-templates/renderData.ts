@@ -121,6 +121,12 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
     [fs?.business_phone ? `${L.phone} ${fs.business_phone}` : '', fs?.business_email || ''].filter(Boolean).join('  ·  '),
     fs?.business_website ? `${L.website}: ${fs.business_website}` : '',
     fs?.business_gemi ? `${L.registry}: ${fs.business_gemi}` : '',
+    // EMPA/AMP packaging-producer number. N. 4819/2021 art. 11(7) requires it on every sales
+    // document of N. 4308/2014 arts. 8-14 -- invoice, retail receipt, credit note, delivery note
+    // -- and YA 181504/2016 art. 9(e) repeats it for "all fiscal documents". It sits in the
+    // ISSUER IDENTITY block rather than a template footer so one edit reaches every PDF path
+    // (CLAUDE.md 1c: the printed document must say what the transmitted one says).
+    fs?.business_amp ? `${L.empa}: ${fs.business_amp}` : '',
     branch ? `${L.establishment} #${branch.branch_code}: ${[branch.name, branch.address, branch.street_number, branch.postal_code, branch.city].filter(Boolean).join(' ')}` : '',
   ].filter(Boolean) as string[];
 

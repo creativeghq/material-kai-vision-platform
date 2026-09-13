@@ -13,6 +13,7 @@ import {
   applyAddressUnit,
 } from '@/modules/finance/invoice-templates/counterparty';
 import { round2 } from '@/utils/decimal';
+import { blankComments } from '../helpers/stripComments';
 
 const SETTINGS = {
   business_name: 'Kai Materials A.E.',
@@ -73,7 +74,7 @@ describe('invoice line columns — every stored myDATA figure reaches the page',
     expect(data.vatExemptions[0]).toMatchObject({ marker: '(1)', code: 8 });
     expect(data.vatExemptions[1]).toMatchObject({ marker: '(2)', code: 16 });
     // The ground itself, not just the code — the code means nothing to a reader.
-    expect(data.vatExemptions[0].label).toMatch(/art\. 24/);
+    expect(data.vatExemptions[0].label).toMatch(/art\. 29/);
     expect(data.items.map((i) => i.exemptionCode)).toEqual([8, 8, 16]);
   });
 
@@ -83,7 +84,8 @@ describe('invoice line columns — every stored myDATA figure reaches the page',
       { description: 'Εξαγωγή', quantity: 1, unit_price: 100, net_value: 100, vat_percent: 0, vat_exemption_category: 16 },
     ]);
     expect(data.vatExemptions[0].label).toContain('Χωρίς ΦΠΑ');
-    expect(data.vatExemptions[0].label).toContain('39α');
+    // ν.5144/2024: the reverse-charge ground moved from art. 39α to art. 45.
+    expect(data.vatExemptions[0].label).toContain('άρθρο 45');
   });
 
   it('a VAT-bearing line does NOT invent an exemption ground', () => {
@@ -297,5 +299,52 @@ describe('label dictionaries — three hand-kept copies', () => {
       'These labels exist in src/modules/finance/invoice-templates/labels.ts but not in the ' +
         'PDF generator\'s copy, so the PDF prints "undefined" where the preview prints a word.',
     ).toEqual([]);
+  });
+});
+
+describe('EPR: the AMP number is on every sales document (#454)', () => {
+  // N. 4819/2021 art. 11(7): «υποχρεούνται να αναγράφουν τον αριθμό του ΕΜΠΑ στα παραστατικά
+  // πώλησης, τα οποία αναφέρονται στα άρθρα 8 έως 14 του ν. 4308/2014». YA 181504/2016 art. 9(ε)
+  // repeats it for «όλα τα φορολογικά στοιχεία … Τιμολόγια, Δελτία αποστολής». Penalty art. 69(4):
+  // €100–€5.000. It lives in the ISSUER IDENTITY block, not a template footer, so it cannot be
+  // dropped by one PDF path while the other keeps it.
+  it('the preview prints it in the issuer block', () => {
+    const data = build({ document_type: '1.1' }, [], {
+      settings: { ...SETTINGS, business_amp: '19988' },
+    });
+    expect(
+      data.issuer.lines.some((l) => l.includes('19988')),
+      'business_amp is set and the printed issuer block does not carry it.',
+    ).toBe(true);
+  });
+
+  it('an absent number prints no empty label', () => {
+    const data = build({ document_type: '1.1' }, []);
+    expect(data.issuer.lines.some((l) => l.includes(INVOICE_LABELS.en.empa))).toBe(false);
+  });
+
+  it('the pdf-lib generator reads the same column into the same block', () => {
+    // Source scan over BLANKED comments (CLAUDE.md): a comment naming the column must not be
+    // able to satisfy this — only the expression that actually renders it.
+    const pdf = blankComments(
+      readFileSync(
+        join(__dirname, '..', '..', 'supabase', 'functions', 'finance-invoice-pdf', 'index.ts'),
+        'utf8',
+      ),
+    );
+    expect(
+      pdf.includes('fs?.business_amp'),
+      'supabase/functions/finance-invoice-pdf/index.ts renders the invoice, the credit note, the ' +
+        'delivery note and the payment receipt from one issuer block. It does not read ' +
+        'business_amp, so every PDF a customer actually receives omits a legally required number.',
+    ).toBe(true);
+  });
+
+  it('the POS receipt carries it too', () => {
+    const pos = blankComments(
+      readFileSync(join(__dirname, '..', '..', 'src', 'modules', 'finance', 'pages', 'PosPage.tsx'), 'utf8'),
+    );
+    expect(pos.includes('business_amp'), 'PosPage does not select business_amp.').toBe(true);
+    expect(pos.includes('issuer.amp'), 'The POS receipt never prints the AMP number.').toBe(true);
   });
 });

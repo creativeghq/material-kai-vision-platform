@@ -51,7 +51,7 @@ interface CartLine extends SellItem { qty: number; line_vat: number; }
 interface Issuer {
   name: string; vat: string; tax_office: string; profession: string;
   address: string; street_number: string; postal_code: string; city: string; country: string;
-  phone: string; email: string; gemi: string; company_type: string;
+  phone: string; email: string; gemi: string; amp: string; company_type: string;
 }
 
 // Thermal printer paper width. Greek receipt rolls are 80mm or 58mm.
@@ -165,7 +165,7 @@ const PosPage: React.FC = () => {
           // specific variant from the POS needs a picker on the button, which is its own job.
           .is('variant_key', null),
         supabase.from('finance_settings').select(
-          'default_vat_rate, business_name, business_vat, business_tax_office, business_profession, business_address, business_street_number, business_postal_code, business_city, business_country, business_phone, business_email, business_gemi, business_company_type',
+          'default_vat_rate, business_name, business_vat, business_tax_office, business_profession, business_address, business_street_number, business_postal_code, business_city, business_country, business_phone, business_email, business_gemi, business_amp, business_company_type',
         ).eq('workspace_id', activeWorkspaceId).maybeSingle(),
         invoicingSetupService.listBranches(activeWorkspaceId).catch(() => [] as FinanceBranch[]),
         financeService.getBankAccountBalances(activeWorkspaceId).catch(() => [] as BankAccountBalance[]),
@@ -179,6 +179,7 @@ const PosPage: React.FC = () => {
         address: fs.business_address ?? '', street_number: fs.business_street_number ?? '',
         postal_code: fs.business_postal_code ?? '', city: fs.business_city ?? '', country: fs.business_country ?? '',
         phone: fs.business_phone ?? '', email: fs.business_email ?? '', gemi: fs.business_gemi ?? '',
+        amp: fs.business_amp ?? '',
         company_type: fs.business_company_type ?? '',
       } : null);
       const sell: SellItem[] = (prices ?? [])
@@ -1071,6 +1072,8 @@ const PosPage: React.FC = () => {
                 {addrLine && <div>{addrLine}</div>}
                 {(issuer.phone || issuer.email) && <div>{[issuer.phone, issuer.email].filter(Boolean).join('  ')}</div>}
                 {issuer.gemi && <div>Γ.Ε.ΜΗ.: {issuer.gemi}</div>}
+                {/* N. 4819/2021 art. 11(7): the EMPA/AMP number is required on a retail receipt too. */}
+                {issuer.amp && <div>ΑΜΠ: {issuer.amp}</div>}
               </div>
             )}
             <div className="r-c">---</div>

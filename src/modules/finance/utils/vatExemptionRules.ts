@@ -73,7 +73,7 @@ export function suggestVatExemption(input: ExemptionInputs): ExemptionSuggestion
   if (buyer === seller) {
     return suggestion(null, 'high',
       'Domestic Greek sale — VAT applies at the normal rate.',
-      'A 0% domestic line needs a specific ground (art. 22 exemption, or the art. 39a reverse charge on certain goods). Only you can confirm which.');
+      'A 0% domestic line needs a specific ground (art. 27 exemption, or the art. 45 reverse charge on certain goods). Only you can confirm which.');
   }
 
   // ── Elsewhere in the EU ─────────────────────────────────────────────────────
@@ -89,7 +89,7 @@ export function suggestVatExemption(input: ExemptionInputs): ExemptionSuggestion
       }
       return suggestion(14, 'low',
         `Intra-community supply to a VAT-registered business in ${buyer} — assuming goods.`,
-        'If this line is a service, art. 14 (cause 4) applies instead.');
+        'If this line is a service, art. 18 (cause 4) applies instead.');
     }
     // No verified VAT number ⇒ treat as a consumer.
     if (supply === 'services') {
@@ -114,5 +114,5 @@ export function suggestVatExemption(input: ExemptionInputs): ExemptionSuggestion
   }
   return suggestion(8, 'low',
     `Customer in ${buyer}, outside the EU — assuming an export of goods.`,
-    'If this line is a service, art. 14 (cause 4) applies instead.');
+    'If this line is a service, art. 18 (cause 4) applies instead.');
 }

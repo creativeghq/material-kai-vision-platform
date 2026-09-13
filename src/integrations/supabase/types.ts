@@ -8620,6 +8620,8 @@ export type Database = {
           business_country_en: string | null
           business_email: string | null
           business_fax: string | null
+          business_amp: string | null
+          business_amp_certificate_expires_at: string | null
           business_gemi: string | null
           business_logo_path: string | null
           business_name: string | null
@@ -8734,6 +8736,8 @@ export type Database = {
           business_country_en?: string | null
           business_email?: string | null
           business_fax?: string | null
+          business_amp?: string | null
+          business_amp_certificate_expires_at?: string | null
           business_gemi?: string | null
           business_logo_path?: string | null
           business_name?: string | null
@@ -8848,6 +8852,8 @@ export type Database = {
           business_country_en?: string | null
           business_email?: string | null
           business_fax?: string | null
+          business_amp?: string | null
+          business_amp_certificate_expires_at?: string | null
           business_gemi?: string | null
           business_logo_path?: string | null
           business_name?: string | null

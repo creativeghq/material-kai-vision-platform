@@ -15,7 +15,7 @@ describe('suggestVatExemption', () => {
 
       expect(s.code).toBeNull();
       expect(s.confidence).toBe('high');
-      expect(s.caveat).toMatch(/art\. 22|39a/);
+      expect(s.caveat).toMatch(/art\. 27|art\. 45/);
     });
 
     it('treats the GR address code and the EL VAT prefix as the same country', () => {
@@ -32,12 +32,13 @@ describe('suggestVatExemption', () => {
   });
 
   describe('EU B2B', () => {
-    it('suggests art. 28 (14) for goods to a VIES-verified business', () => {
+    it('suggests art. 33 (14) for goods to a VIES-verified business', () => {
       const s = suggestVatExemption(euBusiness('goods'));
 
       expect(s.code).toBe(14);
       expect(s.confidence).toBe('high');
-      expect(s.label).toMatch(/art\. 28/);
+      // ν.5144/2024 renumbered the intra-community supply ground from art. 28 to art. 33.
+      expect(s.label).toMatch(/art\. 33/);
     });
 
     it('suggests art. 14 (4) for services — the same buyer, a different answer', () => {
@@ -83,7 +84,7 @@ describe('suggestVatExemption', () => {
   });
 
   describe('outside the EU', () => {
-    it('suggests art. 24 (8) for exported goods', () => {
+    it('suggests art. 29 (8) for exported goods', () => {
       const s = suggestVatExemption({ ...GREEK_SELLER, buyerCountry: 'US', supply: 'goods' });
 
       expect(s.code).toBe(8);

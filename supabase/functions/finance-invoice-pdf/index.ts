@@ -105,6 +105,7 @@ const LABELS: Record<Lang, Record<string, string>> = {
     fees: 'Τέλη', stamp: 'Χαρτόσημο', otherTaxes: 'Λοιποί Φόροι', deductions: 'Κρατήσεις',
     digitalFee: 'Ψηφιακό Τέλος Συναλλαγής', related: 'Σχετ. Παραστατικό',
     paymentMethod: 'Τρόπος Πληρωμής', bank: 'Τραπεζικός Λογαριασμός', registry: 'ΓΕΜΗ', website: 'Ιστότοπος',
+    empa: 'ΑΜΠ (ΕΜΠΑ)',
     rfCode: 'Κωδικός πληρωμής (RF)', rfNote: 'Πληρώστε με τραπεζικό έμβασμα χρησιμοποιώντας αυτόν τον κωδικό ως αιτιολογία — δεν χρειάζεται IBAN.',
     mark: 'ΜΑΡΚ', uid: 'UID', verify: 'Σαρώστε για επαλήθευση στο myDATA',
     movement: 'ΣΤΟΙΧΕΙΑ ΔΙΑΚΙΝΗΣΗΣ', loadingPlace: 'Τόπος φόρτωσης', deliveryPlace: 'Τόπος παράδοσης',
@@ -149,6 +150,7 @@ const LABELS: Record<Lang, Record<string, string>> = {
     fees: 'Fees', stamp: 'Stamp duty', otherTaxes: 'Other taxes', deductions: 'Deductions',
     digitalFee: 'Digital transaction fee', related: 'Related doc',
     paymentMethod: 'Payment method', bank: 'Bank account', registry: 'Reg. no.', website: 'Website',
+    empa: 'EPR reg. (AMP)',
     rfCode: 'Bank transfer code (RF)', rfNote: 'Pay by bank transfer using this code as the payment reference — no IBAN needed.',
     mark: 'MARK', uid: 'UID', verify: 'Scan to verify on myDATA',
     movement: 'TRANSPORT DETAILS', loadingPlace: 'Loading place', deliveryPlace: 'Delivery place',
@@ -800,6 +802,12 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
     [fs?.business_phone ? `${L.phone} ${fs.business_phone}` : '', fs?.business_email || ''].filter(Boolean).join('  ·  '),
     fs?.business_website ? `${L.website}: ${fs.business_website}` : '',
     fs?.business_gemi ? `${L.registry}: ${fs.business_gemi}` : '',
+    // EMPA/AMP packaging-producer number. N. 4819/2021 art. 11(7) requires it on every sales
+    // document of N. 4308/2014 arts. 8-14 -- invoice, retail receipt, credit note, delivery note
+    // -- and YA 181504/2016 art. 9(e) repeats it for "all fiscal documents". It sits in the
+    // ISSUER IDENTITY block rather than a template footer so one edit reaches every PDF path
+    // (CLAUDE.md 1c: the printed document must say what the transmitted one says).
+    fs?.business_amp ? `${L.empa}: ${fs.business_amp}` : '',
     branch ? `${L.establishment} #${branch.branch_code}: ${[branch.name, branch.address, branch.street_number, branch.postal_code, branch.city].filter(Boolean).join(' ')}` : '',
   ].filter(Boolean) as string[];
   const issuerLines = selfBilledId

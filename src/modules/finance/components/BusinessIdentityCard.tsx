@@ -30,6 +30,10 @@ const BILLING: Field[] = [
   { key: 'business_profession', label: 'Activity', bilingual: true, placeholder: 'Wholesale of building materials' },
   { key: 'business_vat', label: 'VAT number', placeholder: 'EL123456789' },
   { key: 'business_gemi', label: 'GEMI number', placeholder: '123456789000' },
+  // EMPA/AMP packaging-producer number (N. 4819/2021 art. 11(7)). EOAN issues a plain
+  // 2-5 digit number -- no prefix, no fixed width -- so the column carries a digits-only
+  // CHECK and no length constraint. Printed in the issuer block of every sales document.
+  { key: 'business_amp', label: 'EPR / packaging reg. no. (AMP)', placeholder: '12345' },
   { key: 'business_tax_office', label: 'Tax office', bilingual: true, placeholder: 'FAE Athinon' },
   { key: 'business_address', label: 'Street', bilingual: true, placeholder: 'Ermou' },
   { key: 'business_street_number', label: 'Number', placeholder: '15' },
