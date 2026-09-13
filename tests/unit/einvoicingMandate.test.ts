@@ -72,3 +72,25 @@ describe('the mandate is surfaced, not assumed', () => {
     expect(card).toContain('2026-10-01');
   });
 });
+
+describe('the provider and the standard disagree on a field name', () => {
+  it('the trap is written down where the binding will be made', () => {
+    // The provider's swagger still carries `invoiveDeliveryStatus` -- the misspelling AADE
+    // corrected in v2.0.1. We speak to Novus, so the PROVIDER's spelling is the one that works,
+    // and binding to the standard's is a silent breaker: the request is accepted and the field
+    // is ignored.
+    // Raw, not comment-stripped: here the COMMENT is the artifact under test.
+    const novus = readFileSync(join(ROOT, 'supabase/functions/_shared/fiscal/novus.ts'), 'utf8');
+    expect(novus, 'nothing warns the next person about the delivery-status spelling')
+      .toContain('invoiveDeliveryStatus');
+  });
+
+  it('the swagger really does still carry it', () => {
+    // If the provider ever fixes it, this fails and the comment above should be revisited
+    // rather than left to describe a divergence that no longer exists.
+    const swagger = readFileSync(
+      join(ROOT, 'src/modules/myaade/AadeSpec/novus-swagger-2026-09-11.json'), 'utf8',
+    );
+    expect(swagger).toContain('invoiveDeliveryStatus');
+  });
+});

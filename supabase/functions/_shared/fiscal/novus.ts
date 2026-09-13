@@ -4,6 +4,11 @@
 //   production https://provider.timologisi.online
 // Auth header: `API-KEY: {key}`.
 
+// FIELD-NAME TRAP for the delivery lifecycle (#407): the provider's swagger still carries
+// `invoiveDeliveryStatus`, the misspelling AADE fixed in v2.0.1. BIND TO THE PROVIDER'S
+// SPELLING -- we speak to Novus, not to AADE. Same release fixed `EndToEndReferenceID`, which
+// had a GREEK epsilon in position 2. Both are silent: the field is accepted and ignored.
+
 import type {
   FiscalConnector,
   FiscalConnectorContext,
