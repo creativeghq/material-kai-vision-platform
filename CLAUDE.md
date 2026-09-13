@@ -144,6 +144,21 @@ the customer held a payment confirmation. Nothing raised: `paid` is a valid stat
 - **Profile → Services IS Finance → Settings → Services**: `products(item_type='service')` + `product_prices`, listed on a profile by `products.profile_user_id`. `user_profiles.services_detail` was a second store with a free-text price no invoice could read; it is dropped, and `user_profiles.services` is a trigger-derived cache. A hire of PRICED listed services opens a sales order + draft pre-invoice through `create_service_order_from_profile` → `_generate_invoice_from_order_core` (the ONE order→invoice writer; `generate_invoice_from_order` is now its auth wrapper). Never add a jsonb services column, and never build a second order→invoice path.
 - Guarded by [tests/unit/profileServicesSingleSource.test.ts](tests/unit/profileServicesSingleSource.test.ts), which asserts the issue-before-allocate ORDER.
 
+### 6. Building near a queue must never DRAIN it.
+
+The platform holds real, un-actioned business data waiting on a human. Measured 2026-09-13:
+**2,019 `warehouse_pending_items` (EUR 101,616)**, **1,895 `inbound_documents` at `new` (EUR 664,019)**,
+180 unresolved `ontology_bindings`. Building the code that handles a queue must never action its
+contents. A backfill, a new cron, a new heal, or a "let me just check this works" RPC call is how a
+month of supplier deliveries silently becomes stock nobody counted — and every one of those writes is
+individually plausible, which is why this needs a rule rather than judgement.
+
+- **No migration writes a business fact.** DDL may add a column, table, index or function. It may not populate a quantity, status, cost, or link from existing rows. Adding `quantity_shipped` is schema; setting it from `quantity_delivered` is inventing a receipt that never happened.
+- **A new integrity check ships with `autoheal_enabled = false`.** Eleven heals run unattended at 04:25 and all eleven only re-derive a cached number or a drifted status. `stock.reservation_missing` is already deliberately off — follow it. **A "heal" that moves goods, money or documents is not a heal.**
+- **`finance_settings.warehouse_autosync_mode` stays `suggest`** (all 4 workspaces are). `'auto'` makes the 05:00 `finance-inbound-sync` call `autoapprove_pending_items_for_document` — which drains the queue straight into stock with no human. Never flip it to demo a feature, and never default a new workspace to it.
+- **Verification runs in a transaction that aborts.** Calling a mutating RPC against live data to confirm it works IS the write. Use a `DO` block that raises at the end, or a workspace with no real data.
+- **The counts above are the baseline.** If they fall and nobody in the business pressed a button, something we built did it.
+
 ## Data layering — the pipeline is Medallion; name the layers
 
 **Every cache/pipeline bug we have hit has been a layer violation.**
