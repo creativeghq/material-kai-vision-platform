@@ -79,6 +79,14 @@ describe('an unpriced product says so', () => {
     }
   });
 
+  it('a refusal is UNKNOWN, never "no price set"', () => {
+    // A PostgREST refusal arrives as { data: null, error }, not as a throw. Read as a clean
+    // empty answer it becomes a positive claim about the catalog built out of a failure.
+    expect(hook, 'the hook ignores the RPC error').toContain('if (error)');
+    expect(hook).toContain('setFailed(true)');
+    expect(priceLine, 'the price line renders a refusal as "no price set"').toContain('failed');
+  });
+
   it('a capped call is reported, never silently short', () => {
     // Returning 200 rows for 500 ids with no word about it renders the other 300 as unpriced.
     expect(hook).toContain('capped');

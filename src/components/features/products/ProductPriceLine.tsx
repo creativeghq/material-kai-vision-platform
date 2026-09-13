@@ -16,10 +16,21 @@ export const ProductPriceLine: React.FC<{ workspaceId: string; productId: string
   workspaceId, productId,
 }) => {
   const ids = React.useMemo(() => [productId], [productId]);
-  const { byProduct, loading } = useCatalogPrices(workspaceId, ids);
+  const { byProduct, loading, failed } = useCatalogPrices(workspaceId, ids);
   const price = byProduct[productId];
 
   if (loading) return null;
+  // A refusal or an unreachable resolver is UNKNOWN, not "no price set" -- the live function
+  // raises 42501 for a non-member, and saying the catalog has no price for this product would
+  // be a positive claim built out of a failure (rule 3).
+  if (failed) {
+    return (
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-hairline bg-surface-sunken px-3 py-2">
+        <Tag className="h-3.5 w-3.5 text-muted-foreground" />
+        <span className="text-sm text-muted-foreground">Price unavailable — could not be read just now.</span>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-lg border border-hairline bg-surface-sunken px-3 py-2">
