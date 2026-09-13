@@ -287,6 +287,77 @@ function emptyBrief(overrides: Partial<NormalizedBrief>): NormalizedBrief {
   };
 }
 
+/** Non-empty array, or null — so "the caller said nothing" is distinguishable from "[]". */
+const filled = (a: string[] | null | undefined): string[] | null =>
+  Array.isArray(a) && a.length > 0 ? a : null;
+
+/**
+ * Normalize the caller's brief, then fill ONLY what it left absent from the workspace's brand
+ * profile. The caller always wins: a per-article brief that names its own author is stating a
+ * fact about that article, and a stored default must never overwrite it.
+ *
+ * Without this, `provenance` and `firsthandExperience` are null on every run — the analyzer's
+ * two E-E-A-T checks then fail every time and read as a writing problem rather than a missing
+ * input. They are also the checks no competitor has, so they are the worst two to leave broken.
+ */
+export async function resolveBriefWithProfile(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  workspaceId: string | null | undefined,
+  raw: unknown,
+): Promise<NormalizedBrief | null> {
+  const brief = normalizeContentBrief(raw);
+  if (!workspaceId) return brief;
+
+  const { data: p, error } = await supabase
+    .from('workspace_brand_profile')
+    .select('*')
+    .eq('workspace_id', workspaceId)
+    .maybeSingle();
+  // A profile we could not read is not an empty profile. Return the caller's brief untouched and
+  // let the checks report honestly, rather than silently writing defaults we did not load.
+  if (error || !p) return brief;
+
+  const base = brief ?? emptyBrief({});
+
+  return {
+    ...base,
+    brandVoice: {
+      toneAttributes:         filled(base.brandVoice.toneAttributes)         ?? (p.tone_attributes ?? []),
+      personalityTraits:      filled(base.brandVoice.personalityTraits)      ?? (p.personality_traits ?? []),
+      writingStyle:           base.brandVoice.writingStyle                   ?? (p.writing_style ?? null),
+      terminologyPreferences: filled(base.brandVoice.terminologyPreferences) ?? (p.terminology_preferences ?? []),
+      avoidList:              filled(base.brandVoice.avoidList)              ?? (p.avoid_list ?? []),
+      exampleContentUrls:     filled(base.brandVoice.exampleContentUrls)     ?? (p.example_content_urls ?? []),
+    },
+    // Whole-object fallback: a caller that supplied provenance at all owns it, because a half-
+    // merged author (their name, our bio) is a claim nobody made.
+    provenance: base.provenance ?? (
+      p.author_name || p.publisher_name || p.reviewed_by || p.ai_disclosure
+        ? {
+            authorName: p.author_name ?? null,
+            authorTitle: p.author_title ?? null,
+            authorBio: p.author_bio ?? null,
+            authorUrl: p.author_url ?? null,
+            publisherName: p.publisher_name ?? null,
+            reviewedBy: p.reviewed_by ?? null,
+            aiDisclosure: p.ai_disclosure ?? null,
+          }
+        : null
+    ),
+    firsthandExperience: base.firsthandExperience ?? (
+      (p.proprietary_data?.length || p.owned_examples?.length || p.methodology || p.credentials)
+        ? {
+            proprietaryData: p.proprietary_data ?? [],
+            ownedExamples: p.owned_examples ?? [],
+            methodology: p.methodology ?? null,
+            credentials: p.credentials ?? null,
+          }
+        : null
+    ),
+  };
+}
+
 /**
  * What to print when a brief field is absent. "Not specified" rather than a silent blank:
  * a prompt line reading `Knowledge level: ` invites the model to guess one, and a prompt

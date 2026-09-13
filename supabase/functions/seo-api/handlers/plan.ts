@@ -25,7 +25,7 @@ import type {
   KeywordResearchResult,
 } from '../../_shared/seo-types.ts';
 import {
-  normalizeContentBrief,
+  resolveBriefWithProfile,
   briefValue,
   briefList,
   briefExtraContextBlock,
@@ -169,7 +169,10 @@ export async function handlePlan(req: Request, body: any): Promise<Response> {
     // Normalized at the boundary, never dereferenced raw — `content_brief` arrives through a
     // `z.any()` tool schema, so `brief.audience.painPoints.join()` was a TypeError waiting for
     // the first caller that shaped a brief its own way. See content-brief.ts.
-    const brief = normalizeContentBrief(body.content_brief);
+    // Fills brandVoice / provenance / firsthandExperience from the workspace profile where the
+    // caller left them absent. Without it those three are null on every run and the E-E-A-T
+    // checks fail as a writing problem rather than a missing input.
+    const brief = await resolveBriefWithProfile(supabase, workspaceId, body.content_brief);
 
     // Load base system prompt from DB, then append dynamic context
     const baseSystemPrompt = await getToolPrompt(supabase, 'seo_planner');

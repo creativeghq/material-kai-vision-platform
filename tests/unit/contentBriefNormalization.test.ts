@@ -206,7 +206,24 @@ describe('the handlers normalize instead of dereferencing the raw body', () => {
 
   it.each(HANDLERS)('%s normalizes the brief', (file) => {
     const src = readFileSync(join(process.cwd(), HANDLER_DIR, file), 'utf-8');
-    expect(src, `${file} never calls normalizeContentBrief`).toContain('normalizeContentBrief(');
+    // Either entry point is fine, because `resolveBriefWithProfile` normalizes FIRST and then
+    // fills gaps from the workspace brand profile — plan and pipeline moved to it so the stored
+    // brief carries provenance and first-hand experience. What must never happen is a handler
+    // reaching into the raw body, which the next case covers.
+    const normalizes = src.includes('normalizeContentBrief(') || src.includes('resolveBriefWithProfile(');
+    expect(normalizes, `${file} reads the brief without normalizing it`).toBe(true);
+  });
+
+  it('resolveBriefWithProfile normalizes before it merges', () => {
+    // The indirection above is only safe while this holds: if the merge ever read `raw` directly,
+    // every handler that delegates to it would silently lose its normalizer.
+    const src = readFileSync(join(process.cwd(), HANDLER_DIR, 'content-brief.ts'), 'utf-8');
+    const fn = src.slice(src.indexOf('export async function resolveBriefWithProfile'));
+    const body = fn.slice(0, fn.indexOf('\n}\n') + 3);
+    expect(body).toContain('normalizeContentBrief(raw)');
+    const normalizeAt = body.indexOf('normalizeContentBrief(raw)');
+    const mergeAt = body.indexOf('brandVoice:');
+    expect(normalizeAt, 'the merge must not precede the normalize').toBeLessThan(mergeAt);
   });
 
   it.each(HANDLERS)('%s never reaches into an un-normalized brief', (file) => {

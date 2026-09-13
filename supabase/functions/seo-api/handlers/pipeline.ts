@@ -13,7 +13,7 @@ import { runInBackground } from '../../_shared/background.ts';
 import type { DbClient } from '../../_shared/supabase-client.ts';
 import { handleResearch } from './research.ts';
 import { handlePlan } from './plan.ts';
-import { normalizeContentBrief, type NormalizedBrief } from './content-brief.ts';
+import { resolveBriefWithProfile, type NormalizedBrief } from './content-brief.ts';
 import { handleWrite } from './write.ts';
 import { handleAnalyze } from './analyze.ts';
 import { buildGapsGains } from './gaps.ts';
@@ -214,7 +214,7 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
     // defensively too, but doing it here means the shape STORED on the article row is the
     // canonical one, so a re-run, the viewer and the provenance byline all read the same
     // brief rather than whatever the caller happened to send.
-    const brief = normalizeContentBrief(body.content_brief);
+    const brief = await resolveBriefWithProfile(supabase, workspaceId, body.content_brief);
 
     // Resolve the connected website this article belongs to — explicit body.website_id
     // when the agent picked one, else the workspace's default site. Also feeds the

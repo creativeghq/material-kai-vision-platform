@@ -4,7 +4,7 @@ import { formatDate, timeAgo } from '@/utils/datetime';
 import {
   ArrowLeft, Globe, ExternalLink, RefreshCw, Loader2, FileText, Search,
   FlaskConical, Radar, AlertTriangle, LineChart, Gauge, TrendingUp, CalendarClock, Check, Bot,
-  LayoutDashboard, Sparkles, Swords, Plus, Target, FileBarChart, Trash2,
+  LayoutDashboard, Sparkles, Swords, Plus, Target, FileBarChart, Trash2, ShieldCheck,
 } from 'lucide-react';
 import { WebsiteGscPanel } from '@/components/core/Profile/WebsiteGscPanel';
 import { WebsiteLlmsTxtPanel } from '@/components/core/Profile/WebsiteLlmsTxtPanel';
@@ -19,6 +19,7 @@ import { WebsiteReportsPanel } from '@/components/core/Profile/WebsiteReportsPan
 import { WebsiteCrawlPanel } from '@/components/core/Profile/WebsiteCrawlPanel';
 import { WebsiteAnalyticsPanel } from '@/components/core/Profile/WebsiteAnalyticsPanel';
 import { WebsiteCannibalisationPanel } from '@/components/core/Profile/WebsiteCannibalisationPanel';
+import { WebsiteBrandProfilePanel } from '@/components/core/Profile/WebsiteBrandProfilePanel';
 import { HubEmptyState, HubStatGrid, HubStatTile } from '@/components/core/hub';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
@@ -398,6 +399,7 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
           <TabsTrigger value="reports" className="w-full justify-start gap-2"><FileBarChart className="w-3.5 h-3.5" /> Reports</TabsTrigger>
           <TabsTrigger value="competitors" className="w-full justify-start gap-2"><Swords className="w-3.5 h-3.5" /> Competitors</TabsTrigger>
           <TabsTrigger value="articles" className="w-full justify-start gap-2"><FileText className="w-3.5 h-3.5" /> Articles</TabsTrigger>
+          <TabsTrigger value="brand" className="w-full justify-start gap-2"><ShieldCheck className="w-3.5 h-3.5" /> Brand Profile</TabsTrigger>
           <TabsTrigger value="research" className="w-full justify-start gap-2"><Search className="w-3.5 h-3.5" /> Keyword Research</TabsTrigger>
           <TabsTrigger value="runs" className="w-full justify-start gap-2"><FlaskConical className="w-3.5 h-3.5" /> Toolkit Runs</TabsTrigger>
           <TabsTrigger value="domains" className="w-full justify-start gap-2"><Radar className="w-3.5 h-3.5" /> Domain Audits</TabsTrigger>
@@ -444,6 +446,10 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
         </TabsContent>
 
         {/* Articles */}
+        <TabsContent value="brand" className="space-y-4">
+          <WebsiteBrandProfilePanel />
+        </TabsContent>
+
         <TabsContent value="articles" className="space-y-4">
           {/*
             Content decay (issue #349 C1). An article does not break when it goes stale —
