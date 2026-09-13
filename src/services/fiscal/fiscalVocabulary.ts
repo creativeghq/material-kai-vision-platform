@@ -335,3 +335,88 @@ export const MYDATA_THIRD_PARTY_COLLECTION_TYPES: readonly string[] = ['8.4', '8
 
 /** `multipleConnectedMarks` — "δεν είναι αποδεκτό" on these three. */
 export const MYDATA_NO_MULTIPLE_MARKS_TYPES: readonly string[] = ['1.6', '2.4', '5.1'];
+
+// ─── ΨΔΑ Phase Β1 — the movement LIFECYCLE (#407) ────────────────────────────
+// Source: AADE `DeliveryNote_v2.0.2.pdf` §7.1–7.4 + `TransportTypes-v2.0.2.xsd`.
+// Mandatory 12/10/2026; penalty €5.000/€10.000 ΑΝΑ ΦΟΡΟΛΟΓΙΚΟ ΕΛΕΓΧΟ, not per document.
+
+/**
+ * `InvoiceDeliveryStatus` — AADE §7.1. **There is no code 6.** A range check of 1..9, or a map
+ * indexed by position, silently invents a status AADE never defined.
+ */
+export const MYDATA_DELIVERY_STATUSES: readonly (MydataNamedCode & { key: string })[] = [
+  { code: 1, key: 'Registered',         en: 'Registered',           el: 'Εκδόθηκε' },
+  { code: 2, key: 'Cancelled',          en: 'Cancelled',            el: 'Ακυρώθηκε' },
+  { code: 3, key: 'InTransit',          en: 'In transit',           el: 'Σε διακίνηση' },
+  { code: 4, key: 'Rejected',           en: 'Rejected',             el: 'Απορρίφθηκε' },
+  { code: 5, key: 'DeliveredByCarrier', en: 'Delivered by carrier', el: 'Παραδόθηκε από μεταφορέα' },
+  { code: 7, key: 'FailedDelivery',     en: 'Delivery failed',      el: 'Αποτυχία παράδοσης' },
+  { code: 8, key: 'Completed',          en: 'Completed',            el: 'Ολοκληρώθηκε' },
+  { code: 9, key: 'InTransitReturn',    en: 'In transit (return)',  el: 'Σε διακίνηση (επιστροφή)' },
+];
+
+export function deliveryStatusLabel(
+  code: number | string | null | undefined,
+  lang: 'el' | 'en' = 'en',
+): string {
+  if (code == null || code === '') return '';
+  const n = Number(code);
+  const row = MYDATA_DELIVERY_STATUSES.find((s) => s.code === n);
+  return row ? row[lang] : String(code);
+}
+
+/**
+ * `DeliveryEventType` — AADE §7.2. The event name is NOT the method name: calling
+ * `ConfirmDeliveryOutcome` records a `ConfirmOutcome` event, and `ConfirmDeliveryReturn` records
+ * `ConfirmReturn`. Binding the method name would produce an event AADE does not recognise.
+ */
+export const MYDATA_DELIVERY_EVENT_TYPES: readonly string[] = [
+  'RegisterTransfer', 'ConfirmOutcome', 'Rejection', 'ConfirmReturn', 'RegisterTransferReturn',
+];
+
+/**
+ * The AADE method each event comes from, and the field its MARK arrives in. Every one is a
+ * different name — `transferMark`, `deliveryOutcomeMark`, `rejectMark`, `deliveryReturnMark` —
+ * and §3.2.1 remark 3 still calls the first `transportMark`, the name v2.0.1 renamed. Reading
+ * the wrong key yields no MARK and no error.
+ */
+export const MYDATA_DELIVERY_EVENT_METHODS: Readonly<Record<string, { method: string; markField: string }>> = {
+  RegisterTransfer:       { method: 'RegisterTransfer',        markField: 'transferMark' },
+  RegisterTransferReturn: { method: 'RegisterTransfer',        markField: 'transferMark' },
+  ConfirmOutcome:         { method: 'ConfirmDeliveryOutcome',  markField: 'deliveryOutcomeMark' },
+  Rejection:              { method: 'RejectDeliveryNote',      markField: 'rejectMark' },
+  ConfirmReturn:          { method: 'ConfirmDeliveryReturn',   markField: 'deliveryReturnMark' },
+};
+
+/** `DeliveryOutcomeType` — AADE §3.2.2. PARTIAL is accepted ONLY from the carrier. */
+export const MYDATA_DELIVERY_OUTCOMES: readonly string[] = ['FULL', 'PARTIAL', 'NONE'];
+
+/** `transportType` — AADE §7.4. 7 is "Άνευ": a movement with no vehicle at all. */
+export const MYDATA_TRANSPORT_TYPES: readonly MydataNamedCode[] = [
+  { code: 1, en: 'Public-use truck',    el: 'Φορτηγό Δημόσιας Χρήσης' },
+  { code: 2, en: 'Own-account truck',   el: 'Φορτηγό Ιδιωτικής Χρήσης' },
+  { code: 3, en: 'Ship',                el: 'Πλοίο' },
+  { code: 4, en: 'Train',               el: 'Τρένο' },
+  { code: 5, en: 'Aeroplane',           el: 'Αεροπλάνο' },
+  { code: 6, en: 'Other (e.g. two-wheeler)', el: 'Λοιπά Μεταφορικά Μέσα (π.χ. Δίκυκλα)' },
+  { code: 7, en: 'No vehicle',          el: 'Άνευ' },
+];
+
+export function transportTypeLabel(
+  code: number | string | null | undefined,
+  lang: 'el' | 'en' = 'en',
+): string {
+  if (code == null || code === '') return '';
+  const n = Number(code);
+  const row = MYDATA_TRANSPORT_TYPES.find((t) => t.code === n);
+  return row ? row[lang] : String(code);
+}
+
+/** The five party roles Α.1123/2024 Παράρτημα activates in Phase Β (all `όχι` in Phase Α). */
+export const MYDATA_MOVEMENT_PARTY_ROLES: readonly { key: string; en: string; el: string }[] = [
+  { key: 'sender',           en: 'Sender',            el: 'Αποστολέας' },
+  { key: 'sender_third',     en: 'Third-party sender', el: 'Αποστολέας Τρίτος' },
+  { key: 'carrier',          en: 'Carrier',           el: 'Μεταφορέας' },
+  { key: 'recipient',        en: 'Recipient',         el: 'Παραλήπτης' },
+  { key: 'recipient_third',  en: 'Third-party recipient', el: 'Παραλήπτης Τρίτος' },
+];
