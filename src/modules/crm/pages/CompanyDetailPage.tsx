@@ -97,6 +97,7 @@ interface Company {
   factory_names?: string[] | null; // supplier↔factory pin (ingested metadata.factory_name values)
   // Commercial depth
   contact_group?: string | null;
+  is_government_body?: boolean | null;
   include_in_myf?: boolean | null;
   vat_exemption_reason?: string | null;
   billing_name?: string | null;
@@ -947,6 +948,18 @@ export const CompanyDetailPage: React.FC = () => {
                           <CardContent className="space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
                               <InlineSelect alwaysEdit={isNew} label="Segment" value={company.contact_group ?? undefined} unsetValue="none" placeholder="Unsegmented" options={[{ value: 'b2b', label: 'B2B' }, { value: 'retail', label: 'Retail' }, { value: 'wholesale', label: 'Wholesale' }, { value: 'public_sector', label: 'Public sector' }]} onSave={(v) => patchInline({ contact_group: v })} hint="Groups this party for filtering and statement batches." />
+                              {/* #446: withholding is a SEPARATE fact from the segment. The
+                                  segment drives B2G document type; this drives arthro 64 - 4% on
+                                  goods, 8% on services - which is deducted from what they pay us.
+                                  Without it a fully-paid public-sector sale reads part-unpaid. */}
+                              <InlineSelect
+                                alwaysEdit={isNew}
+                                label="Withholds tax (φορέας γενικής κυβέρνησης)"
+                                value={company.is_government_body ? 'yes' : 'no'}
+                                options={[{ value: 'no', label: 'No' }, { value: 'yes', label: 'Yes — withholds άρθρο 64' }]}
+                                onSave={(v) => patchInline({ is_government_body: v === 'yes' })}
+                                hint="A public body pays 96% of a goods invoice and remits 4% to the state. Recording it here is what stops the rest reading as debt."
+                              />
                               <InlineSelect alwaysEdit={isNew} label="Default VAT-exemption category" value={company.vat_exemption_reason ?? undefined} unsetValue="__none" placeholder="None" options={MYDATA_EXEMPTION_CATEGORIES.map((c) => ({ value: String(c.code), searchText: `${c.code} ${c.label}`, label: <span><span className="font-mono text-[10px] mr-2">{c.code}</span>{c.label}</span> }))} displayValue={company.vat_exemption_reason ? <span><span className="font-mono text-[10px] mr-2">{company.vat_exemption_reason}</span>{MYDATA_EXEMPTION_CATEGORIES.find((c) => String(c.code) === company.vat_exemption_reason)?.label}</span> : undefined} onSave={(v) => patchInline({ vat_exemption_reason: v })} hint="Reason a line carries no separately-shown VAT (myDATA codes 1–31). The rate itself (24/13/6%) is set per product/line, not here." />
                             </div>
                             <div className="flex items-center justify-between gap-4">

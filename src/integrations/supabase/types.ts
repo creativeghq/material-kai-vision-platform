@@ -4243,6 +4243,7 @@ export type Database = {
           country: string | null
           country_code: string | null
           created_at: string | null
+          is_government_body: boolean
           created_by: string | null
           credit_limit: number | null
           description: string | null
@@ -4323,6 +4324,7 @@ export type Database = {
           country?: string | null
           country_code?: string | null
           created_at?: string | null
+          is_government_body?: boolean
           created_by?: string | null
           credit_limit?: number | null
           description?: string | null
@@ -4403,6 +4405,7 @@ export type Database = {
           country?: string | null
           country_code?: string | null
           created_at?: string | null
+          is_government_body?: boolean
           created_by?: string | null
           credit_limit?: number | null
           description?: string | null
@@ -4586,6 +4589,7 @@ export type Database = {
           country: string | null
           country_code: string | null
           created_at: string | null
+          is_government_body: boolean
           created_by: string | null
           credit_limit: number | null
           date_of_birth: string | null
@@ -4658,6 +4662,7 @@ export type Database = {
           country?: string | null
           country_code?: string | null
           created_at?: string | null
+          is_government_body?: boolean
           created_by?: string | null
           credit_limit?: number | null
           date_of_birth?: string | null
@@ -4730,6 +4735,7 @@ export type Database = {
           country?: string | null
           country_code?: string | null
           created_at?: string | null
+          is_government_body?: boolean
           created_by?: string | null
           credit_limit?: number | null
           date_of_birth?: string | null
