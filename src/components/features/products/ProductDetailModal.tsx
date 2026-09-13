@@ -18,7 +18,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
-import { ChevronLeft, ChevronRight, Factory, Info, Activity, Loader2, BookOpen, Database, Sparkles, Globe, Video, Box, Search, Palette, Package, ScanText, Settings2, Star, Wrench, Droplets, ShoppingCart, Ruler, Layers, ShieldCheck, Wand2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Factory, Info, Activity, Loader2, BookOpen, Database, Sparkles, Globe, Video, Box, Search, Palette, Package, ScanText, Settings2, Star, Wrench, Droplets, ShoppingCart, Ruler, Layers, ShieldCheck, Wand2, Grid3x3 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { buildTestOnRoomUrl, buildProductStudioUrl } from '@/utils/testOnRoom';
 import { Product } from './types';
@@ -51,6 +51,7 @@ import { useToast } from '@/hooks/use-toast';
 import { DollarSign, Ship, Boxes } from 'lucide-react';
 import { ProductRecommendationsPanel } from './ProductRecommendationsPanel';
 import { SupplierPricingSection } from './SupplierPricingSection';
+import { ProductPriceLine } from './ProductPriceLine';
 import { supabase } from '@/integrations/supabase/client';
 import { generateGroutRecommendations, formatGroutSuggestion } from '@/utils/groutSuggestions';
 import {
@@ -1696,6 +1697,15 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
           {/* Details Tab */}
           <TabsContent value="details" className="mt-6">
+            {/* The price, read-only, for anybody who can see the product at all (#405). Seeing a
+                price and EDITING one were the same permission (`pricing.manage`), so a member or a
+                sales rep saw no price anywhere in the modal — while they see one the moment they
+                add the product to a quote. Cost and margin stay on the admin Pricing tab. */}
+            {!isAdmin && activeWorkspaceId && (
+              <div className="mb-4">
+                <ProductPriceLine workspaceId={activeWorkspaceId} productId={product.id} />
+              </div>
+            )}
             {/* Availability, for people who quote but do not run the warehouse. A total and a
                 word — no warehouses, no locations, no ledger, no listings. Rendered for anyone
                 with availability access; those who also hold `warehouse.manage` get the full
@@ -2257,6 +2267,16 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               >
                 <Wand2 className="h-3.5 w-3.5" />
                 Test on a room
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-1.5 text-xs"
+                title="See this product tiled on a room surface at its real size — no credits"
+                onClick={() => { navigate(`/visualizer?product=${product.id}`); onClose(); }}
+              >
+                <Grid3x3 className="h-3.5 w-3.5" />
+                See it on a surface
               </Button>
 
               {/*

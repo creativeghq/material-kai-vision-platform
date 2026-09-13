@@ -5,7 +5,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { getOptimizedImageUrl } from '@/utils/imageUrl';
-import { Package, Replace, Pin, Boxes, Video, Box } from 'lucide-react';
+import { Package, Replace, Pin, Boxes, Video, Box, Wand2 } from 'lucide-react';
 import { Badge } from '@/components/core/ui/badge';
 import { Product } from '@/components/features/products/types';
 import ProductDetailModal from '@/components/features/products/ProductDetailModal';
@@ -23,13 +23,23 @@ interface ProductStripProps {
    * surface that cannot do the thing does not offer it.
    */
   onReplaceInImage?: (product: Product) => void;
+  /** Attach the product's photo as the material reference for an edit of the user's own room. */
+  onTestInRoom?: (product: { id: string; name: string; imageUrl: string }) => void;
   onPinMaterial?: (product: { id: string; name: string; imageUrl?: string }) => void;
   onGenerateVR?: (imageUrl: string, context: { prompt?: string; roomType?: string; style?: string }) => void;
   onGenerateVideo?: (imageUrl: string) => void;
   onUseIn3DScene?: (imageUrl: string, productName: string) => void;
 }
 
-type ViewerPrice = { price: number | null; discount_pct: number; currency: string };
+type ViewerPrice = {
+  price: number | null;
+  discount_pct: number;
+  currency: string;
+  /** What the number IS, said by the resolver. Inferring it from `discount_pct > 0` labelled a
+   *  sub-account at 0% discount "Retail" when it was their buy price (#405). */
+  kind: 'your_price' | 'retail' | 'seller';
+  unpriced: boolean;
+};
 
 const sym = (c: string) => (c === 'EUR' ? '€' : c === 'USD' ? '$' : c === 'GBP' ? '£' : `${c} `);
 
@@ -55,6 +65,7 @@ export const ProductStrip: React.FC<ProductStripProps> = ({
   products,
   title = 'Related Products',
   onReplaceInImage,
+  onTestInRoom,
   onPinMaterial,
   onGenerateVR,
   onGenerateVideo,
@@ -78,13 +89,18 @@ export const ProductStrip: React.FC<ProductStripProps> = ({
     supabase
       .rpc('get_catalog_prices_for_workspace', { p_workspace_id: activeWorkspaceId, p_product_ids: ids })
       .then(({ data }) => {
-        if (cancelled || !Array.isArray(data)) return;
+        // The resolver reports how many ids it was asked for and how many it answered, so a
+        // capped call is a stated fact rather than products that silently read as unpriced.
+        const rows = (data as any)?.prices;
+        if (cancelled || !Array.isArray(rows)) return;
         const map: Record<string, ViewerPrice> = {};
-        for (const r of data as any[]) {
+        for (const r of rows as any[]) {
           map[r.product_id] = {
             price: r.price != null ? Number(r.price) : null,
             discount_pct: Number(r.discount_pct) || 0,
             currency: r.currency || 'EUR',
+            kind: r.kind ?? 'retail',
+            unpriced: !!r.unpriced,
           };
         }
         setViewerPrices(map);
@@ -160,8 +176,11 @@ export const ProductStrip: React.FC<ProductStripProps> = ({
                   if (price == null) return null;
                   const cur = vp?.currency ?? 'EUR';
                   const disc = vp?.discount_pct ?? 0;
+                  // The LABEL comes from `kind`, not from whether there is a discount.
+                  const label = vp?.kind === 'your_price' ? 'Your price' : 'Retail';
                   return (
                     <p className="text-sm font-semibold text-foreground mt-1.5">
+                      <span className="mr-1 text-[11px] font-normal text-muted-foreground">{label}</span>
                       {sym(cur)}{price.toFixed(2)}
                       {disc > 0 && (
                         <span className="text-xs font-normal text-primary ml-1">({disc}% off)</span>
@@ -172,10 +191,17 @@ export const ProductStrip: React.FC<ProductStripProps> = ({
                 {/* Actions. `stopPropagation` on every one: the whole card is a button that
                     opens the detail modal, so without it each action also opens the modal it
                     was meant to act instead of. */}
-                {(onReplaceInImage || onPinMaterial || onGenerateVR || onGenerateVideo || onUseIn3DScene) && (
+                {(onReplaceInImage || onTestInRoom || onPinMaterial || onGenerateVR || onGenerateVideo || onUseIn3DScene) && (
                   <div className="mt-2 flex flex-wrap gap-1">
                     {onReplaceInImage && (
                       <ProductAction label="Replace in image" icon={Replace} onClick={() => onReplaceInImage(product)} />
+                    )}
+                    {onTestInRoom && primaryImage?.url && (
+                      <ProductAction
+                        label="Test in a room"
+                        icon={Wand2}
+                        onClick={() => onTestInRoom({ id: product.id, name: product.name, imageUrl: primaryImage.url })}
+                      />
                     )}
                     {onPinMaterial && (
                       <ProductAction

@@ -6,6 +6,8 @@ import {
 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { useCatalogPrices, type CatalogPrice } from '@/hooks/useCatalogPrices';
 import { useModule } from '@/modules/_core';
 import { PropertyDiscoveryTab } from '@/modules/real-estate/components/PropertyDiscoveryTab';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/core/ui/avatar';
@@ -192,7 +194,11 @@ function Pagination({ page, total, onPage }: { page: number; total: number; onPa
 
 // ─── Product Row ──────────────────────────────────────────────────────────────
 
-function ProductRow({ product, onView, surplus }: { product: RawProduct; onView: (p: RawProduct) => void; surplus?: { price: number; currency: string } }) {
+function ProductRow({ product, onView, surplus, price }: {
+  product: RawProduct; onView: (p: RawProduct) => void;
+  surplus?: { price: number; currency: string };
+  price?: CatalogPrice;
+}) {
   const color = CAT_COLORS[product.detectedCat] ?? CAT_COLORS.other;
   const rawCat = getMaterialCategory(product.metadata);
   const displayCat = rawCat ? rawCat.replace(/_/g, ' ') : catLabel(product.detectedCat);
@@ -247,6 +253,32 @@ function ProductRow({ product, onView, surplus }: { product: RawProduct; onView:
         )}
       </div>
 
+      {/* Price. A member of the owning workspace sees retail; a sub-account sees its own price.
+          Cost and margin stay behind `pricing.manage` and are never in this list. An unpriced
+          product is an em dash with a reason on hover — never a 0, which reads as free. */}
+      <div className="hidden sm:block shrink-0 text-right tabular-nums">
+        {price?.price != null ? (
+          <>
+            <span className="text-sm font-medium text-foreground">
+              {price.currency === 'EUR' ? '€' : `${price.currency} `}{price.price.toFixed(2)}
+            </span>
+            {price.discount_pct > 0 && (
+              <span className="ml-1 text-[10px] font-normal text-primary">−{price.discount_pct}%</span>
+            )}
+            <span className="block text-[10px] font-normal text-muted-foreground">
+              {price.kind === 'your_price' ? 'Your price' : 'Retail'}
+            </span>
+          </>
+        ) : (
+          <span
+            className="text-sm text-muted-foreground"
+            title={price ? 'No price has been set for this product in this workspace.' : 'Price not loaded.'}
+          >
+            —
+          </span>
+        )}
+      </div>
+
       {/* Actions */}
       <div className="flex items-center justify-end gap-1 shrink-0" role="presentation" onClick={(e) => e.stopPropagation()}>
         <AddToMoodboardButton
@@ -282,8 +314,13 @@ function ProductRow({ product, onView, surplus }: { product: RawProduct; onView:
 
 function ProductList({ products, onView, surplus }: { products: RawProduct[]; onView: (p: RawProduct) => void; surplus?: Record<string, { price: number; currency: string }> }) {
   const [page, setPage] = useState(1);
+  const { activeWorkspaceId } = useWorkspace();
   const totalPages = Math.ceil(products.length / PER_PAGE);
   const paged = products.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+  // The VISIBLE page only: a price is resolved per viewer through the one ladder, and
+  // resolving the whole filtered list would be a per-product call for rows nobody is looking at.
+  const pagedIds = useMemo(() => paged.map((p) => p.id), [paged]);
+  const { byProduct: prices } = useCatalogPrices(activeWorkspaceId, pagedIds);
 
   // Reset page when filtered list changes
   React.useEffect(() => { setPage(1); }, [products.length]);
@@ -293,15 +330,16 @@ function ProductList({ products, onView, surplus }: { products: RawProduct[]; on
       <div className="border border-border rounded-lg overflow-hidden">
         <div
           className="grid px-4 py-2 bg-muted/40 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground border-b border-border"
-          style={{ gridTemplateColumns: '1fr 130px 120px' }}
+          style={{ gridTemplateColumns: '1fr 130px 110px 120px' }}
         >
           <span>Product</span>
           <span>Category</span>
+          <span className="text-right">Price</span>
           <span className="text-right">Actions</span>
         </div>
         <div className="divide-y divide-border">
           {paged.map((p) => (
-            <ProductRow key={p.id} product={p} onView={onView} surplus={surplus?.[p.id]} />
+            <ProductRow key={p.id} product={p} onView={onView} surplus={surplus?.[p.id]} price={prices[p.id]} />
           ))}
         </div>
       </div>
