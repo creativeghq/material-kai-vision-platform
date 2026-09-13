@@ -24,6 +24,7 @@ import { OrderCustomsCard } from '@/modules/finance/components/OrderCustomsCard'
 import { OrderCbamCard } from '@/modules/finance/components/OrderCbamCard';
 import { OrderEudrCard } from '@/modules/finance/components/OrderEudrCard';
 import { MarginAuthorityNotice } from '@/modules/finance/components/MarginAuthorityNotice';
+import { ReceptionReportCard } from '@/modules/stock/components/ReceptionReportCard';
 import { ContractsSection } from '@/components/features/contracts/ContractsSection';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
@@ -4452,6 +4453,14 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                 <div className="mt-4">
                   <OrderCbamCard orderId={order.id} workspaceId={order.workspace_id} />
                 </div>
+                {/* #433 -- who gets the pallet. `receive_order_lines` moved the goods in and
+                    nothing decided whose they were; around a third of merchant lines are
+                    non-stock specials somebody is already waiting on. */}
+                {order.order_type === 'purchase' && (
+                  <div className="mt-4">
+                    <ReceptionReportCard purchaseOrderId={order.id} />
+                  </div>
+                )}
                 {/* Same question again for wood: which of three roles this line puts us in,
                     derived from the CN code and the origin rather than set by hand. */}
                 <div className="mt-4">

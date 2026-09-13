@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { CreditTopUpDialog, type CreditTopUpRequest } from '@/components/core/CreditTopUpDialog';
 import { TablePagination, paginate } from '@/components/core/ui/table-pagination';
 import { stockService, type ForecastCandidate } from '../services/stockService';
+import { ContainerFillNotice } from '@/modules/stock/components/ContainerFillNotice';
 
 const TrendBadge: React.FC<{ t: ForecastCandidate['trend'] }> = ({ t }) => {
   if (t === 'accelerating') return <span className="inline-flex items-center text-xs text-amber-600 dark:text-amber-400"><TrendingUp className="h-3 w-3 mr-1" />rising</span>;
@@ -122,6 +123,22 @@ export const ResupplySection: React.FC<{ workspaceId: string }> = ({ workspaceId
         </div>
       </CardHeader>
       <CardContent className="p-0">
+        {/* #439 -- what the flagged lines do to a container. Every published fill algorithm
+            is volume-first, which on tile builds a box that looks correct and cannot be
+            lifted: weight binds at about 14-15 m3 of a 33 m3 cube. */}
+        {flagged.length > 0 && (
+          <div className="px-4 pt-3">
+            <ContainerFillNotice
+              workspaceId={workspaceId}
+              lines={flagged
+                .filter((c) => c.product_id)
+                .map((c) => ({
+                  product_id: c.product_id as string,
+                  quantity: c.recommended_order_qty ?? Math.max(c.reorder_point - c.available, 0),
+                }))}
+            />
+          </div>
+        )}
         {loading ? (
           <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
         ) : rows.length === 0 ? (
