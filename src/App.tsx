@@ -48,6 +48,7 @@ const SearchEntryRedirect: React.FC = () => {
 
 const Index = lazy(() => import('./pages/Index'));
 const RoomPlannerPage = lazy(() => import('./pages/RoomPlannerPage').then(m => ({ default: m.RoomPlannerPage })));
+const SurfaceVisualizerPage = lazy(() => import('./pages/SurfaceVisualizerPage'));
 const UserProfilePage = lazy(() => import('./pages/UserProfilePage').then(m => ({ default: m.UserProfilePage })));
 const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage').then(m => ({ default: m.PublicProfilePage })));
 const DiscoverPage = lazy(() => import('./pages/DiscoverPage').then(m => ({ default: m.DiscoverPage })));
@@ -484,6 +485,17 @@ const App = () => (
                     <AuthGuard>
                       <Layout>
                         <RoomPlannerPage />
+                      </Layout>
+                    </AuthGuard>
+                  }
+                />
+                {/* #447 Phase 1 — a product's face on a room photo, at its real size, drawn in the browser. */}
+                <Route
+                  path="/visualizer"
+                  element={
+                    <AuthGuard>
+                      <Layout>
+                        <SurfaceVisualizerPage />
                       </Layout>
                     </AuthGuard>
                   }

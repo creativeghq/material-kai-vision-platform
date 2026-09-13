@@ -5,6 +5,7 @@
  */
 
 import { resolveImageSlots } from './image-slots.ts';
+import { PATTERNS as SURFACE_PATTERNS } from '../surfacePatterns.generated.ts';
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what
@@ -1211,5 +1212,112 @@ Model: marble-1.1 (~5min, 190 credits). The faster marble-1.0-draft tier was ret
         model: z.enum(['marble-1.1']).optional().describe('Model. marble-1.1 (190cr, ~5min) is the only VR world model.'),
       }),
     }
+  );
+};
+
+/**
+ * LangChain Tool: deterministic surface preview (#447 Phase 1). No model and no credits: the
+ * browser draws the product's real face on a scene at its real format from the chunk this emits.
+ */
+export const createVisualizeOnSurfaceTool = (workspaceId: string, onChunk?: (chunk: any) => void) => {
+  return tool(
+    async ({ product_id, productName, scene_id, sceneName, surfaceKey, pattern, groutWidthMm, groutColorHex, rotationDeg }) => {
+      try {
+        let productQuery = supabase.from('products').select('id, name').eq('workspace_id', workspaceId).limit(5);
+        productQuery = product_id
+          ? productQuery.eq('id', product_id)
+          : productQuery.ilike('name', `%${(productName ?? '').trim()}%`);
+        const { data: products, error: pErr } = await productQuery;
+        if (pErr) return JSON.stringify({ success: false, error: `Product lookup failed: ${pErr.message}` });
+        if (!products?.length) {
+          return JSON.stringify({
+            success: false,
+            error: product_id ? 'No such product in this workspace.' : `No product matches "${productName ?? ''}". Ask which product, or run material_search first.`,
+          });
+        }
+        if (products.length > 1 && !product_id) {
+          return JSON.stringify({ success: false, error: 'Several products match; ask the user which one.', candidates: products });
+        }
+        const product = products[0];
+
+        const { data: scenes, error: sErr } = await supabase
+          .from('visualizer_scenes')
+          .select('id, name, workspace_id, room_type')
+          .or(`workspace_id.is.null,workspace_id.eq.${workspaceId}`)
+          .order('workspace_id', { ascending: true, nullsFirst: true })
+          .order('name');
+        if (sErr) return JSON.stringify({ success: false, error: `Scene lookup failed: ${sErr.message}` });
+        const wanted = (sceneName ?? '').trim().toLowerCase();
+        const scene = scene_id
+          ? scenes?.find((s) => s.id === scene_id)
+          : wanted
+            ? scenes?.find((s) => `${s.name} ${s.room_type ?? ''}`.toLowerCase().includes(wanted))
+            : scenes?.[0];
+        if (!scene) {
+          return JSON.stringify({ success: false, error: 'No scene found.', scenes: (scenes ?? []).map((s) => ({ id: s.id, name: s.name })) });
+        }
+
+        const { data: surfaces } = await supabase
+          .from('visualizer_scene_surfaces')
+          .select('key, kind')
+          .eq('scene_id', scene.id)
+          .order('sort_order');
+        const surface = (surfaceKey
+          ? surfaces?.find((s) => s.key === surfaceKey || s.kind === surfaceKey)
+          : surfaces?.[0]) ?? null;
+        if (!surface) {
+          return JSON.stringify({ success: false, error: `Scene "${scene.name}" has no surface${surfaceKey ? ` named ${surfaceKey}` : ''}.` });
+        }
+
+        const params = new URLSearchParams({ scene: scene.id, surface: surface.key, product: product.id });
+        if (pattern) params.set('pattern', pattern);
+        if (groutWidthMm !== undefined) params.set('grout', String(groutWidthMm));
+        if (groutColorHex) params.set('groutColor', groutColorHex);
+        if (rotationDeg) params.set('rot', String(rotationDeg));
+        const url = `/visualizer?${params.toString()}`;
+
+        onChunk?.({
+          type: 'visualizer_render',
+          scene_id: scene.id,
+          scene_name: scene.name,
+          surface_key: surface.key,
+          surface_kind: surface.kind,
+          product_id: product.id,
+          product_name: product.name,
+          pattern: pattern ?? 'stack',
+          grout_width_mm: groutWidthMm ?? 3,
+          grout_color_hex: groutColorHex ?? null,
+          rotation_deg: rotationDeg ?? 0,
+          url,
+        });
+        return JSON.stringify({
+          success: true,
+          product: product.name,
+          scene: scene.name,
+          surface: surface.kind,
+          pattern: pattern ?? 'stack',
+          url,
+          note: 'The preview is drawn in the user\'s browser from the product\'s real face and recorded format; YOU CANNOT SEE IT. '
+            + 'Say which product, scene and surface were used and that the full visualizer is at the link. Never describe how it looks.',
+        });
+      } catch (e) {
+        return JSON.stringify({ success: false, error: e instanceof Error ? e.message : 'visualize_on_surface failed' });
+      }
+    },
+    {
+      name: 'visualize_on_surface',
+      description: `Show a catalog product tiled on a room surface at its REAL format — a deterministic preview drawn in the user's browser: no model, no credits, exact scale, a chosen laying pattern and joint. Use it when the user wants to see how a SPECIFIC tile, stone, wood or wallcovering looks on a floor or wall. Prefer it over generate_gemini for "show me this product on the floor"; use generate_gemini for restyling or photoreal renders. Pass productName (or product_id); the scene defaults to the first library room.`,
+      schema: z.object({
+        product_id: z.string().optional().describe('Product id when known'),
+        productName: z.string().optional().describe('Product name to match (partial is fine) when the id is not known'),
+        scene_id: z.string().optional().describe('Scene id when known'),
+        sceneName: z.string().optional().describe('Room to show it in, matched against scene names (e.g. "kitchen", "bathroom")'),
+        surfaceKey: z.string().optional().describe('Which surface: floor, wall, backsplash… Defaults to the first surface of the scene'),
+        pattern: z.enum(SURFACE_PATTERNS).optional().describe('Laying pattern'),
+        groutWidthMm: z.number().min(0).max(20).optional().describe('Joint width in mm (default 3)'),
+        groutColorHex: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().describe('Joint colour as #rrggbb'),
+        rotationDeg: z.number().optional().describe('Rotate the layout, in degrees (0, 45, 90)'),
+      }),
+    },
   );
 };

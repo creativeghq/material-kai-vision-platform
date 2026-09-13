@@ -251,7 +251,12 @@ export interface GeminiEditParams {
   modelTier: EditModelTier;
   /** Set to true when the user chose Region Edit — triggers canvas mode in AgentHub */
   regionEdit?: boolean;
+  /** A photo of the material to apply. Attached FIRST, as the reference slot, beside the room. */
+  referenceImage?: string;
 }
+
+/** A material the user has already pinned, offered as a one-click reference. */
+export interface ReferenceOption { id: string; name: string; imageUrl?: string }
 
 interface GeminiEditModalProps {
   isOpen: boolean;
@@ -263,6 +268,8 @@ interface GeminiEditModalProps {
   roomType?: string | null;
   /** Style context from the image being edited (e.g. 'modern', 'scandinavian'). */
   style?: string | null;
+  /** Pinned materials, offered as the material photo for a floor or wall edit. */
+  referenceOptions?: ReferenceOption[];
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -274,6 +281,7 @@ export const GeminiEditModal: React.FC<GeminiEditModalProps> = ({
   generating = false,
   roomType = null,
   style = null,
+  referenceOptions = [],
 }) => {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [category, setCategory] = useState<EditCategoryId | null>(null);
@@ -283,6 +291,7 @@ export const GeminiEditModal: React.FC<GeminiEditModalProps> = ({
   const [custom, setCustom] = useState('');
   const [prompt, setPrompt] = useState('');
   const [modelTier, setModelTier] = useState<EditModelTier>('fast');
+  const [referenceImage, setReferenceImage] = useState<string | null>(null);
 
   // Reset on open
   useEffect(() => {
@@ -295,8 +304,16 @@ export const GeminiEditModal: React.FC<GeminiEditModalProps> = ({
       setCustom('');
       setPrompt('');
       setModelTier('fast');
+      setReferenceImage(null);
     }
   }, [isOpen]);
+
+  const pickReferenceFile = (file: File | undefined) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => { if (typeof reader.result === 'string') setReferenceImage(reader.result); };
+    reader.readAsDataURL(file);
+  };
 
   // Build room context string from props
   const roomContext = roomType
@@ -339,7 +356,7 @@ export const GeminiEditModal: React.FC<GeminiEditModalProps> = ({
     const finalPrompt = prompt.trim() || buildPrompt(category!, selected, selectedSub, custom, wallZone);
     if (!finalPrompt) return;
     onClose();
-    onApply({ prompt: finalPrompt, modelTier });
+    onApply({ prompt: finalPrompt, modelTier, referenceImage: referenceImage ?? undefined });
   };
 
   const canProceedToStep3 = selected.length > 0 || (category && ['furniture', 'custom'].includes(category) && custom.trim().length > 0);
@@ -497,6 +514,41 @@ export const GeminiEditModal: React.FC<GeminiEditModalProps> = ({
                     </div>
                   </div>
                 </>
+              )}
+
+              {/* A material PHOTO for a floor or wall edit: sent as pixels beside the room, so the
+                  model reproduces that material instead of its idea of the name. */}
+              {(category === 'flooring' || category === 'walls') && (
+                <div>
+                  <p className="text-[11px] font-medium text-muted-foreground mb-1.5">Material photo (optional)</p>
+                  {referenceImage ? (
+                    <div className="flex items-center gap-3">
+                      <img src={referenceImage} alt="Material reference" className="h-14 w-14 rounded-sm border border-border object-cover" />
+                      <button type="button" onClick={() => setReferenceImage(null)} className="text-xs text-muted-foreground underline">
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <label className="cursor-pointer rounded-sm border border-border px-3 py-1.5 text-xs font-medium hover:border-primary/40">
+                        Upload a photo of the material
+                        <input type="file" accept="image/*" className="sr-only" onChange={(e) => pickReferenceFile(e.target.files?.[0])} />
+                      </label>
+                      {referenceOptions.filter((o) => o.imageUrl).map((o) => (
+                        <button
+                          key={o.id}
+                          type="button"
+                          title={`Use pinned material: ${o.name}`}
+                          onClick={() => setReferenceImage(o.imageUrl!)}
+                          className="flex items-center gap-1.5 rounded-sm border border-border px-2 py-1 text-xs hover:border-primary/40"
+                        >
+                          <img src={o.imageUrl} alt="" className="h-6 w-6 rounded-sm object-cover" />
+                          <span className="max-w-[10rem] truncate">{o.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
 
               {/* Walls */}

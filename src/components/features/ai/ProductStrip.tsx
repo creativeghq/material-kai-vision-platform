@@ -5,7 +5,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { getOptimizedImageUrl } from '@/utils/imageUrl';
-import { Package, Replace, Pin, Boxes, Video, Box } from 'lucide-react';
+import { Package, Replace, Pin, Boxes, Video, Box, Wand2 } from 'lucide-react';
 import { Badge } from '@/components/core/ui/badge';
 import { Product } from '@/components/features/products/types';
 import ProductDetailModal from '@/components/features/products/ProductDetailModal';
@@ -23,6 +23,8 @@ interface ProductStripProps {
    * surface that cannot do the thing does not offer it.
    */
   onReplaceInImage?: (product: Product) => void;
+  /** Attach the product's photo as the material reference for an edit of the user's own room. */
+  onTestInRoom?: (product: { id: string; name: string; imageUrl: string }) => void;
   onPinMaterial?: (product: { id: string; name: string; imageUrl?: string }) => void;
   onGenerateVR?: (imageUrl: string, context: { prompt?: string; roomType?: string; style?: string }) => void;
   onGenerateVideo?: (imageUrl: string) => void;
@@ -55,6 +57,7 @@ export const ProductStrip: React.FC<ProductStripProps> = ({
   products,
   title = 'Related Products',
   onReplaceInImage,
+  onTestInRoom,
   onPinMaterial,
   onGenerateVR,
   onGenerateVideo,
@@ -172,10 +175,17 @@ export const ProductStrip: React.FC<ProductStripProps> = ({
                 {/* Actions. `stopPropagation` on every one: the whole card is a button that
                     opens the detail modal, so without it each action also opens the modal it
                     was meant to act instead of. */}
-                {(onReplaceInImage || onPinMaterial || onGenerateVR || onGenerateVideo || onUseIn3DScene) && (
+                {(onReplaceInImage || onTestInRoom || onPinMaterial || onGenerateVR || onGenerateVideo || onUseIn3DScene) && (
                   <div className="mt-2 flex flex-wrap gap-1">
                     {onReplaceInImage && (
                       <ProductAction label="Replace in image" icon={Replace} onClick={() => onReplaceInImage(product)} />
+                    )}
+                    {onTestInRoom && primaryImage?.url && (
+                      <ProductAction
+                        label="Test in a room"
+                        icon={Wand2}
+                        onClick={() => onTestInRoom({ id: product.id, name: product.name, imageUrl: primaryImage.url })}
+                      />
                     )}
                     {onPinMaterial && (
                       <ProductAction

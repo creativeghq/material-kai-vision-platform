@@ -206,9 +206,6 @@
       "reportRunPayload",
       "retireAutoKeywords"
     ],
-    "src/services/visualizerService.ts": [
-      "deleteSurface"
-    ],
     "src/services/vrWorldService.ts": [
       "getVRWorld",
       "listVRWorlds"

@@ -1083,6 +1083,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // in registerTools; listing them here is what makes the toolkit filter and
       // load_toolkit agree with what the agent can actually call.
       'generate_3d', 'generate_gemini', 'virtual_staging', 'apply_lighting_preset', 'generate_vr_world',
+      'visualize_on_surface',
       // The read half of the generation kit. Unlisted and unclustered until 2026-08-26, so an
       // agent could start a render and had no way to report whether it had finished.
       'check_generation_status',
@@ -1152,6 +1153,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost',
       // Image-driven post-processing tools (require an existing room image in the conversation)
       'apply_lighting_preset', 'generate_vr_world', 'generate_video',
+      // Deterministic surface preview: exact product, exact format, no credits (#447).
+      'visualize_on_surface',
       // Presentation sheets (all users; per-sheet credit cost gated inside the tool)
       'generate_presentation_sheet',
       // Project Workspace — interior designers benefit most from the container
@@ -2047,6 +2050,7 @@ async function executeAgent(
   const createGenerationStatusTool = generationMod?.createGenerationStatusTool;
   const createApplyLightingPresetTool = generationMod?.createApplyLightingPresetTool;
   const createGenerateVRWorldTool = generationMod?.createGenerateVRWorldTool;
+  const createVisualizeOnSurfaceTool = generationMod?.createVisualizeOnSurfaceTool;
   const createCheckServerHealthTool = opsMod?.createCheckServerHealthTool;
   const createQuerySentryTool = opsMod?.createQuerySentryTool;
   const createQueryDatabaseTool = dbMod?.createQueryDatabaseTool;
@@ -2838,6 +2842,11 @@ async function executeAgent(
   // VR world generation — turn a room image into an explorable 3D Gaussian Splat
   if (config.tools.includes('generate_vr_world') && createGenerateVRWorldTool) {
     tools.push(createGenerateVRWorldTool(userId, workspaceId, conversationImages, onChunk, toolImages));
+  }
+
+  // Deterministic surface preview — the browser draws it from the chunk; no model, no credits (#447).
+  if (config.tools.includes('visualize_on_surface') && createVisualizeOnSurfaceTool) {
+    tools.push(createVisualizeOnSurfaceTool(workspaceId, onChunk));
   }
 
   // Interior video — animate a room image. createInteriorVideoV2Tool has existed since

@@ -10,7 +10,7 @@ import { getOptimizedImageUrl } from '@/utils/imageUrl';
 import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { ChevronRight, Sun, Smartphone, Wand2 } from 'lucide-react';
+import { ChevronRight, Sun, Smartphone, Wand2, Grid3x3 } from 'lucide-react';
 import { buildTestOnRoomUrl } from '@/utils/testOnRoom';
 import { AddToQuoteButton } from '@/modules/quotes/components/AddToQuoteButton';
 import { AddToMoodboardButton } from '@/components/business/moodboard/AddToMoodboardButton';
@@ -262,6 +262,19 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             >
               <Wand2 className="h-3.5 w-3.5" />
               Test on a room
+            </Button>
+
+            {/* See it on a surface — the deterministic visualizer: this face at its real format
+                on a library room or your own photo, drawn in the browser, no credits. */}
+            <Button
+              onClick={(e) => { e.stopPropagation(); navigate(`/visualizer?product=${product.id}`); }}
+              variant="outline"
+              size="sm"
+              className="w-full text-xs gap-1.5"
+              title="See this product tiled on a room surface at its real size"
+            >
+              <Grid3x3 className="h-3.5 w-3.5" />
+              See it on a surface
             </Button>
 
             {/* View Details Button */}
