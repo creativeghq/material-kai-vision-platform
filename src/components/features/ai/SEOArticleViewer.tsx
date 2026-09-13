@@ -28,7 +28,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/core/ui/button';
-import { Card, CardContent } from '@/components/core/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Dialog, DialogContent, DialogTitle } from '@/components/core/ui/dialog';
 import { Progress } from '@/components/core/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
@@ -61,7 +61,7 @@ import {
   AlertOctagon,
   Quote,
   BookOpen,
-  Undo2, Wand2, RefreshCw, Plus,
+  Undo2, Wand2, RefreshCw, Plus, Pencil,
 } from 'lucide-react';
 
 // ─── Types (matching seo-pipeline output / ArticleOutput) ───────
@@ -98,6 +98,9 @@ interface SEOArticle {
   seo_score: number | null;
   readability_score: number | null;
   previous_markdown_at?: string | null;
+  /** Where this article actually went live. Without it nothing can be matched to Search Console. */
+  published_url?: string | null;
+  published_at?: string | null;
   word_count: number;
   reading_time_minutes: number;
   keyword_density: any;
@@ -2161,9 +2164,158 @@ function ArticleBlocks({ blocks }: { blocks: ArticleBlock[] }) {
 
 // ─── Top-level Article Content ──────────────────────────────────
 
+/**
+ * Did the article work — and, when we cannot say, why not.
+ *
+ * `get_article_decay` derives all of it: the query the page actually ranks for, clicks and
+ * impression-weighted position against the previous window, and a verdict. Every absence is its
+ * own answer, and the panel SETS the published URL, because a reason with no way to fix it is
+ * half a message.
+ */
+interface DecayRow {
+  status: string;
+  note: string | null;
+  main_query: string | null;
+  clicks_now: number | null;
+  clicks_prev: number | null;
+  position_now: number | null;
+  position_prev: number | null;
+  position_delta: number | null;
+  verdict: string | null;
+}
+
+const VERDICT_TONE: Record<string, 'success' | 'warning' | 'error' | 'info' | 'neutral'> = {
+  improving: 'success', stable: 'neutral', slipping: 'warning', dropped_out: 'error', new: 'info',
+};
+
+const VERDICT_LABEL: Record<string, string> = {
+  improving: 'Improving', stable: 'Holding', slipping: 'Slipping',
+  dropped_out: 'Dropped out', new: 'Too new to compare',
+};
+
+function ArticlePerformance({
+  articleId, publishedUrl, onSetPublishedUrl,
+}: {
+  articleId: string;
+  publishedUrl: string | null;
+  onSetPublishedUrl: (url: string) => Promise<{ ok: boolean; error?: string }>;
+}) {
+  const [row, setRow] = useState<DecayRow | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [url, setUrl] = useState(publishedUrl ?? '');
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoadError(null);
+    const { data, error } = await supabase.rpc('get_article_decay', { p_article_id: articleId });
+    if (error) { setLoadError(error.message); return; }
+    setRow(((data ?? []) as DecayRow[])[0] ?? null);
+  }, [articleId]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const save = async () => {
+    const next = url.trim();
+    if (!/^https:\/\//i.test(next)) { setSaveError('Give the full https:// URL, exactly as Search Console reports it.'); return; }
+    setSaving(true);
+    setSaveError(null);
+    const r = await onSetPublishedUrl(next);
+    setSaving(false);
+    if (!r.ok) { setSaveError(r.error ?? 'Nothing was saved.'); return; }
+    await load();
+  };
+
+  // A read that failed is UNKNOWN, not a page that is doing fine.
+  if (loadError) {
+    return (
+      <Card className="dashboard-card">
+        <CardContent className="p-4 text-sm text-muted-foreground">
+          Could not read this article&apos;s performance: {loadError}
+        </CardContent>
+      </Card>
+    );
+  }
+  if (!row) return null;
+
+  const needsUrl = row.status === 'not_collected';
+
+  return (
+    <Card className="dashboard-card">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">How it is doing in search</CardTitle>
+        {row.status !== 'ok' && <CardDescription>{row.note}</CardDescription>}
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {needsUrl && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://example.com/the-article"
+              className="max-w-md flex-1"
+              aria-label="Published URL"
+            />
+            <Button size="sm" onClick={save} disabled={saving || !url.trim()}>
+              {saving ? 'Saving…' : 'Watch this page'}
+            </Button>
+          </div>
+        )}
+        {saveError && <p className="text-sm text-destructive">{saveError}</p>}
+
+        {row.status === 'ok' && (
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={VERDICT_TONE[row.verdict ?? ''] ?? 'neutral'}>
+                {VERDICT_LABEL[row.verdict ?? ''] ?? 'Unknown'}
+              </Badge>
+              <span className="text-sm text-muted-foreground">
+                on <span className="font-medium text-foreground">{row.main_query}</span> — the query it
+                actually ranks for
+              </span>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div>
+                <div className="text-xs font-semibold text-muted-foreground">Clicks</div>
+                <div className="text-sm tabular-nums">
+                  {formatNumber(row.clicks_now ?? 0)}
+                  <span className="text-muted-foreground"> from {formatNumber(row.clicks_prev ?? 0)}</span>
+                </div>
+              </div>
+              <div>
+                <div className="text-xs font-semibold text-muted-foreground">Position</div>
+                <div className="text-sm tabular-nums">
+                  {row.position_now ?? '—'}
+                  <span className="text-muted-foreground"> from {row.position_prev ?? '—'}</span>
+                </div>
+              </div>
+              <div>
+                <div className="text-xs font-semibold text-muted-foreground">Change</div>
+                <div className="text-sm tabular-nums">
+                  {row.position_delta === null
+                    ? '—'
+                    : `${row.position_delta > 0 ? '+' : ''}${row.position_delta} places`}
+                </div>
+              </div>
+            </div>
+            {publishedUrl && (
+              <p className="text-xs text-muted-foreground break-all">Watching {publishedUrl}</p>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 interface ArticleContentProps {
   markdown: string | null;
   html: string | null;
+  /**
+   * Save a hand-edited body. Absent in demo mode, where there is no row to write to.
+   * Resolves with the SAVE's own outcome, so the toolbar never claims a save it did not get.
+   */
+  onSaveMarkdown?: (next: string) => Promise<{ ok: boolean; error?: string }>;
   /** Article title (article.title from DB). Used when markdown has no H1 of its own. */
   title?: string | null;
   /** Meta description — rendered as a dek under the title. */
@@ -2172,9 +2324,30 @@ interface ArticleContentProps {
   readingTimeMinutes?: number;
 }
 
-function ArticleContent({ markdown, html, title, metaDescription, wordCount, readingTimeMinutes }: ArticleContentProps) {
+function ArticleContent({ markdown, html, title, metaDescription, wordCount, readingTimeMinutes, onSaveMarkdown }: ArticleContentProps) {
   const [copied, setCopied] = useState(false);
   const [view, setView] = useState<'rendered' | 'markdown'>('rendered');
+  // The draft is held here and only ever written by one call, which also re-scores — see
+  // reanalyze.ts. Two calls means the body can land while the score does not, and the screen
+  // then shows a confident number next to text it was never computed from.
+  const [draft, setDraft] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const editing = draft !== null;
+
+  const beginEdit = () => { setSaveError(null); setDraft(markdown ?? html ?? ''); setView('markdown'); };
+  const cancelEdit = () => { setSaveError(null); setDraft(null); };
+  const commitEdit = async () => {
+    if (draft === null || !onSaveMarkdown) return;
+    setSaving(true);
+    setSaveError(null);
+    const r = await onSaveMarkdown(draft);
+    setSaving(false);
+    // Stay in the editor on failure. Closing it would discard what the writer typed on the
+    // strength of a save that did not happen.
+    if (!r.ok) { setSaveError(r.error ?? 'Nothing was saved.'); return; }
+    setDraft(null);
+  };
 
   const handleCopy = async () => {
     if (markdown) {
@@ -2204,21 +2377,49 @@ function ArticleContent({ markdown, html, title, metaDescription, wordCount, rea
   return (
     <div className="space-y-3">
       {/* Toolbar */}
-      <div className="flex justify-end gap-1">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setView(view === 'rendered' ? 'markdown' : 'rendered')}
-        >
-          {view === 'rendered' ? 'View Markdown' : 'View Rendered'}
-        </Button>
-        <Button variant="ghost" size="sm" onClick={handleCopy}>
-          {copied ? <Check className="w-3 h-3 mr-1" /> : <Copy className="w-3 h-3 mr-1" />}
-          {copied ? 'Copied' : 'Copy Markdown'}
-        </Button>
+      <div className="flex flex-wrap items-center justify-end gap-1">
+        {editing ? (
+          <>
+            <Button variant="ghost" size="sm" onClick={cancelEdit} disabled={saving}>Cancel</Button>
+            <Button size="sm" onClick={commitEdit} disabled={saving || !draft?.trim()}>
+              {saving ? 'Saving…' : 'Save and re-score'}
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setView(view === 'rendered' ? 'markdown' : 'rendered')}
+            >
+              {view === 'rendered' ? 'View Markdown' : 'View Rendered'}
+            </Button>
+            {onSaveMarkdown && (
+              <Button variant="ghost" size="sm" onClick={beginEdit}>
+                <Pencil className="w-3 h-3 mr-1" />
+                Edit
+              </Button>
+            )}
+            <Button variant="ghost" size="sm" onClick={handleCopy}>
+              {copied ? <Check className="w-3 h-3 mr-1" /> : <Copy className="w-3 h-3 mr-1" />}
+              {copied ? 'Copied' : 'Copy Markdown'}
+            </Button>
+          </>
+        )}
       </div>
+      {saveError && (
+        <p className="text-sm text-destructive">{saveError}</p>
+      )}
 
-      {view === 'rendered' ? (
+      {editing ? (
+        <Textarea
+          value={draft ?? ''}
+          onChange={(e) => setDraft(e.target.value)}
+          spellCheck
+          className="min-h-[60vh] max-h-[80vh] font-mono text-xs leading-relaxed"
+          aria-label="Article markdown"
+        />
+      ) : view === 'rendered' ? (
         <article className="rounded-2xl bg-card border border-border/60 shadow-md max-h-[80vh] overflow-y-auto">
           {/* Editorial header — kicker, title, dek, byline strip */}
           <header className="px-6 md:px-12 pt-10 md:pt-14 pb-8">
@@ -2498,6 +2699,57 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
    * unconditionally — the honest answer to "this analysis is stale" has to be cheap enough to
    * act on, or it is not an answer.
    */
+  /**
+   * Save a hand edit AND re-score it, in ONE call.
+   *
+   * `reanalyze` takes the body when it is given one, writes it with a revert snapshot and scores
+   * what it wrote — all in a single statement. Saving here and re-scoring in a second request
+   * would let the body land while the score did not, and the screen would then show a confident
+   * number next to text it was never computed from (anti-regression rule 4).
+   */
+  /** Where the article went live. Stated by the operator; nothing here guesses a URL. */
+  const setPublishedUrl = useCallback(async (next: string): Promise<{ ok: boolean; error?: string }> => {
+    if (!article?.id) return { ok: false, error: 'This article has no id to save against.' };
+    const { error } = await supabase
+      .from('seo_articles')
+      .update({ published_url: next, published_at: new Date().toISOString() })
+      .eq('id', article.id);
+    if (error) return { ok: false, error: error.message };
+    setArticle((prev) => (prev ? { ...prev, published_url: next } : prev));
+    return { ok: true };
+  }, [article?.id]);
+
+  const saveMarkdown = useCallback(async (next: string): Promise<{ ok: boolean; error?: string }> => {
+    if (!article?.id) return { ok: false, error: 'This article has no id to save against.' };
+    const { data, error } = await supabase.functions.invoke('seo-api', {
+      body: { action: 'reanalyze', article_id: article.id, markdown_content: next },
+    });
+    if (error || !data?.success) {
+      return { ok: false, error: data?.error || error?.message || 'Nothing was saved.' };
+    }
+    setArticle((prev) => (prev ? {
+      ...prev,
+      markdown_content: data.data.markdown_content ?? next,
+      // html_content is the pipeline's render of the OLD body. Leaving it would make the
+      // rendered view show the text the writer just replaced.
+      html_content: null,
+      word_count: data.data.word_count ?? prev.word_count,
+      content_analysis: data.data.analysis ?? prev.content_analysis,
+      seo_score: data.data.seo_score ?? prev.seo_score,
+      overall_score: data.data.seo_score ?? prev.overall_score,
+      readability_score: data.data.readability_score ?? prev.readability_score,
+      previous_markdown_at: data.data.reverts_to ?? prev.previous_markdown_at,
+    } : prev));
+    toast({
+      title: data.data.scored === false ? 'Saved, not scored' : `Saved — score ${data.data.seo_score}/100`,
+      // A score we could not compute is stated, never left as the old number beside new text.
+      description: data.data.scored === false
+        ? data.data.score_unavailable
+        : `${data.data.word_count ?? '?'} words.`,
+    });
+    return { ok: true };
+  }, [article?.id, toast]);
+
   const reanalyze = useCallback(async () => {
     if (!article?.id || reanalyzing) return;
     setReanalyzing(true);
@@ -2732,9 +2984,19 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
                     metaDescription={article.meta_description}
                     slug={article.slug}
                   />
+                  {!initialArticle && article.status === 'completed' && (
+                    <div className="my-4">
+                      <ArticlePerformance
+                        articleId={article.id}
+                        publishedUrl={article.published_url ?? null}
+                        onSetPublishedUrl={setPublishedUrl}
+                      />
+                    </div>
+                  )}
                   <ArticleContent
                     markdown={article.markdown_content}
                     html={article.html_content}
+                    onSaveMarkdown={initialArticle ? undefined : saveMarkdown}
                     title={article.title}
                     metaDescription={article.meta_description}
                     wordCount={article.word_count}

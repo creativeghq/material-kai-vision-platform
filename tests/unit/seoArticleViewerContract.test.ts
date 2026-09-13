@@ -222,11 +222,18 @@ describe('applying or reverting a fix refreshes the analysis it invalidated', ()
     expect(revert, 'a brief-less re-score gives a different answer for identical text').not.toContain('undefined, null, undefined');
   });
 
-  it('re-analysis never rewrites the article body', () => {
-    // What makes it safe to offer unconditionally. A "refresh" that silently edited the article
-    // would make the honest answer too expensive to act on.
+  it('re-analysis writes only the body the caller handed it', () => {
+    // It may now SAVE a hand edit, in the same call that scores it — two calls would let the body
+    // land while the score did not. What it must never do is invent a body of its own: a
+    // "refresh" that silently edited the article would make the honest answer too expensive to
+    // act on, which is what makes this safe to offer unconditionally.
     const reanalyze = readFileSync(join(HANDLERS, 'reanalyze.ts'), 'utf-8');
-    expect(reanalyze).not.toMatch(/markdown_content:/);
+    for (const write of reanalyze.match(/markdown_content: [^,\n]+/g) ?? []) {
+      expect(write, `reanalyze writes a body it derived itself: ${write}`)
+        .toMatch(/markdown_content: (edited|markdown)/);
+    }
+    // And the body it saves is the body it scored.
+    expect(reanalyze).toMatch(/const markdown = edited \?\? article\.markdown_content \?\? '';/);
     expect(reanalyze, 'the analyzer is pure TypeScript; charging for it would be charging for nothing')
       .not.toMatch(/debit_credits/);
   });

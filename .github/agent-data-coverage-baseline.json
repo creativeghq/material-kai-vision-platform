@@ -67,6 +67,11 @@
   ],
   "known_gaps": [
     {
+      "rpc": "get_article_decay",
+      "scope_arg": "p_article_id",
+      "reason": "reached through get_website_opportunities, which aggregates it across the site; the per-article form is a panel read on the article itself"
+    },
+    {
       "rpc": "get_assessment_snapshot",
       "scope_arg": "p_subject_type",
       "reason": "served to the agent by the get_*_assessment tools through the assessment edge function; not a direct read"

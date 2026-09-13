@@ -82,6 +82,10 @@ export async function persistAnalysis(
         },
       },
       seo_score: analysis.overallScore,
+      // The analysis counted the body it just scored, so the stored count cannot drift from the
+      // text. It did: nothing on the apply-fix or reanalyse path touched it, so the viewer
+      // printed the pipeline's original figure over a body that had been rewritten since.
+      word_count: analysis.wordCount,
       ...(analysis.readabilityScore !== null ? { readability_score: analysis.readabilityScore } : {}),
       updated_at: new Date().toISOString(),
       ...columns,

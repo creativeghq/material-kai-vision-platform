@@ -1,4 +1,10 @@
-/** Re-score an article that is already written, and store the result. */
+/**
+ * Re-score an article that is already written, and store the result. Optionally SAVE a
+ * hand-edited body first, in the same call.
+ *
+ * One call on purpose (anti-regression rule 4): two would let the body land while the score did
+ * not, and the screen would then show a confident number next to text it was never computed from.
+ */
 
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../../_shared/http.ts';
@@ -38,7 +44,15 @@ export async function handleReanalyze(req: Request, body: any): Promise<Response
     const { response: entResponse } = await resolveAndAssertSeoEntitled(supabase, userId);
     if (entResponse) return entResponse;
 
-    const markdown = article.markdown_content || '';
+    // A hand edit, when the caller sent one. The stored body is scored otherwise.
+    const edited = typeof body.markdown_content === 'string' ? body.markdown_content : null;
+    if (edited !== null && !edited.trim()) {
+      return jsonResponse({ success: false, error: 'An article cannot be saved empty.' }, 400);
+    }
+    if (edited !== null && edited.length > 400_000) {
+      return jsonResponse({ success: false, error: 'That body is too large to save (400,000 characters max).' }, 413);
+    }
+    const markdown = edited ?? article.markdown_content ?? '';
     if (!markdown.trim()) {
       return jsonResponse(
         { success: false, error: 'This article has no content yet, so there is nothing to analyse.' },
@@ -50,12 +64,33 @@ export async function handleReanalyze(req: Request, body: any): Promise<Response
     // An article whose run failed before the plan landed cannot be re-analysed, and saying so is
     // better than analysing against an empty plan and returning a confident wrong score.
     const plan = storedArticlePlan(article) as ArticlePlan | null;
+    const noPlan = 'This article has no stored plan, so it cannot be scored. Only articles the '
+      + 'pipeline completed carry one.';
     if (!plan) {
+      // A re-score that cannot run must not eat the edit the writer just made. The save still
+      // happens; what is missing is the SCORE, and that is said rather than implied by leaving
+      // the old number sitting next to new text.
+      if (edited === null) return jsonResponse({ success: false, error: noPlan }, 409);
+
+      const savedAt = new Date().toISOString();
+      const { error: saveErr } = await supabase.from('seo_articles').update({
+        markdown_content: edited,
+        previous_markdown: article.markdown_content ?? '',
+        previous_markdown_at: savedAt,
+        previous_markdown_label: 'Your edit',
+        updated_at: savedAt,
+      }).eq('id', articleId);
+      if (saveErr) throw new Error(`Could not save your edit: ${saveErr.message}`);
+
       return jsonResponse({
-        success: false,
-        error: 'This article has no stored plan, so it cannot be re-analysed. Only articles the '
-          + 'pipeline completed carry one.',
-      }, 409);
+        success: true,
+        data: {
+          article_id: articleId, analysis: null, seo_score: null, readability_score: null,
+          applicable_fixes: 0, gaps_gains: null, markdown_content: edited, word_count: null,
+          saved: true, scored: false, score_unavailable: noPlan,
+          can_revert: true, reverts_to: savedAt, credits_used: 0,
+        },
+      });
     }
 
     const analysis = analyzeContent(
@@ -74,11 +109,23 @@ export async function handleReanalyze(req: Request, body: any): Promise<Response
       ?.extra?.research_tab_data;
     const gapsGains = research ? buildGapsGains(markdown, research) : null;
 
+    // The snapshot goes in the SAME statement as the new body, so the two can never disagree
+    // about which text it precedes — and Revert reaches a hand edit exactly as it reaches an
+    // applied fix, because both leave the same trail.
+    const capturedAt = new Date().toISOString();
+    const columns = edited === null ? {} : {
+      markdown_content: edited,
+      previous_markdown: article.markdown_content ?? '',
+      previous_markdown_at: capturedAt,
+      previous_markdown_label: 'Your edit',
+      updated_at: capturedAt,
+    };
+
     const { error: writeErr } = await persistAnalysis(
       supabase,
       article,
       analysis,
-      {},
+      columns,
       {
         ...(gapsGains ? { gaps_gains_data: gapsGains } : {}),
         // Drops FAQ schema entries the body no longer shows. Free, and it repairs a row that
@@ -101,6 +148,12 @@ export async function handleReanalyze(req: Request, body: any): Promise<Response
         readability_score: analysis.readabilityScore,
         applicable_fixes: applicable,
         gaps_gains: gapsGains,
+        markdown_content: markdown,
+        word_count: analysis.wordCount,
+        saved: edited !== null,
+        scored: true,
+        can_revert: edited !== null,
+        reverts_to: edited === null ? null : capturedAt,
         credits_used: 0,
       },
     });
