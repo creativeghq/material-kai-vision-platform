@@ -148,6 +148,12 @@ export interface OrderItem {
   /** Effective per-line discount % (from the order-level discount, allocated proportionally). */
   discount_pct: number;
   quantity_delivered: number;
+  /**
+   * How much has actually been RECEIVED into stock. Written only alongside a stock movement, which
+   * is what makes it the receipt fact the three-way match reads — `quantity_delivered` is the
+   * commercial view and moves nothing (#320).
+   */
+  quantity_shipped: number;
   update_warehouse: boolean;
   sort_order: number;
 }

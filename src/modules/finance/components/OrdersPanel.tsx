@@ -18,6 +18,7 @@ import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { OrderWorklistPanel } from './OrderWorklistPanel';
+import { ReceiveOrderLinesDialog } from './ReceiveOrderLinesDialog';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle , DialogDescription } from '@/components/core/ui/dialog';
 import { OrderCustomsCard } from '@/modules/finance/components/OrderCustomsCard';
 import { ContractsSection } from '@/components/features/contracts/ContractsSection';
@@ -2784,6 +2785,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   // The invoice a credit note can be raised against: issued (never a draft — the credit-note
   // picker excludes drafts, which is how that dialog used to open empty with no explanation)
   // and not already fully credited.
+  const [receiving, setReceiving] = useState(false);
   const creditableInvoiceId = order?.order_type === 'sales'
     ? (fin?.invoices ?? []).find((i: { id: string; status?: string }) =>
         i.status && !['draft', 'void', 'credit_noted'].includes(i.status))?.id ?? null
@@ -3086,9 +3088,18 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                             <Send className="h-3.5 w-3.5 mr-2" /> {handoff?.available ? 'Email to supplier (PDF)' : 'Send to supplier'}
                           </DropdownMenuItem>
                         )}
+                        {/* Part of a delivery. Without this the only stock-moving action was
+                            all-or-nothing, so a half delivery was recorded with the "Delivered"
+                            editor — which moves nothing and made the three-way match read as
+                            received. */}
+                        {canReceiveIntoWarehouse && (
+                          <DropdownMenuItem onClick={() => setReceiving(true)}>
+                            <PackageCheck className="h-3.5 w-3.5 mr-2" /> Receive goods (part or all)…
+                          </DropdownMenuItem>
+                        )}
                         {canReceiveIntoWarehouse && (
                           <DropdownMenuItem onClick={receiveWarehouse}>
-                            <PackageCheck className="h-3.5 w-3.5 mr-2" /> Receive into warehouse
+                            <PackageCheck className="h-3.5 w-3.5 mr-2" /> Receive everything outstanding
                           </DropdownMenuItem>
                         )}
                         {canCoverShortfall && (
@@ -4567,6 +4578,17 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
         onDone={() => { void loadProfit(order.id, order.order_type, order.workspace_id); onChanged(); }}
       />
     )}
+    {order && (
+      <ReceiveOrderLinesDialog
+        orderId={order.id}
+        orderNumber={order.order_number ?? null}
+        items={items}
+        open={receiving}
+        onOpenChange={setReceiving}
+        onReceived={() => { void load(order.id); onChanged(); }}
+      />
+    )}
+
     {/* The same link written against an expense that already exists, instead of a new one. */}
     {order && (
       <LinkExpenseToOrderDialog
