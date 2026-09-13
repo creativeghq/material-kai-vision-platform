@@ -96,13 +96,13 @@ describe('myDATA §8.3 — the exemption ground cites ν.5144/2024 (#453)', () =
     ).toBe(31);
   });
 
-  it.skipIf(!HAVE_SPEC)('we declare exactly codes 1-31, once each, in order', () => {
+  it('we declare exactly codes 1-31, once each, in order', () => {
     expect(MYDATA_EXEMPTION_CATEGORIES.map((c) => c.code)).toEqual(
       Array.from({ length: 31 }, (_, i) => i + 1),
     );
   });
 
-  it.each(Array.from({ length: 31 }, (_, i) => i + 1))(
+  it.skipIf(!HAVE_SPEC).each(Array.from({ length: 31 }, (_, i) => i + 1))(
     'code %i prints the ν.5144/2024 ground ΑΑΔΕ publishes, verbatim',
     (code) => {
       const ours = MYDATA_EXEMPTION_CATEGORIES.find((c) => c.code === code)!;
