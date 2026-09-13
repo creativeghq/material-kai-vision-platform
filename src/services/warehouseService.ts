@@ -4,6 +4,7 @@ import { isQuotaError } from '@/hooks/useQuotaErrorHandler';
 import { PRODUCT_IMAGE_SELECT, getProductImageUrl, getProductName } from '@/utils/productMetadata';
 import { mivaaApi } from '@/services/mivaaApiClient';
 import { dealerProductsService, type ManualImageRef } from '@/services/dealerProductsService';
+import type { IntakeAddition } from '@/modules/stock/intakeApprovalRules';
 
 /** A catalog product offered as the match for a supplier line. */
 export interface CatalogMatch {
@@ -739,6 +740,30 @@ export const warehouseService = {
     return { approved: Number(r.approved ?? 0), failed: Number(r.failed ?? 0), errors: r.errors ?? [] };
   },
 
+  /** What intake actually created, most recent first. The approved line vanishes from every
+   *  pending list, so without this there is no trail from line to product to movement. */
+  async intakeRecentAdditions(workspaceId: string, limit = 50): Promise<{
+    rows: IntakeAddition[]; note: string;
+  }> {
+    const { data, error } = await supabase.rpc('intake_recent_additions' as never, {
+      p_workspace: workspaceId, p_limit: limit,
+    } as never);
+    if (error) throw error;
+    const r = (data ?? {}) as { rows?: IntakeAddition[]; note?: string };
+    return { rows: r.rows ?? [], note: r.note ?? '' };
+  },
+
+  /** Reverse an approval: a compensating movement and the line queued again. The product stays. */
+  async undoIntakeApproval(pendingItemId: string): Promise<{
+    stock_reversed: boolean; quantity_reversed: number; note: string;
+  }> {
+    const { data, error } = await supabase.rpc('undo_intake_approval' as never, {
+      p_pending_item_id: pendingItemId,
+    } as never);
+    if (error) throw error;
+    return data as unknown as { stock_reversed: boolean; quantity_reversed: number; note: string };
+  },
+
   async bulkDismissPending(ids: string[]): Promise<number> {
     const { data, error } = await supabase.rpc('bulk_dismiss_pending_warehouse_items', { p_ids: ids });
     if (error) throw error;
@@ -785,6 +810,8 @@ export interface PendingProduct {
   matched_warehouse_item_id?: string | null;
   match_score?: number | null;
   match_reason?: string | null;
+  /** When the match was scored. A verdict with no date is one that has never been re-checked. */
+  match_scored_at?: string | null;
 }
 
 /** One issuer's share of the intake queue. */

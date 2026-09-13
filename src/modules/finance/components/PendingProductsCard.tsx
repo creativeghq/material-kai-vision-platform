@@ -38,6 +38,9 @@ import { formatMoney } from '@/modules/finance/services/financeService';
 import { parseDecimalOr, round2 } from '@/utils/decimal';
 import { formatDate } from '@/utils/datetime';
 import { TablePagination, clampPage } from '@/components/core/ui/table-pagination';
+import {
+  STOCK_MODE_LABEL, bulkConfirmText, stockOverrideFor, type StockMode,
+} from '@/modules/stock/intakeApprovalRules';
 
 /** A CRM row read only for the names `parseSupplierLine` can recognise in a description. */
 interface MakerRow { name: string; factory_names: string[] | null }
@@ -219,6 +222,9 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
    *  these are the two answers that apply to a whole delivery, so asking per line is noise. */
   const [targetWarehouse, setTargetWarehouse] = useState('');
   const [addToCatalog, setAddToCatalog] = useState(true);
+  /* #406 -- "the product exists" and "this quantity arrived" are two facts. Undecided lets
+     each line decide from its own document date instead of assuming a delivery. */
+  const [stockMode, setStockMode] = useState<StockMode>('auto');
 
   const [searchText, setSearchText] = useState('');
   const [search, setSearch] = useState('');
@@ -319,8 +325,8 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
     const wh = warehouses.find((w) => w.id === targetWarehouse);
     const ok = action === 'approve'
       ? confirm(
-          `Add all ${g.line_count} queued line(s) from ${who} to ${wh?.name ?? 'the default warehouse'}?\n\n`
-          + `This creates or tops up ${g.line_count} product(s) and posts a stock movement for each. `
+          bulkConfirmText(g.line_count, wh?.name ?? 'the default warehouse', stockMode)
+          + `\n\nQueued by ${who}. `
           + 'They are built from the invoice data only — the text embedding and facets are filled in by '
           + 'the background passes, not at this moment.')
       : confirm(`Dismiss all ${g.line_count} queued line(s) from ${who}? They will not be added to stock.`);
@@ -334,6 +340,8 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
         const res = await warehouseService.bulkApprovePending(ids, {
           target_warehouse_id: targetWarehouse || null,
           add_to_catalog: addToCatalog,
+          ...(stockOverrideFor(stockMode) !== undefined
+            ? { add_to_stock: stockOverrideFor(stockMode) } : {}),
         });
         toast({
           title: `${res.approved} added to warehouse`,
@@ -471,6 +479,16 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
             <Checkbox className="h-3.5 w-3.5" checked={addToCatalog} onCheckedChange={(v) => setAddToCatalog(v === true)} />
             Sellable
           </label>
+          <Select value={stockMode} onValueChange={(v) => setStockMode(v as StockMode)}>
+            <SelectTrigger className="h-7 w-56 text-[11px]" aria-label="Stock mode">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(['auto', 'catalog_only', 'catalog_and_stock'] as StockMode[]).map((m) => (
+                <SelectItem key={m} value={m}>{STOCK_MODE_LABEL[m]}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -529,7 +547,7 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
             workspaceId={workspaceId} issuerKey={null} search={search}
             categories={categories} materialCategories={materialCategories} warehouses={warehouses}
             knownManufacturers={knownManufacturers}
-            targetWarehouseId={targetWarehouse} addToCatalog={addToCatalog}
+            targetWarehouseId={targetWarehouse} addToCatalog={addToCatalog} stockMode={stockMode}
             onChanged={async () => { await load(); onChanged?.(); }}
           />
         ) : (
@@ -603,7 +621,7 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
                         categories={categories} materialCategories={materialCategories} warehouses={warehouses}
                         knownManufacturers={knownManufacturers}
                         supplierName={g.issuer_name}
-                        targetWarehouseId={targetWarehouse} addToCatalog={addToCatalog}
+                        targetWarehouseId={targetWarehouse} addToCatalog={addToCatalog} stockMode={stockMode}
                         onChanged={async () => { await load(); onChanged?.(); }}
                       />
                     )}
@@ -672,11 +690,12 @@ const IntakeLineList: React.FC<{
   knownManufacturers: string[];
   targetWarehouseId: string;
   addToCatalog: boolean;
+  stockMode: StockMode;
   supplierName?: string | null;
   onChanged: () => void | Promise<void>;
 }> = ({
   workspaceId, issuerKey, search, categories, materialCategories, warehouses,
-  knownManufacturers, targetWarehouseId, addToCatalog, supplierName, onChanged,
+  knownManufacturers, targetWarehouseId, addToCatalog, stockMode, supplierName, onChanged,
 }) => {
   const { toast } = useToast();
   const [lines, setLines] = useState<IntakeLine[]>([]);
@@ -825,6 +844,8 @@ const IntakeLineList: React.FC<{
       category_id: e.category_id || null,
       target_warehouse_id: targetWarehouseId || null,
       add_to_catalog: addToCatalog,
+      ...(stockOverrideFor(stockMode) !== undefined
+        ? { add_to_stock: stockOverrideFor(stockMode) } : {}),
       ...detailOverrides(e),
       // '' is a real answer — "no, create a new product" — and must beat the stored match, so
       // this is only spread when the operator actually chose.
@@ -879,8 +900,8 @@ const IntakeLineList: React.FC<{
     // debiting credits, and a thousand of them is not a thing to put behind one button. The
     // products are real and the background passes do finish them — but say so, don't assume it.
     if (action === 'approve' && !confirm(
-      `Add ${ids.length} selected line(s) to the warehouse?\n\n`
-      + 'They are created from the invoice data only. The text embedding and facets are filled in '
+      bulkConfirmText(ids.length, 'the warehouse', stockMode)
+      + '\n\nThey are created from the invoice data only. The text embedding and facets are filled in '
       + 'by the background passes (embeddings within ~15 min, facets overnight).')) return;
     setBulkBusy(true);
     try {
@@ -892,6 +913,8 @@ const IntakeLineList: React.FC<{
         for (const id of ids) perItem[id] = overrides(id);
         const res = await warehouseService.bulkApprovePending(ids, {
           target_warehouse_id: targetWarehouseId || null, add_to_catalog: addToCatalog,
+          ...(stockOverrideFor(stockMode) !== undefined
+            ? { add_to_stock: stockOverrideFor(stockMode) } : {}),
         }, perItem);
         toast({
           title: `${res.approved} added to warehouse`,
