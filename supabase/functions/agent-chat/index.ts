@@ -2295,10 +2295,29 @@ async function executeAgent(
   // Resolve the workspace's connected websites once so every SEO tool defaults to
   // (and files its output under) the primary site, and the agent can ask which
   // site to use when there are several. "Ask, default to primary."
+
+  // The toolkit was gated on isAdmin because each call spends real DataForSEO credits. That is a
+  // SPEND concern, and a workspace that PAID for seo-toolkit bought the spend — the handlers debit
+  // its own wallet. On the role, no ordinary member of a paying workspace could use it (#401).
+  let seoEntitled = false;
+  if (workspaceId) {
+    try {
+      const { data: entRow } = await supabase.rpc('is_workspace_entitled', {
+        p_workspace_id: workspaceId, p_module_slug: 'seo-toolkit',
+      });
+      seoEntitled = entRow === true;
+    } catch (e) {
+      // Fail CLOSED. An entitlement we could not read is not a licence to spend someone else's
+      // credits, and an admin still gets the tools through the || below.
+      console.warn('[agent-chat] seo entitlement check failed:', e instanceof Error ? e.message : e);
+    }
+  }
+  const canUseSeo = isAdmin || seoEntitled;
+
   let seoDefaultWebsite:
     | { id: string; url: string; domain: string; display_name: string | null; is_default: boolean }
     | null = null;
-  const needsSeoWebsiteCtx = isAdmin && !!workspaceId && config.tools.some((t: string) => t.startsWith('seo_') || t === 'create_seo_article');
+  const needsSeoWebsiteCtx = canUseSeo && !!workspaceId && config.tools.some((t: string) => t.startsWith('seo_') || t === 'create_seo_article');
   if (needsSeoWebsiteCtx) {
     try {
       const { data: wsRows } = await supabase
@@ -2331,11 +2350,11 @@ async function executeAgent(
     }
   }
 
-  // SEO toolkit (admin-only — each call spends real DataForSEO credits on the platform's tab).
+  // SEO toolkit — gated on the paid module (see canUseSeo above), not on the admin role.
   // 25 tools across keyword research, SERP audit, URL audit, domain intel,
   // backlinks, OnPage crawl, content + domain analytics, LLM-mention native
   // search, multi-engine SERP, Google Trends, composite audits, escape hatch.
-  if (isAdmin) {
+  if (canUseSeo) {
   if (config.tools.includes('seo_research_keyword') && createSEOResearchKeywordTool) {
     tools.push(createSEOResearchKeywordTool(userId, onChunk, { supabase, workspaceId, defaultWebsite: seoDefaultWebsite }));
   }
@@ -2469,7 +2488,7 @@ async function executeAgent(
   if (config.tools.includes('seo_categories_for_domain') && createSEOCategoriesForDomainTool) {
     tools.push(createSEOCategoriesForDomainTool(userId, onChunk));
   }
-  if (config.tools.includes('seo_dataforseo_call') && createSEODataForSEOCallTool) {
+  if (isAdmin && config.tools.includes('seo_dataforseo_call') && createSEODataForSEOCallTool) {
     tools.push(createSEODataForSEOCallTool(userId, onChunk));
   }
   // Gap-filler tools (DataForSEO data GSC can't provide)
@@ -2485,7 +2504,7 @@ async function executeAgent(
   if (config.tools.includes('seo_ai_overview') && createSEOAiOverviewTool) tools.push(createSEOAiOverviewTool(userId, onChunk));
   if (config.tools.includes('seo_google_maps') && createSEOGoogleMapsTool) tools.push(createSEOGoogleMapsTool(userId, onChunk));
   if (config.tools.includes('seo_gbp_info') && createSEOGbpInfoTool) tools.push(createSEOGbpInfoTool(userId, onChunk));
-  } // end isAdmin SEO gate
+  } // end SEO module gate
 
   // Mention monitoring tools (all users; module-gated + per-tool credit cost inside each tool)
   if (config.tools.includes('track_product_mentions') && createTrackProductMentionsTool) {
@@ -2853,6 +2872,31 @@ async function executeAgent(
     tools.push(createWebFetchTool(userId, workspaceId ?? null, sendProgress));
   }
 
+  if (canUseSeo) {
+  // SEO Article Pipeline tools — the same module gate as the rest of the toolkit, not the admin
+  // role. They sat inside the sub-agent admin block, so a paying workspace could see the whole
+  // article pipeline in the palette and have none of it bound (#401).
+  // onChunk is wired across all 4 stages so the seo-article wizard advances on each emit.
+  if (config.tools.includes('seo_keyword_research')) {
+    tools.push(createSEOKeywordResearchTool(userId, sendProgress, onChunk));
+  }
+  if (config.tools.includes('seo_article_planner')) {
+    tools.push(createSEOArticlePlannerTool(userId, sendProgress, onChunk));
+  }
+  if (config.tools.includes('seo_article_writer')) {
+    tools.push(createSEOArticleWriterTool(userId, sendProgress, onChunk));
+  }
+  if (config.tools.includes('seo_content_analyzer')) {
+    tools.push(createSEOContentAnalyzerTool(userId, sendProgress, onChunk));
+  }
+  if (config.tools.includes('seo_score_url')) {
+    tools.push(createSEOScoreUrlTool(userId, sendProgress, onChunk));
+  }
+  if (config.tools.includes('create_seo_article')) {
+    tools.push(createSEOPipelineTool(userId, onChunk));
+  }
+  }
+
   if (isAdmin) {
     // Sub-agent orchestration tools.
     if (config.tools.includes('research_analysis')) {
@@ -2912,26 +2956,6 @@ async function executeAgent(
       tools.push(createSaveToCRMTool(userId, workspaceId, sendProgress, onChunk));
     }
 
-    // SEO Article Pipeline tools — onChunk wired across all 4 stages so the
-    // seo-article wizard advances on each step's emit.
-    if (config.tools.includes('seo_keyword_research')) {
-      tools.push(createSEOKeywordResearchTool(userId, sendProgress, onChunk));
-    }
-    if (config.tools.includes('seo_article_planner')) {
-      tools.push(createSEOArticlePlannerTool(userId, sendProgress, onChunk));
-    }
-    if (config.tools.includes('seo_article_writer')) {
-      tools.push(createSEOArticleWriterTool(userId, sendProgress, onChunk));
-    }
-    if (config.tools.includes('seo_content_analyzer')) {
-      tools.push(createSEOContentAnalyzerTool(userId, sendProgress, onChunk));
-    }
-    if (config.tools.includes('seo_score_url')) {
-      tools.push(createSEOScoreUrlTool(userId, sendProgress, onChunk));
-    }
-    if (config.tools.includes('create_seo_article')) {
-      tools.push(createSEOPipelineTool(userId, onChunk));
-    }
 
     // Background task dispatch
     if (config.tools.includes('dispatch_background_task')) {

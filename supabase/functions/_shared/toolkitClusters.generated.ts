@@ -144,34 +144,27 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
     tool_ids: ['generate_3d', 'apply_lighting_preset', 'generate_vr_world', 'generate_video', 'generate_gemini', 'virtual_staging', 'check_generation_status'],
   },
   'seo-research': {
-    adminOnly: true,
     tool_ids: ['seo_my_rankings', 'seo_site_report', 'seo_research_keyword', 'seo_keyword_difficulty', 'seo_keyword_suggestions', 'seo_search_intent', 'seo_keyword_overview', 'seo_ai_keyword_volume', 'seo_serp_audit', 'seo_audit_url', 'seo_score_url', 'seo_historical_serps', 'seo_gsc_striking_distance', 'seo_opportunities', 'seo_gsc_top_movers', 'seo_keyword_ideas', 'seo_related_keywords', 'seo_search_volume', 'seo_ai_overview'],
   },
   'seo-domain': {
-    adminOnly: true,
     tool_ids: ['seo_domain_snapshot', 'seo_ranked_keywords', 'seo_domain_competitors', 'seo_keyword_gap', 'seo_traffic_estimation', 'seo_subdomains', 'seo_relevant_pages', 'seo_categories_for_domain', 'seo_historical_rank_overview', 'seo_keywords_for_site', 'seo_domain_intersection'],
   },
   'seo-backlinks': {
-    adminOnly: true,
     tool_ids: ['seo_backlinks_summary', 'seo_backlinks_anchors', 'seo_referring_domains', 'seo_backlinks_timeseries', 'seo_backlinks_competitors'],
   },
   'seo-content': {
-    adminOnly: true,
     tool_ids: ['seo_content_sentiment', 'seo_domain_technologies', 'seo_domain_whois', 'seo_site_crawl_start', 'seo_site_crawl_status', 'seo_llm_mentions_search', 'seo_onpage_issues'],
   },
   'seo-multi-engine': {
-    adminOnly: true,
     tool_ids: ['seo_youtube_search', 'seo_local_pack', 'seo_google_trends', 'seo_amazon_asin', 'seo_app_keywords', 'seo_trustpilot_search', 'seo_pinterest_search', 'seo_reddit_search', 'seo_google_maps', 'seo_gbp_info'],
   },
   'seo-composite': {
-    adminOnly: true,
     tool_ids: ['seo_site_review', 'seo_brand_search_audit'],
   },
   'ai-visibility': {
     tool_ids: ['check_llm_visibility', 'seo_brand_search_audit', 'seo_llm_mentions_search', 'seo_ai_keyword_volume'],
   },
   'seo-article': {
-    adminOnly: true,
     tool_ids: ['create_seo_article', 'seo_keyword_research', 'seo_article_planner', 'seo_article_writer', 'seo_content_analyzer'],
   },
   'b2b': {
