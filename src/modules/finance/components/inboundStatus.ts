@@ -1,7 +1,7 @@
 /** How an inbound (myDATA received) document's triage state is WORDED for the operator. */
 import { isCancelledDocument } from '@/modules/finance/utils/inboundProvenance';
 
-export type InboundStatus = 'new' | 'classified' | 'received' | 'dismissed';
+export type InboundStatus = 'new' | 'classified' | 'received' | 'partially_received' | 'dismissed';
 
 /** Table cell: only the acted-on states get a word. `new` is absent on purpose. */
 export const INBOUND_OUTCOME: Record<string, { label: string; tone: string }> = {
@@ -9,6 +9,9 @@ export const INBOUND_OUTCOME: Record<string, { label: string; tone: string }> = 
   // became an expense you owe — say that, in the same word the tab and the menu use.
   classified: { label: 'In Expenses', tone: 'text-emerald-600 dark:text-emerald-400' },
   received: { label: 'Stocked', tone: 'text-emerald-600 dark:text-emerald-400' },
+  // #415: 60 of 100 boards arrived. Distinct from `received` on purpose -- one word for both
+  // is how the outstanding 40 stopped being tracked anywhere.
+  partially_received: { label: 'Part stocked', tone: 'text-amber-800 dark:text-amber-300' },
   ordered: { label: 'Ordered', tone: 'text-emerald-600 dark:text-emerald-400' },
   dismissed: { label: 'Dismissed', tone: 'text-muted-foreground line-through' },
   // AADE voided the document. Written as a light/dark PAIR because `red-400` is chosen for
@@ -39,6 +42,7 @@ export function inboundOutcomes(
   if (opts?.ordered) out.push(INBOUND_OUTCOME.ordered);
   if (doc.created_supplier_bill_id) out.push(INBOUND_OUTCOME.classified);
   if (doc.status === 'received') out.push(INBOUND_OUTCOME.received);
+  if (doc.status === 'partially_received') out.push(INBOUND_OUTCOME.partially_received);
   return out;
 }
 

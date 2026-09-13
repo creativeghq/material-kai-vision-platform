@@ -171,6 +171,19 @@ export const ReceiveToWarehouseDialog: React.FC<{
     [lines],
   );
 
+  /**
+   * The DOCUMENT's own line id — a supplier's 209851, not this array's index. It is what the
+   * outstanding quantity nets against, so an index here would net one line against another's
+   * receipts and produce a plausible, wrong "still to come".
+   */
+  const lineNumberAt = (i: number): number | null => {
+    const n = lines[i]?.line_number;
+    return typeof n === 'number' ? n : null;
+  };
+
+  /** Survives a failed submit so the retry replays rather than re-receives; cleared on success. */
+  const clickTokenRef = useRef<string | null>(null);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -441,9 +454,16 @@ export const ReceiveToWarehouseDialog: React.FC<{
      */
     const createdNames: string[] = [];
 
+    /**
+     * One token per CLICK, reused across a retry of that same click. A useRef latch closes the
+     * double-tap and cannot close the dropped connection — the case where the receipt committed
+     * and the operator is holding an error (anti-regression rule 4).
+     */
+    if (!clickTokenRef.current) clickTokenRef.current = crypto.randomUUID();
+
     setBusy(true);
     try {
-      const mappings: { item_id: string; quantity: number }[] = [];
+      const mappings: { item_id: string; quantity: number; line_number: number | null }[] = [];
       let created = 0;
       let notEmbedded = 0;
       const converted: string[] = [];
@@ -474,10 +494,10 @@ export const ReceiveToWarehouseDialog: React.FC<{
               return;
             }
             converted.push(`${qty} ${lineUnit} → ${base} ${targetUnit} (${r.name || 'line'})`);
-            mappings.push({ item_id: r.mode, quantity: base });
+            mappings.push({ item_id: r.mode, quantity: base, line_number: lineNumberAt(i) });
             continue;
           }
-          mappings.push({ item_id: r.mode, quantity: qty });
+          mappings.push({ item_id: r.mode, quantity: qty, line_number: lineNumberAt(i) });
           continue;
         }
 
@@ -580,10 +600,10 @@ export const ReceiveToWarehouseDialog: React.FC<{
           supplier_product_code: r.supplierCode.trim() || null,
           image_urls: r.images.map((x) => x.storage_url),
         });
-        mappings.push({ item_id: itemId, quantity: qty });
+        mappings.push({ item_id: itemId, quantity: qty, line_number: lineNumberAt(i) });
       }
 
-      const n = await inboundService.receiveToWarehouse(doc.id, mappings);
+      const n = await inboundService.receiveToWarehouse(doc.id, mappings, clickTokenRef.current);
 
       // The nightly AI pass queues these same lines in `warehouse_pending_items`, and that
       // queue is a second, independent way to turn them into stock. Without settling them
@@ -606,12 +626,15 @@ export const ReceiveToWarehouseDialog: React.FC<{
           converted.length > 0 ? `Converted to stock units — ${converted.join('; ')}.` : null,
         ].filter(Boolean).join(' ') || undefined,
       });
+      // A LATER partial delivery against this same document is a new receipt, not a replay.
+      clickTokenRef.current = null;
       onDone();
     } catch (e: any) {
       // A plan-quota refusal gets the dedicated "Upgrade" toast instead of the failure blob.
       if (handleQuota(e)) return; // finally below still clears busy
-      // Name what survived. No stock moved (the receipt RPC is all-or-nothing and runs last), but
-      // anything created before the failure is real and will be duplicated by a blind retry.
+      // Name what survived. The receipt RPC runs last and is all-or-nothing, and the retry now
+      // carries the same token — so if it DID commit before the connection dropped, pressing
+      // Receive again replays it rather than receiving the goods a second time.
       const leftBehind = createdNames.length > 0
         ? ` ${createdNames.length} catalog product(s) were already created and still exist: `
           + `${createdNames.slice(0, 5).join(', ')}${createdNames.length > 5 ? `, +${createdNames.length - 5} more` : ''}. `

@@ -176,10 +176,19 @@ export interface InboundDocument {
   total_vat: number | null;
   total_gross: number | null;
   lines: InboundDocLine[];
-  status: 'new' | 'classified' | 'received' | 'dismissed';
+  status: 'new' | 'classified' | 'received' | 'partially_received' | 'dismissed';
   created_supplier_bill_id: string | null;
   category_id: string | null;
   created_at: string;
+}
+
+/** One document line's receipt position, derived by `inbound_doc_outstanding`. */
+export interface InboundLineOutstanding {
+  line_number: number | null;
+  description: string | null;
+  ordered: number;
+  received: number;
+  outstanding: number;
 }
 
 /**
@@ -464,10 +473,31 @@ export const inboundService = {
   /** Receive an inbound doc's lines into the warehouse. mappings: [{item_id, quantity}].
    *  Records an 'in' stock movement per mapping (server-side, finance-manager-gated) and
    *  marks the doc 'received'. Returns the number of movements recorded. */
-  async receiveToWarehouse(docId: string, mappings: { item_id: string; quantity: number }[]): Promise<number> {
-    const { data, error } = await supabase.rpc('inbound_doc_receive_to_warehouse', { p_doc_id: docId, p_mappings: mappings });
+  async receiveToWarehouse(
+    docId: string,
+    /** `line_number` is the DOCUMENT's own line id (a supplier's 209851, not an array index) —
+     *  it is what the outstanding quantity nets against. */
+    mappings: { item_id: string; quantity: number; line_number?: number | null }[],
+    /** Minted once per click. A retry replays the receipt that already committed instead of
+     *  receiving the goods twice — the case a client-side latch cannot close, because the
+     *  connection drops after the write (anti-regression rule 4). */
+    clientToken?: string,
+  ): Promise<number> {
+    const { data, error } = await supabase.rpc('inbound_doc_receive_to_warehouse', {
+      p_doc_id: docId, p_mappings: mappings, p_client_token: clientToken ?? null,
+    } as never);
     if (error) throw error;
     return (data as number) ?? 0;
+  },
+
+  /** What is still to come on this document, per line. THE derivation — the over-receipt
+   *  refusal and the document's status read the same function. */
+  async outstanding(docId: string): Promise<InboundLineOutstanding[]> {
+    const { data, error } = await supabase.rpc('inbound_doc_outstanding' as never, {
+      p_doc_id: docId,
+    } as never);
+    if (error) throw error;
+    return (data ?? []) as unknown as InboundLineOutstanding[];
   },
 
   /** Mark the AI-extracted pending rows for this document as handled, so the pending queue
