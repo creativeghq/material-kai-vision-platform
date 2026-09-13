@@ -22,6 +22,7 @@ import { masterRequestsService } from '@/services/masterRequestsService';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/utils/datetime';
 import { TileQuantityDialog } from '@/modules/finance/components/TileQuantityDialog';
+import { HomogeneousStockNotice } from '@/modules/stock/components/HomogeneousStockNotice';
 
 // Helper to extract size from notes (format: "Size: 15×38 cm")
 const extractSizeFromNotes = (notes?: string | null): string | null => {
@@ -492,6 +493,15 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                                     );
                                   })()}
                                 </p>
+                              )}
+                              {/* #420 -- that free figure is a SUM across lots, and a tile
+                                  order has to come out of one. 200 m2 in three tones cannot
+                                  fill a 200 m2 job, and it shows after grouting. */}
+                              {!isCustom && item.product_id && (
+                                <HomogeneousStockNotice
+                                  productId={item.product_id}
+                                  quantity={item.quantity ?? 0}
+                                />
                               )}
                               <div className="flex flex-wrap gap-1 mt-1">
                                 {(item.selected_size || selectedSize) && (
