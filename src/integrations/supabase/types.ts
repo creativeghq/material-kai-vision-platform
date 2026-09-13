@@ -12575,6 +12575,8 @@ export type Database = {
           internal_number: string
           invoice_kind: string
           is_b2g: boolean
+          issuance_channel: Database['public']['Enums']['fiscal_issuance_channel'] | null
+          issuance_outage_id: string | null
           issued_at: string | null
           legal_number: string | null
           logo_mode: string
@@ -12679,6 +12681,8 @@ export type Database = {
           internal_number: string
           invoice_kind?: string
           is_b2g?: boolean
+          issuance_channel?: Database['public']['Enums']['fiscal_issuance_channel'] | null
+          issuance_outage_id?: string | null
           issued_at?: string | null
           legal_number?: string | null
           logo_mode?: string
@@ -40098,6 +40102,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "analyst" | "factory"
+      fiscal_issuance_channel: "provider" | "timologio" | "erp_fallback"
       appointment_status: "pending" | "confirmed" | "cancelled" | "completed"
       automation_flow_status: "draft" | "active" | "paused" | "archived"
       automation_run_status:

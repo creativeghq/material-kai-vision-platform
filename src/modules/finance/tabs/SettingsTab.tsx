@@ -38,6 +38,7 @@ import { TeamPanel } from '@/components/core/Team/TeamPanel';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { WorkspaceCreditsCard } from '@/modules/finance/components/WorkspaceCreditsCard';
 import { EInvoicingCard } from '@/modules/finance/components/EInvoicingCard';
+import { EInvoicingMandateCard } from '@/modules/finance/components/EInvoicingMandateCard';
 import { BankAccountsCard } from '@/modules/finance/components/BankAccountsCard';
 import { MoneyOutCard } from '@/modules/banking-revolut/components/MoneyOutCard';
 import { formatDate } from '@/utils/datetime';
@@ -231,6 +232,9 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
 
         <TabsContent value="einvoicing" className="mt-0">
           <EInvoicingCard workspaceId={workspaceId} onGoToIdentity={() => setActiveTab('identity')} />
+          {/* #444 -- the mandate, and whether we are meeting it. Beside the connection card
+              because "connected" and "compliant" are different facts. */}
+          <EInvoicingMandateCard workspaceId={workspaceId} />
           <SelfBillingCard workspaceId={workspaceId} />
         </TabsContent>
 
