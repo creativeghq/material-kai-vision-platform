@@ -16,6 +16,9 @@ import { ResupplySection } from '../components/ResupplySection';
 import { InboundSection } from '../components/InboundSection';
 import { StockValuationSection } from '../components/StockValuationSection';
 import { StockPoolsPanel } from '../components/StockPoolsPanel';
+import { ImportFoldersPanel } from '../components/ImportFoldersPanel';
+import { RebatesPanel } from '../components/RebatesPanel';
+import { StockAgeingPanel } from '../components/StockAgeingPanel';
 
 // Warehouse module page (module slug stays 'stock' internally). Extracted from the Finance "Warehouse"
 // tab into a first-class entitlement-gated module. Plain Radix tabs (no forceMount) so only the active
@@ -86,6 +89,14 @@ export default function StockPage() {
             <TabsContent value="valuation" className="mt-0 space-y-4">
               <StockValuationSection workspaceId={ws} />
               <StockPoolsPanel workspaceId={ws} />
+              {/* #422 -- the on-costs that never reached cost per m2. They belong beside the cost
+                  layer because they are the other half of it. */}
+              <ImportFoldersPanel workspaceId={ws} />
+              {/* #425 -- the other thing that moves landed cost after the fact. */}
+              <RebatesPanel workspaceId={ws} />
+              {/* #438 -- the write-down nobody else can post, because nobody else owns the
+                  ledger AND computes the buckets. */}
+              <StockAgeingPanel workspaceId={ws} />
             </TabsContent>
             <TabsContent value="resupply" className="mt-0 space-y-4">
               <ResupplySection workspaceId={ws} />

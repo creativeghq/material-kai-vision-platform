@@ -17,6 +17,7 @@ import { OriginCountryCombobox } from '@/components/core/OriginCountryCombobox';
 import { RegulatoryRoleNotice } from '@/components/business/marketplace/RegulatoryRoleNotice';
 import { DopcPanel } from '@/components/business/marketplace/DopcPanel';
 import { OfferDisclosureCard } from '@/components/business/marketplace/OfferDisclosureCard';
+import { ageingService } from '@/modules/stock/services/ageingService';
 import { UNITS } from '@/lib/units';
 
 const NONE = '__none';
@@ -30,6 +31,7 @@ const SELECT_COLUMNS = [
   'prices_include_vat', 'markup_percent', 'warranty', 'product_url', 'notes',
   'taric_code', 'country_of_origin', 'is_own_brand', 'dopc_product_type_code', 'workspace_id',
   'wood_species_common', 'wood_species_scientific', 'first_placed_on_eu_market_at',
+  'discontinued_by_supplier_on',
   'taric_code_suggested', 'taric_confidence', 'taric_status', 'taric_source', 'taric_reasoning',
 ].join(', ');
 
@@ -56,6 +58,7 @@ interface State {
   speciesCommon: string;
   speciesScientific: string;
   firstPlacedOn: string;
+  discontinuedOn: string;
 }
 
 const EMPTY: State = {
@@ -63,7 +66,7 @@ const EMPTY: State = {
   vat: '', incType: '', incCat: '', incTypeRetail: '', incCatRetail: '',
   pricesIncludeVat: false, markup: '', warranty: '', productUrl: '', notes: '',
   taric: '', origin: '', ownBrand: false, dopcTypeCode: '',
-  speciesCommon: '', speciesScientific: '', firstPlacedOn: '',
+  speciesCommon: '', speciesScientific: '', firstPlacedOn: '', discontinuedOn: '',
 };
 
 export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }) => {
@@ -128,6 +131,7 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
         speciesCommon: row?.wood_species_common ?? '',
         speciesScientific: row?.wood_species_scientific ?? '',
         firstPlacedOn: row?.first_placed_on_eu_market_at ?? '',
+        discontinuedOn: row?.discontinued_by_supplier_on ?? '',
       });
       setWorkspaceId(row?.workspace_id ?? null);
       setProvenance(
@@ -187,6 +191,9 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
         ...(form.taric ? { taric_status: 'confirmed', taric_source: 'manual', taric_code_suggested: null } : {}),
       }).eq('id', productId);
       if (error) throw error;
+      // #438 -- the factory dropping a range is the EARLIEST signal that stock is becoming a
+      // write-down. Everything else only tells you once it has already sat.
+      await ageingService.markDiscontinued(productId, form.discontinuedOn || null);
       if (form.taric) { setSuggestion(null); setProvenance({ source: 'manual', reasoning: null }); }
       setSavedAt((n) => n + 1);
       toast({ title: 'Product data saved' });
@@ -482,10 +489,20 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
           <FieldBox className="sm:col-span-3" label="Link">
             <Input className="h-8 text-xs" value={form.productUrl} onChange={(e) => set({ productUrl: e.target.value })} placeholder="https://" />
           </FieldBox>
+          <FieldBox label="Discontinued by the supplier">
+            <Input
+              className="h-8 text-xs" type="date" value={form.discontinuedOn}
+              onChange={(e) => set({ discontinuedOn: e.target.value })}
+            />
+          </FieldBox>
           <FieldBox className="sm:col-span-4" label="Notes">
             <Input className="h-8 text-xs" value={form.notes} onChange={(e) => set({ notes: e.target.value })} placeholder="Optional notes…" />
           </FieldBox>
         </Grid>
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          A range the factory has dropped stops being inventory and starts being a write-down.
+          The only other signal is that nobody has bought it for a while, which arrives late.
+        </p>
       </Section>
 
       <Button size="sm" variant="outline" onClick={save} disabled={saving} className="w-full">
