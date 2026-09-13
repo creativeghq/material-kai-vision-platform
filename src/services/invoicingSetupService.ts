@@ -34,8 +34,17 @@ export const invoicingSetupService = {
     if (error) throw error;
   },
 
+  /**
+   * The workspace's OWN numbering ranges. A self-billing series belongs to one supplier and is
+   * legally theirs, so it is excluded here: callers use this list to decide which document types
+   * are issuable, and a supplier's range standing in for a missing one of ours would offer a type
+   * that then numbers out of the wrong sequence.
+   */
   async listSeries(workspaceId: string): Promise<DocSeries[]> {
-    const { data } = await supabase.from('document_series').select('*').eq('workspace_id', workspaceId).order('doc_code');
+    const { data } = await supabase.from('document_series').select('*')
+      .eq('workspace_id', workspaceId)
+      .is('self_billed_supplier_company_id', null)
+      .order('doc_code');
     return (data ?? []) as DocSeries[];
   },
 

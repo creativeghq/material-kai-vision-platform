@@ -87,6 +87,14 @@ export function InvoicePreviewModal({
           customer = data;
         }
 
+        // On a self-billed document the supplier is the ISSUER, so the preview needs their row.
+        let selfBillSupplier: Record<string, any> | null = null;
+        if (invoice.self_billed_supplier_company_id) {
+          const { data } = await supabase.from('crm_companies').select('*')
+            .eq('id', invoice.self_billed_supplier_company_id).maybeSingle();
+          selfBillSupplier = data;
+        }
+
         let branch: Record<string, any> | null = null;
         if (Number(invoice.branch_code ?? 0) > 0) {
           const { data } = await supabase.from('finance_branches').select('*')
@@ -193,7 +201,7 @@ export function InvoicePreviewModal({
 
         const data = buildInvoiceRenderData({
           providerAttribution, posPayments, timezone,
-          invoice, items: items ?? [], settings, customer, addressUnit, authCode,
+          invoice, items: items ?? [], settings, customer, selfBillSupplier, addressUnit, authCode,
           branch, order, logoUrl, bankAccounts, payUrl, priorBalance,
           documentTaxes: documentTaxes ?? null,
         });

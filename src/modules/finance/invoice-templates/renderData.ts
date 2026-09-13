@@ -25,6 +25,9 @@ export interface BuildRenderInput {
   /** crm_address_units row when invoice.customer_address_unit_id is set — the sub-unit the
    *  goods go to, which is also the branch number transmitted to myDATA. */
   addressUnit?: Record<string, any> | null;
+  /** crm_companies row for invoice.self_billed_supplier_company_id. On a self-billed document
+   *  this party is the ISSUER, so without it the document cannot be printed truthfully. */
+  selfBillSupplier?: Record<string, any> | null;
   /** fiscal_submissions.authentication_code for this document, when it has been transmitted. */
   authCode?: string | null;
   /** "Novus Conceptus | https://timologisi.online" — the provider that CARRIED this document,
@@ -91,7 +94,7 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
   const {
     invoice: inv, items, settings: fs, customer, addressUnit, authCode, branch, order,
     logoUrl, bankAccounts, priorBalance, payUrl, providerAttribution, posPayments, timezone,
-    documentTaxes,
+    documentTaxes, selfBillSupplier,
   } = input;
   // English is the default; Greek only when explicitly chosen (until translations launch).
   const lang: Lang = inv.doc_language === 'el' ? 'el' : 'en';
@@ -135,6 +138,24 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
   const custName = billTo?.name || '—';
   const custLines = billTo ? partyAddressLines(billTo, L) : [];
 
+  // ── Self-billing (αυτοτιμολόγηση) ──
+  // The document is legally the SUPPLIER's invoice, so they head it as issuer and we are the
+  // bill-to. Printing our own identity at the top would contradict the envelope, which transmits
+  // their ΑΦΜ as `issuer` (CLAUDE.md §1c). When the supplier row was not loaded we say so rather
+  // than falling back to our identity — a wrong issuer is a valid-looking document.
+  const selfBilledId = inv.self_billed_supplier_company_id ?? null;
+  const selfBillRaw = selfBilledId && selfBillSupplier
+    ? resolvePrintedCounterparty(null, selfBillSupplier)
+    : null;
+  const selfBillParty = selfBillRaw
+    ? { ...selfBillRaw, vatNumber: normalizeVat(selfBillRaw.vatNumber) }
+    : null;
+  const selfBilledIssuer = selfBilledId
+    ? (selfBillParty
+        ? { name: selfBillParty.name, lines: partyAddressLines(selfBillParty, L) }
+        : { name: '—', lines: [L.selfBilledSupplierUnavailable] })
+    : null;
+
   // ── Delivery party ── the goods go to the chosen sub-unit; shown only when it actually
   // differs from the billing address, so an ordinary invoice does not grow an empty panel.
   const deliveryParty = billTo && addressUnit ? applyAddressUnit(billTo, addressUnit) : null;
@@ -154,6 +175,9 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
   // The myDATA document-type code (1.1, 2.1, 11.2 …) is what an auditor matches against the
   // transmitted envelope; the title alone does not identify it.
   if (inv.document_type) meta.push({ label: L.docType, value: String(inv.document_type) });
+  // ΑΑΔΕ transmits `selfPricing` on the envelope; the reader of the paper has to be told the same
+  // thing, and told WHO drew it up — that is the whole legal character of the document.
+  if (selfBilledId) meta.push({ label: L.selfBilled, value: `${L.selfBilledBy} ${bizName || '—'}` });
   meta.push({ label: L.number, value: String(inv.internal_number ?? inv.legal_number ?? '') });
   if (inv.series) meta.push({ label: L.series, value: String(inv.series) });
   if (inv.issued_at) {
@@ -300,8 +324,11 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
   }
 
   // ── Payment + bank accounts (treasury accounts flagged "Show on invoice" only) ──
+  // NOT on a self-billed document. There we are the PAYER, so our IBANs and the hosted pay link
+  // would invite the supplier to settle their own invoice into our account — money moving the
+  // wrong way on a page that otherwise reads correctly.
   const accounts: string[] = [];
-  for (const a of bankAccounts ?? []) {
+  for (const a of (selfBilledId ? [] : (bankAccounts ?? []))) {
     const detail = a.kind === 'bank'
       ? [a.name, a.iban ? `IBAN ${a.iban}` : ''].filter(Boolean).join('  ·  ')
       : [a.name, a.account_ref ?? a.iban ?? ''].filter(Boolean).join('  ·  ');
@@ -336,8 +363,13 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
     title: invoiceDocTitle(inv.document_type, L, inv.status),
     isPreInvoice: invoiceDocTitle(inv.document_type, L, inv.status) === L.preInvoice,
     labels: L,
-    issuer: { name: bizName, lines: issuerLines, logoUrl: inv.logo_mode === 'none' ? null : (logoUrl ?? null) },
-    customer: { name: custName, lines: custLines },
+    // On a self-billed document the parties are the other way round: the supplier issues it and we
+    // are the bill-to. The logo is ours, so it is dropped — heading the supplier's invoice with our
+    // mark would misstate who issued it.
+    issuer: selfBilledIssuer
+      ? { name: selfBilledIssuer.name, lines: selfBilledIssuer.lines, logoUrl: null }
+      : { name: bizName, lines: issuerLines, logoUrl: inv.logo_mode === 'none' ? null : (logoUrl ?? null) },
+    customer: selfBilledIssuer ? { name: bizName, lines: issuerLines } : { name: custName, lines: custLines },
     meta,
     items: rows,
     vatAnalysis,
@@ -367,7 +399,7 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
     infoBox: inv.info_box || null,
     vatSuspended: !!inv.vat_payment_suspension,
     priorBalance: (typeof priorBalance === 'number' && Math.abs(priorBalance) >= 0.01) ? priorBalance : null,
-    payUrl: payUrl ?? null,
+    payUrl: selfBilledId ? null : (payUrl ?? null),
     fiscal: inv.fiscal_mark ? {
       mark: String(inv.fiscal_mark),
       uid: inv.fiscal_uid || undefined,

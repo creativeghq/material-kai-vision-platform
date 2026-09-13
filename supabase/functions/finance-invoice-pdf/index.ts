@@ -90,6 +90,9 @@ const LABELS: Record<Lang, Record<string, string>> = {
     receivingNote: 'ΔΕΛΤΙΟ ΠΟΣΟΤΙΚΗΣ ΠΑΡΑΛΑΒΗΣ',
     retailCreditNote: 'ΠΙΣΤΩΤΙΚΟ ΣΤΟΙΧΕΙΟ ΛΙΑΝΙΚΗΣ',
     issuer: 'ΕΚΔΟΤΗΣ', customer: 'ΠΕΛΑΤΗΣ', vatNo: 'ΑΦΜ', taxOffice: 'ΔΟΥ', profession: 'Δραστηριότητα',
+    selfBilled: 'ΑΥΤΟΤΙΜΟΛΟΓΗΣΗ',
+    selfBilledBy: 'Εκδόθηκε με αυτοτιμολόγηση από',
+    selfBilledSupplierUnavailable: 'Αυτοτιμολόγηση: τα στοιχεία του προμηθευτή δεν είναι διαθέσιμα',
     phone: 'Τηλ.', email: 'Email', establishment: 'Εγκατάσταση',
     number: 'Αριθμός', series: 'Σειρά', date: 'Ημερομηνία', due: 'Λήξη',
     descr: 'Περιγραφή', qty: 'Ποσ.', unit: 'Μ.Μ.', unitPrice: 'Τιμή Μον.', net: 'Καθαρή Αξία',
@@ -131,6 +134,9 @@ const LABELS: Record<Lang, Record<string, string>> = {
     receivingNote: 'GOODS RECEIPT NOTE',
     retailCreditNote: 'RETAIL CREDIT NOTE',
     issuer: 'ISSUER', customer: 'CUSTOMER', vatNo: 'VAT No.', taxOffice: 'Tax office', profession: 'Activity',
+    selfBilled: 'SELF-BILLED',
+    selfBilledBy: 'Self-billed by',
+    selfBilledSupplierUnavailable: 'Self-billed document: supplier identity unavailable',
     phone: 'Tel.', email: 'Email', establishment: 'Establishment',
     number: 'Number', series: 'Series', date: 'Date', due: 'Due',
     descr: 'Description', qty: 'Qty', unit: 'Unit', unitPrice: 'Unit price', net: 'Net',
@@ -493,6 +499,15 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
       const { data } = await supabase.from('crm_contacts').select('*').eq('id', inv.customer_contact_id).maybeSingle();
       customer = data;
     }
+
+    // SELF-BILLING (αυτοτιμολόγηση): the supplier is the ISSUER of this document, so their
+    // identity heads the page and ours moves to the bill-to block.
+    let selfBillSupplier: any = null;
+    if (inv.self_billed_supplier_company_id) {
+      const { data } = await supabase.from('crm_companies').select('*')
+        .eq('id', inv.self_billed_supplier_company_id).maybeSingle();
+      selfBillSupplier = data;
+    }
     // The sub-unit the goods go to. It also carries the myDATA branch number on the
     // transmitted envelope, so a document re-addressed for AADE must print that address
     // rather than the party's head office.
@@ -590,8 +605,10 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
     }
 
     // Business logo (generation-images/business-logos/…) — embedded in the header.
+    // Not on a self-billed document: the header is the SUPPLIER's identity, and our mark on it
+    // would say we issued it.
     let logo: Uint8Array | null = null;
-    if (fs?.business_logo_path) {
+    if (fs?.business_logo_path && !inv.self_billed_supplier_company_id) {
       try {
         const { data: lf } = await supabase.storage.from('generation-images').download(fs.business_logo_path);
         if (lf) logo = new Uint8Array(await lf.arrayBuffer());
@@ -657,7 +674,7 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
       } catch { /* RF is best-effort — never block the PDF */ }
     }
 
-    const pdfBytes = await buildPdf({ inv, items, documentTaxes, fs, customer, addressUnit, authCode, providerAttribution, posPayments, tz: workspaceTz, branch, lang, logo, spec, colors, priorBalance, payUrl, rfCode });
+    const pdfBytes = await buildPdf({ inv, items, documentTaxes, fs, customer, selfBillSupplier, addressUnit, authCode, providerAttribution, posPayments, tz: workspaceTz, branch, lang, logo, spec, colors, priorBalance, payUrl, rfCode });
 
     const path = `${OUT}/${docId}/${PREFIX}-${docId}.pdf`;
     const { error: upErr } = await supabase.storage.from('pdf-documents').upload(path, pdfBytes, { upsert: true, contentType: 'application/pdf' });
@@ -675,8 +692,8 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
   }
 }));
 
-async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: any; customer: any; addressUnit?: any; authCode?: string | null; providerAttribution?: string | null; posPayments?: any[]; tz?: string | null; branch: any; lang: Lang; logo?: Uint8Array | null; spec: TemplateSpec; colors: InvoicePdfColors; priorBalance?: number | null; payUrl?: string | null; rfCode?: string | null }): Promise<Uint8Array> {
-  const { inv, items, fs, customer, addressUnit, authCode, providerAttribution, posPayments, tz, branch, lang, logo, spec, colors, priorBalance, payUrl, rfCode } = d;
+async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: any; customer: any; selfBillSupplier?: any; addressUnit?: any; authCode?: string | null; providerAttribution?: string | null; posPayments?: any[]; tz?: string | null; branch: any; lang: Lang; logo?: Uint8Array | null; spec: TemplateSpec; colors: InvoicePdfColors; priorBalance?: number | null; payUrl?: string | null; rfCode?: string | null }): Promise<Uint8Array> {
+  const { inv, items, fs, customer, selfBillSupplier, addressUnit, authCode, providerAttribution, posPayments, tz, branch, lang, logo, spec, colors, priorBalance, payUrl, rfCode } = d;
   const L = LABELS[lang];
   const isCommercial = spec.headerStyle === 'commercial';
 
@@ -756,10 +773,21 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
   const bizCity = en ? (fs?.business_city_en || fs?.business_city) : fs?.business_city;
   const bizTaxOffice = en ? (fs?.business_tax_office_en || fs?.business_tax_office) : fs?.business_tax_office;
   const bizProfession = en ? (fs?.business_profession_en || fs?.business_profession) : fs?.business_profession;
-  const issuerName = bizName;
+  // SELF-BILLING (αυτοτιμολόγηση): the document is legally the SUPPLIER's invoice — their ΑΦΜ is
+  // what the envelope transmits as `issuer` — so they head the page and our identity moves to the
+  // bill-to block below. With the supplier row missing we say so rather than printing ourselves:
+  // a document naming the wrong issuer is a valid-looking PDF that nothing downstream can catch.
+  const selfBilledId = inv.self_billed_supplier_company_id ?? null;
+  const selfBillRaw = selfBilledId && selfBillSupplier
+    ? resolvePrintedCounterparty(null, selfBillSupplier)
+    : null;
+  const selfBillParty = selfBillRaw
+    ? { ...selfBillRaw, vatNumber: normalizeVat(selfBillRaw.vatNumber) }
+    : null;
+  const issuerName = selfBilledId ? (selfBillParty?.name || '—') : bizName;
   const title = docTitle(inv.document_type, L, inv.status);
   const isPreInvoice = title === L.preInvoice;
-  const issuerLines = [
+  const ownerLines = [
     [bizAddress, fs?.business_street_number].filter(Boolean).join(' '),
     [fs?.business_postal_code, bizCity].filter(Boolean).join(' '),
     fs?.business_vat ? `${L.vatNo}: ${fs.business_vat}` : '',
@@ -774,6 +802,9 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
     fs?.business_gemi ? `${L.registry}: ${fs.business_gemi}` : '',
     branch ? `${L.establishment} #${branch.branch_code}: ${[branch.name, branch.address, branch.street_number, branch.postal_code, branch.city].filter(Boolean).join(' ')}` : '',
   ].filter(Boolean) as string[];
+  const issuerLines = selfBilledId
+    ? (selfBillParty ? partyAddressLines(selfBillParty, L) : [L.selfBilledSupplierUnavailable])
+    : ownerLines;
   const locale = lang === 'el' ? 'el-GR' : 'en-GB';
   const issuedAt = inv.issued_at ? new Date(inv.issued_at) : null;
   // THE PRINTED DATE AND TIME ARE THE ISSUER'S, NOT THE SERVER'S.
@@ -793,6 +824,7 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
     inv.document_type ? [L.docType, String(inv.document_type)] : ['', ''],
     [L.number, String(inv.internal_number ?? inv.legal_number ?? '')],
     inv.series ? [L.series, String(inv.series)] : ['', ''],
+    selfBilledId ? [L.selfBilled, `${L.selfBilledBy} ${bizName || '—'}`] : ['', ''],
     [L.date, issuedAt ? fmtIssueDate(issuedAt) : ''],
     // Issue TIME orders two documents numbered on the same day. Stored all along, never printed.
     issuedAt ? [L.time, fmtIssueTime(issuedAt)] : ['', ''],
@@ -905,8 +937,9 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
   // (CLAUDE.md §1c). It is applied here rather than inside `resolvePrintedCounterparty` because
   // that module is a byte-mirrored source and has to stay import-free.
   const billTo = billToRaw ? { ...billToRaw, vatNumber: normalizeVat(billToRaw.vatNumber) } : null;
-  const custName = billTo?.name || '—';
-  const custLines = billTo ? partyAddressLines(billTo, L) : [];
+  // On a self-billed document WE are the party billed, because the supplier heads it as issuer.
+  const custName = selfBilledId ? (bizName || '—') : (billTo?.name || '—');
+  const custLines = selfBilledId ? ownerLines : (billTo ? partyAddressLines(billTo, L) : []);
   // Where the goods GO, when that is not where the bill goes.
   const deliveryParty = billTo && addressUnit ? applyAddressUnit(billTo, addressUnit) : null;
   const deliveryName: string = addressUnit?.name ? String(addressUnit.name) : '';
@@ -1386,7 +1419,10 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
   if (inv.payment_method_info) payBits.push(String(inv.payment_method_info));
   // Payment accounts to print — sourced solely from the treasury accounts flagged
   // "Show on invoice" (mapped onto fs.bank_accounts above). No legacy fallback.
-  const accounts: any[] = Array.isArray(fs?.bank_accounts) ? fs.bank_accounts : [];
+  // NOT on a self-billed document: there the SUPPLIER is the payee and we are the payer, so our
+  // IBANs, our Revtag and the hosted pay link would invite them to settle their own invoice into
+  // our account. Money moving the wrong way on a page that otherwise reads perfectly.
+  const accounts: any[] = (!selfBilledId && Array.isArray(fs?.bank_accounts)) ? fs.bank_accounts : [];
   const accountLines: string[] = [];
   for (const a of accounts) {
     let detail = '';
@@ -1405,7 +1441,7 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
   //    IBAN by hand means a reference we then have to match on text — the path that produces
   //    unmatched money in the feed. Whichever is listed first is the one most people use, so the
   //    one that settles itself goes first. The IBANs stay: RF is Greek-domestic and EUR-only.
-  if (rfCode) {
+  if (rfCode && !selfBilledId) {
     if (y < M + 60) newPage();
     const rfColor = spec.headerStyle === 'sidebar' ? colors.accent : MUTED;
     text(`${L.rfCode}: ${rfCode}`, M, y, 9, bold, rfColor); y -= 11;
@@ -1428,7 +1464,7 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
   // ── Pay / view online (→ /pay/{token}) — a scannable QR + the link, so the customer
   //    holding the PDF can open their online page and pay. Distinct from the myDATA verify
   //    QR (that one proves the document to the tax authority; this one takes payment). ──
-  if (payUrl) {
+  if (payUrl && !selfBilledId) {
     if (y < M + 100) newPage();
     const qs = 64;
     const blockTop = y;

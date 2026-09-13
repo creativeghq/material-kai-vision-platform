@@ -316,6 +316,16 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [paymentMethodInfo, setPaymentMethodInfo] = useState('');
   const [vatSuspension, setVatSuspension] = useState(false);
   const [selfPricing, setSelfPricing] = useState(false);
+  /**
+   * SELF-BILLING (αυτοτιμολόγηση) — the supplier in whose name we draw the document up. Only
+   * suppliers with an ACTIVE agreement are offered: ΑΑΔΕ needs the written agreement and the
+   * provider needs their ΑΦΜ authorized, and neither can be inferred from our own data. The flag
+   * alone used to be the whole control, which filed the supplier's sale under our ΑΦΜ.
+   */
+  const [selfBillSupplierId, setSelfBillSupplierId] = useState<string>('');
+  const [selfBillSuppliers, setSelfBillSuppliers] = useState<{ id: string; name: string }[]>([]);
+  /** The full CRM row for the chosen supplier — the preview heads the document with it. */
+  const [selfBillSupplierRow, setSelfBillSupplierRow] = useState<Record<string, any> | null>(null);
   const [exchangeRate, setExchangeRate] = useState('');
   const [paymentMethods, setPaymentMethods] = useState<{ code: string; description: string }[]>([]);
   // Reference-screen fields
@@ -403,7 +413,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     setDocumentType(initialDocType || '1.1'); setCurrency('EUR'); setVatRate('24'); setPaymentTermsDays('30');
     setIssueDate(todayLocalISO()); setNotes(initialNotes ?? ''); setIssueNow(true);
     setCategoryId(''); setBranchCode('0'); setDocLanguage('en'); setWithholdingCode(''); setWithholdingAmount('');
-    setPaymentMethodCode('3'); setPaymentMethodInfo(''); setVatSuspension(false); setSelfPricing(false); setExchangeRate('');
+    setPaymentMethodCode('3'); setPaymentMethodInfo(''); setVatSuspension(false); setSelfPricing(false); setSelfBillSupplierId(''); setExchangeRate('');
     setPricesIncludeVat(false); setDigitalFee(''); setRelatedDocument(''); setPrintTerms(true); setIncludeInMyf(true); setMoveStock(true);
     setPrintOnlineCode(true); setInfoBox(''); setLogoMode('auto'); setSubmitNow(false); setSendEmail(false); setNextNumber(null);
     setGUnit(''); setGVat(''); setGIncType(''); setGIncCat(''); setDocTaxes([]);
@@ -414,6 +424,42 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     setB2gBuyerIdentifier(''); setB2gBudgetIdentifier(''); setB2gDueDate('');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialCustomer?.id, initialCustomer?.type]);
+
+  // Suppliers this workspace may self-bill for. An agreement row that is present but not active,
+  // or missing its signed/authorized dates, is deliberately NOT offered — self_billing_blocks
+  // would refuse it at issuance anyway, and offering it only moves the refusal later.
+  useEffect(() => {
+    if (!open) { setSelfBillSuppliers([]); return; }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('finance_self_billing_agreements')
+        .select('supplier_company_id, crm_companies!inner(id, name)')
+        .eq('workspace_id', workspaceId)
+        .eq('is_active', true)
+        .not('agreement_signed_on', 'is', null)
+        .not('issuer_vat_authorized_on', 'is', null);
+      if (cancelled) return;
+      const rows = (data ?? [])
+        .map((r: any) => ({ id: r.crm_companies?.id as string, name: (r.crm_companies?.name as string) ?? '' }))
+        .filter((r: { id?: string }) => !!r.id)
+        .sort((a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name));
+      setSelfBillSuppliers(rows);
+    })();
+    return () => { cancelled = true; };
+  }, [open, workspaceId]);
+
+  // The chosen supplier's full identity, so the live preview heads the document with the party
+  // the envelope will name as issuer rather than with a bare name.
+  useEffect(() => {
+    if (!selfBillSupplierId) { setSelfBillSupplierRow(null); return; }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.from('crm_companies').select('*').eq('id', selfBillSupplierId).maybeSingle();
+      if (!cancelled) setSelfBillSupplierRow(data ?? null);
+    })();
+    return () => { cancelled = true; };
+  }, [selfBillSupplierId]);
 
   // ── Load catalogs + issuer ──
   useEffect(() => {
@@ -559,13 +605,19 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     if (!open) return;
     (async () => {
       const { data: br } = await supabase.from('finance_branches').select('id').eq('workspace_id', workspaceId).eq('branch_code', parseInt(branchCode, 10) || 0).maybeSingle();
-      let q = supabase.from('document_series').select('series, next_number, branch_id').eq('workspace_id', workspaceId).eq('doc_code', documentType).eq('is_active', true);
-      const { data: rows } = await q;
+      // A self-billed document draws from the SUPPLIER's single range, and an ordinary one must
+      // never draw from it — previewing the wrong series prints a number the issue then contradicts.
+      const base = supabase.from('document_series').select('series, next_number, branch_id').eq('workspace_id', workspaceId).eq('is_active', true);
+      const { data: rows } = selfBillSupplierId
+        ? await base.eq('self_billed_supplier_company_id', selfBillSupplierId)
+        : await base.eq('doc_code', documentType).is('self_billed_supplier_company_id', null);
       const list = rows ?? [];
-      const match = list.find((r: any) => r.branch_id === (br as any)?.id) ?? list.find((r: any) => r.branch_id === null);
+      const match = selfBillSupplierId
+        ? list[0]
+        : (list.find((r: any) => r.branch_id === (br as any)?.id) ?? list.find((r: any) => r.branch_id === null));
       setNextNumber(match ? { series: (match as any).series, number: (match as any).next_number } : null);
     })();
-  }, [open, workspaceId, documentType, branchCode]);
+  }, [open, workspaceId, documentType, branchCode, selfBillSupplierId]);
 
   // ── Product search (debounced) ──
   useEffect(() => {
@@ -904,7 +956,18 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   };
 
   const handleSave = async () => {
-    if (!customer) { setTab('details'); toast({ title: 'Pick a customer', variant: 'destructive' }); return; }
+    // A self-billed document has no customer — the counterpart is us. It needs the supplier
+    // instead, and the flag without one is the arrangement αυτοτιμολόγηση cannot be.
+    if (selfPricing && !selfBillSupplierId) {
+      setTab('taxes');
+      toast({
+        title: 'Pick the supplier you are self-billing for',
+        description: 'A self-billed invoice is issued in the supplier\'s name, so the document has to say whose.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (!customer && !selfBillSupplierId) { setTab('details'); toast({ title: 'Pick a customer', variant: 'destructive' }); return; }
     const clean = lines.filter((l) => l.description.trim() && parseDecimalOr(l.quantity, 0) > 0);
     if (clean.length === 0) { setTab('items'); toast({ title: 'Add at least one line item', variant: 'destructive' }); return; }
     /**
@@ -949,8 +1012,11 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       const { data: invoice, error: insErr } = await supabase.from('invoices').insert({
         workspace_id: workspaceId,
         internal_number: draftNumber as string, series: null, series_number: null,
-        customer_contact_id: customer.type === 'contact' ? customer.id : null,
-        customer_company_id: customer.type === 'company' ? customer.id : null,
+        customer_contact_id: customer?.type === 'contact' ? customer.id : null,
+        customer_company_id: customer?.type === 'company' ? customer.id : null,
+        // Naming the supplier is what makes this self-billed; the flag follows it so the two can
+        // never disagree about who the envelope says is issuing.
+        self_billed_supplier_company_id: selfBillSupplierId || null,
         // Always insert as draft. "Issue now" routes through mark_invoice_issued
         // below so the legal_number (gapless) + issued_at + due_at are assigned
         // by the same RPC the quote path uses — inline status:'issued' here was
@@ -967,7 +1033,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         total_other_taxes_amount: Number(totals.other.toFixed(2)), total_deductions_amount: Number(totals.deduct.toFixed(2)),
         payment_method_code: paymentMethodCode ? parseInt(paymentMethodCode, 10) : null,
         payment_method_info: paymentMethodInfo || null,
-        vat_payment_suspension: vatSuspension, self_pricing: selfPricing,
+        vat_payment_suspension: vatSuspension, self_pricing: !!selfBillSupplierId,
         exchange_rate: currency !== 'EUR' && exchangeRate ? parseDecimalOr(exchangeRate, 0) : null,
         prices_include_vat: pricesIncludeVat,
         paid_upfront: paidUpfront,
@@ -1206,6 +1272,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       vehicle_number: hasShipping ? vehicleNumber : null, move_purpose: hasShipping ? movePurpose : null,
       print_terms: printTerms, print_online_code: printOnlineCode, info_box: infoBox || null,
       notes: notes || null, logo_mode: logoMode, fiscal_mark: null,
+      self_billed_supplier_company_id: selfBillSupplierId || null,
     },
     items: lines.filter((l) => l.description.trim()).map((l) => {
       const pct = vatPctForCat(l.vat_category || undefined, parseDecimalOr(vatRate, 0));
@@ -1221,6 +1288,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       };
     }),
     settings: issuer,
+    selfBillSupplier: selfBillSupplierRow,
     customer: customerAddr ?? (customer ? { name: customer.label.replace(' (company)', '') } : null),
     branch: null, logoUrl: null, bankAccounts: previewBanks,
     // The document-level charges, as they will be stored — so what the operator approves on
@@ -1240,7 +1308,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         })
         .filter((r) => r.tax_type > 0 && r.tax_amount !== 0)
       : null,
-  }), [issuer, previewBanks, previewColors, currency, documentType, nextNumber, issueDate, dueDatePreview, relatedDocument, vatRate, paidUpfront, cashPct, totals, paymentMethodCode, paymentMethodInfo, hasShipping, shipFrom, shipTo, vehicleNumber, movePurpose, printTerms, printOnlineCode, infoBox, notes, logoMode, lines, customer, customerAddr, docTaxes, docTaxAmountOf, refsForTaxType]);
+  }), [issuer, previewBanks, previewColors, currency, documentType, nextNumber, issueDate, dueDatePreview, relatedDocument, vatRate, paidUpfront, cashPct, totals, paymentMethodCode, paymentMethodInfo, hasShipping, shipFrom, shipTo, vehicleNumber, movePurpose, printTerms, printOnlineCode, infoBox, notes, logoMode, lines, customer, customerAddr, selfBillSupplierId, selfBillSupplierRow, docTaxes, docTaxAmountOf, refsForTaxType]);
 
   const itemCount = useMemo(() => lines.filter((l) => l.description.trim()).length, [lines]);
 
@@ -1268,10 +1336,19 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             {/* Parties + document */}
             <section className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label className="text-xs uppercase tracking-wide text-muted-foreground">Billed to</Label>
-                <button type="button" className="text-xs text-primary hover:underline" onClick={() => setClientDialogOpen(true)}>+ Add new client</button>
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                  {selfPricing ? 'Billed to (you)' : 'Billed to'}
+                </Label>
+                {!selfPricing && (
+                  <button type="button" className="text-xs text-primary hover:underline" onClick={() => setClientDialogOpen(true)}>+ Add new client</button>
+                )}
               </div>
-              {customer ? (
+              {selfPricing ? (
+                <div className="rounded-md border border-border/60 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                  This is a self-billed document, so the counterpart is your own business — there is no
+                  customer to pick. The supplier issuing it is chosen on the Taxes tab.
+                </div>
+              ) : customer ? (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2">
                     <span className="text-sm">{customer.label}</span>
@@ -1948,10 +2025,44 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                   VAT payment suspension
                 </label>
                 <label className="flex items-center gap-2 self-end text-xs">
-                  <Checkbox className="h-4 w-4 rounded" checked={selfPricing} onCheckedChange={(v) => setSelfPricing(v === true)} />
-                  Self-pricing
+                  <Checkbox
+                    className="h-4 w-4 rounded"
+                    checked={selfPricing}
+                    onCheckedChange={(v) => {
+                      const on = v === true;
+                      setSelfPricing(on);
+                      if (on) setCustomer(null); // the counterpart becomes us
+                      else setSelfBillSupplierId('');
+                    }}
+                  />
+                  Self-billed (αυτοτιμολόγηση)
                 </label>
               </div>
+              {/* The document is issued in the SUPPLIER's name — their ΑΦΜ, their income, their VAT —
+                  and we are the counterpart. Only suppliers with a signed agreement and an ΑΦΜ
+                  authorized on the provider account are offered. */}
+              {selfPricing && (
+                <div className="mt-3 space-y-2 rounded-sm border border-hairline bg-surface-sunken p-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Supplier this invoice is issued for</Label>
+                    <Select value={selfBillSupplierId} onValueChange={setSelfBillSupplierId}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder={selfBillSuppliers.length ? 'Pick the supplier…' : 'No supplier is set up for self-billing'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {selfBillSuppliers.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    {selfBillSuppliers.length
+                      ? 'The supplier is the ISSUER on this document and your business is the counterpart. It is booked as a purchase, not as revenue, and a supplier bill is raised with it.'
+                      : 'A supplier becomes available here once their written self-billing agreement and their ΑΦΜ authorization on the e-invoicing provider are recorded under Finance → Settings → e-Invoicing.'}
+                  </p>
+                </div>
+              )}
               {/* A Τίτλος Κτήσης records what WE paid someone not obliged to invoice us, so AADE
                   classifies it in the expense ledger and refuses an income classification (231).
                   Which expense it was — goods bought, a service received — is a tax fact only the

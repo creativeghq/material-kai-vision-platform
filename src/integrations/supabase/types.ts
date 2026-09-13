@@ -7071,6 +7071,7 @@ export type Database = {
           id: string
           is_active: boolean
           next_number: number
+          self_billed_supplier_company_id: string | null
           series: string
           workspace_id: string
         }
@@ -7081,6 +7082,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           next_number?: number
+          self_billed_supplier_company_id?: string | null
           series: string
           workspace_id: string
         }
@@ -7091,6 +7093,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           next_number?: number
+          self_billed_supplier_company_id?: string | null
           series?: string
           workspace_id?: string
         }
@@ -8514,6 +8517,72 @@ export type Database = {
           },
           {
             foreignKeyName: "finance_recurring_expenses_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_self_billing_agreements: {
+        Row: {
+          agreement_bucket: string | null
+          agreement_path: string | null
+          agreement_signed_on: string | null
+          authorized_issuer_vat: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          issuer_vat_authorized_on: string | null
+          notes: string | null
+          revoked_on: string | null
+          supplier_company_id: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          agreement_bucket?: string | null
+          agreement_path?: string | null
+          agreement_signed_on?: string | null
+          authorized_issuer_vat?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          issuer_vat_authorized_on?: string | null
+          notes?: string | null
+          revoked_on?: string | null
+          supplier_company_id: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          agreement_bucket?: string | null
+          agreement_path?: string | null
+          agreement_signed_on?: string | null
+          authorized_issuer_vat?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          issuer_vat_authorized_on?: string | null
+          notes?: string | null
+          revoked_on?: string | null
+          supplier_company_id?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_self_billing_agreements_supplier_company_id_fkey"
+            columns: ["supplier_company_id"]
+            isOneToOne: false
+            referencedRelation: "crm_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_self_billing_agreements_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -12527,6 +12596,7 @@ export type Database = {
           quote_id: string | null
           related_document: string | null
           responsible: string | null
+          self_billed_supplier_company_id: string | null
           self_pricing: boolean
           series: string | null
           series_number: number | null
@@ -12630,6 +12700,7 @@ export type Database = {
           quote_id?: string | null
           related_document?: string | null
           responsible?: string | null
+          self_billed_supplier_company_id?: string | null
           self_pricing?: boolean
           series?: string | null
           series_number?: number | null
@@ -12733,6 +12804,7 @@ export type Database = {
           quote_id?: string | null
           related_document?: string | null
           responsible?: string | null
+          self_billed_supplier_company_id?: string | null
           self_pricing?: boolean
           series?: string | null
           series_number?: number | null
@@ -28742,6 +28814,7 @@ export type Database = {
           order_id: string | null
           paid_at: string | null
           project_id: string | null
+          self_billed_invoice_id: string | null
           status: string
           subtotal_net: number
           supplier_bill_number: string | null
@@ -28771,6 +28844,7 @@ export type Database = {
           order_id?: string | null
           paid_at?: string | null
           project_id?: string | null
+          self_billed_invoice_id?: string | null
           status?: string
           subtotal_net?: number
           supplier_bill_number?: string | null
@@ -28800,6 +28874,7 @@ export type Database = {
           order_id?: string | null
           paid_at?: string | null
           project_id?: string | null
+          self_billed_invoice_id?: string | null
           status?: string
           subtotal_net?: number
           supplier_bill_number?: string | null
@@ -39398,6 +39473,20 @@ export type Database = {
           snippet: string
           title: string
         }[]
+      }
+      authorize_self_billing_supplier: {
+        Args: {
+          p_workspace_id: string
+          p_supplier_company_id: string
+          p_series: string
+          p_agreement_signed_on?: string | null
+          p_issuer_vat_authorized_on?: string | null
+        }
+        Returns: string
+      }
+      self_billing_blocks: {
+        Args: { p_invoice_id: string }
+        Returns: string[]
       }
       seed_workspace_user_levels: {
         Args: { p_workspace_id: string }

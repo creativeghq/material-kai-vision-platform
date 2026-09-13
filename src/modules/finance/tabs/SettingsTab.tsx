@@ -31,6 +31,7 @@ import { PendingDiscountApprovalsCard } from '@/modules/finance/components/Pendi
 import { ServicesCard } from '@/modules/finance/components/ServicesCard';
 import { CategoriesCard } from '@/modules/finance/components/CategoriesCard';
 import { BranchesCard } from '@/modules/finance/components/BranchesCard';
+import { SelfBillingCard } from '@/modules/finance/components/SelfBillingCard';
 import { PosTerminalsCard } from '@/modules/finance/components/PosTerminalsCard';
 import { StorefrontCard } from '@/modules/finance/components/StorefrontCard';
 import { TeamPanel } from '@/components/core/Team/TeamPanel';
@@ -230,6 +231,7 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
 
         <TabsContent value="einvoicing" className="mt-0">
           <EInvoicingCard workspaceId={workspaceId} onGoToIdentity={() => setActiveTab('identity')} />
+          <SelfBillingCard workspaceId={workspaceId} />
         </TabsContent>
 
         <TabsContent value="pricing" className="mt-0 space-y-4">

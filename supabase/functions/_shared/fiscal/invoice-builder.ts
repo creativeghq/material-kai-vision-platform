@@ -204,6 +204,55 @@ function partyFromCrm(c: any): FiscalParty {
   };
 }
 
+/**
+ * The submitting workspace as a myDATA party. On an ordinary document this is the issuer; on a
+ * self-billed one it is the counterpart, because the document is the supplier's.
+ */
+function partyFromFinanceSettings(fs: any, branchCode: unknown): FiscalParty {
+  const country = fs?.business_country_code ?? 'GR';
+  return {
+    vatNumber: fiscalVatNumber(fs?.business_vat, country),
+    country,
+    branch: Number(branchCode ?? 0), // myDATA establishment number this document was issued under
+    name: fs?.business_name ?? '',
+    profession: fs?.business_profession ?? undefined,
+    taxOffice: fs?.business_tax_office ?? undefined,
+    address: {
+      street: fs?.business_address ?? '',
+      number: fs?.business_street_number ?? '',
+      postalCode: fs?.business_postal_code ?? '',
+      city: fs?.business_city ?? '',
+      country,
+    },
+    phone: fs?.business_phone ?? undefined,
+    email: fs?.business_email ?? undefined,
+  };
+}
+
+/**
+ * SELF-BILLING (αυτοτιμολόγηση). The buyer draws the document up, but it is legally the SUPPLIER's
+ * invoice — their ΑΦΜ issues it, their income, their VAT — so the parties are the other way round
+ * from every other document this builder produces. Reading the supplier is fiscal-critical: a
+ * failed read must throw, never fall through to an empty issuer, or we file under nobody.
+ */
+async function resolveSelfBilledIssuer(supabase: any, supplierCompanyId: string): Promise<FiscalParty> {
+  const { data: sup, error } = await supabase
+    .from('crm_companies').select('*').eq('id', supplierCompanyId).maybeSingle();
+  if (error) {
+    throw new Error(`refusing to build a self-billed invoice: supplier read failed (${error.message ?? error})`);
+  }
+  if (!sup) {
+    throw new Error(`refusing to build a self-billed invoice: supplier ${supplierCompanyId} not found`);
+  }
+  const party = partyFromCrm(sup);
+  if (!party.vatNumber) {
+    throw new Error(
+      `refusing to build a self-billed invoice: ${party.name || 'the supplier'} has no ΑΦΜ, and the document is issued in their name`,
+    );
+  }
+  return party;
+}
+
 /** Resolve the counterparty for a fiscal document (#328). */
 async function resolveCounterparty(
   supabase: any,
@@ -310,26 +359,32 @@ export async function buildInvoiceInputFromDb(
   // built from a read we didn't confirm. A real invoice also cannot have zero lines.
   assertFiscalLines(items, itemsErr, `invoice ${invoiceId}`);
 
-  const issuer: FiscalParty = {
-    vatNumber: fiscalVatNumber(fs?.business_vat, fs?.business_country_code ?? 'GR'),
-    country: fs?.business_country_code ?? 'GR',
-    branch: Number(inv.branch_code ?? 0), // myDATA establishment number this invoice was issued under
-    name: fs?.business_name ?? '',
-    profession: fs?.business_profession ?? undefined,
-    taxOffice: fs?.business_tax_office ?? undefined,
-    address: {
-      street: fs?.business_address ?? '',
-      number: fs?.business_street_number ?? '',
-      postalCode: fs?.business_postal_code ?? '',
-      city: fs?.business_city ?? '',
-      country: fs?.business_country_code ?? 'GR',
-    },
-    phone: fs?.business_phone ?? undefined,
-    email: fs?.business_email ?? undefined,
-  };
+  const selfBilledSupplierId: string | null = inv.self_billed_supplier_company_id ?? null;
+  const workspaceParty = partyFromFinanceSettings(fs, inv.branch_code);
 
-  let counterpart: FiscalParty = await resolveCounterparty(supabase, inv);
-  counterpart = await applyCounterpartAddressUnit(supabase, counterpart, inv.customer_address_unit_id);
+  // `self_pricing` alone used to mark the document while leaving US as the issuer, which is the
+  // one arrangement αυτοτιμολόγηση cannot be: it filed the supplier's sale under our ΑΦΜ. The flag
+  // is now a consequence of naming the supplier, never a substitute for it.
+  if (inv.self_pricing && !selfBilledSupplierId) {
+    throw new Error(
+      'refusing to build a self-billed invoice with no supplier: αυτοτιμολόγηση is issued in the ' +
+        "supplier's name, so the document must say whose. Pick the supplier on the invoice.",
+    );
+  }
+
+  let issuer: FiscalParty;
+  let counterpart: FiscalParty;
+  if (selfBilledSupplierId) {
+    issuer = await resolveSelfBilledIssuer(supabase, selfBilledSupplierId);
+    counterpart = workspaceParty;
+  } else {
+    issuer = workspaceParty;
+    counterpart = await applyCounterpartAddressUnit(
+      supabase,
+      await resolveCounterparty(supabase, inv),
+      inv.customer_address_unit_id,
+    );
+  }
 
   const rate = Number(inv.vat_rate ?? fs?.default_vat_rate ?? 24);
   const cat = vatCategory(rate);
@@ -546,7 +601,9 @@ export async function buildInvoiceInputFromDb(
     header: {
       series, aa, issueDate, invoiceType, currency: inv.currency ?? 'EUR',
       vatPaymentSuspension: !!inv.vat_payment_suspension,
-      selfPricing: !!inv.self_pricing,
+      // Naming the supplier IS the self-billing declaration — the envelope flag follows it rather
+      // than a checkbox that can disagree with the parties actually being transmitted.
+      selfPricing: !!selfBilledSupplierId || !!inv.self_pricing,
       exchangeRate: inv.exchange_rate ?? undefined,
       ...(movement ?? {}),
       // AADE §8.19 / §8.18 — stated on any invoice, not only one carrying goods.
@@ -637,28 +694,28 @@ export async function buildCreditNoteInputFromDb(
       }))
     : undefined;
 
-  const issuer: FiscalParty = {
-    vatNumber: fiscalVatNumber(fs?.business_vat, fs?.business_country_code ?? 'GR'),
-    country: fs?.business_country_code ?? 'GR',
-    branch: Number(inv.branch_code ?? 0), // same establishment as the corrected invoice
-    name: fs?.business_name ?? '',
-    profession: fs?.business_profession ?? undefined,
-    taxOffice: fs?.business_tax_office ?? undefined,
-    address: {
-      street: fs?.business_address ?? '', number: fs?.business_street_number ?? '',
-      postalCode: fs?.business_postal_code ?? '', city: fs?.business_city ?? '',
-      country: fs?.business_country_code ?? 'GR',
-    },
-    phone: fs?.business_phone ?? undefined,
-    email: fs?.business_email ?? undefined,
-  };
+  // A credit note is the invoice it corrects, in reverse — INCLUDING which way round the parties
+  // run. Crediting a self-billed invoice under our own ΑΦΜ would file a correction against a
+  // document we never issued, and leave the supplier's original uncorrected.
+  const cnSelfBilledSupplierId: string | null = inv.self_billed_supplier_company_id ?? null;
+  const cnWorkspaceParty = partyFromFinanceSettings(fs, inv.branch_code);
 
-  // From the CORRECTED INVOICE, snapshot included: a credit note must name the same party the
-  // document it corrects named. Reading the credit note's own customer refs (or today's CRM)
-  // could address the correction to someone the original invoice never mentioned.
-  let counterpart: FiscalParty = await resolveCounterparty(supabase, inv);
-  // Credit note inherits the corrected invoice's chosen sub-unit address.
-  counterpart = await applyCounterpartAddressUnit(supabase, counterpart, inv.customer_address_unit_id);
+  let issuer: FiscalParty;
+  let counterpart: FiscalParty;
+  if (cnSelfBilledSupplierId) {
+    issuer = await resolveSelfBilledIssuer(supabase, cnSelfBilledSupplierId);
+    counterpart = cnWorkspaceParty;
+  } else {
+    issuer = cnWorkspaceParty;
+    // From the CORRECTED INVOICE, snapshot included: a credit note must name the same party the
+    // document it corrects named. Reading the credit note's own customer refs (or today's CRM)
+    // could address the correction to someone the original invoice never mentioned.
+    counterpart = await applyCounterpartAddressUnit(
+      supabase,
+      await resolveCounterparty(supabase, inv),
+      inv.customer_address_unit_id,
+    );
+  }
 
   const creditDocType = String(
     overrides.invoiceType ?? cn.document_type
@@ -756,6 +813,9 @@ export async function buildCreditNoteInputFromDb(
       issueDate: String(cn.issued_at ?? cn.created_at ?? new Date().toISOString()).slice(0, 10),
       invoiceType: creditDocType,
       currency: cn.currency ?? inv.currency ?? 'EUR',
+      // Inherited from the credited document, like its type and its parties. Without it the
+      // correction declares an income classification the original was refused for carrying.
+      ...(cnSelfBilledSupplierId ? { selfPricing: true } : {}),
     },
     correlatedInvoices: isCorrelated ? [Number(correlatedMark)] : undefined,
     lines,

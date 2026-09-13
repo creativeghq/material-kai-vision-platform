@@ -127,10 +127,15 @@ async function reserveTransmission(
 async function buyerRiskBlocks(supabase: any, invoiceId: string): Promise<string[]> {
   const { data: inv } = await supabase
     .from('invoices')
-    .select('workspace_id, customer_company_id, customer_contact_id, total, document_type')
+    .select('workspace_id, customer_company_id, customer_contact_id, total, document_type, self_billed_supplier_company_id')
     .eq('id', invoiceId)
     .single();
   if (!inv) return [];
+
+  // On a self-billed document the buyer is US. Every rule below asks about a customer's standing —
+  // the minimum-order rule would measure a purchase against a sales floor — so the supplier-side
+  // gate (self_billing_blocks) answers for this document instead.
+  if (inv.self_billed_supplier_company_id) return [];
 
   const { data: s } = await supabase
     .from('finance_settings')
@@ -930,6 +935,27 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
           error: `Invoice blocked by risk check: ${blocks.join('; ')}. Fix the buyer in CRM or relax the rule under Finance → Settings → Buyer risk checks.`,
           code: 'buyer_risk_blocked',
           blocks,
+        }, 422);
+      }
+
+      // Self-billing (αυτοτιμολόγηση) — issuing in a supplier's name needs their written agreement
+      // AND their ΑΦΜ authorized on the provider account. Derived in SQL so the RPC path enforces
+      // the same rule; a failed check is itself a block, because an unauthorized issuer is refused
+      // by the provider in an opaque shape and a transmitted document cannot be cancelled.
+      const { data: sbBlocks, error: sbErr } = await supabase.rpc('self_billing_blocks', {
+        p_invoice_id: invoiceId,
+      });
+      if (sbErr) {
+        return json({
+          error: `Could not verify the self-billing authorization for this document, so it was not issued (${sbErr.message ?? sbErr}).`,
+          code: 'self_billing_check_failed',
+        }, 422);
+      }
+      if (Array.isArray(sbBlocks) && sbBlocks.length > 0) {
+        return json({
+          error: `This self-billed invoice cannot be issued: ${sbBlocks.join('; ')}.`,
+          code: 'self_billing_blocked',
+          blocks: sbBlocks,
         }, 422);
       }
     }

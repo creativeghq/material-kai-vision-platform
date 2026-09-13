@@ -14,7 +14,9 @@ const rf = read('supabase/functions/_shared/payments/invoice-rf.ts');
 
 describe('the PDF prints RF above the bank details', () => {
   it('the RF block comes before the account lines', () => {
-    const rfBlock = pdf.indexOf('if (rfCode) {');
+    // Anchored on the condition's START, not its exact text: this guards the ORDER of the two
+    // blocks, and it should not fail because the RF block grew a second condition.
+    const rfBlock = pdf.search(/if \(rfCode\b/);
     const bankBlock = pdf.indexOf('if (payBits.length || accountLines.length) {');
     expect(rfBlock).toBeGreaterThan(-1);
     expect(bankBlock).toBeGreaterThan(-1);
