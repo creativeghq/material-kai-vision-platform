@@ -33,6 +33,7 @@ import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsM
 import { useInboundDocActions } from '@/modules/finance/components/useInboundDocActions';
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
 import { NewDeliveryNoteDialog } from '@/modules/finance/components/NewDeliveryNoteDialog';
+import { MovementLifecycleDialog } from '@/modules/finance/components/MovementLifecycleDialog';
 import { NewChequeDialog } from '@/modules/finance/components/NewChequeDialog';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { ExpensePaymentsDialog } from '@/modules/finance/components/ExpensePaymentsDialog';
@@ -894,6 +895,9 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
   const navigate = useNavigate();
   const [busy, setBusy] = React.useState<string | null>(null);
   const [cancelling, setCancelling] = React.useState<DeliveryNote | null>(null);
+  // #407: the movement whose lifecycle is open. Its legs are separate filings, so this is a
+  // ledger rather than a field on the row.
+  const [lifecycleFor, setLifecycleFor] = React.useState<{ id: string; number: string | null } | null>(null);
   const financeBase = FINANCE_BASE;
   const issue = async (id: string) => {
     setBusy(id);
@@ -999,6 +1003,17 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
                     {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
                   </Button>
                 )}
+                {/* ΨΔΑ Phase Β1 (#407): loading, transhipment and receipt are each filings with
+                    their own MARK from 12/10/2026, so the movement has a lifecycle to record
+                    rather than a single status. Offered on a dispatch that has left draft. */}
+                {d.status !== 'draft' && d.kind === 'dispatch' && (
+                  <Button
+                    size="sm" variant="ghost" title="Movement lifecycle"
+                    onClick={() => setLifecycleFor({ id: d.id, number: d.delivery_note_number ?? null })}
+                  >
+                    <Truck className="h-3.5 w-3.5" />
+                  </Button>
+                )}
                 {!readOnly && d.status === 'issued' && d.kind === 'dispatch' && (
                   <Button size="sm" variant="outline" disabled={busy === d.id} onClick={() => toInvoice(d.id)}>
                     {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Create invoice'}
@@ -1044,6 +1059,13 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+    {lifecycleFor && (
+      <MovementLifecycleDialog
+        deliveryNoteId={lifecycleFor.id}
+        deliveryNoteNumber={lifecycleFor.number}
+        onClose={() => setLifecycleFor(null)}
+      />
+    )}
     </div>
   );
 };
