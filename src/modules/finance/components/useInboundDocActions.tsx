@@ -9,6 +9,7 @@ import { ExpensePaymentsDialog } from '@/modules/finance/components/ExpensePayme
 import { ReceiveToWarehouseDialog } from '@/modules/finance/components/ReceiveToWarehouseDialog';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { NewOrderModal } from '@/modules/finance/components/OrdersPanel';
+import { BillToExistingOrderDialog } from '@/modules/finance/components/BillToExistingOrderDialog';
 import { orderLinesFromDoc, docsWithOrders } from '@/modules/finance/utils/inboundToOrder';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 
@@ -54,6 +55,8 @@ export function useInboundDocActions({
   const [payDoc, setPayDoc] = useState<InboundDocument | null>(null);
   /** Being turned into the purchase order it was always for. */
   const [orderDoc, setOrderDoc] = useState<InboundDocument | null>(null);
+  /** Being booked against a purchase order that already exists. */
+  const [billOrderDoc, setBillOrderDoc] = useState<InboundDocument | null>(null);
   const [previewDoc, setPreviewDoc] = useState<InboundDocument | null>(null);
   /** The bill whose ledger is open, when the host did not claim that job. */
   const [paymentsBillId, setPaymentsBillId] = useState<string | null>(null);
@@ -105,6 +108,7 @@ export function useInboundDocActions({
       onRecordPayment={() => setPayDoc(doc)}
       onCreateOrder={() => setOrderDoc(doc)}
       hasOrder={ordered.has(doc.id)}
+      onBillExistingOrder={() => setBillOrderDoc(doc)}
       // The balance behind the bronze Gross column: a settled document still shows its whole
       // amount there, so this is the only way to reach what is actually outstanding.
       onOpenPayments={doc.created_supplier_bill_id ? () => openPayments(doc.created_supplier_bill_id!) : undefined}
@@ -124,6 +128,14 @@ export function useInboundDocActions({
           doc={previewDoc}
           open
           onOpenChange={(v) => { if (!v) setPreviewDoc(null); }}
+        />
+      )}
+      {billOrderDoc && (
+        <BillToExistingOrderDialog
+          doc={billOrderDoc}
+          open
+          onOpenChange={(v) => { if (!v) setBillOrderDoc(null); }}
+          onBooked={() => { setBillOrderDoc(null); onChanged(); }}
         />
       )}
       {detailDoc && (

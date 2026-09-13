@@ -245,6 +245,21 @@ export interface IssuerMoney {
   mixed_currency: boolean;
 }
 
+/** One candidate from `suggest_orders_for_inbound_doc`. `net_delta` is the derived disagreement
+ *  between what the supplier billed and what is still unbilled on the order. */
+export interface InboundOrderSuggestion {
+  order_id: string;
+  order_number: string | null;
+  ordered_on: string | null;
+  po_net: number;
+  currency: string | null;
+  party_name: string | null;
+  already_billed_net: number;
+  net_delta: number;
+  same_supplier: boolean;
+  match_reason: string;
+}
+
 export const inboundService = {
   /**
    * Columns the LIST needs. Deliberately not `*`.
@@ -414,6 +429,26 @@ export const inboundService = {
     const { data, error } = await supabase.rpc('inbound_doc_to_supplier_bill', { p_doc_id: docId });
     if (error) throw error;
     return data as string;
+  },
+
+  /** Purchase orders this document might be billing, derived in SQL and ranked by closeness. */
+  async suggestOrders(docId: string): Promise<InboundOrderSuggestion[]> {
+    const { data, error } = await supabase.rpc('suggest_orders_for_inbound_doc' as never, {
+      p_doc_id: docId,
+    } as never);
+    if (error) throw error;
+    return (data ?? []) as unknown as InboundOrderSuggestion[];
+  },
+
+  /** Book this document as the bill FOR an existing purchase order — one act, so a retry cannot
+   *  leave an expense with no order or book the payable twice. */
+  async billToOrder(docId: string, orderId: string): Promise<{ supplier_bill_id: string; note: string }> {
+    const { data, error } = await supabase.rpc('inbound_doc_bill_to_order' as never, {
+      p_doc_id: docId, p_order: orderId,
+    } as never);
+    if (error) throw error;
+    const row = (Array.isArray(data) ? data[0] : data) as { supplier_bill_id: string; note: string };
+    return row;
   },
 
   /** Manually trigger the myDATA RequestDocs pull (finance-manager).

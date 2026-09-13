@@ -8,7 +8,7 @@
  */
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MoreVertical, Building2, ListPlus, PackagePlus, Trash2, Loader2, Eye, Wallet, ShoppingCart, Receipt } from 'lucide-react';
+import { MoreVertical, Building2, ListPlus, PackagePlus, Trash2, Loader2, Eye, Wallet, ShoppingCart, Receipt, Link2 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -37,6 +37,8 @@ interface Props {
   onCreateOrder?: () => void;
   /** This document already produced an order — offered as done rather than repeated. */
   hasOrder?: boolean;
+  /** Book this document against a purchase order that ALREADY exists. Absent → not offered. */
+  onBillExistingOrder?: () => void;
   /**
    * Open the payments/balance ledger for the expense this document became. Read-only: it shows
    * what has settled and what is still owed, and never converts the document.
@@ -54,7 +56,7 @@ interface Props {
   onChanged?: () => void;
 }
 
-export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy, crmCompanyId, onRecordPayment, onCreateOrder, hasOrder, onOpenPayments, onReceiveStock, onAddLineDetail, onDismiss, onChanged }) => {
+export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy, crmCompanyId, onRecordPayment, onCreateOrder, hasOrder, onBillExistingOrder, onOpenPayments, onReceiveStock, onAddLineDetail, onDismiss, onChanged }) => {
   const navigate = useNavigate();
 
   // ONE goods receipt per purchase. Receiving the document and receiving the purchase order it
@@ -156,6 +158,15 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
           >
             <ShoppingCart className="h-4 w-4 mr-2" />
             {isCancelled ? 'Cancelled at AADE' : isPayroll ? 'Payroll — recorded in HR' : hasOrder ? 'Already in Expenses' : 'Add to Expenses'}
+          </DropdownMenuItem>
+          {/* The other half of the same question. "Add to Expenses" raises a new order, which is
+              right when the purchase was never recorded; when the PO exists it made a SECOND one
+              and left the real order's three-way match reading `awaiting_bill` for good. */}
+          <DropdownMenuItem
+            onClick={onBillExistingOrder}
+            disabled={!onBillExistingOrder || hasOrder || isPayroll || isCancelled || doc.status === 'dismissed'}
+          >
+            <Link2 className="h-4 w-4 mr-2" /> Bill an existing order&hellip;
           </DropdownMenuItem>
           <DropdownMenuItem onClick={onRecordPayment} disabled={!canPay}>
             <Wallet className="h-4 w-4 mr-2" /> Record payment
