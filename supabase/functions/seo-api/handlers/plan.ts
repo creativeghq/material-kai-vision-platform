@@ -372,6 +372,27 @@ ${paaAnswers
 Target each as an FAQ entry, write a tighter answer than the current one shown.`
     : '';
 
+  // What the ranking pages actually SAY, read rather than described from the SERP. The section
+  // states how many pages it is derived from: three pages read out of ten is a different claim
+  // from ten, and a planner given a bare list cannot tell them apart.
+  const rc = research.rankingContent;
+  const rankingSection = rc && rc.read > 0
+    ? `
+
+=== WHAT THE RANKING PAGES ACTUALLY COVER (read from ${rc.read} page(s)) ===
+${rc.note}
+Median length of the pages read: ${rc.medianWordCount ?? 'unknown'} words.
+Sections MOST of them have (cover these or say why not):
+  - ${rc.common.slice(0, 15).map((c) => `${serpValue(c.label, 200)} — on ${c.pages} of ${rc.read}`).join('\n  - ') || 'none shared'}
+Sections only ONE of them has (an angle nobody else took):
+  - ${rc.distinctive.slice(0, 10).map((c) => serpValue(c.label, 200)).join('\n  - ') || 'none'}`
+    : rc
+      ? `
+
+=== WHAT THE RANKING PAGES ACTUALLY COVER ===
+${rc.note} Plan from the keyword and SERP data below, and do not assert what competitors cover.`
+      : '';
+
   const intentSection = signals?.keywordIntents && Object.keys(signals.keywordIntents).length
     ? `
 
@@ -400,12 +421,12 @@ ${lsiTerms}
 === COMPETITOR HEADINGS (top SERP results) ===
 ${competitorHeadings}
 
-=== CONTENT GAPS (topics competitors cover) ===
+=== COMPETING PAGE TITLES ===
   - ${gaps}
 
 === PEOPLE ALSO ASK ===
   - ${paaList}
-${aiOverviewSection}${featuredSnippetSection}${relatedSection}${paaSection}${intentSection}`)}
+${rankingSection}${aiOverviewSection}${featuredSnippetSection}${relatedSection}${paaSection}${intentSection}`)}
 
 === TOTAL ADDRESSABLE VOLUME ===
 ${research.totalAddressableVolume} monthly searches across all related keywords

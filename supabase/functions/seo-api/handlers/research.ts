@@ -5,7 +5,7 @@
  * Runs 6 parallel API calls: keyword expansion, related keywords,
  * bulk difficulty, PAA questions, SERP competitors, content analysis.
  *
- * Credit cost: 18 credits per research
+ * Credit cost: 18 credits, or 23 when it also reads the pages that actually rank.
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -18,6 +18,7 @@ import type { SEOResearchRequest, SEOResearchResponse } from '../../_shared/seo-
 import { fetchOpportunitiesStateless } from '../../_shared/mention-opportunities-client.ts';
 import { resolveWebsite } from '../../_shared/seo-website.ts';
 import { resolveSecret } from '../../_shared/secrets.ts';
+import { readRankingPages } from '../serp-content.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -35,6 +36,14 @@ async function dataforseoCredentials(supabase: { from: (t: string) => any }): Pr
 }
 
 const CREDIT_COST = 18;
+
+/**
+ * Reading the pages that actually rank costs a Firecrawl fetch each. Priced into the SAME debit
+ * rather than a second one: a handler with two debits needs two refunds, and the refund path is
+ * the one nobody exercises until it is wrong.
+ */
+const READ_PAGES_COST = 5;
+const READ_PAGES_LIMIT = 5;
 
 
 /** Map DataForSEO numeric location_code → ISO-3166 alpha-2 country code so
@@ -80,6 +89,9 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
   // Declared OUTSIDE the try because the refund lives in the catch: a refund that cannot see
   // which wallet was charged would hand the money back to the wrong one.
   let workspaceId: string | null = null;
+  // Same reason, and the same trap: the refund lives in the catch. A cost decided inside the try
+  // is out of scope exactly where the money has to be handed back.
+  let creditCost = CREDIT_COST;
 
   try {
 
@@ -110,6 +122,11 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
     const locationCode = body.location_code || 2840;
     const languageCode = body.language_code || 'en';
 
+    // Opt OUT, not in: a plan written without reading the competition is the default this was
+    // built to replace.
+    const readPages = body.read_ranking_pages !== false;
+    creditCost = CREDIT_COST + (readPages ? READ_PAGES_COST : 0);
+
     // Entitlement gate BEFORE the debit and the upstream calls (#212 + invariant 10).
     // Also resolves the workspace the research is filed under (was a late `.single()`
     // lookup, which errors → null for multi-workspace users — same bug pipeline.ts fixed).
@@ -122,13 +139,14 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
       'debit_credits',
       {
         p_user_id: userId,
-        p_amount: CREDIT_COST,
+        p_amount: creditCost,
         p_operation_type: 'seo_research',
         p_description: `SEO keyword research: "${body.target_keyword}"`,
         p_metadata: {
           topic: body.topic,
           target_keyword: body.target_keyword,
           location_code: locationCode,
+          read_ranking_pages: readPages,
         },
         p_workspace_id: workspaceId,
       },
@@ -178,6 +196,32 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
       console.log('[seo-research] opportunities enrichment unavailable — continuing baseline');
     }
 
+    // Read the pages that actually rank. Until this, `serpInsights[].headings` was `[]` with the
+    // comment "Not available from SERP" and `contentGapOpportunities` was a list of competitor
+    // TITLES — so the planner was told "here are the gaps" and handed ten page titles.
+    //
+    // Failures are STATED, never dropped: a page Firecrawl could not fetch stays in the list with
+    // its reason, so nothing downstream can read three pages as a survey of ten.
+    if (readPages) {
+      const targets = research.serpInsights
+        .filter((c) => !!c.url)
+        .map((c) => ({ url: c.url, position: c.position }));
+      const ranking = await readRankingPages(targets, { limit: READ_PAGES_LIMIT });
+      research.rankingContent = ranking;
+
+      const byUrl = new Map(ranking.pages.map((r) => [r.url, r]));
+      for (const c of research.serpInsights) {
+        const r = byUrl.get(c.url);
+        if (r?.status !== 'read') continue;
+        c.headings = r.headings;
+        c.wordCount = r.wordCount ?? 0;
+      }
+      console.log(
+        `[seo-research] ranking pages: ${ranking.read} read, ${ranking.failed} failed, ` +
+        `${ranking.common.length} shared subtopics, median ${ranking.medianWordCount ?? 'n/a'} words`,
+      );
+    }
+
     // File this research under a connected website — explicit body.website_id when the
     // agent picked one, else the workspace's default site (null when none connected).
     const website = await resolveWebsite(supabase, { workspaceId, explicitWebsiteId: body.website_id });
@@ -202,7 +246,7 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
           0,
         ),
         total_addressable_volume: research.totalAddressableVolume,
-        credits_used: CREDIT_COST,
+        credits_used: creditCost,
       })
       .select('id')
       .single();
@@ -221,7 +265,7 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
       data: {
         research_id: researchRow?.id || '',
         research,
-        credits_used: CREDIT_COST,
+        credits_used: creditCost,
       },
     };
 
@@ -233,7 +277,7 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
     try {
       await supabase.rpc('refund_credits', {
         p_user_id: userId,
-        p_amount: CREDIT_COST,
+        p_amount: creditCost,
         p_operation_type: 'seo_research_refund',
         p_description: `Refund: SEO research failed`,
         p_metadata: { error: error.message },

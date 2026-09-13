@@ -44,6 +44,34 @@ export interface CompetitorData {
   domainAuthority: number | null;
 }
 
+/** One ranking page, with its own outcome. A page we could not fetch is never a 0-word competitor. */
+export interface RankingPageRead {
+  url: string;
+  position: number;
+  status: 'read' | 'failed' | 'not_attempted';
+  wordCount: number | null;
+  headings: string[];
+  reason?: string;
+}
+
+export interface SubtopicCoverage {
+  label: string;
+  /** Out of the pages READ, never out of the SERP. */
+  pages: number;
+  examples: string[];
+}
+
+/** What the pages that actually rank say — read, not described from the SERP. */
+export interface RankingContent {
+  pages: RankingPageRead[];
+  read: number;
+  failed: number;
+  not_attempted: number;
+  medianWordCount: number | null;
+  common: SubtopicCoverage[];
+  distinctive: SubtopicCoverage[];
+  note: string;
+}
 export interface SerpFeatures {
   hasAiOverview: boolean;
   aiOverviewSources: { url: string; title: string; domain: string }[];
@@ -121,6 +149,8 @@ export interface KeywordResearchResult {
   researchedAt: string; // ISO timestamp
   /** Mention-monitoring SERP signals (Phase 1 wiring). Optional — never blocks the pipeline. */
   serpSignals?: SerpSignalBlob;
+  /** The ranking pages, read. Absent when the reader was not run for this research. */
+  rankingContent?: RankingContent;
 }
 
 // ════════════════════════════════════════════════════════════════

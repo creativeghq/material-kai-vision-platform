@@ -37,6 +37,16 @@ interface ResearchBlob {
   clusters?: { name?: string; theme?: string; keywords?: any[]; totalVolume?: number }[];
   serpInsights?: { url?: string; title?: string; domain?: string; position?: number }[];
   contentGapOpportunities?: string[];
+  rankingContent?: {
+    read?: number;
+    failed?: number;
+    not_attempted?: number;
+    medianWordCount?: number | null;
+    common?: { label: string; pages: number }[];
+    distinctive?: { label: string }[];
+    note?: string;
+    pages?: { url: string; position: number; status: string; wordCount: number | null; reason?: string }[];
+  };
   recommendedPrimary?: Record<string, any>;
   recommendedSecondaries?: Record<string, any>[];
   contentLandscape?: {
@@ -521,12 +531,73 @@ export const KeywordResearchDetail: React.FC<{
         </Card>
       )}
 
+      {/* ── What the ranking pages actually cover ──────────────────────── */}
+      {blob?.rankingContent && (
+        <Card className="dashboard-card">
+          <CardHeader>
+            <CardTitle className="text-base">What the ranking pages actually cover</CardTitle>
+            <CardDescription>{blob.rankingContent.note}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {(blob.rankingContent.read ?? 0) > 0 && (
+              <>
+                <div className="text-sm text-muted-foreground">
+                  Median length of the pages read:{' '}
+                  <span className="font-medium tabular-nums text-foreground">
+                    {blob.rankingContent.medianWordCount ?? '—'}
+                  </span>{' '}
+                  words
+                </div>
+                <div>
+                  <div className="mb-1.5 text-xs font-semibold text-muted-foreground">Sections most of them have</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(blob.rankingContent.common ?? []).map((c, i) => (
+                      <Badge key={i} variant="secondary">
+                        {c.label} · {c.pages}/{blob.rankingContent!.read}
+                      </Badge>
+                    ))}
+                    {(blob.rankingContent.common ?? []).length === 0 && (
+                      <span className="text-sm text-muted-foreground">No section appears on more than one of them.</span>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <div className="mb-1.5 text-xs font-semibold text-muted-foreground">Only one of them has</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(blob.rankingContent.distinctive ?? []).map((c, i) => (
+                      <Badge key={i} variant="outline">{c.label}</Badge>
+                    ))}
+                    {(blob.rankingContent.distinctive ?? []).length === 0 && (
+                      <span className="text-sm text-muted-foreground">Nothing unique to a single page.</span>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+            {/* A page we could not fetch is named with its reason. Dropping it would let three
+                pages read as a survey of ten. */}
+            {(blob.rankingContent.pages ?? []).some((pg) => pg.status !== 'read') && (
+              <div>
+                <div className="mb-1.5 text-xs font-semibold text-muted-foreground">Not read</div>
+                <ul className="space-y-1 text-sm text-muted-foreground">
+                  {(blob.rankingContent.pages ?? []).filter((pg) => pg.status !== 'read').map((pg) => (
+                    <li key={pg.url}>
+                      #{pg.position} {pg.url} — {pg.reason ?? pg.status}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* ── Gaps ───────────────────────────────────────────────────────── */}
       {(blob?.contentGapOpportunities?.length ?? 0) > 0 && (
         <Card className="dashboard-card">
           <CardHeader>
-            <CardTitle className="text-base">Gaps worth covering</CardTitle>
-            <CardDescription>Subjects the ranking pages address that a new page would need to match.</CardDescription>
+            <CardTitle className="text-base">Competing pages</CardTitle>
+            <CardDescription>The titles of the pages ranking for this keyword. What they actually cover is above, read from the pages themselves.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-1.5">
