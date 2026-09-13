@@ -359,6 +359,24 @@ const InboxPage: React.FC = () => {
       setSearchParams(p, { replace: true });
     }
   }, [activeWorkspaceId, searchParams, setSearchParams]);
+
+  /**
+   * `/inbox?thread=…&say=…` seeds the composer and sends NOTHING.
+   *
+   * How a quote or a pay link reaches a customer on the channel they actually use. Sending it
+   * from the finance screen would be posting to a customer from a surface with no sight of the
+   * conversation or Meta's 24-hour window; this puts the operator in the thread with the text
+   * ready, which is where both of those are already handled.
+   */
+  useEffect(() => {
+    const say = searchParams.get('say');
+    if (!say) return;
+    setDraft(say.slice(0, 4000));
+    setIsNote(false);
+    const p = new URLSearchParams(searchParams);
+    p.delete('say');
+    setSearchParams(p, { replace: true });
+  }, [searchParams, setSearchParams]);
   /** True while a send is in flight. See `send` — a ref, because the state read is stale there. */
   const sendInFlight = useRef(false);
   const isMobile = useIsMobile();

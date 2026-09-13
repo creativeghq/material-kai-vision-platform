@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { Share2, Copy, ExternalLink, Loader2, Link2 } from 'lucide-react';
+import { Share2, Copy, ExternalLink, Loader2, Link2, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Switch } from '@/components/core/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/core/ui/popover';
 import { useToast } from '@/hooks/use-toast';
 import { quotesService } from '../services/QuotesService';
+import { messagingService } from '@/modules/messaging/services/messagingService';
+import { useNavigate } from 'react-router-dom';
 
 /**
  * QuoteShareButton — lets a quote owner (or admin) turn on a public share link
@@ -19,11 +21,19 @@ interface Props {
   token: string | null;
   /** Reload the parent quote after the share state changes. */
   onChange?: () => void;
+  /**
+   * The customer's mobile, when we hold one. Enables sending the link on the channel this
+   * business actually sells on — without it the only routes are email and the clipboard.
+   */
+  customerPhone?: string | null;
+  customerName?: string | null;
 }
 
-export const QuoteShareButton: React.FC<Props> = ({ quoteId, enabled, token, onChange }) => {
+export const QuoteShareButton: React.FC<Props> = ({ quoteId, enabled, token, onChange, customerPhone, customerName }) => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
+  const [opening, setOpening] = useState(false);
 
   const shareUrl =
     token && typeof window !== 'undefined' ? `${window.location.origin}/q/${token}` : null;
@@ -42,6 +52,30 @@ export const QuoteShareButton: React.FC<Props> = ({ quoteId, enabled, token, onC
       toast({ title: 'Error', description: 'Could not update sharing.', variant: 'destructive' });
     } finally {
       setBusy(false);
+    }
+  };
+
+  /**
+   * Open the customer's WhatsApp conversation with the link in the composer. It does NOT send.
+   *
+   * Sending from here would post to a customer from a screen with no sight of the conversation
+   * or of Meta's 24-hour service window — both of which the Inbox already handles. Until this,
+   * the only ways to get a quote onto the channel the business actually sells on were email and
+   * copy-paste, which is a human step outside the system on every sale.
+   */
+  const sendOnWhatsApp = async () => {
+    if (!shareUrl || !customerPhone) return;
+    try {
+      setOpening(true);
+      const r = await messagingService.openWhatsAppThread({
+        phone: customerPhone, name: customerName || undefined,
+      });
+      const say = `Here is your quote: ${shareUrl}`;
+      navigate(`/inbox?thread=${r.thread_id}&say=${encodeURIComponent(say)}`);
+    } catch (e) {
+      toast({ title: 'Could not open WhatsApp', description: (e as Error).message, variant: 'destructive' });
+    } finally {
+      setOpening(false);
     }
   };
 
@@ -96,6 +130,12 @@ export const QuoteShareButton: React.FC<Props> = ({ quoteId, enabled, token, onC
                   <ExternalLink className="h-3.5 w-3.5" /> Open
                 </Button>
               </div>
+              {customerPhone && (
+                <Button variant="secondary" size="sm" className="w-full gap-1.5" disabled={opening} onClick={sendOnWhatsApp}>
+                  {opening ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircle className="h-3.5 w-3.5" />}
+                  Send on WhatsApp
+                </Button>
+              )}
             </>
           )}
 

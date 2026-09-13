@@ -25,6 +25,7 @@ import { useQuoteDocument } from '../hooks/useQuoteDocument';
 import { trackQuoteView } from '@/services/quoteAnalyticsService';
 import { QuoteAnalyticsPanel } from '../components/QuoteAnalyticsPanel';
 import { QuoteEmailButton } from '../components/QuoteEmailButton';
+import { SendOnWhatsAppButton } from '@/modules/messaging/components/SendOnWhatsAppButton';
 import { QuoteStatusBadge } from '@/lib/quoteStatus';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { QuoteItemsList } from '../components/QuoteItemsList';
@@ -641,6 +642,16 @@ export const QuoteDetailPage: React.FC = () => {
 
             {/* Email the quote to the customer (or a typed recipient) */}
             <QuoteEmailButton quoteId={quote.id} onSent={loadQuoteDetails} />
+
+            {/* The channel this business actually sells on. Only once the quote has a public link
+                to send — offering it before that would hand the customer nothing to open. */}
+            {(quote as any).public_share_token && (
+              <SendOnWhatsAppButton
+                contactId={quote.customer_contact_id ?? null}
+                companyId={quote.customer_company_id ?? null}
+                message={`Here is your quote: ${window.location.origin}/q/${(quote as any).public_share_token}`}
+              />
+            )}
 
             {/* Send Quote to Customer — only when submitted/draft and all items priced */}
             {(quote.status === 'submitted' || quote.status === 'draft') && allItemsHavePrices && (

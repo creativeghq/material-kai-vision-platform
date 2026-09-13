@@ -23,6 +23,7 @@ import {
   formatMoney,
   type InvoiceWithItems,
 } from '@/modules/finance/services/financeService';
+import { SendOnWhatsAppButton } from '@/modules/messaging/components/SendOnWhatsAppButton';
 import { fiscalConnectorService } from '@/services/fiscalConnectorService';
 import { mydataPaymentLabel } from '@/modules/finance/paymentVocabulary';
 import { movePurposeLabel } from '@/services/fiscal/fiscalVocabulary';
@@ -333,6 +334,16 @@ const InvoiceDetailPage: React.FC = () => {
               <Button size="sm" variant="ghost" onClick={() => window.open(payLink, '_blank')}>
                 <ExternalLink className="h-3 w-3 mr-1" /> Open
               </Button>
+              {/* Onto the channel the customer answers on. Copy-to-clipboard was the only route
+                  for a pay link, which makes the paste into WhatsApp a step outside the system on
+                  every invoice. */}
+              <SendOnWhatsAppButton
+                contactId={(invoice as any).customer_contact_id ?? null}
+                companyId={(invoice as any).customer_company_id ?? null}
+                message={`Invoice ${invoice.internal_number ?? ''} — you can pay here: ${payLink}`}
+                label="WhatsApp"
+                variant="ghost"
+              />
               <Button size="sm" variant="ghost" onClick={() => setPayLink(null)}>Hide</Button>
             </div>
           </CardContent>

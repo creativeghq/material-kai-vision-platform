@@ -94,3 +94,34 @@ describe('a quote line does not claim stock it has not checked', () => {
     expect(QUOTE_LINES).toMatch(/Stock unknown/);
   });
 });
+
+describe('a quote and a pay link can reach the channel the business sells on', () => {
+  const WA = read('src/modules/messaging/components/SendOnWhatsAppButton.tsx');
+  const INBOX = read('src/pages/Inbox/InboxPage.tsx');
+
+  it('the action opens the conversation and sends nothing', () => {
+    // Sending from a finance screen would post to a customer with no sight of the thread or of
+    // Meta's 24-hour window, both of which the Inbox already handles.
+    expect(WA).toMatch(/openWhatsAppThread\(/);
+    expect(WA, 'the button sends a message itself instead of opening the thread')
+      .not.toMatch(/send_message|sendMessage\(/);
+    expect(WA).toMatch(/\/inbox\?thread=\$\{r\.thread_id\}&say=/);
+  });
+
+  it('the Inbox seeds the composer from the link and does not auto-send', () => {
+    expect(INBOX).toMatch(/searchParams\.get\('say'\)/);
+    const seed = INBOX.slice(INBOX.indexOf("const say = searchParams.get('say')"));
+    expect(seed.slice(0, 400)).toMatch(/setDraft\(say/);
+    expect(seed.slice(0, 400), 'the deep link triggers a send').not.toMatch(/void send\(|send\(\)/);
+  });
+
+  it('is offered where the sale is actually closed', () => {
+    expect(QUOTE_ADMIN).toMatch(/SendOnWhatsAppButton/);
+    expect(INVOICE).toMatch(/SendOnWhatsAppButton/);
+  });
+
+  it('and stays out of the way when there is no number on file', () => {
+    // A disabled button with a tooltip nobody reads is worse than no button.
+    expect(WA).toMatch(/party === null\) return null/);
+  });
+});
