@@ -16,6 +16,7 @@ import {
   Globe,
   Image,
   Link,
+  Link2Off,
   LockKeyhole,
   Search,
   CheckCircle2,
@@ -104,6 +105,12 @@ export const MoodBoardDetailPage: React.FC = () => {
   const [relatedQuotes, setRelatedQuotes] = useState<any[]>([]);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [sharingToggle, setSharingToggle] = useState(false);
+  // #410: once a board link goes to a client it is permanent -- forwarded, posted in a group
+  // chat, or sent for a project that was cancelled -- and it carries pricing.
+  const [rotating, setRotating] = useState(false);
+
+  /** `/board/<address>` — the token when the board has one, its id only while it has not. */
+  const shareUrl = (address: string) => `${window.location.origin}/board/${address}`;
 
   useEffect(() => {
     if (id) loadMoodboardDetails();
@@ -191,10 +198,15 @@ export const MoodBoardDetailPage: React.FC = () => {
       // place that emits `moodboard_shared`, so this toggle -- the only way a board is ever made
       // public -- meant the trigger the palette offers could never once fire (#419).
       await moodboardAPI.updateMoodBoard(moodboard.id, { is_public: newPublic });
-      setMoodboard({ ...moodboard, isPublic: newPublic });
+      let token = moodboard.publicShareToken ?? null;
       if (newPublic) {
-        const url = `${window.location.origin}/board/${moodboard.id}`;
-        await navigator.clipboard.writeText(url).catch(() => {});
+        // The board gets an ADDRESS on its first share, so every link ever sent is revocable.
+        // Sharing by bare id leaves a permanent one (#410).
+        token = await moodboardAPI.ensureShareToken(moodboard.id).catch(() => null);
+      }
+      setMoodboard({ ...moodboard, isPublic: newPublic, publicShareToken: token });
+      if (newPublic) {
+        await navigator.clipboard.writeText(shareUrl(token ?? moodboard.id)).catch(() => {});
         toast({ title: 'Board is now public', description: 'Share link copied to clipboard.' });
       } else {
         toast({ title: 'Board is now private' });
@@ -208,9 +220,36 @@ export const MoodBoardDetailPage: React.FC = () => {
 
   const handleCopyShareLink = async () => {
     if (!moodboard) return;
-    const url = `${window.location.origin}/board/${moodboard.id}`;
-    await navigator.clipboard.writeText(url).catch(() => {});
+    await navigator.clipboard.writeText(shareUrl(moodboard.publicShareToken ?? moodboard.id)).catch(() => {});
     toast({ title: 'Link copied!' });
+  };
+
+  /**
+   * Give the board a NEW address. Everything already sent stops working — said plainly before
+   * it happens, because it cannot be undone and the old links are out of our hands.
+   */
+  const handleRotateShareLink = async () => {
+    if (!moodboard) return;
+    const ok = window.confirm(
+      'Issue a new address for this board?\n\n'
+      + 'Every link you have already sent stops working immediately — including any a client has '
+      + 'forwarded. You will need to send the new link to anyone who should still have access.',
+    );
+    if (!ok) return;
+    setRotating(true);
+    try {
+      const token = await moodboardAPI.rotatePublicShareToken(moodboard.id);
+      setMoodboard({ ...moodboard, publicShareToken: token });
+      await navigator.clipboard.writeText(shareUrl(token)).catch(() => {});
+      toast({
+        title: 'Old links revoked',
+        description: 'The board has a new address and it is copied to your clipboard.',
+      });
+    } catch (e) {
+      toast({ title: 'Could not revoke the links', description: (e as Error).message, variant: 'destructive' });
+    } finally {
+      setRotating(false);
+    }
   };
 
   const handleCreateProposal = async () => {
@@ -415,6 +454,22 @@ export const MoodBoardDetailPage: React.FC = () => {
             >
               <Link className="h-3.5 w-3.5" />
               Copy link
+            </Button>
+          )}
+
+          {/* Revoke — offered only once the board HAS an address to replace, so it is a decision
+              rather than a guess about what is currently shared. */}
+          {moodboard.isPublic && moodboard.publicShareToken && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 bg-black/35 text-white hover:text-white hover:bg-black/50 backdrop-blur-sm"
+              onClick={handleRotateShareLink}
+              disabled={rotating}
+              title="Issue a new address and revoke every link already sent"
+            >
+              <Link2Off className="h-3.5 w-3.5" />
+              Revoke links
             </Button>
           )}
 

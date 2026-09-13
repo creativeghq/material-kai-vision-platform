@@ -33,7 +33,10 @@ export interface ProjectSnag {
   status: SnagStatus;
   severity: SnagSeverity;
   assignee_id: string | null;
+  /** The defect AS FOUND. */
   photo_paths: string[];
+  /** The REMEDY, from the return visit. Separate so the gallery stays readable (#412). */
+  fix_photo_paths: string[];
   client_visible: boolean;
   due_date: string | null;
   /**
@@ -220,13 +223,21 @@ export const siteService = {
     return data as ProjectSnag;
   },
 
-  /** Append photos to an existing snag. */
-  async addSnagPhotos(snag: ProjectSnag, files: File[]): Promise<ProjectSnag> {
+  /**
+   * Append photos to an existing snag — the whole second half of snagging, which had no control
+   * at all (#412).
+   *
+   * `kind` is what keeps the gallery readable after two visits: 'found' is the defect, 'fixed'
+   * is the remedy photographed on the return. An untagged append is the thing that made the
+   * evidence unreadable, so there is no default.
+   */
+  async addSnagPhotos(snag: ProjectSnag, files: File[], kind: 'found' | 'fixed'): Promise<ProjectSnag> {
     const added = await uploadPhotos(`project-snags/${snag.project_id}`, files);
+    const patch = kind === 'fixed'
+      ? { fix_photo_paths: [...(snag.fix_photo_paths ?? []), ...added] }
+      : { photo_paths: [...(snag.photo_paths ?? []), ...added] };
     const { data, error } = await (supabase as any)
-      .from('project_snags')
-      .update({ photo_paths: [...snag.photo_paths, ...added] })
-      .eq('id', snag.id).select().single();
+      .from('project_snags').update(patch).eq('id', snag.id).select().single();
     if (error) throw error;
     return data as ProjectSnag;
   },

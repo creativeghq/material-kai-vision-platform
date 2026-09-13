@@ -4,7 +4,7 @@
  * Notifications go out via Flows from the service; nothing here sends anything directly.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Plus, MessageSquare, Send, Trash2, Check, X, Eye, EyeOff, FileText, AlertTriangle } from 'lucide-react';
+import { Loader2, Plus, MessageSquare, Send, Trash2, Check, X, Eye, EyeOff, FileText, AlertTriangle, Pencil } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { HubEmptyState } from '@/components/core/hub';
 import { Button } from '@/components/core/ui/button';
@@ -25,6 +25,9 @@ import {
 import {
   projectDocumentsService, type ProjectDocumentWithRevisions,
 } from '../../services/projectDocumentsService';
+import { projectsService } from '../../services/projectsService';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { AmendRequestDialog } from '../AmendRequestDialog';
 
 export const RequestsTab: React.FC<{
   projectId: string;
@@ -33,6 +36,7 @@ export const RequestsTab: React.FC<{
   focusRequestId?: string | null;
 }> = ({ projectId, isOwner, focusRequestId }) => {
   const { toast } = useToast();
+  const { activeWorkspaceId } = useWorkspace();
   const [requests, setRequests] = useState<ProjectRequestWithMessages[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -40,6 +44,24 @@ export const RequestsTab: React.FC<{
   const [openId, setOpenId] = useState<string | null>(null);
   const [reply, setReply] = useState('');
   const [sending, setSending] = useState(false);
+  // #413: who owes the answer, and the amend dialog for a request already raised. A date slip
+  // or a re-issued drawing revision used to mean raising a duplicate.
+  const [assignees, setAssignees] = useState<Array<{ id: string; name: string }>>([]);
+  const [amending, setAmending] = useState<ProjectRequestWithMessages | null>(null);
+
+  // Platform members only: `project_requests.assignee_id` points at an auth user, so the HR
+  // roster half of the task picker cannot own an RFI. Failure leaves the list empty and the
+  // control simply is not offered.
+  useEffect(() => {
+    if (!activeWorkspaceId) return;
+    let cancelled = false;
+    projectsService.listTaskAssignees(activeWorkspaceId)
+      .then((rows) => {
+        if (!cancelled) setAssignees(rows.filter((r) => r.kind === 'member').map(({ id, name }) => ({ id, name })));
+      })
+      .catch(() => { if (!cancelled) setAssignees([]); });
+    return () => { cancelled = true; };
+  }, [activeWorkspaceId]);
 
   const load = useCallback(async () => {
     try { setLoading(true); setRequests(await projectRequestsService.list(projectId)); }
@@ -214,6 +236,13 @@ export const RequestsTab: React.FC<{
                           )}
                         </p>
                       )}
+                      {/* Who owes the answer. Without it the overdue line below is a deadline
+                          nobody is on the hook for. */}
+                      <p className="text-xs text-muted-foreground">
+                        {r.assignee_id
+                          ? `Owner: ${assignees.find((a) => a.id === r.assignee_id)?.name ?? 'a teammate'}`
+                          : 'Nobody owns this yet'}
+                      </p>
                       {r.due_at && (
                         /* Overdue is a fact about an unanswered request, so it is only said while
                            one is still open — a resolved RFI that was late is history, not a task. */
@@ -238,6 +267,12 @@ export const RequestsTab: React.FC<{
                         </select>
                       ) : (
                         <span className={`text-xs ${statusTone(r.status)}`}>{humanizeLabel(r.status)}</span>
+                      )}
+                      {isOwner && !REQUEST_CLOSED_STATUSES.includes(r.status) && (
+                        <button type="button" title="Amend owner, due date or drawing revision"
+                          className="text-muted-foreground hover:text-foreground" onClick={() => setAmending(r)}>
+                          <Pencil className="h-4 w-4" />
+                        </button>
                       )}
                       {isOwner && (
                         <button type="button" className="text-muted-foreground hover:text-destructive" onClick={() => remove(r)}>
@@ -316,9 +351,17 @@ export const RequestsTab: React.FC<{
 
       {creating && (
         <NewRequestDialog
-          projectId={projectId} isOwner={isOwner}
+          projectId={projectId} isOwner={isOwner} assignees={assignees}
           onClose={() => setCreating(false)}
           onSaved={() => { setCreating(false); void load(); }}
+        />
+      )}
+
+      {amending && (
+        <AmendRequestDialog
+          request={amending} projectId={projectId} assignees={assignees}
+          onClose={() => setAmending(null)}
+          onSaved={() => { setAmending(null); void load(); }}
         />
       )}
     </Card>
@@ -328,10 +371,16 @@ export const RequestsTab: React.FC<{
 // ---------------------------------------------------------------------------
 
 const NewRequestDialog: React.FC<{
-  projectId: string; isOwner: boolean; onClose: () => void; onSaved: () => void;
-}> = ({ projectId, isOwner, onClose, onSaved }) => {
+  projectId: string; isOwner: boolean;
+  assignees: Array<{ id: string; name: string }>;
+  onClose: () => void; onSaved: () => void;
+}> = ({ projectId, isOwner, assignees, onClose, onSaved }) => {
   const { toast } = useToast();
   const [title, setTitle] = useState('');
+  // #413: `assignee_id` existed on the row and on the service and was omitted from the create
+  // payload, so no RFI ever had an owner — while the list rendered overdue state with nobody to
+  // chase.
+  const [assigneeId, setAssigneeId] = useState('');
   const [body, setBody] = useState('');
   const [kind, setKind] = useState<RequestKind>('question');
   const [clientVisible, setClientVisible] = useState(true);
@@ -395,6 +444,7 @@ const NewRequestDialog: React.FC<{
         client_visible: teamFacing ? false : (isOwner ? clientVisible : true),
         due_at: dueAt || null,
         drawing_revision_id: revisionId || null,
+        assignee_id: assigneeId || null,
       });
       onSaved();
     } catch (err: any) {
@@ -426,6 +476,21 @@ const NewRequestDialog: React.FC<{
               {kinds.map((k) => <option key={k} value={k}>{humanizeLabel(k)}</option>)}
             </select>
           </div>
+
+          {/* Who owes the answer. Same rule as the drawing picker: offered only when there is
+              somebody to offer, because an empty select teaches people the control does nothing. */}
+          {assignees.length > 0 && (
+            <div className="space-y-1">
+              <Label className="text-xs">Owner</Label>
+              <select
+                className="h-9 w-full rounded-md border border-border/60 bg-background px-2 text-sm"
+                value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)}
+              >
+                <option value="">Nobody yet</option>
+                {assignees.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+            </div>
+          )}
 
           {/* The sheet the question is about. Offered only when the register has one — an empty
               picker is a control that teaches people it does nothing. */}

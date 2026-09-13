@@ -148,30 +148,6 @@ class MoodBoardAPI {
     if (error) throw error;
   }
 
-  /** Read a PUBLISHED board by its share token (#360 CB-15). */
-  async getPublicMoodBoard(shareToken: string): Promise<MoodBoard | null> {
-    const { data, error } = await (supabase as any)
-      .rpc('moodboard_by_share_token', { p_token: shareToken });
-    if (error) throw error;
-    const row = Array.isArray(data) ? data[0] : data;
-    if (!row) return null;
-    return {
-      id: row.id,
-      // A public viewer is not told whose board it is.
-      userId: '',
-      title: row.title,
-      description: row.description,
-      isPublic: true,
-      items: [],
-      createdAt: new Date(row.created_at),
-      updatedAt: new Date(row.updated_at),
-      projectId: null,
-      roomId: null,
-      status: 'active',
-      deletionScheduledAt: null,
-    };
-  }
-
   /**
    * Revoke every outstanding public link by giving the board a new address (#360 CB-15).
    *
@@ -183,6 +159,34 @@ class MoodBoardAPI {
       .rpc('rotate_moodboard_share_token', { p_moodboard_id: id });
     if (error) throw error;
     return String(data);
+  }
+
+  /** The board's share ADDRESS, minted on first share so every link sent is revocable. */
+  async ensureShareToken(id: string): Promise<string> {
+    const { data, error } = await (supabase as any)
+      .rpc('ensure_moodboard_share_token', { p_moodboard_id: id });
+    if (error) throw error;
+    return String(data);
+  }
+
+  /**
+   * The anonymous visitor's read, by share token or (legacy, only until the board is given a
+   * token) by id. `moodboards` has no anon SELECT policy, so a direct query returned "not found"
+   * to every visitor but the owner. The SQL delegates the token half to
+   * `moodboard_by_share_token`, which already owns the expiry rule.
+   */
+  async getPublicMoodBoard(key: string): Promise<{
+    board: {
+      id: string; title: string; description: string | null; is_public: boolean;
+      created_at: string;
+      /** Answered from the caller's own JWT. The owner's id is never handed to a viewer. */
+      viewer_is_owner: boolean;
+    };
+    items: unknown[];
+  } | null> {
+    const { data, error } = await (supabase as any).rpc('get_public_moodboard', { p_key: key });
+    if (error) throw error;
+    return (data as any) ?? null;
   }
 
   // Get a specific moodboard by ID
@@ -209,6 +213,7 @@ class MoodBoardAPI {
       roomId: (data as any).room_id ?? null,
       status: (data as any).status ?? 'active',
       deletionScheduledAt: (data as any).deletion_scheduled_at ?? null,
+      publicShareToken: (data as any).public_share_token ?? null,
     };
   }
 

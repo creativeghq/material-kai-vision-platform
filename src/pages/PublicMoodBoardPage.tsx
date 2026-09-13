@@ -20,7 +20,8 @@ interface PublicBoard {
   description: string | null;
   is_public: boolean;
   created_at: string;
-  user_id: string;
+  /** Derived in SQL from the caller's JWT — the owner's id is not disclosed to a viewer. */
+  viewer_is_owner: boolean;
 }
 
 interface PublicItem {
@@ -39,7 +40,9 @@ interface PublicItem {
 }
 
 export default function PublicMoodBoardPage() {
-  const { id } = useParams<{ id: string }>();
+  // The route param is the board's ADDRESS: its share token, or -- only for a board that was
+  // never given one -- its id. Reading by id regardless is what made a sent link permanent.
+  const { id: shareKey } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [board, setBoard] = useState<PublicBoard | null>(null);
@@ -51,48 +54,36 @@ export default function PublicMoodBoardPage() {
   const [requested, setRequested] = useState(false);
 
   useEffect(() => {
-    if (!id) return;
+    if (!shareKey) return;
     (async () => {
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       setUserId(user?.id ?? null);
-      const { data: boardData, error: boardError } = await supabase
-        .from('moodboards')
-        .select('id, title, description, is_public, created_at, user_id')
-        .eq('id', id)
-        .eq('is_public', true)
-        .maybeSingle();
-
-      if (boardError || !boardData) {
+      // One DEFINER read. A direct select cannot work here: `moodboards` has no anon SELECT
+      // policy, so every visitor who is not the owner saw "not found" on a shared board.
+      try {
+        const res = await moodboardAPI.getPublicMoodBoard(shareKey);
+        if (!res?.board) { setNotFound(true); setLoading(false); return; }
+        setBoard(res.board as PublicBoard);
+        setItems((res.items as unknown as PublicItem[]) ?? []);
+      } catch {
         setNotFound(true);
-        setLoading(false);
-        return;
       }
-      setBoard(boardData);
-
-      const { data: itemsData } = await supabase
-        .from('moodboard_items')
-        .select(`
-          id, notes, media_url, media_type, material_id,
-          material:products(name, description, thumbnail_url, category, manufacturer)
-        `)
-        .eq('moodboard_id', id)
-        .order('created_at', { ascending: true });
-
-      setItems((itemsData as unknown as PublicItem[]) ?? []);
       setLoading(false);
     })();
-  }, [id]);
+  }, [shareKey]);
 
   const handleRequestQuote = async () => {
-    if (!id) return;
+    // The board's real id, from the row the reader returned — the address in the URL may be a
+    // token, and the quote request is against the board.
+    if (!board) return;
     if (!userId) {
-      navigate(`/auth?redirect=/board/${id}`);
+      navigate(`/auth?redirect=/board/${shareKey ?? board.id}`);
       return;
     }
     setRequesting(true);
     try {
-      await moodboardAPI.requestQuoteFromMoodboard(id);
+      await moodboardAPI.requestQuoteFromMoodboard(board.id);
       setRequested(true);
       toast({
         title: 'Quote requested',
@@ -140,7 +131,7 @@ export default function PublicMoodBoardPage() {
 
   const materialItems = items.filter((i) => i.material_id && i.material);
   const mediaItems = items.filter((i) => i.media_url && !i.material_id);
-  const isOwner = !!userId && board!.user_id === userId;
+  const isOwner = board!.viewer_is_owner;
   // Any non-empty board can generate a lead — media-only boards submit inspiration items as custom
   // quote lines (see moodboardAPI.requestQuoteFromMoodboard), so the CTA isn't hidden on them.
   const canRequestQuote = (materialItems.length > 0 || mediaItems.length > 0) && !isOwner;

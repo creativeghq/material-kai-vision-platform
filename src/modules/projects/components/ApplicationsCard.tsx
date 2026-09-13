@@ -1,6 +1,6 @@
 /** Applications for payment. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Plus, Receipt, Trash2, Check, FileText } from 'lucide-react';
+import { Loader2, Plus, Receipt, Trash2, Check, FileText, Pencil } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -40,6 +40,9 @@ export const ApplicationsCard: React.FC<Props> = ({ projectId, workspaceId, curr
   const [busy, setBusy] = useState(false);
   const [creating, setCreating] = useState(false);
   const [certifying, setCertifying] = useState<ApplicationRow | null>(null);
+  // #411: a mistyped gross valuation had to be deleted and re-raised, which burns the
+  // `reference` the payer is quoting back and leaves a gap in a numbered sequence.
+  const [amending, setAmending] = useState<ApplicationRow | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -175,6 +178,14 @@ export const ApplicationsCard: React.FC<Props> = ({ projectId, workspaceId, curr
                     <td className="px-5 py-2">
                       {isOwner && (
                         <div className="flex justify-end gap-1">
+                          {/* Amend, while the payer has not answered. Once they have, the
+                              number they answered is the record — see the dialog. */}
+                          {r.certified_amount === null && r.status !== 'disputed' && (
+                            <Button size="sm" variant="ghost" title="Correct the claimed valuation"
+                              disabled={busy} onClick={() => setAmending(r)}>
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                           {r.certified_amount === null && (
                             <Button size="sm" variant="ghost" title="Record what was certified"
                               disabled={busy} onClick={() => setCertifying(r)}>
@@ -310,6 +321,14 @@ export const ApplicationsCard: React.FC<Props> = ({ projectId, workspaceId, curr
           onSaved={() => { setCertifying(null); void load(); }}
         />
       )}
+
+      {amending && (
+        <AmendValuationDialog
+          row={amending} currency={currency}
+          onClose={() => setAmending(null)}
+          onSaved={() => { setAmending(null); void load(); }}
+        />
+      )}
     </Card>
   );
 };
@@ -425,6 +444,77 @@ const CertifyDialog: React.FC<{
             </Button>
           </div>
         </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+/**
+ * Correct the claimed valuation on an application the payer has not answered yet.
+ *
+ * The alternative was delete-and-re-raise, which burns the `reference` the assign-reference
+ * trigger issued and leaves a gap in a sequence the payer reads. The reference does NOT change:
+ * it is what they quote back.
+ */
+const AmendValuationDialog: React.FC<{
+  row: ApplicationRow; currency: string; onClose: () => void; onSaved: () => void;
+}> = ({ row, currency, onClose, onSaved }) => {
+  const { toast } = useToast();
+  const [gross, setGross] = useState(String(n(row.gross_valuation)));
+  const [saving, setSaving] = useState(false);
+
+  // Belt and braces with the row action's own gate: an answered application is a record of what
+  // the payer said, and amending the claim underneath it would rewrite the disagreement.
+  const answered = row.certified_amount !== null || row.status === 'certified'
+    || row.status === 'paid' || row.status === 'disputed';
+
+  const save = async () => {
+    const value = Number(gross);
+    if (!Number.isFinite(value) || value < 0) {
+      toast({ title: 'Give the cumulative gross value', variant: 'destructive' });
+      return;
+    }
+    setSaving(true);
+    try {
+      await applicationsService.setValuation(row.id, value);
+      onSaved();
+    } catch (e) {
+      toast({ title: 'Could not amend it', description: (e as Error).message, variant: 'destructive' });
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o && !saving) onClose(); }}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader><DialogTitle>Amend valuation — {row.reference}</DialogTitle></DialogHeader>
+        {answered ? (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              The payer has already answered this application, so the claim behind their answer
+              cannot be changed. Raise the correction on the next valuation — it is cumulative,
+              so the next claim carries it.
+            </p>
+            <div className="flex justify-end"><Button size="sm" variant="ghost" onClick={onClose}>Close</Button></div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Gross valuation to date ({currency})</Label>
+              <Input inputMode="decimal" value={gross} onChange={(e) => setGross(e.target.value)} />
+              <p className="text-[11px] text-muted-foreground">
+                Retention, previously-certified and the net due are re-derived from this. The
+                reference {row.reference} does not change — it is what the payer quotes back.
+              </p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
+              <Button size="sm" onClick={() => void save()} disabled={saving}>
+                {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Save'}
+              </Button>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

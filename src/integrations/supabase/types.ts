@@ -22565,6 +22565,7 @@ export type Database = {
           created_by: string | null
           description: string | null
           due_date: string | null
+          fix_photo_paths: string[]
           id: string
           photo_paths: string[]
           project_id: string
@@ -22583,6 +22584,7 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           due_date?: string | null
+          fix_photo_paths?: string[]
           id?: string
           photo_paths?: string[]
           project_id: string
@@ -22601,6 +22603,7 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           due_date?: string | null
+          fix_photo_paths?: string[]
           id?: string
           photo_paths?: string[]
           project_id?: string
@@ -31729,6 +31732,87 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      visualizer_scene_surfaces: {
+        Row: {
+          created_at: string
+          depth_cm: number
+          id: string
+          key: string
+          kind: string
+          mask_path: string | null
+          quad: Json
+          scene_id: string
+          sort_order: number
+          width_cm: number
+        }
+        Insert: {
+          created_at?: string
+          depth_cm: number
+          id?: string
+          key: string
+          kind: string
+          mask_path?: string | null
+          quad: Json
+          scene_id: string
+          sort_order?: number
+          width_cm: number
+        }
+        Update: {
+          created_at?: string
+          depth_cm?: number
+          id?: string
+          key?: string
+          kind?: string
+          mask_path?: string | null
+          quad?: Json
+          scene_id?: string
+          sort_order?: number
+          width_cm?: number
+        }
+        Relationships: []
+      }
+      visualizer_scenes: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          height_px: number
+          id: string
+          image_path: string
+          name: string
+          room_type: string | null
+          storage_bucket: string
+          updated_at: string
+          width_px: number
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          height_px: number
+          id?: string
+          image_path: string
+          name: string
+          room_type?: string | null
+          storage_bucket?: string
+          updated_at?: string
+          width_px: number
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          height_px?: number
+          id?: string
+          image_path?: string
+          name?: string
+          room_type?: string | null
+          storage_bucket?: string
+          updated_at?: string
+          width_px?: number
+          workspace_id?: string | null
+        }
+        Relationships: []
       }
       vr_worlds: {
         Row: {

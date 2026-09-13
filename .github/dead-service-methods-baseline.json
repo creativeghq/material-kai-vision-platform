@@ -1,5 +1,5 @@
 {
-  "total": 125,
+  "total": 120,
   "files": {
     "src/modules/email/services/campaignService.ts": [
       "getCampaignStats",
@@ -53,15 +53,7 @@
       "validatePhoneNumber"
     ],
     "src/modules/projects/services/applicationsService.ts": [
-      "setRetentionTerms",
-      "setValuation"
-    ],
-    "src/modules/projects/services/projectRequestsService.ts": [
-      "setAssignee",
-      "setDrawingRevision"
-    ],
-    "src/modules/projects/services/siteService.ts": [
-      "addSnagPhotos"
+      "setRetentionTerms"
     ],
     "src/modules/quotes/services/QuotePDFService.ts": [
       "downloadPDF",
@@ -185,9 +177,7 @@
       "voiceToMaterial"
     ],
     "src/services/moodboardAPI.ts": [
-      "getPublicMoodBoard",
-      "getPublicMoodBoards",
-      "rotatePublicShareToken"
+      "getPublicMoodBoards"
     ],
     "src/services/platformSecretsService.ts": [
       "clearValue"
@@ -215,6 +205,9 @@
     "src/services/userWebsitesService.ts": [
       "reportRunPayload",
       "retireAutoKeywords"
+    ],
+    "src/services/visualizerService.ts": [
+      "deleteSurface"
     ],
     "src/services/vrWorldService.ts": [
       "getVRWorld",

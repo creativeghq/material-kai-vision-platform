@@ -5,13 +5,14 @@
  * project tab bar already carries 14. Snags marked `client_visible` are the handover list the
  * client sees; the site log is internal only and has no collaborator read policy at all.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CostCodePicker } from '@/components/business/costCodes/CostCodePicker';
 import { useCostCodes } from '@/hooks/useCostCodes';
 import { costCodeLabel } from '@/services/costCodesService';
 import { InspectionsPanel } from '../InspectionsPanel';
 import {
   Loader2, Plus, Trash2, ClipboardList, ClipboardCheck, CalendarDays, ImagePlus, Eye, EyeOff, Mic,
+  Camera,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -172,7 +173,33 @@ const SnagsView: React.FC<{ projectId: string; isOwner: boolean }> = ({ projectI
   }), [snags, roomFilter, tradeFilter, showClosed]);
 
   const openCount = snags.filter((s) => !SNAG_CLOSED_STATUSES.includes(s.status)).length;
-  const photoUrls = useSignedPhotos(useMemo(() => visible.flatMap((s) => s.photo_paths ?? []), [visible]));
+  const photoUrls = useSignedPhotos(useMemo(
+    () => visible.flatMap((s) => [...(s.photo_paths ?? []), ...(s.fix_photo_paths ?? [])]),
+    [visible],
+  ));
+
+  /** Which snag is taking photos, and whether they are the defect or the remedy (#412). */
+  const [addingPhotosTo, setAddingPhotosTo] = useState<{ snag: ProjectSnag; kind: 'found' | 'fixed' } | null>(null);
+  const snagPhotoInput = useRef<HTMLInputElement>(null);
+
+  const onSnagPhotosPicked = async (files: FileList | null) => {
+    const target = addingPhotosTo;
+    if (!files || files.length === 0 || !target) return;
+    try {
+      await siteService.addSnagPhotos(target.snag, Array.from(files), target.kind);
+      void load();
+    } catch (err: any) {
+      toast({ title: 'Could not add the photos', description: err?.message, variant: 'destructive' });
+    } finally {
+      setAddingPhotosTo(null);
+      if (snagPhotoInput.current) snagPhotoInput.current.value = '';
+    }
+  };
+
+  const pickSnagPhotos = (snag: ProjectSnag, kind: 'found' | 'fixed') => {
+    setAddingPhotosTo({ snag, kind });
+    snagPhotoInput.current?.click();
+  };
 
   const setStatus = async (snag: ProjectSnag, status: SnagStatus) => {
     setSnags((list) => list.map((s) => (s.id === snag.id ? { ...s, status } : s)));
@@ -282,7 +309,17 @@ const SnagsView: React.FC<{ projectId: string; isOwner: boolean }> = ({ projectI
                     </div>
                     {s.description && <p className="mt-1 text-sm text-muted-foreground">{s.description}</p>}
                     {s.photo_paths.length > 0 && (
-                      <PhotoStrip paths={s.photo_paths} urls={photoUrls} alt={(i) => `Snag photo ${i + 1}: ${s.title}`} />
+                      <>
+                        <p className="mt-2 text-[11px] uppercase tracking-wide text-muted-foreground">As found</p>
+                        <PhotoStrip paths={s.photo_paths} urls={photoUrls} alt={(i) => `Snag photo ${i + 1}: ${s.title}`} />
+                      </>
+                    )}
+                    {(s.fix_photo_paths?.length ?? 0) > 0 && (
+                      <>
+                        <p className="mt-2 text-[11px] uppercase tracking-wide text-muted-foreground">As fixed</p>
+                        <PhotoStrip paths={s.fix_photo_paths} urls={photoUrls}
+                          alt={(i) => `Remedy photo ${i + 1}: ${s.title}`} />
+                      </>
                     )}
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
@@ -306,6 +343,19 @@ const SnagsView: React.FC<{ projectId: string; isOwner: boolean }> = ({ projectI
                         >
                           {s.client_visible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
                         </button>
+                        {/* The return visit. Which array the photos land in follows the snag's
+                            own state, so nobody has to remember: a defect still open is being
+                            photographed as found, one marked fixed is being evidenced. */}
+                        <button
+                          type="button"
+                          title={s.status === 'open' || s.status === 'in_progress'
+                            ? 'Add photos of the defect'
+                            : 'Add photos of the remedy'}
+                          className="text-muted-foreground hover:text-foreground"
+                          onClick={() => pickSnagPhotos(s, s.status === 'open' || s.status === 'in_progress' ? 'found' : 'fixed')}
+                        >
+                          <Camera className="h-4 w-4" />
+                        </button>
                         <button type="button" className="text-muted-foreground hover:text-destructive" onClick={() => remove(s)}>
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -318,6 +368,12 @@ const SnagsView: React.FC<{ projectId: string; isOwner: boolean }> = ({ projectI
           </div>
         )}
       </CardContent>
+
+      {/* One hidden picker for the whole list; `addingPhotosTo` says which snag and which half. */}
+      <input
+        ref={snagPhotoInput} type="file" accept="image/*" multiple capture="environment"
+        className="hidden" onChange={(e) => void onSnagPhotosPicked(e.target.files)}
+      />
 
       {adding && (
         <AddSnagDialog
