@@ -47,6 +47,7 @@ import { IslandVatTerritoriesCard } from '@/modules/finance/components/IslandVat
 import { VatPrefillCard } from '@/modules/finance/components/VatPrefillCard';
 import { PosInterconnectionCard } from '@/modules/finance/components/PosInterconnectionCard';
 import { ErpDeclarationCard } from '@/modules/finance/components/ErpDeclarationCard';
+import { PackagingDeclarationCard } from '@/modules/finance/components/PackagingDeclarationCard';
 import { BankAccountsCard } from '@/modules/finance/components/BankAccountsCard';
 import { MoneyOutCard } from '@/modules/banking-revolut/components/MoneyOutCard';
 import { formatDate } from '@/utils/datetime';
@@ -264,6 +265,9 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
               somebody. Both are invisible until an audit. */}
           <PosInterconnectionCard workspaceId={workspaceId} />
           <ErpDeclarationCard workspaceId={workspaceId} />
+          {/* #454 -- the EMΠA report and the ΣΣΕΔ declaration must come from ONE derivation: the
+              scheme is required to report any difference between them to ΕΟΑΝ. */}
+          <PackagingDeclarationCard workspaceId={workspaceId} />
         </TabsContent>
 
         {/* Credit holds, margin authority and till variances share one spine, because they

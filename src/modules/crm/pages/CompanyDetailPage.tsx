@@ -6,6 +6,7 @@ import { PartyProjectsCard } from '@/modules/projects/components/PartyProjectsCa
 import { PartyWorkTab } from '@/modules/crm/components/PartyWorkTab';
 import { WarrantiesTab } from '@/components/business/crm/WarrantiesTab';
 import { SampleLoansCard } from '@/modules/crm/components/SampleLoansCard';
+import { SupplierEprCard } from '@/modules/crm/components/SupplierEprCard';
 import { resolveRecordTab } from '@/modules/crm/recordTabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
 import { PartyAccountTabs } from '@/modules/finance/components/PartyAccountTabs';
@@ -1241,6 +1242,12 @@ export const CompanyDetailPage: React.FC = () => {
                   ...(activeWorkspaceId ? [{
                     id: 'samples', label: 'Samples', icon: PackageOpen, group: 'Showroom',
                     node: <SampleLoansCard workspaceId={activeWorkspaceId} companyId={company.id} />,
+                  }] : []),
+                  /* #454 -- PPWR art. 19(2)(a) makes verifying their producer registration a
+                     precondition to selling their packaging on, not an audit finding. */
+                  ...(activeWorkspaceId ? [{
+                    id: 'epr', label: 'Packaging EPR', icon: PackageOpen, group: 'After sale',
+                    node: <SupplierEprCard workspaceId={activeWorkspaceId} companyId={company.id} />,
                   }] : []),
                 ]}
               />

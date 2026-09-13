@@ -17,6 +17,7 @@ import { OriginCountryCombobox } from '@/components/core/OriginCountryCombobox';
 import { RegulatoryRoleNotice } from '@/components/business/marketplace/RegulatoryRoleNotice';
 import { DopcPanel } from '@/components/business/marketplace/DopcPanel';
 import { OfferDisclosureCard } from '@/components/business/marketplace/OfferDisclosureCard';
+import { PackagingComponentsPanel } from '@/modules/marketplace/components/PackagingComponentsPanel';
 import { ageingService } from '@/modules/stock/services/ageingService';
 import { UNITS } from '@/lib/units';
 
@@ -480,6 +481,14 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
       <Section icon={<ShieldAlert className="h-3.5 w-3.5 text-primary" />} title="Consumer safety on the offer">
         <OfferDisclosureCard productId={productId} workspaceId={workspaceId} refreshKey={savedAt} />
       </Section>
+
+      {/* #454 -- PPWR art. 6(9) assesses each separable component on its own, and these weights
+          are what the annual packaging declaration is built from. */}
+      {workspaceId && (
+        <Section icon={<ShieldAlert className="h-3.5 w-3.5 text-primary" />} title="Packaging">
+          <PackagingComponentsPanel workspaceId={workspaceId} productId={productId} />
+        </Section>
+      )}
 
       <Section icon={<Tag className="h-3.5 w-3.5 text-primary" />} title="Commercial">
         <Grid>
