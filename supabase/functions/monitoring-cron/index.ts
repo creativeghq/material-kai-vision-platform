@@ -13,6 +13,33 @@ import { isModuleEnabled, moduleSupabaseClient } from '../_shared/modules/regist
  */
 const CRON_SECRET = () => Deno.env.get('CRON_SECRET') || '';
 
+/**
+ * Retry ONLY where the request provably never reached the app: a thrown connect error, or a
+ * gateway status. These tasks are not idempotent — a 500 comes from the app itself and may mean
+ * it ran halfway, so retrying that could double the work. Measured cause: ~1% `tls handshake eof`
+ * to the MIVAA host, which lost one hourly refresh every few days (Sentry KAI-TB, KAI-T7, KAI-QM).
+ */
+const RETRYABLE_GATEWAY = new Set([502, 503, 504]);
+
+async function fetchWithRetry(url: string, init: RequestInit, attempts = 3): Promise<Response> {
+  let lastError: unknown;
+  for (let i = 0; i < attempts; i++) {
+    if (i > 0) await new Promise((r) => setTimeout(r, 500 * i));
+    try {
+      const resp = await fetch(url, init);
+      if (RETRYABLE_GATEWAY.has(resp.status) && i < attempts - 1) {
+        // Drain, or the connection is held open while we wait to retry.
+        await resp.body?.cancel();
+        continue;
+      }
+      return resp;
+    } catch (e) {
+      lastError = e;
+    }
+  }
+  throw lastError ?? new Error('fetch failed after retries');
+}
+
 /** Unified monitoring cron dispatcher. */
 
 interface TaskSpec {
@@ -87,7 +114,7 @@ Deno.serve(withApiLogging(
 
   const base = Deno.env.get('PYTHON_BACKEND_URL') || 'https://v1api.materialshub.gr';
   try {
-    const resp = await fetch(`${base}${spec.path()}`, {
+    const resp = await fetchWithRetry(`${base}${spec.path()}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET() },
     });
