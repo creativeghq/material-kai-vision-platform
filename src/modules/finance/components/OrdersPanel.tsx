@@ -21,6 +21,7 @@ import { OrderWorklistPanel } from './OrderWorklistPanel';
 import { ReceiveOrderLinesDialog } from './ReceiveOrderLinesDialog';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle , DialogDescription } from '@/components/core/ui/dialog';
 import { OrderCustomsCard } from '@/modules/finance/components/OrderCustomsCard';
+import { OrderCbamCard } from '@/modules/finance/components/OrderCbamCard';
 import { ContractsSection } from '@/components/features/contracts/ContractsSection';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
@@ -4428,6 +4429,12 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                   orderId={order.id}
                   onAddCost={(s) => { setExpensePrefill({ amount: s.amount, description: `${order.order_number ?? order.id.slice(0, 8)} — ${s.description}` }); setExpenseOpen(true); }}
                 />
+                {/* CBAM sits here because it is the same question one layer out: what this
+                    consignment costs at the border, and whether the year it lands in has
+                    crossed the 50 t line that makes every earlier entry liable too. */}
+                <div className="mt-4">
+                  <OrderCbamCard orderId={order.id} workspaceId={order.workspace_id} />
+                </div>
               </TabsContent>
 
               {/* The paper behind the order (#378 L4). Counterparty prefilled from the order's own

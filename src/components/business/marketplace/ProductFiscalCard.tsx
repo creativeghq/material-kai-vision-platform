@@ -1,6 +1,6 @@
 /** The one editor for a product's fiscal, catalog and customs identity. */
 import React, { useEffect, useState } from 'react';
-import { Loader2, Save, Receipt, Ship, Tag, Sparkles, Check, X, AlertTriangle, Info } from 'lucide-react';
+import { Loader2, Save, Receipt, Ship, Tag, Sparkles, Check, X, AlertTriangle, Info, ShieldCheck } from 'lucide-react';
 import { Label } from '@/components/core/ui/label';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -14,6 +14,8 @@ import { warehouseService, type ProductFiscalFields } from '@/services/warehouse
 import { taricService, formatTaricCode } from '@/services/taricService';
 import { TaricCombobox } from '@/components/core/TaricCombobox';
 import { OriginCountryCombobox } from '@/components/core/OriginCountryCombobox';
+import { RegulatoryRoleNotice } from '@/components/business/marketplace/RegulatoryRoleNotice';
+import { DopcPanel } from '@/components/business/marketplace/DopcPanel';
 import { UNITS } from '@/lib/units';
 
 const NONE = '__none';
@@ -25,7 +27,7 @@ const SELECT_COLUMNS = [
   'mydata_income_classification_type', 'mydata_income_classification_category',
   'mydata_income_classification_type_retail', 'mydata_income_classification_category_retail',
   'prices_include_vat', 'markup_percent', 'warranty', 'product_url', 'notes',
-  'taric_code', 'country_of_origin',
+  'taric_code', 'country_of_origin', 'is_own_brand', 'dopc_product_type_code', 'workspace_id',
   'taric_code_suggested', 'taric_confidence', 'taric_status', 'taric_source', 'taric_reasoning',
 ].join(', ');
 
@@ -47,13 +49,15 @@ interface State {
   notes: string;
   taric: string;
   origin: string;
+  ownBrand: boolean;
+  dopcTypeCode: string;
 }
 
 const EMPTY: State = {
   barcode: '', cpv: '', itemType: 'good', categoryId: '', unitCode: '',
   vat: '', incType: '', incCat: '', incTypeRetail: '', incCatRetail: '',
   pricesIncludeVat: false, markup: '', warranty: '', productUrl: '', notes: '',
-  taric: '', origin: '',
+  taric: '', origin: '', ownBrand: false, dopcTypeCode: '',
 };
 
 export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }) => {
@@ -75,6 +79,10 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
    * to have been read by a human, and most likely to be asked at a border.
    */
   const [provenance, setProvenance] = useState<{ source: string; reasoning: string | null } | null>(null);
+  // The regulatory role is derived from what is STORED, so the notice re-reads after a save
+  // rather than guessing from the form.
+  const [savedAt, setSavedAt] = useState(0);
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
 
   const set = (patch: Partial<State>) => setForm((f) => ({ ...f, ...patch }));
 
@@ -109,7 +117,10 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
         notes: row?.notes ?? '',
         taric: (row?.taric_code ?? '').replace(/[^0-9]/g, ''),
         origin: row?.country_of_origin ?? '',
+        ownBrand: row?.is_own_brand ?? false,
+        dopcTypeCode: row?.dopc_product_type_code ?? '',
       });
+      setWorkspaceId(row?.workspace_id ?? null);
       setProvenance(
         row?.taric_code && row?.taric_source
           ? { source: row.taric_source as string, reasoning: (row.taric_reasoning as string) ?? null }
@@ -159,10 +170,13 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
       // customs, and a code chosen by hand here is a confirmed one whatever the classifier said.
       const { error } = await supabase.from('products').update({
         country_of_origin: form.origin || null,
+        is_own_brand: form.ownBrand,
+        dopc_product_type_code: form.dopcTypeCode.trim() || null,
         ...(form.taric ? { taric_status: 'confirmed', taric_source: 'manual', taric_code_suggested: null } : {}),
       }).eq('id', productId);
       if (error) throw error;
       if (form.taric) { setSuggestion(null); setProvenance({ source: 'manual', reasoning: null }); }
+      setSavedAt((n) => n + 1);
       toast({ title: 'Product data saved' });
     } catch (err: any) {
       toast({ title: 'Save failed', description: err?.message, variant: 'destructive' });
@@ -387,6 +401,41 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
             </div>
           </div>
         )}
+      </Section>
+
+      <Section icon={<ShieldCheck className="h-3.5 w-3.5 text-primary" />} title="Regulatory role">
+        <label className="flex items-start gap-2 text-xs">
+          <Checkbox
+            className="mt-0.5"
+            checked={form.ownBrand}
+            onCheckedChange={(v) => set({ ownBrand: v === true })}
+          />
+          <span>
+            We sell this under our own name or trademark
+            <span className="block text-[11px] text-muted-foreground">
+              Own-branding makes us the MANUFACTURER of it whatever the factory’s address is
+              — the declaration of performance and the technical file become ours.
+            </span>
+          </span>
+        </label>
+        <div className="mt-2">
+          <RegulatoryRoleNotice productId={productId} refreshKey={savedAt} />
+        </div>
+        <Grid>
+          <FieldBox className="sm:col-span-2" label="Manufacturer product-type code (DoPC)">
+            <Input
+              className="h-8 text-xs" value={form.dopcTypeCode}
+              onChange={(e) => set({ dopcTypeCode: e.target.value })}
+              placeholder="the manufacturer’s code, not our SKU"
+            />
+          </FieldBox>
+        </Grid>
+        <div className="mt-2">
+          <DopcPanel
+            productId={productId} workspaceId={workspaceId}
+            productTypeCode={form.dopcTypeCode.trim()} refreshKey={savedAt}
+          />
+        </div>
       </Section>
 
       <Section icon={<Tag className="h-3.5 w-3.5 text-primary" />} title="Commercial">
