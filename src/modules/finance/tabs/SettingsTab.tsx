@@ -48,6 +48,7 @@ import { VatPrefillCard } from '@/modules/finance/components/VatPrefillCard';
 import { PosInterconnectionCard } from '@/modules/finance/components/PosInterconnectionCard';
 import { ErpDeclarationCard } from '@/modules/finance/components/ErpDeclarationCard';
 import { PackagingDeclarationCard } from '@/modules/finance/components/PackagingDeclarationCard';
+import { PsdaReadinessCard } from '@/modules/finance/components/PsdaReadinessCard';
 import { BankAccountsCard } from '@/modules/finance/components/BankAccountsCard';
 import { MoneyOutCard } from '@/modules/banking-revolut/components/MoneyOutCard';
 import { formatDate } from '@/utils/datetime';
@@ -268,6 +269,9 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
           {/* #454 -- the EMΠA report and the ΣΣΕΔ declaration must come from ONE derivation: the
               scheme is required to report any difference between them to ΕΟΑΝ. */}
           <PackagingDeclarationCard workspaceId={workspaceId} />
+          {/* #407 -- the four Phase B1 legs are recorded and not yet filed, and a leg looks the
+              same either way. The route is the open decision, not the code. */}
+          <PsdaReadinessCard workspaceId={workspaceId} />
         </TabsContent>
 
         {/* Credit holds, margin authority and till variances share one spine, because they
