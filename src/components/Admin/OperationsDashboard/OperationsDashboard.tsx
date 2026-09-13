@@ -76,6 +76,7 @@ import { SEODashboardPanel } from '@/components/business/seo-toolkit/SEODashboar
 import { SecretsManagerCard } from '@/components/Admin/Secrets/SecretsManagerCard';
 import { ModuleSubscribersPanel } from './ModuleSubscribersPanel';
 import { InboxAIPanel } from './InboxAIPanel';
+import { CapabilityLedgerPanel } from './CapabilityLedgerPanel';
 import { ChannelsCostPanel } from './ChannelsCostPanel';
 import { ChannelsBillingDetail } from './ChannelsBillingDetail';
 
@@ -633,6 +634,7 @@ const OperationsDashboardInner: React.FC = () => {
 
           {/* System Health Tab */}
           <TabsContent value="system-health" className="space-y-4">
+            <CapabilityLedgerPanel />
             <SystemHealthMonitor />
             {/* Generation providers — what each said when we last ASKED it. SystemHealthMonitor
                 infers health from ai_usage_logs, where the row is written before the call and never
