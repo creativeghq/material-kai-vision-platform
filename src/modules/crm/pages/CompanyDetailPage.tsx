@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
-import { ArrowLeft, Building2, MapPin, Globe, Save, Users, Trash2, Plus, Receipt, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, MessageSquare, Phone, ChevronDown, Clock, TrendingUp, RefreshCw, FolderKanban, Layers , Wrench, Kanban } from 'lucide-react';
+import { ArrowLeft, Building2, MapPin, Globe, Save, Users, Trash2, Plus, Receipt, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, MessageSquare, Phone, ChevronDown, Clock, TrendingUp, RefreshCw, FolderKanban, Layers , Wrench, Kanban, PackageOpen } from 'lucide-react';
 import { PartyProjectsCard } from '@/modules/projects/components/PartyProjectsCard';
 import { PartyWorkTab } from '@/modules/crm/components/PartyWorkTab';
 import { WarrantiesTab } from '@/components/business/crm/WarrantiesTab';
+import { SampleLoansCard } from '@/modules/crm/components/SampleLoansCard';
 import { resolveRecordTab } from '@/modules/crm/recordTabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
 import { PartyAccountTabs } from '@/modules/finance/components/PartyAccountTabs';
@@ -1235,6 +1236,12 @@ export const CompanyDetailPage: React.FC = () => {
                     id: 'equipment', label: 'Equipment', icon: Wrench, group: 'After sale',
                     node: <WarrantiesTab companyId={company.id} />,
                   },
+                  /* #427 -- a borrowed sample with a follow-up date is a warm lead; one nobody
+                     wrote down is missing inventory. It belongs on the customer's record. */
+                  ...(activeWorkspaceId ? [{
+                    id: 'samples', label: 'Samples', icon: PackageOpen, group: 'Showroom',
+                    node: <SampleLoansCard workspaceId={activeWorkspaceId} companyId={company.id} />,
+                  }] : []),
                 ]}
               />
             ) : (

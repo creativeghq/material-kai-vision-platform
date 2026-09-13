@@ -26,6 +26,7 @@ import { OrderEudrCard } from '@/modules/finance/components/OrderEudrCard';
 import { MarginAuthorityNotice } from '@/modules/finance/components/MarginAuthorityNotice';
 import { ReceptionReportCard } from '@/modules/stock/components/ReceptionReportCard';
 import { OrderLineTimelineCard } from '@/modules/finance/components/OrderLineTimelineCard';
+import { DeliveryEvidenceCard } from '@/modules/stock/components/DeliveryEvidenceCard';
 import { ContractsSection } from '@/components/features/contracts/ContractsSection';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
@@ -4453,6 +4454,16 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                     crossed the 50 t line that makes every earlier entry liable too. */}
                 <div className="mt-4">
                   <OrderCbamCard orderId={order.id} workspaceId={order.workspace_id} />
+                </div>
+                {/* #424/#440 -- the dispute record. A delivery either happened or it did not and
+                    there was no evidence either way; a receipt either accepted everything or it
+                    absorbed somebody else's breakage. */}
+                <div className="mt-4">
+                  <DeliveryEvidenceCard
+                    orderId={order.id}
+                    workspaceId={order.workspace_id}
+                    isPurchase={order.order_type === 'purchase'}
+                  />
                 </div>
                 {/* #432 -- the status ladder and the eight dates. For a kitchen job the status is
                     what the customer is actually asking about, and the money timeline has two
