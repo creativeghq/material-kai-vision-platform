@@ -85,6 +85,7 @@ export const CvrCard: React.FC<Props> = ({ projectId, currency = 'EUR', reloadTo
                   <th className="px-3 py-2 text-right">Variations</th>
                   <th className="px-3 py-2 text-right">Value</th>
                   <th className="px-3 py-2 text-right">Actual</th>
+                  <th className="px-3 py-2 text-right">Pending</th>
                   <th className="px-3 py-2 text-right">Committed</th>
                   <th className="px-3 py-2 text-right">Cost</th>
                   <th className="px-5 py-2 text-right">Margin</th>
@@ -107,6 +108,7 @@ export const CvrCard: React.FC<Props> = ({ projectId, currency = 'EUR', reloadTo
                     <td className="px-3 py-2 text-right tabular-nums">{cell(r.variation_value)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{cell(r.total_value)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{cell(r.actual_cost)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{cell(r.pending_cost)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{cell(r.committed_cost)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{cell(r.total_cost)}</td>
                     <td className={`px-5 py-2 text-right font-medium tabular-nums ${marginTone(n(r.margin))}`}>
@@ -125,7 +127,7 @@ export const CvrCard: React.FC<Props> = ({ projectId, currency = 'EUR', reloadTo
                   <td className="px-5 py-2">Total</td>
                   <td colSpan={2} />
                   <td className="px-3 py-2 text-right tabular-nums">{money(totals.value)}</td>
-                  <td colSpan={2} />
+                  <td colSpan={3} />
                   <td className="px-3 py-2 text-right tabular-nums">{money(totals.cost)}</td>
                   <td className={`px-5 py-2 text-right tabular-nums ${marginTone(totals.margin)}`}>
                     {money(totals.margin)}
@@ -134,6 +136,15 @@ export const CvrCard: React.FC<Props> = ({ projectId, currency = 'EUR', reloadTo
               </tbody>
             </table>
           </div>
+        )}
+
+        {/* #431 -- pending is money nobody has approved. Naming it apart from committed is the
+            whole point: a job with unapproved POs used to read exactly like a job with none. */}
+        {list.some((r) => n(r.pending_cost) > 0) && (
+          <p className="border-t border-border/60 px-5 py-3 text-xs text-muted-foreground">
+            Pending is purchase orders still in draft. It is shown here and NOT added into Cost —
+            an order nobody has approved is not yet a spend.
+          </p>
         )}
 
         {uncoded && (n(uncoded.total_value) > 0 || n(uncoded.total_cost) > 0) && (
