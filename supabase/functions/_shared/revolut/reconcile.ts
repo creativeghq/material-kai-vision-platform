@@ -144,6 +144,17 @@ export async function loadLegShapes(service: any, workspaceId: string, transacti
  * `null` legsTotal is a row written before the column existed — unknowable, so it counts as
  * incomplete. Fewer rows than the total means the rest have not been written yet.
  */
+/**
+ * Does this provider split one transaction into several rows?
+ *
+ * Only Revolut does. A statement row imported from a bank IS the whole transaction, so demanding
+ * a leg shape for it would leave every such row permanently unmatched — the fail-closed guard
+ * below firing on data that was never multi-leg.
+ */
+export function carriesLegs(provider: string | null | undefined): boolean {
+  return String(provider ?? '') === 'revolut';
+}
+
 export function legShapeIsComplete(shape: LegShape | undefined): boolean {
   if (!shape) return false;
   if (typeof shape.legsTotal !== 'number') return false;
@@ -473,13 +484,30 @@ export async function reconcileOutgoingRevolut(service: any, workspaceId: string
 export async function reconcileWorkspaceRevolut(service: any, workspaceId: string): Promise<ReconcileResult> {
   const result: ReconcileResult = { scanned: 0, autoMatched: 0, suggested: 0, unmatched: 0, internal: 0, errors: [] };
 
+  // WHICH ACCOUNT the money sits in decides whether it needs matching — not which provider
+  // delivered the row. A merchant settlement account mirrors payments its own webhook already
+  // settled, and re-matching one double-books the same money; a bank account holds unattributed
+  // money whoever sent us the statement. Keeping this as `provider = 'revolut'` made the rule a
+  // property of the integration, so a bank with no API could never be reconciled at all.
+  const { data: reconcilable, error: acctErr } = await service
+    .from('finance_bank_accounts')
+    .select('id')
+    .eq('workspace_id', workspaceId)
+    .eq('feed_kind', 'bank_account');
+  if (acctErr) {
+    result.errors.push(`bank-account load failed: ${acctErr.message}`);
+    return result;
+  }
+  const reconcilableIds = ((reconcilable ?? []) as Array<{ id: string }>).map((a) => a.id);
+  // No reconcilable account is not an error and not a reason to fall back to matching
+  // everything — it means nothing here holds unattributed money.
+  if (reconcilableIds.length === 0) return result;
+
   const { data: txs, error: txErr } = await service
     .from('revolut_bank_transactions')
     .select('*')
     .eq('workspace_id', workspaceId)
-    // Only REVOLUT rows auto-match: stripe/viva feed rows describe money the provider
-    // webhooks already settled — rematching them would double-book.
-    .eq('provider', 'revolut')
+    .in('bank_account_id', reconcilableIds)
     .eq('match_status', 'unmatched')
     .eq('direction', 'in')
     .eq('state', 'completed')
@@ -504,7 +532,13 @@ export async function reconcileWorkspaceRevolut(service: any, workspaceId: strin
   }
 
   for (const tx of lines) {
-    const shape = shapes.get(String(tx.transaction_id));
+    // A single-row provider is one transaction, one leg, by construction — NOT the `{inLegs: 1,
+    // outLegs: 0}` default that #359 CM-12 removed. That default was a GUESS about a Revolut
+    // transaction whose sibling leg had not arrived; this is a fact about a format that has no
+    // siblings. The guard below still fires, unchanged, for anything that does carry legs.
+    const shape = carriesLegs(tx.provider)
+      ? shapes.get(String(tx.transaction_id))
+      : { inLegs: 1, outLegs: 0, legsTotal: 1 };
 
     // FAIL CLOSED on an incomplete picture (#359 CM-12). The default here used to be
     // `{ inLegs: 1, outLegs: 0 }` — "external money" — so a transaction whose sibling out leg had
