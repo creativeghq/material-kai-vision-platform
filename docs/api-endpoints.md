@@ -1784,7 +1784,7 @@ For the full endpoint inventory, action parameters, database tables, and webhook
 | `logs` | Delivery logs with filtering |
 | `analytics` | Aggregated messaging analytics |
 | `connect-whatsapp` | Connect a Zernio WhatsApp account (Meta access token + WABA ID + phone number ID) |
-| `sync-from-zernio` | Sync connected WhatsApp accounts from `GET /v1/accounts?platform=whatsapp` |
+| `sync-channels` (a doc previously called this `sync-from-zernio`, which no handler accepts) | Sync connected WhatsApp accounts from `GET /v1/accounts?platform=whatsapp` |
 | `send-test` | Send a test message for a campaign |
 
 ### Database Tables

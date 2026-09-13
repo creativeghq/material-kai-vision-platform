@@ -158,7 +158,7 @@ Check for similar searches
 
 ### Merge Confirmation Modal
 
-The frontend (`src/components/Search/MergeSearchModal.tsx`) displays:
+The frontend (`src/components/Search/MergeSearchModal.tsx` **(does not exist — the UI described below was never built)**) displays:
 - The existing search (name, query, use count, merge count)
 - The new search query
 - A similarity score progress bar

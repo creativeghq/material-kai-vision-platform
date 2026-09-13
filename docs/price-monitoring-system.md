@@ -135,7 +135,7 @@ Single chokepoint for both flows. Methods of interest:
 - `reverify(tracking_id, urls?)` — Firecrawl-only re-verify
 - `due_for_refresh(limit)` — used by the manual cron-refresh escape hatch
 
-### Edge Function — `supabase/functions/price-monitoring-cron/index.ts`
+### Edge Function — `supabase/functions/monitoring-cron/index.ts` (task `price-refresh`)
 
 Hourly. Calls `get_internal_tracked_queries_due()` then POSTs `/products/{id}/refresh` for each row. Service-role auth. Does NOT touch external API tracked queries. See [docs/price-monitoring-system.md](price-monitoring-system.md).
 
@@ -178,7 +178,7 @@ Hourly. Calls `get_internal_tracked_queries_due()` then POSTs `/products/{id}/re
 ## Deployment
 
 1. **Database migrations** — `supabase db push` (or apply via `mcp__supabase__apply_migration`). The 2026-05-01 consolidation migration is `consolidate_price_monitoring_into_tracked_queries`.
-2. **Edge function** — `supabase functions deploy price-monitoring-cron`.
+2. **Edge function** — `supabase functions deploy monitoring-cron`.
 3. **Cron schedule** — see [docs/price-monitoring-system.md](price-monitoring-system.md).
 4. **Backend secrets** — set on the MIVAA `systemd` unit's `Environment=` lines.
 
@@ -222,7 +222,7 @@ A `CHECK (api_key_id XOR product_id)` constraint enforces routing. `uniq_tracked
 - Cross-flow: `/market-check`, `/classifier-correction`, `/promote-family-row`, `/demote-to-family`, `/tracked-queries/cron-refresh`, `/broadcast-api-announcement`
 - Legacy aliases (`/start`, `/stop`, `/check-now`, `/discover`, `/sources/{id}`, `/history/{id}`, `/status/{id}`) kept short-term, marked deprecated.
 
-**Internal cron** ([supabase/functions/price-monitoring-cron/index.ts](../supabase/functions/monitoring-cron/index.ts)): every hour calls `get_internal_tracked_queries_due()` (RPC) which returns rows where `api_key_id IS NULL AND product_id IS NOT NULL AND next_check_at < now()`, then POSTs to `/products/{id}/refresh` for each. External API consumers (`api_key_id IS NOT NULL`) are intentionally NOT touched — they pay per call and control their own cadence.
+**Internal cron** ([supabase/functions/monitoring-cron/index.ts](../supabase/functions/monitoring-cron/index.ts)): every hour calls `get_internal_tracked_queries_due()` (RPC) which returns rows where `api_key_id IS NULL AND product_id IS NOT NULL AND next_check_at < now()`, then POSTs to `/products/{id}/refresh` for each. External API consumers (`api_key_id IS NOT NULL`) are intentionally NOT touched — they pay per call and control their own cadence.
 
 **Service entry points** ([mivaa-pdf-extractor/app/services/integrations/tracked_queries_service.py](../mivaa-pdf-extractor/app/services/integrations/tracked_queries_service.py)):
 
@@ -347,14 +347,14 @@ A `CHECK (api_key_id XOR product_id)` constraint enforces routing. `uniq_tracked
 - User pastes specific URLs in "Custom Monitoring" → `source_type='firecrawl_url'` via the existing `FirecrawlClient`.
 - 6h throttle on Perplexity per product; admin/super_admin `force_refresh=true` bypasses.
 - **Single-tier 24h cadence** (2026-04-25): every monitored product refreshes once per day measured from its last refresh. `monitoring_frequency` column is forced to `'daily'`; `update_next_check_time()` ignores the input frequency and always sets `NOW() + INTERVAL '1 day'`. UI dropdown was collapsed to a single "Every 24h" line.
-- Cron at `supabase/functions/price-monitoring-cron` — pg_cron `price-monitoring-refresh-hourly` fires at `:15` every hour, queries `get_products_due_for_monitoring()`, refreshes each via MIVAA's `/api/v1/price-monitoring/check-now`. The hourly cron tick is fine-grained — it just picks up any product whose 24h window has elapsed since its last refresh.
+- Cron at `supabase/functions/monitoring-cron` (task `price-refresh`) — pg_cron `price-monitoring-refresh-hourly` fires at `:15` every hour, queries `get_products_due_for_monitoring()`, refreshes each via MIVAA's `/api/v1/price-monitoring/check-now`. The hourly cron tick is fine-grained — it just picks up any product whose 24h window has elapsed since its last refresh.
 
 **Flow 2 — External API (api_keys Bearer auth, for other projects):**
 - `POST /api/v1/prices/track` creates a `tracked_queries` row (search_query, dimensions, country_code, preferred_retailer_domains, refresh_interval_hours 1–720). First refresh runs synchronously; initial results in response.
 - `tracked_queries.api_key_id → api_keys.id ON DELETE CASCADE` — deleting the key wipes the tracked query AND all `tracked_query_price_history` (also cascades). Intentional blast radius.
 - 6 endpoints at `/api/v1/prices/track/*` (POST / GET list / GET one / GET /{id}/history / PUT / POST /{id}/refresh / DELETE). All route-level api_keys auth.
 - **No automated refresh** (2026-04-25 policy change): external consumers control their own refresh cadence. Each tracked query is refreshed only when the consumer calls `POST /api/v1/prices/track/{id}/refresh`. Our internal cron does NOT touch `tracked_queries` — unsolicited refreshes would surprise per-call billing.
-- Manual admin endpoint `POST /api/v1/price-monitoring/tracked-queries/cron-refresh` (x-cron-secret auth) still exists in MIVAA as an escape hatch for emergency batch refreshes after a bug fix or data backfill, but is NOT invoked by any cron. The price-monitoring-cron edge function intentionally does NOT call it.
+- Manual admin endpoint `POST /api/v1/price-monitoring/tracked-queries/cron-refresh` (x-cron-secret auth) still exists in MIVAA as an escape hatch for emergency batch refreshes after a bug fix or data backfill, but is NOT invoked by any cron. The monitoring-cron price-refresh task intentionally does NOT call it.
 
 **Engine: Perplexity Sonar-pro** (`app/services/integrations/perplexity_price_search_service.py`):
 - Replaced Claude `web_search_20250305` on 2026-04-24 — Claude API's Brave-based snippets missed prices visible on pages (e.g. YouBath €25). Perplexity has deeper page reading + real `user_location` geo support.

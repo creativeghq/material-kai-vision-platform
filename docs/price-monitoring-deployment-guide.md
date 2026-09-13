@@ -144,7 +144,7 @@ supabase functions deploy monitoring-cron   # single dispatcher for all five mon
 ### Manual smoke test
 
 ```bash
-curl -X POST https://<project>.supabase.co/functions/v1/price-monitoring-cron \
+curl -X POST https://<project>.supabase.co/functions/v1/monitoring-cron?task=price-refresh \
   -H "x-cron-secret: <secret>"
 ```
 
@@ -168,7 +168,7 @@ SELECT cron.schedule(
   '0 * * * *',
   $$
   SELECT net.http_post(
-    url := 'https://<project>.supabase.co/functions/v1/price-monitoring-cron',
+    url := 'https://<project>.supabase.co/functions/v1/monitoring-cron?task=price-refresh',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
       'x-cron-secret', '<secret>'
@@ -254,21 +254,21 @@ ORDER BY created_at DESC;
 ### 6. Trigger cron manually
 
 ```bash
-curl -X POST https://<project>.supabase.co/functions/v1/price-monitoring-cron \
+curl -X POST https://<project>.supabase.co/functions/v1/monitoring-cron?task=price-refresh \
   -H "x-cron-secret: <secret>"
 ```
 
 Tail logs:
 
 ```bash
-supabase functions logs price-monitoring-cron --tail
+supabase functions logs monitoring-cron --tail
 ```
 
 ## Step 6: Monitoring & Troubleshooting
 
 ### Logs
 
-- **Edge function**: `supabase functions logs price-monitoring-cron --tail`
+- **Edge function**: `supabase functions logs monitoring-cron --tail`
 - **MIVAA backend**: `sudo journalctl -u mivaa-api -f` (production) or terminal output (dev)
 - **AI Analytics dashboard**: Admin → AI Analytics, filter by `module_slug` (`greek-marketplaces`, `idealo`, `price-monitoring-notifications`)
 
@@ -326,7 +326,7 @@ supabase secrets list
 ### Deploy
 
 ```bash
-supabase functions deploy price-monitoring-cron --project-ref <prod-project-ref>
+supabase functions deploy monitoring-cron --project-ref <prod-project-ref>
 supabase functions list --project-ref <prod-project-ref>
 ```
 
@@ -373,7 +373,7 @@ SELECT cron.schedule('price-monitoring-hourly', '0 * * * *', $$ ... $$);
 
 ## Support
 
-1. Edge function logs: `supabase functions logs price-monitoring-cron`
+1. Edge function logs: `supabase functions logs monitoring-cron`
 2. MIVAA backend logs: `sudo journalctl -u mivaa-api -n 200`
 3. Database queries against `tracked_query_price_history`, `tracked_queries`, `price_alert_log`
 4. Firecrawl status: https://status.firecrawl.dev

@@ -133,7 +133,7 @@ systemctl show mivaa-pdf-extractor --property=Environment | tr ' ' '\n' | grep -
 
 ```bash
 supabase functions deploy monitoring-cron   # single dispatcher for all five monitoring tasks
-supabase functions deploy llm-mention-probe-cron
+supabase functions deploy monitoring-cron  # serves the llm probe as ?task=mention-probe
 supabase functions deploy agent-chat
 ```
 

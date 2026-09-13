@@ -95,7 +95,7 @@ Set these in **Vercel > Project Settings > Environment Variables**. All `VITE_` 
 | `VISION_GUIDED_FALLBACK_TO_PYMUPDF` | Public | Server ENV | Fallback to PyMuPDF if Vision AI fails | `true` (default), `false` |
 | `HUGGING_FACE_ACCESS_TOKEN` | **Secret** | Server ENV (GitHub Actions deploy) | No longer needed for SLIG — SLIG moved to Modal 2026-06-14. HuggingFace hosts nothing now; this deploy-workflow secret can be removed. | `hf_xxxxxxxxxxxxxxxx` |
 | `REDIS_URL` | Public | Server ENV | Redis connection URL for embedding cache (optional — disables cache if not set) | `redis://localhost:6379` or `redis://your-redis-host:6379` |
-| `ADMIN_RESTART_TOKEN` | **Secret** | Server ENV | Auth token for the `/api/admin/restart` endpoint — required to authenticate server restart requests from the agent | `your-secure-restart-token` |
+| ~~`ADMIN_RESTART_TOKEN`~~ | — | — | **Not implemented.** There is no `/api/admin/restart` route, handler or env read anywhere in the edge functions, `src`, or the MIVAA app. Setting it does nothing. | — |
 
 ### **PDF Pipeline Structural Backbone — PaddleOCR-VL on Modal**
 
@@ -242,9 +242,9 @@ modal app stop paddleocr-vl     # tear down
 |------------|------|----------------------|-------------|----------------|
 | `ANTHROPIC_API_KEY` | **Secret** | `agent-chat`, `ai-rerank`, `suggest-fields`, `xml-import-orchestrator` | Claude API key | `sk-ant-xxxxxxxxxxxxxxxx` |
 | `FIRECRAWL_API_KEY` | **Secret** | `scrape-single-page`, `scrape-preview`, `suggest-fields`, `price-monitoring`, `agent-chat` | Firecrawl web scraping API | `fc-xxxxxxxxxxxxxxxx` |
-| `STRIPE_SECRET_KEY` | **Secret** | `crm-stripe-api`, `stripe-checkout`, `stripe-customer-portal`, `stripe-webhooks` | Stripe secret key for payments | `sk_test_...` or `sk_live_...` |
+| `STRIPE_SECRET_KEY` | **Secret** | `stripe-api`, `crm-api`, `stripe-webhooks` | Stripe secret key for payments | `sk_test_...` or `sk_live_...` |
 | `STRIPE_WEBHOOK_SECRET` | **Secret** | `stripe-webhooks` | Stripe webhook signing secret | `whsec_...` |
-| `STRIPE_CREDITS_PRODUCT_ID` | **Secret** | `stripe-checkout` | Stripe product ID for credit purchases (single reusable product) | `prod_...` |
+| `STRIPE_CREDITS_PRODUCT_ID` | **Secret** | `stripe-api` | Stripe product ID for credit purchases (single reusable product) | `prod_...` |
 | `STRIPE_PRO_PRICE_ID` | Public | `stripe-webhooks` | Stripe price ID for Pro subscription | `price_...` |
 | `STRIPE_ENTERPRISE_PRICE_ID` | Public | `stripe-webhooks` | Stripe price ID for Enterprise subscription | `price_...` |
 | `MIVAA_GATEWAY_URL` | Public | `agent-chat`, `_shared/embedding-utils.ts` | MIVAA gateway URL (default: `https://v1api.materialshub.gr`) | `https://v1api.materialshub.gr` |

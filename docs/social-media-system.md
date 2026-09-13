@@ -44,9 +44,9 @@ Admin Panel → /admin/social-media/* → Direct DB queries (social_posts, socia
 | `zernio-api` | Unified router (`action` selects handler): **oauth** (connect/callback/disconnect/list), **publish** (publish_now/schedule), **analytics** (get_post_analytics/get_account_insights/get_best_time) | `ZERNIO_API_KEY` |
 | `zernio-webhook-handler` | Receive Zernio webhooks (`post.published`, `post.failed`, `post.partial`, `post.cancelled`, `post.scheduled`, `account.disconnected`) | `ZERNIO_WEBHOOK_SECRET` |
 | `generate-social-content` | Claude Haiku generates 3 caption variants + hashtags | *(uses shared ANTHROPIC_API_KEY)* |
-| `generate-social-image` | Image generation — routes by type (lifestyle/product/artistic) | `XAI_API_KEY`, `GOOGLE_AI_API_KEY`, `REPLICATE_API_TOKEN` |
-| `generate-social-video` | Short-form reel. Delegates every model but `kling-3.0` to `generate-interior-video-v2`; attaches the result to the post. `{ action: 'status', job_id }` collects a render that outran the inline poll | `REPLICATE_API_TOKEN`, `GOOGLE_AI_API_KEY` |
-| `generate-interior-video-v2` | Multi-model interior video (Veo 2 / Kling / Wan / Runway) | `REPLICATE_API_TOKEN`, `GOOGLE_AI_API_KEY` |
+| `generate-social-image` | Image generation — routes by type (lifestyle/product/artistic) | `XAI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, `REPLICATE_API_TOKEN` |
+| `generate-social-video` | Short-form reel. Delegates every model but `kling-3.0` to `generate-interior-video-v2`; attaches the result to the post. `{ action: 'status', job_id }` collects a render that outran the inline poll | none directly — credentials are resolved by the shared client it delegates to |
+| `generate-interior-video-v2` | Multi-model interior video (Veo 2 / Kling / Wan / Runway) | none directly — resolved through `_shared` provider clients |
 
 ---
 
@@ -59,7 +59,7 @@ Resolution is **env-first, then `platform_secrets` (DB)** — set via edge-funct
 | `ZERNIO_API_KEY` *(fallback: `LATE_API_KEY`)* | [Zernio Dashboard](https://zernio.com) → API Keys. The old Late key will **not** authenticate against Zernio — a real Zernio key is required. |
 | `ZERNIO_WEBHOOK_SECRET` *(fallback: `LATE_WEBHOOK_SECRET`)* | **You invent this one** — there is nothing to copy from Zernio. Generate a random string (`openssl rand -hex 32`), save it here, then register the webhook (below): `ensureZernioWebhook` **sends** this secret to Zernio as the signing key. |
 | `XAI_API_KEY` | [x.ai console](https://console.x.ai) |
-| `GOOGLE_AI_API_KEY` | Google AI Studio or Google Cloud → Gemini API |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | Google AI Studio or Google Cloud → Gemini API. The LONG name is the one the code reads; `GOOGLE_AI_API_KEY` and `GEMINI_API_KEY` are silent no-ops. |
 | `REPLICATE_API_TOKEN` | [replicate.com/account/api-tokens](https://replicate.com/account/api-tokens) |
 
 > **Note**: `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` are already set if JARVIS agent is working.
@@ -211,7 +211,7 @@ The `SocialAccountsTab` component (`src/modules/social-media/components/SocialAc
 
 ## Deployment Checklist
 
-- [ ] Add secrets: `ZERNIO_API_KEY`, `ZERNIO_WEBHOOK_SECRET`, `XAI_API_KEY`, `GOOGLE_AI_API_KEY`, `REPLICATE_API_TOKEN`
+- [ ] Add secrets: `ZERNIO_API_KEY`, `ZERNIO_WEBHOOK_SECRET`, `XAI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, `REPLICATE_API_TOKEN`
 - [ ] Register the webhook from /messaging → Register webhook (AFTER setting `ZERNIO_WEBHOOK_SECRET`)
 - [ ] Register OAuth redirect URL in Zernio dashboard
 - [ ] Deploy edge functions (all 8 new functions are in `config.toml`)

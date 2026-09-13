@@ -154,7 +154,7 @@ MIVAA uses **3 primary relationship tables** to link entities:
 
 ### Frontend Service: `entityRelationshipService.ts`
 
-**Location:** `src/services/entityRelationshipService.ts`
+**Location:** `src/services/entityRelationshipService.ts` **(does not exist — no file by this name, and none of `linkChunkToProduct` / `linkProductToImage` / `linkChunkToImage` appears anywhere in the repo)**
 
 **Key Methods:**
 

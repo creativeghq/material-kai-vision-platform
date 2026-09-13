@@ -36,7 +36,13 @@ No API key required. Uses Pinterest's public oEmbed endpoint.
 
 ---
 
-## Phase 2: OAuth Board Browsing
+## Phase 2 — NOT BUILT
+
+> The `pinterest-oauth` function and its five actions (`get_auth_url`, `callback`, `get_boards`,
+> `get_board_pins`, `disconnect`) do not exist. The only Pinterest function is `pinterest-api`,
+> whose handler accepts `extract_pin`, `import_pin` and `import_pins_bulk` and rejects anything
+> else with a 400. `public/api/openapi-edge.json` records the OAuth half as removed. Everything in
+> this section describes an unimplemented design.: OAuth Board Browsing
 
 Requires Pinterest developer app registration (~1-2 weeks approval).
 

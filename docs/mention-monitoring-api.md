@@ -693,7 +693,7 @@ The most-recent corrections are prepended as few-shot examples to subsequent Hai
 
 ### `POST /cron-refresh` — `x-cron-secret` only
 
-Cron-target batch refresh. Calls `get_internal_tracked_mentions_due()` and runs `refresh()` on each due subject. Used by `mention-monitoring-cron` edge function.
+Cron-target batch refresh. Calls `get_internal_tracked_mentions_due()` and runs `refresh()` on each due subject. Used by `monitoring-cron` (`?task=mention-refresh`).
 
 ### `POST /cron-probe-llm` — `x-cron-secret` only
 
@@ -834,7 +834,7 @@ On the MIVAA backend (systemd unit / Docker env):
 | `YOUTUBE_DATA_API_KEY` | YouTube discovery (opt-in per subject) |
 | `OPENAI_API_KEY` | gpt-4o-mini probe |
 | `GEMINI_API_KEY` | gemini-2.0-flash probe |
-| `CRON_SECRET` | shared with price-monitoring-cron; validates `x-cron-secret` header |
+| `CRON_SECRET` | shared with monitoring-cron; validates `x-cron-secret` header |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | bell + email + RPCs |
 
 On Supabase Edge Function env:

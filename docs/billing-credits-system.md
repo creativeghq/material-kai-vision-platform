@@ -16,9 +16,9 @@ The platform uses a two-track billing model:
 - `/billing/credits` — View balance, purchase credit top-ups
 
 **Edge Functions:**
-- `crm-stripe-api` — Subscriptions + credit purchases (action-based routing)
-- `stripe-checkout` — Creates Stripe Checkout sessions
-- `stripe-customer-portal` — Opens Stripe's hosted billing portal
+- `crm-api` with `{ resource: 'stripe' }` — Subscriptions + credit purchases
+- `stripe-api` with `{ action: 'checkout' }` — Creates Stripe Checkout sessions
+- `stripe-api` with `{ action: 'customer_portal' }` — Opens Stripe's hosted billing portal
 - `stripe-webhooks` — Processes Stripe webhook events (payment success, subscription changes)
 
 ---
@@ -108,7 +108,7 @@ Subscription plans are defined in the `subscription_plans` table and managed via
 ### Create subscription checkout
 
 ```
-POST /functions/v1/crm-stripe-api
+POST /functions/v1/crm-api    # body: { resource: 'stripe', ... }
 Content-Type: application/json
 
 {
@@ -125,7 +125,7 @@ Returns: Stripe Checkout session URL.
 ### Purchase credits
 
 ```
-POST /functions/v1/crm-stripe-api
+POST /functions/v1/crm-api    # body: { resource: 'stripe', ... }
 
 {
   "path": ["credits", "purchase"],
@@ -141,7 +141,7 @@ Returns: Stripe Checkout session URL.
 ### Get current subscription
 
 ```
-POST /functions/v1/crm-stripe-api
+POST /functions/v1/crm-api    # body: { resource: 'stripe', ... }
 
 {
   "path": ["subscriptions"],
@@ -154,7 +154,7 @@ Returns: Current subscription with plan details.
 ### Get credit balance
 
 ```
-POST /functions/v1/crm-stripe-api
+POST /functions/v1/crm-api    # body: { resource: 'stripe', ... }
 
 {
   "path": ["credits"],
@@ -167,7 +167,7 @@ Returns: `{ balance, total_purchased, total_used }`.
 ### Create Stripe Checkout session directly
 
 ```
-POST /functions/v1/stripe-checkout
+POST /functions/v1/stripe-api    # body: { action: 'checkout', ... }
 Authorization: Bearer <jwt>
 
 {
@@ -183,7 +183,7 @@ Authorization: Bearer <jwt>
 ### Open customer billing portal
 
 ```
-POST /functions/v1/stripe-customer-portal
+POST /functions/v1/stripe-api    # body: { action: 'customer_portal', ... }
 Authorization: Bearer <jwt>
 
 {

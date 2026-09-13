@@ -409,7 +409,7 @@ All POST, all JWT-authenticated.
 
 | Function | Purpose |
 |----------|---------|
-| `seo-research` | Keyword research via DataForSEO (6 parallel API calls, volumes + SERP analysis) |
+| `seo-api` `{action:'research'}` _(a doc previously listed this as its own `seo-research` function)_ | Keyword research via DataForSEO (6 parallel API calls, volumes + SERP analysis) |
 | `seo-plan` | Generate article structure + meta tags + FAQ schema from research output |
 | `seo-write` | Full article generation from plan via Claude Opus |
 | `seo-analyze` | 15+ SEO quality checks; auto-fix issues via Gemini |
@@ -465,8 +465,8 @@ All JWT-authenticated. Role-gated (admin/manager/factory for mutations).
 
 | Function | Method | Auth | Purpose |
 |----------|--------|------|---------|
-| `stripe-checkout` | POST | JWT | Create checkout session for credit packages and subscription plans |
-| `stripe-customer-portal` | POST | JWT | Create customer portal session (subscription / payment method mgmt) |
+| `stripe-api` `{action:'checkout'}` | POST | JWT | Create checkout session for credit packages and subscription plans |
+| `stripe-api` `{action:'customer_portal'}` | POST | JWT | Create customer portal session (subscription / payment method mgmt) |
 | `stripe-webhooks` | POST | signature | Handle Stripe events — sub created/updated/cancelled, invoice paid, payment failed. See [stripe-webhooks-api](payments-stripe.md) |
 
 ### 1.9 Messaging (email / WhatsApp)
@@ -476,7 +476,7 @@ WhatsApp moved from Twilio (SMS+WA) to **Zernio** (WhatsApp via Meta Cloud API) 
 | Function | Method | Auth | Purpose | Deep docs |
 |----------|--------|------|---------|-----------|
 | `email-api` | POST | JWT | Send transactional email via Resend. Templates, analytics, domain management. | [email-api](email-system.md) |
-| `messaging-api` | POST | JWT | Send WhatsApp via Zernio. Actions: `send`, `create-campaign`, `connect-whatsapp`, `sync-channels`, conversation/reply ops. | [messaging-api](inbox-system.md) |
+| `messaging-api` | POST | JWT | Send WhatsApp via Zernio. Actions: `send`, `connect-whatsapp`, `sync-channels`, conversation/reply ops. (`create-campaign` is NOT one of them — campaigns run through `campaign-processor` / `marketingService`.) | [messaging-api](inbox-system.md) |
 | `messaging-processor` | POST | service-role | WhatsApp campaign batch dispatcher (cron-invoked, see §1.6) | — |
 | `zernio-webhook-handler` | POST | signature (Zernio) | One webhook for social `post.*` + WhatsApp `message.*` (delivery + reply capture) | [zernio-social-api](social-media-system.md) |
 | `email-webhook` | POST | signature (Resend) | Campaign email events (delivered/bounced/opened/clicked) | — |
@@ -557,7 +557,7 @@ Multi-tenant (tenant = workspace). Gated on the `sales-finance` module entitleme
 |----------|--------|------|---------|
 | `xml-import-orchestrator` | POST | JWT | Intelligent XML imports with AI field mapping. See [xml-import-orchestrator-api](xml-import-orchestrator.md) |
 | `scheduled-import-runner` | POST | service-role | Cron runner (see §1.6) |
-| `scrape-preview` | POST | JWT | Preview materials from URL before full import |
+| `scrape-preview` | — | — | **Not deployed.** This and the seven rows below name edge functions that do not exist in this repo (`scrape-single-page`, `parse-sitemap`, `firecrawl-webhook`, `field-templates`, `suggest-fields`, `pdf-batch-process`, `batch-update-sessions`). The live equivalents are the two rows above plus `page-watches` / `page-watch-webhook`, which is the only Firecrawl webhook receiver. |
 | `scrape-single-page` | POST | JWT | Extract materials from a single URL with custom schema |
 | `parse-sitemap` | POST | JWT | Parse `sitemap.xml` and enumerate URLs |
 | `firecrawl-webhook` | POST | signature | Receive async crawl results from Firecrawl |

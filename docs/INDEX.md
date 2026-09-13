@@ -170,7 +170,7 @@ Complete documentation for Material Kai Vision Platform.
 
 **[billing-credits-system.md](billing-credits-system.md)** - Billing & Credits System ✨ NEW
 - Stripe subscription plans + credit packages
-- stripe-checkout, stripe-customer-portal, crm-stripe-api
+- stripe-api (actions: checkout, customer_portal), crm-api (resource: stripe)
 - Per-workspace credit balance tracking
 - Frontend: `/billing/credits` and `/billing/subscriptions`
 

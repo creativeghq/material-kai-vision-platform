@@ -432,7 +432,7 @@ The platform uses **7 embedding types** for comprehensive search:
 - Agent & AI: `agent-chat`, `ai-rerank`, `background-agent-runner`, `mivaa-gateway`
 - Interior Design: `generate-interior-gemini`, `generate-interior-video-v2`, `generate-region-edit`, `generate-virtual-staging`, `generate-vr-world`, `generate-quote-pdf`, `generate-social-content`, `generate-social-image`, `generate-social-video`
 - Social: `zernio-api`, `zernio-webhook-handler`
-- CRM & Billing: `crm-companies-api`, `crm-contacts-api`, `crm-users-api`, `crm-stripe-api`, `stripe-checkout`, `stripe-customer-portal`, `stripe-webhooks`
+- CRM & Billing: `crm-companies-api`, `crm-contacts-api`, `crm-users-api`, `stripe-api`, `crm-api`, `stripe-webhooks`
 - Automation: `flow-engine`, `flow-scheduler-cron`, `flow-webhook`
 - Messaging: `email-api`, `messaging-api`, `notification-dispatcher`
 - Scraping & Import: `scrape-session-manager`, `scrape-single-page`, `scrape-preview`, `parse-sitemap`, `xml-import-orchestrator`, `scheduled-import-runner`, `pdf-batch-process`

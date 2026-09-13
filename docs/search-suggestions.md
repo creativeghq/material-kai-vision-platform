@@ -100,7 +100,11 @@ Request body fields: `suggestion_id`, `user_id`, `session_id`, `original_query`,
 
 Response: `{"success": true, "message": "Click tracked successfully"}`.
 
-## Frontend Integration
+## Frontend Integration — NOT BUILT
+
+> The Python backend below is real (`app/services/search/search_suggestions_service.py`,
+> `app/api/suggestions.py`). There is no `src/services/searchSuggestionsService.ts` and no
+> `SemanticSearchInput` component; the TypeScript half of this section is unimplemented.
 
 ### SearchSuggestionsService
 
