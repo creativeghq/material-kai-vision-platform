@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (145)
+## 1. Supabase Edge Functions (146)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -315,6 +315,12 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 |---|---|---|
 | `canonicalize-attributes` | public | Proxy product attribute canonicalization to MIVAA facet service |
 | `facets-recanonicalize` | service_role | Bulk facet re-canonicalization sweep (proxy to MIVAA) |
+
+**Misc**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `inbox-draft-cron` | public | Pre-writes the assistant's reply on threads set to `agent_state='suggesting'`, so a member opening the Inbox finds a draft waiting instead of an empty composer. Cron, every 2 minutes; `x-cron-secret` or a service-role bearer. Claims each thread by stamping the inbound message it is answering (`claim_due_inbox_drafts`) in the same statement that selects it, so two overlapping runs cannot bill the same turn twice. A 90-second quiet period debounces WhatsApp bursts — one draft once the customer stops, not one per message. Nothing is ever sent: the draft is stored on the thread and only reaches the customer if a human presses send. |
 
 **Customs**
 

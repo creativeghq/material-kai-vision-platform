@@ -61,7 +61,8 @@ Four tables in `public` (all writes are performed by `inbox-api` under the servi
 
 - `thread_type ∈ {internal, customer, upstream}`; `channel ∈ {internal, whatsapp, email}` (email added by #342).
 - `status ∈ {open, snoozed, closed}` (bumped to `open` on every new message).
-- `agent_state ∈ {off, suggesting, active, paused}` and `agent_id` drive the AI takeover ([§4](#4-ai-assistant-takeover-9)).
+- `agent_state ∈ {off, suggesting, active, paused}` and `agent_id` drive how much the assistant does ([§4](#4-ai-assistant-takeover-9)). `off` = nothing. `suggesting` = it writes a draft onto the thread (`agent_draft`) for a member to edit and send; nothing reaches the customer. `active` = it replies directly. `paused` is server-internal — `send_message` sets it when a member types on an `active` thread so the assistant stops talking over them; `set_agent` accepts only `off|suggesting|active`.
+- `agent_draft` / `agent_draft_at` / `agent_draft_for_message_id` / `agent_draft_error` hold a waiting reply. A draft is CURRENT only while `agent_draft_for_message_id` equals `inbox_newest_inbound_message_id(thread)` — the one definition of "the message a reply is answering", shared with `claim_due_inbox_drafts`. A stale draft answers the previous question and is never loaded into the composer.
 - `metadata` carries channel binding for WhatsApp (`zernio_account_id`, `zernio_conversation_id`, `channel_id`, `contact_phone`) and, for marketplace threads, `marketplace_listing_id` / `marketplace_inquiry_id` / `buyer_workspace_id`.
 - `metadata.order_intake` holds an **order proposal** read out of the conversation (#342, [§11](#11-order-intake-342)). It is deliberately not a table and never an `orders` row until a member approves it. Any writer must read-modify-write this column — clobbering it drops the WhatsApp relay binding above.
 
@@ -126,7 +127,7 @@ One `POST`-only, action-discriminated function (merge rule; precedent `moodboard
 | `add_participant` / `remove_participant` | thread members | Add/remove a teammate or customer (directional add-rule enforced) |
 | `send_message` | participants (members + customers) | Post a `text` or member-only `note`; relays to WhatsApp when in the 24h window; triggers agent reply / human-takeover pause |
 | `mark_read` / `set_status` | participants / members | Update `last_read_at`; set `open/snoozed/closed` |
-| `set_agent` | members | Hand a thread to / back from the AI (`off/suggesting/active`); writes a `system` transcript note |
+| `set_agent` | members | Set how much the assistant does (`off/suggesting/active`); `off` also discards any waiting draft; writes a `system` transcript note |
 | `get_agent_settings` / `set_agent_settings` | member reads / owner-admin writes | Per-workspace AI config (`workspaces.settings.inbox_agent`) |
 | `list_threads` | member / operator | Thread list (see visibility rules below); operator `scope:'all'` spans every workspace |
 | `get_thread` | participants (note-filtered for non-members) | Thread + participants + messages + WhatsApp window |

@@ -59,6 +59,21 @@ export interface InboxThread {
   waiting_since?: string | null;
   /** Inbound messages since our last reply. */
   unanswered_count?: number;
+  /**
+   * A reply the assistant wrote while nobody was looking, for a member to edit and send.
+   * Only present for members — the customer projection is an explicit column list.
+   */
+  agent_draft?: string | null;
+  agent_draft_at?: string | null;
+  agent_draft_error?: string | null;
+  /**
+   * Does the draft still answer the customer's LATEST message? Derived server-side against
+   * `inbox_newest_inbound_message_id`, the same definition the draft cron claims on.
+   *
+   * A stale draft is a valid string that answers the previous question, so it must never be
+   * loaded into the composer — the only safe thing to do with one is say why it is gone.
+   */
+  agent_draft_is_current?: boolean;
   needs_reply?: boolean | null;
   /** Labels assigned to this thread (returned by list_threads). */
   labels?: InboxLabel[];
@@ -626,7 +641,7 @@ export const inboxApi = {
   reactMessage(thread_id: string, message_id: string, emoji: string | null) {
     return call<{ ok: boolean; reactions: string[] }>('react_message', { thread_id, message_id, emoji });
   },
-  setAgent(thread_id: string, agent_state: 'off' | 'active', agent_id?: string) {
+  setAgent(thread_id: string, agent_state: 'off' | 'suggesting' | 'active', agent_id?: string) {
     return call<{ ok: boolean; agent_state: string }>('set_agent', { thread_id, agent_state, agent_id });
   },
   /**

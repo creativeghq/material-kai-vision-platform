@@ -132,6 +132,10 @@
       "description": "Internal proxies called by agents/service-role."
     },
     {
+      "name": "Misc",
+      "description": "Uncategorised."
+    },
+    {
       "name": "Customs",
       "description": "Customs functions."
     },
@@ -15741,6 +15745,32 @@
                       }
                     },
                     "description": "Returns: {ok, message_id} — 409 when the WhatsApp service window is closed"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "thread_id",
+                      "message_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "internal_draft_reply"
+                        ],
+                        "description": "INTERNAL (service-role bearer only). Writes the waiting draft for a thread the draft cron has already claimed. Uses the same `buildAgentDraft` brain as the auto-reply and the “Draft with AI” button, and posts nothing — the text is stored on `inbox_threads.agent_draft`. Writes only against the claimed `message_id`, so a customer who wrote again while the model was thinking does not get last question's answer presented as current. A failure is stored in `agent_draft_error` rather than swallowed."
+                      },
+                      "thread_id": {
+                        "type": "string",
+                        "description": "Thread claimed by claim_due_inbox_drafts (string (uuid))"
+                      },
+                      "message_id": {
+                        "type": "string",
+                        "description": "The inbound message the draft answers; the write is conditional on it still being the claim (string (uuid))"
+                      }
+                    },
+                    "description": "Returns: {ok:true, drafted:boolean, error:string|null} or {ok:true, skipped:string}"
                   }
                 ],
                 "discriminator": {
@@ -26783,6 +26813,49 @@
           },
           "403": {
             "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/inbox-draft-cron": {
+      "post": {
+        "tags": [
+          "Misc"
+        ],
+        "summary": "Pre-writes the assistant's reply on threads set to `agent_state='suggesting'`, so a member opening the Inbox finds a draft waiting instead of an empty composer. Cron, every 2 minutes; `x-cron-secret` or a service-role bearer. Claims each thread by stamping the inbound message it is answering (`claim_due_inbox_drafts`) in the same statement that selects it, so two overlapping runs cannot bill the same turn twice. A 90-second quiet period debounces WhatsApp bursts — one draft once the customer stops, not one per message. Nothing is ever sent: the draft is stored on the thread and only reaches the customer if a human presses send.",
+        "operationId": "post_inbox_draft_cron",
+        "description": "Pre-writes the assistant's reply on threads set to `agent_state='suggesting'`, so a member opening the Inbox finds a draft waiting instead of an empty composer. Cron, every 2 minutes; `x-cron-secret` or a service-role bearer. Claims each thread by stamping the inbound message it is answering (`claim_due_inbox_drafts`) in the same statement that selects it, so two overlapping runs cannot bill the same turn twice. A 90-second quiet period debounces WhatsApp bursts — one draft once the customer stops, not one per message. Nothing is ever sent: the draft is stored on the thread and only reaches the customer if a human presses send.\n\n**Response:** `{success:true, claimed:number, drafted:number, empty:number, failed:number}`",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
             "content": {
               "application/json": {
                 "schema": {

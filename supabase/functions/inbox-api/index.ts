@@ -2269,8 +2269,8 @@ async function handleJwtAction(
       // Manual hand-to-agent / hand-back (§9). Members only.
       const threadId = String(payload.thread_id || '');
       const state = String(payload.agent_state || '');
-      if (!threadId || !['off', 'active'].includes(state)) {
-        throw new HttpError(400, 'thread_id and a valid agent_state (off|active) are required');
+      if (!threadId || !['off', 'suggesting', 'active'].includes(state)) {
+        throw new HttpError(400, 'thread_id and a valid agent_state (off|suggesting|active) are required');
       }
       const thread = await getThreadOrThrow(db, threadId);
       const access = await resolveThreadAccess(db, userId, thread, operator);
@@ -2291,6 +2291,13 @@ async function handleJwtAction(
         const { error: leftErr } = await db.from('inbox_participants').update({ status: 'left' })
           .eq('thread_id', threadId).eq('participant_type', 'agent');
         if (leftErr) throw new HttpError(500, `Could not remove the agent participant: ${leftErr.message}`);
+        // Turning the assistant off discards whatever it had written. Leaving the draft behind
+        // would offer a reply from an assistant the operator has just switched off.
+        const { error: clearErr } = await db.from('inbox_threads').update({
+          agent_draft: null, agent_draft_at: null,
+          agent_draft_for_message_id: null, agent_draft_error: null,
+        }).eq('id', threadId);
+        if (clearErr) throw new HttpError(500, `Could not clear the draft: ${clearErr.message}`);
       } else {
         // Ensure exactly one active agent participant.
         const { data: existing, error: exErr } = await db.from('inbox_participants')
@@ -2307,7 +2314,11 @@ async function handleJwtAction(
       // already succeeded, and losing the note must not undo a completed takeover.
       const { error: noteErr } = await db.from('inbox_messages').insert({
         thread_id: threadId, message_type: 'system',
-        body: state === 'off' ? 'Conversation handed back to the team.' : `Conversation handed to the AI assistant (${state}).`,
+        body: state === 'off'
+          ? 'Conversation handed back to the team.'
+          : state === 'suggesting'
+            ? 'The AI assistant will draft replies here for the team to review.'
+            : 'Conversation handed to the AI assistant, which will reply directly.',
       });
       if (noteErr) console.error('[inbox-api] set_agent system note failed (non-fatal):', noteErr.message);
       return json({ ok: true, agent_state: state });
@@ -2622,8 +2633,20 @@ async function handleJwtAction(
           return slot === undefined ? p : { ...p, avatar_slot: slot };
         });
 
+      // Is the waiting draft still about the right thing? The DERIVATION of "the message a reply
+      // would be answering" lives in SQL (`inbox_newest_inbound_message_id`) and is the same one
+      // the claim uses — this only compares. A draft written before the customer wrote again
+      // answers the previous question, and a stale draft is a perfectly valid string, so nothing
+      // downstream would otherwise notice.
+      let draftIsCurrent = false;
+      if (isMember && thread.agent_draft) {
+        const { data: newestId } = await db.rpc('inbox_newest_inbound_message_id', { p_thread_id: threadId });
+        draftIsCurrent = !!newestId && newestId === thread.agent_draft_for_message_id;
+      }
+
       const threadForCaller = isMember ? {
         ...thread,
+        agent_draft_is_current: draftIsCurrent,
         counterparty_participant_id: counterpartyId,
         counterparty_avatar_slot: counterpartyId
           ? avatarSlotByParticipant.get(counterpartyId) ?? null
@@ -5311,6 +5334,57 @@ async function handler(req: Request): Promise<Response> {
       senderLabel: 'Follow-up sent',
     });
     return json({ ok: true, message_id: (msg as { id?: string }).id ?? null });
+  }
+
+  /*
+   * internal_draft_reply — write the draft the operator will find waiting.
+   *
+   * Same brain as the auto-reply and the "Draft with AI" button (`buildAgentDraft`); the
+   * difference is only who reads it first. The cron has already CLAIMED the thread, so this fills
+   * in the text and records a failure on the row rather than swallowing it.
+   */
+  if (action === 'internal_draft_reply') {
+    const authHeader = req.headers.get('authorization') || '';
+    if (authHeader !== `Bearer ${SERVICE_ROLE_KEY}`) throw new HttpError(401, 'Unauthorized');
+    const threadId = String(payload.thread_id || '');
+    const messageId = String(payload.message_id || '');
+    if (!threadId || !messageId) throw new HttpError(400, 'thread_id and message_id are required');
+
+    const thread = await getThreadOrThrow(db, threadId);
+    if (thread.agent_state !== 'suggesting') {
+      // Switched off between the claim and here. Not an error, and not a draft either.
+      return json({ ok: true, skipped: 'agent_state is no longer suggesting' });
+    }
+
+    const owner = await workspaceOwner(db, String(thread.workspace_id));
+    if (!owner) throw new HttpError(409, 'This workspace has no owner to bill the draft to');
+
+    let draft = '';
+    let failure: string | null = null;
+    try {
+      draft = await buildAgentDraft(db, thread, { userId: owner, task: 'inbox_agent_suggest' });
+      if (!draft) failure = 'The assistant produced no reply.';
+    } catch (e) {
+      failure = e instanceof Error ? e.message : String(e);
+    }
+
+    // Only write against the message we were claimed for. A customer who wrote again while the
+    // model was thinking has already moved the claim on, and overwriting it would put an answer
+    // to the previous question in front of the operator as though it were current.
+    const { data: written, error: writeErr } = await db.from('inbox_threads')
+      .update({
+        agent_draft: failure ? null : draft,
+        agent_draft_error: failure ? failure.slice(0, 500) : null,
+        agent_draft_at: new Date().toISOString(),
+      })
+      .eq('id', threadId)
+      .eq('agent_draft_for_message_id', messageId)
+      .select('id');
+    if (writeErr) throw new HttpError(500, `Could not store the draft: ${writeErr.message}`);
+    if (!written || written.length === 0) {
+      return json({ ok: true, skipped: 'the conversation moved on while the draft was being written' });
+    }
+    return json({ ok: true, drafted: !failure, error: failure });
   }
 
   // Internal branch — function-to-function (e.g. the Zernio webhook after a WhatsApp inbound).

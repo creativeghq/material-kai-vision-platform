@@ -474,6 +474,17 @@ const InboxPage: React.FC = () => {
       setWaWindow(whatsapp_window);
       setThreads((prev) => prev.map((t) => (t.id === id ? { ...t, unread: false } : t)));
 
+      // A reply the assistant wrote while nobody was looking. Only when it still answers the
+      // customer's LATEST message — `agent_draft_is_current` is derived server-side against the
+      // same definition the draft cron claims on. A stale draft answers the previous question,
+      // and it is a perfectly valid string, so the only safe thing to do with one is leave it
+      // out of the composer.
+      if (thread.agent_draft && thread.agent_draft_is_current) {
+        setDraft(thread.agent_draft);
+        setIsNote(false);
+        setAiDraftShown(true);
+      }
+
       // CRM context for the right rail (members only; internal threads come back empty).
       let ctx: InboxThreadContext | null = null;
       if (isMember) {
@@ -939,21 +950,38 @@ const InboxPage: React.FC = () => {
           <CheckCircle2 className="w-4 h-4 mr-1.5" /> Accept inquiry
         </Button>
       )}
+      {/* Three settings, cycled in order of how much the assistant is trusted with: nothing,
+          draft-for-review, answer-directly. `suggesting` is the one that was documented and never
+          built — without it the only way to get help was to open each thread and press Draft. */}
       <Button
-        variant={activeThread.agent_state === 'active' ? 'default' : 'outline'}
+        variant={activeThread.agent_state === 'active' ? 'default'
+          : activeThread.agent_state === 'suggesting' ? 'secondary' : 'outline'}
         size="icon" className="h-9 w-9"
         title={
           activeThread.agent_state === 'active'
-            ? 'AI assistant is handling this — click to take back'
-            : activeThread.agent_state === 'paused'
-              ? 'You took over — click to let the AI respond again'
-              : 'Hand this conversation to the AI assistant'
+            ? 'The AI answers this conversation directly — click to stop it entirely'
+            : activeThread.agent_state === 'suggesting'
+              ? 'The AI drafts replies here for you to review — click to let it answer directly'
+              : activeThread.agent_state === 'paused'
+                ? 'You took over — click to have the AI draft replies for you again'
+                : 'Have the AI draft replies here for you to review before sending'
         }
         onClick={async () => {
-          const next = activeThread.agent_state === 'active' ? 'off' : 'active';
+          const next = activeThread.agent_state === 'suggesting' ? 'active'
+            : activeThread.agent_state === 'active' ? 'off' : 'suggesting';
           try {
             await inboxApi.setAgent(activeThread.id, next);
             setActiveThread({ ...activeThread, agent_state: next });
+            toast({
+              title: next === 'off' ? 'Assistant off for this conversation'
+                : next === 'suggesting' ? 'The AI will draft replies here'
+                  : 'The AI will answer this conversation directly',
+              description: next === 'suggesting'
+                ? 'You will find a reply waiting to edit and send. Nothing goes out without you.'
+                : next === 'active'
+                  ? 'Replies are sent to the customer without review.'
+                  : undefined,
+            });
           } catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
         }}
       >
@@ -1701,6 +1729,26 @@ const InboxPage: React.FC = () => {
                         </PopoverContent>
                       </Popover>
                     )}
+                  </div>
+                )}
+                {/* Why there is no draft waiting. An empty composer on a `suggesting` thread is
+                    indistinguishable from nobody having written in, which is the whole reason the
+                    reason gets stored rather than logged. */}
+                {!aiDraftShown && !isNote && activeThread?.agent_state === 'suggesting'
+                  && activeThread?.agent_draft_error && (
+                  <div className="flex items-start gap-2 text-xs bg-[hsl(var(--warning-bg))] text-warning rounded-sm px-3 py-2">
+                    <AlertTriangle className="w-3.5 h-3.5 mt-px shrink-0" />
+                    <span>The assistant could not draft a reply here: {activeThread.agent_draft_error}</span>
+                  </div>
+                )}
+                {/* A draft that was overtaken by a newer customer message. It answers the previous
+                    question, so it is never loaded — but vanishing without a word reads as the
+                    assistant having done nothing. */}
+                {!aiDraftShown && !isNote && activeThread?.agent_draft
+                  && activeThread?.agent_draft_is_current === false && (
+                  <div className="flex items-start gap-2 text-xs bg-surface-sunken text-muted-foreground rounded-sm px-3 py-2">
+                    <Sparkles className="w-3.5 h-3.5 mt-px shrink-0" />
+                    <span>A draft was written here, then they wrote again — it answered the earlier message, so it was set aside.</span>
                   </div>
                 )}
                 {aiDraftShown && !isNote && (
