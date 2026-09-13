@@ -5,9 +5,7 @@
  * calling `get_product_price_for_workspace`, the one ladder 15 call sites use — so it knew nothing
  * about customer overrides, level discounts, quantity breaks or custom category rules. And
  * `ProductStrip` threw away the `kind` it was given and inferred the label from `discount_pct > 0`,
- * which labelled a sub-account at 0% discount "Retail" when it was their buy price.
- *
- * A wrong price is a valid number. Nothing downstream can see it.
+ * which labelled a sub-account at 0% discount "Retail" when it was their buy price — a valid number nothing can see.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
