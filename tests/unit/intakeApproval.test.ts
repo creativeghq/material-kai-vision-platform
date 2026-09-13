@@ -124,3 +124,69 @@ describe('a match verdict ages', () => {
     expect(service).toContain('match_scored_at');
   });
 });
+
+describe('the ontology proposal is a candidate, and never a distributor', () => {
+  const svc = read('src/services/warehouseService.ts');
+  const propose = read('supabase/functions/ontology-propose-targets/index.ts');
+
+  it('the rubric lives in the database, not in the function', () => {
+    expect(propose).toContain("loadPrompt(supabase, 'tool', 'ontology_propose')");
+    expect(propose).not.toMatch(/You are matching free-text terms/);
+  });
+
+  it('a hallucinated id cannot bind anything', () => {
+    // The model does not get to name a binding it was not given, or a company that does not exist.
+    expect(propose).toMatch(/known\.has\(p\?\.binding_id\)/);
+    expect(propose).toMatch(/validCompany\.has\(p\?\.company_id\)/);
+  });
+
+  it('it proposes and never confirms', () => {
+    expect(propose).toContain('ontology_propose_binding');
+    expect(propose).toContain('ontology_propose_new_party');
+    expect(propose).not.toContain('ontology_confirm_binding');
+  });
+
+  it('the invoice terms are fenced as data', () => {
+    expect(propose).toMatch(/untrusted_invoice_terms/);
+  });
+
+  it('it is reachable from the gaps dialog', () => {
+    const dialog = read('src/modules/finance/components/OntologyGapsDialog.tsx');
+    expect(dialog).toContain('ontologyProposeTargets');
+    expect(svc).toContain('ontology-propose-targets');
+  });
+});
+
+describe('the enrichment drain reads only what we already hold', () => {
+  const drain = read('supabase/functions/intake-enrich-products/index.ts');
+
+  it('a product with no link and no brand site is recorded, not searched for', () => {
+    // Hunting the open web by name is the guessed match: a wrong specification on the
+    // right-looking product is a valid-looking value nothing downstream catches.
+    expect(drain).toMatch(/sourceFor[\s\S]{0,120}product_url[\s\S]{0,80}brand_website/);
+    expect(drain).toMatch(/p_status: 'no_source'/);
+  });
+
+  it('a low-confidence page writes nothing', () => {
+    expect(drain).toMatch(/confidence < MIN_CONFIDENCE/);
+    expect(drain).toMatch(/p_status: 'low_confidence'[\s\S]{0,400}p_findings: null/);
+  });
+
+  it('findings are claims in attributes_raw, never in metadata or attributes', () => {
+    expect(drain).toContain("source: 'web_enrichment'");
+    expect(drain).not.toMatch(/attributes:\s*\{|p\.attributes\s*=/);
+  });
+
+  it('it wires the existing scraper rather than growing a second one', () => {
+    expect(drain).toContain("from '../_shared/tools/material-scrape-tools.ts'");
+    expect(drain).not.toMatch(/api\.firecrawl\.dev/);
+  });
+
+  it('the batch is CLAIMED, so two drains cannot enrich one product twice', () => {
+    expect(drain).toContain('claim_products_for_enrichment');
+  });
+
+  it('it is reachable from the additions panel', () => {
+    expect(panel).toContain('runIntakeEnrichment');
+  });
+});

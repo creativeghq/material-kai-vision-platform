@@ -204,6 +204,7 @@ export const OntologyGapsDialog: React.FC<{
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<OntologyConceptType | 'all'>('all');
+  const [proposing, setProposing] = useState(false);
 
   const load = useCallback(async () => {
     if (!open) return;
@@ -229,6 +230,24 @@ export const OntologyGapsDialog: React.FC<{
     [gaps, filter],
   );
   const blocked = useMemo(() => shown.reduce((a, g) => a + g.occurrences, 0), [shown]);
+
+  const propose = async () => {
+    setProposing(true);
+    try {
+      const res = await warehouseService.ontologyProposeTargets(workspaceId, {
+        conceptType: filter === 'supplier' ? 'supplier' : 'manufacturer',
+      });
+      toast({
+        title: res.considered === 0
+          ? 'Nothing waiting for a proposal'
+          : `${res.proposed_existing} matched, ${res.proposed_new_party} look like new makers`,
+        description: res.reason ?? res.note,
+      });
+      await load();
+    } catch (err) {
+      toast({ title: 'Could not propose', description: (err as Error)?.message, variant: 'destructive' });
+    } finally { setProposing(false); }
+  };
 
   const resolved = (bindingId: string) => {
     setGaps((prev) => prev.filter((g) => g.binding_id !== bindingId));
@@ -260,6 +279,16 @@ export const OntologyGapsDialog: React.FC<{
           <span className="text-[11px] text-muted-foreground">
             {shown.length} name{shown.length === 1 ? '' : 's'} · {blocked} queued line{blocked === 1 ? '' : 's'} blocked
           </span>
+          {/* #406 Phase 3 -- the list was 180 names waiting to be matched entirely by hand. A
+              proposal is a candidate; confirming is still a person's act. */}
+          <Button
+            size="sm" variant="outline" className="h-8 rounded-sm text-xs"
+            disabled={proposing || filter === 'material_category'}
+            onClick={propose}
+          >
+            {proposing ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Sparkles className="mr-1 h-3 w-3" />}
+            Propose matches
+          </Button>
         </div>
 
         <div className="max-h-[60vh] overflow-y-auto">

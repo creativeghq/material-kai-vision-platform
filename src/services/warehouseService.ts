@@ -609,6 +609,64 @@ export const warehouseService = {
   },
 
   /** A human says no. The term and its evidence are KEPT, so the next run cannot re-propose it. */
+  /**
+   * Ask a model to propose a target for terms nobody has matched yet (#406 Phase 3).
+   *
+   * Every answer is a CANDIDATE. A brand is never bound to its distributor -- doing that once
+   * brands every one of that maker's products with the distributor's name, permanently.
+   */
+  async ontologyProposeTargets(
+    workspaceId: string,
+    opts?: { conceptType?: 'manufacturer' | 'supplier'; limit?: number },
+  ): Promise<{
+    considered: number; proposed_existing: number; proposed_new_party: number;
+    left_unknown: number; note: string; reason?: string;
+  }> {
+    const { data, error } = await supabase.functions.invoke('ontology-propose-targets', {
+      body: {
+        workspace_id: workspaceId,
+        concept_type: opts?.conceptType ?? 'manufacturer',
+        limit: opts?.limit ?? 25,
+      },
+    });
+    if (error) throw error;
+    const r = (data ?? {}) as Record<string, unknown>;
+    return {
+      considered: Number(r.considered ?? 0),
+      proposed_existing: Number(r.proposed_existing ?? 0),
+      proposed_new_party: Number(r.proposed_new_party ?? 0),
+      left_unknown: Number(r.left_unknown ?? 0),
+      note: String(r.note ?? ''),
+      reason: r.reason ? String(r.reason) : undefined,
+    };
+  },
+
+  /**
+   * Drain the products approve marked for enrichment (#406 Phase 5).
+   *
+   * It reads only a URL we already hold. Every outcome is recorded, `no_source` included --
+   * "nothing found" and "never tried" must not look the same, or the drain re-crawls forever.
+   */
+  async runIntakeEnrichment(workspaceId: string, limit = 10): Promise<{
+    claimed: number; enriched: number; no_source: number; low_confidence: number;
+    failed: number; note: string; reason?: string;
+  }> {
+    const { data, error } = await supabase.functions.invoke('intake-enrich-products', {
+      body: { workspace_id: workspaceId, limit },
+    });
+    if (error) throw error;
+    const r = (data ?? {}) as Record<string, unknown>;
+    return {
+      claimed: Number(r.claimed ?? 0),
+      enriched: Number(r.enriched ?? 0),
+      no_source: Number(r.no_source ?? 0),
+      low_confidence: Number(r.low_confidence ?? 0),
+      failed: Number(r.failed ?? 0),
+      note: String(r.note ?? ''),
+      reason: r.reason ? String(r.reason) : undefined,
+    };
+  },
+
   async ontologyReject(bindingId: string, note?: string): Promise<void> {
     const { error } = await supabase.rpc('ontology_reject_binding', {
       p_binding_id: bindingId, p_note: note ?? null,

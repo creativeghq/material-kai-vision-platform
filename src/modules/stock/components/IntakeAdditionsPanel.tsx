@@ -6,7 +6,7 @@
  * is in three tables nobody renders.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { Loader2, AlertTriangle, PackagePlus, Undo2 } from 'lucide-react';
+import { Loader2, AlertTriangle, PackagePlus, Undo2, Sparkles } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
@@ -29,6 +29,7 @@ export const IntakeAdditionsPanel: React.FC<{ workspaceId: string }> = ({ worksp
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [draining, setDraining] = useState(false);
 
   const load = useCallback(async () => {
     if (!workspaceId) return;
@@ -42,6 +43,29 @@ export const IntakeAdditionsPanel: React.FC<{ workspaceId: string }> = ({ worksp
   }, [workspaceId]);
 
   useEffect(() => { void load(); }, [load]);
+
+  /* #406 -- approve never crawls. This is the drain, and it says what it could not do as
+     plainly as what it did. */
+  const enrich = async () => {
+    setDraining(true);
+    try {
+      const res = await warehouseService.runIntakeEnrichment(workspaceId, 10);
+      toast({
+        title: res.claimed === 0
+          ? 'Nothing queued for enrichment'
+          : `${res.enriched} enriched, ${res.no_source} had nowhere to look`,
+        description: res.reason ?? `${res.low_confidence} page(s) were not confidently about the `
+          + `product and ${res.failed} could not be read. ${res.note}`,
+      });
+      await load();
+    } catch (err) {
+      toast({
+        title: 'Could not run the enrichment',
+        description: (err as Error)?.message,
+        variant: 'destructive',
+      });
+    } finally { setDraining(false); }
+  };
 
   const undo = async (a: IntakeAddition) => {
     if (!window.confirm(`Undo the approval of “${a.name}”?\n\n${UNDO_KEEPS_THE_PRODUCT}`)) return;
@@ -74,6 +98,11 @@ export const IntakeAdditionsPanel: React.FC<{ workspaceId: string }> = ({ worksp
       </CardHeader>
 
       <CardContent className="space-y-2 text-xs">
+        <Button size="sm" variant="outline" className="h-8" disabled={draining} onClick={enrich}>
+          {draining ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Sparkles className="mr-1 h-3 w-3" />}
+          Run enrichment
+        </Button>
+
         {loading && (
           <p className="flex items-center gap-2 text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Reading what intake created…
