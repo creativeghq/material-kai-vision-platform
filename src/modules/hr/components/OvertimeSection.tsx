@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, Loader2, Timer, Send, Trash2 } from 'lucide-react';
+import { Plus, Loader2, Timer, Send, Trash2, Pencil } from 'lucide-react';
+import { EditOvertimeDialog } from './EditOvertimeDialog';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -27,6 +28,9 @@ export function OvertimeSection({ workspaceId, canManage }: { workspaceId: strin
   const [erganiOn, setErganiOn] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
+  // #409: a mistyped entry could only be DELETED. Once filed it is locked in `submitted` by
+  // the CHECK, and the way out of that is Ergani -> Cancel.
+  const [editing, setEditing] = useState<Overtime | null>(null);
 
   const load = useCallback(async () => {
     if (!workspaceId) { setLoading(false); return; }
@@ -140,6 +144,11 @@ export function OvertimeSection({ workspaceId, canManage }: { workspaceId: strin
                     </TableCell>
                     <TableCell className="text-right">
                       {canManage && o.status !== 'submitted' && (
+                        <Button size="sm" variant="ghost" disabled={busyId === o.id} onClick={() => setEditing(o)} title="Edit">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {canManage && o.status !== 'submitted' && (
                         <Button size="sm" variant="ghost" disabled={busyId === o.id} onClick={() => remove(o.id)} title="Delete">
                           {busyId === o.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 text-destructive" />}
                         </Button>
@@ -153,6 +162,14 @@ export function OvertimeSection({ workspaceId, canManage }: { workspaceId: strin
           <TablePagination page={page} total={entries.length} onPageChange={setPage} label="entries" />
         </CardContent>
       </Card>
+
+      {editing && workspaceId && (
+        <EditOvertimeDialog
+          workspaceId={workspaceId} entry={editing}
+          onClose={() => setEditing(null)}
+          onDone={() => { setEditing(null); load(); }}
+        />
+      )}
     </div>
   );
 }

@@ -622,6 +622,14 @@ class HrService {
   erganiDownloadPdf(ws: string, input: { code: string; protocol: string; submitted_date: string }): Promise<{ pdf_base64: string }> { return call(ws, 'ergani-download-pdf', input); }
   erganiSubmissionsLog(ws: string, filters: { employee_id?: string; submission_type?: string; limit?: number } = {}): Promise<{ submissions: ErganiSubmission[] }> { return call(ws, 'ergani-submissions-log', filters); }
   erganiRetry(ws: string, submission_id: string): Promise<{ ok: boolean; result: ErganiSubmitResult }> { return call(ws, 'ergani-retry', { submission_id }); }
+  /**
+   * Cancel a filed document AT ERGANI and release the record it belongs to back to `draft`.
+   *
+   * The only way out of a wrong filing: the CHECK on hr_separations / hr_overtime /
+   * hr_work_schedules is draft|submitted|failed, so without this a mis-filed record sits in
+   * `submitted` forever while the ministry holds a document that says something else.
+   */
+  erganiCancel(ws: string, submission_id: string): Promise<{ ok: boolean; cancelled: boolean; message?: string; warning?: string; local_write_failed?: boolean }> { return call(ws, 'ergani-cancel', { submission_id }); }
 
   // ── Ε3 / Ε4 / Ε5 / Ε6 / Ε7 / Ε8 filings ──
   // Each is preview-then-submit: call with { preview: true } to get the document Ergani's own

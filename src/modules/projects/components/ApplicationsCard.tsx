@@ -1,6 +1,6 @@
 /** Applications for payment. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Plus, Receipt, Trash2, Check, FileText, Pencil } from 'lucide-react';
+import { Loader2, Plus, Receipt, Trash2, Check, FileText, Pencil, Percent } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -17,6 +17,7 @@ import {
   applicationsService, isApplicationSettled,
   type ApplicationRow, type ApplicationStatus, type RetentionTerms, type RetentionPosition,
 } from '../services/applicationsService';
+import { RetentionTermsDialog } from './RetentionTermsDialog';
 
 interface Props {
   projectId: string;
@@ -43,6 +44,9 @@ export const ApplicationsCard: React.FC<Props> = ({ projectId, workspaceId, curr
   // #411: a mistyped gross valuation had to be deleted and re-raised, which burns the
   // `reference` the payer is quoting back and leaves a gap in a numbered sequence.
   const [amending, setAmending] = useState<ApplicationRow | null>(null);
+  // #408: the whole retention subsystem read terms that nothing could write, so every
+  // valuation deducted zero and the tranche button threw on every project.
+  const [editingTerms, setEditingTerms] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -103,9 +107,14 @@ export const ApplicationsCard: React.FC<Props> = ({ projectId, workspaceId, curr
           </p>
         </div>
         {isOwner && workspaceId && (
-          <Button size="sm" variant="secondary" onClick={() => setCreating(true)} disabled={busy}>
-            <Plus className="h-3.5 w-3.5" /> Application
-          </Button>
+          <div className="flex shrink-0 items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => setEditingTerms(true)} disabled={busy}>
+              <Percent className="h-3.5 w-3.5" /> Retention terms
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => setCreating(true)} disabled={busy}>
+              <Plus className="h-3.5 w-3.5" /> Application
+            </Button>
+          </div>
         )}
       </CardHeader>
 
@@ -319,6 +328,14 @@ export const ApplicationsCard: React.FC<Props> = ({ projectId, workspaceId, curr
           row={certifying} currency={currency}
           onClose={() => setCertifying(null)}
           onSaved={() => { setCertifying(null); void load(); }}
+        />
+      )}
+
+      {editingTerms && (
+        <RetentionTermsDialog
+          projectId={projectId}
+          onClose={() => setEditingTerms(false)}
+          onSaved={() => { setEditingTerms(false); void load(); }}
         />
       )}
 

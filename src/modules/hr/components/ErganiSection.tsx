@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { FileText, Loader2, RefreshCw, Download, Plug, Send, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { FileText, Loader2, RefreshCw, Download, Plug, Send, AlertTriangle, CheckCircle2, Ban } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -19,7 +19,10 @@ import { formatDate } from '@/utils/datetime';
 const statusBadge = (s: string) =>
   s === 'submitted' ? <span className="text-sm text-emerald-600 dark:text-emerald-400">Submitted</span>
   : s === 'failed' ? <span className="text-sm text-red-500 dark:text-red-400">Failed</span>
-  : <span className="text-sm text-muted-foreground">Cancelled</span>;
+  // "Cancelled at Ergani" is not "never filed": the document existed, the ministry held it, and
+  // the withdrawal is itself a filing. Written as a light/dark PAIR — amber-300 is chosen for
+  // plum-black and renders at 1.23:1 on the light themes' cream.
+  : <span className="text-sm text-amber-800 dark:text-amber-300">Cancelled at Ergani</span>;
 
 /** Ergani "dd/mm/yyyy hh:mm" (or the row's created_at) → yyyymmdd for the PDF fetch. */
 function toYyyymmdd(submitDate: string | null, createdAt: string): string {
@@ -69,6 +72,39 @@ export function ErganiSection({ workspaceId, canManage }: { workspaceId: string 
     try { const r = await hrService.erganiRetry(workspaceId, id); toast({ title: 'Re-submitted', description: `Protocol ${r.result.protocol}` }); load(); }
     catch (e) { toast({ title: 'Retry failed', description: (e as Error).message, variant: 'destructive' }); }
     finally { setBusyId(null); }
+  };
+
+  /**
+   * Withdraw a filing and release the record behind it.
+   *
+   * Confirmed first and the reason recorded, because the cancellation reaches the MINISTRY: it
+   * cannot be undone from here, and a document that was withdrawn is not a document that was
+   * never sent.
+   */
+  const cancel = async (s: ErganiSubmission) => {
+    if (!workspaceId) return;
+    const reason = window.prompt(
+      `Cancel ${s.submission_type} at Ergani (protocol ${s.protocol})?
+
+`
+      + 'This withdraws the filing at the ministry and releases the record back to draft so it '
+      + 'can be corrected and filed again. Say why — it is recorded against the submission.',
+    );
+    if (reason === null) return;
+    setBusyId(s.id);
+    try {
+      const r = await hrService.erganiCancel(workspaceId, s.id);
+      if (r.local_write_failed) {
+        // The ministry accepted the cancellation and our own row did not move. Named, never
+        // swallowed: cancelling again would be a second withdrawal of a document that is gone.
+        toast({ title: 'Cancelled at Ergani, but our record did not update', description: r.warning, variant: 'destructive' });
+      } else {
+        toast({ title: 'Cancelled at Ergani', description: r.message ?? 'The record is back in draft and can be re-filed.' });
+      }
+      load();
+    } catch (e) {
+      toast({ title: 'Could not cancel', description: (e as Error).message, variant: 'destructive' });
+    } finally { setBusyId(null); }
   };
 
   const downloadPdf = async (s: ErganiSubmission) => {
@@ -168,6 +204,12 @@ export function ErganiSection({ workspaceId, canManage }: { workspaceId: string 
                         {canManage && s.status === 'failed' && (
                           <Button size="sm" variant="ghost" disabled={busyId === s.id} onClick={() => retry(s.id)} title="Retry">
                             {busyId === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                          </Button>
+                        )}
+                        {canManage && s.status === 'submitted' && s.protocol && (
+                          <Button size="sm" variant="ghost" disabled={busyId === s.id}
+                            onClick={() => void cancel(s)} title="Cancel at Ergani and release the record">
+                            {busyId === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ban className="h-4 w-4 text-destructive" />}
                           </Button>
                         )}
                       </div>

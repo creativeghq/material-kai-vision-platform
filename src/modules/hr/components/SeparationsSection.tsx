@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, Loader2, UserMinus, Send, Trash2 } from 'lucide-react';
+import { Plus, Loader2, UserMinus, Send, Trash2, Pencil } from 'lucide-react';
+import { EditSeparationDialog } from './EditSeparationDialog';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -29,6 +30,9 @@ export function SeparationsSection({ workspaceId, canManage }: { workspaceId: st
   const [busyId, setBusyId] = useState<string | null>(null);
   const [erganiOn, setErganiOn] = useState(false);
   const [page, setPage] = useState(1);
+  // #409: there was no edit path at all -- a wrong separation could only be deleted, and a
+  // FILED one could not even be that.
+  const [editing, setEditing] = useState<Separation | null>(null);
 
   const load = useCallback(async () => {
     if (!workspaceId) { setLoading(false); return; }
@@ -111,6 +115,11 @@ export function SeparationsSection({ workspaceId, canManage }: { workspaceId: st
                           />
                         )}
                         {canManage && s.status !== 'submitted' && (
+                          <Button size="sm" variant="ghost" disabled={busyId === s.id} onClick={() => setEditing(s)} title="Edit">
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {canManage && s.status !== 'submitted' && (
                           <Button size="sm" variant="ghost" disabled={busyId === s.id} onClick={() => remove(s.id)} title="Delete">
                             {busyId === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 text-destructive" />}
                           </Button>
@@ -125,6 +134,14 @@ export function SeparationsSection({ workspaceId, canManage }: { workspaceId: st
           <TablePagination page={page} total={separations.length} onPageChange={setPage} label="departures" />
         </CardContent>
       </Card>
+
+      {editing && workspaceId && (
+        <EditSeparationDialog
+          workspaceId={workspaceId} separation={editing}
+          onClose={() => setEditing(null)}
+          onDone={() => { setEditing(null); load(); }}
+        />
+      )}
     </div>
   );
 }
