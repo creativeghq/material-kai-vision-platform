@@ -70,6 +70,11 @@ export interface CompanyAsset {
   useful_life_months: number | null;
   salvage_value: number;
   depreciation_start: string | null;
+  // The SECOND basis. Greek tax depreciation is a statutory rate on cost by category, so it needs
+  // a category and its own in-service date -- never a life back-computed from a rate (#451).
+  tax_category_code: string | null;
+  tax_placed_in_service_on: string | null;
+  tax_basis_cost: number | null;
   disposed_on: string | null;
   disposal_proceeds: number | null;
   source_supplier_bill_id: string | null;
@@ -100,6 +105,9 @@ export interface AssetInput {
   useful_life_months?: number | null;
   salvage_value?: number | null;
   depreciation_start?: string | null;
+  tax_category_code?: string | null;
+  tax_placed_in_service_on?: string | null;
+  tax_basis_cost?: number | null;
   disposed_on?: string | null;
   disposal_proceeds?: number | null;
   /** The supplier bill this asset was acquired on, when it came in through Finance. */
@@ -213,6 +221,9 @@ class AssetsService {
         useful_life_months: row.useful_life_months ?? null,
         salvage_value: row.salvage_value ?? 0,
         depreciation_start: row.depreciation_start ?? null,
+        tax_category_code: row.tax_category_code ?? null,
+        tax_placed_in_service_on: row.tax_placed_in_service_on ?? null,
+        tax_basis_cost: row.tax_basis_cost ?? null,
         disposed_on: row.disposed_on ?? null,
         disposal_proceeds: row.disposal_proceeds ?? null,
         source_supplier_bill_id: row.source_supplier_bill_id ?? null,
@@ -247,6 +258,9 @@ class AssetsService {
       useful_life_months: input.useful_life_months ?? null,
       salvage_value: input.salvage_value ?? 0,
       depreciation_start: input.depreciation_start || null,
+      tax_category_code: input.tax_category_code || null,
+      tax_placed_in_service_on: input.tax_placed_in_service_on || null,
+      tax_basis_cost: input.tax_basis_cost ?? null,
       disposed_on: input.disposed_on || null,
       disposal_proceeds: input.disposal_proceeds ?? null,
       source_supplier_bill_id: input.source_supplier_bill_id || null,

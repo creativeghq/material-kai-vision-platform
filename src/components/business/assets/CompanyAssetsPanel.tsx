@@ -19,6 +19,11 @@ import {
   type AssetInput, type EmployeeOption, type ContactOption, type RecurringExpenseOption, type CompanyOption,
 } from '@/services/assetsService';
 import { HubEmptyState } from '@/components/core/hub';
+import { TaxDepreciationCard } from './TaxDepreciationCard';
+import {
+  taxDepreciationService, TAX_STATUS_LABEL, taxBasisIsUnknown,
+  type TaxRateRow, type AssetTaxDepreciation,
+} from '@/modules/finance/services/taxDepreciationService';
 
 const CATEGORY_ICON: Record<AssetCategory, React.ComponentType<{ className?: string }>> = {
   vehicle: Car, phone: Smartphone, laptop: Laptop, payment_card: CreditCard, equipment: Wrench, other: Box,
@@ -49,6 +54,7 @@ const EMPTY_FORM: AssetInput = {
   acquisition_type: 'owned', acquisition_cost: null, currency: 'EUR', acquired_at: '',
   supplier_company_id: null, recurring_expense_id: null, finance_category_id: null, notes: '',
   depreciation_method: 'none', useful_life_months: null, salvage_value: null, depreciation_start: '',
+  tax_category_code: null, tax_placed_in_service_on: '',
 };
 
 export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = true, context = 'finance' }) => {
@@ -68,6 +74,8 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<CompanyAsset | null>(null);
   const [form, setForm] = useState<AssetInput>(EMPTY_FORM);
+  const [taxCategories, setTaxCategories] = useState<TaxRateRow[]>([]);
+  const [taxBasis, setTaxBasis] = useState<Record<string, AssetTaxDepreciation>>({});
   const [costText, setCostText] = useState('');
   const [salvageText, setSalvageText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -83,14 +91,22 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
     if (!workspaceId) return;
     setLoading(true);
     try {
-      const [a, emp, con, co, rec] = await Promise.all([
+      const [a, emp, con, co, rec, tax] = await Promise.all([
         assetsService.listAssets(workspaceId),
         assetsService.listEmployees(workspaceId).catch(() => []),
         assetsService.listContacts(workspaceId).catch(() => []),
         assetsService.listCompanies(workspaceId).catch(() => []),
         assetsService.listRecurringExpenses(workspaceId).catch(() => []),
+        taxDepreciationService.rateTable(workspaceId).catch(() => [] as TaxRateRow[]),
       ]);
       setAssets(a); setEmployees(emp); setContacts(con); setCompanies(co); setRecurring(rec);
+      setTaxCategories(tax);
+      // The tax schedule for the same assets. Derived server-side against the rate in force in
+      // each month, so this is a read -- never a second computation of the same money.
+      const basis = await taxDepreciationService
+        .forAssets(a.map((x) => x.id))
+        .catch(() => [] as AssetTaxDepreciation[]);
+      setTaxBasis(Object.fromEntries(basis.map((b) => [b.asset_id, b])));
     } catch (e: any) {
       toast({ title: 'Could not load assets', description: e?.message || String(e), variant: 'destructive' });
     } finally { setLoading(false); }
@@ -121,6 +137,8 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
       recurring_expense_id: a.recurring_expense_id, finance_category_id: a.finance_category_id, notes: a.notes || '',
       depreciation_method: a.depreciation_method, useful_life_months: a.useful_life_months,
       salvage_value: a.salvage_value, depreciation_start: a.depreciation_start || '',
+      tax_category_code: a.tax_category_code,
+      tax_placed_in_service_on: a.tax_placed_in_service_on || '',
     });
     setCostText(a.acquisition_cost != null ? String(a.acquisition_cost) : '');
     setSalvageText(a.salvage_value ? String(a.salvage_value) : '');
@@ -141,6 +159,10 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
         useful_life_months: owned && depreciates(form.depreciation_method) ? (form.useful_life_months || null) : null,
         salvage_value: owned && depreciates(form.depreciation_method) && salvageText.trim() ? parseDecimal(salvageText) : 0,
         depreciation_start: owned && depreciates(form.depreciation_method) ? (form.depreciation_start || null) : null,
+        // The tax basis is independent of the book method: an asset the books do not depreciate
+        // can still carry a statutory rate, and vice versa.
+        tax_category_code: owned ? (form.tax_category_code || null) : null,
+        tax_placed_in_service_on: owned ? (form.tax_placed_in_service_on || null) : null,
       };
       if (editing) { await assetsService.updateAsset(editing.id, payload); toast({ title: 'Asset updated' }); }
       else { await assetsService.createAsset(workspaceId, payload); toast({ title: 'Asset added' }); }
@@ -188,6 +210,7 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
   const assignOptions = assignKind === 'employee' ? employees : contacts;
 
   return (
+    <div className="space-y-4">
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between gap-3 flex-wrap space-y-0">
         <div>
@@ -260,6 +283,9 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
                         <div>{ACQUISITION_LABEL[a.acquisition_type]}</div>
                         <div className="text-xs text-muted-foreground">{money(a.acquisition_cost, a.currency)}</div>
                         {a.book_value != null && <div className="text-xs text-muted-foreground">Book: {money(a.book_value, a.currency)}</div>}
+                        {taxBasis[a.id] && (taxBasisIsUnknown(taxBasis[a.id].status)
+                          ? <div className="text-xs text-amber-800 dark:text-amber-300">Tax: {TAX_STATUS_LABEL[taxBasis[a.id].status]}</div>
+                          : <div className="text-xs text-muted-foreground">Tax: {money(taxBasis[a.id].written_down_value, a.currency)}</div>)}
                       </td>
                       <td className="px-3 py-2">
                         {a.current_holder?.assignee_name
@@ -390,6 +416,34 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
                     <p className="col-span-3 text-xs text-muted-foreground">Book value = cost − straight-line depreciation since start (defaults to the acquired date).</p>
                   </div>
                 )}
+                <div className="grid grid-cols-2 gap-3 border-t border-border/60 pt-3">
+                  <div className="space-y-1">
+                    <Label>Tax category (άρθρο 24)</Label>
+                    <Select
+                      value={form.tax_category_code || 'none'}
+                      onValueChange={(v) => setForm((f) => ({ ...f, tax_category_code: v === 'none' ? null : v }))}
+                    >
+                      <SelectTrigger className="h-8"><SelectValue placeholder="Not set" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Not set</SelectItem>
+                        {taxCategories.map((c) => (
+                          <SelectItem key={c.code} value={c.code}>{c.label_en}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Put into use on</Label>
+                    <Input
+                      type="date" value={form.tax_placed_in_service_on || ''}
+                      onChange={(e) => setForm((f) => ({ ...f, tax_placed_in_service_on: e.target.value }))}
+                    />
+                  </div>
+                  <p className="col-span-2 text-xs text-muted-foreground">
+                    Tax depreciation is a statutory percentage of cost and runs from the month AFTER
+                    the asset was put into use — which is why this is not the book start date.
+                  </p>
+                </div>
               </div>
             )}
             <div className="space-y-1 col-span-2">
@@ -445,6 +499,10 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
         </DialogContent>
       </Dialog>
     </Card>
+    {/* #451 -- the book basis above is one of TWO. The tax one is a statutory rate on cost, and
+        the difference between them is a real adjustment on the income-tax return. */}
+    {context === 'finance' && <TaxDepreciationCard workspaceId={workspaceId} canManage={canManage} />}
+    </div>
   );
 };
 

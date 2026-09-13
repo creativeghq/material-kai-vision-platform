@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { financeService, formatMoney, formatPct } from '@/modules/finance/services/financeService';
 import { AccountingExportCard } from '@/modules/finance/components/AccountingExportCard';
+import { IntrastatObligationCard } from '@/modules/finance/components/IntrastatObligationCard';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { formatDate, toLocalISODate, todayLocalISO } from '@/utils/datetime';
 type ReportKind =
@@ -329,6 +330,16 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
           )}
         </CardContent>
       </Card>
+
+      {/* #451 -- above the lines, because it changes what they mean: the same empty table reads as
+          "nothing to declare" or as "nobody ever checked", and those are different facts. */}
+      {report.startsWith('intrastat') && (
+        <IntrastatObligationCard
+          workspaceId={workspaceId}
+          flow={report === 'intrastat_dispatch' ? 'dispatch' : 'arrival'}
+          year={new Date(range.to || todayLocalISO()).getFullYear()}
+        />
+      )}
 
       {/* Result */}
       <Card>
