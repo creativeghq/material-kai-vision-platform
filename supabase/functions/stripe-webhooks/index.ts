@@ -5,6 +5,7 @@ import Stripe from 'https://esm.sh/stripe@14.10.0';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { emitFlowEvent, emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { captureException } from '../_shared/sentry.ts';
 import { getStripe, getPlatformBillingStripe, getSupabase, stripeWebhookSecret, platformBillingWebhookSecret } from '../_shared/stripe-clients.ts';
 import { moduleTierRank } from '../_shared/module-tiers.ts';
 // provider-neutral commerce-payment ingestion. Used ONLY by the
@@ -200,6 +201,16 @@ function signatureFailure(primaryErr: unknown, billingErr?: unknown): Response {
     `[stripe-webhooks] signature verification failed — default secret: ${primary}` +
     (billing ? ` | billing secret: ${billing}` : ' (no distinct billing secret configured)'),
   );
+  // Reported explicitly, because the wrapper never reports a 4xx — rightly, since a 4xx is
+  // normally the caller's fault. This one is OURS: Stripe signed the delivery and we could not
+  // verify it, which means a secret here is wrong or stale. 435 real deliveries were refused this
+  // way between 6 Jul and 1 Aug 2026 with nothing raised anywhere, and Stripe stops delivering to
+  // an endpoint that keeps failing — so the events are not queued, they are gone.
+  captureException(new Error(`Stripe signature verification failed: ${primary}`), {
+    tags: { area: 'stripe-webhooks', reason: 'signature_verification_failed' },
+    extra: { billing_secret_error: billing ?? null },
+    fingerprint: ['stripe-webhooks', 'signature_verification_failed'],
+  }).catch(() => {});
   return new Response(
     JSON.stringify({
       error: `Stripe signature verification failed: ${primary}`,
