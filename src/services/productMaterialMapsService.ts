@@ -104,6 +104,26 @@ export const productMaterialMapsService = {
     return out;
   },
 
+  /** Selected albedo per PRODUCT (no option value), as `productId -> url`, in one query (#404). */
+  async selectedAlbedoByProduct(productIds: string[]): Promise<Map<string, string>> {
+    const out = new Map<string, string>();
+    if (productIds.length === 0) return out;
+    const { data, error } = await supabase
+      .from('product_material_maps')
+      .select('product_id, storage_bucket, albedo_path')
+      .in('product_id', productIds)
+      .eq('is_selected', true)
+      .is('option_value_id', null);
+    if (error) throw error;
+    for (const row of (data ?? []) as Array<{
+      product_id: string; storage_bucket: string; albedo_path: string | null;
+    }>) {
+      const url = publicUrl(row.storage_bucket, row.albedo_path);
+      if (url) out.set(row.product_id, url);
+    }
+    return out;
+  },
+
   /**
    * Derive a tileable albedo from the product's own image and record it as a candidate.
    *

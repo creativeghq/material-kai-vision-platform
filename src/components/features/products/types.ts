@@ -46,7 +46,6 @@ export interface ProductMetadata {
   applications?: unknown;
   recommended_use?: unknown;
   room_type?: unknown;
-  joint_width?: unknown;
   joint_width_mm?: unknown;
   certifications?: unknown;
   standards?: unknown;

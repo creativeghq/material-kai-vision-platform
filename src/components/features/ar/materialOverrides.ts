@@ -30,19 +30,40 @@ export interface MaterialOverride {
  * material — the same texture legitimately dresses several materials.
  */
 const textureCache = new Map<string, Texture>();
+const texturePromises = new Map<string, Promise<Texture>>();
 const textureLoader = new TextureLoader();
+textureLoader.setCrossOrigin('anonymous');
+
+/**
+ * One download and one decode per URL for the page. A caller that needs its own repeat clones the
+ * result — clones share the decoded source, so five walls in one tile cost one upload.
+ */
+export function loadSharedTexture(url: string): Promise<Texture> {
+  const pending = texturePromises.get(url);
+  if (pending) return pending;
+  const promise = new Promise<Texture>((resolve, reject) => {
+    const tex = textureLoader.load(url, () => resolve(tex), undefined, (err) => {
+      texturePromises.delete(url);
+      textureCache.delete(url);
+      reject(err);
+    });
+    // sRGB, because it is a colour image. Left in linear space it renders washed out — the same
+    // colour-space trap the fixture generator hit from the other direction.
+    tex.colorSpace = SRGBColorSpace;
+    tex.wrapS = RepeatWrapping;
+    tex.wrapT = RepeatWrapping;
+    textureCache.set(url, tex);
+  });
+  texturePromises.set(url, promise);
+  return promise;
+}
 
 function loadTexture(url: string, repeat: number): Texture {
   const cached = textureCache.get(url);
   if (cached) return cached;
-  const tex = textureLoader.load(url);
-  // sRGB, because it is a colour image. Left in linear space it renders washed out — the same
-  // colour-space trap the fixture generator hit from the other direction.
-  tex.colorSpace = SRGBColorSpace;
-  tex.wrapS = RepeatWrapping;
-  tex.wrapT = RepeatWrapping;
+  void loadSharedTexture(url).catch(() => undefined);
+  const tex = textureCache.get(url)!;
   tex.repeat.set(repeat, repeat);
-  textureCache.set(url, tex);
   return tex;
 }
 

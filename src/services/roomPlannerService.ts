@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { PRODUCT_IMAGE_SELECT, getProductImageUrl } from '@/utils/productMetadata';
 import type { Tables } from '@/integrations/supabase/types';
 import { modelPublicUrl } from '@/services/product3dService';
+import { productMaterialMapsService } from '@/services/productMaterialMapsService';
+import { tileFormatM, type SurfaceTexture } from '@/components/features/roomplanner/surfaceFormat';
 
 /**
  * `Tables<'room_layouts'>` is generated from the database, and the committed `types.ts` is stale —
@@ -75,6 +77,8 @@ export interface ResolvedLayoutItem {
   footprint_source: 'override' | 'model' | 'default';
   product_name: string;
 }
+
+export type { SurfaceTexture } from '@/components/features/roomplanner/surfaceFormat';
 
 export const roomPlannerService = {
   async listLayouts(workspaceId: string): Promise<RoomLayout[]> {
@@ -291,6 +295,37 @@ export const roomPlannerService = {
     for (const row of data ?? []) {
       const url = getProductImageUrl(row);
       if (url) out.set((row as { id: string }).id, url);
+    }
+    return out;
+  },
+
+  /**
+   * The texture and format for each surface product (#404 Phase 0.4): the selected tileable
+   * albedo when one exists, else the product photo, else none — and the format either way.
+   * Throws on either read failing; a caller that swallowed that would show flat colours as fact.
+   */
+  async surfaceTexturesForProducts(workspaceId: string, productIds: string[]): Promise<Map<string, SurfaceTexture>> {
+    const out = new Map<string, SurfaceTexture>();
+    const ids = [...new Set(productIds.filter(Boolean))];
+    if (ids.length === 0) return out;
+    const [productsRes, albedoByProduct] = await Promise.all([
+      supabase
+        .from('products')
+        .select(`id, attributes, metadata, ${PRODUCT_IMAGE_SELECT}`)
+        .eq('workspace_id', workspaceId)
+        .in('id', ids),
+      productMaterialMapsService.selectedAlbedoByProduct(ids),
+    ]);
+    if (productsRes.error) throw productsRes.error;
+    for (const row of productsRes.data ?? []) {
+      const id = (row as { id: string }).id;
+      const albedo = albedoByProduct.get(id) ?? null;
+      const photo = albedo ? null : getProductImageUrl(row);
+      out.set(id, {
+        url: albedo ?? photo,
+        source: albedo ? 'albedo' : photo ? 'photo' : 'none',
+        ...tileFormatM(row as { attributes?: unknown; metadata?: unknown }),
+      });
     }
     return out;
   },

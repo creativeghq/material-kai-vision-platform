@@ -23,6 +23,7 @@ import {
 } from '@/components/core/ui/select';
 import { RoomPlannerCanvas } from './RoomPlannerCanvas';
 import { RoomScene3D, type SceneItem } from './RoomScene3D';
+import { tileFormatLabel } from './surfaceFormat';
 import { roomCameraPosition } from './roomScene';
 import { CanvasLoader, ThreeErrorBoundary } from '@/components/features/ar/CanvasChrome';
 import { occupiedAreaM2 } from './roomGeometry';
@@ -31,7 +32,7 @@ import type { PresetKey } from '@/components/features/lighting/lightingPresets';
 import {
 
   roomPlannerService, SURFACE_KEYS,
-  type RoomLayout, type ResolvedLayoutItem, type LayoutSurface, type SurfaceKey,
+  type RoomLayout, type ResolvedLayoutItem, type LayoutSurface, type SurfaceKey, type SurfaceTexture,
 } from '@/services/roomPlannerService';
 
 /** Picker cap. Named so the limit and the "is it truncated" test read the same
@@ -52,6 +53,8 @@ export const RoomPlannerPanel: React.FC = () => {
   const [modelUrls, setModelUrls] = useState<Map<string, string>>(new Map());
   const [imageUrls, setImageUrls] = useState<Map<string, string>>(new Map());
   const [surfaces, setSurfaces] = useState<LayoutSurface[]>([]);
+  const [surfaceTextures, setSurfaceTextures] = useState<Map<string, SurfaceTexture>>(new Map());
+  const [surfaceTextureError, setSurfaceTextureError] = useState<string | null>(null);
   const [quoting, setQuoting] = useState(false);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -371,6 +374,39 @@ export const RoomPlannerPanel: React.FC = () => {
     [items, modelUrls],
   );
 
+  // What each applied surface looks like (#404 Phase 0.4). Keyed on the SET of surface products,
+  // so re-assigning one wall to a product already in the room refetches nothing. A failed read is
+  // shown as one, never as flat colours.
+  const surfaceProductKey = useMemo(
+    () => [...new Set(surfaces.map((s2) => s2.product_id))].sort().join(','),
+    [surfaces],
+  );
+  useEffect(() => {
+    if (!activeWorkspaceId || !surfaceProductKey) {
+      setSurfaceTextures(new Map());
+      setSurfaceTextureError(null);
+      return;
+    }
+    let cancelled = false;
+    roomPlannerService.surfaceTexturesForProducts(activeWorkspaceId, surfaceProductKey.split(','))
+      .then((m) => { if (!cancelled) { setSurfaceTextures(m); setSurfaceTextureError(null); } })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        setSurfaceTextures(new Map());
+        setSurfaceTextureError(e instanceof Error ? e.message : 'unknown error');
+      });
+    return () => { cancelled = true; };
+  }, [activeWorkspaceId, surfaceProductKey]);
+
+  const sceneSurfaces = useMemo(() => {
+    const out: Partial<Record<SurfaceKey, SurfaceTexture>> = {};
+    for (const s2 of surfaces) {
+      const t = surfaceTextures.get(s2.product_id);
+      if (t) out[s2.surface] = t;
+    }
+    return out;
+  }, [surfaces, surfaceTextures]);
+
   const assumedCount = items.filter((i) => i.footprint_source === 'default').length;
   const missingModels = sceneItems.filter((i) => !i.modelUrl).length;
   const areaUsed = occupiedAreaM2(items.map((i) => ({
@@ -552,9 +588,11 @@ export const RoomPlannerPanel: React.FC = () => {
                       <RoomScene3D
                       lighting={(layout?.lighting_preset as PresetKey) ?? DEFAULT_PRESET}
                         room={{ widthM: Number(layout.effective_width_m), depthM: Number(layout.effective_depth_m) }}
+                        heightM={Number(layout.effective_height_m)}
                         items={sceneItems}
                         selectedId={selectedId}
                         onSelect={setSelectedId}
+                        surfaces={sceneSurfaces}
                       />
                     </Canvas>
                   </Suspense>
@@ -626,12 +664,20 @@ export const RoomPlannerPanel: React.FC = () => {
                       {applied && (
                         <span className="w-28 shrink-0 text-right text-[10px] text-muted-foreground">
                           {Number(applied.order_qty_m2).toFixed(2)} m²
+                          {/* The format the 3D view tiles at; "assumed" is the difference between a
+                              recorded format and a placeholder, same as the footprints above. */}
+                          {sceneSurfaces[key] && <span className="block">{tileFormatLabel(sceneSurfaces[key])}</span>}
                         </span>
                       )}
                     </div>
                   );
                 })}
               </div>
+              {surfaceTextureError && (
+                <p className="mt-2 text-[10px] text-destructive">
+                  Surface textures and formats could not be loaded ({surfaceTextureError}). The 3D view shows flat colours.
+                </p>
+              )}
             </div>
 
             <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">

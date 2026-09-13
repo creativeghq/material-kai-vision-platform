@@ -1,5 +1,30 @@
 /** True-scale placement for the 3D room view (#321 M3, #259 Phase 2). */
 import { Box3, Vector3, type Object3D } from 'three';
+import type { SurfaceKey } from '@/services/roomPlannerService';
+
+/** Which edge each wall stands on: the direction from the room's centre to that wall. Plan north is -z. */
+export const WALL_NORMALS: Array<{ key: SurfaceKey; normal: [number, number] }> = [
+  { key: 'wall_north', normal: [0, -1] },
+  { key: 'wall_south', normal: [0, 1] },
+  { key: 'wall_east', normal: [1, 0] },
+  { key: 'wall_west', normal: [-1, 0] },
+];
+
+/** Where an inward-facing wall stands, how wide it is, and its rotation about y. */
+export function wallTransform(
+  normal: [number, number],
+  widthM: number,
+  depthM: number,
+  heightM: number,
+): { position: [number, number, number]; span: number; rotationY: number } {
+  const [nx, nz] = normal;
+  return {
+    position: [(nx * widthM) / 2, heightM / 2, (nz * depthM) / 2],
+    span: nx !== 0 ? depthM : widthM,
+    // A plane faces +z; turning it by this angle points it back at the centre.
+    rotationY: Math.atan2(-nx, -nz),
+  };
+}
 
 export interface TrueScalePlacement {
   /** Uniform scale factor to apply to the model. */

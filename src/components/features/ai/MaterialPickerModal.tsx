@@ -36,7 +36,9 @@ import {
 import { mivaaApi } from '@/services/mivaaApiClient';
 import { SegmentWithResults } from '@/hooks/useSegmentation';
 import { supabase } from '@/integrations/supabase/client';
-import { INPAINTING_CREDIT_COSTS, INPAINTING_MODEL_LABELS, InpaintingModel, loadInpaintingCreditCosts } from '@/services/vrWorldService';
+import {
+  INPAINTING_MODEL_LABELS, InpaintingModel, INPAINT_PRICING_FALLBACK, loadInpaintPricing, type InpaintPricing,
+} from '@/services/vrWorldService';
 import {
   getMaterialCategory,
   getProductImageUrl,
@@ -516,12 +518,23 @@ export const MaterialPickerModal: React.FC<MaterialPickerModalProps> = ({
   // Live per-model prices from ai_model_pricing — the SAME rows sam_routes meters against,
   // so what this modal prints is what the backend debits. The imported constants are only
   // the first-paint fallback and must never become a hand-maintained price ladder.
-  const [inpaintCosts, setInpaintCosts] = useState<Record<InpaintingModel, number>>(INPAINTING_CREDIT_COSTS);
+  const [pricing, setPricing] = useState<InpaintPricing>(INPAINT_PRICING_FALLBACK);
   useEffect(() => {
     let cancelled = false;
-    loadInpaintingCreditCosts().then((c) => { if (!cancelled) setInpaintCosts(c); });
+    loadInpaintPricing().then((p) => { if (!cancelled) setPricing(p); });
     return () => { cancelled = true; };
   }, []);
+  const inpaintCosts = pricing.tiers;
+  // A material WITH a photo is placed by AnyDoor, which has its own row; the quality tier only
+  // prices the text-described fills. Showing the tier price for both is how the displayed number
+  // and the debited one came apart.
+  const anydoorCost = pricing.anydoor;
+
+  /** The catalog photo AnyDoor places, when the pick is a real product and not a sentinel. */
+  const referenceImageFor = (m: PickedMaterial): string | undefined =>
+    m.imageUrl && !m.id.startsWith('__') ? m.imageUrl : undefined;
+  const creditsFor = (m: PickedMaterial, q: InpaintingModel): number =>
+    referenceImageFor(m) ? anydoorCost : inpaintCosts[q];
 
   // Queue state
   const [queue, setQueue] = useState<QueueItem[]>([]);
@@ -799,12 +812,7 @@ export const MaterialPickerModal: React.FC<MaterialPickerModalProps> = ({
         }
         const negativePrompt = 'blurry, artifacts, distorted, low quality, unrealistic, cartoon, illustration, collage edges, visible seams';
 
-        // AnyDoor path: use actual catalog product photo when available (not a sentinel)
-        const referenceImageUrl =
-          item.material.imageUrl &&
-          !item.material.id.startsWith('__')
-            ? item.material.imageUrl
-            : undefined;
+        const referenceImageUrl = referenceImageFor(item.material);
 
         const res = await mivaaApi.inpaintRegion({
           image_url: currentImageUrl,
@@ -853,9 +861,9 @@ export const MaterialPickerModal: React.FC<MaterialPickerModalProps> = ({
 
   // ── Credit calculations ───────────────────────────────────────────────────────
 
-  const queueCredits = queue.reduce((sum, item) => sum + inpaintCosts[item.quality], 0);
-  const currentItemCredits = inpaintCosts[quality];
-  const totalCredits = queueCredits + (selectedMaterial ? currentItemCredits : 0);
+  const queueCredits = queue.reduce((sum, item) => sum + creditsFor(item.material, item.quality), 0);
+  const currentItemCredits = selectedMaterial ? creditsFor(selectedMaterial, quality) : 0;
+  const totalCredits = queueCredits + currentItemCredits;
 
   const hasAnythingToApply = selectedMaterial !== null || queue.length > 0;
 
@@ -1317,6 +1325,12 @@ export const MaterialPickerModal: React.FC<MaterialPickerModalProps> = ({
                           );
                         })}
                       </div>
+                      {selectedMaterial && referenceImageFor(selectedMaterial) && (
+                        <p className="text-[10px] text-muted-foreground">
+                          This material has a product photo, so it is placed as-is by AnyDoor ({anydoorCost} cr).
+                          Quality applies to fills described in words.
+                        </p>
+                      )}
                     </div>
 
                     {/* Add to queue button */}
@@ -1328,7 +1342,7 @@ export const MaterialPickerModal: React.FC<MaterialPickerModalProps> = ({
                         className="w-full text-xs border-violet-200 text-violet-700 hover:bg-violet-50"
                       >
                         <Plus className="w-3.5 h-3.5 mr-1.5" />
-                        Add to queue ({inpaintCosts[quality]} cr) and add another
+                        Add to queue ({currentItemCredits} cr) and add another
                       </Button>
                     )}
 
@@ -1355,7 +1369,7 @@ export const MaterialPickerModal: React.FC<MaterialPickerModalProps> = ({
                         {item.colorOverride && (
                           <div className="w-3.5 h-3.5 rounded-full border border-border flex-shrink-0" style={{ backgroundColor: item.colorOverride }} />
                         )}
-                        <span className="text-muted-foreground flex-shrink-0">{inpaintCosts[item.quality]}cr</span>
+                        <span className="text-muted-foreground flex-shrink-0">{creditsFor(item.material, item.quality)}cr</span>
                         <button
                           onClick={() => handleRemoveFromQueue(item.queueId)}
                           className="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0"

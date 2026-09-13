@@ -1080,7 +1080,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [selectedGenerationMode, setSelectedGenerationMode] = useState<string | null>(null);
   const [imageDragOverIndex, setImageDragOverIndex] = useState<number | null>(null);
   const imageDragIndexRef = useRef<number | null>(null);
-  const [geminiModalImage, setGeminiModalImage] = useState<string | null>(null);
+  // Which image the single-image editor holds, and where it came from — the title and the owner
+  // lookups follow the kind rather than a scan of every message.
+  const [geminiModalImage, setGeminiModalImage] = useState<{ url: string; kind: 'generated' | 'uploaded' } | null>(null);
   const [showGeminiEditModal, setShowGeminiEditModal] = useState(false);
   const [geminiEditRoomType, setGeminiEditRoomType] = useState<string | null>(null);
   const [geminiEditStyle, setGeminiEditStyle] = useState<string | null>(null);
@@ -2549,6 +2551,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             }
           }),
         );
+      }
+
+      // The bubble was drawn from the data: URLs. Swap in the stored ones, so opening the photo in
+      // the editor hands the segmenter and the inpainter a URL they can fetch. A failed upload
+      // leaves the data: URL, and the bubble offers no editor for it.
+      if (resolvedImageUrls.length > 0) {
+        setMessages((prev) => prev.map((m) => (m.id === userMessage.id ? { ...m, images: resolvedImageUrls } : m)));
       }
 
       // Save user message to database, including image URLs so they survive page refresh
@@ -5533,9 +5542,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         <div
           role="button"
           tabIndex={0}
-          onKeyDown={onEnterOrSpace(() => setGeminiModalImage(message.geminiImageData!.image_url))}
+          onKeyDown={onEnterOrSpace(() => setGeminiModalImage({ url: message.geminiImageData!.image_url, kind: 'generated' }))}
           className="group relative cursor-pointer"
-          onClick={() => setGeminiModalImage(message.geminiImageData!.image_url)}
+          onClick={() => setGeminiModalImage({ url: message.geminiImageData!.image_url, kind: 'generated' })}
         >
           <img
             src={message.geminiImageData.image_url}
@@ -6235,12 +6244,31 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                         {message.role === 'user' && message.images && message.images.length > 0 && (
                           <div className="flex flex-wrap gap-2 pt-1">
                             {message.images.map((img, idx) => (
-                              <img
-                                key={img}
-                                src={img}
-                                alt={`Uploaded image ${idx + 1}`}
-                                className="h-24 w-24 object-cover rounded-lg border border-white/20 shadow"
-                              />
+                              // A stored photo opens in the same editor a generated image does, so its
+                              // floor and walls can be found and replaced without generating first. A
+                              // data: URL (upload still running, or failed) is a picture and nothing more.
+                              img.startsWith('data:') ? (
+                                <img
+                                  key={img}
+                                  src={img}
+                                  alt={`Uploaded image ${idx + 1}`}
+                                  className="h-24 w-24 object-cover rounded-lg border border-white/20 shadow"
+                                />
+                              ) : (
+                                <button
+                                  key={img}
+                                  type="button"
+                                  onClick={() => setGeminiModalImage({ url: img, kind: 'uploaded' })}
+                                  title="Open in the editor: find or replace materials in this photo"
+                                  className="rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                                >
+                                  <img
+                                    src={img}
+                                    alt={`Uploaded image ${idx + 1}`}
+                                    className="h-24 w-24 object-cover rounded-lg border border-white/20 shadow"
+                                  />
+                                </button>
+                              )
                             ))}
                           </div>
                         )}
@@ -7144,7 +7172,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           jobId=""
           modelCount={0}
           models={[]}
-          directImage={{ url: geminiModalImage, title: 'Generated Design' }}
+          directImage={{
+            url: geminiModalImage.url,
+            title: geminiModalImage.kind === 'generated' ? 'Generated Design' : 'Your room photo',
+          }}
           onDirectImageClose={() => setGeminiModalImage(null)}
           workspaceId={workspaceId}
           onGenerateVR={(imageUrl, context) => {
@@ -7277,7 +7308,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           if (params.regionEdit) {
             // Use the image the user clicked Edit on, falling back to last generated then attached
             const lastGenerated = [...messages].reverse().find(m => m.geminiImageData?.image_url)?.geminiImageData?.image_url ?? null;
-            const targetImage = geminiModalImage ?? lastGenerated ?? attachedImages[0] ?? null;
+            const targetImage = geminiModalImage?.url ?? lastGenerated ?? attachedImages[0] ?? null;
             if (!targetImage) {
               toast({ title: 'No image to edit', description: 'Generate or attach a room image first, then use Region Edit.' });
               return;

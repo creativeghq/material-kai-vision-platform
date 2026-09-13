@@ -14,7 +14,13 @@ export function buildTestOnRoomUrl(args: {
       'I\'ll upload a photo of my room — apply this material onto a surface ' +
       '(floor or wall) and show me the result, keeping everything else in place.',
   });
-  if (productImage) params.set('pinned_product_image', productImage);
+  if (productImage) {
+    params.set('pinned_product_image', productImage);
+    // ATTACHED, not only pinned: attachment 0 is the reference slot the edit sends as pixels
+    // beside the room photo the user adds as attachment 1 (`resolveImageSlots`). A pin alone is
+    // read only by text-to-image, so the tile never reached the edit.
+    params.set('image', productImage);
+  }
   return `/agent-hub?${params.toString()}`;
 }
 
