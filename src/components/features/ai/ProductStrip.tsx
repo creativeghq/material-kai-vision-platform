@@ -31,7 +31,15 @@ interface ProductStripProps {
   onUseIn3DScene?: (imageUrl: string, productName: string) => void;
 }
 
-type ViewerPrice = { price: number | null; discount_pct: number; currency: string };
+type ViewerPrice = {
+  price: number | null;
+  discount_pct: number;
+  currency: string;
+  /** What the number IS, said by the resolver. Inferring it from `discount_pct > 0` labelled a
+   *  sub-account at 0% discount "Retail" when it was their buy price (#405). */
+  kind: 'your_price' | 'retail' | 'seller';
+  unpriced: boolean;
+};
 
 const sym = (c: string) => (c === 'EUR' ? '€' : c === 'USD' ? '$' : c === 'GBP' ? '£' : `${c} `);
 
@@ -81,13 +89,18 @@ export const ProductStrip: React.FC<ProductStripProps> = ({
     supabase
       .rpc('get_catalog_prices_for_workspace', { p_workspace_id: activeWorkspaceId, p_product_ids: ids })
       .then(({ data }) => {
-        if (cancelled || !Array.isArray(data)) return;
+        // The resolver reports how many ids it was asked for and how many it answered, so a
+        // capped call is a stated fact rather than products that silently read as unpriced.
+        const rows = (data as any)?.prices;
+        if (cancelled || !Array.isArray(rows)) return;
         const map: Record<string, ViewerPrice> = {};
-        for (const r of data as any[]) {
+        for (const r of rows as any[]) {
           map[r.product_id] = {
             price: r.price != null ? Number(r.price) : null,
             discount_pct: Number(r.discount_pct) || 0,
             currency: r.currency || 'EUR',
+            kind: r.kind ?? 'retail',
+            unpriced: !!r.unpriced,
           };
         }
         setViewerPrices(map);
@@ -163,8 +176,11 @@ export const ProductStrip: React.FC<ProductStripProps> = ({
                   if (price == null) return null;
                   const cur = vp?.currency ?? 'EUR';
                   const disc = vp?.discount_pct ?? 0;
+                  // The LABEL comes from `kind`, not from whether there is a discount.
+                  const label = vp?.kind === 'your_price' ? 'Your price' : 'Retail';
                   return (
                     <p className="text-sm font-semibold text-foreground mt-1.5">
+                      <span className="mr-1 text-[11px] font-normal text-muted-foreground">{label}</span>
                       {sym(cur)}{price.toFixed(2)}
                       {disc > 0 && (
                         <span className="text-xs font-normal text-primary ml-1">({disc}% off)</span>

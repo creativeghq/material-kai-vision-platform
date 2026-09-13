@@ -51,6 +51,7 @@ import { useToast } from '@/hooks/use-toast';
 import { DollarSign, Ship, Boxes } from 'lucide-react';
 import { ProductRecommendationsPanel } from './ProductRecommendationsPanel';
 import { SupplierPricingSection } from './SupplierPricingSection';
+import { ProductPriceLine } from './ProductPriceLine';
 import { supabase } from '@/integrations/supabase/client';
 import { generateGroutRecommendations, formatGroutSuggestion } from '@/utils/groutSuggestions';
 import {
@@ -1696,6 +1697,15 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
           {/* Details Tab */}
           <TabsContent value="details" className="mt-6">
+            {/* The price, read-only, for anybody who can see the product at all (#405). Seeing a
+                price and EDITING one were the same permission (`pricing.manage`), so a member or a
+                sales rep saw no price anywhere in the modal — while they see one the moment they
+                add the product to a quote. Cost and margin stay on the admin Pricing tab. */}
+            {!isAdmin && activeWorkspaceId && (
+              <div className="mb-4">
+                <ProductPriceLine workspaceId={activeWorkspaceId} productId={product.id} />
+              </div>
+            )}
             {/* Availability, for people who quote but do not run the warehouse. A total and a
                 word — no warehouses, no locations, no ledger, no listings. Rendered for anyone
                 with availability access; those who also hold `warehouse.manage` get the full
