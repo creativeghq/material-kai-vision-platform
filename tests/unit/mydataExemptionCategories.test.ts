@@ -7,12 +7,18 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { MYDATA_EXEMPTION_CATEGORIES } from '@/lib/mydataExemptionCategories';
+import GROUNDS from '@/lib/mydataExemptionGrounds.generated.json';
 
 const SPEC = join(
   __dirname, '..', '..', 'src', 'modules', 'myaade', 'AadeSpec', 'v2.0.2', 'ERP_v2.0.2.pdf',
 );
-// AADE's spec PDF is gitignored (4 MB), so CI has no copy: the two checks that READ it are
-// skipped there and run wherever the file exists. The rotation and mirror checks need no PDF.
+/**
+ * AADE's spec PDF is gitignored (4 MB), so CI has no copy -- and a check that only reads it is
+ * INERT exactly where it matters. `mydataExemptionGrounds.generated.json` is the same table
+ * extracted from that PDF and committed, so the citations are pinned everywhere; where the PDF
+ * IS present it is read directly and the JSON is verified against it, which is what stops the
+ * committed copy drifting from the authority it claims to be.
+ */
 const HAVE_SPEC = existsSync(SPEC);
 
 /** Whitespace and the space AADE leaves before a full stop ("άρθρο 32 .1.γ."). */
@@ -88,6 +94,9 @@ describe('myDATA §8.3 — the exemption ground cites ν.5144/2024 (#453)', () =
   let spec: string[];
   beforeAll(async () => { if (HAVE_SPEC) spec = await section83Cells(); }, 60_000);
 
+  /** The committed extraction, keyed by code. Read wherever the PDF is not. */
+  const committed = (code: number) => (GROUNDS.grounds as Record<string, string>)[String(code)];
+
   it.skipIf(!HAVE_SPEC)('the spec table parsed as 31 rows', () => {
     expect(
       spec.length,
@@ -102,7 +111,7 @@ describe('myDATA §8.3 — the exemption ground cites ν.5144/2024 (#453)', () =
     );
   });
 
-  it.skipIf(!HAVE_SPEC).each(Array.from({ length: 31 }, (_, i) => i + 1))(
+  it.each(Array.from({ length: 31 }, (_, i) => i + 1))(
     'code %i prints the ν.5144/2024 ground ΑΑΔΕ publishes, verbatim',
     (code) => {
       const ours = MYDATA_EXEMPTION_CATEGORIES.find((c) => c.code === code)!;
@@ -111,6 +120,19 @@ describe('myDATA §8.3 — the exemption ground cites ν.5144/2024 (#453)', () =
         `Code ${code} is printed on a legal document and transmitted to ΑΑΔΕ. The citation must ` +
           'be §8.3 column "Αιτία Εξαίρεσης (ν. 5144/2024)" of ' +
           'src/modules/myaade/AadeSpec/v2.0.2/ERP_v2.0.2.pdf. ν.2859/2000 is repealed.',
+      ).toBe(committed(code));
+    },
+  );
+
+  it.skipIf(!HAVE_SPEC).each(Array.from({ length: 31 }, (_, i) => i + 1))(
+    'code %i: the committed extraction still matches the PDF it came from',
+    (code) => {
+      // Where the spec is present, the JSON is checked against it — otherwise the committed
+      // copy is an authority nobody ever re-reads, which is the drift this guard exists to stop.
+      expect(
+        committed(code),
+        `src/lib/mydataExemptionGrounds.generated.json disagrees with §8.3 on code ${code}. ` +
+          'Regenerate it from the PDF rather than editing it.',
       ).toBe(spec[code - 1]);
     },
   );
