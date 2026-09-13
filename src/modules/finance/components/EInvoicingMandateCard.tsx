@@ -9,62 +9,76 @@
  * A fallback is an incident, not a retry. It is counted in the open, never swallowed.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Loader2, ShieldAlert, Wifi } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Loader2, ShieldAlert, Wifi, Inbox, Save } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
-import { supabase } from '@/integrations/supabase/client';
-import { formatDate } from '@/utils/datetime';
-
-/** A.1128/2025 art. 2 §2: the second period. Legacy channels run in parallel to 31/12/2026. */
-const MANDATE_FROM = '2026-10-01';
-const GRACE_UNTIL = '2026-12-31';
-
-interface Row {
-  issuance_channel: string | null;
-  issued_at: string | null;
-}
+import { Button } from '@/components/core/ui/button';
+import { Input } from '@/components/core/ui/input';
+import { Label } from '@/components/core/ui/label';
+import { useToast } from '@/hooks/use-toast';
+import { formatDate, todayLocalISO } from '@/utils/datetime';
+import {
+  einvoiceMandateService, MANDATE_LABEL, INBOUND_LABEL,
+  declarationIsFiled, mandateNeedsAttention, fallbackIsIncident, inboundNeedsAttention,
+  pullIsNotAcceptance, ERP_IS_NON_ISSUANCE, DECLARATION_IS_AN_OPERATOR_ACTION,
+  ONE_DERIVATION_TWO_SERIALISATIONS, MANDATE_SCOPE,
+  type MandatePosition, type InboundPosition, type OpenOutage,
+} from '@/modules/finance/services/einvoiceMandateService';
 
 export const EInvoicingMandateCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
-  const [rows, setRows] = useState<Row[] | null>(null);
-  const [openOutage, setOpenOutage] = useState<{ started_at: string; detail: string | null } | null>(null);
+  const { toast } = useToast();
+  const [position, setPosition] = useState<MandatePosition | null>(null);
+  const [inbound, setInbound] = useState<InboundPosition | null>(null);
+  const [openOutage, setOpenOutage] = useState<OpenOutage | null>(null);
+  const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [draft, setDraft] = useState({ filedOn: todayLocalISO(), startDate: '2026-10-01' });
 
   const load = useCallback(async () => {
-    const [inv, outage] = await Promise.all([
-      supabase.from('invoices')
-        .select('issuance_channel, issued_at')
-        .eq('workspace_id', workspaceId)
-        .not('issued_at', 'is', null)
-        .gte('issued_at', MANDATE_FROM),
-      supabase.from('fiscal_outage_events')
-        .select('started_at, detail')
-        .eq('workspace_id', workspaceId)
-        .is('ended_at', null)
-        .order('started_at', { ascending: false })
-        .limit(1),
-    ]);
-    // A failed read is UNKNOWN, never "nothing to report" — this card's whole job is to say
-    // whether we are compliant, and an empty state built out of an error says we are.
-    if (inv.error || outage.error) { setFailed(true); setRows([]); return; }
-    setFailed(false);
-    setRows((inv.data ?? []) as Row[]);
-    setOpenOutage((outage.data ?? [])[0] ?? null);
+    if (!workspaceId) return;
+    setLoading(true);
+    try {
+      const [p, i, o] = await Promise.all([
+        einvoiceMandateService.position(workspaceId),
+        einvoiceMandateService.inbound(workspaceId),
+        einvoiceMandateService.openOutage(workspaceId),
+      ]);
+      setPosition(p); setInbound(i); setOpenOutage(o); setFailed(false);
+    } catch {
+      // A failed read is UNKNOWN, never "nothing to report" — this card's whole job is to say
+      // whether we are compliant, and an empty state built out of an error says we are.
+      setPosition(null); setInbound(null); setOpenOutage(null); setFailed(true);
+    } finally { setLoading(false); }
   }, [workspaceId]);
 
   useEffect(() => { void load(); }, [load]);
 
-  if (rows === null) {
+  const fileDeclaration = async () => {
+    setBusy(true);
+    try {
+      await einvoiceMandateService.recordDeclaration(workspaceId, draft.filedOn, draft.startDate);
+      await load();
+      toast({
+        title: 'Filing recorded',
+        description: 'This records that it was filed. It does not file it.',
+      });
+    } catch (err: unknown) {
+      toast({
+        title: 'Could not record the filing',
+        description: err instanceof Error ? err.message : String(err),
+        variant: 'destructive',
+      });
+    } finally { setBusy(false); }
+  };
+
+  if (loading) {
     return (
       <Card><CardContent className="flex justify-center py-8">
         <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
       </CardContent></Card>
     );
   }
-
-  const fallback = rows.filter((r) => r.issuance_channel === 'erp_fallback').length;
-  const unrecorded = rows.filter((r) => !r.issuance_channel).length;
-  const provider = rows.filter((r) => r.issuance_channel === 'provider' || r.issuance_channel === 'timologio').length;
-  const mandateLive = new Date().toISOString().slice(0, 10) >= MANDATE_FROM;
 
   return (
     <Card>
@@ -73,20 +87,19 @@ export const EInvoicingMandateCard: React.FC<{ workspaceId: string }> = ({ works
           <ShieldAlert className="h-4 w-4" /> B2B e-invoicing mandate
         </CardTitle>
         <p className="mt-1 text-xs text-muted-foreground">
-          From {formatDate(MANDATE_FROM)} a B2B invoice must be issued through a certified provider
-          or AADE&rsquo;s <span className="font-mono">timologio</span>. Issuing it from our own ERP
-          counts as <strong>not issuing it at all</strong> — the transmission still returns a MARK,
-          which is why this is counted rather than assumed. Legacy channels run in parallel until{' '}
-          {formatDate(GRACE_UNTIL)}.
+          {ERP_IS_NON_ISSUANCE} {MANDATE_SCOPE}
         </p>
       </CardHeader>
+
       <CardContent className="space-y-4 p-5">
-        {failed ? (
+        {failed && (
           <div className="flex items-center gap-2 rounded-md border border-hairline bg-surface-sunken p-3 text-sm text-muted-foreground">
             <AlertTriangle className="h-4 w-4" />
             Compliance position could not be read just now — this is not a statement that it is clean.
           </div>
-        ) : (
+        )}
+
+        {!failed && position && (
           <>
             {openOutage && (
               <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3">
@@ -101,34 +114,95 @@ export const EInvoicingMandateCard: React.FC<{ workspaceId: string }> = ({ works
               </div>
             )}
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <Stat label="Through a provider" value={provider} tone="ok" />
-              <Stat
-                label="ERP fallback"
-                value={fallback}
-                tone={fallback > 0 ? 'warn' : 'ok'}
-                hint={fallback > 0 ? 'Lawful only under a recorded outage.' : undefined}
-              />
-              <Stat
-                label="No channel recorded"
-                value={unrecorded}
-                tone={unrecorded > 0 ? 'bad' : 'ok'}
-                hint={unrecorded > 0 ? 'Cannot be shown to have been lawfully issued.' : undefined}
-              />
+            <div
+              className={`space-y-1 rounded-md border p-3 text-xs ${
+                position.status === 'declaration_missing' || position.status === 'channel_unrecorded'
+                  ? 'border-destructive/40 bg-destructive/10 text-destructive'
+                  : mandateNeedsAttention(position)
+                    ? 'border-amber-500/40 bg-amber-500/5 text-amber-800 dark:text-amber-300'
+                    : 'border-hairline bg-surface-sunken text-muted-foreground'
+              }`}
+            >
+              <div className="flex flex-wrap items-center gap-2 font-medium">
+                {mandateNeedsAttention(position)
+                  ? <AlertTriangle className="h-3.5 w-3.5" />
+                  : <CheckCircle2 className="h-3.5 w-3.5" />}
+                <Badge variant={mandateNeedsAttention(position) ? 'warning' : 'success'}>
+                  {MANDATE_LABEL[position.status]}
+                </Badge>
+                <span className="tabular-nums">
+                  since {formatDate(position.mandate_from)}: {position.via_provider} provider ·{' '}
+                  {position.via_timologio} timologio · {position.via_erp_fallback} ERP ·{' '}
+                  {position.channel_unrecorded} unrecorded
+                </span>
+              </div>
+              <p>{position.reason}</p>
+              <p>{position.legal_basis}</p>
+              <p>{position.note}</p>
+              {fallbackIsIncident(position) && (
+                <p>
+                  A fallback is an incident, not a retry: {position.fallback_unreconciled} of them
+                  rely on an outage nobody has closed out.
+                </p>
+              )}
             </div>
 
-            {!mandateLive && (
-              <p className="text-xs text-muted-foreground">
-                The mandate has not started yet. These counts are here so the channel is already
-                being recorded when it does — a document issued before {formatDate(MANDATE_FROM)}
-                with no channel is history, not an exposure.
-              </p>
-            )}
-            {mandateLive && unrecorded === 0 && fallback === 0 && rows.length > 0 && (
-              <p className="flex items-center gap-1.5 text-xs text-emerald-700 dark:text-emerald-400">
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                Every B2B invoice issued since the mandate went through a certified provider.
-              </p>
+            <div className="space-y-2 rounded-md border border-hairline p-3 text-xs">
+              <p className="font-medium">Δήλωση Έναρξης Ηλεκτρονικής Έκδοσης Στοιχείων</p>
+              <p className="text-muted-foreground">{DECLARATION_IS_AN_OPERATOR_ACTION}</p>
+              {declarationIsFiled(position) ? (
+                <p className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Filed {formatDate(position.declaration_filed_on as string)}, starting{' '}
+                  {formatDate(position.declared_start_date as string)}.
+                </p>
+              ) : (
+                <div className="flex flex-wrap items-end gap-2">
+                  <div>
+                    <Label htmlFor="ein-filed" className="text-[11px]">Filed on</Label>
+                    <Input
+                      id="ein-filed" type="date" className="mt-1 h-8 w-40 text-xs" value={draft.filedOn}
+                      onChange={(e) => setDraft((d) => ({ ...d, filedOn: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="ein-start" className="text-[11px]">Declared start date</Label>
+                    <Input
+                      id="ein-start" type="date" className="mt-1 h-8 w-40 text-xs" value={draft.startDate}
+                      onChange={(e) => setDraft((d) => ({ ...d, startDate: e.target.value }))}
+                    />
+                  </div>
+                  <Button size="sm" onClick={fileDeclaration} disabled={busy}>
+                    <Save className="mr-1 h-3 w-3" /> Record the filing
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {inbound && (
+              <div
+                className={`space-y-1 rounded-md border p-3 text-xs ${
+                  inboundNeedsAttention(inbound)
+                    ? 'border-amber-500/40 bg-amber-500/5 text-amber-800 dark:text-amber-300'
+                    : 'border-hairline bg-surface-sunken text-muted-foreground'
+                }`}
+              >
+                <div className="flex flex-wrap items-center gap-2 font-medium">
+                  <Inbox className="h-3.5 w-3.5" />
+                  <Badge variant={inboundNeedsAttention(inbound) ? 'warning' : 'neutral'}>
+                    {INBOUND_LABEL[inbound.status]}
+                  </Badge>
+                  <span className="tabular-nums">
+                    since {formatDate(inbound.due_from)}: {inbound.documents} received ·{' '}
+                    {inbound.structured} structured · {inbound.pulled_from_mydata} pulled ·{' '}
+                    {inbound.without_receipt_date} with no receipt date
+                  </span>
+                </div>
+                <p>{inbound.reason}</p>
+                <p>{pullIsNotAcceptance}</p>
+                <p>{inbound.note}</p>
+                <p>{ONE_DERIVATION_TWO_SERIALISATIONS}</p>
+              </div>
             )}
           </>
         )}
@@ -136,17 +210,3 @@ export const EInvoicingMandateCard: React.FC<{ workspaceId: string }> = ({ works
     </Card>
   );
 };
-
-const Stat: React.FC<{ label: string; value: number; tone: 'ok' | 'warn' | 'bad'; hint?: string }> = ({
-  label, value, tone, hint,
-}) => (
-  <div className="rounded-md border border-border/60 p-3">
-    <div className="flex items-center justify-between">
-      <span className="text-xs text-muted-foreground">{label}</span>
-      <Badge variant={tone === 'bad' ? 'error' : tone === 'warn' ? 'warning' : 'neutral'}>
-        <span className="tabular-nums">{value}</span>
-      </Badge>
-    </div>
-    {hint && <p className="mt-1 text-[11px] text-muted-foreground">{hint}</p>}
-  </div>
-);

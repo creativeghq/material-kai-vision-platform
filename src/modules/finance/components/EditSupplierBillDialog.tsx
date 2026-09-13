@@ -97,6 +97,7 @@ export const EditSupplierBillDialog: React.FC<{
   const [billNumber, setBillNumber] = useState('');
   const [issuedAt, setIssuedAt] = useState('');
   const [dueAt, setDueAt] = useState('');
+  const [receivedOn, setReceivedOn] = useState('');
   const [categoryId, setCategoryId] = useState<string>(NO_CATEGORY);
   const [costCodeId, setCostCodeId] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
@@ -120,7 +121,7 @@ export const EditSupplierBillDialog: React.FC<{
       // The five link columns are not on PayableExpense (the AP list has no use for them), so
       // they are read here rather than widening a type every payables row pays for.
       supabase.from('supplier_bills')
-        .select('project_id, order_id, covers_order_id, trip_report_id, property_id, receipt_path, receipt_name, cost_code_id')
+        .select('project_id, order_id, covers_order_id, trip_report_id, property_id, receipt_path, receipt_name, cost_code_id, received_on')
         .eq('id', billId).maybeSingle(),
     ])
       .then(async ([rows, linkRow]) => {
@@ -131,8 +132,12 @@ export const EditSupplierBillDialog: React.FC<{
         setDueAt(b?.due_at?.slice(0, 10) ?? '');
         setCategoryId(b?.category_id ?? NO_CATEGORY);
         setNotes(b?.notes ?? '');
-        const rec = (linkRow.data ?? {}) as { receipt_path?: string | null; receipt_name?: string | null; cost_code_id?: string | null };
+        const rec = (linkRow.data ?? {}) as {
+          receipt_path?: string | null; receipt_name?: string | null;
+          cost_code_id?: string | null; received_on?: string | null;
+        };
         setCostCodeId(rec.cost_code_id ?? null);
+        setReceivedOn(rec.received_on ?? '');
         setReceiptName(rec.receipt_path ? (rec.receipt_name || 'Receipt') : null);
         const cols = { ...EMPTY_LINK, ...((linkRow.data ?? {}) as Partial<BillLinkColumns>) };
         const resolved = await resolveLink(cols);
@@ -155,6 +160,7 @@ export const EditSupplierBillDialog: React.FC<{
         supplierBillNumber: billNumber,
         issuedAt: issuedAt || null,
         dueAt: dueAt || null,
+        receivedOn: receivedOn || null,
         categoryId: categoryId === NO_CATEGORY ? null : categoryId,
         costCodeId,
         notes,
@@ -208,6 +214,12 @@ export const EditSupplierBillDialog: React.FC<{
               <div className="space-y-1.5">
                 <Label>Due date</Label>
                 <Input type="date" value={dueAt} onChange={(e) => setDueAt(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                {/* #444 -- the day it reached US, which from 1 July 2030 starts a five-day
+                    statutory clock and cannot be reconstructed from the issue date. */}
+                <Label>Received on</Label>
+                <Input type="date" value={receivedOn} onChange={(e) => setReceivedOn(e.target.value)} />
               </div>
             </div>
             {/* What the cost is FOR. Merging is off (a bill has no lines to merge into an order)

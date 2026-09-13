@@ -18,6 +18,7 @@ const read = (p: string) => stripComments(readFileSync(join(ROOT, p), 'utf8'));
 
 const issue = read('supabase/functions/finance-issue-invoice/index.ts');
 const card = read('src/modules/finance/components/EInvoicingMandateCard.tsx');
+const service = read('src/modules/finance/services/einvoiceMandateService.ts');
 const settings = read('src/modules/finance/tabs/SettingsTab.tsx');
 
 describe('the issuance channel is recorded where the transmission happens', () => {
@@ -57,8 +58,15 @@ describe('the mandate is surfaced, not assumed', () => {
   it('it counts the fallback and the unrecorded separately', () => {
     // "Fell back to ERP" and "we never recorded a channel" are different findings: the first is
     // lawful under an outage, the second cannot be shown to be lawful at all.
-    expect(card).toContain("issuance_channel === 'erp_fallback'");
-    expect(card).toMatch(/!r\.issuance_channel/);
+    expect(card).toContain('via_erp_fallback');
+    expect(card).toContain('channel_unrecorded');
+  });
+
+  it('the compliance count is derived in SQL, not totalled in the card', () => {
+    // A compliance number totalled beside the rule is the shape where the two drift and the
+    // screen keeps reporting a clean bill.
+    expect(service).toContain('einvoice_mandate_position');
+    expect(card).not.toMatch(/\.filter\(\(r\) => r\.issuance_channel/);
   });
 
   it('a failed read says so rather than reporting a clean bill', () => {
@@ -68,8 +76,19 @@ describe('the mandate is surfaced, not assumed', () => {
   });
 
   it('it counts only documents issued from the mandate date', () => {
-    // A document issued before 1/10/2026 with no channel is history, not an exposure.
-    expect(card).toContain('2026-10-01');
+    // A document issued before 1/10/2026 with no channel is history, not an exposure. The date
+    // comes back with the verdict rather than being restated on screen.
+    expect(card).toContain('mandate_from');
+  });
+
+  it('the filing that makes any of it lawful is tracked and is named as an operator action', () => {
+    expect(card).toContain('DECLARATION_IS_AN_OPERATOR_ACTION');
+    expect(service).toContain('einvoice_start_declaration_filed_on');
+  });
+
+  it('the inbound duty is surfaced, and a myDATA pull is not counted as acceptance', () => {
+    expect(card).toContain('pullIsNotAcceptance');
+    expect(service).toContain('inbound_einvoice_position');
   });
 });
 

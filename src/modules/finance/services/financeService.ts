@@ -2130,6 +2130,12 @@ const _financeServiceCore = {
     supplierBillNumber?: string | null;
     issuedAt?: string | null;
     dueAt?: string | null;
+    /**
+     * The day the document arrived on our desk (#444). From 1 July 2030 that date starts a
+     * five-day statutory clock under ViDA's new art. 263, and it is NOT the issue date -- a
+     * supplier's invoice dated the 1st that reaches us on the 20th has two different facts on it.
+     */
+    receivedOn?: string | null;
     categoryId?: string | null;
     /**
      * Cost code — how this cost is classified in the job's own breakdown. Separate from
@@ -2159,6 +2165,7 @@ const _financeServiceCore = {
     if ('supplierBillNumber' in patch) row.supplier_bill_number = patch.supplierBillNumber?.trim() || null;
     if ('issuedAt' in patch) row.issued_at = patch.issuedAt || null;
     if ('dueAt' in patch) row.due_at = patch.dueAt || null;
+    if ('receivedOn' in patch) row.received_on = patch.receivedOn || null;
     if ('categoryId' in patch) row.category_id = patch.categoryId || null;
     if ('costCodeId' in patch) row.cost_code_id = patch.costCodeId || null;
     if ('notes' in patch) row.notes = patch.notes?.trim() || null;
