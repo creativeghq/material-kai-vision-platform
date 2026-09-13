@@ -2447,6 +2447,23 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'visualize_on_surface',
+    file: 'supabase/functions/_shared/tools/generation-tools.ts',
+    factory: 'createVisualizeOnSurfaceTool',
+    description: 'Show a catalog product tiled on a room surface at its REAL format — a deterministic preview drawn in the user\'s browser: no model, no credits, exact scale, a chosen laying pattern and joint. Use it when the user wants…',
+    params: [
+      { name: 'product_id', type: 'string', optional: true, description: 'Product id when known' },
+      { name: 'productName', type: 'string', optional: true, description: 'Product name to match (partial is fine) when the id is not known' },
+      { name: 'scene_id', type: 'string', optional: true, description: 'Scene id when known' },
+      { name: 'sceneName', type: 'string', optional: true, description: 'Room to show it in, matched against scene names (e.g. "kitchen", "bathroom")' },
+      { name: 'surfaceKey', type: 'string', optional: true, description: 'Which surface: floor, wall, backsplash… Defaults to the first surface of the scene' },
+      { name: 'pattern', type: 'enum', enum: ['stack', 'offset_1_2', 'offset_1_3', 'diagonal', 'herringbone', 'diagonal_herringbone', 'basket_weave'], optional: true, description: 'Laying pattern' },
+      { name: 'groutWidthMm', type: 'number', optional: true, description: 'Joint width in mm (default 3)' },
+      { name: 'groutColorHex', type: 'string', optional: true, description: 'Joint colour as #rrggbb' },
+      { name: 'rotationDeg', type: 'number', optional: true, description: 'Rotate the layout, in degrees (0, 45, 90)' },
+    ],
+  },
+  {
     name: 'web_fetch',
     file: 'supabase/functions/_shared/tools/web-research-tools.ts',
     factory: 'createWebFetchTool',

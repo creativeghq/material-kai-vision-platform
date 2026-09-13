@@ -122,6 +122,7 @@ import { CatalogImageCandidatesCard, type ImageCandidate } from './CatalogImageC
 import { SEOResearchCard, type SEOResearchCardData } from './SEOResearchCard';
 import { SEOGenericCard, type SEOGenericCardData } from './SEOGenericCard';
 import { VirtualStagingViewer } from './VirtualStagingViewer';
+import { SurfaceVisualizerCard, type VisualizerRenderData } from '@/components/features/visualizer/SurfaceVisualizerCard';
 import { SheetCanvasCard } from '@/components/features/sheets/SheetCanvasCard';
 import { SheetPreviewCard } from '@/components/features/sheets/SheetPreviewCard';
 import { QuoteCanvasCard, type QuoteCanvasData } from '@/components/features/ai/QuoteCanvasCard';
@@ -327,6 +328,8 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   construction_variations: 'Variations',
   construction_tenders: 'Tender packages',
   construction_bid_analysis: 'Bid analysis',
+  // Deterministic surface preview (#447): the card draws it in the browser from this chunk.
+  visualizer_render: 'Surface preview',
   // Cross-entity record lookup. The "Find a record" quick-start is a DIRECT run (no model turn),
   // so this card is the only thing that puts the matches on screen.
   record_search_results: 'Records found',
@@ -609,6 +612,8 @@ interface Message {
     job_id: string;
     status: 'processing' | 'completed' | 'failed';
   }; // Veo video walkthrough
+  /** A deterministic surface preview the browser draws itself (#447). */
+  visualizerData?: VisualizerRenderData;
   virtualStagingData?: {
     image_url: string;
     source_image_url?: string;
@@ -1351,7 +1356,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       // attachment or the latest generated image) so launching from a chip
       // doesn't re-ask for the photo the user already provided.
       let prefill: Record<string, string> | undefined;
-      const imgKey = qs.generation?.imageKeys?.[0];
+      // The LAST image key is the photo being worked on; an earlier one is a reference
+      // (a material swatch), which a photo already in play must never be mistaken for.
+      const imageKeys = qs.generation?.imageKeys ?? [];
+      const imgKey = imageKeys[imageKeys.length - 1];
       if (imgKey) {
         const img = latestAvailableImage();
         if (img) prefill = { [imgKey]: img };
@@ -1718,6 +1726,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const loadedConversationParamRef = useRef<string | null>(null);
   // Ref to latest handleSendMessage for use in effects (avoids stale closures)
   const handleSendMessageRef = useRef<() => Promise<void>>(() => Promise.resolve());
+  // A material attached as the REFERENCE slot; alone it would be sent as the room and edited.
+  const referenceOnlyRef = useRef<string | null>(null);
   const initialPromptSent = useRef(false);
 
   // Pending material replacement — set by "Replace in Image" on ProductStrip cards
@@ -2396,6 +2406,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     if (!userId) {
       return;
     }
+    if (!directRun && attachedImages.length === 1 && attachedImages[0] === referenceOnlyRef.current) {
+      toast({ title: 'Attach your room photo', description: 'The material is the reference; the photo to edit is still missing.', variant: 'destructive' });
+      return;
+    }
 
     // A direct run has no typed text: the bubble shows the sentence the quick-start
     // stands for, marked with ▶ to keep "I clicked this" distinct from "I typed this".
@@ -2895,6 +2909,29 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 // Don't add a message here — it will be merged into the final assistant message
                 // so the agent's explanation text and the image appear in a single bubble.
               // Handle vr_world_ready — agent-triggered VR world generation
+              } else if (chunk.type === 'visualizer_render') {
+                const vizMsg: Message = {
+                  id: `msg-visualizer-${Date.now()}`,
+                  role: 'assistant',
+                  content: `Surface preview — ${chunk.product_name} on the ${chunk.surface_kind} of ${chunk.scene_name}.`,
+                  timestamp: new Date(),
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                  visualizerData: {
+                    scene_id: chunk.scene_id,
+                    scene_name: chunk.scene_name,
+                    surface_key: chunk.surface_key,
+                    surface_kind: chunk.surface_kind,
+                    product_id: chunk.product_id,
+                    product_name: chunk.product_name,
+                    pattern: chunk.pattern,
+                    grout_width_mm: chunk.grout_width_mm,
+                    grout_color_hex: chunk.grout_color_hex ?? null,
+                    rotation_deg: chunk.rotation_deg ?? 0,
+                    url: chunk.url,
+                  },
+                };
+                setMessages(prev => [...prev, vizMsg]);
               } else if (chunk.type === 'vr_world_ready') {
                 const vrMsg: Message = {
                   id: `msg-vr-${Date.now()}`,
@@ -4533,6 +4570,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     if (m.sheetCanvasData) return { id: m.id, kind: 'sheet', title: m.sheetCanvasData.title || 'Presentation sheet' };
     if (m.quoteData) return { id: m.id, kind: 'quote', title: m.quoteData.quote_number ? `Quote ${m.quoteData.quote_number}` : (m.quoteData.name || 'Quote') };
     if (m.virtualStagingData) return { id: m.id, kind: 'staging', title: 'Virtual staging', preview: m.virtualStagingData.image_url };
+    if (m.visualizerData) return { id: m.id, kind: 'render', title: `Surface preview · ${m.visualizerData.product_name}` };
     if (m.materialData?.products && m.materialData.products.length > 0) {
       const lead = m.materialData.products[0];
       const leadImage = lead?.images?.find((img: { isPrimary?: boolean }) => img.isPrimary) || lead?.images?.[0];
@@ -5405,6 +5443,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         />
       );
     }
+    if (message.visualizerData) return <SurfaceVisualizerCard data={message.visualizerData} workspaceId={workspaceId} />;
     if (message.heatPumpData) return <HeatPumpResultCard result={message.heatPumpData.result} />;
     if (message.heatingCostData) return <HeatingCostResultCard result={message.heatingCostData.result} />;
     if (message.kitchenCostData) return <KitchenCostResultCard result={message.kitchenCostData.result} />;
@@ -5463,6 +5502,16 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             onReplaceInImage={(product) => {
               const primaryImage = product.images?.find((img: any) => img.isPrimary) || product.images?.[0];
               setPendingReplacement({ id: product.id, name: product.name, imageUrl: primaryImage?.url });
+            }}
+            // The product photo becomes attachment 0 — the reference slot — so the room photo the
+            // user adds next is the one being edited and the material goes to the model as pixels.
+            onTestInRoom={(product) => {
+              setAttachedImages([product.imageUrl]);
+              referenceOnlyRef.current = product.imageUrl;
+              handlePinMaterial({ id: product.id, name: product.name, imageUrl: product.imageUrl });
+              setSelectedGenerationMode('image-edit');
+              setInput(`Apply "${product.name}" onto the floor of my room photo, keeping everything else exactly in place.`);
+              toast({ title: 'Material attached as the reference', description: 'Now attach a photo of your room and send.' });
             }}
             onPinMaterial={selectedAgent === 'interior-designer' ? handlePinMaterial : undefined}
             // The three generate actions a materials search used to reach only through
@@ -7304,6 +7353,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         onClose={() => setShowGeminiEditModal(false)}
         roomType={geminiEditRoomType}
         style={geminiEditStyle}
+        referenceOptions={pinnedMaterials}
         onApply={(params) => {
           if (params.regionEdit) {
             // Use the image the user clicked Edit on, falling back to last generated then attached
@@ -7315,6 +7365,17 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             }
             setRegionEditImageUrl(targetImage);
             return;
+          }
+          // A material photo rides FIRST, as the reference slot, and the room being edited second.
+          if (params.referenceImage) {
+            const ref = params.referenceImage;
+            const lastGenerated = [...messages].reverse().find((m) => m.geminiImageData?.image_url)?.geminiImageData?.image_url ?? null;
+            const room = geminiModalImage?.url ?? attachedImages.find((u) => u !== ref) ?? lastGenerated ?? null;
+            if (!room) {
+              toast({ title: 'No room to edit', description: 'Attach or generate a room photo first; the material photo is the reference, not the room.', variant: 'destructive' });
+              return;
+            }
+            setAttachedImages([ref, room].slice(0, AGENT_MAX_IMAGES));
           }
           // Direct submit: set input + modelTier indicator, then auto-send
           setSelectedGenerationMode('image-edit');

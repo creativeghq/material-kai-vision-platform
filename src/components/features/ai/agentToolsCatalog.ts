@@ -2813,21 +2813,43 @@ export const TOOLKITS: ToolkitDefinition[] = [
       // above, and it belonged to no cluster and no agent, so it was unreachable. A generation
       // kit that can start a job and cannot say whether it finished is half a kit.
       'check_generation_status',
+      // Deterministic surface preview — exact product, exact format, drawn in the browser (#447).
+      'visualize_on_surface',
     ],
     quick_starts: [
+      {
+        // A DIRECT run: no model turn, no credits. autoFields adds the pattern select, the joint
+        // width and colour and the rotation from the tool's own schema.
+        label: 'See it on a surface',
+        description: 'A product tiled on a library room at its real size — no credits',
+        icon: 'Grid3x3',
+        prompt: 'Show me Calacatta 60x60 tiled on the kitchen floor at its real size.',
+        done: 'Drawn in your browser from the product\'s real face and recorded format. Change the pattern or the joint on the card, or open the visualizer.',
+        promptTemplate: 'Show me {{productName}} tiled on the {{sceneName}} {{surfaceKey}} at its real size.',
+        run: { tool: 'visualize_on_surface', argMap: { productName: 'productName', sceneName: 'sceneName', surfaceKey: 'surfaceKey' } },
+        autoFields: true,
+        form: [
+          { key: 'productName', label: 'Product', kind: 'text', required: true, placeholder: 'e.g. Calacatta 60x60' },
+          { key: 'sceneName', label: 'Room', kind: 'text', placeholder: 'kitchen, bathroom, living, bedroom, dining, hallway' },
+          { key: 'surfaceKey', label: 'Surface', kind: 'text', placeholder: 'floor (default)' },
+        ],
+      },
       // Every image-required interior flow captures its inputs (photo first, then
       // the creative choices) step-by-step in ToolkitFormModal, then auto-sends
       // ONE complete generation message — the same collect-then-send rail the
       // other toolkits use, never a bare prompt that asks for the photo in chat.
       {
         label: 'Test on a room',
-        description: 'Apply a material from the catalog onto a photo of your room',
+        description: 'Apply a material — a photo of it, or a description — onto a photo of your room',
         icon: 'ImageIcon',
         imageRequired: true,
         prompt: 'Apply the chosen material/finish onto the chosen surface in my room photo, keeping everything else in place.',
         promptTemplate: 'Apply {{material}} onto the {{surface}} in this room photo. Keep the layout, furniture, lighting and everything else exactly in place — change only the {{surface}} finish. {{notes}}',
-        generation: { imageKeys: ['photo'], mode: 'image-edit' },
+        // The material photo rides FIRST: attachment 0 is the reference slot and attachment 1 the
+        // room (`resolveImageSlots`), so with a swatch the edit copies THAT material as pixels.
+        generation: { imageKeys: ['swatch', 'photo'], mode: 'image-edit' },
         form: [
+          { key: 'swatch', label: 'Material photo (optional)', kind: 'image', required: false, help: 'A photo of the tile, stone or finish itself. With one, the model reproduces that exact material; without, it works from your description.' },
           { key: 'photo', label: 'Your room photo', kind: 'image', required: true, help: 'Upload a photo of the room you want to restyle.' },
           { key: 'material', label: 'Material / Finish to apply', kind: 'text', required: true, placeholder: 'e.g. warm oak herringbone, Carrara marble, matte charcoal microcement' },
           { key: 'surface', label: 'Apply to', kind: 'select', default: 'floor', options: [

@@ -11,6 +11,12 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 /** [source, target] pairs, repo-relative. One line per vocabulary. */
 export const VOCABULARIES = [
   [
+    // #447 — the laying patterns of the surface visualizer. The browser renders them and the
+    // agent's tool offers them as an enum; one list, or the tool offers a pattern nothing draws.
+    'src/lib/surfaceRenderer/patternVocabulary.ts',
+    'supabase/functions/_shared/surfacePatterns.generated.ts',
+  ],
+  [
     // The public catalog URL. Nine sites built `/c/${slug}` by hand across both runtimes, so
     // making it workspace-scoped would otherwise have meant nine independent edits that agree.
     'src/config/catalogPublicUrl.ts',

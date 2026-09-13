@@ -27,6 +27,7 @@ import {
   Building2,
   Layers,
   Ruler,
+  Grid3x3,
   DraftingCompass,
   Handshake,
   FileSearch,
@@ -154,6 +155,7 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // MoodBoards (no module, no extra capability): it draws the workspace's own catalogue on a plan,
   // and `room_layouts` is workspace-scoped by RLS.
   { id: 'room-planner', label: 'Room Planner', path: '/room-planner', icon: Ruler, surface: 'app', hub: 'studio', description: 'Arrange catalog products on a floor plan, at their real size.' },
+  { id: 'surface-visualizer', label: 'Surface Visualizer', path: '/visualizer', icon: Grid3x3, surface: 'app', hub: 'studio', description: 'A tile, stone or floor on a room photo, at its real size — drawn in the browser.' },
   // Blueprints. Previously reachable ONLY from a button on the Projects list page — the nav comment
   // claimed they "live under Projects", which was true of the page and not of any menu. Gated like
   // MoodBoards and Room Planner (no module, no extra capability): `blueprints` is workspace-scoped
@@ -360,6 +362,7 @@ export const BOTTOM_NAV_PRIORITY: readonly string[] = [
   'moodboard',
   'interior',
   'room-planner',
+  'surface-visualizer',
   'blueprints',
   'catalogs',
   'image-studio',
