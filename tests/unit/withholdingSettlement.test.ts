@@ -13,7 +13,7 @@ import { join } from 'node:path';
 import { stripComments } from '../helpers/stripComments';
 import {
   withholdingNeedsDecision, type WithholdingVerdict,
-} from '@/modules/finance/services/withholdingService';
+} from '@/modules/finance/withholdingRules';
 
 const ROOT = join(__dirname, '..', '..');
 const read = (p: string) => stripComments(readFileSync(join(ROOT, p), 'utf8'));
@@ -55,7 +55,9 @@ describe('it is a leg of the ONE derivation', () => {
     // The settlement ledger reads `total_withheld_amount`, so writing it there is what keeps the
     // transmitted document and the ledger equal by construction.
     expect(withholding).toContain('total_withheld_amount');
-    expect(withholding).toContain('invoice_withholding');
+    // `invoice_withholding` is read by the integrity probe in SQL and by nothing here: one door
+    // onto one derivation.
+    expect(withholding).not.toContain('invoice_withholding');
   });
 
   it('nothing applies a rate in the client', () => {

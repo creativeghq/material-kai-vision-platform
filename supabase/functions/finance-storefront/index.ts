@@ -49,10 +49,14 @@ Deno.serve(withApiLogging('finance-storefront', async (req) => {
       // Returned here so the storefront knows whether to show a challenge at all: when Turnstile
       // is unconfigured this is null and checkout stays open, matching the server's fail-open.
       const siteKey = (await resolveSecret(supabase, 'TURNSTILE_SITE_KEY').catch(() => ({ value: null })))?.value ?? null;
+      // EAA art. 13 + Annex I: the statement belongs on the service, not in a drawer.
+      const { data: stmt } = await supabase.from('accessibility_statements')
+        .select('body').eq('workspace_id', ws.id).eq('language_code', 'el').maybeSingle();
       return json({
         ok: true, enabled: true, workspace_name: ws.name,
         headline: store?.headline ?? ws.name, subheadline: store?.subheadline ?? null, accent: store?.accent ?? null,
         turnstile_site_key: siteKey,
+        accessibility_statement: stmt?.body ?? null,
       });
     }
 
@@ -67,8 +71,18 @@ Deno.serve(withApiLogging('finance-storefront', async (req) => {
       // VAT-inclusive price, so add VAT here for display.
       const { data: fsP } = await supabase.from('finance_settings').select('default_vat_rate').eq('workspace_id', ws.id).maybeSingle();
       const vatP = Number(fsP?.default_vat_rate ?? 24);
-      const products = (rows ?? [])
-        .filter((r: any) => r.product)
+      // GPSR art. 19: the manufacturer contact, the responsible person, the identifier and
+      // the warnings travel WITH the offer. Art 2(1) excludes only Chapter III section 1 for
+      // CE-marked goods, so a CE mark carves nothing out of this.
+      const listed = (rows ?? []).filter((r: any) => r.product);
+      const disclosures = new Map<string, any>();
+      await Promise.all(listed.map(async (r: any) => {
+        const { data } = await supabase.rpc('product_offer_disclosure', {
+          p_product: r.product_id, p_language: 'el',
+        });
+        if (data) disclosures.set(r.product_id, data);
+      }));
+      const products = listed
         .map((r: any) => ({
           product_id: r.product_id,
           name: r.product.name,
@@ -78,6 +92,7 @@ Deno.serve(withApiLogging('finance-storefront', async (req) => {
           price: grossFromNet(r.list_price, vatP),
           currency: r.currency ?? 'EUR',
           image_url: imageFromMetadata(r.product.metadata),
+          safety: disclosures.get(r.product_id) ?? null,
         }));
       return json({ ok: true, products });
     }

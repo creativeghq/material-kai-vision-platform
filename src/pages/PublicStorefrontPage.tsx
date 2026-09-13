@@ -12,7 +12,10 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { TurnstileWidget, type TurnstileHandle } from '@/components/features/turnstile/TurnstileWidget';
-import { storefrontService, type StorefrontMeta, type StorefrontProduct } from '@/modules/finance/services/storefrontService';
+import {
+  storefrontService,
+  type StorefrontMeta, type StorefrontProduct, type StorefrontProductSafety,
+} from '@/modules/finance/services/storefrontService';
 
 const money = (n: number, ccy: string) => formatMoney(n, ccy || 'EUR');
 
@@ -141,9 +144,16 @@ const PublicStorefrontPage: React.FC = () => {
                   <CardContent className="p-3">
                     <div className="line-clamp-2 text-sm font-medium">{p.name}</div>
                     <div className="mt-1 text-sm text-primary">{money(p.price, p.currency)}{p.unit ? <span className="text-muted-foreground">/{p.unit}</span> : ''}</div>
-                    <Button size="sm" variant="outline" className="mt-2 w-full" onClick={() => setQty(p.product_id, 1)}>
+                    {/* The visible label is short because the card is; the accessible name is not,
+                        because "Add" repeated twenty times down a list says nothing. */}
+                    <Button
+                      size="sm" variant="outline" className="mt-2 w-full"
+                      aria-label={`Add ${p.name} to the cart`}
+                      onClick={() => setQty(p.product_id, 1)}
+                    >
                       <Plus className="mr-1 h-3.5 w-3.5" /> Add
                     </Button>
+                    <SafetyDisclosure safety={p.safety ?? null} />
                   </CardContent>
                 </Card>
               ))}
@@ -169,10 +179,12 @@ const PublicStorefrontPage: React.FC = () => {
                           <div className="text-xs text-muted-foreground">{money(p.price, p.currency)} × {qty}</div>
                         </div>
                         <div className="flex items-center gap-1">
-                          <button className="rounded p-1 hover:bg-muted" onClick={() => setQty(id, -1)}><Minus className="h-3 w-3" /></button>
+                          {/* An icon-only control has no accessible name, so a screen reader
+                              announces "button" three times per line. EAA Annex I IV(g)(ii). */}
+                          <button type="button" aria-label={`Remove one ${p.name}`} className="rounded p-1 hover:bg-muted" onClick={() => setQty(id, -1)}><Minus className="h-3 w-3" /></button>
                           <span className="w-5 text-center">{qty}</span>
-                          <button className="rounded p-1 hover:bg-muted" onClick={() => setQty(id, 1)}><Plus className="h-3 w-3" /></button>
-                          <button className="rounded p-1 text-muted-foreground hover:text-destructive" onClick={() => removeLine(id)}><Trash2 className="h-3 w-3" /></button>
+                          <button type="button" aria-label={`Add one ${p.name}`} className="rounded p-1 hover:bg-muted" onClick={() => setQty(id, 1)}><Plus className="h-3 w-3" /></button>
+                          <button type="button" aria-label={`Remove ${p.name} from the cart`} className="rounded p-1 text-muted-foreground hover:text-destructive" onClick={() => removeLine(id)}><Trash2 className="h-3 w-3" /></button>
                         </div>
                       </div>
                     );
@@ -182,17 +194,19 @@ const PublicStorefrontPage: React.FC = () => {
                   <span>Total</span><span>{money(total, currency)}</span>
                 </div>
                 <div className="space-y-2 border-t border-border/60 pt-2">
+                  {/* A placeholder is not a label: it disappears on focus and is not exposed
+                      as one. Checkout is named in Annex I IV(g)(ii) specifically. */}
                   <div className="space-y-1">
-                    <Label className="text-xs">Name</Label>
-                    <Input className="h-9" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" />
+                    <Label htmlFor="storefront-name" className="text-xs">Name</Label>
+                    <Input id="storefront-name" autoComplete="name" className="h-9" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs">Email</Label>
-                    <Input className="h-9" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
+                    <Label htmlFor="storefront-email" className="text-xs">Email</Label>
+                    <Input id="storefront-email" autoComplete="email" className="h-9" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs">Note <span className="text-muted-foreground">(optional)</span></Label>
-                    <Input className="h-9" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. I'll pick up today" maxLength={500} />
+                    <Label htmlFor="storefront-note" className="text-xs">Note <span className="text-muted-foreground">(optional)</span></Label>
+                    <Input id="storefront-note" className="h-9" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. I'll pick up today" maxLength={500} />
                   </div>
                 </div>
                 {meta?.turnstile_site_key && (
@@ -208,7 +222,8 @@ const PublicStorefrontPage: React.FC = () => {
                     />
                   </div>
                 )}
-                {error && <p className="text-xs text-destructive">{error}</p>}
+                {/* An error that is only a colour and a font size is not an identified one. */}
+                {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
                 <Button
                   className="w-full"
                   onClick={checkout}
@@ -224,7 +239,61 @@ const PublicStorefrontPage: React.FC = () => {
           </CardContent>
         </Card>
       </div>
+
+      {meta?.accessibility_statement && (
+        <footer className="border-t border-border/60">
+          <div className="mx-auto max-w-5xl px-4 py-6">
+            <h2 className="text-sm font-semibold">Accessibility</h2>
+            <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">
+              {meta.accessibility_statement}
+            </p>
+          </div>
+        </footer>
+      )}
     </div>
+  );
+};
+
+/**
+ * GPSR art. 19 on the offer itself.
+ *
+ * A <details> rather than a dialog: it is keyboard-operable and announced with no JavaScript,
+ * which is the point of putting safety information behind a control at all.
+ */
+const SafetyDisclosure: React.FC<{ safety: StorefrontProductSafety | null }> = ({ safety }) => {
+  if (!safety || safety.status === 'not_found') return null;
+  const rp = safety.responsible_person;
+  return (
+    <details className="mt-2 text-[11px] text-muted-foreground">
+      <summary className="cursor-pointer">Safety and manufacturer information</summary>
+      <div className="mt-1 space-y-1">
+        {(safety.warnings?.length ?? 0) > 0 && (
+          <ul className="list-disc pl-4 font-medium text-foreground">
+            {safety.warnings?.map((w) => <li key={w}>{w}</li>)}
+          </ul>
+        )}
+        {safety.manufacturer?.name && (
+          <p>
+            Manufacturer: {safety.manufacturer.name}
+            {safety.manufacturer.postal_address ? `, ${safety.manufacturer.postal_address}` : ''}
+            {safety.manufacturer.email ? ` · ${safety.manufacturer.email}` : ''}
+          </p>
+        )}
+        {rp && rp.source !== 'manufacturer_is_eu' && rp.name && (
+          <p>
+            Responsible person in the EU: {rp.name}
+            {rp.postal_address ? `, ${rp.postal_address}` : ''}
+            {rp.email ? ` · ${rp.email}` : ''}
+          </p>
+        )}
+        {safety.product_identifier && (
+          <p>Identifier: {safety.product_identifier}{safety.product_type ? ` · ${safety.product_type}` : ''}</p>
+        )}
+        {safety.accessibility_information && (
+          <p>Accessibility: {safety.accessibility_information}</p>
+        )}
+      </div>
+    </details>
   );
 };
 

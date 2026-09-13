@@ -22,6 +22,8 @@ import { ReceiveOrderLinesDialog } from './ReceiveOrderLinesDialog';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle , DialogDescription } from '@/components/core/ui/dialog';
 import { OrderCustomsCard } from '@/modules/finance/components/OrderCustomsCard';
 import { OrderCbamCard } from '@/modules/finance/components/OrderCbamCard';
+import { OrderEudrCard } from '@/modules/finance/components/OrderEudrCard';
+import { MarginAuthorityNotice } from '@/modules/finance/components/MarginAuthorityNotice';
 import { ContractsSection } from '@/components/features/contracts/ContractsSection';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
@@ -1601,6 +1603,21 @@ export const NewOrderModal: React.FC<{
               {marginTotal != null && <div className="flex justify-between gap-8 w-56"><span className="text-muted-foreground">Margin</span><span className={`tabular-nums ${marginTotal >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>{formatMoney(marginTotal)}</span></div>}
             </div>
           </div>
+          {/* #435 -- margin is an AUTHORITY, not a figure. The floor belongs to the
+              workspace role and the write refuses on it; this says so before the save
+              rather than after. A purchase has a cost, not a margin. */}
+          {isSales && (
+            <MarginAuthorityNotice
+              workspaceId={workspaceId}
+              lines={items.map((l, i) => ({
+                key: `${i}`,
+                description: l.description,
+                unitPrice: Number(l.unit_price) || 0,
+                unitCost: l.unit_cost == null ? null : Number(l.unit_cost),
+                quantity: Number(l.quantity) || 0,
+              }))}
+            />
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
@@ -4434,6 +4451,15 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                     crossed the 50 t line that makes every earlier entry liable too. */}
                 <div className="mt-4">
                   <OrderCbamCard orderId={order.id} workspaceId={order.workspace_id} />
+                </div>
+                {/* Same question again for wood: which of three roles this line puts us in,
+                    derived from the CN code and the origin rather than set by hand. */}
+                <div className="mt-4">
+                  <OrderEudrCard
+                    orderId={order.id} workspaceId={order.workspace_id}
+                    isSale={order.order_type === 'sales'}
+                    customerIsBusiness={!!order.customer_company_id}
+                  />
                 </div>
               </TabsContent>
 

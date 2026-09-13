@@ -23,6 +23,7 @@ import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 import { invoicingSetupService, type FinanceBranch, type RefRow } from '@/services/invoicingSetupService';
 import { AddressUnitSelect } from '@/modules/crm/components/AddressUnitSelect';
 import { DeliveryVatNotice } from '@/modules/finance/components/DeliveryVatNotice';
+import { CreditControlNotice } from '@/modules/finance/components/CreditControlNotice';
 import { formatAddressLine } from '@/services/crm.service';
 import { QuickAddCompanyDialog } from '@/components/business/crm/QuickAddCompanyDialog';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
@@ -257,6 +258,10 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [addrUnitPostcode, setAddrUnitPostcode] = useState<string | null>(null);
   const [addrUnitCountry, setAddrUnitCountry] = useState<string | null>(null);
   const [vatDestinationBlocked, setVatDestinationBlocked] = useState(false);
+  // #426 -- the credit verdict is derived in SQL beside the exposure it reads, and the write
+  // is gated there too. This state only mirrors it so the button can say so before the
+  // operator presses it.
+  const [creditBlocked, setCreditBlocked] = useState(false);
   const [validatingVat, setValidatingVat] = useState(false);
   // Buyer risk-gate (finance_settings) + the buyer's current open balance for the credit-limit check.
   const [riskRules, setRiskRules] = useState({ block_inactive: true, block_unvalidated: false, warn_over: true, block_over: false });
@@ -1408,6 +1413,17 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                     </div>
                   )}
 
+                  {/* #426 -- credit control, derived server-side. The VAT-status checks above
+                      stay client-side because they are a different question about the same
+                      buyer; this one is the boundary, and it lives with the derivation. */}
+                  <CreditControlNotice
+                    workspaceId={workspaceId}
+                    companyId={customer.type === 'company' ? customer.id : null}
+                    contactId={customer.type === 'contact' ? customer.id : null}
+                    amount={totals.total || 0}
+                    onBlockedChange={setCreditBlocked}
+                  />
+
                   {/* Bill-to address: main address or one of the party's sub-units. */}
                   <AddressUnitSelect
                     companyId={customer.type === 'company' ? customer.id : null}
@@ -2212,7 +2228,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               catch it, and it reaches AADE that way. */}
           <Button
             onClick={handleSave}
-            disabled={busy || buyerRisk.hardBlocked || vatDestinationBlocked || docTypes.length === 0}
+            disabled={busy || buyerRisk.hardBlocked || vatDestinationBlocked || creditBlocked || docTypes.length === 0}
             title={
               docTypes.length === 0
                 ? 'No active document type — configure one in Settings → Documents'

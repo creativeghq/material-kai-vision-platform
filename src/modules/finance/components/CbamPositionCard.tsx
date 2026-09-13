@@ -23,6 +23,13 @@ import {
   type CbamYearPosition, type CbamExtractRow,
 } from '@/modules/finance/services/cbamService';
 
+interface ScopeRow {
+  cn_prefix: string;
+  description: string;
+  in_scope: boolean;
+  note: string | null;
+}
+
 /** The definitive regime began 1 January 2026; there is nothing to report before it. */
 const FIRST_YEAR = 2026;
 
@@ -38,19 +45,23 @@ export const CbamPositionCard: React.FC<{ workspaceId: string }> = ({ workspaceI
   const [year, setYear] = useState(() => Math.max(new Date().getFullYear(), FIRST_YEAR));
   const [position, setPosition] = useState<CbamYearPosition | null>(null);
   const [rows, setRows] = useState<CbamExtractRow[]>([]);
+  const [scope, setScope] = useState<ScopeRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [p, r] = await Promise.all([
+      const [p, r, s] = await Promise.all([
         cbamService.yearPosition(workspaceId, year),
         cbamService.portalExtract(workspaceId, year),
+        // The Annex I table itself, so an operator can CHECK it rather than trust it. 7324 and
+        // 7326 are one digit apart and only one of them is liable.
+        cbamService.scopeTable().catch(() => [] as unknown[]),
       ]);
-      setPosition(p); setRows(r); setFailed(false);
+      setPosition(p); setRows(r); setScope(s as ScopeRow[]); setFailed(false);
     } catch {
-      setPosition(null); setRows([]); setFailed(true);
+      setPosition(null); setRows([]); setScope([]); setFailed(true);
     } finally { setLoading(false); }
   }, [workspaceId, year]);
 
@@ -174,6 +185,23 @@ export const CbamPositionCard: React.FC<{ workspaceId: string }> = ({ workspaceI
               </TableBody>
             </Table>
           </div>
+        )}
+
+        {scope.length > 0 && (
+          <details className="text-[11px] text-muted-foreground">
+            <summary className="cursor-pointer">
+              What counts as Annex I, and what was checked and ruled out
+            </summary>
+            <ul className="mt-1 space-y-0.5">
+              {scope.map((s) => (
+                <li key={s.cn_prefix}>
+                  <span className="tabular-nums">{s.cn_prefix}</span>{' '}
+                  {s.in_scope ? 'IN' : 'out'} — {s.description}
+                  {s.note ? ` (${s.note})` : ''}
+                </li>
+              ))}
+            </ul>
+          </details>
         )}
 
         <p className="text-[11px] text-muted-foreground">

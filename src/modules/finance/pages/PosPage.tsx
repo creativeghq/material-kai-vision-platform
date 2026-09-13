@@ -299,8 +299,22 @@ const PosPage: React.FC = () => {
     if (!session) return;
     const raw = window.prompt('Counted cash in drawer at close?', '');
     if (raw === null) return;
+    const counted = raw.trim() ? (parseDecimal(raw) ?? undefined) : undefined;
+    // The expected figure is already on screen, so the operator can see whether they are
+    // out before they are asked to account for it.
+    const expected = zReport?.expected_cash ?? null;
+    const outBy = counted != null && expected != null ? round2(counted - expected) : null;
+    let variance: { reason?: string; approved?: boolean } | undefined;
+    if (outBy != null && outBy !== 0) {
+      const why = window.prompt(
+        `The drawer is out by ${outBy}. Say what happened — this is recorded against your name.`,
+        '',
+      );
+      if (why === null) return;
+      variance = { reason: why.trim() || undefined, approved: true };
+    }
     try {
-      const z = await posSessionService.close(session.id, raw.trim() ? (parseDecimal(raw) ?? undefined) : undefined);
+      const z = await posSessionService.close(session.id, counted, variance);
       setZReport(z);
       await loadSession();
       toast({ title: `Z report #${z.z_number} — shift closed` });

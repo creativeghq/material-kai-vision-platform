@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { UNITS } from '@/lib/units';
-import { Package, Plus, Eye, Trash2, Minus, Ruler, Loader2, PenLine, Home, Wrench, Truck, ChevronDown, ChevronUp, DollarSign, Send } from 'lucide-react';
+import { Package, Plus, Eye, Trash2, Minus, Ruler, Loader2, PenLine, Home, Wrench, Truck, ChevronDown, ChevronUp, DollarSign, Send, Calculator } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
@@ -21,6 +21,7 @@ import { parseDecimal, formatMoney, currencySymbol } from '@/utils/decimal';
 import { masterRequestsService } from '@/services/masterRequestsService';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/utils/datetime';
+import { TileQuantityDialog } from '@/modules/finance/components/TileQuantityDialog';
 
 // Helper to extract size from notes (format: "Size: 15×38 cm")
 const extractSizeFromNotes = (notes?: string | null): string | null => {
@@ -211,6 +212,8 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   // Price lookup drawer state — one instance, reused for any row the admin clicks.
   const [lookupItem, setLookupItem] = useState<QuoteItemWithProduct | null>(null);
+  // #436 -- which line the room calculator is open for.
+  const [calcFor, setCalcFor] = useState<{ id: string; productId: string; name?: string } | null>(null);
   // Hide the per-line margin from a sales rep when sales_can_see_cost is off.
   const { isSalesRep, can } = usePermissions();
   const { toast } = useToast();
@@ -628,6 +631,18 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                               >
                                 <Plus className="h-3 w-3" />
                               </Button>
+                              {/* #436 -- rooms to m2 to boxes. The counter does this by hand
+                                  on nearly every tile line. */}
+                              {item.product_id && (
+                                <Button
+                                  variant="ghost" size="icon" className="h-6 w-6"
+                                  aria-label={`Work out the quantity for ${getProductName(item.product as any) || 'this line'}`}
+                                  disabled={isUpdating}
+                                  onClick={e => { e.stopPropagation(); setCalcFor({ id: item.id, productId: item.product_id as string, name: getProductName(item.product as any) }); }}
+                                >
+                                  <Calculator className="h-3 w-3" />
+                                </Button>
+                              )}
                             </div>
                           ) : (
                             <div className="flex justify-center">
@@ -839,6 +854,30 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
               price_lookup_call_id: payload.price_lookup_call_id ?? null,
             });
             setLookupItem(null);
+          }}
+        />
+      )}
+
+      {calcFor && (
+        <TileQuantityDialog
+          open={!!calcFor}
+          onOpenChange={(v) => { if (!v) setCalcFor(null); }}
+          productId={calcFor.productId}
+          productName={calcFor.name}
+          onApply={async ({ quantity, wastagePercent, note }) => {
+            const id = calcFor.id;
+            setCalcFor(null);
+            // The quantity and WHAT IT MEASURES both land on the line: a figure nobody can
+            // re-derive a month later is a figure nobody can check.
+            if (onUpdateQuantity) await onUpdateQuantity(id, quantity);
+            if (onUpdateItem) {
+              await onUpdateItem(id, {
+                dimensions: note,
+                notes: wastagePercent != null && wastagePercent > 0
+                  ? `Includes ${wastagePercent}% cut allowance`
+                  : undefined,
+              });
+            }
           }}
         />
       )}

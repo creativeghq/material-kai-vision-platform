@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { stripComments } from '../helpers/stripComments';
-import { vatVerdictBlocks, type VatDestinationVerdict } from '@/modules/finance/services/islandVatService';
+import { vatVerdictBlocks, type VatDestinationVerdict } from '@/modules/finance/islandVatRules';
 
 const ROOT = join(__dirname, '..', '..');
 const read = (p: string) => stripComments(readFileSync(join(ROOT, p), 'utf8'));
@@ -49,7 +49,10 @@ describe('the rate is never computed in the client', () => {
 
   it('the verdict comes from the SQL derivation', () => {
     expect(service).toContain('vat_category_for_destination');
-    expect(service).toContain('invoice_delivery_vat');
+    // `invoice_delivery_vat` has no TypeScript reader on purpose: the invoice-level verdict is
+    // consumed by the nightly integrity probe, in SQL. A second door onto one derivation is how
+    // two answers start.
+    expect(service).not.toContain('invoice_delivery_vat');
   });
 });
 

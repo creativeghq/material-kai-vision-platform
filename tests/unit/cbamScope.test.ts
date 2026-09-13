@@ -13,12 +13,9 @@ import { join } from 'node:path';
 import { stripComments } from '../helpers/stripComments';
 import {
   cbamNeedsAttention, cbamIsWatched, formatTonnes, extractToRows, ROLE_OBLIGATIONS,
-  type CbamYearPosition,
-} from '@/modules/finance/services/cbamService';
-import {
   dopcNeedsAttention, formatDeclaredValue, NO_PERFORMANCE_DECLARED,
-  type DopcVerdict, type DopcStatus,
-} from '@/modules/finance/services/dopcService';
+  type CbamYearPosition, type DopcVerdict, type DopcStatus,
+} from '@/modules/finance/complianceRules';
 
 const ROOT = join(__dirname, '..', '..');
 const read = (p: string) => stripComments(readFileSync(join(ROOT, p), 'utf8'));

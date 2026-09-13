@@ -15,6 +15,30 @@ export interface StorefrontMeta {
    *  case the storefront shows no challenge and the server accepts the checkout without a token
    *  (same fail-open ruling as every other public form here). */
   turnstile_site_key?: string | null;
+  /** EAA art. 13: the statement belongs on the service, not in a drawer. */
+  accessibility_statement?: string | null;
+}
+
+/**
+ * What GPSR art. 19 makes the OFFER display, and what the EAA adds to it.
+ *
+ * Derived server-side by `product_offer_disclosure` so the storefront cannot show a different
+ * answer from the publish gate that let the product on to it.
+ */
+export interface StorefrontProductSafety {
+  status: 'complete' | 'incomplete' | 'not_found';
+  manufacturer?: { name: string | null; postal_address: string | null; email: string | null };
+  responsible_person?: {
+    source: 'us' | 'named' | 'manufacturer_is_eu';
+    name?: string | null;
+    postal_address?: string | null;
+    email?: string | null;
+  };
+  product_identifier?: string | null;
+  product_type?: string | null;
+  warnings?: string[];
+  accessibility_information?: string | null;
+  reason?: string;
 }
 
 export interface StorefrontProduct {
@@ -26,6 +50,7 @@ export interface StorefrontProduct {
   price: number;
   currency: string;
   image_url: string | null;
+  safety?: StorefrontProductSafety | null;
 }
 
 export interface StorefrontConfig {

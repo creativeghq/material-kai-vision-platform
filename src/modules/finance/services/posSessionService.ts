@@ -68,9 +68,23 @@ export const posSessionService = {
     return data as PosReport;
   },
 
-  async close(sessionId: string, countedCash?: number): Promise<PosReport> {
+  /**
+   * Close the shift.
+   *
+   * A till that is out carries WHO accepted it and WHY. The server refuses the close without
+   * them once a variance policy exists — an exception nobody signed is the finding, not the
+   * number.
+   */
+  async close(
+    sessionId: string,
+    countedCash?: number,
+    variance?: { reason?: string; approved?: boolean },
+  ): Promise<PosReport> {
     const { data, error } = await supabase.rpc('close_pos_session', {
-      p_session_id: sessionId, p_counted_cash: countedCash ?? null,
+      p_session_id: sessionId,
+      p_counted_cash: countedCash ?? null,
+      p_variance_reason: variance?.reason ?? null,
+      p_variance_approved: variance?.approved ?? false,
     });
     if (error) throw error;
     return data as PosReport;

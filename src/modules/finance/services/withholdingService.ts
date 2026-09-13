@@ -7,30 +7,10 @@
  */
 import { supabase } from '@/integrations/supabase/client';
 
-export type WithholdingStatus = 'withheld' | 'not_withheld' | 'below_floor' | 'unclassified';
-
-export interface WithholdingVerdict {
-  status: WithholdingStatus;
-  /** NULL when the rule cannot be applied — never 0, which would read as "nothing is withheld". */
-  amount: number | null;
-  reason: string;
-  net?: number;
-  rate?: number;
-  floor?: number;
-  supply_kind?: 'goods' | 'services' | 'mixed' | 'unknown' | null;
-  legal_basis?: string;
-}
+export type { WithholdingStatus, WithholdingVerdict } from '@/modules/finance/withholdingRules';
+export { withholdingNeedsDecision } from '@/modules/finance/withholdingRules';
 
 export const withholdingService = {
-  /** What άρθρο 64 produces for this invoice. */
-  async forInvoice(invoiceId: string): Promise<WithholdingVerdict> {
-    const { data, error } = await supabase.rpc('invoice_withholding' as never, {
-      p_invoice: invoiceId,
-    } as never);
-    if (error) throw error;
-    return data as unknown as WithholdingVerdict;
-  },
-
   /**
    * Record the derived figure on the document.
    *
@@ -55,14 +35,3 @@ export const withholdingService = {
     return data ?? [];
   },
 };
-
-/**
- * Does this verdict need a human before the document can be issued?
- *
- * Only `unclassified` does. `below_floor` and `not_withheld` are answers — the rule ran and said
- * nothing is withheld. `unclassified` is the absence of an answer, and treating it as zero is how
- * a €400 receivable goes missing.
- */
-export function withholdingNeedsDecision(v: WithholdingVerdict | null): boolean {
-  return v?.status === 'unclassified';
-}

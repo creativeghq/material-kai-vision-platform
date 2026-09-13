@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Save, Upload, Loader2, ImageIcon, Mail, Send, ExternalLink, Info, SlidersHorizontal, Building2, FileText, Tag, CreditCard, Wrench, Users, Tags, Store, FileSignature, Landmark, Ruler, ShieldCheck } from 'lucide-react';
+import { Save, Upload, Loader2, ImageIcon, Mail, Send, ExternalLink, Info, SlidersHorizontal, Building2, FileText, Tag, CreditCard, Wrench, Users, Tags, Store, FileSignature, Landmark, Ruler, ShieldCheck, Gavel } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { CostCodesPanel } from '@/components/business/costCodes/CostCodesPanel';
@@ -40,6 +40,10 @@ import { WorkspaceCreditsCard } from '@/modules/finance/components/WorkspaceCred
 import { EInvoicingCard } from '@/modules/finance/components/EInvoicingCard';
 import { EInvoicingMandateCard } from '@/modules/finance/components/EInvoicingMandateCard';
 import { CbamPositionCard } from '@/modules/finance/components/CbamPositionCard';
+import { RecallsCard } from '@/modules/finance/components/RecallsCard';
+import { AccessibilityCard } from '@/modules/finance/components/AccessibilityCard';
+import { ApprovalsCard } from '@/modules/finance/components/ApprovalsCard';
+import { IslandVatTerritoriesCard } from '@/modules/finance/components/IslandVatTerritoriesCard';
 import { BankAccountsCard } from '@/modules/finance/components/BankAccountsCard';
 import { MoneyOutCard } from '@/modules/banking-revolut/components/MoneyOutCard';
 import { formatDate } from '@/utils/datetime';
@@ -52,6 +56,7 @@ const SETTINGS_SECTIONS = [
   { value: 'documents', label: 'Documents', icon: FileText },
   { value: 'einvoicing', label: 'e-Invoicing', icon: FileSignature },
   { value: 'compliance', label: 'Compliance', icon: ShieldCheck },
+  { value: 'approvals', label: 'Approvals', icon: Gavel },
   { value: 'pricing', label: 'Pricing', icon: Tag },
   { value: 'categories', label: 'Categories', icon: Tags },
   { value: 'costcodes', label: 'Cost Codes', icon: Ruler },
@@ -245,6 +250,16 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
             per regulation — they share the same two facts, origin and mass. */}
         <TabsContent value="compliance" className="mt-0 space-y-4">
           <CbamPositionCard workspaceId={workspaceId} />
+          <RecallsCard workspaceId={workspaceId} />
+          <AccessibilityCard workspaceId={workspaceId} />
+          <IslandVatTerritoriesCard />
+        </TabsContent>
+
+        {/* Credit holds, margin authority and till variances share one spine, because they
+            are the same three questions: is this allowed, who may wave it through, and who
+            signed. */}
+        <TabsContent value="approvals" className="mt-0 space-y-4">
+          <ApprovalsCard workspaceId={workspaceId} />
         </TabsContent>
 
         <TabsContent value="pricing" className="mt-0 space-y-4">

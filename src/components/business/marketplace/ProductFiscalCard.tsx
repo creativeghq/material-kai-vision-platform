@@ -1,6 +1,6 @@
 /** The one editor for a product's fiscal, catalog and customs identity. */
 import React, { useEffect, useState } from 'react';
-import { Loader2, Save, Receipt, Ship, Tag, Sparkles, Check, X, AlertTriangle, Info, ShieldCheck } from 'lucide-react';
+import { Loader2, Save, Receipt, Ship, Tag, Sparkles, Check, X, AlertTriangle, Info, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { Label } from '@/components/core/ui/label';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -16,6 +16,7 @@ import { TaricCombobox } from '@/components/core/TaricCombobox';
 import { OriginCountryCombobox } from '@/components/core/OriginCountryCombobox';
 import { RegulatoryRoleNotice } from '@/components/business/marketplace/RegulatoryRoleNotice';
 import { DopcPanel } from '@/components/business/marketplace/DopcPanel';
+import { OfferDisclosureCard } from '@/components/business/marketplace/OfferDisclosureCard';
 import { UNITS } from '@/lib/units';
 
 const NONE = '__none';
@@ -28,6 +29,7 @@ const SELECT_COLUMNS = [
   'mydata_income_classification_type_retail', 'mydata_income_classification_category_retail',
   'prices_include_vat', 'markup_percent', 'warranty', 'product_url', 'notes',
   'taric_code', 'country_of_origin', 'is_own_brand', 'dopc_product_type_code', 'workspace_id',
+  'wood_species_common', 'wood_species_scientific', 'first_placed_on_eu_market_at',
   'taric_code_suggested', 'taric_confidence', 'taric_status', 'taric_source', 'taric_reasoning',
 ].join(', ');
 
@@ -51,6 +53,9 @@ interface State {
   origin: string;
   ownBrand: boolean;
   dopcTypeCode: string;
+  speciesCommon: string;
+  speciesScientific: string;
+  firstPlacedOn: string;
 }
 
 const EMPTY: State = {
@@ -58,6 +63,7 @@ const EMPTY: State = {
   vat: '', incType: '', incCat: '', incTypeRetail: '', incCatRetail: '',
   pricesIncludeVat: false, markup: '', warranty: '', productUrl: '', notes: '',
   taric: '', origin: '', ownBrand: false, dopcTypeCode: '',
+  speciesCommon: '', speciesScientific: '', firstPlacedOn: '',
 };
 
 export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }) => {
@@ -119,6 +125,9 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
         origin: row?.country_of_origin ?? '',
         ownBrand: row?.is_own_brand ?? false,
         dopcTypeCode: row?.dopc_product_type_code ?? '',
+        speciesCommon: row?.wood_species_common ?? '',
+        speciesScientific: row?.wood_species_scientific ?? '',
+        firstPlacedOn: row?.first_placed_on_eu_market_at ?? '',
       });
       setWorkspaceId(row?.workspace_id ?? null);
       setProvenance(
@@ -172,6 +181,9 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
         country_of_origin: form.origin || null,
         is_own_brand: form.ownBrand,
         dopc_product_type_code: form.dopcTypeCode.trim() || null,
+        wood_species_common: form.speciesCommon.trim() || null,
+        wood_species_scientific: form.speciesScientific.trim() || null,
+        first_placed_on_eu_market_at: form.firstPlacedOn || null,
         ...(form.taric ? { taric_status: 'confirmed', taric_source: 'manual', taric_code_suggested: null } : {}),
       }).eq('id', productId);
       if (error) throw error;
@@ -436,6 +448,30 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
             productTypeCode={form.dopcTypeCode.trim()} refreshKey={savedAt}
           />
         </div>
+        <p className="mt-3 text-[11px] text-muted-foreground">
+          Wood under EUDR Annex I (MDF, plywood, joinery, wooden furniture) is enforced per
+          SPECIES, so art. 9(1)(a) asks for the scientific name as well as the common one.
+        </p>
+        <Grid>
+          <FieldBox label="Wood species (common)">
+            <Input className="h-8 text-xs" value={form.speciesCommon}
+              onChange={(e) => set({ speciesCommon: e.target.value })} placeholder="oak" />
+          </FieldBox>
+          <FieldBox label="Wood species (scientific)">
+            <Input className="h-8 text-xs italic" value={form.speciesScientific}
+              onChange={(e) => set({ speciesScientific: e.target.value })} placeholder="Quercus robur" />
+          </FieldBox>
+          <FieldBox label="First placed on the EU market">
+            <Input className="h-8 text-xs" type="date" value={form.firstPlacedOn}
+              onChange={(e) => set({ firstPlacedOn: e.target.value })} />
+          </FieldBox>
+        </Grid>
+      </Section>
+
+      {/* GPSR art. 19 reaches CE-marked goods too: art. 2(1) excludes only Chapter III
+          SECTION 1, and the online-offer duty is in section 2. */}
+      <Section icon={<ShieldAlert className="h-3.5 w-3.5 text-primary" />} title="Consumer safety on the offer">
+        <OfferDisclosureCard productId={productId} workspaceId={workspaceId} refreshKey={savedAt} />
       </Section>
 
       <Section icon={<Tag className="h-3.5 w-3.5 text-primary" />} title="Commercial">
