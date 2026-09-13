@@ -10,7 +10,7 @@ import {
   Package, PackagePlus, AlertTriangle,
   Banknote, Calculator, CalendarDays, FileText, Flame, Link, ListPlus, Network,
   Pencil, Percent, Radar, RefreshCw, ShoppingCart, Tag, UserPlus, Video, Wallet,
-  Inbox, Code2, Factory, BarChart3, Eraser, Gauge,
+  Inbox, Code2, Factory, BarChart3, Eraser, Gauge, Activity,
 } from 'lucide-react';
 import { Badge } from '@/components/core/ui/badge';
 import { cn } from '@/lib/utils';
@@ -31,7 +31,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   Package, PackagePlus, AlertTriangle,
   Banknote, Calculator, CalendarDays, FileText, Flame, Link, ListPlus, Network,
   Pencil, Percent, Radar, RefreshCw, ShoppingCart, Tag, UserPlus, Video, Wallet,
-  Inbox, Code2, BarChart3, Eraser, Gauge,
+  Inbox, Code2, BarChart3, Eraser, Gauge, Activity,
 };
 
 interface Props {

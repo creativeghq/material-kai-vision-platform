@@ -487,3 +487,90 @@ export const createEnrichCompanyFromAadeTool = (
     },
   );
 };
+
+/** Worst first: a customer report that leads with what is fine buries the reason it was opened. */
+const HEALTH_SEVERITY: Record<string, number> = { attention: 0, watch: 1, good: 2, none: 3 };
+
+export const createCustomerHealthTool = (
+  _userId: string,
+  workspaceId: string,
+  onChunk?: (chunk: AnyRow) => void,
+) => {
+  return tool(
+    async ({ company_id, company_query, days }: { company_id?: string; company_query?: string; days?: number }) => {
+      const denied = await moduleGate(workspaceId, 'crm');
+      if (denied) return denied;
+
+      // Tenancy binding. The RPC self-guards for a USER, but this client is service-role and
+      // assert_workspace_member deliberately lets that through — so resolving the company inside
+      // the workspace IS the check (invariant 1), not a convenience.
+      let q = supabase.from('crm_companies').select('id, name').eq('workspace_id', workspaceId);
+      if (company_id) q = q.eq('id', company_id);
+      else if (company_query) {
+        const term = String(company_query).trim().replace(/[,()]/g, ' ');
+        q = q.or(`name.ilike.%${term}%,name_fold.ilike.%${term}%,name_xscript.ilike.%${term}%`);
+      } else return JSON.stringify({ success: false, error: 'Provide company_id or company_query.' });
+
+      const { data: matches, error: mErr } = await q.limit(8);
+      if (mErr) return JSON.stringify({ success: false, error: mErr.message });
+      if (!matches || matches.length === 0) {
+        return JSON.stringify({ success: false, error: 'No matching company in this workspace.' });
+      }
+      if (matches.length > 1) {
+        return JSON.stringify({
+          success: false,
+          error: `Multiple companies match "${company_query}". Ask which one.`,
+          candidates: matches.map((c: AnyRow) => ({ id: c.id, name: c.name })),
+        });
+      }
+      const company = matches[0];
+
+      const { data, error } = await supabase.rpc('get_customer_health', {
+        p_company_id: company.id, p_days: days ?? 90,
+      });
+      if (error) return JSON.stringify({ success: false, error: error.message });
+
+      const signals = ((data as AnyRow[]) || []).slice().sort(
+        (a, b) => (HEALTH_SEVERITY[a.severity] ?? 9) - (HEALTH_SEVERITY[b.severity] ?? 9),
+      );
+      const needsAttention = signals.filter((s) => s.severity === 'attention');
+
+      onChunk?.({
+        type: 'crm_customer_health',
+        company: company.name,
+        company_id: company.id,
+        window_days: days ?? 90,
+        attention: needsAttention.length,
+        signals,
+        timestamp: Date.now(),
+      });
+
+      return JSON.stringify({
+        success: true,
+        company: company.name,
+        company_id: company.id,
+        window_days: days ?? 90,
+        // Every signal carries its own status, so "nothing billed yet" reads as an absence and
+        // never as a customer who owes nothing. The model reports these; it does not score them.
+        signals: signals.map((s) => ({
+          signal: s.signal, label: s.label, status: s.status, severity: s.severity,
+          value: s.value, previous: s.previous, detail: s.detail,
+        })),
+      });
+    },
+    {
+      name: 'customer_health',
+      description:
+        'What is actually happening with one customer: order value against the previous window, whether '
+        + 'they are waiting on a reply from us, money outstanding and overdue, and what we have open with '
+        + 'them (quotes, orders, projects). One row per signal, each with its own verdict — good, watch, '
+        + 'attention, or none — and its own status, so "nothing billed yet" is never reported as "owes '
+        + 'nothing". Use for "how is <customer> doing", "should I call them", "are we at risk of losing X".',
+      schema: z.object({
+        company_id: z.string().optional().describe('The crm company UUID.'),
+        company_query: z.string().optional().describe('Fuzzy company name to resolve (if you don\'t have the id).'),
+        days: z.number().optional().describe('Comparison window in days (default 90, min 7, max 730).'),
+      }),
+    },
+  );
+};

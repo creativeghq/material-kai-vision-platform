@@ -81,7 +81,7 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
     tool_ids: ['manage_messaging'],
   },
   'crm': {
-    tool_ids: ['create_company_from_vat', 'enrich_company_from_aade', 'manage_crm', 'manage_deal'],
+    tool_ids: ['create_company_from_vat', 'enrich_company_from_aade', 'manage_crm', 'manage_deal', 'customer_health'],
   },
   'finance': {
     tool_ids: ['manage_finance'],

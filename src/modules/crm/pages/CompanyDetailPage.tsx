@@ -30,6 +30,7 @@ import { flowEventService } from '@/services/flows/flowEventService';
 import { validateVatViaVies } from '@/services/viesService';
 import { researchCompany, summarizeResearch, missingSoftIdentity } from '@/modules/crm/services/companyResearch';
 import { CompanyRegistryDetails, type KadEntry } from '@/modules/crm/components/CompanyRegistryDetails';
+import { CustomerHealthStrip } from '../components/CustomerHealthStrip';
 import { crmActivitiesService } from '@/services/crmActivitiesService';
 import { CategoryAssignmentPicker } from '@/components/business/catalogs/CategoryAssignmentPicker';
 import { CollapsibleCard } from '@/components/business/crm/CollapsibleCard';
@@ -1168,6 +1169,7 @@ export const CompanyDetailPage: React.FC = () => {
               contact record). forceMount keeps it (and its portalled email dialog)
               reachable from the sidebar / Details quick-actions on any tab. */}
           <TabsContent value="activity" forceMount className="space-y-4 data-[state=inactive]:hidden">
+            {company.id && showCommercial && <CustomerHealthStrip companyId={company.id} />}
             {company.id ? (
               <CrmRecordActivity
                 ref={activityRef}

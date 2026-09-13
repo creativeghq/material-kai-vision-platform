@@ -195,6 +195,16 @@ const KAI_TOOLS: AgentToolEntry[] = [
 
   // ── CRM (workspace-scoped) ────────────────────────────────────────────
   {
+    id: 'customer_health', name: 'Customer health', category: 'CRM',
+    moduleSlug: 'crm',
+    desc: 'One customer, every signal: order value against the previous window, whether they are waiting on a reply from us, money outstanding and overdue, and what we have open with them. Each signal carries its own verdict and its own status, so \'nothing billed yet\' is never reported as \'owes nothing\'.',
+    examples: [
+      'How is Trendafil doing?',
+      'Should I call ACME?',
+      'Which of our customers are we at risk of losing?',
+    ],
+  },
+  {
     id: 'manage_deal', name: 'Deal pipeline', category: 'CRM',
     moduleSlug: 'deals',
     desc: 'The deal pipeline for every deal type — list open deals, read the weighted forecast, create a deal for a contact, move one to a stage by name, or mark it lost. Stages differ per deal type and are read from the data.',
@@ -1945,9 +1955,17 @@ export const TOOLKITS: ToolkitDefinition[] = [
     description: 'Add companies from a VAT/ΑΦΜ (ΑΑΔΕ/VIES) and refresh existing companies from ΑΑΔΕ.',
     icon: 'Building2',
     moduleSlug: 'crm',
-    tool_ids: ['create_company_from_vat', 'enrich_company_from_aade', 'manage_crm', 'manage_deal'],
+    tool_ids: ['create_company_from_vat', 'enrich_company_from_aade', 'manage_crm', 'manage_deal', 'customer_health'],
     quick_starts: [
       { label: 'Company from VAT', description: 'Look up a VAT/ΑΦΜ and add the company', prompt: 'Add a company to the CRM from a VAT or ΑΦΜ number — ask me for it.', icon: 'Plus' },
+      {
+        label: 'How is a customer doing?', description: 'Value, replies owed, money outstanding, what is open', icon: 'Activity',
+        prompt: 'How is one of our customers doing? Ask me which.',
+        done: 'Here is where that customer stands.',
+        promptTemplate: 'How is {{company_query}} doing?',
+        run: { tool: 'customer_health' },
+        autoFields: true,
+      },
       {
         label: 'Deal pipeline', description: 'Open deals and the weighted forecast', icon: 'FolderKanban',
         prompt: 'Show me the deal pipeline.',

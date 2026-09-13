@@ -13,6 +13,7 @@
     "delete_simple_flow",
     "get_configured_product_price",
     "get_cooccurring_products",
+    "get_customer_health",
     "get_customer_open_balance",
     "get_deal_forecast",
     "get_embed_analytics_summary",

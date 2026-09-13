@@ -485,6 +485,17 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'customer_health',
+    file: 'supabase/functions/_shared/tools/crm-tools.ts',
+    factory: 'createCustomerHealthTool',
+    description: 'What is actually happening with one customer: order value against the previous window, whether they are waiting on a reply from us, money outstanding and overdue, and what we have open with them (quotes, orders, proje…',
+    params: [
+      { name: 'company_id', type: 'string', optional: true, description: 'The crm company UUID.' },
+      { name: 'company_query', type: 'string', optional: true, description: 'Fuzzy company name to resolve (if you don\'t have the id).' },
+      { name: 'days', type: 'number', optional: true, description: 'Comparison window in days (default 90, min 7, max 730).' },
+    ],
+  },
+  {
     name: 'customer_overview',
     file: 'supabase/functions/_shared/tools/graph-tools.ts',
     factory: 'createCustomerOverviewTool',

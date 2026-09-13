@@ -967,7 +967,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // Calculators (all users; deterministic, free, no upstream API)
       'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost',
       // CRM roster query — "which businesses have ΚΑΔ X?" + create-from-VAT (all users; workspace-scoped)
-      'search_crm_by_kad', 'create_company_from_vat', 'enrich_company_from_aade', 'manage_crm', 'manage_deal',
+      'search_crm_by_kad', 'create_company_from_vat', 'enrich_company_from_aade', 'manage_crm', 'manage_deal', 'customer_health',
       // Sub-agent orchestration (admin/owner only — gated at injection time)
       'research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis',
       // B2B Research (admin/owner only)
@@ -1232,7 +1232,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites',
       'price_lookup', 'product_analysis', 'business_analysis', 'dispatch_background_task',
       // Price monitoring + CRM-from-VAT (Pepper is the product/business agent)
-      'track_product_prices', 'get_price_summary', 'create_company_from_vat', 'enrich_company_from_aade', 'manage_crm', 'manage_deal',
+      'track_product_prices', 'get_price_summary', 'create_company_from_vat', 'enrich_company_from_aade', 'manage_crm', 'manage_deal', 'customer_health',
     ],
   },
   marketing: {
@@ -1980,7 +1980,7 @@ async function executeAgent(
   const needsMyHr = config.tools.includes('manage_my_hr');
   const needsStock = config.tools.includes('manage_stock');
   const needsRealEstate = config.tools.includes('manage_real_estate');
-  const needsCrm = config.tools.some((t: string) => ['search_crm_by_kad', 'create_company_from_vat', 'enrich_company_from_aade', 'manage_crm'].includes(t));
+  const needsCrm = config.tools.some((t: string) => ['search_crm_by_kad', 'create_company_from_vat', 'enrich_company_from_aade', 'manage_crm', 'manage_deal', 'customer_health'].includes(t));
   const needsQuotes = config.tools.some((t: string) => ['create_quote', 'generate_quote_pdf', 'list_my_quotes', 'raise_quote_request'].includes(t));
   const needsSocial = config.tools.includes('manage_social');
   // Tech Radar spends real Anthropic + web-search $ per call with no credit debit
@@ -2268,6 +2268,11 @@ async function executeAgent(
   }
   if (config.tools.includes('manage_deal') && crmToolsMod?.createManageDealTool) {
     tools.push(crmToolsMod.createManageDealTool(userId, workspaceId, userJwt, onChunk));
+  }
+  // One derivation of a customer RELATIONSHIP. The records that answer it live in six tables,
+  // so before this the question took six tool calls and nothing put the answer together.
+  if (config.tools.includes('customer_health') && crmToolsMod?.createCustomerHealthTool) {
+    tools.push(crmToolsMod.createCustomerHealthTool(userId, workspaceId, onChunk));
   }
   if (config.tools.includes('manage_crm') && crmToolsMod?.createManageCrmTool) {
     tools.push(crmToolsMod.createManageCrmTool(userId, workspaceId, userJwt, onChunk));
