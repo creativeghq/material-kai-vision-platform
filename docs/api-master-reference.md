@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (146)
+## 1. Supabase Edge Functions (147)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -320,6 +320,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 
 | Function | Auth | Summary |
 |---|---|---|
+| `bank-statement-import` | public | Feed a bank that has no API. Revolut Business syncs itself; every other account had no route into the reconciler at all. The operator maps the statement columns once per account (`bank_statement_mappings`) and imports exports against it. Nothing is matched here — rows land as `provider='statement'`, `match_status='unmatched'`, and the reconciler (the one derivation that decides what a credit settles) picks them up because the account's `feed_kind` is `bank_account`. Re-importing an overlapping statement is idempotent: the unique index on (workspace_id, provider, provider_ref) enforces it, and the reference is the bank's own transaction id where the export carries one, otherwise a stable fingerprint plus an ordinal so two identical same-day amounts stay two transactions. Refuses an account whose feed_kind is `merchant_settlement` — importing a statement into a card-processor balance would double-count money its own webhook already settled. 404 (never 403) on an account outside the caller's workspaces. |
 | `inbox-draft-cron` | public | Pre-writes the assistant's reply on threads set to `agent_state='suggesting'`, so a member opening the Inbox finds a draft waiting instead of an empty composer. Cron, every 2 minutes; `x-cron-secret` or a service-role bearer. Claims each thread by stamping the inbound message it is answering (`claim_due_inbox_drafts`) in the same statement that selects it, so two overlapping runs cannot bill the same turn twice. A 90-second quiet period debounces WhatsApp bursts — one draft once the customer stops, not one per message. Nothing is ever sent: the draft is stored on the thread and only reaches the customer if a human presses send. |
 
 **Customs**

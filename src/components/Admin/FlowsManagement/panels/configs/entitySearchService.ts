@@ -33,6 +33,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'ai-rerank', label: 'ai-rerank', sublabel: 'Reorder search results by relevance to a query' },
   { id: 'asset-service-reminders-cron', label: 'asset-service-reminders-cron', sublabel: 'Cron: emit equipment service-due, service-overdue and warranty-expiring flow events (#343).' },
   { id: 'auto-recovery-cron', label: 'auto-recovery-cron', sublabel: 'Every-5-minute cron: detect and recover stuck PDF, XML, scraping, and agent runs' },
+  { id: 'bank-statement-import', label: 'bank-statement-import', sublabel: 'Import a bank statement export (CSV) for an account with no API, against an operator-defined column mapping' },
   { id: 'background-agent-runner', label: 'background-agent-runner', sublabel: 'Execute a registered background agent by agent_id' },
   { id: 'campaign-processor', label: 'campaign-processor', sublabel: 'Every-minute cron: start scheduled campaigns and drip-send emails to recipients' },
   { id: 'canonicalize-attributes', label: 'canonicalize-attributes', sublabel: 'Proxy product attribute canonicalization to MIVAA facet service' },

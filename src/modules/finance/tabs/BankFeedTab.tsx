@@ -16,6 +16,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { callRevolutApi } from '@/modules/banking-revolut/services/revolutConfigService';
+import { ImportStatementDialog } from '@/modules/finance/components/ImportStatementDialog';
 import { formatDate } from '@/utils/datetime';
 // One source (#391).
 import { PAYMENT_PROVIDER_SLUGS, type PaymentProviderSlug } from '../paymentVocabulary';
@@ -62,6 +63,22 @@ const MatchWord: React.FC<{ row: FeedRow }> = ({ row }) => {
 };
 
 export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
+  // Accounts we reconcile that no integration feeds — the ones a statement has to be imported
+  // for. `feed_kind` says which: a merchant settlement balance mirrors payments already settled
+  // and must never receive one.
+  const [importAccounts, setImportAccounts] = React.useState<Array<{ id: string; name: string }>>([]);
+  const [importFor, setImportFor] = React.useState<{ id: string; name: string } | null>(null);
+  React.useEffect(() => {
+    if (!workspaceId) return;
+    void supabase
+      .from('finance_bank_accounts')
+      .select('id, name')
+      .eq('workspace_id', workspaceId)
+      .eq('feed_kind', 'bank_account')
+      .eq('is_active', true)
+      .order('name')
+      .then(({ data }) => setImportAccounts((data ?? []) as Array<{ id: string; name: string }>));
+  }, [workspaceId]);
   const { toast } = useToast();
   const [rows, setRows] = React.useState<FeedRow[]>([]);
   const [invoices, setInvoices] = React.useState<Map<string, InvoiceLite>>(new Map());
@@ -217,11 +234,25 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
           <div>
             <CardTitle className="flex items-center gap-2 text-base"><Landmark className="h-4 w-4" /> Bank Feed</CardTitle>
             <CardDescription className="text-xs">
-              Money movement across your connected providers. Revolut lines are matchable; Stripe and Viva
-              lines mirror payments their webhooks already settled.
+              Money movement across your accounts. Lines on a BANK account are matched against open
+              invoices — whether they arrived from Revolut or from an imported statement. Stripe and Viva
+              lines mirror payments their own webhooks already settled and are never re-matched.
             </CardDescription>
           </div>
           <div className="flex gap-2">
+            {importAccounts.length > 0 && (
+              <Select value="" onValueChange={(id) => {
+                const a = importAccounts.find((x) => x.id === id);
+                if (a) setImportFor(a);
+              }}>
+                <SelectTrigger aria-label="Import a statement" className="h-8 w-[170px] text-xs">
+                  <SelectValue placeholder="Import statement…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {importAccounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
             <Button size="sm" variant="outline" onClick={matchNow} disabled={busy}>Match now</Button>
             <Button size="sm" variant="outline" onClick={syncNow} disabled={busy}>
               <RefreshCw className="mr-1 h-3.5 w-3.5" />Sync
@@ -394,6 +425,16 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
           </div>
         </DialogContent>
       </Dialog>
+
+      {importFor && (
+        <ImportStatementDialog
+          bankAccountId={importFor.id}
+          bankAccountName={importFor.name}
+          open={!!importFor}
+          onOpenChange={(v) => { if (!v) setImportFor(null); }}
+          onImported={() => { setImportFor(null); void load(); }}
+        />
+      )}
     </Card>
   );
 };

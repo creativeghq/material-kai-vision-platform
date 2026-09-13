@@ -14209,6 +14209,43 @@
     ]
   },
   {
+    "name": "bank-statement-import",
+    "summary": "Feed a bank that has no API. Revolut Business syncs itself; every other account had no route into the reconciler at all. The operator maps the statement columns once per account (`bank_statement_mappings`) and imports exports against it. Nothing is matched here — rows land as `provider='statement'`, `match_status='unmatched'`, and the reconciler (the one derivation that decides what a credit settles) picks them up because the account's `feed_kind` is `bank_account`. Re-importing an overlapping statement is idempotent: the unique index on (workspace_id, provider, provider_ref) enforces it, and the reference is the bank's own transaction id where the export carries one, otherwise a stable fingerprint plus an ordinal so two identical same-day amounts stay two transactions. Refuses an account whose feed_kind is `merchant_settlement` — importing a statement into a card-processor balance would double-count money its own webhook already settled. 404 (never 403) on an account outside the caller's workspaces.",
+    "params": [
+      {
+        "name": "action",
+        "type": "'columns' | 'preview' | 'import'",
+        "required": true,
+        "desc": "columns = the file's headers plus five sample rows, so the mapping is built against real names; preview = what WOULD import, what is already held, and every line that could not be read; import = writes the fresh rows"
+      },
+      {
+        "name": "bank_account_id",
+        "type": "string (uuid)",
+        "required": true,
+        "desc": "A finance_bank_accounts row in a workspace the caller belongs to"
+      },
+      {
+        "name": "csv",
+        "type": "string",
+        "required": true,
+        "desc": "The statement export as text. 8MB / 20,000 rows max. Delimiter is sniffed (comma, semicolon, tab, pipe); quoted fields, doubled quotes, embedded newlines and a BOM are all handled."
+      },
+      {
+        "name": "mapping_id",
+        "type": "string (uuid)",
+        "required": false,
+        "desc": "A saved bank_statement_mappings row for this account"
+      },
+      {
+        "name": "mapping",
+        "type": "object",
+        "required": false,
+        "desc": "An inline mapping while the operator is still building one: date_column, date_format, decimal_mark, and EITHER amount_column (signed) OR credit_column + debit_column; optional reference_column, counterparty_column, external_id_column"
+      }
+    ],
+    "response": "columns → {ok, headers[], sample[][]}; preview → {ok, account, parsed, already_held, to_import, problems[], problem_count, sample[]}; import → {ok, imported, already_held, problems, next}"
+  },
+  {
     "name": "revolut-api",
     "tag": "Finance",
     "summary": "Revolut Business connection management (per-workspace BYOK) — keys, OAuth, accounts, mapping, sync",
