@@ -330,6 +330,17 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
   const paymentMethods = input.paymentMethods?.length
     ? input.paymentMethods
     : [{ type: 5, amount: summary.totalGrossValue }];
+  // SendPaymentsMethod reconciles to the cent. A document whose methods sum to something other
+  // than its gross total is rejected as a whole, so the refusal belongs HERE, where the figure is
+  // still ours to name -- a provider error code arrives with none of this context.
+  const paidTotal = paymentMethods.reduce((s, pm) => s + Number(pm.amount ?? 0), 0);
+  if (Math.abs(paidTotal - Number(summary.totalGrossValue ?? 0)) >= 0.005) {
+    throw new Error(
+      `Payment methods total ${paidTotal.toFixed(2)} but the document is `
+      + `${Number(summary.totalGrossValue ?? 0).toFixed(2)}. myDATA requires them to sum exactly.`,
+    );
+  }
+
   const docLang = input.documentLanguageCode ?? 'EN';
   const paymentLabel =
     input.paymentMethodLabel ??
@@ -551,6 +562,12 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
           // Law 5155 — card(7)/IRIS(8) carry the EFT-POS terminal + NSP for the signature.
           ...(pm.terminalId ? { terminalId: pm.terminalId } : {}),
           ...(pm.posNspId != null ? { posNspId: pm.posNspId } : {}),
+          // Α.1155 — the terminal as its provider knows it, and the token the ΦΗΜ signed. Without
+          // these a type-7 detail is a claim that a card was used, with nothing behind it.
+          ...(pm.tid ? { tid: pm.tid } : {}),
+          ...(pm.ecrToken
+            ? { ECRToken: { SigningAuthor: pm.ecrToken.signingAuthor, Signature: pm.ecrToken.signature } }
+            : {}),
         })) }),
         invoiceDetails,
         // ── Document-level taxes (myDATA `taxesTotals`) ───────────────────────────────

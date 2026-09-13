@@ -31,6 +31,7 @@ import { movePurposeLabel } from '@/services/fiscal/fiscalVocabulary';
 import { usePermissions } from '@/hooks/usePermissions';
 import { ProjectLinkField } from '@/modules/finance/components/ProjectLinkField';
 import { InvoicePreviewModal } from '@/modules/finance/components/InvoicePreviewModal';
+import { WholesaleCardNotice } from '@/modules/finance/components/WholesaleCardNotice';
 import { NewCreditNoteDialog } from '@/modules/finance/components/NewCreditNoteDialog';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
@@ -321,6 +322,11 @@ const InvoiceDetailPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* #448 -- wholesale settled on a terminal is collected by a 355 -> 8.4 receipt correlated
+          to this invoice, NOT by the A.1098 retail-receipt-then-credit-note workaround. Running
+          both files two documents for one sale. */}
+      <WholesaleCardNotice invoiceId={invoiceId ?? null} />
 
       {payLink && (
         <Card className="border-primary/30 bg-primary/5">

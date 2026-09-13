@@ -1047,10 +1047,35 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
             // signing so Novus returns a provider signature instead of transmitting to AADE.
             const effOverrides: FiscalOverrides = { ...(body.fiscal_overrides ?? {}) };
             if (body.pos_payment) {
+              // The TID and the ECR Token come from the DB, never from the request body: the token
+              // is what the ΦΗΜ signed, and a caller-supplied one is a claim about a signature
+              // rather than the signature (invariant 8).
+              const { data: term } = await supabase
+                .from('pos_terminals')
+                .select('acquirer_id, fim_registry_number, interconnection_route')
+                .eq('workspace_id', invRow!.workspace_id)
+                .eq('terminal_id', body.pos_payment.terminal_id)
+                .maybeSingle();
+              const { data: tok } = await supabase
+                .from('pos_ecr_tokens')
+                .select('token, fim_registry_number, tid_nsp')
+                .eq('invoice_id', invoiceId)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
               effOverrides.posPayment = {
                 type: body.pos_payment.payment_type ?? 7,
                 terminalId: body.pos_payment.terminal_id,
                 posNspId: body.pos_payment.pos_nsp_id,
+                ...(tok?.tid_nsp ? { tid: tok.tid_nsp } : {}),
+                ...(tok?.token && (tok.fim_registry_number ?? term?.fim_registry_number)
+                  ? {
+                      ecrToken: {
+                        signingAuthor: String(tok.fim_registry_number ?? term!.fim_registry_number),
+                        signature: tok.token,
+                      },
+                    }
+                  : {}),
               };
             }
             const input = await buildInvoiceInputFromDb(supabase, invoiceId, effOverrides);
