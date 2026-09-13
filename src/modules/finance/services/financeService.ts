@@ -526,6 +526,12 @@ export interface CreditNote {
   reason: string;
   issued_at: string;
   created_at: string;
+  /**
+   * When the credited goods were physically received back. NULL is the NORMAL case — most credit
+   * notes correct money and return nothing, so this must never be read as "the return is pending".
+   */
+  goods_returned_at?: string | null;
+  goods_returned_by?: string | null;
 }
 
 export interface SupplierCreditNote {

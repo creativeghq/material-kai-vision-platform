@@ -189,18 +189,42 @@ export const createManageFinanceTool = (
         return JSON.stringify({ success: true, customer: company, balance: data });
       }
 
+      if (action === 'worklist') {
+        // The whole verdict — state, action and severity — is derived by get_order_worklist. The
+        // model reports it; it never decides what an order is waiting on.
+        const { data, error } = await sb.rpc('get_order_worklist', {
+          p_workspace_id: workspaceId, p_limit: limit,
+        });
+        if (error) return JSON.stringify({ success: false, error: error.message });
+        const rows = (data as any[]) || [];
+        onChunk?.({ type: 'finance_order_worklist', count: rows.length, items: rows, timestamp: Date.now() });
+        return JSON.stringify({
+          success: true,
+          count: rows.length,
+          // An empty list is a real answer here, not a missing one: orders with nothing
+          // outstanding are omitted by the derivation.
+          note: rows.length === 0 ? 'Nothing on the order book is waiting on us.' : undefined,
+          items: rows.map((r) => ({
+            order_id: r.order_id, order_number: r.order_number, customer: r.customer_name,
+            total: r.total, currency: r.currency, age_days: r.age_days,
+            state: r.state, next_action: r.next_action, detail: r.detail, severity: r.severity,
+          })),
+        });
+      }
+
       return JSON.stringify({ success: false, error: `unknown action: ${action}` });
     },
     {
       name: 'manage_finance',
       description:
         'Finance documents: list_invoices (recent / per-customer / unpaid), list_orders (sales orders), ' +
-        'list_payments (money in/out), customer_balance ("what does X owe?"), and issue_invoice (issue a ' +
+        'list_payments (money in/out), customer_balance ("what does X owe?"), worklist ("what needs doing" — '
+        + 'every sales order waiting on something, with the blocking state and the next action), and issue_invoice (issue a ' +
         'DRAFT invoice + transmit to ΑΑΔΕ/myDATA). issue_invoice is a legal fiscal action — it ALWAYS asks ' +
         'the user to Approve/Decline first (never pass confirm:true yourself; the UI sets it when the user ' +
         'approves). Reads are 0 credits.',
       schema: z.object({
-        action: z.enum(['list_invoices', 'list_orders', 'list_payments', 'customer_balance', 'issue_invoice']).default('list_invoices'),
+        action: z.enum(['list_invoices', 'list_orders', 'list_payments', 'customer_balance', 'worklist', 'issue_invoice']).default('list_invoices'),
         customer_company_id: z.string().optional().describe('CRM company UUID (preferred).'),
         customer_name: z.string().optional().describe('Customer company name to fuzzy-match if you don\'t have the id.'),
         unpaid_only: z.boolean().optional().describe('list_invoices: only invoices still owed (issued/partially paid/overdue).'),

@@ -363,6 +363,7 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   crm_activity_logged: 'Activity logged',
   crm_kad_results: 'Business activity codes (KAD)',
   crm_customer_health: 'Customer health',
+  finance_order_worklist: 'Orders needing action',
   // Messaging / WhatsApp
   messaging_channels_list: 'WhatsApp channels',
   messaging_sent: 'WhatsApp sent',

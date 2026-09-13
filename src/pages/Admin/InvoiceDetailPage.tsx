@@ -24,6 +24,7 @@ import {
   type InvoiceWithItems,
 } from '@/modules/finance/services/financeService';
 import { SendOnWhatsAppButton } from '@/modules/messaging/components/SendOnWhatsAppButton';
+import { ReceiveReturnDialog } from '@/modules/finance/components/ReceiveReturnDialog';
 import { fiscalConnectorService } from '@/services/fiscalConnectorService';
 import { mydataPaymentLabel } from '@/modules/finance/paymentVocabulary';
 import { movePurposeLabel } from '@/services/fiscal/fiscalVocabulary';
@@ -46,6 +47,7 @@ const InvoiceDetailPage: React.FC = () => {
 
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [creditNoteDialogOpen, setCreditNoteDialogOpen] = useState(false);
+  const [returnFor, setReturnFor] = useState<{ id: string; number: string | null } | null>(null);
   const [payLink, setPayLink] = useState<string | null>(null);
   const [payLinkBusy, setPayLinkBusy] = useState(false);
   const [fiscalBusy, setFiscalBusy] = useState(false);
@@ -550,6 +552,7 @@ const InvoiceDetailPage: React.FC = () => {
                   <th className="px-4 py-2 text-left">Type / myDATA</th>
                   <th className="px-4 py-2 text-left">Reason</th>
                   <th className="px-4 py-2 text-right">Amount</th>
+                  <th className="px-4 py-2 text-right">Goods</th>
                 </tr>
               </thead>
               <tbody>
@@ -565,6 +568,20 @@ const InvoiceDetailPage: React.FC = () => {
                     </td>
                     <td className="px-4 py-2 text-muted-foreground">{cn.reason ?? '—'}</td>
                     <td className="px-4 py-2 text-right font-medium">{formatMoney(cn.total ?? cn.amount, cn.currency)}</td>
+                    {/* The credit note moves money and nothing else. Whether the goods came back
+                        is a separate, physical fact — stated here rather than assumed either way. */}
+                    <td className="px-4 py-2 text-right whitespace-nowrap">
+                      {cn.goods_returned_at ? (
+                        <span className="text-[11px] text-muted-foreground">
+                          Back in stock {formatDate(cn.goods_returned_at)}
+                        </span>
+                      ) : (
+                        <Button size="sm" variant="ghost" className="h-6 text-[11px]"
+                          onClick={() => setReturnFor({ id: cn.id, number: cn.credit_note_number ?? null })}>
+                          Receive goods
+                        </Button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -674,6 +691,15 @@ const InvoiceDetailPage: React.FC = () => {
         onOpenChange={setCreditNoteDialogOpen}
         onCreated={async () => { setCreditNoteDialogOpen(false); await load(); }}
       />
+      {returnFor && (
+        <ReceiveReturnDialog
+          creditNoteId={returnFor.id}
+          creditNoteNumber={returnFor.number}
+          open={!!returnFor}
+          onOpenChange={(v) => { if (!v) setReturnFor(null); }}
+          onDone={() => { setReturnFor(null); void load(); }}
+        />
+      )}
       <InvoicePreviewModal
         invoiceId={invoice.id}
         workspaceId={invoice.workspace_id}

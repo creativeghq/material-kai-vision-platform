@@ -21,6 +21,7 @@
     "get_gsc_movers",
     "get_gsc_striking_distance",
     "get_gsc_summary",
+    "get_order_worklist",
     "get_page_gsc_queries",
     "get_product_embed_readiness",
     "get_product_price_for_workspace",

@@ -17,6 +17,7 @@ import { Textarea } from '@/components/core/ui/textarea';
 import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { OrderWorklistPanel } from './OrderWorklistPanel';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle , DialogDescription } from '@/components/core/ui/dialog';
 import { OrderCustomsCard } from '@/modules/finance/components/OrderCustomsCard';
 import { ContractsSection } from '@/components/features/contracts/ContractsSection';
@@ -338,6 +339,11 @@ export const OrdersPanel: React.FC<{
 
   return (
     <div className="space-y-4">
+      {/* What the order book is waiting on, derived. Above the list because a filter cannot tell
+          you that three orders have been confirmed and uninvoiced for eleven weeks. Scoped to the
+          whole workspace, so it is hidden on a party-scoped mount (a company or project record)
+          where a workspace-wide queue would be out of place. */}
+      {!companyId && !contactId && !projectId && <OrderWorklistPanel workspaceId={workspaceId} />}
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between gap-3 flex-wrap space-y-0">
           <CardTitle className="flex items-center gap-2">
@@ -2775,6 +2781,13 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   const canReceiveIntoWarehouse = order?.order_type === 'purchase' && order.status !== 'fulfilled' && order.status !== 'cancelled';
   const canCoverShortfall = order?.order_type === 'sales' && (order.status === 'confirmed' || order.status === 'partially_fulfilled');
   const canOpenDispatch = order?.order_type === 'sales';
+  // The invoice a credit note can be raised against: issued (never a draft — the credit-note
+  // picker excludes drafts, which is how that dialog used to open empty with no explanation)
+  // and not already fully credited.
+  const creditableInvoiceId = order?.order_type === 'sales'
+    ? (fin?.invoices ?? []).find((i: { id: string; status?: string }) =>
+        i.status && !['draft', 'void', 'credit_noted'].includes(i.status))?.id ?? null
+    : null;
   const canMarkCompleted = !!order && order.status !== 'fulfilled' && order.status !== 'cancelled';
   const hasFulfilmentActions = canSendInApp || canEmailSupplier || canReceiveIntoWarehouse
     || canCoverShortfall || canOpenDispatch || canMarkCompleted;
@@ -3086,6 +3099,15 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                         {canOpenDispatch && (
                           <DropdownMenuItem onClick={() => navigate('/warehouse?tab=dispatch')}>
                             <Truck className="h-3.5 w-3.5 mr-2" /> Dispatch board
+                          </DropdownMenuItem>
+                        )}
+                        {/* A return had no entry point from the order at all: `createCreditNote`
+                            requires an invoiceId, and the only way in was the invoice screen or
+                            the global Credit Notes tab. This opens the order's own issued invoice,
+                            where the dialog (and the goods-back step) already live. */}
+                        {creditableInvoiceId && (
+                          <DropdownMenuItem onClick={() => navigate(`${FINANCE_BASE}/invoices/${creditableInvoiceId}?action=credit_note`)}>
+                            <RotateCcw className="h-3.5 w-3.5 mr-2" /> Credit note / return
                           </DropdownMenuItem>
                         )}
                         {/* Derived from the delivered quantities; setting it here is reverted by

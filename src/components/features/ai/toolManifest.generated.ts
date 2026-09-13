@@ -1090,9 +1090,9 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     name: 'manage_finance',
     file: 'supabase/functions/_shared/tools/finance-tools.ts',
     factory: 'createManageFinanceTool',
-    description: 'Finance documents: list_invoices (recent / per-customer / unpaid), list_orders (sales orders), list_payments (money in/out), customer_balance ("what does X owe?"), and issue_invoice (issue a DRAFT invoice + transmit t…',
+    description: 'Finance documents: list_invoices (recent / per-customer / unpaid), list_orders (sales orders), list_payments (money in/out), customer_balance ("what does X owe?"), worklist ("what needs doing" — every sales order wait…',
     params: [
-      { name: 'action', type: 'enum', enum: ['list_invoices', 'list_orders', 'list_payments', 'customer_balance', 'issue_invoice'], optional: true },
+      { name: 'action', type: 'enum', enum: ['list_invoices', 'list_orders', 'list_payments', 'customer_balance', 'worklist', 'issue_invoice'], optional: true },
       { name: 'customer_company_id', type: 'string', optional: true, description: 'CRM company UUID (preferred).' },
       { name: 'customer_name', type: 'string', optional: true, description: 'Customer company name to fuzzy-match if you don\'t have the id.' },
       { name: 'unpaid_only', type: 'boolean', optional: true, description: 'list_invoices: only invoices still owed (issued/partially paid/overdue).' },
