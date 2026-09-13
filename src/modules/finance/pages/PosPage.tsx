@@ -26,6 +26,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { financeService, formatMoney, round2, extractNet, type BankAccountBalance } from '@/modules/finance/services/financeService';
 import { vatOf } from '@/modules/finance/lib/vatMath';
 import { posSessionService, type PosSession, type PosReport } from '@/modules/finance/services/posSessionService';
+import { LostSaleDialog } from '@/modules/finance/components/LostSaleDialog';
 import { fiscalConnectorService, posTerminalService, type PosTerminal } from '@/services/fiscalConnectorService';
 import { invoicingSetupService, type FinanceBranch } from '@/services/invoicingSetupService';
 import { parseDecimal } from '@/utils/decimal';
@@ -269,6 +270,10 @@ const PosPage: React.FC = () => {
   }, [activeWorkspaceId, branchCode]);
 
   const selectedTerminal = useMemo(() => terminals.find((t) => t.id === terminalId) ?? null, [terminals, terminalId]);
+
+  // #434 -- what customers ask for and walk away without. The only data in this whole review we
+  // have no other route to, and nothing else raises it because no row is wrong.
+  const [lostOpen, setLostOpen] = useState(false);
 
   const openShift = async () => {
     if (!activeWorkspaceId) return;
@@ -672,6 +677,9 @@ const PosPage: React.FC = () => {
               <div className="flex items-center gap-1.5">
                 <Button size="sm" variant="ghost" onClick={() => cashMove('in')}>Cash in</Button>
                 <Button size="sm" variant="ghost" onClick={() => cashMove('out')}>Cash out</Button>
+                <Button size="sm" variant="ghost" onClick={() => setLostOpen(true)}>
+                  Asked for something we had not got
+                </Button>
                 <Button size="sm" variant="outline" onClick={showX}>X report</Button>
                 <Button size="sm" variant="outline" className="text-destructive" onClick={closeShift}>Close (Z)</Button>
               </div>
@@ -1159,6 +1167,14 @@ const PosPage: React.FC = () => {
         );
       })()}
       {connectEmailGate}
+      {activeWorkspaceId && (
+        <LostSaleDialog
+          open={lostOpen}
+          onOpenChange={setLostOpen}
+          workspaceId={activeWorkspaceId}
+          branchCode={session?.branch_code}
+        />
+      )}
     </div>
   );
 };

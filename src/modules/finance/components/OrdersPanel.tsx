@@ -25,6 +25,7 @@ import { OrderCbamCard } from '@/modules/finance/components/OrderCbamCard';
 import { OrderEudrCard } from '@/modules/finance/components/OrderEudrCard';
 import { MarginAuthorityNotice } from '@/modules/finance/components/MarginAuthorityNotice';
 import { ReceptionReportCard } from '@/modules/stock/components/ReceptionReportCard';
+import { OrderLineTimelineCard } from '@/modules/finance/components/OrderLineTimelineCard';
 import { ContractsSection } from '@/components/features/contracts/ContractsSection';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
@@ -4452,6 +4453,12 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                     crossed the 50 t line that makes every earlier entry liable too. */}
                 <div className="mt-4">
                   <OrderCbamCard orderId={order.id} workspaceId={order.workspace_id} />
+                </div>
+                {/* #432 -- the status ladder and the eight dates. For a kitchen job the status is
+                    what the customer is actually asking about, and the money timeline has two
+                    sides that do not align. */}
+                <div className="mt-4">
+                  <OrderLineTimelineCard orderId={order.id} />
                 </div>
                 {/* #433 -- who gets the pallet. `receive_order_lines` moved the goods in and
                     nothing decided whose they were; around a third of merchant lines are

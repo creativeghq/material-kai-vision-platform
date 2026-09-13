@@ -17,6 +17,7 @@ import {
 } from '@/components/core/filters';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { HubEmptyState } from '@/components/core/hub';
+import { LineWorkQueueCard } from '@/modules/finance/components/LineWorkQueueCard';
 
 interface Props { workspaceId: string }
 
@@ -182,6 +183,9 @@ export const PlanningTab: React.FC<Props> = ({ workspaceId }) => {
 
   return (
     <div className="space-y-4">
+      {/* #432 -- the other half of planning: which order LINES are late. A kitchen customer asks
+          about the line, not the payment. */}
+      <LineWorkQueueCard workspaceId={workspaceId} />
       <SectionHeader
         title="Planning"
         subtitle="Scheduled future payments and expected receipts. Marking Paid creates a real payment + allocation."
