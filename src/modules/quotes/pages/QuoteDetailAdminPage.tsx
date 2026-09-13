@@ -133,6 +133,7 @@ export const QuoteDetailPage: React.FC = () => {
   // PDF progress is owned by QuoteDownloadButtons (its own `generating` flag). This page keeps
   // no mirror of it — an unread busy flag only looks like protection.
   const [sendingQuote, setSendingQuote] = useState(false);
+  const [acceptingQuote, setAcceptingQuote] = useState(false);
 
   // HTML/client-side PDF — hook must be at top level (before any early returns)
   const { data: docData } = useQuoteDocument(id || '');
@@ -516,6 +517,36 @@ export const QuoteDetailPage: React.FC = () => {
 
 
 
+  /**
+   * Mark the quote accepted, from the screen the operator actually works on.
+   *
+   * `acceptQuote` had three callers and all three were the CUSTOMER's: the public share link and
+   * two customer-facing pages. Acceptance is what mints the order AND the draft pre-invoice, so a
+   * sale closed over WhatsApp or on the phone could not be entered at all — the operator had to
+   * open the customer route or wait for a link to be clicked. The validation (expiry, unpriced
+   * lines, undecided upsells) lives in the service and is the same for both.
+   */
+  const handleAcceptQuote = async () => {
+    if (!quote) return;
+    if (!confirm("Mark this quote accepted on the customer's behalf? This creates the order and a draft invoice.")) return;
+    try {
+      setAcceptingQuote(true);
+      const res = await quotesService.acceptQuote(quote.id);
+      if (!res.success) {
+        // The service's own words — it distinguishes an expired quote from an unpriced line from
+        // an undecided upsell, and each needs a different response from the operator.
+        toast({ title: 'Could not accept the quote', description: res.error ?? 'Nothing was changed.', variant: 'destructive' });
+        return;
+      }
+      toast({ title: 'Quote accepted', description: 'The order and a draft invoice have been created.' });
+      await loadQuoteDetails();
+    } catch (err) {
+      toast({ title: 'Could not accept the quote', description: (err as Error).message, variant: 'destructive' });
+    } finally {
+      setAcceptingQuote(false);
+    }
+  };
+
   const handleSendQuote = async () => {
     if (!quote) return;
     try {
@@ -624,6 +655,17 @@ export const QuoteDetailPage: React.FC = () => {
                 ) : (
                   <><Send className="h-4 w-4 mr-1" /> Send Quote</>
                 )}
+              </Button>
+            )}
+
+            {/* Close the sale from here. A quote agreed on the phone or over WhatsApp was
+                previously only acceptable by the CUSTOMER, through the share link or a
+                customer-facing route — and acceptance is what mints the order and the invoice. */}
+            {quote && (quote.status === 'quoted' || quote.status === 'submitted') && allItemsHavePrices && (
+              <Button size="sm" variant="secondary" onClick={handleAcceptQuote} disabled={acceptingQuote}>
+                {acceptingQuote
+                  ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Accepting...</>
+                  : <><CheckCircle className="h-4 w-4 mr-1" /> Mark accepted</>}
               </Button>
             )}
 

@@ -68,6 +68,14 @@ export interface DispatchQueueOrder {
   notes: string | null;
   lines: DispatchQueueLine[];
   has_shortfall: boolean;
+  /**
+   * Whether the money is in. Shown, NOT filtered on: building materials sell on 30/60-day terms,
+   * so gating the board on `paid` meant nothing sold on credit could ever be dispatched through
+   * the system. Whether to hold a delivery is the operator's call and needs the fact in front of
+   * them, not a queue that silently omits the order.
+   */
+  payment_status: string;
+  is_paid: boolean;
   /** Linked dispatch note when one already exists (draft only — issued orders leave the board). */
   dispatch: { id: string; status: string; number: string | null; fiscal_mark: string | null } | null;
 }
@@ -276,19 +284,20 @@ export const deliveryNotesService = {
   },
 
   /**
-   * Daily dispatch board — every paid, shippable order (`has_shipping=true`, `status='paid'`)
-   * that hasn't yet left the door. An order drops off once its dispatch note is issued; while
-   * the note is still a draft it stays on the board (with the draft linked) so the warehouse can
-   * issue + print it. Each order's lines are matched to warehouse stock so shortfalls show before
-   * picking. Buckets by `transport_date` happen on the client.
+   * Daily dispatch board — every shippable order (`has_shipping=true`) that hasn't left the door.
+   * An order drops off once its dispatch note is issued; a draft note keeps it on the board. Lines
+   * are matched to warehouse stock so shortfalls show before picking.
+   *
+   * Payment is REPORTED, not filtered: requiring `status='paid'` made the board structurally empty
+   * for a business selling on terms.
    */
   async listDispatchQueue(workspaceId: string): Promise<DispatchQueueOrder[]> {
     const { data: invs, error } = await supabase
       .from('invoices')
-      .select('id, internal_number, customer_company_id, customer_contact_id, ship_to, transport_date, currency, total, notes')
+      .select('id, internal_number, customer_company_id, customer_contact_id, ship_to, transport_date, currency, total, notes, status')
       .eq('workspace_id', workspaceId)
       .eq('has_shipping', true)
-      .eq('status', 'paid');
+      .not('status', 'in', '(void,draft)');
     if (error) throw error;
     const orders = (invs ?? []) as any[];
     if (orders.length === 0) return [];
@@ -356,13 +365,15 @@ export const deliveryNotesService = {
         notes: o.notes ?? null,
         lines,
         has_shortfall: lines.some((l) => l.shortfall),
+        payment_status: String(o.status ?? 'unknown'),
+        is_paid: o.status === 'paid',
         dispatch: dn ? { id: dn.id, status: dn.status, number: dn.delivery_note_number ?? null, fiscal_mark: dn.fiscal_mark ?? null } : null,
       });
     }
     return result;
   },
 
-  /** Cut a draft dispatch note from a paid order, matched to warehouse stock and linked back to the invoice. */
+  /** Cut a draft dispatch note from an order, matched to warehouse stock and linked back to the invoice. */
   async createDispatchFromOrder(workspaceId: string, order: DispatchQueueOrder): Promise<string> {
     const lines: DeliveryLineInput[] = order.lines
       .filter((l) => l.description.trim() && l.quantity > 0)

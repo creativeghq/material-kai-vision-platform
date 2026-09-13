@@ -3084,7 +3084,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                           </DropdownMenuItem>
                         )}
                         {canOpenDispatch && (
-                          <DropdownMenuItem onClick={() => navigate('/finance?tab=doc_dispatch')}>
+                          <DropdownMenuItem onClick={() => navigate('/warehouse?tab=dispatch')}>
                             <Truck className="h-3.5 w-3.5 mr-2" /> Dispatch board
                           </DropdownMenuItem>
                         )}
@@ -3188,6 +3188,21 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                   <Link to={`/inbox?thread=${order.source_thread_id}`} className="text-xs hover:underline">
                     <MessageSquare className="mr-1 inline h-3 w-3 text-muted-foreground" />
                     <span className="font-medium">the customer conversation</span>
+                  </Link>
+                </div>
+              </div>
+            )}
+
+            {/* The quote this order was minted from. `orders.source_quote_id` is written by the
+                acceptance trigger and was rendered nowhere — the same write-only-link shape as
+                "Raised from" above, which was fixed while this one was missed. */}
+            {order.source_quote_id && (
+              <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+                <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Quoted as</span>
+                <div className="mt-1">
+                  <Link to={`/quotes/manage/${order.source_quote_id}`} className="text-xs hover:underline">
+                    <FileText className="mr-1 inline h-3 w-3 text-muted-foreground" />
+                    <span className="font-medium">the accepted quote</span>
                   </Link>
                 </div>
               </div>

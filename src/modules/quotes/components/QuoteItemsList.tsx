@@ -6,6 +6,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { QuoteItemWithProduct } from '../services/QuotesService';
+import { ordersService } from '@/modules/finance/services/ordersService';
 import ProductDetailModal from '@/components/features/products/ProductDetailModal';
 import { MarketIntelCard } from '@/components/business/MarketIntelCard';
 import { Product, SimpleProduct } from '@/components/features/products/types';
@@ -118,9 +119,13 @@ const convertToDisplayProduct = (product: SimpleProduct): Product => {
       wholesale: 0, // Never carry procurement cost into a display product (was leaking products.cost)
       currency: product.cost_currency || 'EUR',
     },
+    // `md.stock_quantity` is CATALOG metadata, not the warehouse, and the status was hardcoded
+    // 'Available' — so a week-old quote showed a number that is not free stock next to a word
+    // that was always reassuring. Free stock is fetched separately and shown on the line; this
+    // reports what it actually is, which is unknown.
     stock: {
-      quantity: asNum(md.stock_quantity),
-      status: 'Available',
+      quantity: 0,
+      status: 'Unknown',
       unit: asStr(md.unit, 'pcs'),
     },
     tags: asStrArr(md.tags),
@@ -246,6 +251,29 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
   // per-line margin (cost → price spread) is internal-only: pricing managers/admins,
   // and even then hidden from a sales rep who isn't cleared to see cost.
   const canSeeLineMargin = can('pricing.manage') && showMargin;
+
+  /**
+   * Real free stock per line, from the warehouse — replacing `metadata.stock_quantity`, a CATALOG
+   * number that was shown beside a hardcoded "Available".
+   *
+   * `null` means we could not read it, and is rendered as unknown — never as zero, never as
+   * available. This surface must not assert availability it has not checked.
+   */
+  const [freeStock, setFreeStock] = useState<Map<string, number> | null>(null);
+  useEffect(() => {
+    const ids = items.map((i) => i.product_id).filter((id): id is string => !!id);
+    if (ids.length === 0) { setFreeStock(new Map()); return; }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const m = await ordersService.getAvailableStock(ids);
+        if (!cancelled) setFreeStock(m);
+      } catch {
+        if (!cancelled) setFreeStock(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [items]);
 
   const handleViewProduct = (product: SimpleProduct) => {
     setSelectedProduct(convertToDisplayProduct(product));
@@ -440,6 +468,26 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                               {(isCustom ? item.custom_sku : item.product?.sku) && (
                                 <p className="text-xs text-muted-foreground mt-0.5">
                                   SKU: {isCustom ? item.custom_sku : item.product?.sku}
+                                </p>
+                              )}
+                              {/* What the warehouse actually has free, or that we could not tell.
+                                  A quote cannot RESERVE stock (nothing writes stock_allocations
+                                  for a quote line), so this is a reading at this moment, not a
+                                  promise — and saying so is the difference between an operator
+                                  checking and an operator assuming. */}
+                              {!isCustom && item.product_id && (
+                                <p className="text-xs mt-0.5">
+                                  {freeStock === null ? (
+                                    <span className="text-muted-foreground">Stock unknown — could not reach the warehouse</span>
+                                  ) : (() => {
+                                    const free = freeStock.get(item.product_id!) ?? 0;
+                                    const short = free < (item.quantity ?? 0);
+                                    return (
+                                      <span className={short ? 'text-amber-800 dark:text-amber-300' : 'text-muted-foreground'}>
+                                        {free} free{short ? ` · ${item.quantity} quoted` : ''}
+                                      </span>
+                                    );
+                                  })()}
                                 </p>
                               )}
                               <div className="flex flex-wrap gap-1 mt-1">

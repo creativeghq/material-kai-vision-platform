@@ -17,7 +17,7 @@ The grid and the single-result path **must not both run for the same user reques
 
 | Model ID | Backing model | Provider | Cost (raw) | Purpose |
 |---|---|---|---|---|
-| `gemini-interior` | `gemini-3.1-flash-image-preview` (fast tier) via `generate-interior-gemini` edge function | Gemini | billed by edge fn (6 cr fast / 15 cr pro) | Photorealistic interior render via Gemini 3 Flash Image. Edge fn handles credits + uploads internally. |
+| `gemini-interior` | `gemini-3.1-flash-image` (fast tier) via `generate-interior-gemini` edge function | Gemini | billed by edge fn (6 cr fast / 15 cr pro) | Photorealistic interior render via Gemini 3 Flash Image. Edge fn handles credits + uploads internally. |
 | `flux-2-pro` | `black-forest-labs/flux-2-pro` | Replicate | $0.05 | Production-grade 4MP photoreal text-to-image. Best overall quality for new rooms from scratch. |
 | `playground-v2.5` | `playgroundai/playground-v2.5-1024px-aesthetic` | Replicate | $0.01 | Aesthetic-tuned SD model — soft, magazine-style interiors. |
 | `sd3` | `stability-ai/stable-diffusion-3` | Replicate | $0.055 | SD 3 baseline — strong prompt adherence, neutral aesthetic. |
@@ -26,7 +26,7 @@ The grid and the single-result path **must not both run for the same user reques
 
 | Model ID | Backing model | Provider | Cost (raw) | Schema / Notes |
 |---|---|---|---|---|
-| `gemini-interior` | `gemini-3.1-flash-image-preview` (fast tier, image-edit mode) | Gemini | billed by edge fn (6 cr fast / 15 cr pro) | Image-edit / redesign on the uploaded room. |
+| `gemini-interior` | `gemini-3.1-flash-image` (fast tier, image-edit mode) | Gemini | billed by edge fn (6 cr fast / 15 cr pro) | Image-edit / redesign on the uploaded room. |
 | `comfyui-interior-remodel` | `jschoormans/comfyui-interior-remodel` | Replicate | $0.02 | `comfyui_interior` schema. Minimal: image + prompt only — sending standard SD params triggers 422. Strong remodel results. |
 | `interiorly-gen1-dev` | `julian-at/interiorly-gen1-dev` | Replicate | $0.015 | `flux_lora_interior` schema. Flux LoRA tuned on interiors, supports `prompt_strength` for img2img. |
 | `designer-architecture` | `davisbrown/designer-architecture` | Replicate | $0.018 | Generic schema. Architecture-focused, holds structure tightly. |
@@ -69,8 +69,8 @@ Used when the variations grid is **not** appropriate — chip modes, iterative e
 
 | Backing model | Tier | Cost (credits) | Mode(s) |
 |---|---|---|---|
-| `gemini-3.1-flash-image-preview` | `fast` | 6 cr | `text-to-image`, `image-edit`, `floor-plan-render`, `floor-plan-text` |
-| `gemini-3-pro-image-preview` | `pro` | 15 cr | Same modes at 4K quality. **Forced for `materials-selection-board`.** |
+| `gemini-3.1-flash-image` | `fast` | 6 cr | `text-to-image`, `image-edit`, `floor-plan-render`, `floor-plan-text` |
+| `gemini-3-pro-image` | `pro` | 15 cr | Same modes at 4K quality. **Forced for `materials-selection-board`.** |
 | `black-forest-labs/flux-depth-pro` (called inside the edge fn) | implied by mode | 15 cr | `redesign` (1 image, locks room geometry), `copy-style` (2 images: inspiration + your room — copy aesthetic via depth/ControlNet) |
 | `aurora` (Grok image model, called inside edge fn when `model_tier=grok`) | `grok` | 15 cr | Best spatial accuracy alternative to Flux Depth Pro for `redesign` / `copy-style` |
 | `gpt-image-1` (OpenAI, called inside edge fn when `model_tier=chatgpt`; restored 2026-09-05) | `chatgpt` | 10 cr | `text-to-image` (no image) and `image-edit` (with an image) plus the product modes — strong prompt adherence. Same single-image shape as Grok: multi-reference briefs, `copy-style`, the diagram/board modes and `unstage` collapse to Gemini/Flux in `generation-routing.ts` and are billed as what runs. Needs `OPENAI_API_KEY` (Admin → Platform Secrets). |

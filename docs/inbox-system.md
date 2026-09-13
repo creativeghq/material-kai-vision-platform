@@ -155,7 +155,7 @@ Implemented in [`maybeRunAgentReply()`](../supabase/functions/inbox-api/index.ts
   - `get_account_statement` → aging buckets from `vw_customer_aging_buckets` (total outstanding, not-due / 0–30 / 31–90 / 90+, open-doc count, max days overdue).
   - `list_open_invoices` → unpaid `invoices` (number, amount due, due date, status) with a secure pay link (`/pay/{pay_token}`) when a valid token exists.
   - `list_quotes_and_projects` → the customer's recent `quotes` + `projects`.
-- **Persona.** Loaded from the editable `prompts` row (`prompt_type='agent'`, `category='inbox'`) with an inline `FALLBACK_INBOX_PERSONA` — reply in the customer's language, never invent figures, and defer to a human for negotiation / discounts / refunds / account changes.
+- **Persona.** Loaded from the editable `prompts` row (`prompt_type='agent'`, `category='inbox'`) — reply in the customer's language, never invent figures, and defer to a human for negotiation / discounts / refunds / account changes. There is **no fallback constant**: `getAgentSystemPrompt` THROWS `Agent prompt not found in database` when the row is missing or inactive, which is the platform-wide rule (prompts come from the database, never from code). A doc here previously named an inline `FALLBACK_INBOX_PERSONA`, which inverted the failure mode — a missing row is fatal, not silent.
 - **The reply is relayed to the channel** (WhatsApp) exactly like a member reply — see [§5](#5-whatsapp-channel).
 
 ### Per-workspace settings

@@ -228,6 +228,12 @@ const InvoiceDetailPage: React.FC = () => {
               {(invoice as any).order_id && (
                 <> · <Link to={`${financeBase}/orders/${(invoice as any).order_id}`} className="text-primary hover:underline">View order</Link></>
               )}
+              {/* The quote this document came from. Invoice → order was linked and invoice → quote
+                  was not, so the offer the customer actually agreed to — the prices, the options,
+                  the expiry — was unreachable from the invoice arguing about it. */}
+              {(invoice as any).quote_id && (
+                <> · <Link to={`/quotes/manage/${(invoice as any).quote_id}`} className="text-primary hover:underline">View quote</Link></>
+              )}
             </p>
             {/* Which job this invoice is revenue for (#378 L2). `get_project_pnl` reads billed
                 revenue off this column, so an invoice without one leaves the job showing cost and

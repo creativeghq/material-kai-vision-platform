@@ -135,7 +135,7 @@ Complete documentation for Material Kai Vision Platform.
 - 8 room types, 8 furniture styles
 
 **[gemini-image-generation.md](gemini-image-generation.md)** - Gemini image generation patterns ✨ NEW (2026-05-02)
-- Models, costs, response shape (`gemini-3.1-flash-image-preview`, `gemini-3-pro-image-preview`)
+- Models, costs, response shape (`gemini-3.1-flash-image`, `gemini-3-pro-image`)
 - Minimal copy-paste skeleton for new image-generation endpoints
 - Reference implementation: `seed-sheet-references` (admin static-asset seeder)
 - Admin-secret pattern, bucket conventions, prompt-engineering notes

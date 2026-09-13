@@ -187,6 +187,14 @@ export const DispatchBoard: React.FC<{ workspaceId: string; readOnly: boolean }>
                           <td className="px-2 py-2">
                             <div className="font-mono text-xs">{o.internal_number}</div>
                             <div className="text-xs text-muted-foreground">{o.customer_name ?? 'Customer'}</div>
+                            {/* Shown rather than filtered on. The board used to require `paid`,
+                                which hid every order sold on terms. Holding a delivery until the
+                                money is in is a decision, and it needs the fact to hand. */}
+                            {!o.is_paid && (
+                              <Badge variant="warning" className="mt-1 text-[10px]">
+                                {o.payment_status === 'partially_paid' ? 'Part paid' : 'Unpaid'}
+                              </Badge>
+                            )}
                           </td>
                           <td className="px-2 py-2 max-w-[260px]">
                             <div className="truncate text-xs text-muted-foreground" title={o.ship_to ?? ''}>{o.ship_to ?? '—'}</div>

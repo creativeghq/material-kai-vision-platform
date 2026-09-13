@@ -106,7 +106,7 @@ The platform's core differentiator is not a single AI model — it is the orches
 | Replicate | Wan 2.1 i2v 720p, Runway Gen4 Turbo | Interior video generation (budget + premium) | 12/40 credits |
 | Replicate | meta/sam-2, ali-vilab/anydoor | Pixel-precise mask generation, product placement | Per use |
 | WorldLabs | Marble mini + plus | 3D Gaussian Splat VR world generation | 50/200 credits per world |
-| Google Gemini | gemini-3.1-flash-image-preview, gemini-3-pro-image-preview | Interior image generation (4 modes) | 6/15 credits |
+| Google Gemini | gemini-3.1-flash-image, gemini-3-pro-image | Interior image generation (4 modes) | 6/15 credits |
 | xAI (Grok) | grok-2-aurora | Masked inpainting for region editing, social images | 10–20 credits |
 | Kling | kling-v3.0 | Interior + social video generation | 20 credits |
 

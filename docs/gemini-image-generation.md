@@ -10,8 +10,8 @@ Last reviewed 2026-05-02.
 
 | Model | Speed | Quality | Credits per image (per ai_model_pricing) | When to use |
 |---|---|---|---|---|
-| `gemini-3.1-flash-image-preview` | ~5–10 s | Good | 6 | Default. Static admin assets, throwaway previews, user-facing where speed matters more than 4K detail. |
-| `gemini-3-pro-image-preview` | ~15–30 s | Excellent (~4K) | 15 | Hero / cover images, anything the client will actually print. |
+| `gemini-3.1-flash-image` | ~5–10 s | Good | 6 | Default. Static admin assets, throwaway previews, user-facing where speed matters more than 4K detail. |
+| `gemini-3-pro-image` | ~15–30 s | Excellent (~4K) | 15 | Hero / cover images, anything the client will actually print. |
 
 Endpoint format (REST, no SDK needed):
 
@@ -51,7 +51,7 @@ const GOOGLE_API_KEY = Deno.env.get('GOOGLE_API_KEY') || Deno.env.get('GOOGLE_GE
 ```ts
 async function generateImage(
   prompt: string,
-  model: 'gemini-3.1-flash-image-preview' | 'gemini-3-pro-image-preview' = 'gemini-3.1-flash-image-preview',
+  model: 'gemini-3.1-flash-image' | 'gemini-3-pro-image' = 'gemini-3.1-flash-image',
 ): Promise<{ bytes: Uint8Array; mimeType: string }> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GOOGLE_API_KEY}`;
   const res = await fetch(url, {
