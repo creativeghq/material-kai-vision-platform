@@ -509,63 +509,6 @@ class MoodBoardAPI {
   }
 
   // Update moodboard item
-  async updateMoodBoardItem(
-    id: string,
-    updateData: { notes?: string; position?: number },
-  ): Promise<MoodBoardItem> {
-    const { data: result, error } = await supabase
-      .from('moodboard_items')
-      .update(updateData)
-      .eq('id', id)
-      .select(
-        `
-        *,
-        material:products(
-          id,
-          name,
-          category_id,
-          properties,
-          metadata
-        )
-      `,
-      )
-      .single();
-
-    if (error) throw error;
-
-    // Fetch best image for the product via image_product_associations
-    let thumbnail_url: string | null = null;
-    if (result.material?.id) {
-      const { data: imageRelations } = await supabase
-        .from('image_product_associations')
-        .select('image:document_images(image_url)')
-        .eq('product_id', result.material.id)
-        .order('overall_score', { ascending: false })
-        .limit(1);
-
-      if (imageRelations && imageRelations.length > 0) {
-        const imgData = imageRelations[0].image as any;
-        thumbnail_url = imgData?.image_url || null;
-      }
-    }
-
-    // Transform to include thumbnail_url
-    return {
-      ...result,
-      material: result.material ? {
-        ...result.material,
-        name: getProductName(result.material),
-        category:
-          result.material.metadata?.category ||
-          result.material.metadata?.material_category ||
-          result.material.category_id ||
-          'Uncategorized',
-        thumbnail_url,
-      } : null,
-    };
-  }
-
-  // Remove material from moodboard
   async removeMoodBoardItem(id: string): Promise<void> {
     const { error } = await supabase
       .from('moodboard_items')

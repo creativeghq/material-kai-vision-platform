@@ -142,6 +142,12 @@ export type TriggerType =
   // liability on the customer's account forever and the only way to find it was to open the
   // record and notice.
   | 'customer_credit_releasable'
+  // Finance — a sale is delivered or confirmed and the invoice that settles it was never
+  // raised. `get_order_worklist` derived this correctly all along; it is a PULL, so EUR 12,074
+  // across three orders (oldest 80 days) reached nobody. Raised by the nightly sweep off the
+  // SAME derivation. Never tenant-configurable: an un-invoiced fulfilled sale is revenue
+  // recognised nowhere and VAT undeclared, so silencing it hides breakage rather than noise.
+  | 'order_awaiting_invoice'
   // Docs module: a workspace doc was published, or a member proposed an edit
   | 'document_published'
   | 'doc_suggestion_submitted'
@@ -262,6 +268,7 @@ export interface HrErganiFilingFailedTriggerConfig {}
 export interface OrderCreatedTriggerConfig {}
 export interface OrderStatusChangedTriggerConfig {}
 export interface CustomerCreditReleasableTriggerConfig {}
+export interface OrderAwaitingInvoiceTriggerConfig {}
 export interface DocumentPublishedTriggerConfig {}
 export interface DocSuggestionSubmittedTriggerConfig {}
 export interface CampaignSentTriggerConfig {}
@@ -595,6 +602,7 @@ export type TriggerConfigMap = {
   order_created: OrderCreatedTriggerConfig;
   order_status_changed: OrderStatusChangedTriggerConfig;
   customer_credit_releasable: CustomerCreditReleasableTriggerConfig;
+  order_awaiting_invoice: OrderAwaitingInvoiceTriggerConfig;
   document_published: DocumentPublishedTriggerConfig;
   doc_suggestion_submitted: DocSuggestionSubmittedTriggerConfig;
   campaign_sent: CampaignSentTriggerConfig;

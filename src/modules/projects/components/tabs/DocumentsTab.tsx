@@ -2,7 +2,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Loader2, Plus, FileStack, Download, Trash2, Eye, EyeOff, Upload, History, FileText, ScanLine,
-  PenLine,
+  PenLine, Pencil,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -35,6 +35,9 @@ export const DocumentsTab: React.FC<{ projectId: string; isOwner: boolean }> = (
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [uploadFor, setUploadFor] = useState<ProjectDocumentWithRevisions | null>(null);
+  // #419: the register fields were fixed at upload with no way to correct a typo -- the
+  // service method existed and nothing called it.
+  const [editing, setEditing] = useState<ProjectDocumentWithRevisions | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
@@ -229,6 +232,9 @@ export const DocumentsTab: React.FC<{ projectId: string; isOwner: boolean }> = (
                     )}
                     {isOwner && (
                       <>
+                        <Button size="sm" variant="ghost" title="Edit details" onClick={() => setEditing(d)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
                         <Button size="sm" variant="ghost" title="Upload revision" onClick={() => setUploadFor(d)}>
                           <Upload className="h-4 w-4" />
                         </Button>
@@ -288,6 +294,13 @@ export const DocumentsTab: React.FC<{ projectId: string; isOwner: boolean }> = (
           projectId={projectId}
           onClose={() => setUploadFor(null)}
           onSaved={() => { setUploadFor(null); void load(); }}
+        />
+      )}
+      {editing && (
+        <EditDocumentDialog
+          doc={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => { setEditing(null); void load(); }}
         />
       )}
     </Card>
@@ -596,3 +609,96 @@ const UploadRevisionDialog: React.FC<{
 };
 
 export default DocumentsTab;
+
+/**
+ * Correct the REGISTER fields on an existing entry. Storage and revisions are untouched: a
+ * mistyped drawing number is a metadata mistake, not a reason to re-upload the sheet.
+ */
+const EditDocumentDialog: React.FC<{
+  doc: ProjectDocumentWithRevisions; onClose: () => void; onSaved: () => void;
+}> = ({ doc, onClose, onSaved }) => {
+  const { toast } = useToast();
+  const [title, setTitle] = useState(doc.title ?? '');
+  const [drawingNumber, setDrawingNumber] = useState(doc.drawing_number ?? '');
+  const [kind, setKind] = useState<DocumentKind>((doc.kind as DocumentKind) ?? 'drawing');
+  const [discipline, setDiscipline] = useState(doc.discipline ?? '');
+  const [scale, setScale] = useState(doc.scale ?? '');
+  const [sheetSize, setSheetSize] = useState(doc.sheet_size ?? '');
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    if (!title.trim()) { toast({ title: 'Title required', variant: 'destructive' }); return; }
+    setSaving(true);
+    try {
+      await projectDocumentsService.updateDocument(doc.id, {
+        title, drawing_number: drawingNumber, kind,
+        discipline: discipline || null, scale, sheet_size: sheetSize,
+      });
+      onSaved();
+    } catch (err: any) {
+      const dup = /already uses that drawing number|duplicate key|unique/i.test(err?.message ?? '');
+      toast({
+        title: dup ? 'That drawing number is taken' : 'Could not save',
+        description: dup ? 'Another document in this project already uses it.' : err?.message,
+        variant: 'destructive',
+      });
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader><DialogTitle>Edit document details</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div className="grid grid-cols-3 gap-2">
+            <div className="space-y-1">
+              <Label className="text-xs">Number</Label>
+              <Input value={drawingNumber} onChange={(e) => setDrawingNumber(e.target.value)} placeholder="A-101" />
+            </div>
+            <div className="col-span-2 space-y-1">
+              <Label className="text-xs">Title</Label>
+              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Ground Floor Plan" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label className="text-xs">Kind</Label>
+              <Select value={kind} onValueChange={(v) => setKind(v as DocumentKind)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {DOCUMENT_KINDS.map((k) => <SelectItem key={k} value={k}>{humanizeLabel(k)}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Discipline</Label>
+              <Select value={discipline || 'none'} onValueChange={(v) => setDiscipline(v === 'none' ? '' : v)}>
+                <SelectTrigger><SelectValue placeholder="Not stated" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Not stated</SelectItem>
+                  {DISCIPLINES.map((d) => <SelectItem key={d} value={d}>{humanizeLabel(d)}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label className="text-xs">Scale</Label>
+              <Input value={scale} onChange={(e) => setScale(e.target.value)} placeholder="1:50 (optional)" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Sheet size</Label>
+              <Input value={sheetSize} onChange={(e) => setSheetSize(e.target.value)} placeholder="A1 (optional)" />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
+            <Button size="sm" onClick={save} disabled={saving}>
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Save'}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};

@@ -157,16 +157,5 @@ export const costCodesService = {
     return (data as number) ?? 0;
   },
 
-  /**
-   * Actual cost on one project, split by code, with the uncoded remainder as its own row.
-   *
-   * Derived entirely in SQL from the same predicates `get_project_pnl` uses, so the rows sum to
-   * that function's supplier + labour + expense cost exactly. Callers format; they never re-add.
-   */
-  async projectCostByCode(projectId: string): Promise<ProjectCostByCode[]> {
-    const { data, error } = await supabase.rpc('get_project_cost_by_code', { p_project_id: projectId });
-    if (error) throw readable(error);
-    return (data ?? []) as ProjectCostByCode[];
-  },
 };
 

@@ -70,7 +70,7 @@ import {
   Wrench,
   AlarmClock,
   ShieldCheck,
-  Coins, MessagesSquare, PhoneOff, Link2, Unlink,
+  Coins, ReceiptText, MessagesSquare, PhoneOff, Link2, Unlink,
   EyeOff, SlidersHorizontal, FolderKanban, FolderPlus, Flag, AlertTriangle, BadgeCheck, CalendarClock} from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent } from '@/components/core/ui/card';
@@ -197,6 +197,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   order_created: ShoppingCart,
   order_status_changed: Package,
   customer_credit_releasable: Coins,
+  order_awaiting_invoice: ReceiptText,
   document_published: BookOpen,
   doc_suggestion_submitted: FilePlus2,
   campaign_sent: Megaphone,
@@ -345,6 +346,7 @@ const triggerLabels: Record<TriggerType, string> = {
   order_created: 'Order Created',
   order_status_changed: 'Order Status Changed',
   customer_credit_releasable: 'Customer Credit Can Be Released',
+  order_awaiting_invoice: 'Order Not Invoiced',
   document_published: 'Document Published',
   doc_suggestion_submitted: 'Doc Edit Proposed',
   campaign_sent: 'Campaign Sent',

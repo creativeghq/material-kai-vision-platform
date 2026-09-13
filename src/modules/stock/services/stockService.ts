@@ -313,7 +313,6 @@ export const stockService = {
   },
 
   // ── Freight quotes (SeaRates, BYOK) ─────────────────────────────────────────
-  listFreightQuotes: (ws: string) => call<{ quotes: FreightQuote[] }>('shipping-quotes-list', ws).then((r) => r.quotes),
   getFreightQuote: (ws: string, input: { origin: string; destination: string; mode: string; container_type?: string; ready_date?: string; quote_id?: string }) =>
     call<{ quote: FreightQuote }>('shipping-quote', ws, input).then((r) => r.quote),
   // Freight quotes tied to a specific customer quote (Quotes → Extras). RLS-gated direct read.

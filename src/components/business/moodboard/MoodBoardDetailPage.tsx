@@ -187,11 +187,10 @@ export const MoodBoardDetailPage: React.FC = () => {
     const newPublic = !moodboard.isPublic;
     setSharingToggle(true);
     try {
-      const { error } = await supabase
-        .from('moodboards')
-        .update({ is_public: newPublic })
-        .eq('id', moodboard.id);
-      if (error) throw error;
+      // Through the service, not a direct write: `moodboardAPI.updateMoodBoard` is the ONLY
+      // place that emits `moodboard_shared`, so this toggle -- the only way a board is ever made
+      // public -- meant the trigger the palette offers could never once fire (#419).
+      await moodboardAPI.updateMoodBoard(moodboard.id, { is_public: newPublic });
       setMoodboard({ ...moodboard, isPublic: newPublic });
       if (newPublic) {
         const url = `${window.location.origin}/board/${moodboard.id}`;

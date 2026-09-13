@@ -1,13 +1,15 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { formatMoney } from '@/utils/decimal';
-import { Percent, Plus, Trash2, Loader2, Check } from 'lucide-react';
+import { Percent, Plus, Trash2, Loader2, Check, ReceiptText } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { HubEmptyState } from '@/components/core/hub';
 import { useToast } from '@/hooks/use-toast';
 import { realEstateService, type CommissionSplit, type CommissionTotals } from '../services/realEstateService';
 import { formatDate } from '@/utils/datetime';
+import { AgentCommissionStatementDialog } from './AgentCommissionStatementDialog';
 
 const money = (n: number | null | undefined, ccy: string) => formatMoney(n ?? 0, ccy || 'EUR', { decimals: 2 });
 
@@ -34,6 +36,9 @@ export const CommissionSplitsCard: React.FC<{ ws: string | null; saleId: string;
   const [totals, setTotals] = useState<CommissionTotals | null>(null);
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState<{ party_type: string; basis: string; pct: string; fixed_amount: string; label: string } | null>(null);
+  // #418: the statement was built end-to-end and had no control. Commission is money owed to a
+  // person, and the statement is how they check it.
+  const [statementOpen, setStatementOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!ws) return;
@@ -85,14 +90,31 @@ export const CommissionSplitsCard: React.FC<{ ws: string | null; saleId: string;
             Percentages are of the commission ({money(totals?.commission_base, ccy)}, net of VAT) — not of the sale price.
           </p>
         </div>
-        {canManage && !draft && (
-          <Button size="sm" variant="outline" onClick={() => setDraft({ party_type: 'listing_agent', basis: 'pct', pct: '50', fixed_amount: '', label: '' })}>
-            <Plus className="mr-1 h-4 w-4" /> Add split
+        <div className="flex shrink-0 items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => setStatementOpen(true)}>
+            <ReceiptText className="mr-1 h-4 w-4" /> Statement
           </Button>
-        )}
+          {canManage && !draft && (
+            <Button size="sm" variant="outline" onClick={() => setDraft({ party_type: 'listing_agent', basis: 'pct', pct: '50', fixed_amount: '', label: '' })}>
+              <Plus className="mr-1 h-4 w-4" /> Add split
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        {splits.length === 0 && !draft && <p className="py-2 text-sm text-muted-foreground">No splits yet — the whole fee sits with the house.</p>}
+        {splits.length === 0 && !draft && (
+          <HubEmptyState
+            icon={Percent}
+            title="No splits yet"
+            description="The whole fee sits with the house until somebody is given a share of it."
+            action={canManage ? (
+              <Button size="sm" variant="outline"
+                onClick={() => setDraft({ party_type: 'listing_agent', basis: 'pct', pct: '50', fixed_amount: '', label: '' })}>
+                <Plus className="mr-1 h-4 w-4" /> Add split
+              </Button>
+            ) : undefined}
+          />
+        )}
 
         {splits.map((s) => (
           <div key={s.split_id} className="flex flex-wrap items-center gap-3 rounded-lg border px-3 py-2 text-sm">
@@ -152,6 +174,9 @@ export const CommissionSplitsCard: React.FC<{ ws: string | null; saleId: string;
           </div>
         )}
       </CardContent>
+      <AgentCommissionStatementDialog
+        ws={ws} open={statementOpen} onOpenChange={setStatementOpen} canRunWholeDesk={canManage}
+      />
     </Card>
   );
 };

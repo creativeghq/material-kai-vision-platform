@@ -742,14 +742,6 @@ class ProjectsService {
     return project;
   }
 
-  async archiveProject(id: string): Promise<void> {
-    const { error } = await (supabase as any)
-      .from('projects')
-      .update({ status: 'archived' })
-      .eq('id', id);
-    if (error) throw error;
-  }
-
   // Hard-delete a project. RLS (projects_owner_all) restricts this to the owner.
   // FK CASCADE removes rooms, tasks, product lines, client views, collaborators and
   // events; moodboards, quotes and invoices are SET NULL (kept, just unlinked). Any
@@ -1738,18 +1730,6 @@ class ProjectsService {
   }
 
   /** Is the current viewer a collaborator on this project (vs the owner)? */
-  async isCollaborator(projectId: string): Promise<boolean> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return false;
-    const { data } = await (supabase as any)
-      .from('project_collaborators')
-      .select('id')
-      .eq('project_id', projectId)
-      .eq('user_id', user.id)
-      .is('revoked_at', null)
-      .maybeSingle();
-    return Boolean(data);
-  }
 
   private _renderInviteEmailHtml(input: {
     projectName: string;

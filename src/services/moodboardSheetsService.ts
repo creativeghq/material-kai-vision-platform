@@ -397,17 +397,6 @@ class MoodboardSheetsService {
     if (error) throw error;
   }
 
-  /** Public lookup by share token — used by the /sheets/share/:token route.
-   *  Bypasses RLS via the moodboard-sheet-share edge function (anon role
-   *  cannot SELECT presentation_sheets directly).
-   */
-  async getByShareToken(token: string): Promise<PresentationSheet | null> {
-    const { data, error } = await supabase.functions.invoke('moodboard-sheet-share', {
-      body: { token },
-    });
-    if (error) return null;
-    return data?.sheet ?? null;
-  }
 }
 
 export const moodboardSheetsService = new MoodboardSheetsService();

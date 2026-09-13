@@ -19,7 +19,7 @@ import {
   BatteryLow,
   UserMinus,
   Timer,
-  Wrench, AlarmClock, ShieldCheck, Coins, MessagesSquare, PhoneOff, Link2, Unlink, FolderKanban, FolderPlus, Flag, AlertTriangle, BadgeCheck, CalendarClock} from 'lucide-react';
+  Wrench, AlarmClock, ShieldCheck, Coins, ReceiptText, MessagesSquare, PhoneOff, Link2, Unlink, FolderKanban, FolderPlus, Flag, AlertTriangle, BadgeCheck, CalendarClock} from 'lucide-react';
 import type { TriggerNodeData, TriggerType } from '@/services/flows/types';
 
 const triggerIcons: Record<TriggerType, React.ElementType> = {
@@ -116,6 +116,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   order_created: ShoppingCart,
   order_status_changed: Package,
   customer_credit_releasable: Coins,
+  order_awaiting_invoice: ReceiptText,
   document_published: BookOpen,
   doc_suggestion_submitted: FilePlus2,
   campaign_sent: Megaphone,

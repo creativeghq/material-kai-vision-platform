@@ -96,7 +96,7 @@ async function buildVariables(supabase: any, workspaceId: string): Promise<Recor
   const next60 = new Date(today.getTime() + 60 * 86400_000);
   const next90 = new Date(today.getTime() + 90 * 86400_000);
 
-  const [arAging, apAging, cashFlow, monthPnl, topAr, topAp, planned, followUps] = await Promise.all([
+  const [arAging, apAging, cashFlow, monthPnl, topAr, topAp, planned, followUps, worklist] = await Promise.all([
     supabase.from('vw_ar_aging').select('age_bucket, amount_due').eq('workspace_id', workspaceId),
     supabase.from('vw_ap_aging').select('age_bucket, amount_due').eq('workspace_id', workspaceId),
     supabase.from('vw_cash_flow_forecast').select('expected_date, direction, amount').eq('workspace_id', workspaceId).lte('expected_date', fmt(next90)),
@@ -107,6 +107,9 @@ async function buildVariables(supabase: any, workspaceId: string): Promise<Recor
       .in('status', ['planned', 'overdue'])
       .lte('scheduled_for', fmt(new Date(today.getTime() + 7 * 86400_000))),
     supabase.from('vw_quote_followup_queue').select('id').eq('workspace_id', workspaceId),
+    // #417 -- the SAME derivation the order book shows. A second query here would be a second
+    // answer to "which sales are un-invoiced", and the two would drift.
+    supabase.rpc('get_order_worklist', { p_workspace_id: workspaceId, p_limit: 500 }),
   ]);
 
   // Aggregates
@@ -216,6 +219,20 @@ async function buildVariables(supabase: any, workspaceId: string): Promise<Recor
       </div>
     </div>` : '';
 
+  // #417 -- a sale delivered or confirmed whose invoice was never raised. This is the platform
+  // failing a legal obligation, so it leads the digest rather than sitting behind a tab.
+  const notInvoiced = ((worklist.data ?? []) as Array<{ state: string; total: number; age_days: number }>)
+    .filter((r) => r.state === 'awaiting_invoice' || r.state === 'invoice_never_issued');
+  const notInvoicedValue = notInvoiced.reduce((acc, r) => acc + Number(r.total || 0), 0);
+  const notInvoicedOldest = notInvoiced.reduce((acc, r) => Math.max(acc, Number(r.age_days || 0)), 0);
+  const notInvoicedBlockHtml = notInvoiced.length > 0 ? `
+    <div style="padding:0 24px 20px;">
+      <div style="background:#fdecea; border-left:3px solid #cc3333; padding:12px; border-radius:4px;">
+        <strong style="color:#1a1a2e;">${notInvoiced.length} sale(s) worth ${fmtMoney(notInvoicedValue)} have no issued invoice.</strong>
+        <div style="margin-top:4px; font-size:12px; color:#666;">Oldest ${notInvoicedOldest} days. Open Finance &rarr; Orders.</div>
+      </div>
+    </div>` : '';
+
   const monthName = today.toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
   // Variables must be string-valued (email-api's substituter is /\{\{(\w+)\}\}/g).
@@ -234,6 +251,7 @@ async function buildVariables(supabase: any, workspaceId: string): Promise<Recor
     top_suppliers_html: topSuppliersHtml,
     planned_payments_html: plannedPaymentsHtml,
     follow_ups_block_html: followUpsBlockHtml,
+    not_invoiced_block_html: notInvoicedBlockHtml,
   };
 }
 

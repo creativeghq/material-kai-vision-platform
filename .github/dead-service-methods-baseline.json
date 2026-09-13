@@ -1,0 +1,224 @@
+{
+  "total": 125,
+  "files": {
+    "src/modules/email/services/campaignService.ts": [
+      "getCampaignStats",
+      "removeRecipient"
+    ],
+    "src/modules/email/services/emailService.ts": [
+      "getDefaultDomain",
+      "syncDomains"
+    ],
+    "src/modules/finance/services/financeService.ts": [
+      "deletePlannedPayment",
+      "getBundleDiscountPct",
+      "getDigestFlowId",
+      "getFirstOrderDiscountPct",
+      "getPaymentTermsDiscountPct",
+      "methodsForAccountKind",
+      "refreshInvoicePdfUrl",
+      "voidInvoice",
+      "workspaceMoneyCurrencies"
+    ],
+    "src/modules/finance/services/inboundService.ts": [
+      "linkDocuments"
+    ],
+    "src/modules/finance/services/ordersService.ts": [
+      "deleteOrderPayment",
+      "recordOrderPayment",
+      "updateOrderPayment"
+    ],
+    "src/modules/finance/services/tripExpenseService.ts": [
+      "updateReport"
+    ],
+    "src/modules/hr/services/hrService.ts": [
+      "updateOvertime",
+      "updateSeparation"
+    ],
+    "src/modules/messaging/services/messagingCampaignService.ts": [
+      "getCampaignStats",
+      "getRecipients",
+      "importRecipients",
+      "removeRecipient",
+      "sendTestMessage"
+    ],
+    "src/modules/messaging/services/messagingService.ts": [
+      "createChannel",
+      "getAccountInfo",
+      "getDefaultChannel",
+      "getTemplateBySlug",
+      "getWhatsAppTemplates",
+      "normalizePhoneNumber",
+      "sendBulk",
+      "validatePhoneNumber"
+    ],
+    "src/modules/projects/services/applicationsService.ts": [
+      "setRetentionTerms",
+      "setValuation"
+    ],
+    "src/modules/projects/services/projectRequestsService.ts": [
+      "setAssignee",
+      "setDrawingRevision"
+    ],
+    "src/modules/projects/services/siteService.ts": [
+      "addSnagPhotos"
+    ],
+    "src/modules/quotes/services/QuotePDFService.ts": [
+      "downloadPDF",
+      "getGenerationStatus"
+    ],
+    "src/modules/quotes/services/QuotesService.ts": [
+      "deleteQuote",
+      "getAllTimelineSteps",
+      "getExpirationInfo",
+      "getTimelineStepUsageCount",
+      "listRevisionChain",
+      "updateQuoteStatusTag"
+    ],
+    "src/modules/real-estate/services/realEstateService.ts": [
+      "recent_leads",
+      "upcoming_viewings"
+    ],
+    "src/services/agents/agentChatHistoryService.ts": [
+      "archiveConversation",
+      "updateConversationTitle"
+    ],
+    "src/services/apiGateway/apiGatewayService.ts": [
+      "deleteApiKey"
+    ],
+    "src/services/apiGateway/browserApiClientFactory.ts": [
+      "invokeFunction"
+    ],
+    "src/services/apiGateway/browserApiIntegrationService.ts": [
+      "generateImageWithReplicate",
+      "getAllAvailableModels",
+      "performEnhancedSearch",
+      "recognizeMaterial"
+    ],
+    "src/services/billing.service.ts": [
+      "getCreditTransactions"
+    ],
+    "src/services/catalogGrantsService.ts": [
+      "addToMyCatalog",
+      "listGranted"
+    ],
+    "src/services/catalogsService.ts": [
+      "previewSend",
+      "publicUrlFor"
+    ],
+    "src/services/credits.service.ts": [
+      "debitCredits"
+    ],
+    "src/services/crm.service.ts": [
+      "bulkLinkContacts",
+      "createCheckoutSession",
+      "getCredits",
+      "getPotentialMatches",
+      "getSubscription"
+    ],
+    "src/services/crmActivitiesService.ts": [
+      "listForTarget"
+    ],
+    "src/services/customerAssetsService.ts": [
+      "applyDefaults",
+      "retire"
+    ],
+    "src/services/dataIntegrityService.ts": [
+      "reopenFinding"
+    ],
+    "src/services/factoryAccessService.ts": [
+      "accessibleProducts",
+      "listFactories"
+    ],
+    "src/services/fiscalConnectorService.ts": [
+      "listConnectors",
+      "setBinding"
+    ],
+    "src/services/flows/flowService.ts": [
+      "listWorkspaceFlows"
+    ],
+    "src/services/gemiService.ts": [
+      "credsStatus"
+    ],
+    "src/services/inboxApi.ts": [
+      "markRead",
+      "removeParticipant"
+    ],
+    "src/services/jobResearchService.ts": [
+      "addExclusion",
+      "deactivate",
+      "removeExclusion"
+    ],
+    "src/services/knowledgeBaseService.ts": [
+      "createAttachment",
+      "createCategory",
+      "createFromPDF",
+      "getDocumentAttachments",
+      "getProductDocuments"
+    ],
+    "src/services/logger.service.ts": [
+      "clearOldLogs",
+      "getBufferSize",
+      "getRecentLogs"
+    ],
+    "src/services/manufacturerAnalyticsService.ts": [
+      "getSessionId"
+    ],
+    "src/services/masterRequestsService.ts": [
+      "getOpenForQuote"
+    ],
+    "src/services/mivaaApiClient.ts": [
+      "analyzeKnowledge",
+      "analyzeMultimodal",
+      "analyzeProperties",
+      "analyzeVision",
+      "chatCompletion",
+      "contextualResponse",
+      "createChunks",
+      "extractKnowledge",
+      "extractOcr",
+      "generateClipEmbedding",
+      "generateProductEmbeddings",
+      "getJobResult",
+      "getJobStatus",
+      "orchestrateAgent",
+      "voiceToMaterial"
+    ],
+    "src/services/moodboardAPI.ts": [
+      "getPublicMoodBoard",
+      "getPublicMoodBoards",
+      "rotatePublicShareToken"
+    ],
+    "src/services/platformSecretsService.ts": [
+      "clearValue"
+    ],
+    "src/services/product3dService.ts": [
+      "modelFormatsByProduct"
+    ],
+    "src/services/productConfiguratorService.ts": [
+      "listConfigurations"
+    ],
+    "src/services/quoteAnalyticsService.ts": [
+      "getSessionId",
+      "trackDownload",
+      "trackPreview",
+      "trackView"
+    ],
+    "src/services/roomPlannerService.ts": [
+      "deleteLayout"
+    ],
+    "src/services/supplierClaimsService.ts": [
+      "listClaims",
+      "revokeClaim",
+      "workspaceNames"
+    ],
+    "src/services/userWebsitesService.ts": [
+      "reportRunPayload",
+      "retireAutoKeywords"
+    ],
+    "src/services/vrWorldService.ts": [
+      "getVRWorld",
+      "listVRWorlds"
+    ]
+  }
+}
