@@ -27,6 +27,7 @@ import { FINANCE_BASE, FINANCE_TAB, financeTabUrl } from '@/modules/finance/rout
 import { inboundService, type InboundDocument } from '@/modules/finance/services/inboundService';
 import { deliveryNotesService, type DeliveryNote } from '@/modules/finance/services/deliveryNotesService';
 import { chequesService, type Cheque } from '@/modules/finance/services/chequesService';
+import { ChequePortfolioCard } from '@/modules/finance/components/ChequePortfolioCard';
 import { chequeJob, deliveryNoteJob, type DocumentJob } from '@/modules/finance/utils/documentJob';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsMenu';
@@ -552,7 +553,17 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                 ) : type === 'delivery_notes' ? (
                   <DeliveryNotesTable rows={paginate(activeRows as DeliveryNote[], page)} readOnly={isAccountant} onChanged={load} {...emptyState} onNew={() => setNewDeliveryOpen(true)} />
                 ) : type === 'cheques' ? (
-                  <ChequesTable rows={paginate(activeRows as Cheque[], page)} readOnly={isAccountant} onChanged={load} {...emptyState} onNew={() => setNewChequeOpen(true)} />
+                  <>
+                    <ChequesTable rows={paginate(activeRows as Cheque[], page)} readOnly={isAccountant} onChanged={load} {...emptyState} onNew={() => setNewChequeOpen(true)} />
+                    {/* #423 -- a cheque is an asset that changes hands. The table above is the
+                        list; this is where it moves, and where a pledged one stops being
+                        spendable. */}
+                    {activeWorkspaceId && (
+                      <div className="p-4">
+                        <ChequePortfolioCard workspaceId={activeWorkspaceId} />
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div className="table-scroll">
                   <table className="w-full text-sm">

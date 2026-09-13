@@ -44,6 +44,7 @@ import { RecallsCard } from '@/modules/finance/components/RecallsCard';
 import { AccessibilityCard } from '@/modules/finance/components/AccessibilityCard';
 import { ApprovalsCard } from '@/modules/finance/components/ApprovalsCard';
 import { IslandVatTerritoriesCard } from '@/modules/finance/components/IslandVatTerritoriesCard';
+import { VatPrefillCard } from '@/modules/finance/components/VatPrefillCard';
 import { BankAccountsCard } from '@/modules/finance/components/BankAccountsCard';
 import { MoneyOutCard } from '@/modules/banking-revolut/components/MoneyOutCard';
 import { formatDate } from '@/utils/datetime';
@@ -253,6 +254,9 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
           <RecallsCard workspaceId={workspaceId} />
           <AccessibilityCard workspaceId={workspaceId} />
           <IslandVatTerritoriesCard />
+          {/* #445 -- income is a floor and expenses a ceiling, and breaching the ceiling
+              forfeits the deduction rather than raising a warning. */}
+          <VatPrefillCard workspaceId={workspaceId} />
         </TabsContent>
 
         {/* Credit holds, margin authority and till variances share one spine, because they

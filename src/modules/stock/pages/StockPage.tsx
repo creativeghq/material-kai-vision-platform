@@ -19,6 +19,7 @@ import { StockPoolsPanel } from '../components/StockPoolsPanel';
 import { ImportFoldersPanel } from '../components/ImportFoldersPanel';
 import { RebatesPanel } from '../components/RebatesPanel';
 import { StockAgeingPanel } from '../components/StockAgeingPanel';
+import { ApografiPanel } from '../components/ApografiPanel';
 import { LocationsPanel } from '../components/LocationsPanel';
 
 // Warehouse module page (module slug stays 'stock' internally). Extracted from the Finance "Warehouse"
@@ -119,6 +120,9 @@ export default function StockPage() {
             </TabsContent>
             <TabsContent value="counts" className="mt-0 space-y-4">
               <StockCountsSection workspaceId={ws} />
+              {/* #452 -- the year-end version of the same act, which is a legal record with
+                  defined content and a myDATA submission rather than a report. */}
+              <ApografiPanel workspaceId={ws} />
             </TabsContent>
           </div>
         </Tabs>
