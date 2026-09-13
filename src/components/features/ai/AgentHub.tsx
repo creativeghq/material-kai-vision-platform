@@ -315,6 +315,8 @@ const STATUS_STEP_COPY: Record<string, string> = {
 // Chunk types that were emitted but rendered as plain text. Routed
 // through one generic AgentResultCard (title + structured payload).
 const AGENT_RESULT_TITLES: Record<string, string> = {
+  // The capability ledger. Renders through the generic structured card below.
+  workspace_capabilities: 'What this workspace can do',
   // Construction. All five carry a `run:` quick-start — a deterministic call with NO model turn,
   // so nothing narrates the answer. They shipped emitting only `tool_progress`, which meant the
   // user pressed "How is this job doing?", read the quick-start's cheerful done line and saw no

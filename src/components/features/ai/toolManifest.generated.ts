@@ -2467,6 +2467,15 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'blocked_domains', type: 'array', optional: true, description: 'Exclude these domains from the search. Cannot be combined with allowed_domains.' },
     ],
   },
+  {
+    name: 'workspace_capabilities',
+    file: 'supabase/functions/_shared/tools/capability-tools.ts',
+    factory: 'createWorkspaceCapabilitiesTool',
+    description: 'What this workspace can actually do right now, and where it cannot, the stated reason.',
+    params: [
+      { name: 'only_problems', type: 'boolean', optional: true, description: 'Return only the capabilities that are not working (default false).' },
+    ],
+  },
 ];
 
 export const TOOL_MANIFEST_BY_NAME: Record<string, ToolManifestEntry> =

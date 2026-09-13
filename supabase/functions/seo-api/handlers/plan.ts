@@ -125,7 +125,10 @@ export async function handlePlan(req: Request, body: any): Promise<Response> {
         400,
       );
     }
-    const REQUIRED_ARRAYS = ['clusters', 'contentGapOpportunities', 'paaQuestions', 'recommendedSecondaries'];
+    // `serpInsights` belongs here for the same reason as the rest: buildPlanningUserPrompt
+    // dereferences it with no guard, so a research object missing it is a 500 with a TypeError
+    // rather than the 400 that tells the caller what to pass.
+    const REQUIRED_ARRAYS = ['clusters', 'contentGapOpportunities', 'paaQuestions', 'recommendedSecondaries', 'serpInsights'];
     const missing = REQUIRED_ARRAYS.filter((f) => !Array.isArray((research as Record<string, unknown>)[f]));
     if (missing.length > 0) {
       return jsonResponse(
@@ -239,7 +242,9 @@ function buildPlanningSystemPrompt(
 
   // Append AI Overview context if detected
   if (research?.serpFeatures?.hasAiOverview) {
-    const citedDomains = research.serpFeatures.aiOverviewSources.map((s) => s.domain).join(', ');
+    // `hasAiOverview` being true does not guarantee the sources array came with it — the flag and
+    // the list are separate fields from the SERP payload, and the guard above only checks the flag.
+    const citedDomains = (research.serpFeatures.aiOverviewSources || []).map((s) => s.domain).join(', ');
     prompt += `
 
 === AI OVERVIEW DETECTED ===

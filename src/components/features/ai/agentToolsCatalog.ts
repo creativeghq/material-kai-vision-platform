@@ -922,6 +922,15 @@ const KAI_TOOLS: AgentToolEntry[] = [
 
   // ── Background + admin ────────────────────────────────────────────
   {
+    id: 'workspace_capabilities', name: 'What This Workspace Can Do', category: 'Admin',
+    adminOnly: true,
+    desc: 'The capability ledger: every feature with a status — working, no_data (nothing configured), failed (the upstream refused; UNKNOWN, not zero), never_run, not_connected, not_entitled — and the stated reason.',
+    examples: [
+      'What can this workspace actually do?',
+      'What is broken or not set up?',
+    ],
+  },
+  {
     id: 'dispatch_background_task', name: 'Background Task', category: 'Admin',
     adminOnly: true,
     desc: 'Dispatch a long-running task to MIVAA (>25s).',
@@ -3587,6 +3596,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     // were also listed by no agent, so they were unreachable twice over — the 2026-08-26 sweep
     // got "not available for this agent or your role" for all three as an ADMIN.
     tool_ids: [
+      'workspace_capabilities',
       'dispatch_background_task', 'price_lookup', 'seo_dataforseo_call',
       'checkServerHealth', 'querySentry', 'queryDatabase',
     ],

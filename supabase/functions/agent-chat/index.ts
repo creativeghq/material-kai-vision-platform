@@ -1017,7 +1017,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'create_seo_article', 'seo_keyword_research', 'seo_article_planner',
       'seo_article_writer', 'seo_content_analyzer',
       // Background task dispatch (admin/owner only)
-      'dispatch_background_task',
+      'workspace_capabilities', 'dispatch_background_task',
       // Price lookup from Pricing KB category (admin/owner only)
       'price_lookup',
       // Mention monitoring (all users; per-tool credit cost gated inside the tool)
@@ -2101,6 +2101,7 @@ async function executeAgent(
   const createSEOBrandSearchAuditTool = seoAgentMod?.createSEOBrandSearchAuditTool;
   const createSEOGscStrikingDistanceTool = seoAgentMod?.createSEOGscStrikingDistanceTool;
   const createSEOOpportunitiesTool = seoAgentMod?.createSEOOpportunitiesTool;
+  const { createWorkspaceCapabilitiesTool } = await import('../_shared/tools/capability-tools.ts');
   const createSEOGscTopMoversTool = seoAgentMod?.createSEOGscTopMoversTool;
   const createSEOMyRankingsTool = seoAgentMod?.createSEOMyRankingsTool;
   const createSEOSiteReportTool = seoAgentMod?.createSEOSiteReportTool;
@@ -2406,6 +2407,10 @@ async function executeAgent(
   }
   if (config.tools.includes('seo_brand_search_audit') && createSEOBrandSearchAuditTool) {
     tools.push(createSEOBrandSearchAuditTool(userId, onChunk));
+  }
+  // The capability ledger — what this workspace can do, and the stated reason where it cannot.
+  if (config.tools.includes('workspace_capabilities')) {
+    tools.push(createWorkspaceCapabilitiesTool(userId, onChunk, { supabase, workspaceId }));
   }
   // Google Search Console — reads first-party gsc_performance for the connected website.
   if (config.tools.includes('seo_opportunities') && createSEOOpportunitiesTool) {

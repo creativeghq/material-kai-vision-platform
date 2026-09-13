@@ -44,6 +44,7 @@
     "get_website_rank_summary",
     "get_website_search_metrics",
     "get_website_seo_overview",
+    "get_workspace_capabilities",
     "get_workspace_cash_discount_pct",
     "global_search",
     "inbound_doc_to_supplier_bill",

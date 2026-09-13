@@ -184,6 +184,6 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
   },
   'admin-misc': {
     adminOnly: true,
-    tool_ids: ['dispatch_background_task', 'price_lookup', 'seo_dataforseo_call', 'checkServerHealth', 'querySentry', 'queryDatabase'],
+    tool_ids: ['workspace_capabilities', 'dispatch_background_task', 'price_lookup', 'seo_dataforseo_call', 'checkServerHealth', 'querySentry', 'queryDatabase'],
   },
 };
