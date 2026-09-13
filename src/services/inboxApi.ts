@@ -641,6 +641,22 @@ export const inboxApi = {
       'create_contact_from_thread', { thread_id, ...(fields ?? {}) },
     );
   },
+  /**
+   * Turn this conversation into a piece of work: the contact, the link and a DEAL, in one call.
+   *
+   * Filing the person was all the platform could do with a thread — there is no create-deal action
+   * anywhere else, in the flow engine or otherwise. One call because the writes have to land
+   * together; a contact with no deal is the half-done state this exists to prevent.
+   */
+  promoteThread(thread_id: string, fields: {
+    deal_type?: string; title?: string; value?: number | null; currency?: string;
+    contact_name?: string; company_id?: string;
+  }) {
+    return call<{
+      ok: boolean; deal_id: string; contact_id: string; contact_created: boolean;
+      deal_title: string; stage: string; already_linked: boolean;
+    }>('promote_thread', { thread_id, ...fields });
+  },
   getAgentSettings(workspace_id: string) {
     return call<{ settings: InboxAgentSettings; can_edit: boolean }>(
       'get_agent_settings', { workspace_id },

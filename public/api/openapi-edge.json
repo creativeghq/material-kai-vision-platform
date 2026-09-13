@@ -14454,6 +14454,51 @@
                     "type": "object",
                     "required": [
                       "action",
+                      "thread_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "promote_thread"
+                        ],
+                        "description": "Turn the conversation into a piece of work: link-or-create the CRM contact, adopt the thread and open a DEAL at the first stage of its type, in one transaction. Idempotent — a thread that already carries an open deal returns it with `already_linked:true` rather than opening a second."
+                      },
+                      "thread_id": {
+                        "type": "string",
+                        "description": "Thread the caller is a member of (string (uuid))"
+                      },
+                      "deal_type": {
+                        "type": "string",
+                        "description": "A `crm_deal_types.key` (default `general`). Stages are per type; the starting stage is chosen server-side."
+                      },
+                      "title": {
+                        "type": "string",
+                        "description": "Deal title. Defaults to “Enquiry from <thread subject>”."
+                      },
+                      "value": {
+                        "type": "number",
+                        "description": "Deal value. Omit when it is not known yet — null, never 0."
+                      },
+                      "currency": {
+                        "type": "string",
+                        "description": "ISO code, default EUR"
+                      },
+                      "contact_name": {
+                        "type": "string",
+                        "description": "Name for a contact that has to be created. Ignored when one is already linked."
+                      },
+                      "company_id": {
+                        "type": "string",
+                        "description": "An EXISTING company in the workspace to attach. No company is ever created here. (string (uuid))"
+                      }
+                    },
+                    "description": "Returns: {ok:true, deal_id, contact_id, contact_created:boolean, deal_title, stage, already_linked:boolean}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
                       "thread_id",
                       "status"
                     ],

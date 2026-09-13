@@ -2188,6 +2188,69 @@ async function handleJwtAction(
       return json({ ok: true, contact_id: contactId, created });
     }
 
+    // Turn this conversation into a piece of work.
+    //
+    // `create_contact_from_thread` files the PERSON and stops there, and the platform could then do
+    // nothing with them: the flow engine's CRM actions all mutate a record that must already exist,
+    // and nothing anywhere creates a deal. One RPC rather than four writes from here — contact,
+    // participant link, deal and activity have to land together, or an operator is left holding a
+    // contact with no deal and a button that is still armed (anti-regression rule 4).
+    case 'promote_thread': {
+      const threadId = String(payload.thread_id || '');
+      if (!threadId) throw new HttpError(400, 'thread_id is required');
+      const thread = await getThreadOrThrow(db, threadId);
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      assertThreadVisible(access);
+      if (!access.isMember) throw new HttpError(403, 'Only thread members may open a deal');
+
+      const rawValue = payload.value;
+      const value = rawValue === undefined || rawValue === null || rawValue === ''
+        ? null
+        : Number(rawValue);
+      if (value !== null && !Number.isFinite(value)) {
+        throw new HttpError(400, 'value must be a number');
+      }
+
+      const { data, error } = await db.rpc('promote_inbox_thread', {
+        p_thread_id: threadId,
+        p_deal_type_key: String(payload.deal_type || 'general'),
+        p_title: payload.title ? String(payload.title) : null,
+        p_value: value,
+        p_currency: payload.currency ? String(payload.currency) : null,
+        p_contact_name: payload.contact_name ? String(payload.contact_name) : null,
+        p_company_id: payload.company_id ? String(payload.company_id) : null,
+        // From the verified JWT, never the body — the client is service-role here, so auth.uid()
+        // inside the function is null and the deal would otherwise have no owner at all.
+        p_actor: userId,
+      });
+      if (error) throw new HttpError(400, error.message);
+      const row = (Array.isArray(data) ? data[0] : data) as {
+        deal_id?: string; contact_id?: string; contact_created?: boolean;
+        deal_title?: string; stage?: string; already_linked?: boolean;
+      } | null;
+      if (!row?.deal_id) throw new HttpError(500, 'The deal was not created and no reason was given.');
+
+      if (row.contact_created) {
+        await emitFlowEventToWorkspaceRoles(String(thread.workspace_id), ['owner', 'admin'], 'crm_contact_created', (uid: string) => ({
+          type: 'crm_contact_created', workspace_id: String(thread.workspace_id), user_id: uid,
+          contact_id: row.contact_id, contact_name: payload.contact_name ?? thread.subject,
+          lead_source: 'whatsapp',
+          title: 'New CRM contact', body: `${payload.contact_name ?? thread.subject} was added from a conversation.`,
+          action_url: `/crm/contacts/${row.contact_id}`,
+        })).catch(() => {});
+      }
+
+      return json({
+        ok: true,
+        deal_id: row.deal_id,
+        contact_id: row.contact_id,
+        contact_created: !!row.contact_created,
+        deal_title: row.deal_title,
+        stage: row.stage,
+        already_linked: !!row.already_linked,
+      });
+    }
+
     case 'set_status': {
       const threadId = String(payload.thread_id || '');
       const status = String(payload.status || '');

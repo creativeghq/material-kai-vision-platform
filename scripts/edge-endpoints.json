@@ -7434,6 +7434,55 @@
         "response": "{ok:true, contact_id:string, created:boolean, reason?:string}"
       },
       {
+        "name": "promote_thread",
+        "summary": "Turn the conversation into a piece of work: link-or-create the CRM contact, adopt the thread and open a DEAL at the first stage of its type, in one transaction. Idempotent — a thread that already carries an open deal returns it with `already_linked:true` rather than opening a second.",
+        "params": [
+          {
+            "name": "thread_id",
+            "type": "string (uuid)",
+            "required": true,
+            "desc": "Thread the caller is a member of"
+          },
+          {
+            "name": "deal_type",
+            "type": "string",
+            "required": false,
+            "desc": "A `crm_deal_types.key` (default `general`). Stages are per type; the starting stage is chosen server-side."
+          },
+          {
+            "name": "title",
+            "type": "string",
+            "required": false,
+            "desc": "Deal title. Defaults to “Enquiry from <thread subject>”."
+          },
+          {
+            "name": "value",
+            "type": "number",
+            "required": false,
+            "desc": "Deal value. Omit when it is not known yet — null, never 0."
+          },
+          {
+            "name": "currency",
+            "type": "string",
+            "required": false,
+            "desc": "ISO code, default EUR"
+          },
+          {
+            "name": "contact_name",
+            "type": "string",
+            "required": false,
+            "desc": "Name for a contact that has to be created. Ignored when one is already linked."
+          },
+          {
+            "name": "company_id",
+            "type": "string (uuid)",
+            "required": false,
+            "desc": "An EXISTING company in the workspace to attach. No company is ever created here."
+          }
+        ],
+        "response": "{ok:true, deal_id, contact_id, contact_created:boolean, deal_title, stage, already_linked:boolean}"
+      },
+      {
         "name": "set_status",
         "summary": "Change thread status (open/closed/etc.)",
         "params": [
