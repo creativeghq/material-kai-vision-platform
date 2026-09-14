@@ -19,7 +19,9 @@ export async function listCustomerSalesOrders(
   db: DbClient,
   args: { workspaceId: string; party: Pick<ThreadCustomerParty, 'contactId' | 'companyId'>; limit?: number },
 ): Promise<CustomerSalesOrder[]> {
-  if (!args.party.contactId) return [];
+  // Either half identifies the customer. Requiring the CONTACT meant a business we talk to on a
+  // company line — no named person — showed no orders at all.
+  if (!args.party.contactId && !args.party.companyId) return [];
   const { data: rows, error } = await db
     .from('orders')
     .select('id, order_number, status, total, currency, created_at')

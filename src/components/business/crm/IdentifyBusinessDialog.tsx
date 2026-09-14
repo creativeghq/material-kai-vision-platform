@@ -39,16 +39,36 @@ interface Props {
   onLinked: (company: { id: string; name: string }) => void;
 }
 
+/**
+ * A free mailbox names the person's provider, never their employer, and searching "gmail.com"
+ * returns Google every time. Matched on the WHOLE domain (or its last two labels), never on the
+ * first label — `mail.acme-tiles.it` is a company's own mail host, not a free provider.
+ */
+const FREE_MAIL = new Set([
+  'gmail.com', 'googlemail.com', 'yahoo.com', 'yahoo.co.uk', 'yahoo.gr', 'yahoo.it',
+  'hotmail.com', 'hotmail.it', 'hotmail.gr', 'outlook.com', 'live.com', 'msn.com',
+  'icloud.com', 'me.com', 'aol.com', 'proton.me', 'protonmail.com',
+  'mail.ru', 'yandex.ru', 'yandex.com', 'qq.com', '163.com', '126.com',
+  'web.de', 'gmx.de', 'gmx.net', 'free.fr', 'orange.fr', 'wanadoo.fr',
+  'libero.it', 'virgilio.it', 'tiscali.it', 'alice.it', 'otenet.gr', 'hol.gr',
+]);
+const isFreeMail = (d: string) => FREE_MAIL.has(d) || FREE_MAIL.has(d.split('.').slice(-2).join('.'));
+
 /** Domains and email domains mentioned in the conversation — the strongest lead there is. */
 function domainsIn(text: string): string[] {
   const found = new Set<string>();
   for (const m of text.matchAll(/[\w.+-]+@([\w-]+(?:\.[\w-]+)+)/g)) found.add(m[1].toLowerCase());
   for (const m of text.matchAll(/https?:\/\/([\w-]+(?:\.[\w-]+)+)/gi)) found.add(m[1].toLowerCase());
-  // A free mailbox names the person's provider, never their employer, and searching "gmail.com"
-  // returns Google every time.
-  const FREE = /^(gmail|googlemail|yahoo|hotmail|outlook|live|icloud|me|aol|proton|protonmail|mail|yandex|qq|163|126)\./;
-  return [...found].filter((d) => !FREE.test(`${d.split('.')[0]}.`)).slice(0, 10);
+  return [...found].filter((d) => !isFreeMail(d)).slice(0, 10);
 }
+
+/** What this business is to us. The inbox carries both, so neither may be assumed. */
+type BusinessRole = 'supplier' | 'customer' | 'both';
+const ROLE_LABEL: Record<BusinessRole, string> = {
+  supplier: 'They supply us',
+  customer: 'They buy from us',
+  both: 'Both',
+};
 
 const countryName = (code: string | null): string | null =>
   (code ? VAT_COUNTRY_OPTIONS.find((o) => o.code === code)?.name ?? null : null);
@@ -101,6 +121,11 @@ export const IdentifyBusinessDialog: React.FC<Props> = ({
   const [identity, setIdentity] = useState<CounterpartyIdentity | null>(null);
   const [draft, setDraft] = useState<CompanyIdentityDraft>(emptyCompanyIdentity());
   const [duplicate, setDuplicate] = useState<{ id: string; name: string } | null>(null);
+  /** A company matched on the NUMBER. Held apart from `duplicate`, which the name probe rewrites
+   *  as the operator types — that was clearing a certain match and re-arming "Add as a business"
+   *  for a number already on file. */
+  const [phoneMatch, setPhoneMatch] = useState<{ id: string; name: string } | null>(null);
+  const [role, setRole] = useState<BusinessRole>('supplier');
   const [saving, setSaving] = useState(false);
   const [lookupBusy, setLookupBusy] = useState(false);
   const ranFor = useRef<string | null>(null);
@@ -149,6 +174,7 @@ export const IdentifyBusinessDialog: React.FC<Props> = ({
     setIdentity(null);
     const known = await lookupKnownNumber();
     if (known) {
+      setPhoneMatch(known);
       setDuplicate(known);
       setIdentity({
         ...NO_IDENTITY, verdict: 'business', confidence: 'high', ok: true,
@@ -192,6 +218,8 @@ export const IdentifyBusinessDialog: React.FC<Props> = ({
   // is the shortcut that offers "link to it", never the guarantee.
   useEffect(() => {
     if (!open) return;
+    // A number already on file is the strongest match there is and is never re-opened by typing.
+    if (phoneMatch) { setDuplicate(phoneMatch); return; }
     const vat = draft.vatNumber.trim();
     const name = draft.name.trim();
     const domain = domainOf(draft.fields.website as string | undefined);
@@ -232,7 +260,7 @@ export const IdentifyBusinessDialog: React.FC<Props> = ({
       }
     }, 350);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [open, draft.vatNumber, draft.name, draft.fields.website, workspaceId]);
+  }, [open, draft.vatNumber, draft.name, draft.fields.website, workspaceId, phoneMatch]);
 
   const linkTo = async (company: { id: string; name: string }) => {
     const res = await inboxApi.linkCompanyToThread(threadId, company.id);
@@ -265,14 +293,19 @@ export const IdentifyBusinessDialog: React.FC<Props> = ({
       return;
     }
     setSaving(true);
+    // Two writes with no transaction, so the halves are reported separately (anti-regression
+    // rule 4). A retry is safe: crm-api's duplicate guard 409s with the row it found, which the
+    // catch turns into "link to it" rather than a second business.
+    let created: { id: string; name: string } | null = null;
     try {
-      const payload = companyIdentityPayload(draft, { is_supplier: true, is_customer: false });
+      const payload = companyIdentityPayload(draft, {
+        is_supplier: role === 'supplier' || role === 'both',
+        is_customer: role === 'customer' || role === 'both',
+      });
       const { data } = await companiesAPI.createCompany({ ...payload, workspace_id: workspaceId });
       if (!data?.id) throw new Error('The business was not returned by the server.');
-      await linkTo({ id: data.id as string, name: (data.name as string) ?? name });
+      created = { id: data.id as string, name: (data.name as string) ?? name };
     } catch (err) {
-      // crm-api ran the same folded-name check and found one this probe missed. Offer the row it
-      // found rather than a dead end — and note the create did NOT happen, so nothing is orphaned.
       const dup = err as CreateCompanyError;
       if (dup?.code === 'duplicate_company' && dup.existing) {
         setDuplicate({ id: dup.existing.id, name: dup.existing.name || name });
@@ -280,6 +313,21 @@ export const IdentifyBusinessDialog: React.FC<Props> = ({
       } else {
         toast({ title: 'Could not add the business', description: (err as Error)?.message, variant: 'destructive' });
       }
+      setSaving(false);
+      return;
+    }
+
+    try {
+      await linkTo(created);
+    } catch (e) {
+      // The business EXISTS. Saying "could not add the business" here would send the operator
+      // back to create a second one.
+      setDuplicate(created);
+      toast({
+        title: `${created.name} was added, but not linked`,
+        description: `${(e as Error).message} The business is in the CRM — use “Link to it” to attach this conversation.`,
+        variant: 'destructive',
+      });
     } finally {
       setSaving(false);
     }
@@ -358,6 +406,30 @@ export const IdentifyBusinessDialog: React.FC<Props> = ({
               onBusyChange={setLookupBusy}
               disabled={saving}
             />
+
+            {/* Never assumed. This inbox carries both — suppliers introducing themselves AND
+                customers asking for work — and a customer filed as supplier-only drops out of
+                every customer count and filter without erroring. */}
+            {!duplicate && (
+              <div className="space-y-1.5">
+                <p className="text-[11px] text-muted-foreground">What are they to us?</p>
+                <div className="flex gap-1.5">
+                  {(Object.keys(ROLE_LABEL) as BusinessRole[]).map((r) => (
+                    <Button
+                      key={r}
+                      type="button"
+                      size="sm"
+                      variant={role === r ? 'secondary' : 'outline'}
+                      className="flex-1"
+                      disabled={saving}
+                      onClick={() => setRole(r)}
+                    >
+                      {ROLE_LABEL[r]}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {duplicate && (
               <div className="rounded-sm border border-hairline p-3 flex items-center justify-between gap-3">

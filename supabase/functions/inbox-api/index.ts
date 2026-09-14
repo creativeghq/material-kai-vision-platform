@@ -2249,8 +2249,12 @@ async function handleJwtAction(
       // without anyone pressing this button again.
       const phone = String(((thread.metadata as Json) || {}).contact_phone || '').trim();
       if (phone) {
+        // Scoped to COMPANY rows: every reader of this — the resolver included — filters on
+        // `company_id is not null`, so a contact-only row for the same number is not the row that
+        // makes the next conversation resolve by itself.
         const { data: known } = await db.from('crm_phones')
-          .select('id').eq('workspace_id', workspaceId).eq('phone_normalized', phone).limit(1).maybeSingle();
+          .select('id').eq('workspace_id', workspaceId).eq('phone_normalized', phone)
+          .not('company_id', 'is', null).limit(1).maybeSingle();
         if (!known) {
           await db.from('crm_phones').insert({
             workspace_id: workspaceId, company_id: companyId,
@@ -3086,26 +3090,35 @@ async function handleJwtAction(
       // resolver and the assistant's account scope also read (`threadCustomerParty`).
       const party = await threadCustomerParty(db, threadId);
       const contactId = party.contactId;
-      if (!contactId) return json({ contact: null, company: null, quotes: [], projects: [], invoices: [], orders: [], metrics: null });
+      // A business line has no named person, and that is a complete party — returning nothing for
+      // it hid the company somebody had just filed, left the "Find the business" button on screen,
+      // and put a second paid research run one click away.
+      if (!contactId && !party.companyId) {
+        return json({ contact: null, company: null, quotes: [], projects: [], invoices: [], orders: [], metrics: null });
+      }
 
-      const { data: contact } = await db
-        .from('crm_contacts')
-        .select('id, name, first_name, last_name, email, phone, mobile, company, position, country, country_code, city, lead_source, lead_status, is_client, vat_number, tags, user_id, created_at')
-        .eq('id', contactId)
-        .maybeSingle();
+      const { data: contact } = contactId
+        ? await db
+          .from('crm_contacts')
+          .select('id, name, first_name, last_name, email, phone, mobile, company, position, country, country_code, city, lead_source, lead_status, is_client, vat_number, tags, user_id, created_at')
+          .eq('id', contactId)
+          .maybeSingle()
+        : { data: null };
 
-      const [{ data: quotes }, { data: projects }] = await Promise.all([
-        db.from('quotes')
-          .select('id, quote_number, name, status, grand_total, currency, customer_company_id, created_at')
-          .eq('customer_contact_id', contactId)
-          .order('created_at', { ascending: false })
-          .limit(8),
-        db.from('projects')
-          .select('id, name, status, budget_amount, budget_currency, client_company_id, created_at')
-          .eq('client_contact_id', contactId)
-          .order('created_at', { ascending: false })
-          .limit(8),
-      ]);
+      const [{ data: quotes }, { data: projects }] = contactId
+        ? await Promise.all([
+          db.from('quotes')
+            .select('id, quote_number, name, status, grand_total, currency, customer_company_id, created_at')
+            .eq('customer_contact_id', contactId)
+            .order('created_at', { ascending: false })
+            .limit(8),
+          db.from('projects')
+            .select('id, name, status, budget_amount, budget_currency, client_company_id, created_at')
+            .eq('client_contact_id', contactId)
+            .order('created_at', { ascending: false })
+            .limit(8),
+        ])
+        : [{ data: null }, { data: null }];
 
       // Company: the party's linked company (most recent quote, then project) — the same one the
       // card was priced for and the assistant answers about.
@@ -3126,12 +3139,15 @@ async function handleJwtAction(
       // ness is derived from amount_due, not a status string, so it's robust to
       // the finance status vocabulary.
       // Invoices and orders are independent reads of the same party: one wave.
+      const invoiceParty = partyFilter(party, 'customer_contact_id', 'customer_company_id');
       const [{ data: invRows }, orders] = await Promise.all([
         db
           .from('invoices')
           .select('id, total, amount_due, status, currency, due_at, issued_at, internal_number, legal_number')
           .eq('workspace_id', thread.workspace_id)
-          .or(partyFilter(party, 'customer_contact_id', 'customer_company_id'))
+          // An empty clause is not a wildcard — PostgREST rejects `or()` with nothing in it, and
+          // this block is now reachable for a party that is a company alone.
+          .or(invoiceParty || 'id.is.null')
           .order('issued_at', { ascending: false })
           .limit(200),
         // The customer's SALES orders with what is still owed — the same read the assistant's

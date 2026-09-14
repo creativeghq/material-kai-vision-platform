@@ -59,9 +59,16 @@ export async function threadCustomerParty(db: DbClient, threadId: string): Promi
   return { contactId, companyId, isBusiness };
 }
 
-/** The PostgREST `.or()` clause selecting rows that belong to this party, by contact or company. */
+/**
+ * The PostgREST `.or()` clause selecting rows that belong to this party, by contact or company.
+ *
+ * Each half is included only when it exists: a company line has no contact, and emitting
+ * `customer_contact_id.eq.null` sends the literal string "null" to PostgREST, which matches
+ * nothing and silently empties the result rather than erroring.
+ */
 export function partyFilter(party: Pick<ThreadCustomerParty, 'contactId' | 'companyId'>, contactCol: string, companyCol: string): string {
-  const parts = [`${contactCol}.eq.${party.contactId}`];
+  const parts: string[] = [];
+  if (party.contactId) parts.push(`${contactCol}.eq.${party.contactId}`);
   if (party.companyId) parts.push(`${companyCol}.eq.${party.companyId}`);
   return parts.join(',');
 }

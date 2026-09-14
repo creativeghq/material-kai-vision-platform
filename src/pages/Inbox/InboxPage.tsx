@@ -4117,11 +4117,13 @@ const ChannelIdentityPanel: React.FC<{
   const [identifying, setIdentifying] = useState(false);
   const company = context?.company ?? null;
 
-  // What they actually said, oldest first. This is the strongest identification signal we have:
-  // WhatsApp publishes a display name and nothing else, so who they are has to be read out of
-  // the trade they are doing — sizes, materials, delivery terms, the domain in their signature.
+  // What THEY said, oldest first — the strongest identification signal we have, because WhatsApp
+  // publishes a display name and nothing else. Incoming only: 43% of stored messages are ours,
+  // and including them fences our own words as the counterparty's and hands the research OUR
+  // domain as its best lead.
   const transcript = messages
-    .filter((m) => typeof m.body === 'string' && m.body.trim())
+    .filter((m) => ((m.metadata as Record<string, unknown> | undefined)?.direction) === 'incoming'
+      && typeof m.body === 'string' && m.body.trim())
     .slice(-25)
     .map((m) => m.body as string)
     .join('\n');
