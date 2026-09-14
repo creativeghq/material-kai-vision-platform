@@ -5,6 +5,7 @@
  * lines that draw on a commitment, never stored on the contract — a second copy is one that drifts.
  */
 import { supabase } from '@/integrations/supabase/client';
+import { todayLocalISO } from '@/utils/datetime';
 
 import type {
   BlanketPosition, HoldPosition, Scorecard, PriceUpdateResult, ProcessingStatus,
@@ -131,7 +132,9 @@ export const verticalGapService = {
   async releaseHold(holdId: string): Promise<void> {
     const { error } = await supabase.from('stock_holds').update({
       status: 'released',
-      released_on: new Date().toISOString().slice(0, 10),
+      // The operator's day, not UTC's: a hold released just after local midnight would otherwise
+      // be dated yesterday.
+      released_on: todayLocalISO(),
       updated_at: new Date().toISOString(),
     }).eq('id', holdId).eq('status', 'active');
     if (error) throw error;

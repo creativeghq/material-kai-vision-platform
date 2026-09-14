@@ -5,6 +5,7 @@
  * warm lead and missing inventory.
  */
 import { supabase } from '@/integrations/supabase/client';
+import { todayLocalISO } from '@/utils/datetime';
 
 import type { SampleLoanRow, LoanPosition, LoanStatus } from '@/modules/crm/sampleLoanRules';
 
@@ -91,7 +92,10 @@ export const sampleLoanService = {
   async close(loanId: string, status: LoanStatus, extra?: { returnedOn?: string; orderId?: string }) {
     const { error } = await supabase.from('sample_loans').update({
       status,
-      returned_on: status === 'returned' ? (extra?.returnedOn ?? new Date().toISOString().slice(0, 10)) : null,
+      // The OPERATOR'S calendar day. `toISOString()` renders the UTC one, which is yesterday for
+      // a UTC+2/+3 showroom between local midnight and 02:00 -- and a sample returned on the
+      // wrong day is a valid date nothing raises on.
+      returned_on: status === 'returned' ? (extra?.returnedOn ?? todayLocalISO()) : null,
       converted_order_id: status === 'converted' ? (extra?.orderId ?? null) : null,
     }).eq('id', loanId);
     if (error) throw error;
