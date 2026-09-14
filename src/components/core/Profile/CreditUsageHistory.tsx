@@ -10,6 +10,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import {
   CreditsService,
   creditOperationCategory,
+  type CreditSpendCategoryLabel,
   type CreditTransaction,
   type CreditSpendSummary,
 } from '@/services/credits.service';
@@ -25,19 +26,35 @@ const WINDOWS: { label: string; days: number }[] = [
   { label: '90 days', days: 90 },
 ];
 
-// Category → tailwind accent for the breakdown bars / badges. Falls back to muted.
-const CATEGORY_COLOR: Record<string, string> = {
+// Category → tailwind accent for the breakdown bars / badges. Keyed by the category
+// union, so a new category cannot ship without a colour and quietly render as "Other".
+const CATEGORY_COLOR: Record<CreditSpendCategoryLabel, string> = {
   'AI Assistant': 'bg-violet-500',
+  'SEO Toolkit': 'bg-orange-500',
+  'Mention Monitoring': 'bg-cyan-500',
+  'Price Monitoring': 'bg-lime-500',
+  'Job Research': 'bg-emerald-500',
+  'B2B & Company Research': 'bg-blue-500',
+  'Web Research': 'bg-yellow-500',
+  'Knowledge Base': 'bg-indigo-400',
+  'Catalog & Products': 'bg-stone-500',
+  Stock: 'bg-neutral-500',
+  'Finance & Documents': 'bg-green-600',
+  CRM: 'bg-red-500',
+  HR: 'bg-orange-700',
+  'Real Estate': 'bg-amber-700',
+  Messaging: 'bg-green-500',
+  Automations: 'bg-zinc-500',
+  'Inbox & Email': 'bg-pink-500',
+  'Social Content': 'bg-rose-400',
   'Interior Design': 'bg-sky-500',
   'Video Generation': 'bg-rose-500',
   'Image Generation': 'bg-fuchsia-500',
   '3D / VR Worlds': 'bg-amber-500',
   'Image & Material Tools': 'bg-teal-500',
   'Presentation Sheets': 'bg-indigo-500',
-  'Job Research': 'bg-emerald-500',
-  'Mention Monitoring': 'bg-cyan-500',
-  'Price Monitoring': 'bg-lime-500',
-  'SEO Toolkit': 'bg-orange-500',
+  'AI Assessment': 'bg-purple-500',
+  'Account Adjustments': 'bg-slate-500',
   Other: 'bg-muted-foreground/50',
 };
 
@@ -196,7 +213,7 @@ export const CreditUsageHistory: React.FC = () => {
                 <div className="space-y-3 border-t border-border pt-4">
                   {(() => {
                     // Roll raw operation_types up into friendly categories.
-                    const grouped = new Map<string, number>();
+                    const grouped = new Map<CreditSpendCategoryLabel, number>();
                     for (const c of summary.by_category) {
                       const label = creditOperationCategory(c.operation_type);
                       grouped.set(label, (grouped.get(label) || 0) + Number(c.total_spent));
@@ -265,9 +282,7 @@ export const CreditUsageHistory: React.FC = () => {
                 <TableBody>
                   {transactions.map((t) => {
                     const isSpend = Number(t.amount) < 0;
-                    const category = creditOperationCategory(
-                      (t.metadata?.operation_type as string) ?? t.transaction_type,
-                    );
+                    const category = creditOperationCategory(t.operation_token);
                     return (
                       <TableRow key={t.id}>
                         <TableCell className="max-w-[22rem]">

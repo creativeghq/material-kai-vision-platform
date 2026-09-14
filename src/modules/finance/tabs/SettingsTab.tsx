@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Save, Upload, Loader2, ImageIcon, Mail, Send, ExternalLink, Info, SlidersHorizontal, Building2, FileText, Tag, CreditCard, Wrench, Users, Tags, Store, FileSignature, Landmark, Ruler } from 'lucide-react';
+import { Save, Upload, Loader2, ImageIcon, Mail, Send, ExternalLink, Info, SlidersHorizontal, Building2, FileText, Tag, CreditCard, Wrench, Users, Tags, Store, FileSignature, Landmark, Ruler, ShieldCheck, Gavel } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { CostCodesPanel } from '@/components/business/costCodes/CostCodesPanel';
@@ -38,6 +38,17 @@ import { TeamPanel } from '@/components/core/Team/TeamPanel';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { WorkspaceCreditsCard } from '@/modules/finance/components/WorkspaceCreditsCard';
 import { EInvoicingCard } from '@/modules/finance/components/EInvoicingCard';
+import { EInvoicingMandateCard } from '@/modules/finance/components/EInvoicingMandateCard';
+import { CbamPositionCard } from '@/modules/finance/components/CbamPositionCard';
+import { RecallsCard } from '@/modules/finance/components/RecallsCard';
+import { AccessibilityCard } from '@/modules/finance/components/AccessibilityCard';
+import { ApprovalsCard } from '@/modules/finance/components/ApprovalsCard';
+import { IslandVatTerritoriesCard } from '@/modules/finance/components/IslandVatTerritoriesCard';
+import { VatPrefillCard } from '@/modules/finance/components/VatPrefillCard';
+import { PosInterconnectionCard } from '@/modules/finance/components/PosInterconnectionCard';
+import { ErpDeclarationCard } from '@/modules/finance/components/ErpDeclarationCard';
+import { PackagingDeclarationCard } from '@/modules/finance/components/PackagingDeclarationCard';
+import { PsdaReadinessCard } from '@/modules/finance/components/PsdaReadinessCard';
 import { BankAccountsCard } from '@/modules/finance/components/BankAccountsCard';
 import { MoneyOutCard } from '@/modules/banking-revolut/components/MoneyOutCard';
 import { formatDate } from '@/utils/datetime';
@@ -49,6 +60,8 @@ const SETTINGS_SECTIONS = [
   { value: 'identity', label: 'Business Identity', icon: Building2 },
   { value: 'documents', label: 'Documents', icon: FileText },
   { value: 'einvoicing', label: 'e-Invoicing', icon: FileSignature },
+  { value: 'compliance', label: 'Compliance', icon: ShieldCheck },
+  { value: 'approvals', label: 'Approvals', icon: Gavel },
   { value: 'pricing', label: 'Pricing', icon: Tag },
   { value: 'categories', label: 'Categories', icon: Tags },
   { value: 'costcodes', label: 'Cost Codes', icon: Ruler },
@@ -231,7 +244,41 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
 
         <TabsContent value="einvoicing" className="mt-0">
           <EInvoicingCard workspaceId={workspaceId} onGoToIdentity={() => setActiveTab('identity')} />
+          {/* #444 -- the mandate, and whether we are meeting it. Beside the connection card
+              because "connected" and "compliant" are different facts. */}
+          <EInvoicingMandateCard workspaceId={workspaceId} />
           <SelfBillingCard workspaceId={workspaceId} />
+        </TabsContent>
+
+        {/* Product-regulation obligations that are neither fiscal nor commercial: what we
+            import, under which role, and against which threshold. One tab rather than one
+            per regulation — they share the same two facts, origin and mass. */}
+        <TabsContent value="compliance" className="mt-0 space-y-4">
+          <CbamPositionCard workspaceId={workspaceId} />
+          <RecallsCard workspaceId={workspaceId} />
+          <AccessibilityCard workspaceId={workspaceId} />
+          <IslandVatTerritoriesCard />
+          {/* #445 -- income is a floor and expenses a ceiling, and breaching the ceiling
+              forfeits the deduction rather than raising a warning. */}
+          <VatPrefillCard workspaceId={workspaceId} />
+          {/* #448 -- one terminal taking mixed trade must be interconnected, and the compatibility
+              declaration falls on whoever BUILDS the ERP, which for an in-house one is still
+              somebody. Both are invisible until an audit. */}
+          <PosInterconnectionCard workspaceId={workspaceId} />
+          <ErpDeclarationCard workspaceId={workspaceId} />
+          {/* #454 -- the EMΠA report and the ΣΣΕΔ declaration must come from ONE derivation: the
+              scheme is required to report any difference between them to ΕΟΑΝ. */}
+          <PackagingDeclarationCard workspaceId={workspaceId} />
+          {/* #407 -- the four Phase B1 legs are recorded and not yet filed, and a leg looks the
+              same either way. The route is the open decision, not the code. */}
+          <PsdaReadinessCard workspaceId={workspaceId} />
+        </TabsContent>
+
+        {/* Credit holds, margin authority and till variances share one spine, because they
+            are the same three questions: is this allowed, who may wave it through, and who
+            signed. */}
+        <TabsContent value="approvals" className="mt-0 space-y-4">
+          <ApprovalsCard workspaceId={workspaceId} />
         </TabsContent>
 
         <TabsContent value="pricing" className="mt-0 space-y-4">

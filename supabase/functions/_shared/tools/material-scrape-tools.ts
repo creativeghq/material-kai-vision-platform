@@ -63,8 +63,9 @@ function asUntrustedData(content: string): string {
   return wrapUntrusted('page content', content, MAX_CONTENT_CHARS);
 }
 
-/** Scrape one URL to markdown via Firecrawl. Returns text, or an error string to return as-is. */
-async function scrapeToMarkdown(
+/** Scrape one URL to markdown via Firecrawl. Returns text, or an error string to return as-is.
+ *  Exported so the intake enrichment drain WIRES this rather than growing a second scraper. */
+export async function scrapeToMarkdown(
   url: string,
   userId: string,
   workspaceId: string | null,
@@ -116,8 +117,9 @@ async function scrapeToMarkdown(
   }
 }
 
-/** Run the model over fenced page content with a DB-loaded system + task prompt. */
-async function analysePage(
+/** Run the model over fenced page content with a DB-loaded system + task prompt.
+ *  Exported for the same reason as scrapeToMarkdown: one extraction path, not two. */
+export async function analysePage(
   systemPrompt: string,
   taskPrompt: string,
   markdown: string,

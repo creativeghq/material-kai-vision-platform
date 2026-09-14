@@ -98,10 +98,19 @@ export interface OrderBalance {
   settled_out: number;
   /** The half THIS order type settles on. */
   settled: number;
-  /** `total − settled`. Negative means over-settled. */
+  /** `total − settled − withheld`. Negative means over-settled. */
   outstanding: number;
   /** What payment_status should be, derived from the ledger. */
   payment_status: OrderPaymentStatus;
+  /**
+   * Money the BUYER kept and paid to the state for us (άρθρο 64 ν.4172/2013) — 4% on goods, 8%
+   * on services, above a €150 floor, when the buyer is a φορέας γενικής κυβέρνησης.
+   *
+   * It is neither a discount nor a write-off: the invoice is settled by 96% plus the βεβαίωση we
+   * are owed for the rest. Without this leg a fully-paid public-sector sale reads part-unpaid
+   * for ever, and €400 outstanding is a valid number nothing raises on (#446).
+   */
+  withheld: number;
 }
 
 export type ThreeWayMatchStatus =
@@ -729,6 +738,7 @@ export const ordersService = {
         ...r,
         total: Number(r.total), settled_in: Number(r.settled_in), settled_out: Number(r.settled_out),
         settled: Number(r.settled), outstanding: Number(r.outstanding),
+        withheld: Number(r.withheld ?? 0),
       });
     }
     return out;

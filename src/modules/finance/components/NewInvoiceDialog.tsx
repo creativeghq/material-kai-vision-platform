@@ -22,6 +22,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 import { invoicingSetupService, type FinanceBranch, type RefRow } from '@/services/invoicingSetupService';
 import { AddressUnitSelect } from '@/modules/crm/components/AddressUnitSelect';
+import { DeliveryVatNotice } from '@/modules/finance/components/DeliveryVatNotice';
+import { CreditControlNotice } from '@/modules/finance/components/CreditControlNotice';
 import { formatAddressLine } from '@/services/crm.service';
 import { QuickAddCompanyDialog } from '@/components/business/crm/QuickAddCompanyDialog';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
@@ -251,6 +253,15 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [customerAddr, setCustomerAddr] = useState<any>(null);
   // Chosen sub-unit address (null = the party's main address).
   const [addrUnitId, setAddrUnitId] = useState<string | null>(null);
+  // #443: the delivery destination decides the VAT rate (n.5246/2025). An unclassifiable
+  // destination blocks issuing rather than quietly taking the mainland rate.
+  const [addrUnitPostcode, setAddrUnitPostcode] = useState<string | null>(null);
+  const [addrUnitCountry, setAddrUnitCountry] = useState<string | null>(null);
+  const [vatDestinationBlocked, setVatDestinationBlocked] = useState(false);
+  // #426 -- the credit verdict is derived in SQL beside the exposure it reads, and the write
+  // is gated there too. This state only mirrors it so the button can say so before the
+  // operator presses it.
+  const [creditBlocked, setCreditBlocked] = useState(false);
   const [validatingVat, setValidatingVat] = useState(false);
   // Buyer risk-gate (finance_settings) + the buyer's current open balance for the credit-limit check.
   const [riskRules, setRiskRules] = useState({ block_inactive: true, block_unvalidated: false, warn_over: true, block_over: false });
@@ -1402,14 +1413,39 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                     </div>
                   )}
 
+                  {/* #426 -- credit control, derived server-side. The VAT-status checks above
+                      stay client-side because they are a different question about the same
+                      buyer; this one is the boundary, and it lives with the derivation. */}
+                  <CreditControlNotice
+                    workspaceId={workspaceId}
+                    companyId={customer.type === 'company' ? customer.id : null}
+                    contactId={customer.type === 'contact' ? customer.id : null}
+                    amount={totals.total || 0}
+                    onBlockedChange={setCreditBlocked}
+                  />
+
                   {/* Bill-to address: main address or one of the party's sub-units. */}
                   <AddressUnitSelect
                     companyId={customer.type === 'company' ? customer.id : null}
                     contactId={customer.type === 'contact' ? customer.id : null}
                     value={addrUnitId}
-                    onChange={(id) => setAddrUnitId(id)}
+                    onChange={(id, unit) => {
+                      setAddrUnitId(id);
+                      // The sub-unit wins over the party's own address: that IS the island rule.
+                      setAddrUnitPostcode(unit?.postal_code ?? customerAddr?.postal_code ?? null);
+                      setAddrUnitCountry(unit?.country_code ?? unit?.country ?? customerAddr?.country_code ?? null);
+                    }}
                     label="Bill-to address"
                     mainAddressLine={customerAddr ? formatAddressLine(customerAddr) : undefined}
+                  />
+
+                  {/* The rate follows where the goods LAND. Rendered beside the address because
+                      that is where the decision is actually made. */}
+                  <DeliveryVatNotice
+                    standardCategory={gVat ? Number(gVat) : null}
+                    postalCode={addrUnitPostcode ?? customerAddr?.postal_code ?? null}
+                    countryCode={addrUnitCountry ?? customerAddr?.country_code ?? null}
+                    onBlockedChange={setVatDestinationBlocked}
                   />
                 </div>
               ) : (
@@ -2187,7 +2223,20 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           </label>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
           <Button variant="outline" onClick={() => setShowPreview(true)} disabled={busy}><Eye className="h-4 w-4 mr-1.5" /> Preview</Button>
-          <Button onClick={handleSave} disabled={busy || buyerRisk.hardBlocked || docTypes.length === 0} title={docTypes.length === 0 ? 'No active document type — configure one in Settings → Documents' : (buyerRisk.hardBlocked ? buyerRisk.blocks.join('; ') : undefined)}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create invoice'}</Button>
+          {/* #443: an unclassifiable delivery destination blocks the same way a buyer-risk
+              hard block does. A wrong VAT rate is a valid percentage — nothing downstream can
+              catch it, and it reaches AADE that way. */}
+          <Button
+            onClick={handleSave}
+            disabled={busy || buyerRisk.hardBlocked || vatDestinationBlocked || creditBlocked || docTypes.length === 0}
+            title={
+              docTypes.length === 0
+                ? 'No active document type — configure one in Settings → Documents'
+                : vatDestinationBlocked
+                  ? 'The delivery destination could not be classified for VAT — give it a postcode'
+                  : (buyerRisk.hardBlocked ? buyerRisk.blocks.join('; ') : undefined)
+            }
+          >{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create invoice'}</Button>
         </DialogFooter>
 
         {/* Full styled-template preview overlay (Oxygen-style "Προεπισκόπηση") */}

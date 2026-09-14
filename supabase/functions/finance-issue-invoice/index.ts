@@ -1047,10 +1047,35 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
             // signing so Novus returns a provider signature instead of transmitting to AADE.
             const effOverrides: FiscalOverrides = { ...(body.fiscal_overrides ?? {}) };
             if (body.pos_payment) {
+              // The TID and the ECR Token come from the DB, never from the request body: the token
+              // is what the ΦΗΜ signed, and a caller-supplied one is a claim about a signature
+              // rather than the signature (invariant 8).
+              const { data: term } = await supabase
+                .from('pos_terminals')
+                .select('acquirer_id, fim_registry_number, interconnection_route')
+                .eq('workspace_id', invRow!.workspace_id)
+                .eq('terminal_id', body.pos_payment.terminal_id)
+                .maybeSingle();
+              const { data: tok } = await supabase
+                .from('pos_ecr_tokens')
+                .select('token, fim_registry_number, tid_nsp')
+                .eq('invoice_id', invoiceId)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
               effOverrides.posPayment = {
                 type: body.pos_payment.payment_type ?? 7,
                 terminalId: body.pos_payment.terminal_id,
                 posNspId: body.pos_payment.pos_nsp_id,
+                ...(tok?.tid_nsp ? { tid: tok.tid_nsp } : {}),
+                ...(tok?.token && (tok.fim_registry_number ?? term?.fim_registry_number)
+                  ? {
+                      ecrToken: {
+                        signingAuthor: String(tok.fim_registry_number ?? term!.fim_registry_number),
+                        signature: tok.token,
+                      },
+                    }
+                  : {}),
               };
             }
             const input = await buildInvoiceInputFromDb(supabase, invoiceId, effOverrides);
@@ -1164,6 +1189,22 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
                   fiscal_error: null,
                 })
                 .eq('id', invoiceId);
+
+              // #444 — HOW this document was lawfully issued, recorded where the fact happens.
+              // From 1/10/2026 a B2B invoice issued from our own ERP is legally non-issuance
+              // (Ε.2004/2026 §2) even though the transmission returns a MARK, so the channel
+              // cannot be inferred afterwards from a connector slug that may since have changed.
+              // Every document that reaches here went through a certified provider.
+              const { error: channelErr } = await supabase.rpc('stamp_invoice_issuance_channel', {
+                p_invoice: invoiceId, p_channel: 'provider', p_outage_id: null,
+              });
+              if (channelErr) {
+                // Reported, never swallowed: an unstamped document is one nobody can later show
+                // was lawfully issued, which is exactly what the compliance probe looks for.
+                console.error('issuance-channel stamp FAILED after a successful transmission', {
+                  invoiceId, mark: result.mark, channelErr,
+                });
+              }
               // The document IS transmitted; ΑΑΔΕ holds a MARK for it whatever this row says.
               // Report the stamp failure rather than swallowing it, and say plainly that the
               // document was sent — the submission row above is the durable record, and the

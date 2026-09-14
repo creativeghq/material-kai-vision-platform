@@ -24,6 +24,12 @@ export interface CatalogPrices {
   /** True when more ids were asked for than the resolver will answer in one call. */
   capped: boolean;
   loading: boolean;
+  /**
+   * The resolver refused or was unreachable. DISTINCT from "this product has no price": the live
+   * function raises 42501 for a non-member, and rendering that as "no price set" would be a
+   * positive claim about the catalog built out of a failure (rule 3).
+   */
+  failed: boolean;
 }
 
 export function useCatalogPrices(
@@ -33,20 +39,29 @@ export function useCatalogPrices(
   const [byProduct, setByProduct] = useState<Record<string, CatalogPrice>>({});
   const [capped, setCapped] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   // Stable key so the fetch fires on the actual product set, not on every parent re-render.
   const idsKey = useMemo(() => productIds.filter(Boolean).join(','), [productIds]);
 
   useEffect(() => {
-    if (!workspaceId || !idsKey) { setByProduct({}); setCapped(false); return; }
+    // Nothing to ask about is not a pending state: leaving `loading` true here left every
+    // consumer rendering nothing, for ever.
+    if (!workspaceId || !idsKey) {
+      setByProduct({}); setCapped(false); setFailed(false); setLoading(false); return;
+    }
     let cancelled = false;
     setLoading(true);
+    setFailed(false);
     supabase
       .rpc('get_catalog_prices_for_workspace' as never, {
         p_workspace_id: workspaceId, p_product_ids: idsKey.split(','),
       } as never)
-      .then(({ data }) => {
+      .then(({ data, error }) => {
         if (cancelled) return;
+        // A PostgREST refusal is NOT a throw: it arrives as { data: null, error }. Read as a
+        // clean empty answer it becomes the positive claim "this product has no price".
+        if (error) { setByProduct({}); setCapped(false); setFailed(true); return; }
         const payload = data as unknown as {
           prices?: Array<Record<string, unknown>>; asked?: number; returned?: number;
         } | null;
@@ -66,10 +81,10 @@ export function useCatalogPrices(
         // rest as "no price", which is a different fact.
         setCapped(Number(payload?.asked ?? 0) > Number(payload?.returned ?? 0));
       })
-      .catch(() => { if (!cancelled) { setByProduct({}); setCapped(false); } })
+      .catch(() => { if (!cancelled) { setByProduct({}); setCapped(false); setFailed(true); } })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [workspaceId, idsKey]);
 
-  return { byProduct, capped, loading };
+  return { byProduct, capped, loading, failed };
 }

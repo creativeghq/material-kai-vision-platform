@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Loader2, Plus, ClipboardList, CheckCircle2, XCircle, ClipboardCheck } from 'lucide-react';
+import { Loader2, Plus, ClipboardList, CheckCircle2, XCircle, ClipboardCheck, Snowflake } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -13,6 +13,9 @@ import { parseDecimal } from '@/utils/decimal';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { warehouseService, type Warehouse } from '@/services/warehouseService';
 import { stockService, type StockCount, type StockCountLine } from '../services/stockService';
+import {
+  locationService, countNeedsFreezing, countHasDrifted, type CountDrift,
+} from '@/modules/stock/services/locationService';
 import { FilterBar, useFilters } from '@/components/core/filters';
 import { buildStockCountFilters } from './stockCountFilters';
 import { formatDate } from '@/utils/datetime';
@@ -207,9 +210,29 @@ const CountSheetDialog: React.FC<{ countId: string | null; workspaceId: string; 
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
+  // #428 -- what moved since the freeze. Without it a sale made while somebody was counting
+  // reads as a miscount, and the counter gets the blame for it.
+  const [drift, setDrift] = useState<CountDrift | null>(null);
+
+  const refreshDrift = React.useCallback(async (id: string) => {
+    try { setDrift(await locationService.countDrift(id)); } catch { setDrift(null); }
+  }, []);
+
+  const freeze = async () => {
+    if (!countId) return;
+    setBusy(true);
+    try {
+      const res = await locationService.freezeCount(countId);
+      toast({ title: res.status === 'frozen' ? 'Count frozen' : 'Already frozen', description: res.reason });
+      await refreshDrift(countId);
+    } catch (err: any) {
+      toast({ title: 'Could not freeze the count', description: err?.message, variant: 'destructive' });
+    } finally { setBusy(false); }
+  };
 
   useEffect(() => {
-    if (!countId) { setCount(null); setLines([]); setDrafts({}); return; }
+    if (!countId) { setCount(null); setLines([]); setDrafts({}); setDrift(null); return; }
+    void refreshDrift(countId);
     (async () => {
       setLoading(true);
       try {
@@ -380,9 +403,25 @@ const CountSheetDialog: React.FC<{ countId: string | null; workspaceId: string; 
             </div>
           </div>
         )}
+        {drift && (
+          <p
+            className={`rounded-md border p-2 text-xs ${
+              countNeedsFreezing(drift) || countHasDrifted(drift)
+                ? 'border-amber-500/40 bg-amber-500/5 text-amber-800 dark:text-amber-300'
+                : 'border-hairline bg-surface-sunken text-muted-foreground'
+            }`}
+          >
+            {drift.reason}
+          </p>
+        )}
         <DialogFooter className="gap-2">
           {!readOnly && count && (
             <>
+              {countNeedsFreezing(drift) && (
+                <Button variant="outline" onClick={freeze} disabled={busy}>
+                  <Snowflake className="h-4 w-4 mr-1" /> Freeze before counting
+                </Button>
+              )}
               <Button variant="ghost" className="text-destructive" onClick={cancel} disabled={busy}><XCircle className="h-4 w-4 mr-1" /> Cancel count</Button>
               <Button onClick={post} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><CheckCircle2 className="h-4 w-4 mr-1" /> Post count</>}</Button>
             </>

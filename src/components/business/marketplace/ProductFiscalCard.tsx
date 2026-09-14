@@ -1,6 +1,6 @@
 /** The one editor for a product's fiscal, catalog and customs identity. */
 import React, { useEffect, useState } from 'react';
-import { Loader2, Save, Receipt, Ship, Tag, Sparkles, Check, X, AlertTriangle, Info } from 'lucide-react';
+import { Loader2, Save, Receipt, Ship, Tag, Sparkles, Check, X, AlertTriangle, Info, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { Label } from '@/components/core/ui/label';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -14,6 +14,11 @@ import { warehouseService, type ProductFiscalFields } from '@/services/warehouse
 import { taricService, formatTaricCode } from '@/services/taricService';
 import { TaricCombobox } from '@/components/core/TaricCombobox';
 import { OriginCountryCombobox } from '@/components/core/OriginCountryCombobox';
+import { RegulatoryRoleNotice } from '@/components/business/marketplace/RegulatoryRoleNotice';
+import { DopcPanel } from '@/components/business/marketplace/DopcPanel';
+import { OfferDisclosureCard } from '@/components/business/marketplace/OfferDisclosureCard';
+import { PackagingComponentsPanel } from '@/modules/marketplace/components/PackagingComponentsPanel';
+import { ageingService } from '@/modules/stock/services/ageingService';
 import { UNITS } from '@/lib/units';
 
 const NONE = '__none';
@@ -25,7 +30,9 @@ const SELECT_COLUMNS = [
   'mydata_income_classification_type', 'mydata_income_classification_category',
   'mydata_income_classification_type_retail', 'mydata_income_classification_category_retail',
   'prices_include_vat', 'markup_percent', 'warranty', 'product_url', 'notes',
-  'taric_code', 'country_of_origin',
+  'taric_code', 'country_of_origin', 'is_own_brand', 'dopc_product_type_code', 'workspace_id',
+  'wood_species_common', 'wood_species_scientific', 'first_placed_on_eu_market_at',
+  'discontinued_by_supplier_on',
   'taric_code_suggested', 'taric_confidence', 'taric_status', 'taric_source', 'taric_reasoning',
 ].join(', ');
 
@@ -47,13 +54,20 @@ interface State {
   notes: string;
   taric: string;
   origin: string;
+  ownBrand: boolean;
+  dopcTypeCode: string;
+  speciesCommon: string;
+  speciesScientific: string;
+  firstPlacedOn: string;
+  discontinuedOn: string;
 }
 
 const EMPTY: State = {
   barcode: '', cpv: '', itemType: 'good', categoryId: '', unitCode: '',
   vat: '', incType: '', incCat: '', incTypeRetail: '', incCatRetail: '',
   pricesIncludeVat: false, markup: '', warranty: '', productUrl: '', notes: '',
-  taric: '', origin: '',
+  taric: '', origin: '', ownBrand: false, dopcTypeCode: '',
+  speciesCommon: '', speciesScientific: '', firstPlacedOn: '', discontinuedOn: '',
 };
 
 export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }) => {
@@ -75,6 +89,10 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
    * to have been read by a human, and most likely to be asked at a border.
    */
   const [provenance, setProvenance] = useState<{ source: string; reasoning: string | null } | null>(null);
+  // The regulatory role is derived from what is STORED, so the notice re-reads after a save
+  // rather than guessing from the form.
+  const [savedAt, setSavedAt] = useState(0);
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
 
   const set = (patch: Partial<State>) => setForm((f) => ({ ...f, ...patch }));
 
@@ -109,7 +127,14 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
         notes: row?.notes ?? '',
         taric: (row?.taric_code ?? '').replace(/[^0-9]/g, ''),
         origin: row?.country_of_origin ?? '',
+        ownBrand: row?.is_own_brand ?? false,
+        dopcTypeCode: row?.dopc_product_type_code ?? '',
+        speciesCommon: row?.wood_species_common ?? '',
+        speciesScientific: row?.wood_species_scientific ?? '',
+        firstPlacedOn: row?.first_placed_on_eu_market_at ?? '',
+        discontinuedOn: row?.discontinued_by_supplier_on ?? '',
       });
+      setWorkspaceId(row?.workspace_id ?? null);
       setProvenance(
         row?.taric_code && row?.taric_source
           ? { source: row.taric_source as string, reasoning: (row.taric_reasoning as string) ?? null }
@@ -159,10 +184,19 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
       // customs, and a code chosen by hand here is a confirmed one whatever the classifier said.
       const { error } = await supabase.from('products').update({
         country_of_origin: form.origin || null,
+        is_own_brand: form.ownBrand,
+        dopc_product_type_code: form.dopcTypeCode.trim() || null,
+        wood_species_common: form.speciesCommon.trim() || null,
+        wood_species_scientific: form.speciesScientific.trim() || null,
+        first_placed_on_eu_market_at: form.firstPlacedOn || null,
         ...(form.taric ? { taric_status: 'confirmed', taric_source: 'manual', taric_code_suggested: null } : {}),
       }).eq('id', productId);
       if (error) throw error;
+      // #438 -- the factory dropping a range is the EARLIEST signal that stock is becoming a
+      // write-down. Everything else only tells you once it has already sat.
+      await ageingService.markDiscontinued(productId, form.discontinuedOn || null);
       if (form.taric) { setSuggestion(null); setProvenance({ source: 'manual', reasoning: null }); }
+      setSavedAt((n) => n + 1);
       toast({ title: 'Product data saved' });
     } catch (err: any) {
       toast({ title: 'Save failed', description: err?.message, variant: 'destructive' });
@@ -389,6 +423,73 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
         )}
       </Section>
 
+      <Section icon={<ShieldCheck className="h-3.5 w-3.5 text-primary" />} title="Regulatory role">
+        <label className="flex items-start gap-2 text-xs">
+          <Checkbox
+            className="mt-0.5"
+            checked={form.ownBrand}
+            onCheckedChange={(v) => set({ ownBrand: v === true })}
+          />
+          <span>
+            We sell this under our own name or trademark
+            <span className="block text-[11px] text-muted-foreground">
+              Own-branding makes us the MANUFACTURER of it whatever the factory’s address is
+              — the declaration of performance and the technical file become ours.
+            </span>
+          </span>
+        </label>
+        <div className="mt-2">
+          <RegulatoryRoleNotice productId={productId} refreshKey={savedAt} />
+        </div>
+        <Grid>
+          <FieldBox className="sm:col-span-2" label="Manufacturer product-type code (DoPC)">
+            <Input
+              className="h-8 text-xs" value={form.dopcTypeCode}
+              onChange={(e) => set({ dopcTypeCode: e.target.value })}
+              placeholder="the manufacturer’s code, not our SKU"
+            />
+          </FieldBox>
+        </Grid>
+        <div className="mt-2">
+          <DopcPanel
+            productId={productId} workspaceId={workspaceId}
+            productTypeCode={form.dopcTypeCode.trim()} refreshKey={savedAt}
+          />
+        </div>
+        <p className="mt-3 text-[11px] text-muted-foreground">
+          Wood under EUDR Annex I (MDF, plywood, joinery, wooden furniture) is enforced per
+          SPECIES, so art. 9(1)(a) asks for the scientific name as well as the common one.
+        </p>
+        <Grid>
+          <FieldBox label="Wood species (common)">
+            <Input className="h-8 text-xs" value={form.speciesCommon}
+              onChange={(e) => set({ speciesCommon: e.target.value })} placeholder="oak" />
+          </FieldBox>
+          <FieldBox label="Wood species (scientific)">
+            <Input className="h-8 text-xs italic" value={form.speciesScientific}
+              onChange={(e) => set({ speciesScientific: e.target.value })} placeholder="Quercus robur" />
+          </FieldBox>
+          <FieldBox label="First placed on the EU market">
+            <Input className="h-8 text-xs" type="date" value={form.firstPlacedOn}
+              onChange={(e) => set({ firstPlacedOn: e.target.value })} />
+          </FieldBox>
+        </Grid>
+      </Section>
+
+      {/* GPSR art. 19 reaches CE-marked goods too: art. 2(1) excludes only Chapter III
+          SECTION 1, and the online-offer duty is in section 2. */}
+      <Section icon={<ShieldAlert className="h-3.5 w-3.5 text-primary" />} title="Consumer safety on the offer">
+        <OfferDisclosureCard productId={productId} workspaceId={workspaceId} refreshKey={savedAt} />
+      </Section>
+
+      {/* #454 -- PPWR art. 6(9) assesses each separable component on its own, and these weights
+          are what the annual packaging declaration is built from. */}
+      {workspaceId && (
+        <Section icon={<ShieldAlert className="h-3.5 w-3.5 text-primary" />} title="Packaging">
+          <PackagingComponentsPanel workspaceId={workspaceId} productId={productId} />
+        </Section>
+      )}
+
       <Section icon={<Tag className="h-3.5 w-3.5 text-primary" />} title="Commercial">
         <Grid>
           <FieldBox label="Warranty">
@@ -397,10 +498,20 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
           <FieldBox className="sm:col-span-3" label="Link">
             <Input className="h-8 text-xs" value={form.productUrl} onChange={(e) => set({ productUrl: e.target.value })} placeholder="https://" />
           </FieldBox>
+          <FieldBox label="Discontinued by the supplier">
+            <Input
+              className="h-8 text-xs" type="date" value={form.discontinuedOn}
+              onChange={(e) => set({ discontinuedOn: e.target.value })}
+            />
+          </FieldBox>
           <FieldBox className="sm:col-span-4" label="Notes">
             <Input className="h-8 text-xs" value={form.notes} onChange={(e) => set({ notes: e.target.value })} placeholder="Optional notes…" />
           </FieldBox>
         </Grid>
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          A range the factory has dropped stops being inventory and starts being a write-down.
+          The only other signal is that nobody has bought it for a while, which arrives late.
+        </p>
       </Section>
 
       <Button size="sm" variant="outline" onClick={save} disabled={saving} className="w-full">

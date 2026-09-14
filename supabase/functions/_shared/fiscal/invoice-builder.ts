@@ -81,7 +81,11 @@ export interface FiscalOverrides {
   /** Law 5155 — card(7)/IRIS(8) receipt on a registered EFT-POS terminal. When present,
    *  the payment method is forced to this type with the terminal id + NSP so Novus returns a
    *  provider signature (skipSignature=false) instead of transmitting straight to AADE. */
-  posPayment?: { type: number; terminalId: string; posNspId: number };
+  posPayment?: {
+    type: number; terminalId: string; posNspId: number;
+    tid?: string;
+    ecrToken?: { signingAuthor: string; signature: string };
+  };
 }
 
 /**
@@ -623,7 +627,12 @@ export async function buildInvoiceInputFromDb(
     // Payment method captured on the invoice (myDATA requires at least one).
     // A POS/IRIS override wins — it carries the EFT-POS terminal + NSP for the signature.
     paymentMethods: overrides.posPayment
-      ? [{ type: overrides.posPayment.type, amount: grossTotal, terminalId: overrides.posPayment.terminalId, posNspId: overrides.posPayment.posNspId } as any]
+      ? [{
+          type: overrides.posPayment.type, amount: grossTotal,
+          terminalId: overrides.posPayment.terminalId, posNspId: overrides.posPayment.posNspId,
+          ...(overrides.posPayment.tid ? { tid: overrides.posPayment.tid } : {}),
+          ...(overrides.posPayment.ecrToken ? { ecrToken: overrides.posPayment.ecrToken } : {}),
+        } as any]
       : inv.payment_method_code
       ? [{ type: Number(inv.payment_method_code), amount: grossTotal, ...(inv.payment_method_info ? { info: inv.payment_method_info } : {}) } as any]
       : undefined,

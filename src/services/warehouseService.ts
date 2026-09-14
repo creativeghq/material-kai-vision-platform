@@ -4,6 +4,7 @@ import { isQuotaError } from '@/hooks/useQuotaErrorHandler';
 import { PRODUCT_IMAGE_SELECT, getProductImageUrl, getProductName } from '@/utils/productMetadata';
 import { mivaaApi } from '@/services/mivaaApiClient';
 import { dealerProductsService, type ManualImageRef } from '@/services/dealerProductsService';
+import type { IntakeAddition } from '@/modules/stock/intakeApprovalRules';
 
 /** A catalog product offered as the match for a supplier line. */
 export interface CatalogMatch {
@@ -608,6 +609,64 @@ export const warehouseService = {
   },
 
   /** A human says no. The term and its evidence are KEPT, so the next run cannot re-propose it. */
+  /**
+   * Ask a model to propose a target for terms nobody has matched yet (#406 Phase 3).
+   *
+   * Every answer is a CANDIDATE. A brand is never bound to its distributor -- doing that once
+   * brands every one of that maker's products with the distributor's name, permanently.
+   */
+  async ontologyProposeTargets(
+    workspaceId: string,
+    opts?: { conceptType?: 'manufacturer' | 'supplier'; limit?: number },
+  ): Promise<{
+    considered: number; proposed_existing: number; proposed_new_party: number;
+    left_unknown: number; note: string; reason?: string;
+  }> {
+    const { data, error } = await supabase.functions.invoke('ontology-propose-targets', {
+      body: {
+        workspace_id: workspaceId,
+        concept_type: opts?.conceptType ?? 'manufacturer',
+        limit: opts?.limit ?? 25,
+      },
+    });
+    if (error) throw error;
+    const r = (data ?? {}) as Record<string, unknown>;
+    return {
+      considered: Number(r.considered ?? 0),
+      proposed_existing: Number(r.proposed_existing ?? 0),
+      proposed_new_party: Number(r.proposed_new_party ?? 0),
+      left_unknown: Number(r.left_unknown ?? 0),
+      note: String(r.note ?? ''),
+      reason: r.reason ? String(r.reason) : undefined,
+    };
+  },
+
+  /**
+   * Drain the products approve marked for enrichment (#406 Phase 5).
+   *
+   * It reads only a URL we already hold. Every outcome is recorded, `no_source` included --
+   * "nothing found" and "never tried" must not look the same, or the drain re-crawls forever.
+   */
+  async runIntakeEnrichment(workspaceId: string, limit = 10): Promise<{
+    claimed: number; enriched: number; no_source: number; low_confidence: number;
+    failed: number; note: string; reason?: string;
+  }> {
+    const { data, error } = await supabase.functions.invoke('intake-enrich-products', {
+      body: { workspace_id: workspaceId, limit },
+    });
+    if (error) throw error;
+    const r = (data ?? {}) as Record<string, unknown>;
+    return {
+      claimed: Number(r.claimed ?? 0),
+      enriched: Number(r.enriched ?? 0),
+      no_source: Number(r.no_source ?? 0),
+      low_confidence: Number(r.low_confidence ?? 0),
+      failed: Number(r.failed ?? 0),
+      note: String(r.note ?? ''),
+      reason: r.reason ? String(r.reason) : undefined,
+    };
+  },
+
   async ontologyReject(bindingId: string, note?: string): Promise<void> {
     const { error } = await supabase.rpc('ontology_reject_binding', {
       p_binding_id: bindingId, p_note: note ?? null,
@@ -739,6 +798,30 @@ export const warehouseService = {
     return { approved: Number(r.approved ?? 0), failed: Number(r.failed ?? 0), errors: r.errors ?? [] };
   },
 
+  /** What intake actually created, most recent first. The approved line vanishes from every
+   *  pending list, so without this there is no trail from line to product to movement. */
+  async intakeRecentAdditions(workspaceId: string, limit = 50): Promise<{
+    rows: IntakeAddition[]; note: string;
+  }> {
+    const { data, error } = await supabase.rpc('intake_recent_additions' as never, {
+      p_workspace: workspaceId, p_limit: limit,
+    } as never);
+    if (error) throw error;
+    const r = (data ?? {}) as { rows?: IntakeAddition[]; note?: string };
+    return { rows: r.rows ?? [], note: r.note ?? '' };
+  },
+
+  /** Reverse an approval: a compensating movement and the line queued again. The product stays. */
+  async undoIntakeApproval(pendingItemId: string): Promise<{
+    stock_reversed: boolean; quantity_reversed: number; note: string;
+  }> {
+    const { data, error } = await supabase.rpc('undo_intake_approval' as never, {
+      p_pending_item_id: pendingItemId,
+    } as never);
+    if (error) throw error;
+    return data as unknown as { stock_reversed: boolean; quantity_reversed: number; note: string };
+  },
+
   async bulkDismissPending(ids: string[]): Promise<number> {
     const { data, error } = await supabase.rpc('bulk_dismiss_pending_warehouse_items', { p_ids: ids });
     if (error) throw error;
@@ -785,6 +868,8 @@ export interface PendingProduct {
   matched_warehouse_item_id?: string | null;
   match_score?: number | null;
   match_reason?: string | null;
+  /** When the match was scored. A verdict with no date is one that has never been re-checked. */
+  match_scored_at?: string | null;
 }
 
 /** One issuer's share of the intake queue. */

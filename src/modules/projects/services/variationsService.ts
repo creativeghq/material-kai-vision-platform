@@ -59,6 +59,12 @@ export interface CvrRow {
   variation_value: number;
   total_value: number;
   actual_cost: number;
+  /**
+   * Raised and NOT approved (#431). Buildertrend's split, and it is deliberately not folded into
+   * `total_cost`: an unapproved purchase order is not money spent, and adding it in would make a
+   * job with £40k of draft POs read as having already spent it.
+   */
+  pending_cost: number;
   committed_cost: number;
   supplier_variation_cost: number;
   total_cost: number;

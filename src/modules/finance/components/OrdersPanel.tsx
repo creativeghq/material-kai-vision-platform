@@ -21,6 +21,12 @@ import { OrderWorklistPanel } from './OrderWorklistPanel';
 import { ReceiveOrderLinesDialog } from './ReceiveOrderLinesDialog';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle , DialogDescription } from '@/components/core/ui/dialog';
 import { OrderCustomsCard } from '@/modules/finance/components/OrderCustomsCard';
+import { OrderCbamCard } from '@/modules/finance/components/OrderCbamCard';
+import { OrderEudrCard } from '@/modules/finance/components/OrderEudrCard';
+import { MarginAuthorityNotice } from '@/modules/finance/components/MarginAuthorityNotice';
+import { ReceptionReportCard } from '@/modules/stock/components/ReceptionReportCard';
+import { OrderLineTimelineCard } from '@/modules/finance/components/OrderLineTimelineCard';
+import { DeliveryEvidenceCard } from '@/modules/stock/components/DeliveryEvidenceCard';
 import { ContractsSection } from '@/components/features/contracts/ContractsSection';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
@@ -1600,6 +1606,21 @@ export const NewOrderModal: React.FC<{
               {marginTotal != null && <div className="flex justify-between gap-8 w-56"><span className="text-muted-foreground">Margin</span><span className={`tabular-nums ${marginTotal >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>{formatMoney(marginTotal)}</span></div>}
             </div>
           </div>
+          {/* #435 -- margin is an AUTHORITY, not a figure. The floor belongs to the
+              workspace role and the write refuses on it; this says so before the save
+              rather than after. A purchase has a cost, not a margin. */}
+          {isSales && (
+            <MarginAuthorityNotice
+              workspaceId={workspaceId}
+              lines={items.map((l, i) => ({
+                key: `${i}`,
+                description: l.description,
+                unitPrice: Number(l.unit_price) || 0,
+                unitCost: l.unit_cost == null ? null : Number(l.unit_cost),
+                quantity: Number(l.quantity) || 0,
+              }))}
+            />
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
@@ -4428,6 +4449,45 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                   orderId={order.id}
                   onAddCost={(s) => { setExpensePrefill({ amount: s.amount, description: `${order.order_number ?? order.id.slice(0, 8)} — ${s.description}` }); setExpenseOpen(true); }}
                 />
+                {/* CBAM sits here because it is the same question one layer out: what this
+                    consignment costs at the border, and whether the year it lands in has
+                    crossed the 50 t line that makes every earlier entry liable too. */}
+                <div className="mt-4">
+                  <OrderCbamCard orderId={order.id} workspaceId={order.workspace_id} />
+                </div>
+                {/* #424/#440 -- the dispute record. A delivery either happened or it did not and
+                    there was no evidence either way; a receipt either accepted everything or it
+                    absorbed somebody else's breakage. */}
+                <div className="mt-4">
+                  <DeliveryEvidenceCard
+                    orderId={order.id}
+                    workspaceId={order.workspace_id}
+                    isPurchase={order.order_type === 'purchase'}
+                  />
+                </div>
+                {/* #432 -- the status ladder and the eight dates. For a kitchen job the status is
+                    what the customer is actually asking about, and the money timeline has two
+                    sides that do not align. */}
+                <div className="mt-4">
+                  <OrderLineTimelineCard orderId={order.id} />
+                </div>
+                {/* #433 -- who gets the pallet. `receive_order_lines` moved the goods in and
+                    nothing decided whose they were; around a third of merchant lines are
+                    non-stock specials somebody is already waiting on. */}
+                {order.order_type === 'purchase' && (
+                  <div className="mt-4">
+                    <ReceptionReportCard purchaseOrderId={order.id} />
+                  </div>
+                )}
+                {/* Same question again for wood: which of three roles this line puts us in,
+                    derived from the CN code and the origin rather than set by hand. */}
+                <div className="mt-4">
+                  <OrderEudrCard
+                    orderId={order.id} workspaceId={order.workspace_id}
+                    isSale={order.order_type === 'sales'}
+                    customerIsBusiness={!!order.customer_company_id}
+                  />
+                </div>
               </TabsContent>
 
               {/* The paper behind the order (#378 L4). Counterparty prefilled from the order's own

@@ -26,6 +26,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { financeService, formatMoney, round2, extractNet, type BankAccountBalance } from '@/modules/finance/services/financeService';
 import { vatOf } from '@/modules/finance/lib/vatMath';
 import { posSessionService, type PosSession, type PosReport } from '@/modules/finance/services/posSessionService';
+import { LostSaleDialog } from '@/modules/finance/components/LostSaleDialog';
+import { PosSignatureQueueCard } from '@/modules/finance/components/PosSignatureQueueCard';
+import {
+  posInterconnectionService, paymentIsBlocked,
+} from '@/modules/finance/services/posInterconnectionService';
 import { fiscalConnectorService, posTerminalService, type PosTerminal } from '@/services/fiscalConnectorService';
 import { invoicingSetupService, type FinanceBranch } from '@/services/invoicingSetupService';
 import { parseDecimal } from '@/utils/decimal';
@@ -112,6 +117,7 @@ const PosPage: React.FC = () => {
     lines: { name: string; qty: number; unit_price: number; line_vat: number }[];
   } | null>(null);
   const [txnId, setTxnId] = useState('');
+  const [slip, setSlip] = useState({ acquirerId: '', rrn: '', authCode: '' });
   const [completing, setCompleting] = useState(false);
   const [branchCode, setBranchCode] = useState('0');
   const [vatInclusive, setVatInclusive] = useState(true); // retail prices usually include VAT
@@ -270,6 +276,10 @@ const PosPage: React.FC = () => {
 
   const selectedTerminal = useMemo(() => terminals.find((t) => t.id === terminalId) ?? null, [terminals, terminalId]);
 
+  // #434 -- what customers ask for and walk away without. The only data in this whole review we
+  // have no other route to, and nothing else raises it because no row is wrong.
+  const [lostOpen, setLostOpen] = useState(false);
+
   const openShift = async () => {
     if (!activeWorkspaceId) return;
     const raw = window.prompt('Opening cash float?', '0');
@@ -299,8 +309,22 @@ const PosPage: React.FC = () => {
     if (!session) return;
     const raw = window.prompt('Counted cash in drawer at close?', '');
     if (raw === null) return;
+    const counted = raw.trim() ? (parseDecimal(raw) ?? undefined) : undefined;
+    // The expected figure is already on screen, so the operator can see whether they are
+    // out before they are asked to account for it.
+    const expected = zReport?.expected_cash ?? null;
+    const outBy = counted != null && expected != null ? round2(counted - expected) : null;
+    let variance: { reason?: string; approved?: boolean } | undefined;
+    if (outBy != null && outBy !== 0) {
+      const why = window.prompt(
+        `The drawer is out by ${outBy}. Say what happened — this is recorded against your name.`,
+        '',
+      );
+      if (why === null) return;
+      variance = { reason: why.trim() || undefined, approved: true };
+    }
     try {
-      const z = await posSessionService.close(session.id, raw.trim() ? (parseDecimal(raw) ?? undefined) : undefined);
+      const z = await posSessionService.close(session.id, counted, variance);
       setZReport(z);
       await loadSession();
       toast({ title: `Z report #${z.z_number} — shift closed` });
@@ -588,6 +612,11 @@ const PosPage: React.FC = () => {
     if (!awaiting) return;
     setCompleting(true);
     try {
+      // Α.1155 art. 1 §6 — the terminal may not run on its own. Asked of the server, because the
+      // screen cannot know whether the document reached myDATA.
+      const gate = await posInterconnectionService.paymentGate(awaiting.invoiceId);
+      if (paymentIsBlocked(gate)) throw new Error(gate.reason);
+
       const res = await fiscalConnectorService.completePos({
         pos_signature_id: awaiting.posSignatureId || undefined,
         invoice_id: awaiting.invoiceId,
@@ -596,13 +625,45 @@ const PosPage: React.FC = () => {
       });
       if (!res?.ok) throw new Error(res?.error ?? 'POS completion failed');
       const mark = res?.fiscal?.mark ?? null;
+
+      // The acquirer identifies this transaction by RRN and approval code, not by our row id, so a
+      // dispute is unanswerable without them. Recorded through the one writer, which replays a
+      // repeated approval rather than booking a second payment.
+      if (activeWorkspaceId && (slip.acquirerId.trim() || slip.rrn.trim() || slip.authCode.trim())) {
+        await posInterconnectionService.recordResult({
+          workspaceId: activeWorkspaceId,
+          invoiceId: awaiting.invoiceId,
+          signatureId: awaiting.posSignatureId || null,
+          terminalRowId: selectedTerminal?.id ?? null,
+          result: {
+            acquirer_id: slip.acquirerId.trim() || undefined,
+            rrn: slip.rrn.trim() || undefined,
+            auth_code: slip.authCode.trim() || undefined,
+            amount: awaiting.total,
+            amount_final: awaiting.total,
+            txn_type: 'SALE',
+            txn_ecr_status: 'approved',
+          },
+        }).catch((e: unknown) => {
+          toast({
+            title: 'Receipt settled, payment identity NOT stored',
+            description: e instanceof Error ? e.message : String(e),
+            variant: 'destructive',
+          });
+        });
+      }
+
       await finalizeSale(awaiting.invoiceId, awaiting, awaiting.method, mark);
       setAwaiting(null); setTxnId('');
+      setSlip({ acquirerId: '', rrn: '', authCode: '' });
     } catch (err: any) {
       toast({ title: 'Could not finalize receipt', description: err?.message, variant: 'destructive' });
     } finally { setCompleting(false); }
   };
-  const cancelAwaiting = () => { setAwaiting(null); setTxnId(''); };
+  const cancelAwaiting = () => {
+    setAwaiting(null); setTxnId('');
+    setSlip({ acquirerId: '', rrn: '', authCode: '' });
+  };
 
   // ── Share by email (ΑΠΟΣΤΟΛΗ) — reuses the finance-send-invoice-email function. ──
   const sendEmail = async (to?: string) => {
@@ -658,6 +719,9 @@ const PosPage: React.FC = () => {
               <div className="flex items-center gap-1.5">
                 <Button size="sm" variant="ghost" onClick={() => cashMove('in')}>Cash in</Button>
                 <Button size="sm" variant="ghost" onClick={() => cashMove('out')}>Cash out</Button>
+                <Button size="sm" variant="ghost" onClick={() => setLostOpen(true)}>
+                  Asked for something we had not got
+                </Button>
                 <Button size="sm" variant="outline" onClick={showX}>X report</Button>
                 <Button size="sm" variant="outline" className="text-destructive" onClick={closeShift}>Close (Z)</Button>
               </div>
@@ -952,6 +1016,25 @@ const PosPage: React.FC = () => {
                 <label htmlFor="pospage-terminal-transaction-code-optional" className="text-xs text-muted-foreground">Terminal transaction code (optional)</label>
                 <Input id="pospage-terminal-transaction-code-optional" className="h-9 font-mono text-xs" value={txnId} onChange={(e) => setTxnId(e.target.value)} placeholder="from the POS receipt" />
               </div>
+              {/* #448 -- the payment identity. All three are printed on the terminal slip, and the
+                  acquirer answers a chargeback on them rather than on anything of ours. */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="space-y-1">
+                  <label htmlFor="pos-acquirer" className="text-[11px] text-muted-foreground">Acquirer</label>
+                  <Input id="pos-acquirer" className="h-9 font-mono text-xs" value={slip.acquirerId}
+                    onChange={(e) => setSlip((s) => ({ ...s, acquirerId: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <label htmlFor="pos-rrn" className="text-[11px] text-muted-foreground">RRN</label>
+                  <Input id="pos-rrn" className="h-9 font-mono text-xs" value={slip.rrn}
+                    onChange={(e) => setSlip((s) => ({ ...s, rrn: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <label htmlFor="pos-auth" className="text-[11px] text-muted-foreground">Approval</label>
+                  <Input id="pos-auth" className="h-9 font-mono text-xs" value={slip.authCode}
+                    onChange={(e) => setSlip((s) => ({ ...s, authCode: e.target.value }))} />
+                </div>
+              </div>
               <div className="flex flex-col gap-2">
                 <Button size="lg" className="h-12 w-full text-base font-semibold" onClick={chargeAndComplete} disabled={completing}>
                   {completing ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />} SETTLE POS
@@ -1145,6 +1228,17 @@ const PosPage: React.FC = () => {
         );
       })()}
       {connectEmailGate}
+      {/* #448 -- a signature that never matched auto-rejects after its window, and a simultaneous
+          one still unmatched has to be transmitted flagged «Υπό Έκδοση». Both are silent. */}
+      {activeWorkspaceId && <PosSignatureQueueCard workspaceId={activeWorkspaceId} />}
+      {activeWorkspaceId && (
+        <LostSaleDialog
+          open={lostOpen}
+          onOpenChange={setLostOpen}
+          workspaceId={activeWorkspaceId}
+          branchCode={session?.branch_code}
+        />
+      )}
     </div>
   );
 };

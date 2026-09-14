@@ -1,6 +1,6 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Warehouse as WarehouseIcon, LayoutDashboard, Boxes, ArrowLeftRight, ClipboardList, TrendingUp, Ship, Truck } from 'lucide-react';
+import { Warehouse as WarehouseIcon, LayoutDashboard, Boxes, ArrowLeftRight, ClipboardList, TrendingUp, Ship, Truck, Coins, MapPin } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -13,12 +13,20 @@ import { StockOverviewSection } from '../components/StockOverviewSection';
 import { MovementsSection } from '../components/MovementsSection';
 import { StockCountsSection } from '../components/StockCountsSection';
 import { ResupplySection } from '../components/ResupplySection';
+import { VerticalGapsPanel } from '../components/VerticalGapsPanel';
 import { InboundSection } from '../components/InboundSection';
+import { StockValuationSection } from '../components/StockValuationSection';
+import { StockPoolsPanel } from '../components/StockPoolsPanel';
+import { ImportFoldersPanel } from '../components/ImportFoldersPanel';
+import { RebatesPanel } from '../components/RebatesPanel';
+import { StockAgeingPanel } from '../components/StockAgeingPanel';
+import { ApografiPanel } from '../components/ApografiPanel';
+import { LocationsPanel } from '../components/LocationsPanel';
 
 // Warehouse module page (module slug stays 'stock' internally). Extracted from the Finance "Warehouse"
 // tab into a first-class entitlement-gated module. Plain Radix tabs (no forceMount) so only the active
 // panel renders — mirrors FinancePage; each tab loads its own data on open.
-const TABS = ['overview', 'inventory', 'resupply', 'inbound', 'dispatch', 'movements', 'counts'];
+const TABS = ['overview', 'inventory', 'locations', 'valuation', 'resupply', 'inbound', 'dispatch', 'movements', 'counts'];
 
 export default function StockPage() {
   const { activeWorkspaceId, loading: wsLoading } = useWorkspace();
@@ -64,6 +72,8 @@ export default function StockPage() {
           <TabsList className="section-rail flex h-auto w-full shrink-0 flex-row flex-wrap gap-1 bg-transparent p-0 lg:w-56 lg:flex-col lg:flex-nowrap">
             <TabsTrigger value="overview" className="w-full justify-start"><LayoutDashboard className="h-4 w-4 mr-2" /> Overview</TabsTrigger>
             <TabsTrigger value="inventory" className="w-full justify-start"><Boxes className="h-4 w-4 mr-2" /> Inventory</TabsTrigger>
+            <TabsTrigger value="locations" className="w-full justify-start"><MapPin className="h-4 w-4 mr-2" /> Locations</TabsTrigger>
+            <TabsTrigger value="valuation" className="w-full justify-start"><Coins className="h-4 w-4 mr-2" /> Valuation</TabsTrigger>
             <TabsTrigger value="resupply" className="w-full justify-start"><TrendingUp className="h-4 w-4 mr-2" /> Resupply</TabsTrigger>
             <TabsTrigger value="inbound" className="w-full justify-start"><Ship className="h-4 w-4 mr-2" /> Inbound</TabsTrigger>
             <TabsTrigger value="dispatch" className="w-full justify-start"><Truck className="h-4 w-4 mr-2" /> Dispatch</TabsTrigger>
@@ -78,8 +88,30 @@ export default function StockPage() {
             <TabsContent value="inventory" className="mt-0 space-y-4">
               <WarehousePanel workspaceId={ws} />
             </TabsContent>
+            {/* #428 -- everything below the building: bins, their barcodes, and the rules
+                that direct stock into them. */}
+            <TabsContent value="locations" className="mt-0 space-y-4">
+              <LocationsPanel workspaceId={ws} />
+            </TabsContent>
+            {/* #421 -- stock was a quantity and not a value, so neither the balance sheet
+                nor a gross margin could be derived from it. */}
+            <TabsContent value="valuation" className="mt-0 space-y-4">
+              <StockValuationSection workspaceId={ws} />
+              <StockPoolsPanel workspaceId={ws} />
+              {/* #422 -- the on-costs that never reached cost per m2. They belong beside the cost
+                  layer because they are the other half of it. */}
+              <ImportFoldersPanel workspaceId={ws} />
+              {/* #425 -- the other thing that moves landed cost after the fact. */}
+              <RebatesPanel workspaceId={ws} />
+              {/* #438 -- the write-down nobody else can post, because nobody else owns the
+                  ledger AND computes the buckets. */}
+              <StockAgeingPanel workspaceId={ws} />
+            </TabsContent>
             <TabsContent value="resupply" className="mt-0 space-y-4">
               <ResupplySection workspaceId={ws} />
+              {/* #442 -- a container committed now and drawn down for months, stock held with a
+                  date on it, and material out being cut. All three were integers or nothing. */}
+              <VerticalGapsPanel workspaceId={ws} />
             </TabsContent>
             <TabsContent value="inbound" className="mt-0 space-y-4">
               <InboundSection workspaceId={ws} />
@@ -92,6 +124,9 @@ export default function StockPage() {
             </TabsContent>
             <TabsContent value="counts" className="mt-0 space-y-4">
               <StockCountsSection workspaceId={ws} />
+              {/* #452 -- the year-end version of the same act, which is a legal record with
+                  defined content and a myDATA submission rather than a report. */}
+              <ApografiPanel workspaceId={ws} />
             </TabsContent>
           </div>
         </Tabs>

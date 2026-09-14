@@ -22,6 +22,7 @@ import { FilterBar, useFilters, optionsFromRows, type FilterGroupDef } from '@/c
 import { TaricCombobox } from '@/components/core/TaricCombobox';
 
 import { PendingProductsCard } from '@/modules/finance/components/PendingProductsCard';
+import { IntakeAdditionsPanel } from '@/modules/stock/components/IntakeAdditionsPanel';
 import { localISODateOffset } from '@/utils/datetime';
 import { HubEmptyState } from '@/components/core/hub';
 
@@ -175,6 +176,9 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
   return (
     <div className="space-y-4">
       <PendingProductsCard workspaceId={workspaceId} warehouses={warehouses} onChanged={() => load(selectedWh)} />
+      {/* #406 -- an approved line leaves every pending list, so without this there is no trail
+          from the line to the product, the shelf and the movement, and no way back. */}
+      <IntakeAdditionsPanel workspaceId={workspaceId} />
       <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">

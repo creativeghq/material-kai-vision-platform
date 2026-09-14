@@ -27,12 +27,14 @@ import { FINANCE_BASE, FINANCE_TAB, financeTabUrl } from '@/modules/finance/rout
 import { inboundService, type InboundDocument } from '@/modules/finance/services/inboundService';
 import { deliveryNotesService, type DeliveryNote } from '@/modules/finance/services/deliveryNotesService';
 import { chequesService, type Cheque } from '@/modules/finance/services/chequesService';
+import { ChequePortfolioCard } from '@/modules/finance/components/ChequePortfolioCard';
 import { chequeJob, deliveryNoteJob, type DocumentJob } from '@/modules/finance/utils/documentJob';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsMenu';
 import { useInboundDocActions } from '@/modules/finance/components/useInboundDocActions';
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
 import { NewDeliveryNoteDialog } from '@/modules/finance/components/NewDeliveryNoteDialog';
+import { MovementLifecycleDialog } from '@/modules/finance/components/MovementLifecycleDialog';
 import { NewChequeDialog } from '@/modules/finance/components/NewChequeDialog';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { ExpensePaymentsDialog } from '@/modules/finance/components/ExpensePaymentsDialog';
@@ -551,7 +553,17 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                 ) : type === 'delivery_notes' ? (
                   <DeliveryNotesTable rows={paginate(activeRows as DeliveryNote[], page)} readOnly={isAccountant} onChanged={load} {...emptyState} onNew={() => setNewDeliveryOpen(true)} />
                 ) : type === 'cheques' ? (
-                  <ChequesTable rows={paginate(activeRows as Cheque[], page)} readOnly={isAccountant} onChanged={load} {...emptyState} onNew={() => setNewChequeOpen(true)} />
+                  <>
+                    <ChequesTable rows={paginate(activeRows as Cheque[], page)} readOnly={isAccountant} onChanged={load} {...emptyState} onNew={() => setNewChequeOpen(true)} />
+                    {/* #423 -- a cheque is an asset that changes hands. The table above is the
+                        list; this is where it moves, and where a pledged one stops being
+                        spendable. */}
+                    {activeWorkspaceId && (
+                      <div className="p-4">
+                        <ChequePortfolioCard workspaceId={activeWorkspaceId} />
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div className="table-scroll">
                   <table className="w-full text-sm">
@@ -894,6 +906,9 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
   const navigate = useNavigate();
   const [busy, setBusy] = React.useState<string | null>(null);
   const [cancelling, setCancelling] = React.useState<DeliveryNote | null>(null);
+  // #407: the movement whose lifecycle is open. Its legs are separate filings, so this is a
+  // ledger rather than a field on the row.
+  const [lifecycleFor, setLifecycleFor] = React.useState<{ id: string; number: string | null } | null>(null);
   const financeBase = FINANCE_BASE;
   const issue = async (id: string) => {
     setBusy(id);
@@ -999,6 +1014,17 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
                     {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
                   </Button>
                 )}
+                {/* ΨΔΑ Phase Β1 (#407): loading, transhipment and receipt are each filings with
+                    their own MARK from 12/10/2026, so the movement has a lifecycle to record
+                    rather than a single status. Offered on a dispatch that has left draft. */}
+                {d.status !== 'draft' && d.kind === 'dispatch' && (
+                  <Button
+                    size="sm" variant="ghost" title="Movement lifecycle"
+                    onClick={() => setLifecycleFor({ id: d.id, number: d.delivery_note_number ?? null })}
+                  >
+                    <Truck className="h-3.5 w-3.5" />
+                  </Button>
+                )}
                 {!readOnly && d.status === 'issued' && d.kind === 'dispatch' && (
                   <Button size="sm" variant="outline" disabled={busy === d.id} onClick={() => toInvoice(d.id)}>
                     {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Create invoice'}
@@ -1044,6 +1070,13 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+    {lifecycleFor && (
+      <MovementLifecycleDialog
+        deliveryNoteId={lifecycleFor.id}
+        deliveryNoteNumber={lifecycleFor.number}
+        onClose={() => setLifecycleFor(null)}
+      />
+    )}
     </div>
   );
 };

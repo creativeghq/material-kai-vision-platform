@@ -327,7 +327,13 @@ export interface FiscalInvoiceInput {
   /** myDATA payment method (AADE table 8.12 — `MYDATA_PAYMENT_CODE` in the payment
    *  vocabulary is the one place those integers are named). 7 = POS / e-POS and 8 = IRIS
    *  carry the EFT-POS terminal id + NSP for the Law 5155 signature. */
-  paymentMethods?: { type: number; amount: number; info?: string; terminalId?: string; posNspId?: number }[];
+  paymentMethods?: {
+    type: number; amount: number; info?: string; terminalId?: string; posNspId?: number;
+    /** TID_NSP — the terminal as the payment-service provider knows it. */
+    tid?: string;
+    /** Α.1155 ECR Token. SigningAuthor is the ΦΗΜ registry number; Signature is what it signed. */
+    ecrToken?: { signingAuthor: string; signature: string };
+  }[];
   summary: {
     totalNetValue: number;
     totalVatAmount: number;
