@@ -108,11 +108,9 @@ describe('the provider and the standard disagree on a field name', () => {
     // If the provider ever fixes it, this fails and the comment above should be revisited
     // rather than left to describe a divergence that no longer exists.
     //
-    // `AadeSpec/` is gitignored — it holds 8MB of AADE PDFs — so the file is simply ABSENT in CI,
-    // where readFileSync threw ENOENT and failed the build. Every deploy was blocked from
-    // 2026-09-13 16:20 onward for that reason alone. Absent is "we could not check", never "the
-    // divergence is gone", and the guard that actually protects the binding is the one above,
-    // which reads a committed file and runs everywhere.
+    // `AadeSpec/` is gitignored (8MB of AADE PDFs), so the file is ABSENT in CI. Absent is "we
+    // could not check", never "the divergence is gone" — and the guard that protects the binding
+    // is the one above, which reads a committed file and runs everywhere.
     const spec = join(ROOT, 'src/modules/myaade/AadeSpec/novus-swagger-2026-09-11.json');
     if (!existsSync(spec)) return;
     expect(readFileSync(spec, 'utf8')).toContain('invoiveDeliveryStatus');
