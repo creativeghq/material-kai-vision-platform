@@ -153,6 +153,7 @@ const TripExpensesPage = lazy(() => import('./pages/TripExpensesPage'));
 const ClientPortalPage = lazy(() => import('./pages/ClientPortalPage'));
 const PublicStorefrontPage = lazy(() => import('./pages/PublicStorefrontPage'));
 const PublicRecallPage = lazy(() => import('./pages/PublicRecallPage'));
+const TradePortalPage = lazy(() => import('./pages/TradePortalPage'));
 const ModulesPage = lazy(() => import('./pages/Admin/ModulesPage'));
 const PlansPage = lazy(() => import('./pages/Admin/PlansPage'));
 const ModuleSettingsPage = lazy(() => import('./components/Admin/Secrets/ModuleSettingsPage'));
@@ -1046,6 +1047,9 @@ const App = () => (
                     GPSR art. 36(2) -- a person who owns the product has to be able to read
                     it from a link in an email or on a shelf card. */}
                 <Route path="/recall/:token" element={<PageErrorBoundary name="Recall notice"><PublicRecallPage /></PageErrorBoundary>} />
+                {/* #441 -- a trade customer seeing their own account. The link is the identity:
+                    personal, expiring, and no account for them to create and forget. */}
+                <Route path="/trade/:token" element={<PageErrorBoundary name="Trade portal"><TradePortalPage /></PageErrorBoundary>} />
 
                 {/* Admin: Modules registry */}
                 <Route

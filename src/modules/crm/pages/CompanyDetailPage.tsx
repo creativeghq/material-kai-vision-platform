@@ -8,6 +8,7 @@ import { WarrantiesTab } from '@/components/business/crm/WarrantiesTab';
 import { SampleLoansCard } from '@/modules/crm/components/SampleLoansCard';
 import { SupplierEprCard } from '@/modules/crm/components/SupplierEprCard';
 import { WarrantyClaimsCard } from '@/modules/crm/components/WarrantyClaimsCard';
+import { TradePortalCard } from '@/modules/crm/components/TradePortalCard';
 import { resolveRecordTab } from '@/modules/crm/recordTabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
 import { PartyAccountTabs } from '@/modules/finance/components/PartyAccountTabs';
@@ -1255,6 +1256,12 @@ export const CompanyDetailPage: React.FC = () => {
                   ...(activeWorkspaceId ? [{
                     id: 'callbacks', label: 'Callbacks', icon: Wrench, group: 'After sale',
                     node: <WarrantyClaimsCard workspaceId={activeWorkspaceId} companyId={company.id} />,
+                  }] : []),
+                  /* #441 -- their statement, their prices, their stock, and a delegated admin who
+                     caps her own foremen without phoning us. */
+                  ...(activeWorkspaceId ? [{
+                    id: 'portal', label: 'Trade portal', icon: Users, group: 'Commercial',
+                    node: <TradePortalCard workspaceId={activeWorkspaceId} companyId={company.id} />,
                   }] : []),
                 ]}
               />
