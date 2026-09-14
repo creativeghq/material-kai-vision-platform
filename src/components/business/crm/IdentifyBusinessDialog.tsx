@@ -142,16 +142,35 @@ export const IdentifyBusinessDialog: React.FC<Props> = ({
     const normalized = (phone ?? '').replace(/[^0-9+]/g, '');
     if (!normalized) return null;
     try {
-      const { data: byPhone } = await supabase
+      const { data: phoneRows } = await supabase
         .from('crm_phones')
         .select('company_id, contact_id')
-        .eq('workspace_id', workspaceId).eq('phone_normalized', normalized)
-        .not('company_id', 'is', null).limit(1).maybeSingle();
-      const viaPhones = (byPhone as { company_id?: string } | null)?.company_id ?? null;
+        .eq('workspace_id', workspaceId).eq('phone_normalized', normalized).limit(5);
+      const rows = (phoneRows ?? []) as Array<{ company_id?: string | null; contact_id?: string | null }>;
+      const viaPhones = rows.find((r) => r.company_id)?.company_id ?? null;
+
+      // A number we know through a PERSON still tells us the business, if we recorded where they
+      // work — the same hop the WhatsApp resolver makes. Skipping it paid for research into a
+      // company already on file.
+      //
+      // Read through the RLS-protected table rather than `crm_contact_primary_company()`: that
+      // one is SECURITY DEFINER, granted to service_role only, and answers for ANY contact id
+      // with no workspace check — granting it to `authenticated` would be a cross-tenant probe.
+      const viaContact = viaPhones ? null : await (async () => {
+        const contactId = rows.find((r) => r.contact_id)?.contact_id;
+        if (!contactId) return null;
+        const { data } = await supabase.from('crm_company_contacts')
+          .select('company_id')
+          .eq('contact_id', contactId)
+          .order('is_primary', { ascending: false })
+          .order('created_at', { ascending: true })
+          .limit(1).maybeSingle();
+        return (data as { company_id?: string } | null)?.company_id ?? null;
+      })();
 
       // The company's own `phone` column too — a business filed before crm_phones existed, or
       // one whose number was typed on the record rather than added as a line.
-      const companyId = viaPhones ?? (await (async () => {
+      const companyId = viaPhones ?? viaContact ?? (await (async () => {
         const { data } = await supabase.from('crm_companies')
           .select('id').eq('workspace_id', workspaceId).eq('phone', normalized).limit(1).maybeSingle();
         return (data as { id?: string } | null)?.id ?? null;
