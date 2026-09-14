@@ -22,11 +22,15 @@ import {
   warrantyClaimService, CAUSE_LABEL, OUTCOME_LABEL, WINDOW_LABEL, URGENCY_LABEL,
   CLAIM_STATUS_LABEL, causeIsDecided, outcomeIsUnknown, claimNeedsWork, isInsideWindow,
   RETROSPECTIVE_ATTACH,
-  type WarrantyClaim, type ClaimPosition, type ClaimCause, type Urgency,
+  type WarrantyClaim, type ClaimPosition, type ClaimCause, type Urgency, type ClaimStatus,
 } from '@/modules/crm/services/warrantyClaimService';
+import { assetsService, type EmployeeOption } from '@/services/assetsService';
 
 const CAUSES: ClaimCause[] = ['workmanship', 'product_failure', 'customer_change', 'undetermined'];
 const URGENCIES: Urgency[] = ['low', 'normal', 'high', 'emergency'];
+/** `assigned` is not offered: it is what assigning someone MEANS, and a status you can set without
+ *  naming a fitter is a claim that looks handled and has nobody on it. */
+const SETTABLE_STATUSES: ClaimStatus[] = ['reported', 'scheduled', 'resolved', 'rejected'];
 
 export const WarrantyClaimsCard: React.FC<{ workspaceId: string; companyId: string }> = ({
   workspaceId, companyId,
@@ -38,6 +42,7 @@ export const WarrantyClaimsCard: React.FC<{ workspaceId: string; companyId: stri
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState({ description: '', urgency: 'normal' as Urgency, installedOn: '' });
+  const [installers, setInstallers] = useState<EmployeeOption[]>([]);
 
   const load = useCallback(async () => {
     if (!workspaceId || !companyId) return;
@@ -55,6 +60,16 @@ export const WarrantyClaimsCard: React.FC<{ workspaceId: string; companyId: stri
   }, [workspaceId, companyId]);
 
   useEffect(() => { void load(); }, [load]);
+
+  // Who can be sent. An empty list leaves the picker saying so rather than offering nobody.
+  useEffect(() => {
+    let live = true;
+    if (!workspaceId) return;
+    assetsService.listEmployees(workspaceId)
+      .then((rows) => { if (live) setInstallers(rows); })
+      .catch(() => { if (live) setInstallers([]); });
+    return () => { live = false; };
+  }, [workspaceId]);
 
   const guard = async (fn: () => Promise<unknown>, title: string) => {
     setBusy(true);
@@ -163,6 +178,46 @@ export const WarrantyClaimsCard: React.FC<{ workspaceId: string; companyId: stri
                 {!causeIsDecided(c.cause) && (
                   <span>Not ours by default — that is what writes off the supplier recoveries.</span>
                 )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Select
+                  value={c.installer_employee_id ?? 'none'}
+                  disabled={busy || installers.length === 0}
+                  onValueChange={(v) => v !== 'none' && guard(
+                    () => warrantyClaimService.assign(c.id, { installerEmployeeId: v }),
+                    'Could not assign the callback',
+                  )}
+                >
+                  <SelectTrigger className="h-8 w-56 text-xs" aria-label={`Fitter for ${c.description}`}>
+                    <SelectValue placeholder={installers.length === 0 ? 'No one to assign yet' : 'Not assigned'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none" disabled>Not assigned</SelectItem>
+                    {installers.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+
+                <Select
+                  value={c.status}
+                  disabled={busy}
+                  onValueChange={(v) => guard(
+                    () => warrantyClaimService.setStatus(c.id, v as ClaimStatus),
+                    'Could not change the status',
+                  )}
+                >
+                  <SelectTrigger className="h-8 w-40 text-xs" aria-label={`Status of ${c.description}`}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {c.status === 'assigned' && (
+                      <SelectItem value="assigned" disabled>{CLAIM_STATUS_LABEL.assigned}</SelectItem>
+                    )}
+                    {SETTABLE_STATUSES.map((s) => (
+                      <SelectItem key={s} value={s}>{CLAIM_STATUS_LABEL[s]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {p && <p>{p.reason}</p>}
