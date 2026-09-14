@@ -59,6 +59,7 @@ import {
   SOURCE_FILTER_ORDER, type InboxSource, type InboxSourceKey,
 } from './inboxSource';
 import { formatDate, formatTime } from '@/utils/datetime';
+import { IdentifyBusinessDialog } from '@/components/business/crm/IdentifyBusinessDialog';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/core/ui/dialog';
@@ -4113,6 +4114,18 @@ const ChannelIdentityPanel: React.FC<{
 
   const [linking, setLinking] = useState(false);
   const [promoting, setPromoting] = useState(false);
+  const [identifying, setIdentifying] = useState(false);
+  const company = context?.company ?? null;
+
+  // What they actually said, oldest first. This is the strongest identification signal we have:
+  // WhatsApp publishes a display name and nothing else, so who they are has to be read out of
+  // the trade they are doing — sizes, materials, delivery terms, the domain in their signature.
+  const transcript = messages
+    .filter((m) => typeof m.body === 'string' && m.body.trim())
+    .slice(-25)
+    .map((m) => m.body as string)
+    .join('\n');
+
   const addToCrm = async () => {
     setLinking(true);
     try {
@@ -4289,6 +4302,28 @@ const ChannelIdentityPanel: React.FC<{
           CRM" for it sends someone to a record with nothing in it. */}
       <div className="p-5 space-y-2.5">
         <SectionTitle icon={<UserPlus className="h-4 w-4" />}>CRM</SectionTitle>
+        {/* The counterparty on a trade channel is usually a COMPANY, and filing them as a person
+            named after their WhatsApp handle loses the one fact worth keeping. Offered whether or
+            not a contact exists: a person already on file still works somewhere. */}
+        {isMember && !company && (
+          <>
+            <Button size="sm" variant="secondary" className="w-full" onClick={() => setIdentifying(true)}>
+              <Building2 className="w-3.5 h-3.5 mr-1.5" />
+              Find the business
+            </Button>
+            <p className="text-[11px] text-muted-foreground">
+              Searches the web from their name{phone ? ', number' : ''} and what they have written here,
+              then shows you what it found before anything is filed.
+            </p>
+          </>
+        )}
+        {company && (
+          <Row label="Business">
+            <a href={`/crm/companies/${company.id}`} className="truncate hover:underline">
+              {company.name || '—'}
+            </a>
+          </Row>
+        )}
         {!contact && (
           <>
             <p className="text-xs text-muted-foreground">
@@ -4361,6 +4396,18 @@ const ChannelIdentityPanel: React.FC<{
         suggestedContactName={waStr('name') || (waNameIsJustTheNumber ? '' : waName)}
         onDone={onContactLinked}
       />
+      {identifying && (
+        <IdentifyBusinessDialog
+          open={identifying}
+          onOpenChange={setIdentifying}
+          workspaceId={thread.workspace_id}
+          threadId={thread.id}
+          displayName={waStr('name') || waName || phone}
+          phone={phone || null}
+          transcript={transcript}
+          onLinked={() => onContactLinked?.()}
+        />
+      )}
     </div>
   );
 };

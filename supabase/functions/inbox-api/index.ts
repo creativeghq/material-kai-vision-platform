@@ -2188,6 +2188,83 @@ async function handleJwtAction(
       return json({ ok: true, contact_id: contactId, created });
     }
 
+    // File the BUSINESS behind this conversation.
+    //
+    // The counterparty on a trade channel is usually a company, and until now the only thing a
+    // thread could be linked to was a person — so the drawer had to GUESS the company from the
+    // contact's most recent quote, and a supplier we had never bought from was invisible. The
+    // company itself is created through crm-api like every other business (duplicate guard, VAT
+    // stamping, flow event); this action only records who the conversation belongs to.
+    case 'link_company_to_thread': {
+      const threadId = String(payload.thread_id || '');
+      const companyId = String(payload.company_id || '');
+      if (!threadId || !companyId) throw new HttpError(400, 'thread_id and company_id are required');
+      const thread = await getThreadOrThrow(db, threadId);
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      assertThreadVisible(access);
+      if (!access.isMember) throw new HttpError(403, 'Only thread members may link a business');
+
+      const workspaceId = String(thread.workspace_id);
+      // Invariant 1: this is a service-role client and company_id came from the body. 404 rather
+      // than 403 on a mismatch, so the id space cannot be walked.
+      const { data: company } = await db.from('crm_companies')
+        .select('id, name, workspace_id').eq('id', companyId).maybeSingle();
+      const co = company as { id: string; name: string | null; workspace_id: string } | null;
+      if (!co || co.workspace_id !== workspaceId) throw new HttpError(404, 'No such business');
+
+      const { data: existingP } = await db.from('inbox_participants')
+        .select('id, contact_id, company_id').eq('thread_id', threadId)
+        .eq('participant_type', 'customer').neq('status', 'removed')
+        .order('contact_id', { ascending: false, nullsFirst: false }).limit(1).maybeSingle();
+      const participant = existingP as { id?: string; contact_id?: string | null; company_id?: string | null } | null;
+
+      if (participant?.id) {
+        await db.from('inbox_participants').update({ company_id: companyId }).eq('id', participant.id);
+      } else {
+        // A business line with no named person is a complete answer, so the customer row is
+        // created with a company and no contact rather than not created at all.
+        await db.from('inbox_participants').insert({
+          thread_id: threadId, participant_type: 'customer',
+          company_id: companyId, thread_role: 'participant',
+        });
+      }
+
+      // A contact already on this thread works AT that business — record it, because
+      // `bind_party_company` re-points their next quote or invoice at the company and a link the
+      // operator cannot see is one they cannot correct.
+      let contactLinked = false;
+      if (participant?.contact_id) {
+        const { error: linkErr } = await db.from('crm_company_contacts').insert({
+          company_id: companyId, contact_id: participant.contact_id, is_primary: true,
+          notes: 'Linked from the Inbox conversation.',
+        });
+        // A unique violation means somebody already filed it, which is the outcome we wanted.
+        contactLinked = !linkErr || linkErr.code === '23505';
+        if (linkErr && linkErr.code !== '23505') {
+          console.warn('[inbox-api] company linked to the thread but NOT to the contact', linkErr.message);
+        }
+      }
+
+      // Their number belongs to the business now, so the next conversation from it resolves
+      // without anyone pressing this button again.
+      const phone = String(((thread.metadata as Json) || {}).contact_phone || '').trim();
+      if (phone) {
+        const { data: known } = await db.from('crm_phones')
+          .select('id').eq('workspace_id', workspaceId).eq('phone_normalized', phone).limit(1).maybeSingle();
+        if (!known) {
+          await db.from('crm_phones').insert({
+            workspace_id: workspaceId, company_id: companyId,
+            label: thread.channel === 'whatsapp' ? 'WhatsApp' : 'Inbox',
+            phone, phone_type: thread.channel === 'whatsapp' ? 'whatsapp' : 'other',
+            is_primary: false, created_by: userId,
+            notes: 'The number that contacted us.',
+          });
+        }
+      }
+
+      return json({ ok: true, company_id: companyId, company_name: co.name, contact_linked: contactLinked });
+    }
+
     // Turn this conversation into a piece of work.
     //
     // `create_contact_from_thread` files the PERSON and stops there, and the platform could then do

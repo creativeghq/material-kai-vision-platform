@@ -62,7 +62,7 @@ export function creditOperationCategory(op: string | null | undefined): CreditSp
   // `_analysis` rule at the bottom, which would file it under the agent.
   if (is('email_validate', 'contact_discovery', 'industrial_facility_search',
     'scrape_materials_from_url', 'factory_enrichment')
-    || startsWith('b2b_', 'company_', 'find_competitors')) return 'B2B & Company Research';
+    || startsWith('b2b_', 'company_', 'find_competitors', 'counterparty_identify')) return 'B2B & Company Research';
 
   if (is('web_search', 'web_fetch', 'web_research', 'firecrawl_scrape',
     'inspiration_url_analysis', 'analyze_inspiration_url_haiku', 'tech_radar_review')

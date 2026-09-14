@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (147)
+## 1. Supabase Edge Functions (150)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -152,6 +152,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `crm-lead-score` | JWT | AI lead + health scoring for any CRM contact (canonical platform scorer) |
 | `crm-meeting-reminders` | cron | Cron: send reminders for upcoming CRM meetings whose reminder time has arrived. |
 | `customer-assets-api` | JWT | Installed base: a customer's equipment, its warranties and its recurring service schedules (#343). |
+| `trade-portal` | public / JWT | A trade customer seeing their own account: statement, stock bands, reorder and a delegated admin |
 
 **Business Profile**
 
@@ -373,6 +374,13 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | Function | Auth | Summary |
 |---|---|---|
 | `stock-api` | JWT | Stock / warehouse module - inventory, movements, counts, shipments and forecasting |
+
+**Warehouse**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `intake-enrich-products` | JWT | Drain the products intake marked for enrichment, from a URL we already hold |
+| `ontology-propose-targets` | JWT | Propose a target for the invoice terms the ontology cannot resolve |
 
 **Webhooks**
 

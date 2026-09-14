@@ -43,7 +43,7 @@ const readers = new Map();
  * key would write `used_in` onto nothing while looking like coverage.
  */
 const PROMPT_TYPES = new Set(['agent', 'tool', 'generation', 'extraction', 'classification',
-  'search', 'template', 'chat_starter', 'embed', 'system']);
+  'search', 'template', 'chat_starter', 'embed', 'system', 'research']);
 
 const add = (type, category, file) => {
   if (!type || !category) return;

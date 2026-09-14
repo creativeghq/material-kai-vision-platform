@@ -657,6 +657,18 @@ export const inboxApi = {
     );
   },
   /**
+   * Record that this conversation belongs to a BUSINESS.
+   *
+   * The company is created through crm-api like every other business — this only files who the
+   * conversation is with, links any contact already on the thread to that company, and puts their
+   * number on the business so the next conversation from it resolves by itself.
+   */
+  linkCompanyToThread(thread_id: string, company_id: string) {
+    return call<{ ok: boolean; company_id: string; company_name: string | null; contact_linked: boolean }>(
+      'link_company_to_thread', { thread_id, company_id },
+    );
+  },
+  /**
    * Turn this conversation into a piece of work: the contact, the link and a DEAL, in one call.
    *
    * Filing the person was all the platform could do with a thread — there is no create-deal action

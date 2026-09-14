@@ -37,6 +37,12 @@ const ALLOWED: Record<string, { text: string; why: string }[]> = {
     why: 'Recipient picker: it matches the ADDRESS because that is what a campaign needs. '
       + 'Widening to the folded haystack would offer contacts that have no email at all.',
   }],
+  'src/components/business/crm/IdentifyBusinessDialog.tsx': [{
+    text: ".eq('workspace_id', workspaceId).ilike('website', `%${domain}%`).limit(50);",
+    why: 'Not a search — a duplicate probe on a DOMAIN, which is ASCII by definition, so there '
+      + 'is nothing to fold. The ilike only narrows; the host is then compared exactly in TS, '
+      + 'because `%acme.it%` alone also matches notacme.it.example.com.',
+  }],
 };
 
 function walk(dir: string, out: string[] = []): string[] {
