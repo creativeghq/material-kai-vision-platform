@@ -1,6 +1,6 @@
 /** Embed analytics vocabulary — three places, one list. */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOT = process.cwd();
@@ -24,10 +24,23 @@ function labelledTypes(): string[] {
   return [...block.matchAll(/\['(embed_[a-z_]+)'/g)].map((m) => m[1]);
 }
 
-/** Every `this.track('…')` the widget actually calls. */
+/**
+ * Every event the widgets actually emit, across EVERY embed component.
+ *
+ * Reading one file was right when there was one widget; the visualizer is a second element in the
+ * same bundle, so a scan pinned to `materialkai-product.ts` would report its events as emitted by
+ * nobody. A component whose emitter is named something else fails this LOUDLY (its labels look
+ * unemitted), which is the safe direction.
+ */
 function emittedTypes(): string[] {
-  const src = read('src/embed/materialkai-product.ts');
-  return [...new Set([...src.matchAll(/this\.track\('(embed_[a-z_]+)'\)/g)].map((m) => m[1]))];
+  const dir = join(ROOT, 'src/embed');
+  const found = new Set<string>();
+  for (const file of readdirSync(dir)) {
+    if (!file.endsWith('.ts')) continue;
+    const src = readFileSync(join(dir, file), 'utf8');
+    for (const m of src.matchAll(/this\.(?:track|report)\('(embed_[a-z_]+)'\)/g)) found.add(m[1]);
+  }
+  return [...found];
 }
 
 describe('embed analytics vocabulary', () => {

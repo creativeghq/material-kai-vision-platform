@@ -63,7 +63,7 @@ describe('one piece of a surface product, in metres', () => {
   });
 
   it('labels the format, and says assumed / photo / no image when that is the case', () => {
-    const base: SurfaceTexture = { url: 'u', source: 'albedo', tileWidthM: 0.6, tileLengthM: 1.205, formatSource: 'recorded' };
+    const base: SurfaceTexture = { url: 'u', source: 'albedo', tileWidthM: 0.6, tileLengthM: 1.205, formatSource: 'recorded', packM2: null };
     expect(tileFormatLabel(base)).toBe('60 × 120.5 cm');
     expect(tileFormatLabel({ ...base, formatSource: 'default' })).toBe('60 × 120.5 cm · assumed');
     expect(tileFormatLabel({ ...base, source: 'photo' })).toBe('60 × 120.5 cm · photo');

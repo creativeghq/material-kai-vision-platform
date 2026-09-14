@@ -16,6 +16,7 @@ import {
 import { formatMoney } from '@/utils/decimal';
 // Shared with <materialkai-assistant> (#382 follow-up) — two widgets needed the same derivation.
 import { appOrigin } from './appOrigin';
+import { sessionId } from './embedSession';
 // The tenant's lighting rigs. Plain import-free constants, so a React-free bundle takes them as-is
 // — and importing them is what stops the widget growing a second opinion about what
 // "natural daylight" means.
@@ -30,6 +31,8 @@ import './materialkai-configurator';
 // And `<materialkai-assistant>` (#382 Phase 3) — the platform's tools as buttons. Same bundle,
 // same reason: one script tag, and which element a merchant places is a choice about their page.
 import './materialkai-assistant';
+// #447 — the deterministic surface visualizer, on the merchant's own page.
+import './materialkai-visualizer';
 
 interface EmbedModel {
   format: string;
@@ -87,20 +90,7 @@ const DEFAULT_API_BASE = 'https://bgbavxtjlbvgplozizxu.supabase.co';
  * sessionStorage rather than localStorage: "session" in the analytics sense is a visit, not a
  * person, and a persistent id across visits would be tracking the merchant never asked for.
  */
-function sessionId(): string {
-  const KEY = 'materialkai:embed-session';
-  try {
-    const existing = sessionStorage.getItem(KEY);
-    if (existing) return existing;
-    const fresh = crypto.randomUUID();
-    sessionStorage.setItem(KEY, fresh);
-    return fresh;
-  } catch {
-    // Storage blocked (private mode, third-party cookie rules). A per-widget id is still a valid
-    // session id; it just does not group.
-    return crypto.randomUUID();
-  }
-}
+// sessionId now lives in ./embedSession so every component groups a visitor the same way.
 
 // Price formatting comes from the canonical formatter, not a local copy — `decimal.ts` has no
 // imports of its own, so a React-free bundle can take it as-is. tests/unit/moneyPrimitives.test.ts

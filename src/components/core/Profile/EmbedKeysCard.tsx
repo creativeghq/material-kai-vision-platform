@@ -52,6 +52,9 @@ const EMBED_EVENT_LABELS: Array<[string, string]> = [
   ['embed_plan_room', 'Room planner opened'],
   ['embed_ar_launch', 'AR launches'],
   ['embed_add_to_cart', 'Add to cart'],
+  ['embed_visualize_surface', 'Surfaces rendered'],
+  ['embed_visualizer_share', 'Renders shared'],
+  ['embed_visualizer_quote', 'Quotes from a render'],
 ];
 import { supabaseConfig } from '@/config/apis/supabaseConfig';
 import { HubEmptyState } from '@/components/core/hub';

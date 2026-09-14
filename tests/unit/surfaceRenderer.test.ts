@@ -84,6 +84,20 @@ describe('the lattice', () => {
     expect(horiz.v).toBeLessThan(0.3);
   });
 
+  it('herringbone: ONE physical plank is one piece, with u running along it once', () => {
+    // A vertical plank at cell column 6 spans cell rows 7..12 (a = 20, k = 6). Every point on it
+    // must name the same piece, and u must run 0 → 1 down its length exactly once. Reading the
+    // origin from the wrong end returned six different pieces with u running backwards.
+    const hits = [7, 8, 9, 10, 11, 12].map((cy) => lookupAt(130, cy * 20 + 10, plank, 'herringbone', 0));
+    for (const h of hits) if (h.grout) throw new Error('expected a piece');
+    const ids = hits.map((h) => `${(h as { i: number }).i}:${(h as { j: number }).j}`);
+    expect(new Set(ids).size).toBe(1);
+    const us = hits.map((h) => (h as { u: number }).u);
+    expect(us).toEqual([...us].sort((a, b) => a - b));
+    expect(us[0]).toBeLessThan(0.2);
+    expect(us[us.length - 1]).toBeGreaterThan(0.8);
+  });
+
   it('basket weave: neighbouring blocks run the opposite way', () => {
     const a = lookupAt(10, 5, plank, 'basket_weave', 0);
     const b = lookupAt(130, 5, plank, 'basket_weave', 0);
@@ -172,6 +186,16 @@ describe('the URL state', () => {
     expect(bad.groutColorHex).toBe(DEFAULT_RENDER_STATE.groutColorHex);
     expect(bad.rotationDeg).toBe(270);
     expect(hexToRgb('#ff0080')).toEqual([255, 0, 128]);
+  });
+
+  it('an ABSENT grout param is the 3 mm default, not 0 — so a shared link opens as it was sent', () => {
+    // `Number(null)` is 0 and 0 passes `>= 0`, so the default never applied; and because the
+    // serializer omits a default, every link shared at 3 mm used to open at 0 mm.
+    expect(parseRenderState(new URLSearchParams('')).groutWidthMm).toBe(3);
+    expect(parseRenderState(new URLSearchParams('grout=')).groutWidthMm).toBe(3);
+    expect(parseRenderState(new URLSearchParams('grout=0')).groutWidthMm).toBe(0);
+    const threeMm = { ...DEFAULT_RENDER_STATE, sceneId: 's', surfaceKey: 'floor', productId: 'p' };
+    expect(parseRenderState(serializeRenderState(threeMm)).groutWidthMm).toBe(3);
   });
 });
 

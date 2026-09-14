@@ -45,6 +45,9 @@ const DB_EVENT_TYPES = [
   'embed_add_to_cart',
   'embed_configure',
   'embed_plan_room',
+  'embed_visualize_surface',
+  'embed_visualizer_share',
+  'embed_visualizer_quote',
 ] as const;
 
 /** Pull the `ManufacturerEventType` string-literal union out of the frontend service. */

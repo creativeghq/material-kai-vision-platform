@@ -80,12 +80,14 @@ function herringbone(x: number, y: number, W: number, L: number, g: number): Loo
     if (lx >= faceL || ly >= W) return GROUT;
     return { grout: false, i: cx - d, j: cy, u: lx / faceL, v: ly / W };
   }
+  // `d` DECREASES as cy grows, so a vertical piece BEGINS at the cell where d = 2k − 1.
+  const top = cy - (2 * k - 1 - d);
   const ox = cx * a;
-  const oy = (cy - (d - k)) * a;
+  const oy = top * a;
   const lx = x - ox;
   const ly = y - oy;
   if (lx >= W || ly >= faceL) return GROUT;
-  return { grout: false, i: cx, j: cy - (d - k), u: ly / faceL, v: lx / W };
+  return { grout: false, i: cx, j: top, u: ly / faceL, v: lx / W };
 }
 
 /** Blocks of k pieces, alternating direction like a woven basket. */

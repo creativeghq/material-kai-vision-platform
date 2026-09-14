@@ -13,13 +13,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { edgeError } from '@/utils/edgeError';
 import { STANDARD_GROUT_COLORS } from '@/constants/groutColors';
 import {
-  renderSurface, patternWarning, piecesToCover, normalizeFormat, PATTERNS, PATTERN_LABELS, hexToRgb,
-  serializeRenderState, DEFAULT_RENDER_STATE,
-  type Pattern, type Raster, type RenderState, type Pt,
+  renderSurface, patternWarning, normalizeFormat, PATTERNS, PATTERN_LABELS, hexToRgb,
+  serializeRenderState, DEFAULT_RENDER_STATE, computeCoverage, wastageFor, compareSurfaceFidelity,
+  type Pattern, type Raster, type RenderState, type Pt, type WastageRates, type Fidelity,
 } from '@/lib/surfaceRenderer';
 import { tileFormatLabel } from '@/components/features/roomplanner/surfaceFormat';
-import { SURFACE_KIND_LABELS, type VisualizerScene, type VisualizerSurface, type SurfaceProduct } from '@/services/visualizerService';
+import { visualizerService, SURFACE_KIND_LABELS, type VisualizerScene, type VisualizerSurface, type SurfaceProduct } from '@/services/visualizerService';
 import { loadRaster, loadMaskFor, drawRaster, rasterToBlob } from './raster';
+import { CoveragePanel } from './CoveragePanel';
 
 interface Props {
   scene: VisualizerScene;
@@ -29,13 +30,16 @@ interface Props {
   initialState?: Partial<RenderState>;
   /** Fewer controls, no photoreal step — for the chat card. */
   compact?: boolean;
+  /** Bumped when an allowance is saved. Re-reads the rates WITHOUT remounting, which would throw
+   *  away a photoreal render the operator just spent credits on. */
+  ratesVersion?: number;
   onStateChange?: (state: RenderState) => void;
 }
 
 const ROTATIONS = [0, 45, 90];
 
 export const SurfaceVisualizer: React.FC<Props> = ({
-  scene, surfaces, products, workspaceId, initialState, compact = false, onStateChange,
+  scene, surfaces, products, workspaceId, initialState, compact = false, ratesVersion = 0, onStateChange,
 }) => {
   const { toast } = useToast();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -60,8 +64,9 @@ export const SurfaceVisualizer: React.FC<Props> = ({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [rendering, setRendering] = useState(false);
   const [rendered, setRendered] = useState<Raster | null>(null);
-  const [photoreal, setPhotoreal] = useState<{ url: string; credits: number } | null>(null);
+  const [photoreal, setPhotoreal] = useState<{ url: string; credits: number; fidelity: Fidelity } | null>(null);
   const [photorealBusy, setPhotorealBusy] = useState(false);
+  const [wastage, setWastage] = useState<WastageRates>({});
 
   const surface = useMemo(() => surfaces.find((s) => s.key === surfaceKey) ?? null, [surfaces, surfaceKey]);
   const product = useMemo(() => products.find((p) => p.id === productId) ?? null, [products, productId]);
@@ -74,6 +79,16 @@ export const SurfaceVisualizer: React.FC<Props> = ({
     sceneId: scene.id, surfaceKey, productId, pattern, groutWidthMm, groutColorHex, rotationDeg,
   }), [scene.id, surfaceKey, productId, pattern, groutWidthMm, groutColorHex, rotationDeg]);
   useEffect(() => { onStateChange?.(state); }, [state, onStateChange]);
+
+  // The allowances this workspace has recorded. A failed read leaves the map EMPTY, which reports
+  // "not set" — never a rate we invented, and never silence.
+  useEffect(() => {
+    let live = true;
+    visualizerService.wastageRates(workspaceId)
+      .then((r) => { if (live) setWastage(r); })
+      .catch(() => { if (live) setWastage({}); });
+    return () => { live = false; };
+  }, [workspaceId, ratesVersion]);
 
   // The photo, once per scene.
   useEffect(() => {
@@ -147,7 +162,17 @@ export const SurfaceVisualizer: React.FC<Props> = ({
   }, [rendered, base]);
 
   const warning = format && patternWarning(format, pattern);
-  const pieces = format && surface ? piecesToCover(surface.width_cm, surface.depth_cm, format, groutWidthMm / 10) : null;
+  const coverage = useMemo(() => (surface ? computeCoverage({
+    surfaceWidthCm: surface.width_cm,
+    surfaceDepthCm: surface.depth_cm,
+    format,
+    formatAssumed: product?.texture.formatSource === 'default',
+    groutCm: groutWidthMm / 10,
+    pattern,
+    rotationDeg,
+    wastagePercent: wastageFor(wastage, pattern),
+    m2PerBox: product?.texture.packM2 ?? null,
+  }) : null), [surface, format, product, groutWidthMm, pattern, rotationDeg, wastage]);
 
   const download = useCallback(async () => {
     if (!rendered) return;
@@ -190,13 +215,25 @@ export const SurfaceVisualizer: React.FC<Props> = ({
       });
       if (error) throw await edgeError(error, 'Photoreal render failed');
       if (!body?.success || !body?.image_url) throw new Error(body?.error || 'Generation returned no image');
-      setPhotoreal({ url: body.image_url, credits: Number(body.credits_used ?? 0) });
+
+      // "Change nothing" is a request with no enforcement, so the surface is MEASURED on both
+      // images. An unreadable result reports `unmeasured`, never "held".
+      let fidelity: Fidelity = { verdict: 'unmeasured', deltaE: null };
+      if (surface) {
+        try {
+          const theirs = await loadRaster(body.image_url, 1400);
+          fidelity = compareSurfaceFidelity(rendered, theirs, surface.quad as [Pt, Pt, Pt, Pt]);
+        } catch {
+          fidelity = { verdict: 'unmeasured', deltaE: null };
+        }
+      }
+      setPhotoreal({ url: body.image_url, credits: Number(body.credits_used ?? 0), fidelity });
     } catch (e) {
       toast({ title: 'Photoreal render failed', description: e instanceof Error ? e.message : 'Unknown error', variant: 'destructive' });
     } finally {
       setPhotorealBusy(false);
     }
-  }, [rendered, workspaceId, toast]);
+  }, [rendered, workspaceId, surface, toast]);
 
   return (
     <div className={compact ? 'grid gap-3' : 'grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]'}>
@@ -213,6 +250,21 @@ export const SurfaceVisualizer: React.FC<Props> = ({
         {photoreal && (
           <div className="mt-3">
             <p className="mb-1 text-[11px] font-medium text-muted-foreground">AI render · {photoreal.credits} credits · a model's interpretation, not the exact product</p>
+            {photoreal.fidelity.verdict === 'shifted' && (
+              <p className="mb-1 text-[11px] text-amber-800 dark:text-amber-300">
+                The model shifted this surface's colour (ΔE {photoreal.fidelity.deltaE}). The deterministic render above is the accurate one — quote from that.
+              </p>
+            )}
+            {photoreal.fidelity.verdict === 'held' && (
+              <p className="mb-1 text-[11px] text-muted-foreground">
+                Colour held (ΔE {photoreal.fidelity.deltaE}).
+              </p>
+            )}
+            {photoreal.fidelity.verdict === 'unmeasured' && (
+              <p className="mb-1 text-[11px] text-muted-foreground">
+                Colour could not be checked on this result.
+              </p>
+            )}
             <img src={photoreal.url} alt="Photoreal AI render of the composition" className="w-full rounded-lg border border-border/60" />
           </div>
         )}
@@ -303,11 +355,7 @@ export const SurfaceVisualizer: React.FC<Props> = ({
             ))}
           </div>
         </div>
-        {pieces !== null && surface && (
-          <p className="text-[11px] text-muted-foreground">
-            {(surface.width_cm * surface.depth_cm / 10_000).toFixed(2)} m² · about {pieces} pieces before cuts
-          </p>
-        )}
+        {coverage && <CoveragePanel coverage={coverage} compact={compact} />}
       </div>
     </div>
   );

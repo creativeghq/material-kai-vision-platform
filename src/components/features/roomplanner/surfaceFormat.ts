@@ -10,6 +10,8 @@ export interface SurfaceTexture {
   tileLengthM: number;
   /** 'default' means nobody recorded a format — the label says "assumed", never implies one. */
   formatSource: 'recorded' | 'default';
+  /** m² one pack covers, or null when nobody recorded one. Never a guessed pack. */
+  packM2: number | null;
 }
 
 export type TileFormat = Pick<SurfaceTexture, 'tileWidthM' | 'tileLengthM' | 'formatSource'>;
@@ -89,6 +91,30 @@ export function tileFormatM(row: { attributes?: unknown; metadata?: unknown }): 
   }
 
   return { tileWidthM: DEFAULT_TILE_M, tileLengthM: DEFAULT_TILE_M, formatSource: 'default' };
+}
+
+/**
+ * How many m² one pack covers, read where the field registry puts it. Null means NOT RECORDED —
+ * never a guess, because a wrong pack size is a valid number that under-orders a whole job.
+ */
+export function packCoverageM2(
+  row: { attributes?: unknown; metadata?: unknown },
+  pieceAreaM2: number | null,
+): number | null {
+  const attributes = obj(row.attributes);
+  const metadata = obj(row.metadata);
+  const read = (key: string): number | null => positive(attributes[key] ?? metadata[key]);
+
+  const direct = read('m2_per_box') ?? read('coverage_per_roll_m2');
+  if (direct) return direct;
+
+  const sqft = read('sqft_per_box');
+  if (sqft) return metres(sqft, 0.09290304);
+
+  const pieces = read('pieces_per_box') ?? read('planks_per_box');
+  if (pieces && pieceAreaM2 && pieceAreaM2 > 0) return Math.round(pieces * pieceAreaM2 * 1e6) / 1e6;
+
+  return null;
 }
 
 /** "60 × 60 cm", then "assumed" when defaulted, "photo" when a product photo is being tiled, "no image". */
