@@ -15296,5 +15296,219 @@
       }
     },
     "response": "{status: 'ok'|'fresh'|'not_enough_reviews'|'cooling_down', summary_text?: string, reviews_summarised?: number}"
+  },
+  {
+    "name": "trade-portal",
+    "tag": "CRM",
+    "summary": "A trade customer seeing their own account: statement, stock bands, reorder and a delegated admin",
+    "description": "THE TOKEN IS THE IDENTITY. Every read and write is scoped by what the link resolves to, and a company id in the request body is never trusted. The access pattern is a link unique to the recipient with no account for them to create and forget — which is what pastes into a WhatsApp thread.\n\nThe piece bespoke portals miss is DELEGATED ADMINISTRATION: `admin` on a portal account is the customer's own person, and only they decide a colleague's over-cap order. Over a cap is a REQUEST, not a refusal — the draft order is created either way, so nobody loses a basket to a limit their own office set, and the cap AS IT WAS is recorded so raising it later cannot rewrite why the request existed.\n\nThe statement reads `get_customer_open_balance` and nothing here re-totals it. Stock is shown as BANDS PER POOL unless the account's policy says otherwise: “40 m² available” is a lie if it is three tones. An invalid link gets one refusal shape, because a distinguishable refusal tells a guesser they are close.",
+    "security": [
+      "public",
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "name": "resolve",
+        "summary": "Public: open the account behind a link and read who the holder is",
+        "params": [
+          {
+            "name": "token",
+            "type": "string",
+            "required": true,
+            "desc": "The per-recipient access token"
+          }
+        ]
+      },
+      {
+        "name": "statement",
+        "summary": "Public: the balance and the open items that make it up",
+        "params": [
+          {
+            "name": "token",
+            "type": "string",
+            "required": true,
+            "desc": "The per-recipient token"
+          }
+        ]
+      },
+      {
+        "name": "stock",
+        "summary": "Public: availability per pool, banded or exact according to the account's policy",
+        "params": [
+          {
+            "name": "token",
+            "type": "string",
+            "required": true,
+            "desc": "The per-recipient token"
+          },
+          {
+            "name": "product_id",
+            "type": "string (uuid)",
+            "required": true,
+            "desc": "The product to report on"
+          }
+        ]
+      },
+      {
+        "name": "history",
+        "summary": "Public: past lines on this company's orders, for reorder",
+        "params": [
+          {
+            "name": "token",
+            "type": "string",
+            "required": true,
+            "desc": "The per-recipient token"
+          }
+        ]
+      },
+      {
+        "name": "approvals",
+        "summary": "Public: over-cap requests on this account",
+        "params": [
+          {
+            "name": "token",
+            "type": "string",
+            "required": true,
+            "desc": "The per-recipient token"
+          }
+        ]
+      },
+      {
+        "name": "place_order",
+        "summary": "Public: place a DRAFT order; over a cap it also raises an approval request",
+        "params": [
+          {
+            "name": "token",
+            "type": "string",
+            "required": true,
+            "desc": "The per-recipient token"
+          },
+          {
+            "name": "lines",
+            "type": "array",
+            "required": true,
+            "desc": "[{product_id, description, quantity, unit_price}] — a zero quantity is dropped"
+          },
+          {
+            "name": "notes",
+            "type": "string",
+            "required": false,
+            "desc": "Anything they want us to know"
+          }
+        ]
+      },
+      {
+        "name": "decide",
+        "summary": "Public: the customer's OWN administrator approves or declines a colleague's request",
+        "params": [
+          {
+            "name": "token",
+            "type": "string",
+            "required": true,
+            "desc": "Must resolve to a portal user whose role is `admin`; anyone else is refused"
+          },
+          {
+            "name": "approval_id",
+            "type": "string (uuid)",
+            "required": true,
+            "desc": "The pending request"
+          },
+          {
+            "name": "decision",
+            "type": "string",
+            "required": true,
+            "desc": "approved | declined"
+          },
+          {
+            "name": "reason",
+            "type": "string",
+            "required": false,
+            "desc": "Why, in their words"
+          }
+        ]
+      },
+      {
+        "name": "mint_link",
+        "summary": "Authenticated: mint a per-recipient link. Ours to issue, so it needs a member",
+        "params": [
+          {
+            "name": "portal_user_id",
+            "type": "string (uuid)",
+            "required": true,
+            "desc": "Checked against the caller's workspace through the account; a mismatch 404s"
+          }
+        ]
+      }
+    ],
+    "request": [],
+    "response": "{ ok, token, expires_at } for mint_link; the resolved identity for resolve; { balance, open_items } for statement; { policy, pools } for stock; { ok, order_id, needs_approval, reason } for place_order"
+  },
+  {
+    "name": "ontology-propose-targets",
+    "tag": "Warehouse",
+    "summary": "Propose a target for the invoice terms the ontology cannot resolve",
+    "description": "Every unresolved binding carried `proposed_by = NULL`, so the work list was every unmatched invoice term waiting to be paired by hand. This reads a batch, asks a model and writes back CANDIDATES — a human still confirms, because confirming changes what products get classified as and therefore what they cost.\n\nThe rubric is a DB row (`prompt_type='tool'`, `category='ontology_propose'`), so what counts as a match is retunable without a deploy, and the terms are fenced as untrusted DATA. The model may not name a binding it was not given or a company that does not exist. Its most important rule is in the rubric verbatim: NEVER match a brand to its distributor — doing that once brands every one of that maker's products with the distributor's name, permanently. A term that is plainly a brand with no CRM row is proposed as a NEW manufacturer and left `unresolved`, since a candidate with no target reads as a decision waiting for a click when it is a company waiting to be created.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "workspace_id",
+        "type": "string (uuid)",
+        "required": true,
+        "desc": "Reconciled against the caller — a mismatch 404s"
+      },
+      {
+        "name": "concept_type",
+        "type": "string",
+        "required": false,
+        "desc": "manufacturer (default) | supplier"
+      },
+      {
+        "name": "limit",
+        "type": "number",
+        "required": false,
+        "desc": "Batch size, capped at 25: a hundred answers in one turn is one nobody reviews"
+      }
+    ],
+    "response": "{ ok, considered, proposed_existing, proposed_new_party, left_unknown, results, note }"
+  },
+  {
+    "name": "intake-enrich-products",
+    "tag": "Warehouse",
+    "summary": "Drain the products intake marked for enrichment, from a URL we already hold",
+    "description": "Approving a queued supplier line never crawls: it stamps `metadata.enrichment = {status:'pending'}` and returns, so a slow or failed crawl cannot hold up a receipt. This is the drain, and it CLAIMS its batch — the stamp is the claim, so two runs cannot enrich one product twice.\n\nIt reads only a URL WE ALREADY HOLD: the product's own link, or its brand's site. Searching the open web for a spec sheet by name is a guessed match, and a wrong specification on the right-looking product is a valid-looking value nothing downstream can catch. A product with nowhere to look is recorded as `no_source`; a page that is not confidently about the product writes NOTHING.\n\nFindings are CLAIMS: they land in `attributes_raw` under `web_enrichment` with their source and confidence, and the existing nightly canonicalization pass is what promotes them into `attributes` — never into `metadata`, where the supplier's own invoice facts live.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "workspace_id",
+        "type": "string (uuid)",
+        "required": true,
+        "desc": "Reconciled against the caller — a mismatch 404s"
+      },
+      {
+        "name": "limit",
+        "type": "number",
+        "required": false,
+        "desc": "Batch size, capped at 10"
+      }
+    ],
+    "response": "{ ok, claimed, enriched, no_source, low_confidence, failed, results, note }"
   }
 ]

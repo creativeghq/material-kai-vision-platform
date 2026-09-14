@@ -10,7 +10,7 @@ import {
   FolderOpen, Send, Settings, UserPlus, Receipt, FilePlus, FolderPlus,
   MessageSquarePlus, Megaphone, LayoutTemplate, Store, Landmark, UserMinus,
   CalendarClock, Timer, ClipboardCheck,
-  Boxes, TrendingUp, Ship, Truck, ArrowLeftRight, ClipboardList,
+  Boxes, TrendingUp, Ship, Truck, ArrowLeftRight, ClipboardList, MapPin, Scale,
   Calculator, Flame, Thermometer,
   Radar, Search, PenTool, Activity,
   Wand2, Lightbulb, ListChecks, PauseCircle, Workflow,
@@ -136,9 +136,12 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
     { label: 'Setup', to: '/marketing/email?tab=setup', icon: Settings },
   ],
   // Warehouse (nav id 'stock', route /warehouse) — src/modules/stock/pages/StockPage.tsx tabs:
-  // overview | inventory | resupply | inbound | dispatch | movements | counts (URL-backed + validated).
+  // overview | inventory | locations | valuation | resupply | inbound | dispatch | movements |
+  // counts (URL-backed + validated).
   stock: [
     { label: 'Inventory', to: '/warehouse?tab=inventory', icon: Boxes },
+    { label: 'Locations', to: '/warehouse?tab=locations', icon: MapPin },
+    { label: 'Valuation', to: '/warehouse?tab=valuation', icon: Scale },
     { label: 'Resupply', to: '/warehouse?tab=resupply', icon: TrendingUp },
     { label: 'Inbound', to: '/warehouse?tab=inbound', icon: Ship },
     { label: 'Dispatch', to: '/warehouse?tab=dispatch', icon: Truck },

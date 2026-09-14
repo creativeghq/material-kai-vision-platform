@@ -195,6 +195,16 @@ Deno.serve(withApiLogging('ontology-propose-targets', async (req) => {
       user_id: userId, workspace_id: workspaceId, module_slug: 'stock',
       operation_type: 'ontology_propose', model_name: model,
       input_tokens: inTok, output_tokens: outTok, total_cost: billedUsd,
+      // `ops.silent_zero_provider` skips a row with no `success` key, so a run that proposed
+      // NOTHING would be invisible to the one probe that would notice the model refusing
+      // everything. Derived from the outcome, never hardcoded true.
+      metadata: {
+        success: existing + minted > 0,
+        considered: bindings.length,
+        proposed_existing: existing,
+        proposed_new_party: minted,
+        left_unknown: skipped,
+      },
     });
   } catch (e) { console.warn('[ontology-propose-targets] usage log failed:', e); }
   if (credits < CEILING) {
