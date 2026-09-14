@@ -11,6 +11,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/core/ui/t
 import { HubRailSectionLabel } from '@/components/core/hub';
 import { Skeleton } from '@/components/core/ui/skeleton';
 import { OverviewSection } from '../components/OverviewSection';
+import { InstallerQualityCard } from '../components/InstallerQualityCard';
 import { EmployeesSection } from '../components/EmployeesSection';
 import { DepartmentsSection } from '../components/DepartmentsSection';
 import { TimeOffSection } from '../components/TimeOffSection';
@@ -120,7 +121,12 @@ export default function HRPage() {
             <TabsContent value="separations" forceMount={fm('separations')} className="mt-0 space-y-4 data-[state=inactive]:hidden"><SeparationsSection {...sectionProps} /></TabsContent>
             <TabsContent value="recruitment" forceMount={fm('recruitment')} className="mt-0 space-y-4 data-[state=inactive]:hidden"><RecruitmentSection {...sectionProps} /></TabsContent>
             <TabsContent value="onboarding" forceMount={fm('onboarding')} className="mt-0 space-y-4 data-[state=inactive]:hidden"><OnboardingSection {...sectionProps} /></TabsContent>
-            <TabsContent value="documents" forceMount={fm('documents')} className="mt-0 space-y-4 data-[state=inactive]:hidden"><DocumentsSection {...sectionProps} /></TabsContent>
+            <TabsContent value="documents" forceMount={fm('documents')} className="mt-0 space-y-4 data-[state=inactive]:hidden">
+              <DocumentsSection {...sectionProps} />
+              {/* #437 -- rework per fitter and the documents that lapse. No field-service product
+                  tracks certification expiry, and both Greek ενημερότητες stop a site. */}
+              <InstallerQualityCard workspaceId={ws} canManage={canManage} />
+            </TabsContent>
             <TabsContent value="assets" forceMount={fm('assets')} className="mt-0 space-y-4 data-[state=inactive]:hidden"><CompanyAssetsPanel workspaceId={ws} canManage={canManage} context="hr" /></TabsContent>
             <TabsContent value="payroll" forceMount={fm('payroll')} className="mt-0 space-y-4 data-[state=inactive]:hidden"><PayrollSection {...sectionProps} /></TabsContent>
             <TabsContent value="accounting" forceMount={fm('accounting')} className="mt-0 space-y-4 data-[state=inactive]:hidden"><AccountingSection {...sectionProps} /></TabsContent>

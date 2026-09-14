@@ -7,6 +7,7 @@ import { PartyWorkTab } from '@/modules/crm/components/PartyWorkTab';
 import { WarrantiesTab } from '@/components/business/crm/WarrantiesTab';
 import { SampleLoansCard } from '@/modules/crm/components/SampleLoansCard';
 import { SupplierEprCard } from '@/modules/crm/components/SupplierEprCard';
+import { WarrantyClaimsCard } from '@/modules/crm/components/WarrantyClaimsCard';
 import { resolveRecordTab } from '@/modules/crm/recordTabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
 import { PartyAccountTabs } from '@/modules/finance/components/PartyAccountTabs';
@@ -1248,6 +1249,12 @@ export const CompanyDetailPage: React.FC = () => {
                   ...(activeWorkspaceId ? [{
                     id: 'epr', label: 'Packaging EPR', icon: PackageOpen, group: 'After sale',
                     node: <SupplierEprCard workspaceId={activeWorkspaceId} companyId={company.id} />,
+                  }] : []),
+                  /* #437 -- our workmanship, a failed product, or a change of mind. Three money
+                     outcomes that were all booked as "a job". */
+                  ...(activeWorkspaceId ? [{
+                    id: 'callbacks', label: 'Callbacks', icon: Wrench, group: 'After sale',
+                    node: <WarrantyClaimsCard workspaceId={activeWorkspaceId} companyId={company.id} />,
                   }] : []),
                 ]}
               />

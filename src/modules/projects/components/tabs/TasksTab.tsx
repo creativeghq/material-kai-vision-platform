@@ -32,6 +32,9 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/utils/datetime';
 import {
+  warrantyClaimService, taskGateBlocks,
+} from '@/modules/crm/services/warrantyClaimService';
+import {
   projectsService,
   type ProjectTaskWithSubtasks,
   type ProjectTask,
@@ -167,10 +170,24 @@ export const TasksTab: React.FC<TasksTabProps> = ({ projectId, isOwner = true })
 
   const handleStatusChange = async (id: string, status: TaskStatus) => {
     try {
+      // #437 -- a job cannot be completed while a mandatory step is neither done nor explained.
+      // The server refuses it too; asking first is what turns a raw refusal into the sentence that
+      // says which steps and that a reason is an acceptable answer.
+      if (status === 'done') {
+        const gate = await warrantyClaimService.taskGate(id);
+        if (taskGateBlocks(gate)) {
+          toast({ title: 'Mandatory steps outstanding', description: gate.reason, variant: 'destructive' });
+          return;
+        }
+      }
       await projectsService.updateTask(id, { status });
       await load();
-    } catch (_err) {
-      toast({ title: 'Failed to update task', variant: 'destructive' });
+    } catch (err) {
+      toast({
+        title: 'Failed to update task',
+        description: err instanceof Error ? err.message : undefined,
+        variant: 'destructive',
+      });
     }
   };
 
