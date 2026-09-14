@@ -16,6 +16,7 @@ import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { useToast } from '@/hooks/use-toast';
 import {
   posInterconnectionService, DECLARATION_LABEL, declarationNeedsAttention,
+  DECLARATION_DUTY_IS_OPEN,
   type DeclarationPosition,
 } from '@/modules/finance/services/posInterconnectionService';
 
@@ -128,13 +129,16 @@ export const ErpDeclarationCard: React.FC<{ workspaceId: string }> = ({ workspac
                 </span>
               </div>
               <p>{position.reason}</p>
+              {/* #448 -- the duty follows whoever BUILDS and supports the programme, and we reach
+                  AADE through a provider. Which of us files it is theirs to confirm. */}
+              <p>{DECLARATION_DUTY_IS_OPEN}</p>
               <p>{position.legal_basis}</p>
             </div>
 
             {position.rows.length === 0 && (
               <HubEmptyState
                 title="No version declared"
-                description="Α.1054 attaches to whoever builds and technically supports the programme — which for an in-house ERP is still somebody. Record each released version here and file it before release."
+                description="Α.1054 attaches to whoever builds and technically supports the programme. We reach AADE through a certified provider, so ask them whether they already hold it before filing — and record the answer here either way."
               />
             )}
 

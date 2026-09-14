@@ -20,6 +20,7 @@ export type {
 } from '@/modules/finance/posInterconnectionRules';
 export {
   INTERCONNECTION_LABEL, TERMINAL_VERDICT_LABEL, ROUTE_LABEL, DECLARATION_LABEL,
+  DECLARATION_DUTY_IS_OPEN,
   SIGNATURE_VERDICT_LABEL, MATCHING_WINDOW_HOURS, AUTONOMY_RULE, BRANCH_IS_IDENTITY,
   EFTPOS_PREPAYMENT_CODE, EFTPOS_RECEIPT_TYPE,
   interconnectionNeedsAttention, interconnectionIsBreach, declarationNeedsAttention,

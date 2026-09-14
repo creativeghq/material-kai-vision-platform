@@ -13,6 +13,7 @@ import { StockOverviewSection } from '../components/StockOverviewSection';
 import { MovementsSection } from '../components/MovementsSection';
 import { StockCountsSection } from '../components/StockCountsSection';
 import { ResupplySection } from '../components/ResupplySection';
+import { VerticalGapsPanel } from '../components/VerticalGapsPanel';
 import { InboundSection } from '../components/InboundSection';
 import { StockValuationSection } from '../components/StockValuationSection';
 import { StockPoolsPanel } from '../components/StockPoolsPanel';
@@ -108,6 +109,9 @@ export default function StockPage() {
             </TabsContent>
             <TabsContent value="resupply" className="mt-0 space-y-4">
               <ResupplySection workspaceId={ws} />
+              {/* #442 -- a container committed now and drawn down for months, stock held with a
+                  date on it, and material out being cut. All three were integers or nothing. */}
+              <VerticalGapsPanel workspaceId={ws} />
             </TabsContent>
             <TabsContent value="inbound" className="mt-0 space-y-4">
               <InboundSection workspaceId={ws} />

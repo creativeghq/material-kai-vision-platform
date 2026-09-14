@@ -76,6 +76,7 @@ export interface DeclarationPosition {
   filed: number;
   overdue: number;
   without_iris: number;
+  open_question?: string;
   legal_basis: string;
   rows: DeclarationRow[];
 }
@@ -140,8 +141,18 @@ export const ROUTE_LABEL: Record<InterconnectionRoute, string> = {
   a1155: 'Α.1155 — the ERP tunnels Α.1098 through itself',
 };
 
+/**
+ * WHO owes the Α.1054 declaration is genuinely open. The duty follows whoever builds and
+ * technically supports the programme, and we reach AADE through a certified provider — so the
+ * provider may already hold it for the interconnection. This register holds the answer; it does
+ * not assert one, and filing twice is as wrong as not filing.
+ */
+export const DECLARATION_DUTY_IS_OPEN =
+  'We reach AADE through a certified provider, so whether they file this on our behalf is a '
+  + 'question to put to them before the next release — not something to assume either way.';
+
 export const DECLARATION_LABEL: Record<DeclarationStatus, string> = {
-  undetermined: 'Nothing declared',
+  undetermined: 'Who owes it is unsettled',
   overdue: 'Released and not filed',
   pending: 'Recorded, not yet filed',
   filed: 'Filed with AADE',

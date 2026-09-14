@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import { stripComments } from '../helpers/stripComments';
 import {
   INTERCONNECTION_LABEL, TERMINAL_VERDICT_LABEL, ROUTE_LABEL, DECLARATION_LABEL,
+  DECLARATION_DUTY_IS_OPEN,
   SIGNATURE_VERDICT_LABEL, MATCHING_WINDOW_HOURS, AUTONOMY_RULE, BRANCH_IS_IDENTITY,
   EFTPOS_PREPAYMENT_CODE, EFTPOS_RECEIPT_TYPE,
   interconnectionNeedsAttention, interconnectionIsBreach, declarationNeedsAttention,
@@ -83,6 +84,8 @@ describe('the compatibility declaration is a filing, not a feature', () => {
       status: 'undetermined', reason: '', versions: 0, filed: 0, overdue: 0, without_iris: 0,
       legal_basis: '', rows: [], ...over,
     });
+    // `undetermined` covers two different unknowns: nothing declared, and nobody having settled
+    // whether the PROVIDER files it for us. Both need an answer; neither is a pass.
     expect(declarationNeedsAttention(d({ status: 'undetermined' }))).toBe(true);
     expect(declarationNeedsAttention(d({ status: 'overdue' }))).toBe(true);
     expect(declarationNeedsAttention(d({ status: 'pending' }))).toBe(true);
@@ -96,6 +99,13 @@ describe('the compatibility declaration is a filing, not a feature', () => {
     expect(settings).toContain('ErpDeclarationCard');
     expect(settings).toContain('PosInterconnectionCard');
     expect(erpCard).toContain('Α.1054');
+  });
+
+  it('who owes the declaration is presented as open, not as ours', () => {
+    // We reach AADE through a certified provider. Asserting the duty is ours could mean filing
+    // twice; assuming it is theirs could mean not filing at all.
+    expect(erpCard).toContain('DECLARATION_DUTY_IS_OPEN');
+    expect(DECLARATION_DUTY_IS_OPEN).toMatch(/question to put to them/);
   });
 
   it('a failed read is unknown, not "nothing is due"', () => {
