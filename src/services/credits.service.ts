@@ -22,6 +22,14 @@ export interface CreditTransaction {
   description?: string;
   metadata?: any;
   created_at: string;
+  /**
+   * The normalized operation token, computed server-side by
+   * `public.operation_token(credit_transactions)`. Read it rather than
+   * `metadata.operation_type` so a row is categorised the same way here and in the
+   * spend summary — the raw value still carries the `cron_` wrapper, the
+   * reserve/refund suffix and any `:target` suffix.
+   */
+  operation_token: string | null;
 }
 
 export interface AIUsageLog {
@@ -69,30 +77,11 @@ export interface GrantResult {
   error_message?: string;
 }
 
-/**
- * Maps a raw operation_type / transaction_type token into a human-friendly
- * category label for the usage-history UI. Prefix-matched so new sub-operations
- * (e.g. job_research.*) group without a code change.
- */
-export function creditOperationCategory(op: string | null | undefined): string {
-  const key = (op ?? '').toLowerCase();
-  if (!key) return 'Other';
-
-  const startsWith = (...prefixes: string[]) => prefixes.some((p) => key.startsWith(p));
-
-  if (startsWith('agent_chat')) return 'AI Assistant';
-  if (startsWith('interior_video', 'veo_')) return 'Video Generation';
-  if (startsWith('interior_')) return 'Interior Design';
-  if (startsWith('gemini_')) return 'Image Generation';
-  if (startsWith('vr_', 'worldlabs')) return '3D / VR Worlds';
-  if (startsWith('image_segment', 'sam-segment', 'pbr', 'generate-pbr')) return 'Image & Material Tools';
-  if (startsWith('presentation_sheet')) return 'Presentation Sheets';
-  if (startsWith('job_research')) return 'Job Research';
-  if (startsWith('mention_monitoring')) return 'Mention Monitoring';
-  if (startsWith('price', 'public_price', 'market')) return 'Price Monitoring';
-  if (startsWith('seo')) return 'SEO Toolkit';
-  return 'Other';
-}
+export {
+  CREDIT_SPEND_CATEGORIES,
+  creditOperationCategory,
+  type CreditSpendCategoryLabel,
+} from './creditCategories';
 
 export const creditsAPI = {
   /**
@@ -135,7 +124,7 @@ export const creditsAPI = {
 
     const { data, error, count } = await supabase
       .from('credit_transactions')
-      .select('*', { count: 'exact' })
+      .select('*, operation_token', { count: 'exact' })
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
