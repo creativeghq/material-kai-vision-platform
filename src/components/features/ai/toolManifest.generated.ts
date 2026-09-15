@@ -309,6 +309,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     description: 'Call one of the platform\'s own API endpoints, as the signed-in user, for work no dedicated tool covers.',
     params: [
       { name: 'endpoint', type: 'string', optional: false, description: 'The endpoint name from discover_platform_api, e.g. "crm-api".' },
+      { name: 'path', type: 'string', optional: true, description: 'Sub-path for an endpoint that lists routes, e.g. "companies" on crm-api. Omit unless discover_platform_api showed routes.' },
       { name: 'method', type: 'string', optional: true, description: 'HTTP method (default POST). Must be one the endpoint lists.' },
       { name: 'body', type: 'object', optional: true, description: 'JSON body, built from the endpoint\'s listed fields.' },
       { name: 'reason', type: 'string', optional: true, description: 'One line on what the user asked for — shown on the approval card.' },

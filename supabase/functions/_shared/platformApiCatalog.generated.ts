@@ -1,7 +1,7 @@
 // GENERATED — do not edit here. Regenerate: npm run api:catalog (part of gen:all).
 //
 // The platform edge endpoints a signed-in user's own token can call, derived from
-// scripts/edge-endpoints.json (itself generated). Cron-secret, admin-secret and
+// scripts/edge-endpoints.json. Cron-secret, admin-secret and
 // webhook-signed endpoints are absent by construction: they carry a different security
 // scheme, so no edit here is what keeps them out of the agent's reach.
 
@@ -18,6 +18,8 @@ export interface PlatformApiEndpoint {
   methods: readonly string[];
   summary: string;
   description?: string;
+  /** Sub-paths this endpoint routes on. Present means a path is REQUIRED. */
+  routes?: readonly string[];
   fields?: Record<string, PlatformApiField>;
 }
 
@@ -306,7 +308,15 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "DELETE"
     ],
     "summary": "REST CRM resource router for companies, contacts, users, and Stripe.",
-    "description": "Path-routed REST API dispatching to four resource handlers: /companies (GET/POST/PATCH/DELETE for company CRUD, requires admin or factory role), /contacts (contact CRUD), /users (user profile CRUD), /stripe (Stripe customer/subscription operations). Each handler performs its own auth and RLS enforcement."
+    "description": "Path-routed REST API dispatching to four resource handlers: /companies (GET/POST/PATCH/DELETE for company CRUD, requires admin or factory role), /contacts (contact CRUD), /users (user profile CRUD), /stripe (Stripe customer/subscription operations). Each handler performs its own auth and RLS enforcement.",
+    "routes": [
+      "companies",
+      "contacts",
+      "users",
+      "stripe",
+      "address-units",
+      "google-business"
+    ]
   },
   {
     "name": "crm-company-embedding-backfill",
@@ -445,7 +455,18 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Customer self-service view of their own invoices, receipts and orders",
-    "description": "Any authenticated user (customer-facing, not admin-gated). Resolves the caller's linked crm_contacts (and their businesses via crm_company_contacts), then returns strictly the documents whose counterparty is one of those — issued invoices/retail receipts, payment receipts, and sales orders — with fresh 7-day signed PDF URLs. Runs under service role because customers are not workspace members."
+    "description": "Any authenticated user (customer-facing, not admin-gated). Resolves the caller's linked crm_contacts (and their businesses via crm_company_contacts), then returns strictly the documents whose counterparty is one of those — issued invoices/retail receipts, payment receipts, and sales orders — with fresh 7-day signed PDF URLs. Runs under service role because customers are not workspace members.",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "order_detail",
+          "reorder"
+        ],
+        "required": true,
+        "description": "Which operation to run."
+      }
+    }
   },
   {
     "name": "finance-digest-aggregate",
@@ -1291,7 +1312,25 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "GET"
     ],
     "summary": "Google Search Console for connected websites (OAuth + performance sync)",
-    "description": "Connects a user_website to a Google Search Console property and pulls first-party search-analytics (query/page/clicks/impressions/ctr/position) into gsc_performance. OAuth is SERVER-SIDE: Google's redirect_uri points at THIS function (GET ?code&state); it exchanges the code and 302s back to /profile?tab=websites&gsc=<connected|pick_property|error>. This avoids the SPA's supabase-js (detectSessionI"
+    "description": "Connects a user_website to a Google Search Console property and pulls first-party search-analytics (query/page/clicks/impressions/ctr/position) into gsc_performance. OAuth is SERVER-SIDE: Google's redirect_uri points at THIS function (GET ?code&state); it exchanges the code and 302s back to /profile?tab=websites&gsc=<connected|pick_property|error>. This avoids the SPA's supabase-js (detectSessionI",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "authorize",
+          "list_properties",
+          "set_property",
+          "ga_list_properties",
+          "ga_set_property",
+          "ga_sync",
+          "inspect_urls",
+          "sync",
+          "disconnect"
+        ],
+        "required": true,
+        "description": "Which operation to run."
+      }
+    }
   },
   {
     "name": "health-check",
@@ -1458,7 +1497,28 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Greek company lookup by ΑΦΜ via the ΓΕΜΗ (GEMI) OpenData REST API.",
-    "description": "Queries the public ΓΕΜΗ OpenData API (GET /companies?afm=…) for the Greek Commercial Registry record — GEMI number, legal form, status, incorporation date, activities. Unlike the ΑΑΔΕ RgWsPublic2 service, ΓΕΜΗ OpenData is public open data behind a single operator-issued application key (env GEMI_API_KEY → platform_secrets), so ONE platform key serves every workspace with no per-tenant quota or aud"
+    "description": "Queries the public ΓΕΜΗ OpenData API (GET /companies?afm=…) for the Greek Commercial Registry record — GEMI number, legal form, status, incorporation date, activities. Unlike the ΑΑΔΕ RgWsPublic2 service, ΓΕΜΗ OpenData is public open data behind a single operator-issued application key (env GEMI_API_KEY → platform_secrets), so ONE platform key serves every workspace with no per-tenant quota or aud",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "creds-status"
+        ],
+        "description": "Omit to run a lookup; creds-status reports whether credentials are set."
+      },
+      "afm": {
+        "type": "string",
+        "description": "Greek VAT number (ΑΦΜ) to look up, digits only."
+      },
+      "company_id": {
+        "type": "string",
+        "description": "Existing CRM company to enrich instead of passing an afm."
+      },
+      "workspace_id": {
+        "type": "string",
+        "description": "Workspace the company belongs to."
+      }
+    }
   },
   {
     "name": "notification-dispatcher",
@@ -1653,7 +1713,26 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Authoritative compute for the Blueprint estimating engine (plans, pricing, versions, quotes)",
-    "description": "The only writer of persisted plan-line prices, plan versions, and plan->quote items (#242). User JWT or service-role secret; every write re-binds to the plan/project workspace via userCanAccessWorkspace. Resolves quantities from formulas + rates from product_prices, expands sub-blueprints, and syncs to quotes / purchase items."
+    "description": "The only writer of persisted plan-line prices, plan versions, and plan->quote items (#242). User JWT or service-role secret; every write re-binds to the plan/project workspace via userCanAccessWorkspace. Resolves quantities from formulas + rates from product_prices, expands sub-blueprints, and syncs to quotes / purchase items.",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "create-from-blueprint",
+          "create-plan-from-kitchen-estimate",
+          "rescale",
+          "reprice",
+          "save-version",
+          "restore-version",
+          "create-quote-from-plan",
+          "add-section-from-blueprint",
+          "generate-material-list",
+          "create-change-order"
+        ],
+        "required": true,
+        "description": "Which operation to run."
+      }
+    }
   },
   {
     "name": "quotes-api",
@@ -1664,7 +1743,24 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "PATCH"
     ],
     "summary": "REST API for quote requests (customer-facing)",
-    "description": "Path-routed REST handler for customer quote requests: create one from a quote, list/get the caller’s own, and update its status. All operations scoped to the authenticated user. The /proposals routes were removed with the `proposals` table on 2026-08-30 (#378 N9) — it was an abandoned second quoting system that never held a row. Live quotes are `quotes` / `quote_items`."
+    "description": "Path-routed REST handler for customer quote requests: create one from a quote, list/get the caller’s own, and update its status. All operations scoped to the authenticated user. The /proposals routes were removed with the `proposals` table on 2026-08-30 (#378 N9) — it was an abandoned second quoting system that never held a row. Live quotes are `quotes` / `quote_items`.",
+    "routes": [
+      "quote-requests"
+    ],
+    "fields": {
+      "quote_id": {
+        "type": "string",
+        "description": "Quote request id, for GET/PATCH on quote-requests/{id}."
+      },
+      "notes": {
+        "type": "string",
+        "description": "Free-text notes when raising a quote request."
+      },
+      "status": {
+        "type": "string",
+        "description": "New status, on PATCH quote-requests/{id}."
+      }
+    }
   },
   {
     "name": "real-estate-api",
@@ -1673,7 +1769,112 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Real Estate module — listings, leads, viewings, offers, sales, lettings, investments and deals",
-    "description": "Single action router for the Real Estate module (#249/#281). Gate order per request: `authenticate` → `userCanAccessWorkspace` (404 on mismatch) → `isModuleEnabled('real-estate')` (404) → `assertEntitled(ws, 'real-estate')` (402) → Real-Estate RBAC (`canView` / `canManage`).\n\n**Agent scoping.** A broker sees every listing in the workspace. A `realestate_agent` sees a listing only when they are its"
+    "description": "Single action router for the Real Estate module (#249/#281). Gate order per request: `authenticate` → `userCanAccessWorkspace` (404 on mismatch) → `isModuleEnabled('real-estate')` (404) → `assertEntitled(ws, 'real-estate')` (402) → Real-Estate RBAC (`canView` / `canManage`).\n\n**Agent scoping.** A broker sees every listing in the workspace. A `realestate_agent` sees a listing only when they are its",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "ping",
+          "dashboard",
+          "list-properties",
+          "get-property",
+          "create-property",
+          "update-property",
+          "delete-property",
+          "publish-property",
+          "draft-description",
+          "unpublish-property",
+          "photo-upload-url",
+          "add-photo",
+          "list-bookings",
+          "upsert-booking",
+          "delete-booking",
+          "upsert-booking-task",
+          "upsert-channel-link",
+          "rotate-ical-token",
+          "update-tenancy-lifecycle",
+          "rotate-tenant-portal-token",
+          "list-inspections",
+          "upsert-inspection",
+          "kyc-status",
+          "upsert-kyc-check",
+          "update-kyc-policy",
+          "list-commission-splits",
+          "upsert-commission-split",
+          "delete-commission-split",
+          "agent-commission-statement",
+          "list-routing-rules",
+          "upsert-routing-rule",
+          "delete-routing-rule",
+          "import-listings",
+          "listing-performance",
+          "document-upload-url",
+          "add-document",
+          "list-documents",
+          "delete-document",
+          "upsert-open-house",
+          "delete-open-house",
+          "analyze-photos",
+          "delete-photo",
+          "set-cover",
+          "reorder-photos",
+          "list-inquiries",
+          "convert-inquiry",
+          "update-inquiry",
+          "create-inquiry",
+          "delete-inquiry",
+          "delete-offer",
+          "delete-viewing",
+          "delete-tenancy",
+          "delete-maintenance",
+          "delete-sale",
+          "delete-investment",
+          "delete-contact-ext",
+          "list-viewings",
+          "create-viewing",
+          "update-viewing",
+          "add-interest",
+          "list-offers",
+          "create-offer",
+          "update-offer",
+          "accept-offer",
+          "complete-sale",
+          "list-sales",
+          "link-sale-invoice",
+          "contact-properties",
+          "list-sellers",
+          "list-buyer-requirements",
+          "upsert-buyer-requirement",
+          "match-buyer-requirement",
+          "buyers-for-property",
+          "delete-buyer-requirement",
+          "get-contact-ext",
+          "upsert-contact-ext",
+          "get-feed-settings",
+          "update-feed-settings",
+          "rotate-feed-token",
+          "rotate-inbound-token",
+          "list-tenancies",
+          "upsert-tenancy",
+          "list-rent-charges",
+          "generate-rent-schedule",
+          "mark-rent-paid",
+          "list-maintenance",
+          "upsert-maintenance",
+          "landlord-statement",
+          "get-investment",
+          "upsert-investment",
+          "list-investments",
+          "invoice-rent-charge",
+          "renew-tenancy",
+          "cma-report",
+          "vendor-report",
+          "send-vendor-report"
+        ],
+        "required": true,
+        "description": "Which operation to run."
+      }
+    }
   },
   {
     "name": "real-estate-assessment",
@@ -1711,7 +1912,31 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "DELETE"
     ],
     "summary": "Collaborative filtering interaction tracking, recommendations, and analytics.",
-    "description": "Path-routed REST API. POST /track-interaction records user-material interactions and invalidates the user's recommendation cache. GET /for-user returns cached recommendation scores or indicates Python service is needed for fresh computation. GET /similar-materials/{id} computes item-item similarity from interaction co-occurrence. GET /analytics/{workspace_id} returns interaction counts by type and"
+    "description": "Path-routed REST API. POST /track-interaction records user-material interactions and invalidates the user's recommendation cache. GET /for-user returns cached recommendation scores or indicates Python service is needed for fresh computation. GET /similar-materials/{id} computes item-item similarity from interaction co-occurrence. GET /analytics/{workspace_id} returns interaction counts by type and",
+    "routes": [
+      "track-interaction"
+    ],
+    "fields": {
+      "workspace_id": {
+        "type": "string",
+        "required": true,
+        "description": "Workspace the interaction belongs to."
+      },
+      "material_id": {
+        "type": "string",
+        "required": true,
+        "description": "Material the user interacted with."
+      },
+      "interaction_type": {
+        "type": "string",
+        "required": true,
+        "description": "Kind of interaction; the endpoint validates against its own list."
+      },
+      "interaction_value": {
+        "type": "number",
+        "description": "Weight of the interaction. Defaults to 1.0."
+      }
+    }
   },
   {
     "name": "reset-platform",
@@ -1848,7 +2073,31 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Read a photographed receipt into expense fields, and keep the image on the bill",
-    "description": "Turns a photo or PDF of a receipt into the fields an expense needs (#379). The reader is a forced Anthropic tool call over the image; credits are debited BEFORE the model runs, and the prompt is loaded from the database with no code fallback. It deliberately writes nothing: the caller creates the trip line or the supplier bill and confirms the figures, because a confident wrong reading is the fail"
+    "description": "Turns a photo or PDF of a receipt into the fields an expense needs (#379). The reader is a forced Anthropic tool call over the image; credits are debited BEFORE the model runs, and the prompt is loaded from the database with no code fallback. It deliberately writes nothing: the caller creates the trip line or the supplier bill and confirms the figures, because a confident wrong reading is the fail",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "scan",
+          "attach_bill",
+          "sign_bill"
+        ],
+        "required": true,
+        "description": "Which operation to run."
+      },
+      "workspace_id": {
+        "type": "string",
+        "description": "Workspace the receipt belongs to."
+      },
+      "data_base64": {
+        "type": "string",
+        "description": "The receipt image or PDF, base64 encoded."
+      },
+      "content_type": {
+        "type": "string",
+        "description": "MIME type of data_base64, e.g. image/jpeg."
+      }
+    }
   },
   {
     "name": "send-quote-email",
@@ -1881,7 +2130,29 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Unified SEO API — action-discriminated keyword research, planning, writing, analysis, and toolkit.",
-    "description": "Single POST endpoint routing on body.action to one of eight handlers: research, plan, write, analyze, pipeline, toolkit_audit, toolkit_research, page_ideas. All handlers require Supabase JWT auth and debit user credits. toolkit_audit also accepts x-cron-secret for cron-mode batch auditing."
+    "description": "Single POST endpoint routing on body.action to one of eight handlers: research, plan, write, analyze, pipeline, toolkit_audit, toolkit_research, page_ideas. All handlers require Supabase JWT auth and debit user credits. toolkit_audit also accepts x-cron-secret for cron-mode batch auditing.",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "research",
+          "plan",
+          "write",
+          "analyze",
+          "pipeline",
+          "toolkit_audit",
+          "toolkit_research",
+          "page_ideas",
+          "apply_fix",
+          "revert_fix",
+          "reanalyze",
+          "add_faq",
+          "score_url"
+        ],
+        "required": true,
+        "description": "Which operation to run."
+      }
+    }
   },
   {
     "name": "seo-content-freshness",
@@ -1926,7 +2197,18 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Site Health — homepage Lighthouse + on-page audit for a connected website",
-    "description": "Runs a synchronous homepage audit (DataForSEO instant-page + Google Lighthouse) via MIVAA's quick-page route and stores Core Web Vitals / SEO / accessibility / best-practices scores + failing-audit issues in website_health_audits. verify_jwt disabled so the weekly cron-run (x-cron-secret) works; the run action calls authenticate()+userCanAccessWorkspace(). The full multi-page OnPage crawl stays on"
+    "description": "Runs a synchronous homepage audit (DataForSEO instant-page + Google Lighthouse) via MIVAA's quick-page route and stores Core Web Vitals / SEO / accessibility / best-practices scores + failing-audit issues in website_health_audits. verify_jwt disabled so the weekly cron-run (x-cron-secret) works; the run action calls authenticate()+userCanAccessWorkspace(). The full multi-page OnPage crawl stays on",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "crawl-start",
+          "crawl-sync"
+        ],
+        "required": true,
+        "description": "Which operation to run."
+      }
+    }
   },
   {
     "name": "stock-api",
@@ -1935,7 +2217,49 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Stock / warehouse module - inventory, movements, counts, shipments and forecasting",
-    "description": "Stock Management API. Promotes the warehouse/inventory feature (previously a Finance tab) into a first-class PAID ADD-ON, mirroring hr-api (#252). Gate order: authenticate -> userCanAccessWorkspace -> isModuleEnabled('stock') -> assertEntitled(ws,'stock'), then finance-manager RBAC on writes."
+    "description": "Stock Management API. Promotes the warehouse/inventory feature (previously a Finance tab) into a first-class PAID ADD-ON, mirroring hr-api (#252). Gate order: authenticate -> userCanAccessWorkspace -> isModuleEnabled('stock') -> assertEntitled(ws,'stock'), then finance-manager RBAC on writes.",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "overview",
+          "valuation",
+          "list-warehouses",
+          "ensure-default-warehouse",
+          "create-warehouse",
+          "list-items",
+          "list-low-stock",
+          "create-item",
+          "update-item",
+          "delete-item",
+          "adjust-stock",
+          "transfer",
+          "forecast",
+          "ai-forecast",
+          "reorder",
+          "import-opening-stock",
+          "list-movements",
+          "list-counts",
+          "get-count",
+          "create-count",
+          "update-count-line",
+          "post-count",
+          "cancel-count",
+          "shipment-list",
+          "shipment-add",
+          "shipment-refresh",
+          "shipping-quotes-list",
+          "shipping-quote",
+          "shipment-remove",
+          "shipment-receive",
+          "list-pending",
+          "approve-pending",
+          "dismiss-pending"
+        ],
+        "required": true,
+        "description": "Which operation to run."
+      }
+    }
   },
   {
     "name": "stripe-api",
@@ -1999,7 +2323,26 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Propose a TARIC commodity code for catalog products",
-    "description": "Three stages, cheapest first: a supplier-declared HS/CN/TARIC code found in the product attributes is validated and applied directly; otherwise search_taric_codes shortlists candidates and Claude picks one through a forced tool call. The model result is NEVER written to products.taric_code — it lands in taric_code_suggested with a confidence for a human to confirm, because a tariff misclassificati"
+    "description": "Three stages, cheapest first: a supplier-declared HS/CN/TARIC code found in the product attributes is validated and applied directly; otherwise search_taric_codes shortlists candidates and Claude picks one through a forced tool call. The model result is NEVER written to products.taric_code — it lands in taric_code_suggested with a confidence for a human to confirm, because a tariff misclassificati",
+    "fields": {
+      "product_ids": {
+        "type": "array",
+        "required": true,
+        "description": "Products to classify. The backfill sweep is cron-only."
+      },
+      "chapters": {
+        "type": "array",
+        "description": "Narrow the shortlist to these 2-digit HS chapters."
+      },
+      "force": {
+        "type": "boolean",
+        "description": "Re-classify products that already carry a code or suggestion."
+      },
+      "llm": {
+        "type": "boolean",
+        "description": "Allow the paid stage C. Defaults true for an operator call."
+      }
+    }
   },
   {
     "name": "taric-reference-sync",
@@ -2067,7 +2410,19 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Sales trip-expense receipts: upload, sign, and render the expense PDF",
-    "description": "Service-role-backed receipt operations for sales trip-expense cards (receipts live in the private pdf-documents bucket and feed per-line finance approval / reimbursement to planned_payment). The caller is the authenticated trip owner; the function writes via service role."
+    "description": "Service-role-backed receipt operations for sales trip-expense cards (receipts live in the private pdf-documents bucket and feed per-line finance approval / reimbursement to planned_payment). The caller is the authenticated trip owner; the function writes via service role.",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "upload_receipt",
+          "sign_receipt",
+          "generate_pdf"
+        ],
+        "required": true,
+        "description": "Which operation to run."
+      }
+    }
   },
   {
     "name": "vies-validate",

@@ -39,6 +39,10 @@ export const PLATFORM_API_BLOCKED: readonly BlockedEndpoint[] = [
   { name: 'check-material-alerts', reason: 'A scheduled job body — it runs on its own timetable.' },
   { name: 'page-watches', reason: 'A scheduled job body — it runs on its own timetable.' },
   { name: 'finance-digest-aggregate', reason: 'A scheduled job body — it runs on its own timetable.' },
+  { name: 'seo-rank-tracker', reason: 'A scheduled job body — it runs on its own timetable.' },
+  { name: 'seo-domain-tracker', reason: 'A scheduled job body — it runs on its own timetable.' },
+  { name: 'seo-content-freshness', reason: 'A scheduled job body — it runs on its own timetable.' },
+  { name: 'seo-reports', reason: 'A scheduled job body — it runs on its own timetable.' },
   { name: 'notification-dispatcher', reason: 'Fans out notifications to people. Emit a flow event instead.' },
   {
     name: 'mivaa-gateway',
