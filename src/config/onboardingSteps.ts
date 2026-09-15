@@ -71,7 +71,7 @@ export const ONBOARDING_STEPS: readonly OnboardingStep[] = [
   {
     id: 'business',
     kind: 'setup',
-    navLabel: 'Business details',
+    navLabel: 'Business Details',
     title: 'Your business details',
     lede:
       'Every invoice, quote and delivery note you issue carries these, and so does the envelope '
@@ -100,7 +100,7 @@ export const ONBOARDING_STEPS: readonly OnboardingStep[] = [
   {
     id: 'workspace',
     kind: 'setup',
-    navLabel: 'Modules & team',
+    navLabel: 'Modules & Team',
     title: 'Turn on what you need, and bring your team',
     lede:
       'Most of the platform is opt-in. Switch on the modules you actually work with — the rest '
@@ -279,7 +279,7 @@ export const ONBOARDING_STEPS: readonly OnboardingStep[] = [
   {
     id: 'operations',
     kind: 'tour',
-    navLabel: 'Finance & people',
+    navLabel: 'Finance & People',
     title: 'Finance, warehouse and people',
     lede:
       'The ERP half. Money is derived in one place and formatted everywhere else, so a balance on '
@@ -340,8 +340,8 @@ export const ONBOARDING_STEPS: readonly OnboardingStep[] = [
   {
     id: 'more',
     kind: 'tour',
-    navLabel: 'Everything else',
-    title: 'And the rest, briefly',
+    navLabel: 'Wait, we are not done!',
+    title: 'Wait, we are not done!',
     lede:
       'You do not need any of this on day one. It is here so you know it exists when you want it.',
     icon: Activity,
