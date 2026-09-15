@@ -15,7 +15,7 @@ import { authenticate, isAdminAccess, userCanAccessWorkspace, listUserWorkspaceI
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { notConfiguredResponse } from '../_shared/api-provider-errors.ts';
 import { resolveWorkspaceEmailSender, checkWorkspaceSendQuota } from '../_shared/email-sender.ts';
-import { wrapInLayout, htmlToPlainText, DEFAULT_LAYOUT_HTML, LAYOUT_PREVIEW_SAMPLE, LayoutHasNoContentSlot } from '../_shared/email-layout.ts';
+import { wrapInLayout, htmlToPlainText, fillPlain, DEFAULT_LAYOUT_HTML, LAYOUT_PREVIEW_SAMPLE, LayoutHasNoContentSlot } from '../_shared/email-layout.ts';
 import { recordEmailEvent, DOCUMENT_ENTITY_TYPES } from '../_shared/document-events.ts';
 import type { DocumentEntityType } from '../_shared/document-events.ts';
 
@@ -653,7 +653,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         // A SLOT in the layout, not a prepend: prepended, it landed before `<!doctype html>`
         // on every template shipping a full document, which is invalid and clients drop it.
         const preheader = body.previewText
-          ? renderTemplateWithVariables(body.previewText, body.variables || {})
+          ? fillPlain(body.previewText, body.variables || {})
           : '';
 
         // From the UNWRAPPED body: derived after the wrap, the <style> block lands in the text part.

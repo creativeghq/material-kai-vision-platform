@@ -6,6 +6,7 @@ import {
   renderLayout,
   isFullDocument,
   htmlToPlainText,
+  fillPlain,
   layoutHasContentSlot,
   DEFAULT_LAYOUT_HTML,
   LAYOUT_PREVIEW_SAMPLE,
@@ -75,7 +76,6 @@ describe('email layout — the shell', () => {
 
 describe('email layout — whose brand', () => {
   it('a tenant sending from its own domain never inherits the operator shell', () => {
-    // Same rule as the Resend key (#357 AE-1).
     const operatorShell = '<html><body>OPERATOR CHROME {{content}}</body></html>';
     const tenant = wrapInLayout('<p>Invoice attached</p>', {
       kind: 'workspace',
@@ -95,8 +95,7 @@ describe('email layout — whose brand', () => {
   });
 
   it('only an operator send carries the platform colophon', () => {
-    // Assert on the rendered ELEMENT, not the class name: the stylesheet is shared, so
-    // `mk-colophon` appears in both and a looser check would pass with the line printed.
+    // The rendered ELEMENT, not the class name — the stylesheet is shared by both.
     const op = wrap('<p>x</p>').html;
     const ws = wrapInLayout('<p>x</p>', { kind: 'workspace', brand: BRAND }).html;
     expect(op).toContain('class="mk-colophon"');
@@ -133,6 +132,29 @@ describe('email layout — compliance slots', () => {
     expect(html).toContain('&lt;script&gt;');
   });
 
+  it('gives a full-document body its preheader too, inside <body>', () => {
+    // Every marketing template plus all four React templates ARE full documents.
+    const doc = '<!doctype html><html><head><title>t</title></head><body style="x"><p>Hi</p></body></html>';
+    const { html, source } = wrap(doc, { preheader: 'Preview me' });
+    expect(source).toBe('skipped_full_document');
+    const bodyAt = html.indexOf('<body');
+    expect(html.indexOf('Preview me')).toBeGreaterThan(bodyAt);
+    expect(html.indexOf('Preview me')).toBeLessThan(html.indexOf('<p>Hi</p>'));
+    expect(html.match(/<!doctype/gi)?.length).toBe(1);
+  });
+
+  it('escapes the preheader exactly once', () => {
+    const filled = fillPlain('From {{companyName}}', { companyName: 'Tiles & Stone' });
+    expect(filled).toBe('From Tiles & Stone');
+    const { html } = wrap('<p>x</p>', { preheader: filled });
+    expect(html).toContain('From Tiles &amp; Stone<');
+    expect(html).not.toContain('&amp;amp;');
+  });
+
+  it('leaves an unresolved token in fillPlain rather than blanking it', () => {
+    expect(fillPlain('Hi {{nope}}', {})).toBe('Hi {{nope}}');
+  });
+
   it('drops a slot nothing supplied rather than leaving the token in the mail', () => {
     expect(renderLayout('a{{content}}b{{nope}}c', { content: 'X' })).toBe('aXbc');
   });
@@ -152,8 +174,13 @@ describe('email layout — the plain-text alternative', () => {
     expect(text).toBe('One\n\nTwo\n\n• A\n\n• B');
   });
 
-  it('decodes entities the body carries', () => {
-    expect(htmlToPlainText('<p>Tiles &amp; Stone &euro;10</p>')).toContain('Tiles & Stone');
+  it('decodes entities the body carries, including the ones money is written with', () => {
+    const t = htmlToPlainText('<p>Tiles &amp; Stone &euro;4,820.00 &middot; &copy; 2026 &#8212; &#x20AC;5</p>');
+    expect(t).toBe('Tiles & Stone €4,820.00 · © 2026 — €5');
+  });
+
+  it('decodes &amp; last, so an escaped entity is not decoded twice', () => {
+    expect(htmlToPlainText('<p>&amp;lt;b&amp;gt;</p>')).toBe('&lt;b&gt;');
   });
 });
 
@@ -176,16 +203,17 @@ describe('email layout — one source, applied at the send chokepoint', () => {
   });
 
   it('wraps every send, not only the template path', () => {
-    // 112 of the last 113 sends carried raw HTML and no template.
+    // Anchor past the templateSlug block — `indexOf` alone passes with the wrap nested inside it.
     const wrapAt = apiSrc.indexOf('wrapInLayout(');
-    const templateAt = apiSrc.indexOf('if (body.templateSlug)');
-    expect(templateAt).toBeGreaterThan(-1);
-    expect(wrapAt).toBeGreaterThan(templateAt);
+    const afterTemplateBlock = apiSrc.indexOf("'Either html or text body must be provided'");
+    expect(afterTemplateBlock).toBeGreaterThan(-1);
+    expect(wrapAt).toBeGreaterThan(afterTemplateBlock);
   });
 
   it('derives the text alternative BEFORE the shell goes on', () => {
-    // Run over the wrapped document, the <style> block lands in the recipient's text part.
-    const textAt = apiSrc.indexOf('htmlToPlainText(htmlBody)');
+    // Pin the whole line: `htmlToPlainText(htmlBody)` also appears in the react_code branch
+    // above, which precedes the wrap whatever the wrap does.
+    const textAt = apiSrc.indexOf('if (!textBody && htmlBody) textBody = htmlToPlainText(htmlBody);');
     const wrapAt = apiSrc.indexOf('wrapInLayout(');
     expect(textAt).toBeGreaterThan(-1);
     expect(textAt).toBeLessThan(wrapAt);
