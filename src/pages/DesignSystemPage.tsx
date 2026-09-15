@@ -46,6 +46,7 @@ import {
   HubCellLink,
   HubDataTable,
   HubEmptyState,
+  HubFieldRow,
   HubFilterSelect,
   HubPanel,
   HubPanelAddAction,
@@ -440,6 +441,32 @@ export default function DesignSystemPage() {
                   />
                 </Card>
               </div>
+            </section>
+
+            <section>
+              <SectionHeader
+                title="Field row"
+                subtitle="Labelled controls on one baseline. The hint belongs to the row, never to a column."
+              />
+              <Card>
+                <CardContent className="pt-6" data-specimen="field-row">
+                  <HubFieldRow
+                    className="rounded-md border border-hairline bg-surface-sunken p-3"
+                    hint="A hint placed inside a column would make that column taller than its neighbours, and the row bottom-aligns — so every other control would be dragged down to this text."
+                  >
+                    <HubFieldRow.Field label="Search for" htmlFor="ds-fr-query" grow>
+                      <Input id="ds-fr-query" defaultValue="Aegean Interiors, Athens" />
+                    </HubFieldRow.Field>
+                    <HubFieldRow.Field label="Country" htmlFor="ds-fr-country" width="w-28">
+                      <Input id="ds-fr-country" placeholder="auto" />
+                    </HubFieldRow.Field>
+                    <HubFieldRow.Actions>
+                      <Button variant="ghost">Cancel</Button>
+                      <Button>Search</Button>
+                    </HubFieldRow.Actions>
+                  </HubFieldRow>
+                </CardContent>
+              </Card>
             </section>
           </>
         )}

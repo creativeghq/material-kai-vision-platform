@@ -456,8 +456,6 @@ export const RoomPlannerPanel: React.FC = () => {
               : <><MapIcon className="mr-1 h-3.5 w-3.5" />Floor plan</>}
           </Button>
 
-          {/* Lighting (#335). The presets already existed and only the material viewer could use
-              them; a plan is something you show a client, so it gets the same choice and keeps it. */}
           {layout && view === '3d' && (
             <div className="min-w-[10rem]">
               <Label className="text-xs">Lighting</Label>
@@ -486,8 +484,6 @@ export const RoomPlannerPanel: React.FC = () => {
             </div>
           )}
 
-          {/* The plan produces something (#341). Until now a finished arrangement was a closed
-              loop: real products at their real size, and nothing came out of it. */}
           {layout && (items.length > 0 || surfaces.length > 0) && (
             <Button
               variant="outline"
@@ -501,9 +497,7 @@ export const RoomPlannerPanel: React.FC = () => {
             </Button>
           )}
 
-          {/* Which ROOM this plan is of (#378 N8). Optional on purpose: a showroom arrangement and
-              the public /embed/planner have no project, which is why the column is nullable. Once
-              attached, the room states the dimensions and this plan stops carrying its own. */}
+          {/* Nullable on purpose: a showroom plan and the public /embed/planner have no project. */}
           {layout && (
             <div className="w-56">
               <Label className="text-xs">Room</Label>

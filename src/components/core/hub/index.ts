@@ -29,3 +29,5 @@ export { HubSegmented } from './HubSegmented';
 export type { HubSegment } from './HubSegmented';
 
 export { HubEmptyState } from './HubEmptyState';
+
+export { HubFieldRow } from './HubFieldRow';
