@@ -126,3 +126,26 @@ describe('ai_usage_logs attribution', () => {
       .toEqual([]);
   });
 });
+
+/**
+ * The billing write itself has two ways to vanish, and both leave a call that spent money and
+ * recorded nothing. Unlogged spend has no symptom by construction: every cost view reads a
+ * plausible zero, which is the silent-zero shape (CLAUDE.md, anti-regression rule 2).
+ */
+describe('ai-client books what it spends', () => {
+  const CLIENT = readFileSync(join(FN_DIR, '_shared', 'ai-client.ts'), 'utf8');
+
+  it('awaits the per-unit write instead of firing and forgetting', () => {
+    // The isolate is torn down when the handler returns, so a pending insert is discarded.
+    // 25 of 25 avatar renders were lost this way, with no warning on any of them.
+    expect(CLIENT).not.toMatch(/void _logUnitCall\(/);
+    expect((CLIENT.match(/await _logUnitCall\(/g) ?? []).length).toBeGreaterThan(0);
+  });
+
+  it('builds the logging client lazily, not at module load', () => {
+    // A module-load Deno.env.get reads whatever env held before the handler ran; a null client
+    // makes both loggers return at their first line. Every provider key here is already lazy.
+    expect(CLIENT).toMatch(/function _makeLogClient\(\)/);
+    expect(CLIENT).not.toMatch(/^const _logSupabase = /m);
+  });
+});

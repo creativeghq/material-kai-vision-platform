@@ -43,8 +43,27 @@ export interface OpenItem {
   pay_token: string | null;
 }
 
+/** What `get_customer_open_balance` answers. `net_balance` nets off unapplied customer credit. */
+export interface OpenBalance {
+  open_invoices_due?: number | string | null;
+  customer_credit?: number | string | null;
+  net_balance?: number | string | null;
+  currency?: string | null;
+}
+
+/**
+ * The balance is the LEDGER's figure and the open items are what makes it up — never a second
+ * total. Summing the lines re-derives `open_invoices_due` and silently drops the customer credit,
+ * so a customer sitting on an unapplied payment is shown more than they owe.
+ */
+export function statementBalance(b: OpenBalance | null | undefined): { amount: number | null; currency: string } {
+  const raw = b?.net_balance;
+  const n = typeof raw === 'number' ? raw : raw == null ? NaN : Number(raw);
+  return { amount: Number.isFinite(n) ? n : null, currency: (b?.currency ?? '').toString() };
+}
+
 export interface Statement extends PortalIdentity {
-  balance?: Record<string, unknown>;
+  balance?: OpenBalance;
   open_items?: OpenItem[];
   note?: string;
 }

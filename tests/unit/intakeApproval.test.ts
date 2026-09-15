@@ -43,10 +43,25 @@ describe('an old invoice is an archive, not a delivery', () => {
     expect(autoStockMode('2026-08-13', '2026-09-13')).toBe('catalog_only');
   });
 
-  it('a line with no document falls to receiving, and the operator can still say otherwise', () => {
-    // Absent a date there is nothing to judge age by, and refusing to post a real delivery is the
-    // worse failure of the two — the operator overrides it explicitly.
-    expect(autoStockMode(null, '2026-09-13')).toBe('catalog_and_stock');
+  it('a line with no document date does NOT post stock', () => {
+    // This was the other way round, on the reasoning that refusing a real delivery is the worse
+    // failure. It is not. Understated stock is found the moment somebody looks for it; invented
+    // stock flows through valuation and COGS until the annual count, and this is the BULK path —
+    // "Add all 431 queued lines" is exactly where a convenient default does the damage. Absent a
+    // date we know nothing, so the answer is the one that cannot invent inventory; the operator
+    // still overrides it explicitly and the confirmation names the mode.
+    expect(autoStockMode(null, '2026-09-13')).toBe('catalog_only');
+  });
+
+  it('falls back to the LINE’s age when the document has no date, like the server does', () => {
+    // `_approve_pending_item_core` judges by coalesce(document date, line created_at). The client
+    // returned catalog_and_stock for any missing date, which agreed with neither the server nor
+    // with safety — so the screen could name a mode the server would not apply.
+    expect(autoStockMode(null, '2026-09-13', '2026-09-01')).toBe('catalog_and_stock');
+    expect(autoStockMode(null, '2026-09-13', '2024-11-29')).toBe('catalog_only');
+    // A document date always wins over the line's age.
+    expect(autoStockMode('2024-11-29', '2026-09-13', '2026-09-01')).toBe('catalog_only');
+    expect(autoStockMode(null, '2026-09-13', null)).toBe('catalog_only');
   });
 
   it('undecided sends nothing and lets each line decide from its own date', () => {

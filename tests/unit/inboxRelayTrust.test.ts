@@ -84,7 +84,9 @@ describe('#359 CM-8 — the classifier reads customer text as data', () => {
   it('the transcript goes through the canonical fence', () => {
     // A bare `<conversation>` tag is something a message can contain and thereby close, after
     // which the rest of the customer's text reads as instructions to the classifier.
-    expect(api).toMatch(/wrapUntrusted\('customer conversation', transcript\)/);
+    // Any label — the invariant is the canonical WRAPPER, and pinning the label meant a thread
+    // that is not a customer conversation could not be relabelled without failing this.
+    expect(api).toMatch(/wrapUntrusted\('[^']+', transcript\)/);
     expect(api, 'the closeable bare tag is back').not.toMatch(/<conversation>\\n\$\{transcript\}/);
   });
 

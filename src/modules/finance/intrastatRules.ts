@@ -22,6 +22,8 @@ export interface IntrastatFlowVerdict {
   total?: number;
   threshold?: number | null;
   percent_of_threshold?: number | null;
+  /** Last year's total on the same scope. Exceeding it obliges you for the whole of this year. */
+  prior_year_total?: number | null;
   obliged_from?: string | null;
   status: IntrastatStatus;
   reason: string;

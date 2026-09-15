@@ -325,6 +325,8 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
     const wh = warehouses.find((w) => w.id === targetWarehouse);
     const ok = action === 'approve'
       ? confirm(
+          // No resolved mode here on purpose: a supplier group spans many documents with
+          // different dates, so `auto` genuinely differs per line and one answer would be a lie.
           bulkConfirmText(g.line_count, wh?.name ?? 'the default warehouse', stockMode)
           + `\n\nQueued by ${who}. `
           + 'They are built from the invoice data only — the text embedding and facets are filled in by '

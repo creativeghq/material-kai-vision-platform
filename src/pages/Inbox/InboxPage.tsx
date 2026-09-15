@@ -2239,7 +2239,12 @@ function castAvatarSrc(seed: string | null | undefined, slot?: number | null): s
   const { storage_bucket, storage_object_path } = resolved === null
     ? castObjectFor(seed)
     : castObjectForSlot(resolved);
-  return supabase.storage.from(storage_bucket).getPublicUrl(storage_object_path).data.publicUrl;
+  // RESIZED on the way out. The rendered cast is ~470KB per face at source, and this draws at
+  // 40px on every row of the list and every message in the thread — a twenty-row inbox would
+  // pull ~9MB of avatars. 128px covers the largest draw site at 2x; measured 2.8KB at 96px.
+  return supabase.storage.from(storage_bucket).getPublicUrl(storage_object_path, {
+    transform: { width: 128, height: 128, resize: 'cover', quality: 80 },
+  }).data.publicUrl;
 }
 
 const ThreadAvatar: React.FC<{
@@ -3968,6 +3973,17 @@ const ConversationMoodPanel: React.FC<{ thread: InboxThread; isMember: boolean }
   // previous customer's mood, which is the most confidently wrong a screen can be.
   useEffect(() => { setSentiment(cached); setEmpty(null); }, [thread.id, cached]);
 
+  /**
+   * Whether the reading on screen still describes this conversation.
+   *
+   * The SERVER invalidates on `last_message_id`, but it is only asked when somebody presses a
+   * button, and this panel seeds straight from `thread.metadata` — so one verdict re-rendered
+   * as current forever, which reads as a hardcoded answer rather than a stale one. Compared on
+   * TIME because the thread row the list hands us carries `last_message_at`, not the id.
+   */
+  const stale = !!sentiment?.analysed_at && !!thread.last_message_at
+    && new Date(thread.last_message_at).getTime() > new Date(sentiment.analysed_at).getTime();
+
   const run = async (force: boolean) => {
     setBusy(true);
     try {
@@ -3980,6 +3996,24 @@ const ConversationMoodPanel: React.FC<{ thread: InboxThread; isMember: boolean }
       setBusy(false);
     }
   };
+
+  /*
+   * Refresh a stale reading by itself, ONCE per new message. `force` stays false, so the server
+   * still answers from its own cache when nothing has moved and this costs nothing.
+   *
+   * Only when a reading already exists: a thread nobody has asked about keeps its button, so
+   * clicking down a list of conversations never quietly starts spending on all of them.
+   */
+  const refreshedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!isMember || !stale || busy) return;
+    const key = `${thread.id}:${thread.last_message_at}`;
+    if (refreshedFor.current === key) return;
+    refreshedFor.current = key;
+    void run(false);
+    // `run` is re-created every render; the ref is what makes this fire once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [thread.id, thread.last_message_at, stale, isMember, busy]);
 
   if (!isMember) {
     return (
@@ -4016,6 +4050,16 @@ const ConversationMoodPanel: React.FC<{ thread: InboxThread; isMember: boolean }
 
         {sentiment && style && (
           <>
+            {/* Only ever seen when the automatic re-read is in flight or has failed. A reading
+                the conversation has moved past must say so, not sit there looking current. */}
+            {stale && (
+              <div className="flex items-center gap-2">
+                <Badge variant="warning">Out of date</Badge>
+                <span className="text-xs text-muted-foreground">
+                  {busy ? 'Re-reading…' : 'Messages have arrived since this was read.'}
+                </span>
+              </div>
+            )}
             <div className="flex items-start gap-3">
               <div className="text-3xl leading-none" aria-hidden>{style.face}</div>
               <div className="min-w-0 flex-1">

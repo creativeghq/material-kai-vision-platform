@@ -620,7 +620,7 @@ async function buildAgentDraft(
     if (!autoOnAgentReply) throw new Error('disabled by the operator');
     const { sentiment } = await readConversationSentiment(
       db, threadId, thread.metadata as Record<string, unknown> | null, false,
-      workspaceId, billedTo.userId ?? null,
+      workspaceId, billedTo.userId ?? null, thread.thread_type as string | null,
     );
     if (sentiment) {
       const guidance = Array.isArray(sentiment.reply_guidance)
@@ -3055,7 +3055,7 @@ async function handleJwtAction(
 
       const r = await readConversationSentiment(
         db, threadId, thread.metadata as Record<string, unknown> | null, !!payload.force,
-        thread.workspace_id as string | null, userId,
+        thread.workspace_id as string | null, userId, thread.thread_type as string | null,
       );
       // Nothing to read is a real answer, not an error, and it must not bill anybody.
       if (!r.sentiment) {
@@ -5149,6 +5149,13 @@ async function readConversationSentiment(
    */
   workspaceId?: string | null,
   actorUserId?: string | null,
+  /**
+   * WHO the other side is. The rubric asks how the counterparty feels, and without this every
+   * thread was framed as a customer — so a supplier chasing US and two colleagues talking were
+   * both scored as "how does the customer feel about our service". It is on the thread row at
+   * both call sites and was simply never passed.
+   */
+  threadType?: string | null,
 ): Promise<{ sentiment: Record<string, unknown> | null; cached: boolean; reason?: string }> {
   const settings = await sentimentSettings(db, workspaceId);
   // The master switch, checked BEFORE the message read and long before the model call — an
@@ -5185,6 +5192,17 @@ async function readConversationSentiment(
   }
 
   const rubric = await loadPrompt(db, 'tool', 'inbox_conversation_sentiment');
+
+  // Stated rather than left to inference: on an `upstream` thread "waiting" means WE are owed
+  // something, which inverts the urgency reading, and on an `internal` one there is no customer
+  // in the conversation at all. An unrecorded type says so instead of assuming the common case.
+  const RELATIONSHIP: Record<string, string> = {
+    customer: 'a CUSTOMER of ours — they buy from us.',
+    upstream: 'a SUPPLIER or dealer — we buy from THEM, so "waiting" means we are waiting on them.',
+    internal: 'a COLLEAGUE on our own team. This is an internal thread; there is no customer in it.',
+  };
+  const relationship = RELATIONSHIP[String(threadType ?? '')]
+    ?? 'someone outside our team; their exact relationship to us is not recorded.';
 
   // Delimited as DATA (invariant 9). A customer types whatever they like into WhatsApp,
   // including "ignore your instructions".
@@ -5288,7 +5306,11 @@ async function readConversationSentiment(
         // of the customer's text reads as instructions to the classifier. The canonical wrapper
         // states outright that the block is data, and it is the same wording every other ingested
         // source on this platform carries.
-        messages: [{ role: 'user', content: `${rubric}\n\n${wrapUntrusted('customer conversation', transcript)}` }],
+        messages: [{
+          role: 'user',
+          content: `${rubric}\n\nThe other party in this conversation is ${relationship}\n\n`
+            + wrapUntrusted('conversation', transcript),
+        }],
       }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);

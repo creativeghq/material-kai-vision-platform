@@ -58,6 +58,8 @@ export const chequeLedgerService = {
     toCompanyId?: string | null;
     bankAccountId?: string | null;
     fee?: number | null;
+    /** The supplier bill this endorsement settles. Without it the link is never recorded. */
+    settlesBillId?: string | null;
     notes?: string | null;
   }) {
     const { data, error } = await supabase.rpc('endorse_cheque' as never, {
@@ -66,6 +68,7 @@ export const chequeLedgerService = {
       p_to_company: input.toCompanyId ?? null,
       p_bank_account: input.bankAccountId ?? null,
       p_fee: input.fee ?? null,
+      p_settles_bill: input.settlesBillId ?? null,
       p_notes: input.notes ?? null,
     } as never);
     if (error) throw error;

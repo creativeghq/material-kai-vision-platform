@@ -117,6 +117,25 @@ export function extensionFor(contentType: string, fileName?: string): string {
   return map[ct] ?? '';
 }
 
+/**
+ * The part of a CDN image url that identifies the IMAGE, for "have we already got this one?".
+ *
+ * Meta signs a profile picture url with an expiring token in the query string, so two fetches
+ * of the same unchanged photo return two different urls. Comparing them whole answers "it
+ * changed" every time — which is how one 26KB photo became four identical copies in storage.
+ * Anything unparseable compares as itself, so a malformed url re-downloads rather than
+ * silently matching something else.
+ */
+export function stableImageKey(url: unknown): string | null {
+  if (typeof url !== 'string' || !url) return null;
+  try {
+    const u = new URL(url);
+    return `${u.origin}${u.pathname}`;
+  } catch {
+    return url;
+  }
+}
+
 
 /** Store a counterparty's profile picture on their thread. */
 export async function storeParticipantPicture(
@@ -129,7 +148,9 @@ export async function storeParticipantPicture(
     const img = await fetchImageGuardedOrNull(pictureUrl);
     let avatarPath: string | null = null;
     if (img) {
-      const path = `inbox/${threadId}/profile/${crypto.randomUUID()}${extensionFor(img.mimeType) || '.jpg'}`;
+      // FIXED per thread, upserted — a fresh uuid per pass stacked a copy of the same face on
+      // every webhook that carried a picture url.
+      const path = `inbox/${threadId}/profile/avatar${extensionFor(img.mimeType) || '.jpg'}`;
       const { error } = await supabase.storage
         .from(INBOX_ATTACHMENT_BUCKET)
         .upload(path, img.bytes, { contentType: img.mimeType, upsert: true });
@@ -191,11 +212,15 @@ export async function fetchOwnBusinessAvatar(
   let error: string | null = null;
 
   // Meta's CDN link expires, so the BYTES are held rather than the url — the same rule as inbox
-  // media. Re-downloaded only when the url changes, since the image at a given url is immutable.
-  if (picUrl && (knownCfg.avatar_source !== picUrl || !avatarPath)) {
+  // media. Compared on the path ALONE: the link carries an expiring token, so the full url is
+  // different on every single fetch and "re-download only when it changed" re-downloaded always.
+  if (picUrl && (stableImageKey(knownCfg.avatar_source) !== stableImageKey(picUrl) || !avatarPath)) {
     const img = await fetchImageGuardedOrNull(picUrl);
     if (img) {
-      const path = `inbox/channel/${accountId}/${crypto.randomUUID()}.jpg`;
+      // A FIXED path, upserted. A fresh uuid per download left every previous copy behind under
+      // a prefix `build_storage_reference_set()` did not claim — four byte-identical copies of
+      // one photo, the cleanup cron eating the oldest each night, and the live one next in line.
+      const path = `inbox/channel/${accountId}/profile.jpg`;
       const { error: upErr } = await supabase.storage
         .from(INBOX_ATTACHMENT_BUCKET)
         .upload(path, img.bytes, { contentType: img.mimeType, upsert: true });

@@ -13,6 +13,7 @@ import { emitFlowEvent, emitFlowEventToWorkspaceRoles, emitInboxMessageEvent } f
 import { fetchImageGuardedOrNull } from '../_shared/fetch-image.ts';
 import {
   INBOX_ATTACHMENT_BUCKET, bucketForAttachment, materialiseInlineAttachments, extensionFor, storeParticipantPicture,
+  stableImageKey,
 } from '../_shared/inbox-media.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { shouldAutoEngageAgent } from '../_shared/inbox-autopilot.ts';
@@ -579,9 +580,9 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
     const threadMeta = (await supabase.from('inbox_threads').select('metadata').eq('id', threadId).maybeSingle())
       .data?.metadata as Record<string, unknown> | undefined;
     const known = (threadMeta?.wa_profile ?? {}) as Record<string, unknown>;
-    // Re-fetch only when the picture URL actually changed — the image is immutable for a given
-    // URL, so a per-message download would be one wasted round trip per message.
-    if (convParticipantPicture && known.avatar_source !== convParticipantPicture) {
+    // Re-fetch only when the picture itself changed. Compared on origin+path: the url is signed
+    // with an expiring token, so comparing it whole says "changed" on every message.
+    if (convParticipantPicture && stableImageKey(known.avatar_source) !== stableImageKey(convParticipantPicture)) {
       await storeParticipantPicture(supabase, threadId, convParticipantPicture, convParticipantName);
     } else if (convParticipantName && known.name !== convParticipantName) {
       await supabase.rpc('inbox_thread_merge_metadata', {

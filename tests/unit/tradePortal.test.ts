@@ -81,10 +81,36 @@ describe('over a cap is a request, not a refusal from us', () => {
 });
 
 describe('the statement is the ledger’s figure', () => {
-  it('nothing re-totals what they owe', () => {
+  it('nothing re-totals what they owe — in the service OR on the page', () => {
     expect(service).toContain('statement');
     expect(service).not.toMatch(/get_customer_open_balance|reduce\(\(s, i\) => s \+/);
     expect(STATEMENT_IS_ONE_DERIVATION).toMatch(/second answer/);
+    // The page was the half nobody checked: it summed `open_items` into its own total, which
+    // re-derives `open_invoices_due` and silently drops the customer credit `net_balance` nets
+    // off. It must read the ledger's figure.
+    expect(page).not.toMatch(/reduce\(\(s, i\) => s \+/);
+    expect(page).toContain('statementBalance');
+  });
+
+  it('the PRICE is ours, so the cap cannot be argued down from the request body', () => {
+    // `unit_price` came from the body on a token-authenticated surface: it set the gate amount
+    // AND landed in order_items, so a buyer could price their own order, and omitting it made the
+    // cap see 0.
+    expect(fn).toContain('get_product_price_for_workspace');
+    expect(fn).not.toMatch(/Number\(l\.unit_price \?\? 0\)/);
+    // A line nobody can price is UNKNOWN, never zero, so it cannot slide under the cap.
+    expect(fn).toContain('allPriced');
+    expect(fn).toContain('withinAuthority');
+  });
+
+  it('an over-cap draft never survives without the approval that is its whole point', () => {
+    // Two writes with no transaction: the draft was created first, and a failed approval insert
+    // left an ordinary-looking order in the merchant's list that nobody was asked to decide on.
+    expect(fn).toMatch(/apprErr[\s\S]{0,400}from\('orders'\)\.delete\(\)/);
+  });
+
+  it('an anonymous basket is bounded', () => {
+    expect(fn).toContain('MAX_ORDER_LINES');
   });
 
   it('an order placed through the portal is a draft until we confirm it', () => {
