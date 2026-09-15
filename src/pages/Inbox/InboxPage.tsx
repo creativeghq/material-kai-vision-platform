@@ -2239,7 +2239,12 @@ function castAvatarSrc(seed: string | null | undefined, slot?: number | null): s
   const { storage_bucket, storage_object_path } = resolved === null
     ? castObjectFor(seed)
     : castObjectForSlot(resolved);
-  return supabase.storage.from(storage_bucket).getPublicUrl(storage_object_path).data.publicUrl;
+  // RESIZED on the way out. The rendered cast is ~470KB per face at source, and this draws at
+  // 40px on every row of the list and every message in the thread — a twenty-row inbox would
+  // pull ~9MB of avatars. 128px covers the largest draw site at 2x; measured 2.8KB at 96px.
+  return supabase.storage.from(storage_bucket).getPublicUrl(storage_object_path, {
+    transform: { width: 128, height: 128, resize: 'cover', quality: 80 },
+  }).data.publicUrl;
 }
 
 const ThreadAvatar: React.FC<{
