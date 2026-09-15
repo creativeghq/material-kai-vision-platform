@@ -50,27 +50,35 @@ export function loanIsUnchaseable(l: SampleLoanRow): boolean {
   return l.status === 'out' && l.due_back_on == null;
 }
 
-/** Out past its date. */
-export function loanIsOverdue(l: SampleLoanRow, asOf = new Date()): boolean {
+/**
+ * Out past its date, on the OPERATOR's calendar.
+ *
+ * Comparing UTC midnight against `now` made a loan due today read "Overdue since ..." from local
+ * midnight onwards — a full day early, and the showroom chases a customer who still has until
+ * close of business.
+ */
+export function loanIsOverdue(l: SampleLoanRow, todayIso: string): boolean {
   if (l.status !== 'out' || !l.due_back_on) return false;
-  return new Date(`${l.due_back_on}T00:00:00Z`) < asOf;
+  return todayIso > l.due_back_on;
 }
 
 /**
  * Has the loan finished, one way or the other?
  *
  * The conversion rate divides by these, not by every loan — counting live loans as failures
- * understates it while they are still perfectly capable of converting.
+ * understates it while they are still perfectly capable of converting. A RETURNED sample is
+ * finished and did not convert: leaving it out made one conversion against nine returns read as
+ * 100%.
  */
 export function loanIsSettled(l: SampleLoanRow): boolean {
-  return l.status === 'converted' || l.status === 'written_off';
+  return l.status === 'converted' || l.status === 'written_off' || l.status === 'returned';
 }
 
 /** What a sample loan is worth as a lead: the reason to chase it, in one line. */
-export function describeLoan(l: SampleLoanRow): string {
+export function describeLoan(l: SampleLoanRow, todayIso: string): string {
   if (l.status === 'converted') return 'Became an order';
   if (l.status === 'returned') return `Returned ${l.returned_on ?? ''}`.trim();
   if (l.status === 'written_off') return 'Written off — gone';
   if (loanIsUnchaseable(l)) return 'Out with no date — nobody will ever chase this';
-  return loanIsOverdue(l) ? `Overdue since ${l.due_back_on}` : `Due back ${l.due_back_on}`;
+  return loanIsOverdue(l, todayIso) ? `Overdue since ${l.due_back_on}` : `Due back ${l.due_back_on}`;
 }

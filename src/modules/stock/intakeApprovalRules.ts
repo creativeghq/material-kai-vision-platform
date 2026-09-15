@@ -44,19 +44,30 @@ export const ADDITION_MODE_LABEL: Record<AdditionMode, string> = {
 export const ARCHIVE_AFTER_DAYS = 30;
 
 /**
- * What `auto` will resolve to for one line, so the screen can say it BEFORE the operator presses
- * Add rather than after. The server derives the same thing from the same date; this exists to let
- * the confirmation name the mode, which is the whole failure the split addresses — "Add all 431
- * queued lines" reads identically whether or not it is about to invent a year of inventory.
+ * The CLIENT's statement of the server's rule in `_approve_pending_item_core`, pinned by tests so
+ * the two cannot drift apart silently.
+ *
+ * It is not on a screen today: both bulk paths span many documents with different dates, so `auto`
+ * resolves per line and one answer would be wrong. Showing it per LINE is the remaining piece —
+ * "Add all 431 queued lines" still reads identically whether or not it is about to invent a year
+ * of inventory.
  */
 export const autoStockMode = (
   documentIssueDate: string | null | undefined,
   today: string,
+  /** The queued line's own creation date — what the server falls back to when the document has none. */
+  lineCreatedOn?: string | null,
 ): AdditionMode => {
-  if (!documentIssueDate) return 'catalog_and_stock';
+  // Mirrors `_approve_pending_item_core`: coalesce(document date, line creation date) inside the
+  // window. This used to return `catalog_and_stock` for ANY missing date, which agreed with
+  // nothing — the server was already falling back to the line's age.
+  const judgeBy = documentIssueDate || lineCreatedOn || null;
+  // Neither date means we know nothing, and the answer that cannot invent inventory is the only
+  // safe one on a bulk path.
+  if (!judgeBy) return 'catalog_only';
   const cutoff = new Date(`${today}T00:00:00Z`);
   cutoff.setUTCDate(cutoff.getUTCDate() - ARCHIVE_AFTER_DAYS);
-  return documentIssueDate >= cutoff.toISOString().slice(0, 10)
+  return judgeBy >= cutoff.toISOString().slice(0, 10)
     ? 'catalog_and_stock'
     : 'catalog_only';
 };
@@ -69,7 +80,11 @@ export const stockOverrideFor = (mode: StockMode): boolean | undefined =>
  * The confirmation must name the mode. A bulk that posts a year of stock movements and one that
  * posts none are the same sentence otherwise.
  */
-export const bulkConfirmText = (count: number, where: string, mode: StockMode): string => {
+export const bulkConfirmText = (
+  count: number, where: string, mode: StockMode,
+  /** What `auto` actually resolves to for these lines, when it is knowable. */
+  resolved?: AdditionMode,
+): string => {
   const head = `Add ${count} queued line(s) to ${where}?`;
   const body = mode === 'catalog_only'
     ? 'They will be created as products with their cost, price and supplier link, and NO stock '
@@ -77,8 +92,12 @@ export const bulkConfirmText = (count: number, where: string, mode: StockMode): 
     : mode === 'catalog_and_stock'
       ? 'This posts a stock movement for EVERY line. Use catalogue-only for historic invoices: '
         + 'those goods are already sold or installed.'
-      : 'Each line decides from its own document date: within '
-        + `${ARCHIVE_AFTER_DAYS} days it is received into stock, older than that it is catalogued only.`;
+      : resolved
+        ? `These decide from their document date, and that works out as: ${ADDITION_MODE_LABEL[resolved]}${resolved === 'catalog_and_stock'
+            ? ' — this posts a stock movement for every line.'
+            : ' — no stock movement is posted.'}`
+        : 'Each line decides from its own document date: within '
+          + `${ARCHIVE_AFTER_DAYS} days it is received into stock, older than that it is catalogued only.`;
   return `${head}\n\n${body}`;
 };
 

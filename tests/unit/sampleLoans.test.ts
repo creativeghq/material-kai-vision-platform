@@ -28,7 +28,8 @@ const loan = (over: Partial<SampleLoanRow>): SampleLoanRow => ({
   status: 'out', converted_order_id: null, notes: null, ...over,
 });
 
-const AS_OF = new Date('2026-09-01T00:00:00Z');
+/** The OPERATOR's day, as a plain ISO date — the rules module takes it, so it stays import-free. */
+const AS_OF = '2026-09-01';
 
 describe('a loan with no due date can never be chased', () => {
   it('undated is its own failure, not a quiet success', () => {
@@ -47,11 +48,18 @@ describe('a loan with no due date can never be chased', () => {
     expect(loanIsOverdue(loan({ status: 'returned', due_back_on: '2026-08-15' }), AS_OF)).toBe(false);
   });
 
+  it('due TODAY is not yet overdue — the customer has until close of business', () => {
+    // Comparing UTC midnight against `now` made a loan due today read as overdue from local
+    // midnight, so the showroom chased someone who was still within their date.
+    expect(loanIsOverdue(loan({ due_back_on: AS_OF }), AS_OF)).toBe(false);
+    expect(loanIsOverdue(loan({ due_back_on: '2026-08-31' }), AS_OF)).toBe(true);
+  });
+
   it('the description says which of the two it is', () => {
-    expect(describeLoan(loan({ due_back_on: null })))
+    expect(describeLoan(loan({ due_back_on: null }), AS_OF))
       .toBe('Out with no date — nobody will ever chase this');
-    expect(describeLoan(loan({ status: 'converted' }))).toBe('Became an order');
-    expect(describeLoan(loan({ status: 'written_off' }))).toBe('Written off — gone');
+    expect(describeLoan(loan({ status: 'converted' }), AS_OF)).toBe('Became an order');
+    expect(describeLoan(loan({ status: 'written_off' }), AS_OF)).toBe('Written off — gone');
   });
 });
 
@@ -62,7 +70,9 @@ describe('the conversion rate divides by FINISHED loans', () => {
     expect(loanIsSettled(loan({ status: 'converted' }))).toBe(true);
     expect(loanIsSettled(loan({ status: 'written_off' }))).toBe(true);
     expect(loanIsSettled(loan({ status: 'out' }))).toBe(false);
-    expect(loanIsSettled(loan({ status: 'returned' }))).toBe(false);
+    // A RETURNED sample is finished and did not convert. Leaving it out of the denominator made
+    // one conversion against nine returns read as 100%.
+    expect(loanIsSettled(loan({ status: 'returned' }))).toBe(true);
   });
 
   it('the card shows the derived rate rather than computing one', () => {

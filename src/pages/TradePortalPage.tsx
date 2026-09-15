@@ -19,7 +19,7 @@ import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { formatDate } from '@/utils/datetime';
 import {
   tradePortalService, ROLE_LABEL, APPROVAL_LABEL, canManageColleagues, mayBuy, isUncapped,
-  STATEMENT_IS_ONE_DERIVATION, DRAFT_UNTIL_WE_CONFIRM,
+  STATEMENT_IS_ONE_DERIVATION, DRAFT_UNTIL_WE_CONFIRM, statementBalance,
   type Statement, type HistoryLine, type ApprovalRow,
 } from '@/modules/crm/services/tradePortalService';
 
@@ -122,7 +122,7 @@ const TradePortalPage: React.FC = () => {
 
   const pending = approvals.filter((a) => a.status === 'pending');
   const items = statement.open_items ?? [];
-  const totalOutstanding = items.reduce((s, i) => s + Number(i.outstanding ?? 0), 0);
+  const { amount: netBalance, currency: balanceCurrency } = statementBalance(statement.balance);
 
   return (
     <div className="mx-auto min-h-screen max-w-4xl space-y-4 px-4 py-6">
@@ -158,8 +158,15 @@ const TradePortalPage: React.FC = () => {
           {items.length > 0 && (
             <>
               <p className="tabular-nums font-medium">
-                {items.length} open item(s) · {totalOutstanding.toFixed(2)} outstanding
+                {items.length} open item(s)
+                {netBalance !== null && <> · {netBalance.toFixed(2)} {balanceCurrency} outstanding</>}
               </p>
+              {netBalance === null && (
+                <p className="text-[11px] text-muted-foreground">
+                  The balance could not be read, so the lines below are shown without a total —
+                  adding them up here would be a second figure that can disagree with your account.
+                </p>
+              )}
               <div className="table-scroll">
                 <Table>
                   <TableHeader>

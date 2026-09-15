@@ -19,6 +19,7 @@ export {
   ROLE_LABEL, VISIBILITY_LABEL, BAND_LABEL, APPROVAL_LABEL,
   canManageColleagues, mayBuy, isUncapped, gateBlocks, gateBecomesRequest, showsExactQuantity,
   bandsAreEnough, STATEMENT_IS_ONE_DERIVATION, PASSWORDLESS_IS_THE_POINT, DRAFT_UNTIL_WE_CONFIRM,
+  statementBalance, type OpenBalance,
 } from '@/modules/crm/tradePortalRules';
 
 export interface HistoryLine {

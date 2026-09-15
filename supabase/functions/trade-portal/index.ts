@@ -12,6 +12,7 @@ import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { assertAllSameWorkspace } from '../_shared/same-workspace.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -25,6 +26,10 @@ const corsHeaders = {
 /** Long enough that guessing is not a strategy, minted the way a contract signing token is. */
 const mintToken = () => crypto.randomUUID() + crypto.randomUUID().replace(/-/g, '');
 const TOKEN_TTL_DAYS = 60;
+/** An anonymous surface must not accept an unbounded basket. */
+const MAX_ORDER_LINES = 100;
+
+type OrderLine = { product_id?: string | null; description?: string; quantity?: number; unit_price?: number };
 
 function json(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), {
@@ -37,7 +42,7 @@ interface Body {
     | 'history' | 'approvals';
   token?: string;
   product_id?: string;
-  lines?: Array<{ product_id?: string | null; description?: string; quantity?: number; unit_price?: number }>;
+  lines?: OrderLine[];
   notes?: string;
   portal_user_id?: string;
   approval_id?: string;
@@ -162,14 +167,53 @@ Deno.serve(withApiLogging('trade-portal', async (req: Request) => {
   if (body.action === 'place_order') {
     const lines = (body.lines ?? []).filter((l) => Number(l?.quantity ?? 0) > 0);
     if (lines.length === 0) throw new HttpError(400, 'An order needs at least one line.');
-    const amount = lines.reduce(
-      (s, l) => s + Number(l.quantity ?? 0) * Number(l.unit_price ?? 0), 0,
-    );
+    if (lines.length > MAX_ORDER_LINES) {
+      throw new HttpError(400, `An order may carry at most ${MAX_ORDER_LINES} lines.`);
+    }
+
+    // Every product id here comes from the body. Both halves look valid on their own — the token
+    // resolves to a real account, the id is a real product — and without this nothing checks them
+    // against each other, so another tenant's product would be written onto this order.
+    await assertAllSameWorkspace(
+      service, 'products',
+      lines.map((l) => (typeof l.product_id === 'string' ? l.product_id : null)),
+      who.workspace_id, 'product');
+
+    // THE PRICE IS OURS. This body is written by whoever holds the link, so a `unit_price` it
+    // supplies is a price the customer chose — invariant 8 lists `price` among the fields set
+    // server-side only. It also fed the spend gate, so omitting it made the cap see 0 and allow
+    // anything.
+    //
+    // A line we cannot price has an UNKNOWN amount, and unknown must not become zero: it goes to
+    // the customer's own administrator for a decision rather than sliding under the cap.
+    let allPriced = true;
+    const priced: Array<{ raw: OrderLine; qty: number; productId: string | null; unit: number | null }> = [];
+    for (const l of lines) {
+      const qty = Number(l.quantity ?? 0);
+      const productId = typeof l.product_id === 'string' && l.product_id ? l.product_id : null;
+      let unit: number | null = null;
+      if (productId) {
+        const { data: p } = await service.rpc('get_product_price_for_workspace', {
+          p_workspace_id: who.workspace_id, p_product_id: productId,
+          p_company_id: who.company_id, p_contact_id: null,
+          p_audience: 'seller', p_quantity: qty, p_unit: null, p_variant_key: null,
+        });
+        const pr = (p ?? {}) as any;
+        if (pr.unpriced !== true && pr.final_sell != null && Number.isFinite(Number(pr.final_sell))) {
+          unit = Number(pr.final_sell);
+        }
+      }
+      if (unit === null) allPriced = false;
+      priced.push({ raw: l, qty, productId, unit });
+    }
+    const amount = priced.reduce((s, l) => s + l.qty * (l.unit ?? 0), 0);
 
     const { data: gate } = await service.rpc('trade_portal_spend_gate', {
       p_token: token, p_amount: amount,
     });
     const g = (gate ?? {}) as any;
+    // An order carrying a line nobody can price is not inside anyone's authority.
+    const withinAuthority = allPriced && g.allowed === true;
 
     // The order is created as a DRAFT either way. Losing somebody's basket because they are over
     // their cap punishes them for a limit their own office set — the draft waits for the decision.
@@ -185,18 +229,20 @@ Deno.serve(withApiLogging('trade-portal', async (req: Request) => {
     if (orderErr) throw new HttpError(500, orderErr.message);
 
     const { error: lineErr } = await service.from('order_items').insert(
-      lines.map((l) => ({
+      priced.map((l) => ({
         workspace_id: who.workspace_id,
         order_id: order.id,
-        product_id: l.product_id ?? null,
-        description: l.description ?? 'Portal line',
-        quantity: Number(l.quantity ?? 0),
-        unit_price: Number(l.unit_price ?? 0),
+        product_id: l.productId,
+        description: l.raw.description ?? 'Portal line',
+        quantity: l.qty,
+        // Null, not zero, when we could not price it: a zero here is a line the merchant would
+        // ship for nothing.
+        unit_price: l.unit,
       })),
     );
     if (lineErr) throw new HttpError(500, lineErr.message);
 
-    if (!g.allowed) {
+    if (!withinAuthority) {
       const { error: apprErr } = await service.from('trade_portal_approvals').insert({
         workspace_id: who.workspace_id,
         account_id: who.account_id,
@@ -207,7 +253,14 @@ Deno.serve(withApiLogging('trade-portal', async (req: Request) => {
         limit_at_request: g.limit ?? null,
         status: 'pending',
       });
-      if (apprErr) throw new HttpError(500, apprErr.message);
+      if (apprErr) {
+        // Without the request this draft is an ordinary order in the merchant's list, over a cap,
+        // with nobody told it needs a decision — worse than losing the basket. Undo it and say so.
+        await service.from('order_items').delete().eq('order_id', order.id);
+        await service.from('orders').delete().eq('id', order.id);
+        throw new HttpError(500,
+          'We could not raise the approval request, so the order was not kept. Please try again.');
+      }
       return json({
         ok: true, order_id: order.id, needs_approval: true, code: g.code,
         reason: g.reason,

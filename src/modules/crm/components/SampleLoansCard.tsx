@@ -17,7 +17,7 @@ import {
 } from '@/components/core/ui/table';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { useToast } from '@/hooks/use-toast';
-import { localISODateOffset } from '@/utils/datetime';
+import { localISODateOffset, todayLocalISO } from '@/utils/datetime';
 import {
   sampleLoanService, LOAN_STATUS_LABEL, describeLoan, loanIsOverdue, loanIsUnchaseable,
   type SampleLoanRow, type LoanPosition, type SampleLoanItem,
@@ -27,6 +27,9 @@ export const SampleLoansCard: React.FC<{
   workspaceId: string;
   companyId?: string | null;
 }> = ({ workspaceId, companyId }) => {
+  // The operator's day, passed into the pure rules so they stay import-free and there is still
+  // exactly one local-day derivation in the app.
+  const today = todayLocalISO();
   const { toast } = useToast();
   const [loans, setLoans] = useState<SampleLoanRow[]>([]);
   const [position, setPosition] = useState<LoanPosition | null>(null);
@@ -179,14 +182,14 @@ export const SampleLoansCard: React.FC<{
                     <TableCell>
                       <Badge
                         variant={
-                          loanIsUnchaseable(l) || loanIsOverdue(l)
+                          loanIsUnchaseable(l) || loanIsOverdue(l, today)
                             ? 'warning'
                             : l.status === 'converted' ? 'success' : 'neutral'
                         }
                       >
                         {LOAN_STATUS_LABEL[l.status]}
                       </Badge>
-                      <span className="ml-2 text-[11px] text-muted-foreground">{describeLoan(l)}</span>
+                      <span className="ml-2 text-[11px] text-muted-foreground">{describeLoan(l, today)}</span>
                     </TableCell>
                     <TableCell className="text-right">
                       {l.status === 'out' && (
