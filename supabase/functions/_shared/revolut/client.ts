@@ -2,6 +2,8 @@
 
 // deno-lint-ignore-file no-explicit-any
 
+import { HttpError } from '../api-logger.ts';
+
 export interface RevolutConfigRow {
   workspace_id: string;
   client_id: string | null;
@@ -174,7 +176,12 @@ async function tokenRequest(
   issuerDomain: string,
   params: Record<string, string>,
 ): Promise<TokenResponse> {
-  if (!cfg.client_id || !cfg.private_key) throw new Error('Revolut client_id/keypair missing');
+  // A workspace that has not finished its BYOK setup is a configuration state, not a
+  // bug: HttpError gives the caller a 400 it can act on and keeps the wrapper from
+  // reporting it as an exception.
+  if (!cfg.client_id || !cfg.private_key) {
+    throw new HttpError(400, 'Revolut is not configured for this workspace — add the client ID and key pair under Profile → Keys first.');
+  }
   const hosts = revolutHosts(cfg.environment);
   const assertion = await signClientAssertion(cfg.private_key, cfg.client_id, issuerDomain);
   const body = new URLSearchParams({
