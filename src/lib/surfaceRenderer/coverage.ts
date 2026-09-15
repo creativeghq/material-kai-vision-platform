@@ -6,6 +6,8 @@
  * never trusted.
  */
 import { round2 } from '@/utils/decimal';
+import type { Pattern } from './patternVocabulary';
+import { lookupAt, type TileFormatCm } from './patterns';
 
 /** Areas, not money: a small mosaic piece is a real 0.0025 m² and must not round to nothing. */
 const round4 = (n: number): number => Math.round(n * 10_000) / 10_000;
@@ -37,14 +39,11 @@ function piecesTouched(
     for (let j = 0; j < ny; j++) {
       const y = Math.min(j * step, depthCm - 1e-6);
       const hit = lookupAt(x, y, format, pattern, groutCm, rotationDeg);
-      if (!hit.grout) seen.add(`${hit.i}:${hit.j}`);
+      if (hit.grout === false) seen.add(`${hit.i}:${hit.j}`);
     }
   }
   return seen.size;
 }
-
-import type { Pattern } from './patternVocabulary';
-import { lookupAt, type TileFormatCm } from './patterns';
 
 /** Why a coverage figure is not an order quantity. Each one withholds a number rather than guessing it. */
 export type CoverageGap = 'no_format' | 'format_assumed' | 'wastage_not_configured' | 'no_pack_size';
