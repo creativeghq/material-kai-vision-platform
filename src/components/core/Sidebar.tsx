@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { User, LogOut, Wrench, Eye, EyeOff, LayoutDashboard, Settings } from 'lucide-react';
+import { User, LogOut, Wrench, Eye, EyeOff, LayoutDashboard, Settings, Compass } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/core/ui/avatar';
@@ -105,6 +105,11 @@ export const Sidebar: React.FC = () => {
         <DropdownMenuItem onClick={() => navigate('/profile')} className="py-3">
           <User className="mr-3 h-4 w-4" />
           <span className="text-sm">My Profile</span>
+        </DropdownMenuItem>
+        {/* The first-run walkthrough. It auto-opens once; this is how anyone gets back to it. */}
+        <DropdownMenuItem onClick={() => navigate('/start-here')} className="py-3">
+          <Compass className="mr-3 h-4 w-4" />
+          <span className="text-sm">Start Here</span>
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => navigate('/portal')} className="py-3">
           <LayoutDashboard className="mr-3 h-4 w-4" />

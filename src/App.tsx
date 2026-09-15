@@ -76,6 +76,8 @@ const BlueprintEditorPage = lazy(() => import('./pages/Blueprints/BlueprintEdito
 const TemplateLibraryPage = lazy(() => import('./pages/Templates/TemplateLibraryPage').then(m => ({ default: m.TemplateLibraryPage })));
 const TemplateEditorPage = lazy(() => import('./pages/Templates/TemplateEditorPage').then(m => ({ default: m.TemplateEditorPage })));
 
+const StartHerePage = lazy(() => import('./pages/StartHere/StartHerePage'));
+
 // Feature pages
 const MaterialRecognition = lazy(() => import('./components/features/recognition/MaterialRecognition').then(m => ({ default: m.MaterialRecognition })));
 const MoodBoardPage = lazy(() => import('./components/business/moodboard/MoodBoardPage').then(m => ({ default: m.MoodBoardPage })));
@@ -261,6 +263,16 @@ const App = () => (
                     <PageErrorBoundary name="Home Page">
                       <AuthGuard>
                         <Index />
+                      </AuthGuard>
+                    </PageErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/start-here"
+                  element={
+                    <PageErrorBoundary name="Start Here">
+                      <AuthGuard>
+                        <StartHerePage />
                       </AuthGuard>
                     </PageErrorBoundary>
                   }

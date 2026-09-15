@@ -61,6 +61,14 @@ export const APP_DESTINATIONS: readonly AppDestination[] = [
   { id: 'credits', breadcrumb: 'Profile → Credits', route: '/profile?tab=credits' },
   { id: 'subscription', breadcrumb: 'Profile → Subscription', route: '/profile?tab=subscription' },
   { id: 'profile-reviews', breadcrumb: 'Profile → Reviews', route: '/profile?tab=reviews' },
+  // The first-run walkthrough. It lives in the profile menu rather than on a tab, so the
+  // breadcrumb names the menu it is actually in and the route is the page it actually is.
+  {
+    id: 'start-here',
+    breadcrumb: 'Profile → Start Here',
+    route: '/start-here',
+    aliases: ['Start Here → Setup', 'Profile → Getting Started'],
+  },
   // Where the workspace's public handle is set — the first segment of every catalog link it
   // shares. On the catalogs page itself, because that is the only place it has consequences.
   {
