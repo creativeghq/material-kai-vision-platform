@@ -125,15 +125,14 @@ export async function buildCompsReport(supabase: any, args: {
 export async function buildVendorReport(supabase: any, property: any): Promise<any> {
   const [{ data: perfRows }, { data: viewings }, { data: vendor }] = await Promise.all([
     supabase.rpc('get_property_performance', { p_property_ids: [property.id] }),
-    // #356 `RE-8`. `feedback` is the agent's own note on the viewing and goes into an email
-    // addressed to the VENDOR. It is written as an internal record — "Maria Papadopoulos,
-    // +30…, max budget 350k" is a realistic note — so quoting it verbatim hands one client's
-    // contact details and negotiating position to another. HTML-escaping it, which this path
-    // already did correctly, is not the same as being allowed to say it.
+    // #356 `RE-8`. `feedback` is the VENDOR-FACING line; the agent's private note lives in
+    // `internal_note`, which no owner-facing path may select. Never widen this select to it:
+    // "Maria Papadopoulos, +30…, max budget 350k" is a realistic note, and HTML-escaping it is
+    // not the same as being allowed to say it.
     supabase.from('property_viewings')
       .select('scheduled_at, status, feedback')
       .eq('property_id', property.id).eq('status', 'completed').not('feedback', 'is', null)
-      .eq('share_with_vendor', true)
+      .eq('hidden_from_vendor', false)
       .order('scheduled_at', { ascending: false }).limit(6),
     property.vendor_contact_id
       ? supabase.from('crm_contacts').select('id, name, email').eq('id', property.vendor_contact_id).maybeSingle()

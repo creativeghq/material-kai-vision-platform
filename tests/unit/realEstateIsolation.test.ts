@@ -116,10 +116,15 @@ describe('RE-7 — the digest window follows delivery', () => {
 });
 
 describe('RE-8 — internal viewing notes are not vendor-facing', () => {
-  it('only quotes feedback explicitly shared with the vendor', () => {
-    expect(shared, "the vendor report quotes every viewing's feedback again — those are the "
-      + "agent's internal notes and routinely contain the buyer's name and phone")
-      .toMatch(/\.eq\('share_with_vendor', true\)/);
+  it('skips a viewing the agent hid from the vendor', () => {
+    expect(shared, 'the vendor report quotes every viewing again — an agent who hid one meant it')
+      .toMatch(/\.eq\('hidden_from_vendor', false\)/);
+  });
+
+  it('never selects the private note, which is what carries the buyer', () => {
+    expect(shared, "internal_note is in an owner-facing select — it holds the buyer's name, "
+      + 'phone and budget, and escaping it is not the same as being allowed to say it')
+      .not.toMatch(/internal_note/);
   });
 });
 
