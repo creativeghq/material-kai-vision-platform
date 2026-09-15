@@ -259,6 +259,20 @@ describe('an absent answer is stated, not implied', () => {
     expect(list).toContain('note:');
   });
 
+  it('list with no counterparty answers "what is our house format"', () => {
+    // Found by replaying the conversation: asked to follow "the format we do for all the other",
+    // the model could only sample one counterparty per call, checked three, found none, and told
+    // the user NOBODY had accounts on file while fifteen existed — a generalisation from three,
+    // stated as fact. The workspace-wide read is what makes that question answerable.
+    const listAll = body.slice(body.indexOf("action === 'list' && !contact_id"), body.indexOf('let parent'));
+    expect(listAll.length, 'the workspace-wide list branch is gone').toBeGreaterThan(300);
+    expect(listAll).toContain("scope: 'workspace'");
+    // …and it must say it is a SAMPLE, or the model generalises from 25 the way it did from 3.
+    expect(listAll).toMatch(/not the complete list/);
+    expect(listAll).toContain('found: false');
+    expect(listAll).toContain('found: true');
+  });
+
   it('a re-transcribed IBAN is reported as already present, not inserted twice', () => {
     const add = body.slice(body.indexOf("if (action === 'add')"));
     const dupAt = add.indexOf('already_present: true');

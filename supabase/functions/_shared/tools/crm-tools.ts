@@ -722,7 +722,41 @@ export const createManageCounterpartyBankAccountTool = (
         return JSON.stringify({ success: true, account_id, message: `${row.bank_name} is now the default account.` });
       }
 
-      // list and add both hang off a counterparty.
+      // `list` with NO counterparty answers "what is our house format" — the question the user
+      // actually asks ("following the format we do for all the other"). Without it the model can
+      // only sample a counterparty at a time, and a live replay had it check three, find none,
+      // and tell the user NOBODY had accounts on file while fifteen existed. A generalisation
+      // from a sample of three, stated as fact.
+      if (action === 'list' && !contact_id && !company_id && !company_query) {
+        const { data, error } = await sb().from('crm_bank_accounts')
+          .select('id, bank_name, account_holder, iban, account_ref, currency, is_primary, notes, company_id')
+          .order('created_at', { ascending: false })
+          .limit(25);
+        if (error) return JSON.stringify({ success: false, error: error.message });
+        const rows = (data ?? []) as AnyRow[];
+        const withNames = await attachPartyNames(sb(), rows, [
+          { idField: 'company_id', nameField: 'counterparty' },
+        ]);
+        onChunk?.({
+          type: 'crm_bank_accounts_listed',
+          data: { counterparty: null, scope: 'workspace', count: withNames.length, accounts: withNames },
+          timestamp: Date.now(),
+        });
+        return JSON.stringify(rows.length === 0
+          ? {
+            success: true, found: false, scope: 'workspace', accounts: [],
+            note: 'No counterparty in this workspace has a bank account on file yet, so there is '
+              + 'no established format to copy.',
+          }
+          : {
+            success: true, found: true, scope: 'workspace', count: withNames.length,
+            accounts: withNames,
+            note: 'The most recent accounts on file across the workspace — read the house format '
+              + 'off these. This is a sample of up to 25, not the complete list.',
+          });
+      }
+
+      // Otherwise list and add both hang off a counterparty.
       let parent: { company_id?: string; contact_id?: string; label: string };
       if (contact_id) {
         // Same as set_primary above: scoped to the workspace the agent is RUNNING in, not to
@@ -856,14 +890,16 @@ export const createManageCounterpartyBankAccountTool = (
         'The bank accounts of a CRM company or contact — where we pay a supplier, and where a customer '
         + 'pays us from. list (what is on file), add (a new account: bank_name + iban required, and the '
         + 'IBAN is checksum-tested before it is stored), set_primary (make one the default we pay to, by '
-        + 'account_id). Use for "add this IBAN to <company>", "add the bank accounts off this statement", '
+        + 'account_id). Call list with NO company or contact to see the accounts already on file '
+        + 'across the workspace — that is how you find the house format before adding one. '
+        + 'Use for "add this IBAN to <company>", "add the bank accounts off this statement", '
         + '"which account do we pay <supplier> into". add and set_primary both ask the user to approve '
         + 'first — show them what you read and let them check it. To CHANGE or REMOVE an existing account, '
         + 'send the user to the company\'s Bank accounts panel in CRM; this tool deliberately cannot.',
       schema: z.object({
         action: z.enum(['list', 'add', 'set_primary']),
         company_id: z.string().optional().describe('The crm company UUID.'),
-        company_query: z.string().optional().describe('Fuzzy company name to resolve (Greek or Latin spelling both work).'),
+        company_query: z.string().optional().describe('Fuzzy company name to resolve (Greek or Latin spelling both work; spacing is ignored).'),
         contact_id: z.string().optional().describe('A crm contact UUID, if the account belongs to a person rather than a company.'),
         bank_name: z.string().optional().describe('add: the bank, e.g. "Piraeus" (required).'),
         account_holder: z.string().optional().describe('add: the name on the account, if it differs from the counterparty.'),

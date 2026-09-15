@@ -1051,7 +1051,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     params: [
       { name: 'action', type: 'enum', enum: ['list', 'add', 'set_primary'], optional: false },
       { name: 'company_id', type: 'string', optional: true, description: 'The crm company UUID.' },
-      { name: 'company_query', type: 'string', optional: true, description: 'Fuzzy company name to resolve (Greek or Latin spelling both work).' },
+      { name: 'company_query', type: 'string', optional: true, description: 'Fuzzy company name to resolve (Greek or Latin spelling both work; spacing is ignored).' },
       { name: 'contact_id', type: 'string', optional: true, description: 'A crm contact UUID, if the account belongs to a person rather than a company.' },
       { name: 'bank_name', type: 'string', optional: true, description: 'add: the bank, e.g. "Piraeus" (required).' },
       { name: 'account_holder', type: 'string', optional: true, description: 'add: the name on the account, if it differs from the counterparty.' },
