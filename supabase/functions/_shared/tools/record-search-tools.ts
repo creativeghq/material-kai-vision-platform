@@ -51,6 +51,13 @@ export const createFindRecordsTool = (
   userJwt?: string,
   onChunk?: (c: any) => void,
 ) => {
+  // One CARD per distinct answer, not one per call. A model hedging the spelling of a Greek
+  // counterparty fires several searches in ONE parallel turn, and each emitted its own chunk --
+  // two cards titled "Records found" over the identical row, with the queries that told them
+  // apart never on screen, because that title is a static string (conversation de92b987).
+  // The tool RESULT is unaffected; only the duplicate UI event is dropped. Scoped to this
+  // closure and so to the turn: mergeTools discards a second instance of the same tool name.
+  const emittedSignatures = new Set<string>();
   return tool(
     async ({ query, kinds, limit = 5 }: { query: string; kinds?: string[]; limit?: number }) => {
       try {
@@ -97,7 +104,14 @@ export const createFindRecordsTool = (
           path: PATHS[r.kind]?.(r.id) ?? null,
         }));
 
-        onChunk?.({ type: 'record_search_results', data: { query: q, count: rows.length, records: rows } });
+        // Identity is the SET OF ROWS, not the query text -- two different queries that land on
+        // the same records are one answer, and that is the case this exists for. Sorted so the
+        // per-kind ordering of `global_search` cannot make the same set look like two.
+        const signature = rows.map((r) => `${r.kind}:${r.id}`).sort().join('|');
+        if (!emittedSignatures.has(signature)) {
+          emittedSignatures.add(signature);
+          onChunk?.({ type: 'record_search_results', data: { query: q, count: rows.length, records: rows } });
+        }
 
         if (rows.length === 0) {
           return JSON.stringify({

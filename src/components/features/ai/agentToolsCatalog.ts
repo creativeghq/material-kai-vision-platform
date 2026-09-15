@@ -1955,7 +1955,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     description: 'Add companies from a VAT/ΑΦΜ (ΑΑΔΕ/VIES) and refresh existing companies from ΑΑΔΕ.',
     icon: 'Building2',
     moduleSlug: 'crm',
-    tool_ids: ['create_company_from_vat', 'enrich_company_from_aade', 'manage_crm', 'manage_deal', 'customer_health'],
+    tool_ids: ['create_company_from_vat', 'enrich_company_from_aade', 'manage_crm', 'manage_deal', 'customer_health', 'manage_counterparty_bank_account'],
     quick_starts: [
       { label: 'Company from VAT', description: 'Look up a VAT/ΑΦΜ and add the company', prompt: 'Add a company to the CRM from a VAT or ΑΦΜ number — ask me for it.', icon: 'Plus' },
       {
@@ -2008,6 +2008,16 @@ export const TOOLKITS: ToolkitDefinition[] = [
           ] },
           { key: 'title', label: 'Title', kind: 'text', placeholder: 'Called about the Voula quote' },
           { key: 'note', label: 'Details', kind: 'textarea' },
+        ],
+      },
+      {
+        label: 'Bank accounts', description: 'See or add where we pay a counterparty', icon: 'Landmark',
+        prompt: 'Show me the bank accounts on file for one of our counterparties — I will say which.',
+        done: 'Here are the bank accounts on file.',
+        promptTemplate: 'Show the bank accounts on file for {{company_query}}.',
+        run: { tool: 'manage_counterparty_bank_account', fixedArgs: { action: 'list' } },
+        form: [
+          { key: 'company_query', label: 'Counterparty', kind: 'text', required: true, help: 'Company name — Greek or Latin spelling both resolve.' },
         ],
       },
     ],

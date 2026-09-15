@@ -8,6 +8,7 @@
     "campaign_materialize_recipients",
     "commit_sourcing_options",
     "create_simple_flow",
+    "crm_set_primary_bank_account",
     "customer_360",
     "debit_credits",
     "delete_simple_flow",

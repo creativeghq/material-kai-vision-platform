@@ -1,6 +1,9 @@
 import { describeUpstreamError } from '../tool-result-shape.ts';
 import { moduleGate } from './module-gate.ts';
 import { attachPartyNames } from './record-labels.ts';
+// Generated from src/utils/iban.ts by `npm run vocab:mirror` — the SAME mod-97 the form runs and
+// the same one `public.iban_is_valid` enforces. Never hand-roll a second one here.
+import { isValidIban, normalizeIban } from '../iban.generated.ts';
 /**
  * CRM Tools for JARVIS — workspace-scoped queries over the CRM roster.
  *
@@ -49,6 +52,40 @@ async function callEdge(path: string, body: AnyRow, jwt: string | undefined): Pr
   } catch (e) {
     return { ok: false, status: 0, error: e instanceof Error ? e.message : 'network error' };
   }
+}
+
+/**
+ * Resolve ONE company in this workspace from an id or a fuzzy name.
+ *
+ * This existed twice and the copies had drifted: one searched `name_fold`/`name_xscript` as well
+ * as `name` and the other only `name`, so a Greek counterparty was reachable by its Latin trade
+ * name from one tool and not the other. Half the names in this CRM are Greek and the operator
+ * types Latin. Scoping to `workspaceId` IS the ownership check (invariant 1), not a convenience:
+ * the caller is service-role and `assert_workspace_member` deliberately lets that through.
+ */
+async function resolveCompanyInWorkspace(
+  workspaceId: string,
+  company_id: string | undefined,
+  company_query: string | undefined,
+  columns = 'id, name',
+): Promise<{ company?: AnyRow; error?: string; candidates?: AnyRow[] }> {
+  let q = supabase.from('crm_companies').select(columns).eq('workspace_id', workspaceId);
+  if (company_id) q = q.eq('id', company_id);
+  else if (company_query) {
+    const term = String(company_query).trim().replace(/[,()]/g, ' ');
+    q = q.or(`name.ilike.%${term}%,name_fold.ilike.%${term}%,name_xscript.ilike.%${term}%`);
+  } else return { error: 'Provide company_id or company_query.' };
+
+  const { data: matches, error } = await q.limit(8);
+  if (error) return { error: error.message };
+  if (!matches || matches.length === 0) return { error: 'No matching company in this workspace.' };
+  if (matches.length > 1) {
+    return {
+      error: `Multiple companies match "${company_query}". Ask which one.`,
+      candidates: (matches as AnyRow[]).map((c) => ({ id: c.id, name: c.name, vat: c.vat_number })),
+    };
+  }
+  return { company: matches[0] as AnyRow };
 }
 
 export const createCrmKadSearchTool = (workspaceId: string, onChunk?: (chunk: AnyRow) => void) => {
@@ -445,17 +482,13 @@ export const createEnrichCompanyFromAadeTool = (
       const denied = await moduleGate(workspaceId, 'crm');
       if (denied) return denied;
       // Resolve the company (service-role read, explicitly workspace-scoped).
-      let q = supabase.from('crm_companies').select('id, name, vat_number, country_code').eq('workspace_id', workspaceId);
-      if (company_id) q = q.eq('id', company_id);
-      else if (company_query) q = q.ilike('name', `%${company_query}%`);
-      else return JSON.stringify({ success: false, error: 'Provide company_id or company_query.' });
-      const { data: matches, error } = await q.limit(8);
-      if (error) return JSON.stringify({ success: false, error: error.message });
-      if (!matches || matches.length === 0) return JSON.stringify({ success: false, error: 'No matching company in this workspace.' });
-      if (matches.length > 1) {
-        return JSON.stringify({ success: false, error: `Multiple companies match "${company_query}". Ask which one.`, candidates: matches.map((c: AnyRow) => ({ id: c.id, name: c.name, vat: c.vat_number })) });
+      const resolved = await resolveCompanyInWorkspace(
+        workspaceId, company_id, company_query, 'id, name, vat_number, country_code',
+      );
+      if (!resolved.company) {
+        return JSON.stringify({ success: false, error: resolved.error, candidates: resolved.candidates });
       }
-      const company = matches[0];
+      const company = resolved.company;
       const digits = String(company.vat_number || '').replace(/[^0-9]/g, '');
       const cc = String(company.country_code || '').toUpperCase();
       const isGreek = cc === 'EL' || cc === 'GR' || (!cc && digits.length === 9);
@@ -501,29 +534,11 @@ export const createCustomerHealthTool = (
       const denied = await moduleGate(workspaceId, 'crm');
       if (denied) return denied;
 
-      // Tenancy binding. The RPC self-guards for a USER, but this client is service-role and
-      // assert_workspace_member deliberately lets that through — so resolving the company inside
-      // the workspace IS the check (invariant 1), not a convenience.
-      let q = supabase.from('crm_companies').select('id, name').eq('workspace_id', workspaceId);
-      if (company_id) q = q.eq('id', company_id);
-      else if (company_query) {
-        const term = String(company_query).trim().replace(/[,()]/g, ' ');
-        q = q.or(`name.ilike.%${term}%,name_fold.ilike.%${term}%,name_xscript.ilike.%${term}%`);
-      } else return JSON.stringify({ success: false, error: 'Provide company_id or company_query.' });
-
-      const { data: matches, error: mErr } = await q.limit(8);
-      if (mErr) return JSON.stringify({ success: false, error: mErr.message });
-      if (!matches || matches.length === 0) {
-        return JSON.stringify({ success: false, error: 'No matching company in this workspace.' });
+      const resolved = await resolveCompanyInWorkspace(workspaceId, company_id, company_query);
+      if (!resolved.company) {
+        return JSON.stringify({ success: false, error: resolved.error, candidates: resolved.candidates });
       }
-      if (matches.length > 1) {
-        return JSON.stringify({
-          success: false,
-          error: `Multiple companies match "${company_query}". Ask which one.`,
-          candidates: matches.map((c: AnyRow) => ({ id: c.id, name: c.name })),
-        });
-      }
-      const company = matches[0];
+      const company = resolved.company;
 
       const { data, error } = await supabase.rpc('get_customer_health', {
         p_company_id: company.id, p_days: days ?? 90,
@@ -570,6 +585,252 @@ export const createCustomerHealthTool = (
         company_id: z.string().optional().describe('The crm company UUID.'),
         company_query: z.string().optional().describe('Fuzzy company name to resolve (if you don\'t have the id).'),
         days: z.number().optional().describe('Comparison window in days (default 90, min 7, max 730).'),
+      }),
+    },
+  );
+};
+
+/**
+ * manage_counterparty_bank_account — where we pay a supplier, and where a customer pays us from.
+ *
+ * The app has had this since #366; the agent had NOTHING, so "add those bank accounts to
+ * <company>" resolved the company and then had no verb — and a missing tool reads as the model
+ * declining, not as a capability nobody built (conversation de92b987, 2026-09-15).
+ *
+ * @remarks Deliberately narrower than the form. No `update`/`remove`: changing an EXISTING
+ * payment destination behind the operator is how money reaches the wrong account. `add` never
+ * sets is_primary, and both writes are gated (invariant 9) — the source is usually a photographed
+ * statement, so the approver is the only party who has seen both it and the digits we read out.
+ * @remarks The mod-97 is the mirrored `isValidIban`, the same test `public.iban_is_valid` applies
+ * as a CHECK here; it runs in-tool so the operator gets a sentence instead of a 23514.
+ */
+export const createManageCounterpartyBankAccountTool = (
+  _userId: string,
+  workspaceId: string,
+  jwt: string | undefined,
+  onChunk?: (chunk: AnyRow) => void,
+) => {
+  // RLS is the boundary here, not an `.eq()` somebody remembered: every policy on
+  // crm_bank_accounts is `is_workspace_member(workspace_id)`, so the caller's own token is what
+  // scopes these. The service-role client this file uses elsewhere satisfies all four
+  // unconditionally, which is exactly wrong for a payment destination.
+  const sb = () => createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${jwt ?? ''}` } },
+    auth: { persistSession: false },
+  });
+
+  return tool(
+    async (
+      { action, company_id, company_query, contact_id, bank_name, account_holder, iban, account_ref,
+        currency, notes, account_id, confirm }: AnyRow,
+    ) => {
+      const denied = await moduleGate(workspaceId, 'crm');
+      if (denied) return denied;
+      if (!jwt) {
+        return JSON.stringify({
+          success: false,
+          error: 'Counterparty bank accounts need a signed-in user session and this request has none.',
+        });
+      }
+
+      // set_primary addresses a ROW, not a counterparty — there is nothing to resolve.
+      if (action === 'set_primary') {
+        if (!account_id) return JSON.stringify({ success: false, error: 'set_primary needs the account_id.' });
+        // `.eq('workspace_id', workspaceId)` as well as RLS, because they answer DIFFERENT
+        // questions: RLS asks whether the caller is a member of the row's workspace, and a
+        // multi-workspace user is a member of several. The agent is running in ONE of them, and
+        // that is the one whose records it may touch (invariant 1).
+        const { data: row, error: rowErr } = await sb()
+          .from('crm_bank_accounts').select('id, bank_name, iban')
+          .eq('id', account_id).eq('workspace_id', workspaceId).maybeSingle();
+        // A dropped error reads as "not found", which blames the user's data for a query fault.
+        if (rowErr) return JSON.stringify({ success: false, error: rowErr.message });
+        if (!row) return JSON.stringify({ success: false, error: 'No such bank account in this workspace.' });
+
+        if (confirm !== true) {
+          onChunk?.({
+            type: 'action_confirmation',
+            tool: 'manage_counterparty_bank_account',
+            input: { action: 'set_primary', account_id },
+            title: 'Make this the default payment account?',
+            summary: `${row.bank_name}${row.iban ? ` · ${row.iban}` : ''} becomes the account we pay to by `
+              + 'default, and whichever is primary now stops being it.',
+            danger: true,
+            toolkit_id: 'crm',
+            timestamp: Date.now(),
+          });
+          return JSON.stringify({
+            success: true, awaiting_confirmation: true,
+            message: 'Awaiting the user\'s approval. Do not retry — the user will approve or decline.',
+          });
+        }
+        // ONE transaction in SQL: the clear-others/set-this pair cannot half-apply and leave the
+        // counterparty with no primary at all (#366 BU-4, pipeline convention 3).
+        const { error } = await sb().rpc('crm_set_primary_bank_account', { p_account_id: account_id });
+        if (error) return JSON.stringify({ success: false, error: error.message });
+        onChunk?.({
+          type: 'crm_bank_account_saved',
+          data: { action: 'set_primary', account: { ...row, is_primary: true } },
+          timestamp: Date.now(),
+        });
+        return JSON.stringify({ success: true, account_id, message: `${row.bank_name} is now the default account.` });
+      }
+
+      // list and add both hang off a counterparty.
+      let parent: { company_id?: string; contact_id?: string; label: string };
+      if (contact_id) {
+        // Same as set_primary above: scoped to the workspace the agent is RUNNING in, not to
+        // every workspace the caller happens to belong to. Without it a multi-workspace user
+        // could hang another tenant's contact IBAN off this one — the insert below stamps
+        // `workspace_id: workspaceId` regardless of where the contact actually lives.
+        const { data: c, error: cErr } = await sb().from('crm_contacts')
+          .select('id, name').eq('id', contact_id).eq('workspace_id', workspaceId).maybeSingle();
+        if (cErr) return JSON.stringify({ success: false, error: cErr.message });
+        if (!c) return JSON.stringify({ success: false, error: 'No such contact in this workspace.' });
+        parent = { contact_id: c.id, label: c.name };
+      } else {
+        const resolved = await resolveCompanyInWorkspace(workspaceId, company_id, company_query);
+        if (!resolved.company) {
+          return JSON.stringify({ success: false, error: resolved.error, candidates: resolved.candidates });
+        }
+        parent = { company_id: resolved.company.id, label: resolved.company.name };
+      }
+
+      if (action === 'list') {
+        let q = sb().from('crm_bank_accounts')
+          .select('id, bank_name, account_holder, iban, account_ref, currency, is_primary, notes');
+        q = parent.company_id ? q.eq('company_id', parent.company_id) : q.eq('contact_id', parent.contact_id!);
+        const { data, error } = await q
+          .order('is_primary', { ascending: false }).order('created_at', { ascending: true });
+        if (error) return JSON.stringify({ success: false, error: error.message });
+        const accounts = (data ?? []) as AnyRow[];
+        onChunk?.({
+          type: 'crm_bank_accounts_listed',
+          data: { counterparty: parent.label, count: accounts.length, accounts },
+          timestamp: Date.now(),
+        });
+        // "None on file" is an ANSWER, not an empty list the reader has to interpret (rule 3).
+        return JSON.stringify(accounts.length === 0
+          ? {
+            success: true, found: false, counterparty: parent.label, accounts: [],
+            note: `No bank account is on file for "${parent.label}" yet.`,
+          }
+          : { success: true, found: true, counterparty: parent.label, accounts });
+      }
+
+      if (action === 'add') {
+        if (!bank_name || !String(bank_name).trim()) {
+          return JSON.stringify({ success: false, error: 'add needs the bank_name.' });
+        }
+        const normalizedIban = normalizeIban(iban);
+        if (!normalizedIban) {
+          return JSON.stringify({
+            success: false,
+            error: 'add needs the iban — an account with no number is not a payment destination.',
+          });
+        }
+        if (!isValidIban(normalizedIban)) {
+          return JSON.stringify({
+            success: false,
+            error: `"${normalizedIban}" fails its IBAN checksum. Read it off the document again — one `
+              + 'wrong character fails this test, which is what the test is for. Nothing was saved.',
+          });
+        }
+        // The same IBAN twice on one counterparty is a re-transcription, not a second account.
+        // `.limit(1)`, never `.maybeSingle()`: there is no unique index on (company_id, iban), so
+        // maybeSingle ERRORS on an already-duplicated row — and an ignored error reads as "no
+        // match", which is precisely when a third copy gets written.
+        let dupQ = sb().from('crm_bank_accounts').select('id, bank_name').eq('iban', normalizedIban);
+        dupQ = parent.company_id ? dupQ.eq('company_id', parent.company_id) : dupQ.eq('contact_id', parent.contact_id!);
+        const { data: dupRows, error: dupErr } = await dupQ.limit(1);
+        if (dupErr) return JSON.stringify({ success: false, error: dupErr.message });
+        const dup = dupRows?.[0];
+        if (dup) {
+          return JSON.stringify({
+            success: true, already_present: true, account_id: dup.id,
+            message: `"${parent.label}" already has ${normalizedIban} on file. Nothing added.`,
+          });
+        }
+
+        if (confirm !== true) {
+          onChunk?.({
+            type: 'action_confirmation',
+            tool: 'manage_counterparty_bank_account',
+            input: {
+              action: 'add', company_id: parent.company_id, contact_id: parent.contact_id,
+              bank_name, account_holder, iban: normalizedIban, account_ref, currency, notes,
+            },
+            title: `Add this bank account to ${parent.label}?`,
+            summary: `${String(bank_name).trim()} · ${normalizedIban}`
+              + `${account_holder ? ` · held by ${account_holder}` : ''}`
+              + `${currency && String(currency).toUpperCase() !== 'EUR' ? ` · ${String(currency).toUpperCase()}` : ''}`
+              + '. Check the IBAN against the document before approving — this is where money gets sent.',
+            danger: true,
+            toolkit_id: 'crm',
+            timestamp: Date.now(),
+          });
+          return JSON.stringify({
+            success: true, awaiting_confirmation: true,
+            message: 'Awaiting the user\'s approval. Do not retry — the user will approve or decline.',
+          });
+        }
+
+        // An allowlisted literal, never a spread of the model's own arguments (invariant 8).
+        // workspace_id is server-derived; is_primary is not settable here — see the header.
+        const payload = {
+          workspace_id: workspaceId,
+          company_id: parent.company_id ?? null,
+          contact_id: parent.contact_id ?? null,
+          bank_name: String(bank_name).trim(),
+          account_holder: account_holder ? String(account_holder).trim() : null,
+          iban: normalizedIban,
+          account_ref: account_ref ? String(account_ref).trim() : null,
+          currency: currency ? String(currency).toUpperCase().slice(0, 3) : 'EUR',
+          is_primary: false,
+          notes: notes ? String(notes).trim() : null,
+        };
+        const { data, error } = await sb().from('crm_bank_accounts').insert(payload).select('*').single();
+        if (error) return JSON.stringify({ success: false, error: error.message });
+        onChunk?.({
+          type: 'crm_bank_account_saved',
+          data: { action: 'add', counterparty: parent.label, account: data },
+          timestamp: Date.now(),
+        });
+        return JSON.stringify({
+          success: true, account_id: data.id,
+          message: `Added ${payload.bank_name} (${normalizedIban}) to "${parent.label}".`,
+        });
+      }
+
+      return JSON.stringify({ success: false, error: `Unknown action "${action}".` });
+    },
+    {
+      name: 'manage_counterparty_bank_account',
+      description:
+        'The bank accounts of a CRM company or contact — where we pay a supplier, and where a customer '
+        + 'pays us from. list (what is on file), add (a new account: bank_name + iban required, and the '
+        + 'IBAN is checksum-tested before it is stored), set_primary (make one the default we pay to, by '
+        + 'account_id). Use for "add this IBAN to <company>", "add the bank accounts off this statement", '
+        + '"which account do we pay <supplier> into". add and set_primary both ask the user to approve '
+        + 'first — show them what you read and let them check it. To CHANGE or REMOVE an existing account, '
+        + 'send the user to the company\'s Bank accounts panel in CRM; this tool deliberately cannot.',
+      schema: z.object({
+        action: z.enum(['list', 'add', 'set_primary']),
+        company_id: z.string().optional().describe('The crm company UUID.'),
+        company_query: z.string().optional().describe('Fuzzy company name to resolve (Greek or Latin spelling both work).'),
+        contact_id: z.string().optional().describe('A crm contact UUID, if the account belongs to a person rather than a company.'),
+        bank_name: z.string().optional().describe('add: the bank, e.g. "Piraeus" (required).'),
+        account_holder: z.string().optional().describe('add: the name on the account, if it differs from the counterparty.'),
+        iban: z.string().optional().describe('add: the IBAN (required). Spaces are fine; it is checksum-tested.'),
+        account_ref: z.string().optional().describe('add: a local account number, if the document shows one beside the IBAN.'),
+        currency: z.string().optional().describe('add: ISO currency code, default EUR.'),
+        notes: z.string().optional().describe('add: anything worth recording about this account.'),
+        account_id: z.string().optional().describe('set_primary: the bank account UUID to make the default.'),
+        // Declared because the Approve card re-invokes the tool with confirm:true — that is how
+        // the gate is released. The model cannot set it: `confirm` is in MODEL_FORBIDDEN_ARG_KEYS
+        // and stripped from model-authored arguments, and it is on NEVER_ASK so no quick-start
+        // form can pre-answer it either.
+        confirm: z.boolean().optional().describe('Do NOT set this — the Approve/Decline card sets confirm:true when the user approves.'),
       }),
     },
   );

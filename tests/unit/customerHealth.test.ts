@@ -51,14 +51,29 @@ describe('the verdict comes from SQL', () => {
   });
 });
 
+/**
+ * The resolution moved into `resolveCompanyInWorkspace`, shared by every tool in this file. It
+ * was inline here and inline again in enrich_company_from_aade, and the copies had DRIFTED: this
+ * one searched the folded and transliterated name columns and that one searched only `name`, so a
+ * Greek counterparty was reachable by its Latin trade name from one tool and not the other. The
+ * obligations below are unchanged; they are asserted where the code now lives.
+ */
+const RESOLVER = (() => {
+  const i = CODE.indexOf('async function resolveCompanyInWorkspace');
+  expect(i, 'resolveCompanyInWorkspace is gone from crm-tools.ts').toBeGreaterThan(-1);
+  return CODE.slice(i, CODE.indexOf('export const createCrmKadSearchTool', i));
+})();
+
 describe('tenancy', () => {
   it('resolves the company inside the workspace before calling the RPC', () => {
     // The client is service-role and assert_workspace_member deliberately lets that through, so
     // this resolve IS the ownership check (invariant 1), not a convenience.
-    const resolve = TOOL.indexOf(".eq('workspace_id', workspaceId)");
+    const resolve = TOOL.indexOf('resolveCompanyInWorkspace(');
     const rpc = TOOL.indexOf("rpc('get_customer_health'");
-    expect(resolve, 'the company read is not workspace-scoped').toBeGreaterThan(-1);
-    expect(resolve, 'the workspace scope must be applied BEFORE the RPC call').toBeLessThan(rpc);
+    expect(resolve, 'the company is no longer resolved before the RPC').toBeGreaterThan(-1);
+    expect(resolve, 'the resolve must happen BEFORE the RPC call').toBeLessThan(rpc);
+    expect(RESOLVER, 'the shared resolver is not workspace-scoped')
+      .toContain(".eq('workspace_id', workspaceId)");
   });
 
   it('asks the module gate', () => {
@@ -68,8 +83,18 @@ describe('tenancy', () => {
   });
 
   it('refuses an ambiguous name instead of picking one', () => {
-    expect(TOOL).toMatch(/matches\.length > 1/);
-    expect(TOOL).toMatch(/candidates:/);
+    expect(RESOLVER).toMatch(/matches\.length > 1/);
+    expect(RESOLVER).toMatch(/candidates:/);
+    // …and the caller must actually stop on it, rather than reading `.company` off a refusal.
+    expect(TOOL).toMatch(/if \(!resolved\.company\)/);
+    expect(TOOL).toMatch(/candidates: resolved\.candidates/);
+  });
+
+  it('a Greek counterparty is reachable by its Latin trade name', () => {
+    // Half the names in this CRM are Greek and the operator types Latin. `name_fold` and
+    // `name_xscript` are what make "New Plan" find "Μ ΚΑΝΑΤΣΙΟΠΟΥΛΟΣ NEW PLAN …".
+    expect(RESOLVER).toContain('name_fold.ilike');
+    expect(RESOLVER).toContain('name_xscript.ilike');
   });
 });
 

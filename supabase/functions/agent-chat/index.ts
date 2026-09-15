@@ -159,9 +159,17 @@ async function initRuntime() {
   // default, so langchain's compatibility check let it through — a coincidence, not a design.
   // Sampling parameters are removed on this model tier; the six sites that had picked a
   // different value were all throwing on every call.
+  // `maxTokens` caps EVERYTHING the model emits, and on Opus 5 that includes thinking: omitting
+  // the `thinking` parameter runs ADAPTIVE thinking (a change from Opus 4.8/4.7, where omitting
+  // it meant none) and `display` defaults to `omitted`, so those blocks arrive with empty text.
+  // At 4096 a turn could spend the whole budget reasoning and return no text and no parseable
+  // tool call (conversation de92b987, 2026-09-15). 8192 is sized against AGENT_NODE_TIMEOUT_MS,
+  // NOT the model's 128k: the measured rate was ~87 tok/s, so the model's own ceiling lands near
+  // 94s and the 115s node timeout stays the outer bound. Raising it further only trades a clean,
+  // nameable `max_tokens` stop for a thrown node timeout that discards the streamed text.
   modelOpus = new ChatAnthropic({
     model: MAIN_MODEL,
-    maxTokens: 4096,
+    maxTokens: 8192,
     apiKey: ANTHROPIC_API_KEY,
   });
 
@@ -364,6 +372,48 @@ function createAgentGraph(
 
     // Check if done (no tool calls)
     if (!response.tool_calls || response.tool_calls.length === 0) {
+      // No tool calls AND no text is the model stopping without saying anything, and it must be
+      // NAMED here — the only scope that can see why. `shouldContinue` ends the graph on
+      // `finalResponse !== null` and '' is not null, so an empty string ended the turn as a
+      // clean success and the caller rethrew it as "failed to return a valid result": a generic
+      // crash for a turn that did not crash (conversation de92b987, 2026-09-15).
+      const text = extractTextContent(response.content);
+      let finalResponse = text;
+      if (!text) {
+        const stopReason = response.response_metadata?.stop_reason ?? null;
+        // A tool call the model DID emit but that arrived unparseable — truncation mid-JSON
+        // puts it here rather than in `tool_calls`, so without reading this the attempted
+        // action is silently discarded and the turn looks like the model said nothing.
+        const invalid = Array.isArray(response.invalid_tool_calls) ? response.invalid_tool_calls : [];
+        console.warn('[agent-chat] model returned neither text nor a usable tool call', JSON.stringify({
+          iteration, stopReason, invalidToolCalls: invalid.length, outputTokens,
+          toolResults: state.toolResults?.length ?? 0,
+          attempted: invalid.map((c: any) => c?.name).filter(Boolean),
+        }));
+        // Whether anything RAN is a different fact from why the model went quiet, and it is the
+        // one that decides whether retrying is safe. This branch sits after any number of tool
+        // iterations, so a flat "nothing was changed" would invite a retry straight into a
+        // duplicate of a write that had already committed.
+        const ranTools = (state.toolResults?.length ?? 0) > 0;
+        const didWhat = ranTools
+          ? 'The steps above already ran, so check them before asking me to repeat this.'
+          : 'Nothing was changed.';
+        if (invalid.length > 0) {
+          const named = invalid.map((c: any) => c?.name).filter(Boolean).join(', ');
+          finalResponse = `I started ${named ? `the ${named} step` : 'an action'} and the instruction came back `
+            + `incomplete, so I stopped rather than run it half-formed. ${didWhat} `
+            + 'Ask me again and I will take it in smaller steps.';
+        } else if (stopReason === 'max_tokens') {
+          finalResponse = `I hit this turn's output limit before writing anything back. ${didWhat} `
+            + 'Narrow the request and I will pick it up from there.';
+        } else if (stopReason === 'refusal') {
+          finalResponse = `I stopped on this one and cannot act on it as asked. ${didWhat}`;
+        } else {
+          finalResponse = `I stopped without writing a reply and nothing here says why. ${didWhat} `
+            + `Send that again${stopReason ? ` (the turn ended on "${stopReason}")` : ''}, and `
+            + 'if it happens twice tell the operator — the turn is logged.';
+        }
+      }
       return {
         messages: [response],
         iteration,
@@ -372,7 +422,7 @@ function createAgentGraph(
         cacheReadTokens,
         cacheWriteTokens,
         turnCount: 1,
-        finalResponse: extractTextContent(response.content),
+        finalResponse,
       };
     }
 
@@ -845,7 +895,9 @@ function getModelByName(name: string): ChatAnthropicModel {
       // nothing. The default is the same on every tier, so leaving it out is the setting that
       // actually holds sampling constant.
       model: name,
-      maxTokens: 4096,
+      // Same ceiling as modelOpus, for the same reason — and a pinned turn must not be
+      // measured against a budget the router's own model does not have.
+      maxTokens: 8192,
       apiKey: ANTHROPIC_API_KEY,
     });
     _modelByName.set(name, m);
@@ -968,6 +1020,10 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost',
       // CRM roster query — "which businesses have ΚΑΔ X?" + create-from-VAT (all users; workspace-scoped)
       'search_crm_by_kad', 'create_company_from_vat', 'enrich_company_from_aade', 'manage_crm', 'manage_deal', 'customer_health',
+      // Where we pay a counterparty. A cluster is the unit the picker offers, so an owner of the
+      // CRM cluster binds all of it — and this one is why: routed to a specialist that did not
+      // list it, "add these bank accounts" had no verb at all.
+      'manage_counterparty_bank_account',
       // Sub-agent orchestration (admin/owner only — gated at injection time)
       'research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis',
       // B2B Research (admin/owner only)
@@ -1236,6 +1292,9 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'price_lookup', 'product_analysis', 'business_analysis', 'dispatch_background_task',
       // Price monitoring + CRM-from-VAT (Pepper is the product/business agent)
       'track_product_prices', 'get_price_summary', 'create_company_from_vat', 'enrich_company_from_aade', 'manage_crm', 'manage_deal', 'customer_health',
+      // Pepper is a declared OWNER of the crm cluster, and a cluster is the unit the picker
+      // offers — bind all of it or the quick-start answers "not available for this agent".
+      'manage_counterparty_bank_account',
     ],
   },
   marketing: {
@@ -1316,6 +1375,9 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'list_mydata_expenses',
       // Contracts & e-signature (finance/legal domain)
       'manage_contracts',
+      // Where the money goes. Trinity pays expenses and reads supplier overviews, so the account
+      // a supplier is paid INTO is its business; the write half is confirm-gated in the tool.
+      'manage_counterparty_bank_account',
     ],
   },
   'social-media': {
@@ -1983,7 +2045,7 @@ async function executeAgent(
   const needsMyHr = config.tools.includes('manage_my_hr');
   const needsStock = config.tools.includes('manage_stock');
   const needsRealEstate = config.tools.includes('manage_real_estate');
-  const needsCrm = config.tools.some((t: string) => ['search_crm_by_kad', 'create_company_from_vat', 'enrich_company_from_aade', 'manage_crm', 'manage_deal', 'customer_health'].includes(t));
+  const needsCrm = config.tools.some((t: string) => ['search_crm_by_kad', 'create_company_from_vat', 'enrich_company_from_aade', 'manage_crm', 'manage_deal', 'customer_health', 'manage_counterparty_bank_account'].includes(t));
   const needsQuotes = config.tools.some((t: string) => ['create_quote', 'generate_quote_pdf', 'list_my_quotes', 'raise_quote_request'].includes(t));
   const needsSocial = config.tools.includes('manage_social');
   // Tech Radar spends real Anthropic + web-search $ per call with no credit debit
@@ -2277,6 +2339,9 @@ async function executeAgent(
   // so before this the question took six tool calls and nothing put the answer together.
   if (config.tools.includes('customer_health') && crmToolsMod?.createCustomerHealthTool) {
     tools.push(crmToolsMod.createCustomerHealthTool(userId, workspaceId, onChunk));
+  }
+  if (config.tools.includes('manage_counterparty_bank_account') && crmToolsMod?.createManageCounterpartyBankAccountTool) {
+    tools.push(crmToolsMod.createManageCounterpartyBankAccountTool(userId, workspaceId, userJwt, onChunk));
   }
   if (config.tools.includes('manage_crm') && crmToolsMod?.createManageCrmTool) {
     tools.push(crmToolsMod.createManageCrmTool(userId, workspaceId, userJwt, onChunk));
@@ -3417,18 +3482,32 @@ async function executeAgent(
     // Execute the graph
     const result = await agentGraph.invoke(initialState);
 
-    // Log final usage stats
-
-    // Return results
-    // `stepBudget`, not a literal 10 — this comparison was hardcoded while the budget above was a
-    // parameter, so raising the budget for research turns would have left the apology firing at
-    // step 10 of 20. The `finalize` node now writes a real answer in this case, so reaching this
-    // fallback at all means the wrap-up turn itself failed.
-    let finalText = result.finalResponse ||
-      (result.iteration >= stepBudget
+    // A reply is TEXT, or a stated reason there is none — never an empty string. The agent node
+    // ends the graph on `finalResponse !== null`, and extractTextContent returns '' for content
+    // holding only thinking blocks, so a turn that spent its output budget reasoning ended here
+    // with '' and the caller rethrew it as "failed to return a valid result", naming nothing
+    // anyone could act on. Each branch below is a DIFFERENT state, and tool work the turn already
+    // did is reported rather than discarded. `stepBudget`, never a literal, is the real budget.
+    const producedToolWork = (result.toolResults?.length ?? 0) > 0;
+    if (!result.finalResponse) {
+      console.warn('[agent-chat] the model ended the turn with no text', JSON.stringify({
+        iteration: result.iteration,
+        stepBudget,
+        toolResults: result.toolResults?.length ?? 0,
+        outputTokens: result.outputTokens,
+        turnCount: result.turnCount,
+      }));
+    }
+    let finalText = result.finalResponse || (
+      result.iteration >= stepBudget
         ? 'I ran out of processing steps on this turn and could not write up what I found. '
           + 'Ask me to continue and I will pick up from a narrower scope.'
-        : '');
+        : producedToolWork
+          ? 'I ran the steps below but stopped before writing them up. The results are here -- '
+            + 'ask me to summarise them and I will work from what I already have.'
+          : 'I stopped without writing a reply, and nothing here says why. Send that again, or '
+            + 'narrow it, and if it happens twice tell the operator -- the turn is logged.'
+    );
 
     // ── A question in prose is converted into a form. Mechanically. ───────────
     try {
