@@ -1123,6 +1123,25 @@
           }
         ],
         "response": "{success, error, html, source, storedLayout, defaultLayout, sampleHtml, brand}"
+      },
+      {
+        "name": "domain-tracking",
+        "summary": "Read, and optionally set, Resend's per-domain open/click tracking. Platform operator only.",
+        "params": [
+          {
+            "name": "domain",
+            "type": "string",
+            "required": false,
+            "desc": "Sending domain to inspect. Defaults to the first domain on the Resend account."
+          },
+          {
+            "name": "set",
+            "type": "object",
+            "required": false,
+            "desc": "{open_tracking?:boolean, click_tracking?:boolean} — applied before the values are read back."
+          }
+        ],
+        "response": "{success, domain, status, open_tracking, click_tracking}"
       }
     ],
     "request": [

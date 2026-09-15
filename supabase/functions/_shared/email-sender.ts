@@ -12,19 +12,13 @@ export interface ResolvedEmailSender {
   /** Reply-To to apply as the default when the caller didn't set one. '' = none (reply to From). */
   replyTo: string;
   /**
-   * `workspace` — the tenant's own BYOK key and domain.
-   * `platform`   — the operator's key. Legitimate ONLY with no workspace (a system send) or for
-   *                the operator's own ROOT workspace.
-   * `unconfigured` — a TENANT workspace with incomplete BYOK. There is no sender; the caller
-   *                must refuse rather than send (#357 AE-1).
+   * `platform` is legitimate ONLY with no workspace or for our own ROOT one; `unconfigured`
+   * is a tenant with incomplete BYOK, and the caller must refuse rather than send (#357 AE-1).
    */
   source: 'workspace' | 'platform' | 'unconfigured';
   /** Why there is no sender. Present only when `source === 'unconfigured'`. */
   reason?: string;
-  /**
-   * A brand belongs to the sender, so it resolves here, not at the 22 call sites — and a
-   * tenant gets its own or the default, never the operator's (same rule as the Resend key).
-   */
+  /** Resolved here, not at the 22 call sites; a tenant never gets the operator's. */
   layoutHtml: string | null;
   brand: LayoutBrand;
 }
@@ -39,8 +33,44 @@ export const OPERATOR_BRAND_KEYS = [
   'brand_name',
   'brand_url',
   'brand_logo_url',
+  'brand_logo_dark_url',
   'brand_footer_note',
 ] as const;
+
+/** The footer's legal identity, from the sender's OWN finance_settings — never retyped. */
+export async function businessLinesFor(
+  supabase: SupabaseLike,
+  workspaceId: string | null,
+): Promise<string[]> {
+  const cols = 'business_name, business_company_type, business_vat, business_gemi, business_address,'
+    + ' business_street_number, business_postal_code, business_city, business_country,'
+    + ' business_tax_office, business_phone';
+  try {
+    const q = supabase.from('finance_settings').select(cols);
+    const { data } = workspaceId
+      ? await q.eq('workspace_id', workspaceId).maybeSingle()
+      : await q.eq('workspace_id', (await supabase.from('workspaces').select('id').eq('is_root', true).maybeSingle()).data?.id ?? '').maybeSingle();
+    if (!data) return [];
+
+    const clean = (x: unknown) => String(x ?? '').replace(/\s+/g, ' ').trim();
+    const join = (parts: unknown[], sep: string) => parts.map(clean).filter(Boolean).join(sep);
+
+    const name = join([data.business_name, data.business_company_type], ' ');
+    const street = join([data.business_address, data.business_street_number], ' ');
+    const place = join([data.business_postal_code, data.business_city], ' ');
+    const where = join([street, place, data.business_country], ', ');
+    const ids = join([
+      data.business_vat ? `ΑΦΜ ${clean(data.business_vat)}` : '',
+      data.business_tax_office ? `ΔΟΥ ${clean(data.business_tax_office)}` : '',
+      data.business_gemi ? `ΓΕΜΗ ${clean(data.business_gemi)}` : '',
+      clean(data.business_phone),
+    ], ' · ');
+
+    return [name, where, ids].filter(Boolean);
+  } catch (_) {
+    return []; // Not worth failing a send over; an absent block is visibly absent.
+  }
+}
 
 interface PlatformIdentity {
   fromEmail: string;
@@ -50,6 +80,7 @@ interface PlatformIdentity {
   brandName: string;
   brandUrl: string;
   logoUrl: string;
+  logoDarkUrl: string;
   footerNote: string;
 }
 
@@ -73,6 +104,7 @@ async function platformSender(supabase: SupabaseLike): Promise<PlatformIdentity>
     brandName: v.brand_name || fromName,
     brandUrl: v.brand_url || (Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr'),
     logoUrl: v.brand_logo_url || '',
+    logoDarkUrl: v.brand_logo_dark_url || '',
     footerNote: v.brand_footer_note || '',
   };
 }
@@ -108,9 +140,12 @@ export async function resolveWorkspaceEmailSender(
           brandName: fromName,
           brandUrl: (cfg.brand_url ?? '').trim(),
           logoUrl: (cfg.brand_logo_url ?? '').trim(),
+          logoDarkUrl: (cfg.brand_logo_dark_url ?? '').trim(),
           senderName: fromName,
           senderEmail: fromEmail,
           footerNote: (cfg.brand_footer_note ?? '').trim(),
+          businessLines: await businessLinesFor(supabase, workspaceId),
+          legalLinks: [],
         },
       };
     }
@@ -128,7 +163,10 @@ export async function resolveWorkspaceEmailSender(
         replyTo: '',
         source: 'unconfigured',
         layoutHtml: null,
-        brand: { brandName: '', brandUrl: '', logoUrl: '', senderName: '', senderEmail: '', footerNote: '' },
+        brand: {
+          brandName: '', brandUrl: '', logoUrl: '', logoDarkUrl: '',
+          senderName: '', senderEmail: '', footerNote: '', businessLines: [], legalLinks: [],
+        },
         reason: 'This workspace has no verified email sender of its own. Add a Resend API key and '
           + 'a verified From address in Profile → Keys. Mail is never sent from the platform '
           + "domain on a workspace's behalf.",
@@ -137,6 +175,7 @@ export async function resolveWorkspaceEmailSender(
   }
 
   const p = await platformSender(supabase);
+  const appBase = (Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr').replace(/\/+$/, '');
   return {
     apiKey: platformKey,
     fromEmail: p.fromEmail,
@@ -148,9 +187,15 @@ export async function resolveWorkspaceEmailSender(
       brandName: p.brandName,
       brandUrl: p.brandUrl,
       logoUrl: p.logoUrl,
+      logoDarkUrl: p.logoDarkUrl,
       senderName: p.fromName,
       senderEmail: p.fromEmail,
       footerNote: p.footerNote,
+      businessLines: await businessLinesFor(supabase, null),
+      legalLinks: [
+        { label: 'Privacy Policy', url: `${appBase}/privacy` },
+        { label: 'Terms of Service', url: `${appBase}/terms` },
+      ],
     },
   };
 }

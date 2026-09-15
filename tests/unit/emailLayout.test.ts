@@ -21,9 +21,12 @@ const BRAND = {
   brandName: 'Materials Hub',
   brandUrl: 'https://app.materialshub.gr',
   logoUrl: '',
+  logoDarkUrl: '',
   senderName: 'Materials Hub',
   senderEmail: 'find@mail.materialshub.gr',
-  footerNote: 'Some Street 1, Thessaloniki',
+  footerNote: '',
+  businessLines: ['MATERIALS BANK ΕΕ', 'ΔΗΜΗΤΡΙΟΥ ΧΑΡΙΣΗ 14, 54352 ΘΕΣΣΑΛΟΝΙΚΗ, Greece'],
+  legalLinks: [{ label: 'Privacy Policy', url: 'https://app.materialshub.gr/privacy' }],
 };
 
 const wrap = (content: string, over: Partial<Parameters<typeof wrapInLayout>[1]> = {}) =>
@@ -178,6 +181,61 @@ describe('email layout — the plain-text alternative', () => {
 
   it('decodes &amp; last, so an escaped entity is not decoded twice', () => {
     expect(htmlToPlainText('<p>&amp;lt;b&amp;gt;</p>')).toBe('&lt;b&gt;');
+  });
+});
+
+describe('email layout — logo, business identity, legal links', () => {
+  it('renders the logo and swaps it for the dark one under a dark scheme', () => {
+    const { html } = wrap('<p>x</p>', {
+      brand: { ...BRAND, logoUrl: 'https://x/l.png', logoDarkUrl: 'https://x/d.png' },
+    });
+    expect(html).toContain('class="mk-logo-light"');
+    expect(html).toContain('class="mk-logo-dark"');
+    expect(html).toContain('.mk-logo-dark { display:none !important; }');
+    expect(html).toContain('.mk-logo-dark { display:inline-block !important; }');
+  });
+
+  it('keeps a single logo visible when there is no dark variant', () => {
+    const { html } = wrap('<p>x</p>', { brand: { ...BRAND, logoUrl: 'https://x/l.png' } });
+    expect(html).toContain('mk-logo-only');
+    expect(html).not.toContain('class="mk-logo-dark"');
+  });
+
+  it('falls back to the wordmark when no logo is set', () => {
+    const { html } = wrap('<p>x</p>');
+    expect(html).toContain('mk-wordmark');
+    expect(html).not.toContain('<img');
+  });
+
+  it('prints the business identity in the footer, escaped', () => {
+    const { html } = wrap('<p>x</p>', {
+      brand: { ...BRAND, businessLines: ['Tiles & Stone <EE>', 'Athens'] },
+    });
+    expect(html).toContain('Tiles &amp; Stone &lt;EE&gt;');
+    expect(html).toContain('Athens');
+  });
+
+  it('omits the business block entirely when nothing is on file', () => {
+    // The rendered ELEMENT, not the class: mk-legal is also a dark-mode stylesheet rule.
+    const { html } = wrap('<p>x</p>', { brand: { ...BRAND, businessLines: [] } });
+    expect(html).not.toContain('class="mk-fine mk-legal"');
+    expect(wrap('<p>x</p>').html).toContain('class="mk-fine mk-legal"');
+  });
+
+  it('renders legal links only when given, and never invents a route', () => {
+    expect(wrap('<p>x</p>').html).toContain('/privacy');
+    const none = wrap('<p>x</p>', { brand: { ...BRAND, legalLinks: [] } }).html;
+    expect(none).not.toContain('Privacy Policy');
+  });
+
+  it('gives a tenant its own identity and none of ours', () => {
+    const { html } = wrapInLayout('<p>x</p>', {
+      kind: 'workspace',
+      brand: { ...BRAND, brandName: 'Keros Hellas', businessLines: ['Keros Hellas ΕΠΕ'], legalLinks: [] },
+    });
+    expect(html).toContain('Keros Hellas');
+    expect(html).not.toContain('MATERIALS BANK');
+    expect(html).not.toContain('Privacy Policy');
   });
 });
 

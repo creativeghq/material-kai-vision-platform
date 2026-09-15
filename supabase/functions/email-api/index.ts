@@ -1122,6 +1122,55 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         );
       }
 
+      case 'domain-tracking': {
+        // Resend injects the open pixel per DOMAIN and the flag lives only there, so with it
+        // off the webhook is wired, subscribed, and simply never called.
+        if (!isAdminAccess(auth) && !(await isPlatformOperator(supabaseClient, auth.userId))) {
+          throw new HttpError(403, 'Platform operator access required');
+        }
+        const key = Deno.env.get('RESEND_API_KEY') || '';
+        if (!key) throw new HttpError(503, 'RESEND_API_KEY is not configured');
+        const rHeaders = { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' };
+
+        const listRes = await fetch('https://api.resend.com/domains', { headers: rHeaders });
+        const list = await listRes.json();
+        if (!listRes.ok) throw new HttpError(502, list?.message || `Resend ${listRes.status}`);
+
+        const body2 = (requestBody ?? {}) as {
+          domain?: string;
+          set?: { open_tracking?: boolean; click_tracking?: boolean };
+        };
+        const wanted = (body2.domain || '').trim().toLowerCase();
+        const domains: Array<{ id: string; name: string }> = list?.data ?? [];
+        const target = wanted ? domains.find(d => d.name.toLowerCase() === wanted) : domains[0];
+        if (!target) throw new HttpError(404, `No such domain at Resend: ${wanted || '(none configured)'}`);
+
+        if (body2.set && (body2.set.open_tracking !== undefined || body2.set.click_tracking !== undefined)) {
+          const patch = await fetch(`https://api.resend.com/domains/${target.id}`, {
+            method: 'PATCH',
+            headers: rHeaders,
+            body: JSON.stringify(body2.set),
+          });
+          const patched = await patch.json();
+          if (!patch.ok) throw new HttpError(502, patched?.message || `Resend ${patch.status}`);
+        }
+
+        const oneRes = await fetch(`https://api.resend.com/domains/${target.id}`, { headers: rHeaders });
+        const one = await oneRes.json();
+        if (!oneRes.ok) throw new HttpError(502, one?.message || `Resend ${oneRes.status}`);
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            domain: one?.name ?? target.name,
+            status: one?.status ?? null,
+            open_tracking: one?.open_tracking ?? null,
+            click_tracking: one?.click_tracking ?? null,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+
       case 'domains': {
         if (req.method !== 'GET' && req.method !== 'POST') throw new HttpError(405, 'Method not allowed');
 

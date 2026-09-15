@@ -2546,6 +2546,30 @@
                       }
                     },
                     "description": "Returns: {success, error, html, source, storedLayout, defaultLayout, sampleHtml, brand}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "domain-tracking"
+                        ],
+                        "description": "Read, and optionally set, Resend's per-domain open/click tracking. Platform operator only."
+                      },
+                      "domain": {
+                        "type": "string",
+                        "description": "Sending domain to inspect. Defaults to the first domain on the Resend account."
+                      },
+                      "set": {
+                        "type": "object",
+                        "description": "{open_tracking?:boolean, click_tracking?:boolean} — applied before the values are read back."
+                      }
+                    },
+                    "description": "Returns: {success, domain, status, open_tracking, click_tracking}"
                   }
                 ],
                 "discriminator": {

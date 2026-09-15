@@ -11,14 +11,14 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
-const BRAND_KEYS = ['brand_name', 'brand_url', 'brand_logo_url', 'brand_footer_note'] as const;
+const BRAND_KEYS = ['brand_name', 'brand_url', 'brand_logo_url', 'brand_logo_dark_url', 'brand_footer_note'] as const;
 const LAYOUT_KEY = 'default_layout_html';
 const CONTENT_SLOT = '{{content}}';
 
 type BrandKey = (typeof BRAND_KEYS)[number];
 type Brand = Record<BrandKey, string>;
 
-const EMPTY_BRAND: Brand = { brand_name: '', brand_url: '', brand_logo_url: '', brand_footer_note: '' };
+const EMPTY_BRAND: Brand = { brand_name: '', brand_url: '', brand_logo_url: '', brand_logo_dark_url: '', brand_footer_note: '' };
 
 export const EmailLayoutPanel: React.FC = () => {
   const [brand, setBrand] = useState<Brand>(EMPTY_BRAND);
@@ -184,14 +184,30 @@ export const EmailLayoutPanel: React.FC = () => {
               </p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="brand_footer_note">Footer note</Label>
+              <Label htmlFor="brand_logo_dark_url">Logo URL — dark mode</Label>
+              <Input
+                id="brand_logo_dark_url"
+                placeholder="https://…/logo-white.png (optional)"
+                value={brand.brand_logo_dark_url}
+                onChange={e => setBrand({ ...brand, brand_logo_dark_url: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground">
+                Shown when the reader's client is in dark mode. A dark wordmark vanishes on a dark
+                ground and no email client can recolour a PNG.
+              </p>
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="brand_footer_note">Extra footer line</Label>
               <Input
                 id="brand_footer_note"
-                placeholder="Company name, street, city, VAT number"
+                placeholder="Optional — anything beyond the company details"
                 value={brand.brand_footer_note}
                 onChange={e => setBrand({ ...brand, brand_footer_note: e.target.value })}
               />
-              <p className="text-xs text-muted-foreground">A postal address here is required on marketing sends.</p>
+              <p className="text-xs text-muted-foreground">
+                The legal footer — company name, address, ΑΦΜ, ΔΟΥ, ΓΕΜΗ — is read from Finance →
+                Settings and printed automatically. Use this only for something extra.
+              </p>
             </div>
           </div>
 
