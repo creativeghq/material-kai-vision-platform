@@ -233,6 +233,15 @@ function partyFromFinanceSettings(fs: any, branchCode: unknown): FiscalParty {
   };
 }
 
+function assertWorkspaceIsABusiness(party: FiscalParty, what: string): void {
+  if (!party.vatNumber) {
+    throw new Error(
+      `refusing to build ${what}: this workspace has no ΑΦΜ. Set the business details in ` +
+        'Finance → Settings before issuing fiscal documents.',
+    );
+  }
+}
+
 /**
  * SELF-BILLING (αυτοτιμολόγηση). The buyer draws the document up, but it is legally the SUPPLIER's
  * invoice — their ΑΦΜ issues it, their income, their VAT — so the parties are the other way round
@@ -365,6 +374,7 @@ export async function buildInvoiceInputFromDb(
 
   const selfBilledSupplierId: string | null = inv.self_billed_supplier_company_id ?? null;
   const workspaceParty = partyFromFinanceSettings(fs, inv.branch_code);
+  assertWorkspaceIsABusiness(workspaceParty, `invoice ${invoiceId}`);
 
   // `self_pricing` alone used to mark the document while leaving US as the issuer, which is the
   // one arrangement αυτοτιμολόγηση cannot be: it filed the supplier's sale under our ΑΦΜ. The flag
@@ -708,6 +718,7 @@ export async function buildCreditNoteInputFromDb(
   // document we never issued, and leave the supplier's original uncorrected.
   const cnSelfBilledSupplierId: string | null = inv.self_billed_supplier_company_id ?? null;
   const cnWorkspaceParty = partyFromFinanceSettings(fs, inv.branch_code);
+  assertWorkspaceIsABusiness(cnWorkspaceParty, 'this credit note');
 
   let issuer: FiscalParty;
   let counterpart: FiscalParty;
@@ -891,21 +902,8 @@ export async function buildDeliveryNoteInputFromDb(
   ]);
   assertFiscalLines(items, itemsErr, `delivery note ${deliveryNoteId}`);
 
-  const issuer: FiscalParty = {
-    vatNumber: fiscalVatNumber(fs?.business_vat, fs?.business_country_code ?? 'GR'),
-    country: fs?.business_country_code ?? 'GR',
-    branch: Number(dn.branch_code ?? 0),
-    name: fs?.business_name ?? '',
-    profession: fs?.business_profession ?? undefined,
-    taxOffice: fs?.business_tax_office ?? undefined,
-    address: {
-      street: fs?.business_address ?? '', number: fs?.business_street_number ?? '',
-      postalCode: fs?.business_postal_code ?? '', city: fs?.business_city ?? '',
-      country: fs?.business_country_code ?? 'GR',
-    },
-    phone: fs?.business_phone ?? undefined,
-    email: fs?.business_email ?? undefined,
-  };
+  const issuer: FiscalParty = partyFromFinanceSettings(fs, dn.branch_code);
+  assertWorkspaceIsABusiness(issuer, `delivery note ${deliveryNoteId}`);
 
   // A delivery note carries its OWN customer refs (it can precede any invoice), so it gets its
   // own snapshot rather than inheriting one.
