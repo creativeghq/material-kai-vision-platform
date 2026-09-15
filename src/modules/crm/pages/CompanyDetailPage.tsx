@@ -161,7 +161,7 @@ export const CompanyDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  const { activeWorkspaceId } = useWorkspace();
+  const { activeWorkspaceId, activeWorkspace } = useWorkspace();
   const [pricingLevels, setPricingLevels] = useState<Array<{ level_key: string; label: string }>>([]);
   const isNew = id === 'new';
   // The role-first Add Company modal hands off a prefill (chosen role + any VIES/ΑΑΔΕ lookup)
@@ -1269,6 +1269,8 @@ export const CompanyDetailPage: React.FC = () => {
                     id: 'workspace', label: 'Platform access', icon: Building2, group: 'Commercial',
                     node: (
                       <CompanyWorkspaceCard
+                        workspaceId={activeWorkspaceId}
+                        workspaceName={activeWorkspace?.name || 'your workspace'}
                         companyId={company.id}
                         companyName={company.name}
                         defaultEmail={company.email || (company.contacts ?? [])[0]?.email || null}

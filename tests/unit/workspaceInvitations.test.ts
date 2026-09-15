@@ -20,6 +20,7 @@ const SERVICE = 'src/services/workspaceManagementService.ts';
 const CONTACT_PAGE = 'src/modules/crm/pages/ContactDetailPage.tsx';
 const COMPANY_PAGE = 'src/modules/crm/pages/CompanyDetailPage.tsx';
 const COMPANY_CARD = 'src/modules/crm/components/CompanyWorkspaceCard.tsx';
+const DIALOG = 'src/modules/crm/components/InvitePartyDialog.tsx';
 const TEAM_PANEL = 'src/components/core/Team/TeamPanel.tsx';
 const CRM_SERVICE = 'src/services/crm.service.ts';
 
@@ -74,18 +75,47 @@ describe('an invitation is minted and sent in one place', () => {
 });
 
 describe('an invite raised from a CRM record carries that record', () => {
-  it('the contact page passes crmContactId', () => {
-    const body = bodyOf(read(CONTACT_PAGE), 'workspaceManagementService.inviteByEmail');
-    expect(body).toContain('crmContactId');
-  });
-
-  it('the company card passes crmContactId', () => {
-    const body = bodyOf(read(COMPANY_CARD), 'workspaceManagementService.inviteCompanyAsWorkspace');
-    expect(body).toContain('crmContactId');
-  });
+  it.each(['workspaceManagementService.inviteByEmail', 'workspaceManagementService.inviteCompanyAsWorkspace'])(
+    '%s passes crmContactId', (call) => {
+      expect(bodyOf(read(DIALOG), call)).toContain('crmContactId');
+    });
 
   it('the team panel, which has no CRM record, does not invent one', () => {
     expect(read(TEAM_PANEL)).not.toContain('crmContactId');
+  });
+});
+
+describe('there is ONE invite form', () => {
+  it('neither CRM record page builds its own', () => {
+    for (const f of [CONTACT_PAGE, COMPANY_CARD]) {
+      const src = read(f);
+      expect(src).toContain('InvitePartyDialog');
+      expect(src).not.toContain('inviteByEmail');
+      expect(src).not.toContain('inviteCompanyAsWorkspace');
+    }
+  });
+
+  it('the destination is chosen explicitly, never implied by which page opened it', () => {
+    const src = read(DIALOG);
+    for (const d of ['my_workspace', 'own_workspace', 'portal']) expect(src).toContain(d);
+  });
+
+  it('only the team destination grants a seat in YOUR workspace', () => {
+    const src = read(DIALOG);
+    const mine = src.indexOf("dest === 'my_workspace'");
+    expect(mine).toBeGreaterThan(-1);
+    // A role is meaningless on the other two: they do not put anyone in your workspace.
+    expect(bodyOf(src, 'workspaceManagementService.inviteCompanyAsWorkspace')).not.toContain('role');
+  });
+
+  it('warns before seating somebody who belongs to another business', () => {
+    const src = read(DIALOG);
+    expect(src).toContain('teamWarning');
+    expect(src).toContain('isClient');
+  });
+
+  it("offers a company's own workspace only when there IS a company", () => {
+    expect(read(DIALOG)).toContain('hasCompany');
   });
 });
 
@@ -109,8 +139,8 @@ describe('the role a form offers is a role the RPC accepts', () => {
     expect(WORKSPACE_ROLE_META.owner.portal).toBeTruthy();
   });
 
-  it('the contact dialog reads the catalog rather than listing roles by hand', () => {
-    const src = read(CONTACT_PAGE);
+  it('the dialog reads the catalog rather than listing roles by hand', () => {
+    const src = read(DIALOG);
     expect(src).toContain('WORKSPACE_INVITE_ROLES.map');
     for (const r of WORKSPACE_INVITE_ROLES) {
       expect(src).not.toContain(`value="${r}"`);
