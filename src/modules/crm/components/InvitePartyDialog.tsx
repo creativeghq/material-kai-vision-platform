@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Users, ShieldCheck, Loader2, Send, Copy, AlertTriangle } from 'lucide-react';
+import {
+  Building2, Users, ShieldCheck, Receipt, FolderKanban, Loader2, Send, Copy,
+  AlertTriangle, ArrowUpRight,
+} from 'lucide-react';
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '@/components/core/ui/dialog';
@@ -20,8 +23,9 @@ import {
   WORKSPACE_INVITE_ROLES, WORKSPACE_ROLE_META, type WorkspaceInviteRole,
 } from '@/auth/workspaceRoles';
 
-/** Where the person being invited ends up. The three are NOT interchangeable — see `blurb`. */
-type Destination = 'my_workspace' | 'own_workspace' | 'portal';
+/** Not interchangeable: `my_workspace` seats them in YOUR tenant and lets them read your CRM and
+ *  costs, where `customer` is a login joined to their own CRM record and nothing else. */
+type Destination = 'customer' | 'own_workspace' | 'my_workspace' | 'trade_portal' | 'project';
 
 export interface InviteParty {
   contactId?: string | null;
@@ -29,7 +33,6 @@ export interface InviteParty {
   companyName?: string | null;
   name?: string | null;
   email?: string | null;
-  /** A contact on the other side of the trade — warns against giving them a seat in your team. */
   isClient?: boolean;
 }
 
@@ -42,18 +45,35 @@ interface Props {
   onDone?: () => void;
 }
 
-const OPTIONS: { key: Destination; icon: typeof Users; title: string; blurb: string }[] = [
+interface Option {
+  key: Destination;
+  icon: typeof Users;
+  title: string;
+  blurb: string;
+  sends: boolean;
+  needs?: 'contact' | 'company';
+}
+
+const OPTIONS: Option[] = [
   {
-    key: 'my_workspace', icon: Users, title: 'Join your team',
-    blurb: 'They become a member of your workspace and see what that role sees — your customers, quotes and stock.',
+    key: 'customer', icon: Receipt, title: 'Customer account', sends: true, needs: 'contact',
+    blurb: 'A login that shows them their own orders, invoices, receipts and balance. Not a member of your workspace — they see nothing else.',
   },
   {
-    key: 'own_workspace', icon: Building2, title: 'Run their own workspace',
+    key: 'own_workspace', icon: Building2, title: 'Run their own workspace', sends: true, needs: 'company',
     blurb: 'A separate business on the platform, with them as owner. They see nothing of yours beyond the catalog you grant.',
   },
   {
-    key: 'portal', icon: ShieldCheck, title: 'Trade portal only',
-    blurb: 'Their statement, their prices and their orders. No workspace, no access to anything else.',
+    key: 'my_workspace', icon: Users, title: 'Join your team', sends: true,
+    blurb: 'A member of your workspace. They see what that role sees — your customers, your costs, your pipeline.',
+  },
+  {
+    key: 'trade_portal', icon: ShieldCheck, title: 'Trade portal', sends: false, needs: 'company',
+    blurb: 'A B2B account for the whole company, with spend caps and their own delegated admin. Set up on the company record.',
+  },
+  {
+    key: 'project', icon: FolderKanban, title: 'One project only', sends: false,
+    blurb: 'Access to a single project, moodboard or client view. Invited on the project itself, so the access ends with it.',
   },
 ];
 
@@ -63,8 +83,15 @@ export const InvitePartyDialog: React.FC<Props> = ({
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  const hasContact = !!party.contactId;
   const hasCompany = !!party.companyId;
-  const [dest, setDest] = useState<Destination>(hasCompany ? 'own_workspace' : 'my_workspace');
+  const available = useMemo(
+    () => OPTIONS.filter((o) => (o.needs === 'contact' ? hasContact : o.needs === 'company' ? hasCompany : true)),
+    [hasContact, hasCompany],
+  );
+  const initial: Destination = hasContact ? 'customer' : hasCompany ? 'own_workspace' : 'my_workspace';
+
+  const [dest, setDest] = useState<Destination>(initial);
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState<WorkspaceInviteRole>('member');
@@ -76,12 +103,12 @@ export const InvitePartyDialog: React.FC<Props> = ({
   const [link, setLink] = useState<string | null>(null);
 
   const reset = useCallback(() => {
-    setDest(hasCompany ? 'own_workspace' : 'my_workspace');
+    setDest(initial);
     setEmail(party.email ?? '');
     setName(party.name ?? '');
     setRole('member');
     setLink(null);
-  }, [hasCompany, party.email, party.name]);
+  }, [initial, party.email, party.name]);
 
   useEffect(() => { if (open) reset(); }, [open, reset]);
 
@@ -93,30 +120,41 @@ export const InvitePartyDialog: React.FC<Props> = ({
   }, [open, party.companyId]);
 
   const alreadyRunning = status?.state === 'active';
-  const available = useMemo(
-    () => OPTIONS.filter((o) => (o.key === 'my_workspace' ? true : hasCompany)),
-    [hasCompany],
-  );
+
+  const pick = (o: Option) => {
+    if (o.sends) { setDest(o.key); return; }
+    onOpenChange(false);
+    navigate(o.key === 'trade_portal' ? `/crm/companies/${party.companyId}?tab=work` : '/projects');
+  };
 
   const send = async () => {
     const addr = email.trim();
     if (!addr) return;
     setBusy(true);
     try {
-      if (dest === 'my_workspace') {
-        const { url } = await workspaceManagementService.inviteByEmail({
+      let url: string;
+      if (dest === 'customer') {
+        ({ url } = await workspaceManagementService.inviteAsCustomer({
+          workspaceId, workspaceName, crmContactId: party.contactId!,
+          email: addr, name: name.trim() || undefined,
+        }));
+        toast({
+          title: `Invitation sent to ${addr}`,
+          description: 'They will see their own orders and invoices, and nothing else.',
+        });
+      } else if (dest === 'my_workspace') {
+        ({ url } = await workspaceManagementService.inviteByEmail({
           workspaceId, workspaceName, role, email: addr,
           name: name.trim() || undefined,
           crmContactId: party.contactId ?? undefined,
-        });
-        setLink(url);
+        }));
         toast({
           title: `Invitation sent to ${addr}`,
           description: `They join ${workspaceName} as ${WORKSPACE_ROLE_META[role].label}.`,
         });
       } else {
         const raw = discountPct.trim();
-        const { url } = await workspaceManagementService.inviteCompanyAsWorkspace({
+        ({ url } = await workspaceManagementService.inviteCompanyAsWorkspace({
           companyId: party.companyId!,
           companyName: party.companyName || 'their business',
           email: addr,
@@ -125,13 +163,13 @@ export const InvitePartyDialog: React.FC<Props> = ({
           canSupplyProducts: canSupply,
           catalogAccess,
           discountPct: raw === '' ? 0 : Math.min(100, Math.max(0, parseInt(raw, 10) || 0)),
-        });
-        setLink(url);
+        }));
         toast({
           title: `Invitation sent to ${addr}`,
           description: `${party.companyName} gets its own workspace when they accept.`,
         });
       }
+      setLink(url);
       onDone?.();
     } catch (err) {
       toast({ title: 'Could not send the invitation', description: getErrorMessage(err), variant: 'destructive' });
@@ -142,7 +180,7 @@ export const InvitePartyDialog: React.FC<Props> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Invite {party.name || party.companyName || 'someone'}</DialogTitle>
           <DialogDescription>
@@ -153,22 +191,21 @@ export const InvitePartyDialog: React.FC<Props> = ({
         <div className="space-y-4 py-2">
           <div className="space-y-2">
             {available.map((o) => {
-              const selected = dest === o.key;
+              const selected = o.sends && dest === o.key;
               const disabled = o.key === 'own_workspace' && alreadyRunning;
               return (
                 <button
                   key={o.key}
                   type="button"
                   disabled={disabled}
-                  onClick={() => (o.key === 'portal'
-                    ? navigate(`/crm/companies/${party.companyId}?tab=work`)
-                    : setDest(o.key))}
+                  onClick={() => pick(o)}
                   className={`w-full rounded-sm border p-3 text-left transition-colors disabled:opacity-50 ${
                     selected ? 'border-primary bg-primary/[0.06]' : 'border-hairline hover:bg-surface-sunken'
                   }`}
                 >
                   <span className="flex items-center gap-2 text-sm font-medium">
                     <o.icon className="h-4 w-4 text-muted-foreground" />{o.title}
+                    {!o.sends && <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground" />}
                     {disabled && <span className="text-xs font-normal text-muted-foreground">— already has one</span>}
                   </span>
                   <span className="mt-1 block text-xs text-muted-foreground">{o.blurb}</span>
@@ -182,8 +219,8 @@ export const InvitePartyDialog: React.FC<Props> = ({
               <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
               <span>
                 {party.name || 'This contact'} belongs to {party.companyName || 'another business'}. A
-                seat in your team lets them read your CRM and your prices — pick one of the other two
-                unless they actually work for you.
+                seat in your team lets them read your CRM, your costs and your pipeline — pick
+                Customer account unless they actually work for you.
               </span>
             </p>
           )}
@@ -201,7 +238,7 @@ export const InvitePartyDialog: React.FC<Props> = ({
             </div>
           </div>
 
-          {dest === 'my_workspace' ? (
+          {dest === 'my_workspace' && (
             <div className="space-y-1.5">
               <Label htmlFor="ip-role">Role</Label>
               <Select value={role} onValueChange={(v) => setRole(v as WorkspaceInviteRole)}>
@@ -214,7 +251,9 @@ export const InvitePartyDialog: React.FC<Props> = ({
               </Select>
               <p className="text-xs text-muted-foreground">{WORKSPACE_ROLE_META[role].description}</p>
             </div>
-          ) : (
+          )}
+
+          {dest === 'own_workspace' && (
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="ip-catalog">Catalog access</Label>

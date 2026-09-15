@@ -58,6 +58,7 @@ describe('an invitation is minted and sent in one place', () => {
 
   it.each([
     ['inviteByEmail', 'create_workspace_invite'],
+    ['inviteAsCustomer', 'create_workspace_invite'],
     ['inviteCompanyAsWorkspace', 'invite_crm_company_as_workspace'],
   ])('%s mints then sends — never one without the other', (method, rpc) => {
     const src = read(SERVICE);
@@ -85,6 +86,39 @@ describe('an invite raised from a CRM record carries that record', () => {
   });
 });
 
+describe('a buyer is not a team member', () => {
+  it('the customer invite asks for access_kind customer, not a role', () => {
+    const src = read(SERVICE);
+    const start = src.indexOf('async inviteAsCustomer(');
+    expect(start).toBeGreaterThan(-1);
+    const body = src.slice(start, src.indexOf('\n  async ', start + 1));
+    expect(body).toContain("accessKind: 'customer'");
+    // The contact link is the ENTIRE grant — without it redemption gives nothing at all.
+    expect(body).toContain('crmContactId');
+  });
+
+  it('every invite kind has its own copy, so no email describes the wrong grant', () => {
+    const src = read(SERVICE);
+    for (const k of ['team:', 'owner:', 'customer:']) expect(src).toContain(k);
+    expect(src).toContain('INVITE_COPY');
+  });
+
+  it('the dialog offers the customer account and never defaults to a seat in your team', () => {
+    const src = read(DIALOG);
+    expect(src).toContain("'customer'");
+    expect(src).toContain('inviteAsCustomer');
+    const initial = src.slice(src.indexOf('const initial:'), src.indexOf(';', src.indexOf('const initial:')));
+    expect(initial).toContain("'customer'");
+    expect(initial.indexOf("'my_workspace'")).toBeGreaterThan(initial.indexOf("'customer'"));
+  });
+
+  it('scoped access hands off to the surface that owns it rather than re-implementing it', () => {
+    const src = read(DIALOG);
+    for (const k of ['trade_portal', 'project']) expect(src).toContain(k);
+    expect(src).toContain('sends: false');
+  });
+});
+
 describe('there is ONE invite form', () => {
   it('neither CRM record page builds its own', () => {
     for (const f of [CONTACT_PAGE, COMPANY_CARD]) {
@@ -97,7 +131,9 @@ describe('there is ONE invite form', () => {
 
   it('the destination is chosen explicitly, never implied by which page opened it', () => {
     const src = read(DIALOG);
-    for (const d of ['my_workspace', 'own_workspace', 'portal']) expect(src).toContain(d);
+    for (const d of ['customer', 'own_workspace', 'my_workspace', 'trade_portal', 'project']) {
+      expect(src).toContain(d);
+    }
   });
 
   it('only the team destination grants a seat in YOUR workspace', () => {

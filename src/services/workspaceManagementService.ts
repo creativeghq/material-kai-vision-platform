@@ -3,6 +3,10 @@ import { escapeHtml } from '@/utils/escapeHtml';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { WORKSPACE_ROLE_META, type WorkspaceInviteRole, type WorkspaceMemberRole } from '@/auth/workspaceRoles';
 
+export type InviteKind = 'team' | 'owner' | 'customer';
+
+export type InviteAccessKind = 'member' | 'customer';
+
 /** A claimable (or historical) team invitation. */
 export interface WorkspaceInvite {
   id: string;
@@ -104,7 +108,7 @@ export const workspaceManagementService = {
   async createInvite(
     workspaceId: string,
     role: WorkspaceInviteRole,
-    opts?: { email?: string; name?: string; crmContactId?: string },
+    opts?: { email?: string; name?: string; crmContactId?: string; accessKind?: InviteAccessKind },
   ): Promise<string> {
     const { data, error } = await supabase.rpc('create_workspace_invite', {
       p_workspace_id: workspaceId,
@@ -112,6 +116,7 @@ export const workspaceManagementService = {
       p_email: opts?.email ?? null,
       p_invitee_name: opts?.name ?? null,
       p_crm_contact_id: opts?.crmContactId ?? null,
+      p_access_kind: opts?.accessKind ?? 'member',
     } as never);
     if (error) throw error;
     return data as string;
@@ -131,9 +136,27 @@ export const workspaceManagementService = {
       email, name: input.name, crmContactId: input.crmContactId,
     });
     return emitInvitation({
-      code,
-      email,
+      code, email, kind: 'team', roleLabel: WORKSPACE_ROLE_META[input.role].label,
       role: input.role,
+      workspaceId: input.workspaceId,
+      workspaceName: input.workspaceName,
+    });
+  },
+
+  /** The Client Portal reads `crm_contacts.user_id`, never membership — the link IS the grant. */
+  async inviteAsCustomer(input: {
+    workspaceId: string;
+    workspaceName: string;
+    crmContactId: string;
+    email: string;
+    name?: string;
+  }): Promise<{ code: string; url: string }> {
+    const email = input.email.trim().toLowerCase();
+    const code = await this.createInvite(input.workspaceId, 'member', {
+      email, name: input.name, crmContactId: input.crmContactId, accessKind: 'customer',
+    });
+    return emitInvitation({
+      code, email, kind: 'customer',
       workspaceId: input.workspaceId,
       workspaceName: input.workspaceName,
     });
@@ -164,9 +187,7 @@ export const workspaceManagementService = {
     if (error) throw error;
     const res = data as { workspace_id: string; code: string };
     const sent = await emitInvitation({
-      code: res.code,
-      email,
-      role: 'owner',
+      code: res.code, email, kind: 'owner',
       workspaceId: res.workspace_id,
       workspaceName: input.companyName,
     });
@@ -251,7 +272,9 @@ export const workspaceManagementService = {
 async function emitInvitation(input: {
   code: string;
   email: string;
-  role: WorkspaceMemberRole;
+  kind: InviteKind;
+  roleLabel?: string;
+  role?: WorkspaceMemberRole;
   workspaceId: string;
   workspaceName: string;
 }): Promise<{ code: string; url: string }> {
@@ -259,28 +282,28 @@ async function emitInvitation(input: {
 
   const { data: { user } } = await supabase.auth.getUser();
   const inviterName = (user?.user_metadata as any)?.full_name || user?.email || 'A colleague';
-  const meta = WORKSPACE_ROLE_META[input.role];
-  const isOwner = input.role === 'owner';
+  const copy = INVITE_COPY[input.kind];
+  const roleLabel = input.roleLabel ?? copy.roleLabel;
 
   flowEventService.emit('workspace_invitation_sent', {
     to: input.email,
-    subject: isOwner
-      ? `${inviterName} set up ${input.workspaceName} for you`
-      : `${inviterName} invited you to join ${input.workspaceName} as ${meta.label}`,
+    subject: copy.subject(inviterName, input.workspaceName, roleLabel),
     body: renderInviteEmailHtml({
       workspaceName: input.workspaceName,
       inviterName,
-      roleLabel: meta.label,
-      portal: meta.portal,
-      roleDescription: meta.description,
+      heading: copy.heading,
+      lead: copy.lead(input.workspaceName, roleLabel),
+      portal: copy.portal,
+      portalDetail: copy.portalDetail,
+      cta: copy.cta,
       inviteUrl: url,
-      isOwner,
     }),
     workspace_id: input.workspaceId,
     workspace_name: input.workspaceName,
-    role: input.role,
-    role_label: meta.label,
-    portal: meta.portal,
+    access_kind: input.kind === 'customer' ? 'customer' : 'member',
+    role: input.role ?? null,
+    role_label: roleLabel,
+    portal: copy.portal,
     invite_url: url,
     inviter_name: inviterName,
   });
@@ -288,33 +311,66 @@ async function emitInvitation(input: {
   return { code: input.code, url };
 }
 
+const INVITE_COPY: Record<InviteKind, {
+  roleLabel: string;
+  heading: string;
+  portal: string;
+  portalDetail: string;
+  cta: string;
+  subject: (inviter: string, workspace: string, role: string) => string;
+  lead: (workspace: string, role: string) => string;
+}> = {
+  team: {
+    roleLabel: 'Member',
+    heading: "You've been invited to join the team",
+    portal: 'Team access',
+    portalDetail: 'You will be working inside their workspace alongside their staff.',
+    cta: 'Accept invitation',
+    subject: (i, w, r) => `${i} invited you to join ${w} as ${r}`,
+    lead: (w, r) => `invited you to join <strong>${escapeHtml(w)}</strong> as <strong>${escapeHtml(r)}</strong>.`,
+  },
+  owner: {
+    roleLabel: 'Owner',
+    heading: 'Your workspace is ready',
+    portal: 'Your own workspace',
+    portalDetail: 'Your customers, prices and documents are yours alone. You invite your own people.',
+    cta: 'Create my login',
+    subject: (i, w) => `${i} set up ${w} for you`,
+    lead: (w) => `set up <strong>${escapeHtml(w)}</strong> for you. Accept below to create your login and take ownership of it.`,
+  },
+  customer: {
+    roleLabel: 'Customer',
+    heading: 'See your orders and invoices online',
+    portal: 'Your account',
+    portalDetail: 'Your orders, invoices, receipts and balance. Nothing else, and nobody else can see it.',
+    cta: 'Create my login',
+    subject: (i, w) => `${i} set up your account with ${w}`,
+    lead: (w) => `set up an account for you with <strong>${escapeHtml(w)}</strong>, so you can see your own orders, invoices and balance whenever you want them.`,
+  },
+};
+
 /** Invite email body. All interpolation goes through the canonical `escapeHtml` (attribute-safe). */
 function renderInviteEmailHtml(input: {
   workspaceName: string;
   inviterName: string;
-  roleLabel: string;
+  heading: string;
+  lead: string;
   portal: string;
-  roleDescription: string;
+  portalDetail: string;
+  cta: string;
   inviteUrl: string;
-  isOwner: boolean;
 }): string {
   const e = escapeHtml;
-  const heading = input.isOwner
-    ? 'Your workspace is ready'
-    : "You've been invited to join the team";
-  const lead = input.isOwner
-    ? `<strong>${e(input.inviterName)}</strong> set up <strong>${e(input.workspaceName)}</strong> for you. Accept below to create your login and take ownership of it.`
-    : `<strong>${e(input.inviterName)}</strong> invited you to join <strong>${e(input.workspaceName)}</strong> as <strong>${e(input.roleLabel)}</strong>.`;
   return `<!doctype html>
 <html><body style="font-family:'Open Sans',Arial,sans-serif;max-width:560px;margin:32px auto;padding:24px;color:#222;">
-  <h2 style="margin:0 0 16px;font-weight:300;">${e(heading)}</h2>
-  <p style="margin:0 0 12px;">${lead}</p>
+  <h2 style="margin:0 0 16px;font-weight:300;">${e(input.heading)}</h2>
+  <p style="margin:0 0 12px;"><strong>${e(input.inviterName)}</strong> ${input.lead}</p>
   <p style="margin:16px 0;padding:12px;background:#f5f5f5;border-left:3px solid #999;">
     <strong>${e(input.portal)}</strong><br>
-    <span style="font-size:13px;color:#555;">${e(input.roleDescription)}</span>
+    <span style="font-size:13px;color:#555;">${e(input.portalDetail)}</span>
   </p>
   <p style="margin:24px 0;">
-    <a href="${e(input.inviteUrl)}" style="display:inline-block;padding:12px 24px;background:#8a3a6b;color:#fff;text-decoration:none;border-radius:9999px;font-weight:500;">${e(input.isOwner ? 'Create my login' : 'Accept invitation')}</a>
+    <a href="${e(input.inviteUrl)}" style="display:inline-block;padding:12px 24px;background:#8a3a6b;color:#fff;text-decoration:none;border-radius:9999px;font-weight:500;">${e(input.cta)}</a>
   </p>
   <p style="margin:24px 0 0;font-size:13px;color:#666;">This invitation is tied to your email address and expires in 30 days.</p>
   <p style="margin:8px 0 0;font-size:12px;color:#999;word-break:break-all;">If the button doesn't work, paste this URL into your browser:<br>${e(input.inviteUrl)}</p>
