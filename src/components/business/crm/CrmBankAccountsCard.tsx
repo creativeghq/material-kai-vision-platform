@@ -12,6 +12,7 @@ import {
   type CrmBankAccount, type CrmBankAccountInput, type CrmBankAccountSuggestion,
 } from '@/services/crm.service';
 import { isValidIban, normalizeIban } from '@/utils/iban';
+import { BANK_NAMES, bankFromIban, normalizeBankName } from '@/config/bankVocabulary';
 import { callRevolutApi, getRevolutStatus } from '@/modules/banking-revolut/services/revolutConfigService';
 
 interface Props {
@@ -249,7 +250,17 @@ export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, c
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label className="text-xs" htmlFor="crmb-name">Bank name *</Label>
-          <Input id="crmb-name" value={form.bank_name ?? ''} onChange={(e) => setForm((f) => ({ ...f, bank_name: e.target.value }))} placeholder="e.g. Piraeus Bank" />
+          <Input
+            id="crmb-name"
+            list="crmb-bank-names"
+            value={form.bank_name ?? ''}
+            onChange={(e) => setForm((f) => ({ ...f, bank_name: e.target.value }))}
+            onBlur={(e) => setForm((f) => ({ ...f, bank_name: normalizeBankName(e.target.value) }))}
+            placeholder="Pick a bank, or type one"
+          />
+          <datalist id="crmb-bank-names">
+            {BANK_NAMES.map((b) => <option key={b} value={b} />)}
+          </datalist>
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs" htmlFor="crmb-holder">Account holder</Label>
@@ -257,7 +268,18 @@ export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, c
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs" htmlFor="crmb-iban">IBAN</Label>
-          <Input id="crmb-iban" value={form.iban ?? ''} onChange={(e) => { setForm((f) => ({ ...f, iban: normalizeIban(e.target.value) })); setVopVerdict(null); }} placeholder="GR16 0110 1250 0000 0001 2300 695" className="font-mono" />
+          <Input
+            id="crmb-iban"
+            value={form.iban ?? ''}
+            onChange={(e) => {
+              const iban = normalizeIban(e.target.value);
+              const fromIban = bankFromIban(iban);
+              setForm((f) => ({ ...f, iban, bank_name: fromIban ? fromIban.name : f.bank_name }));
+              setVopVerdict(null);
+            }}
+            placeholder="GR16 0110 1250 0000 0001 2300 695"
+            className="font-mono"
+          />
           {vopAvailable && (
             <div className="flex items-center gap-2 pt-0.5">
               <Button size="sm" variant="outline" type="button" onClick={verifyHolder} disabled={vopBusy}>

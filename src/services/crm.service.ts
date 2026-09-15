@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { isValidIban, normalizeIban } from '@/utils/iban';
+import { resolveBank } from '@/config/bankVocabulary';
 import { formatAddressOneLine, type AddressLike } from '@/utils/address';
 
 // Get Supabase URL — lazy to avoid crash at module load time
@@ -956,7 +957,7 @@ export const crmBankAccountsAPI = {
       workspace_id: parent.workspaceId,
       company_id: parent.companyId ?? null,
       contact_id: parent.companyId ? null : (parent.contactId ?? null),
-      bank_name: (input.bank_name ?? '').trim(),
+      bank_name: resolveBank(input.bank_name, input.iban),
       account_holder: input.account_holder?.trim() || null,
       iban: normalizeIban(input.iban) || null,
       account_ref: input.account_ref?.trim() || null,
@@ -976,7 +977,7 @@ export const crmBankAccountsAPI = {
 
   async update(id: string, input: CrmBankAccountInput): Promise<CrmBankAccount> {
     const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
-    if (input.bank_name !== undefined) patch.bank_name = (input.bank_name ?? '').trim();
+    if (input.bank_name !== undefined) patch.bank_name = resolveBank(input.bank_name, input.iban);
     if (input.account_holder !== undefined) patch.account_holder = input.account_holder?.trim() || null;
     if (input.iban !== undefined) {
       patch.iban = normalizeIban(input.iban) || null;

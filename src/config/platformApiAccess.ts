@@ -1,10 +1,6 @@
-// Which of the platform's own edge endpoints an agent may call on the user's behalf, and which
-// ones stop for a human first.
-//
 // The agent carries the USER'S JWT, so authorization is not decided here — each edge function
-// declares its own auth and validates its own body (invariant 5). Anything reachable through
-// `call_platform_api` was already reachable by that user with curl. What this file decides is the
-// much smaller question of which calls a MODEL should not make unattended.
+// declares its own auth and validates its own body (invariant 5). This decides the much smaller
+// question of which calls a model should not make unattended.
 
 /** An endpoint an agent must never call, whatever the caller's rights. */
 export interface BlockedEndpoint {
@@ -13,12 +9,7 @@ export interface BlockedEndpoint {
   reason: string;
 }
 
-/**
- * NEVER callable. Not a permission — the caller is usually entitled to all of these. They are
- * excluded because a model firing them unattended does damage no permission check would call
- * wrong: unbounded recursion, a bulk job over live data, or a queue that exists to be worked by
- * a human.
- */
+/** NEVER callable — recursion, a bulk job over live data, or a queue a human is meant to work. */
 export const PLATFORM_API_BLOCKED: readonly BlockedEndpoint[] = [
   { name: 'agent-chat', reason: 'This is the agent runtime itself — calling it would recurse without bound.' },
   { name: 'agent-eval', reason: 'Spends a real agent turn per case. The eval harness is run by the operator.' },
@@ -47,22 +38,15 @@ export const PLATFORM_API_BLOCKED: readonly BlockedEndpoint[] = [
   { name: 'notification-dispatcher', reason: 'Fans out notifications to people. Emit a flow event instead.' },
   {
     name: 'mivaa-gateway',
-    // The limit of per-endpoint classification, stated rather than hidden: this is a PROXY over
-    // another backend's ~100 actions — including deletes and bulk RAG jobs — so one verdict here
-    // cannot mean anything about what an individual call does. Blocking the named bulk endpoints
-    // one by one while leaving a dispatcher open is a gate with a door beside it.
+    // A PROXY over ~100 actions, so one verdict here describes none of them.
     reason: 'A proxy over another backend whose individual actions this gate cannot see. The '
       + 'document and material capabilities it fronts have dedicated tools already.',
   },
 ];
 
 /**
- * Callable, but the user approves first (invariant 9).
- *
- * The test is not "is this expensive" and not "does the role allow it" — generation tools cost
- * credits and are ungated today, and gating on entitlement here would just re-impose the limit
- * this tool exists to remove. It is: does this MOVE MONEY, FILE with an authority, or REACH A
- * THIRD PARTY. Each of those is unreversible by us, and a retried call does it twice.
+ * Approved by the user first (invariant 9). The test is MOVES MONEY / FILES with an authority /
+ * REACHES a third party — never "is it expensive", which would re-impose the limit this removed.
  */
 export const PLATFORM_API_CONFIRM: readonly BlockedEndpoint[] = [
   // Filed with ΑΑΔΕ — a transmitted document carries a legal number and cannot be withdrawn.
@@ -92,9 +76,8 @@ export const PLATFORM_API_CONFIRM: readonly BlockedEndpoint[] = [
   { name: 'hr-api', reason: 'Can file with ΕΡΓΑΝΗ and change employment records.' },
   // Privilege.
   { name: 'role-upgrade-requests', reason: 'Changes what an account is permitted to do.' },
-  // Runs the automations that DO the fanout notification-dispatcher is blocked for — emails,
-  // WhatsApp, bells — under the service role. Blocking the dispatcher and leaving this open
-  // would gate the messenger and not the message.
+  // Runs the automations notification-dispatcher is blocked for: gate the message, not only
+  // the messenger.
   { name: 'flow-engine', reason: 'Runs a workspace automation, which can email or message people.' },
 ];
 

@@ -264,6 +264,10 @@ export const VOCABULARIES = [
     'supabase/functions/_shared/iban.generated.ts',
   ],
   [
+    'src/config/bankVocabulary.ts',
+    'supabase/functions/_shared/bankVocabulary.generated.ts',
+  ],
+  [
     // Which of our own edge endpoints an agent may call unattended. The edge tool enforces it and
     // the admin surface explains it, so both runtimes read one list — a second copy would drift
     // into the agent being stopped for something the UI says is free, or worse, the reverse.

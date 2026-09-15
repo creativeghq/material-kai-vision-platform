@@ -4,6 +4,7 @@ import { attachPartyNames } from './record-labels.ts';
 // Generated from src/utils/iban.ts by `npm run vocab:mirror` — the SAME mod-97 the form runs and
 // the same one `public.iban_is_valid` enforces. Never hand-roll a second one here.
 import { isValidIban, normalizeIban } from '../iban.generated.ts';
+import { resolveBank } from '../bankVocabulary.generated.ts';
 /**
  * CRM Tools for JARVIS — workspace-scoped queries over the CRM roster.
  *
@@ -861,7 +862,7 @@ export const createManageCounterpartyBankAccountTool = (
           workspace_id: workspaceId,
           company_id: parent.company_id ?? null,
           contact_id: parent.contact_id ?? null,
-          bank_name: String(bank_name).trim(),
+          bank_name: resolveBank(bank_name, normalizedIban),
           account_holder: account_holder ? String(account_holder).trim() : null,
           iban: normalizedIban,
           account_ref: account_ref ? String(account_ref).trim() : null,

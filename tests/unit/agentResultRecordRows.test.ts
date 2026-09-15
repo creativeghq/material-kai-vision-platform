@@ -4,15 +4,6 @@ import { join } from 'node:path';
 
 import { stripComments } from '../helpers/stripComments';
 
-/**
- * A record in an agent result is a RECORD, not a field list.
- *
- * `find_records` returns `{kind, id, title, subtitle, badge, path}`. The card tabulates a list
- * only at 2+ rows, so a single hit fell through to the generic key/value grid and printed
- * `Path: /crm/companies/b9e72ad2…` as text under a label reading `Kind` — the shape of the JSON,
- * and no way to reach the record it named.
- */
-
 const ROOT = join(__dirname, '..', '..');
 const code = (p: string) => stripComments(readFileSync(join(ROOT, p), 'utf8').replace(/\r\n/g, '\n'));
 
@@ -64,8 +55,7 @@ describe('record rows render as records, at any count', () => {
 
   it('the payload path is not passed through safeHref, which would inert it', () => {
     // safeHref admits only https/http/mailto, so an in-app path becomes '#'. The first cut did
-    // exactly that and every record link rendered dead. The leading-slash test is the right
-    // guard here, and the exemption in scrapedLinkSafety records why.
+    // exactly that and every record link rendered dead.
     const row = src.slice(src.indexOf('function RecordRefRow'), src.indexOf('function RecordRefList'));
     expect(row, 'safeHref is back and sending app paths to #').not.toContain('safeHref(');
     expect(row).toMatch(/row\.path\.startsWith\('\/'\)/);
@@ -95,7 +85,6 @@ describe('a notification click reaches its target', () => {
     const handler = panel.slice(panel.indexOf('const handleClick'), panel.indexOf('const dismissOne'));
     expect(handler, 'a failed mark-read still aborts the click').not.toMatch(/if \(error\) return;/);
     expect(handler).toContain('resolveNotificationTarget');
-    // …and the navigation still happens after the early-exit is gone.
     const navAt = handler.indexOf('resolveNotificationTarget');
     expect(handler.slice(navAt)).toMatch(/navigate\(target\.to\)/);
   });

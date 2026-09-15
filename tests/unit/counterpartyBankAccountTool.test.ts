@@ -4,14 +4,6 @@ import { join } from 'node:path';
 
 import { stripComments } from '../helpers/stripComments';
 
-/**
- * `manage_counterparty_bank_account` — the agent's write path to a payment destination.
- *
- * What is guarded is the SHAPE of that write, because each of these is silent when it regresses:
- * an IBAN is a valid string whether or not it checksums, a spread payload is a valid insert, and
- * a confirmation emitted after the row exists is a dialog about something already done.
- */
-
 const ROOT = join(__dirname, '..', '..');
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8').replace(/\r\n/g, '\n');
 const code = (p: string) => stripComments(read(p));
@@ -45,7 +37,6 @@ describe('the tool is reachable at all', () => {
   });
 
   it('it is in a toolkit cluster, and the cluster module-gates', () => {
-    // A tool in no cluster is stripped before the model ever sees it.
     const catalog = code(CATALOG);
     expect(catalog).toContain("'manage_counterparty_bank_account'");
     // The CRM cluster declares moduleSlug 'crm'; the tool must ask the same gate, because
@@ -92,7 +83,6 @@ describe('an IBAN is checked before it is stored, by the one implementation', ()
     expect(src).toContain("from '../iban.generated.ts'");
     expect(body).toContain('isValidIban(');
     expect(body).toContain('normalizeIban(');
-    // A hand-rolled checksum would need the alphabet shift and a mod 97 of its own.
     expect(body, 'a second mod-97 has appeared in this file').not.toMatch(/%\s*97/);
     expect(body).not.toMatch(/charCodeAt\(0\)\s*-\s*55/);
   });
@@ -116,7 +106,6 @@ describe('an IBAN is checked before it is stored, by the one implementation', ()
 
 describe('the write is allowlisted and narrow', () => {
   it('the payload is an explicit literal, never a spread of model arguments', () => {
-    // Stored/model-authored input spread into an insert is mass assignment (invariant 8).
     const add = body.slice(body.indexOf("if (action === 'add')"));
     const payload = add.slice(add.indexOf('const payload = {'), add.indexOf('.insert(payload)'));
     expect(payload.length).toBeGreaterThan(200);
@@ -160,9 +149,7 @@ describe('the write is allowlisted and narrow', () => {
   it('every id taken from the model is scoped to the RUNNING workspace, not just to RLS', () => {
     // RLS and this check answer different questions. RLS asks whether the caller is a member of
     // the row's workspace, and a multi-workspace user is a member of several; the agent runs in
-    // ONE of them, and that is the one whose records it may touch (invariant 1). Without this a
-    // multi-workspace user could hang another tenant's contact IBAN off this workspace, because
-    // the insert stamps `workspace_id: workspaceId` wherever the contact actually lives.
+    // ONE of them, and that is the one whose records it may touch (invariant 1).
     for (const [label, table] of [['set_primary', 'crm_bank_accounts'], ['contact', 'crm_contacts']] as const) {
       const at = body.indexOf(`from('${table}').select`) >= 0
         ? body.indexOf(`from('${table}')`)
@@ -175,9 +162,9 @@ describe('the write is allowlisted and narrow', () => {
   });
 
   it('no read drops its error and reports it as "not found"', () => {
-    // A dropped error renders as "No such … in this workspace", which blames the user's data for
-    // a query fault — and on the duplicate check it reads as "no match", which is exactly when a
-    // second row gets written.
+    // A dropped error renders as "No such … in this workspace", which blames the user's data
+    // for a query fault — and on the duplicate check it reads as "no match", which is exactly
+    // when a second row gets written.
     const reads = body.match(/const \{\s*data\b[^}]*\} = await/g) ?? [];
     expect(reads.length, 'no supabase destructures found — the regex broke').toBeGreaterThanOrEqual(5);
     for (const r of reads) {
@@ -227,10 +214,10 @@ describe('the human gate comes before the side effect', () => {
   });
 
   it('confirm is declared for the Approve card but reachable by nobody else', () => {
-    // The field has to exist: the Approve/Decline card releases the gate by re-invoking the tool
-    // with confirm:true. What must not exist is any path that lets the MODEL set it — it is in
-    // MODEL_FORBIDDEN_ARG_KEYS (stripped from model-authored arguments) and on NEVER_ASK, so no
-    // quick-start form or fixedArgs pin can pre-answer it on the user's behalf.
+    // The field has to exist: the Approve/Decline card releases the gate by re-invoking the
+    // tool with confirm:true. What must not exist is any path that lets the MODEL set it — it
+    // is in MODEL_FORBIDDEN_ARG_KEYS (stripped from model-authored arguments) and on NEVER_ASK,
+    // so no quick-start form or fixedArgs pin can pre-answer it on the user's behalf.
     const schema = body.slice(body.indexOf('schema: z.object({'));
     expect(schema).toMatch(/confirm:\s*z\.boolean\(\)/);
     const catalog = code(CATALOG);
@@ -260,10 +247,11 @@ describe('an absent answer is stated, not implied', () => {
   });
 
   it('list with no counterparty answers "what is our house format"', () => {
-    // Found by replaying the conversation: asked to follow "the format we do for all the other",
-    // the model could only sample one counterparty per call, checked three, found none, and told
-    // the user NOBODY had accounts on file while fifteen existed — a generalisation from three,
-    // stated as fact. The workspace-wide read is what makes that question answerable.
+    // Found by replaying the conversation: asked to follow "the format we do for all the
+    // other", the model could only sample one counterparty per call, checked three, found none,
+    // and told the user NOBODY had accounts on file while fifteen existed — a generalisation
+    // from three, stated as fact. The workspace-wide read is what makes that question
+    // answerable.
     const listAll = body.slice(body.indexOf("action === 'list' && !contact_id"), body.indexOf('let parent'));
     expect(listAll.length, 'the workspace-wide list branch is gone').toBeGreaterThan(300);
     expect(listAll).toContain("scope: 'workspace'");
@@ -284,9 +272,9 @@ describe('an absent answer is stated, not implied', () => {
 
 describe('the company resolver is declared once', () => {
   it('crm-tools has exactly one fuzzy company lookup', () => {
-    // Two copies existed and had drifted: one searched name_fold/name_xscript and the other only
-    // `name`, so a Greek counterparty was reachable by its Latin trade name from one tool and not
-    // the other. Half the names in this CRM are Greek and the operator types Latin.
+    // Two copies existed and had drifted: one searched name_fold/name_xscript and the other
+    // only `name`, so a Greek counterparty was reachable by its Latin trade name from one tool
+    // and not the other. Half the names in this CRM are Greek and the operator types Latin.
     const matches = src.match(/name_xscript\.ilike/g) ?? [];
     expect(matches.length, 'the transliterated-name lookup has been copied again').toBe(1);
     expect(src).toContain('async function resolveCompanyInWorkspace');
@@ -298,9 +286,9 @@ describe('the company resolver is declared once', () => {
   it('a name that differs only by SPACING still resolves', () => {
     // Found by replaying the failed conversation: the company is stored as "… NEW PLAN …" and
     // prints "NEWPLAN" on its own letterhead, so the model queried the spelling in front of it
-    // and got "No matching company in this workspace" — a confident false negative for a company
-    // that exists. name_fold lowercases and name_xscript transliterates; neither collapses
-    // whitespace, and no index can.
+    // and got "No matching company in this workspace" — a confident false negative for a
+    // company that exists. name_fold lowercases and name_xscript transliterates; neither
+    // collapses whitespace, and no index can.
     expect(src).toContain('const nameShape =');
     // Strips everything that is not a letter or digit — Greek included, or a Greek name would
     // collapse to nothing and match every company in the workspace.

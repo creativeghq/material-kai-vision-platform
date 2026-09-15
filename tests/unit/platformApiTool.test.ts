@@ -8,15 +8,6 @@ import {
 } from '../../src/config/platformApiAccess';
 import { buildCatalog } from '../../scripts/gen-platform-api-catalog.mjs';
 
-/**
- * The agent's generic path into the platform's own API.
- *
- * Authorization is NOT this file's subject — the call carries the user's JWT and each edge
- * function gates itself. What is guarded is that the callable set stays DERIVED from the code,
- * that the few endpoints a model must not fire unattended cannot silently become callable, and
- * that a new endpoint cannot join the reach unclassified.
- */
-
 const ROOT = join(__dirname, '..', '..');
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8').replace(/\r\n/g, '\n');
 const code = (p: string) => stripComments(read(p));
@@ -50,7 +41,6 @@ describe('the callable set is derived from the code, not hand-kept', () => {
   });
 
   it('cron-secret, admin-secret and webhook-signed endpoints are absent by construction', () => {
-    // Not by a deny-list — they carry a different security scheme, so no edit keeps them out.
     const endpoints = Object.values(
       JSON.parse(read('scripts/edge-endpoints.json')),
     ) as Array<{ name: string; security?: string[] }>;
@@ -86,7 +76,6 @@ describe('nothing joins the agent\'s reach unclassified', () => {
   });
 
   it('the agent runtime itself is not callable', () => {
-    // Unbounded recursion, and it bills every lap.
     expect(platformApiAccess('agent-chat').access).toBe('blocked');
   });
 
@@ -130,7 +119,6 @@ describe('nothing joins the agent\'s reach unclassified', () => {
 
 describe('the call acts as the user, and says so when it cannot', () => {
   it('sends the user JWT, never the service role', () => {
-    // The entire safety argument is that this grants exactly what the operator already had.
     expect(src).toMatch(/Authorization: `Bearer \$\{jwt\}`/);
     expect(src, 'a service-role key appears in the call path').not.toContain('SERVICE_ROLE');
   });
@@ -264,9 +252,9 @@ describe('the fallback is reachable and renders', () => {
   });
 
   it('an area the model paraphrases narrows, it never empties', () => {
-    // "Invoicing" for the real tag "Finance" would otherwise empty the pool, and the empty branch
-    // tells the model to say the capability does not exist — a confident wrong answer, which is
-    // the exact failure this tool exists to remove.
+    // "Invoicing" for the real tag "Finance" would otherwise empty the pool, and the empty
+    // branch tells the model to say the capability does not exist — a confident wrong answer,
+    // which is the exact failure this tool exists to remove.
     const discover = src.slice(src.indexOf('createDiscoverPlatformApiTool'), src.indexOf('createCallPlatformApiTool'));
     expect(discover).toMatch(/return scoped\.length \? scoped : all/);
   });

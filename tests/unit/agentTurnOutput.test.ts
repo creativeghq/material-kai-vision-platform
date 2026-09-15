@@ -99,10 +99,10 @@ describe('the output ceiling leaves room for the turn to answer', () => {
   });
 
   it('the background-agent runner has the same ceiling', () => {
-    // `buildLLM` in langgraph-core builds the model for kai-task-agent, which runs claude-opus-5
-    // — so it carries the identical hazard, and its own `|| ''` at the end of runLangGraphAgent
-    // turns a thought-away budget into the same empty answer. One instance fixed and its twin
-    // left at 4096 is how this comes back somewhere nobody is looking.
+    // `buildLLM` in langgraph-core builds the model for kai-task-agent, which runs
+    // claude-opus-5 — so it carries the identical hazard, and its own `|| ''` at the end of
+    // runLangGraphAgent turns a thought-away budget into the same empty answer. One instance
+    // fixed and its twin left at 4096 is how this comes back somewhere nobody is looking.
     const core = code('supabase/functions/_shared/langgraph-core.ts');
     const anthropic = core.slice(core.indexOf('const { ChatAnthropic }'));
     const cap = anthropic.match(/maxTokens:\s*(\d+)/);
@@ -113,9 +113,7 @@ describe('the output ceiling leaves room for the turn to answer', () => {
   it('the model reaches its own ceiling BEFORE the node timeout', () => {
     // The two bounds are not interchangeable. Hitting maxTokens is a clean stop this file can
     // name; hitting AGENT_NODE_TIMEOUT_MS is a thrown graph invoke that discards the streamed
-    // text. At the measured ~87 tok/s the 115s timeout lands near 10k tokens, so the cap has to
-    // stay below that — raising it "for headroom" trades a nameable failure for an unnameable
-    // one, and on a multi-node turn for a 150s edge 504.
+    // text.
     const opus = src.slice(src.indexOf('modelOpus = new ChatAnthropic('), src.indexOf('_initialized = true'));
     const cap = Number(opus.match(/maxTokens:\s*(\d+)/)![1]);
     const timeoutMs = Number(src.match(/AGENT_NODE_TIMEOUT_MS = ([\d_]+)/)![1].replace(/_/g, ''));
@@ -129,11 +127,11 @@ describe('one card per distinct answer, not one per tool call', () => {
   const src = code(RECORD_SEARCH);
 
   it('find_records dedupes its result chunks within the turn', () => {
-    // A model hedging the spelling of a Greek counterparty fires several searches in ONE parallel
-    // turn. "New Plan" and "ΚΑΝΑΤΣΙΟΠΟΥΛΟΣ NEWPLAN" both resolved to the same company and each
-    // emitted its own chunk, so the user got two cards titled "Records found" holding the
-    // identical row — and the queries that told them apart were never on screen, because the
-    // title in AGENT_RESULT_TITLES is a static string.
+    // A model hedging the spelling of a Greek counterparty fires several searches in ONE
+    // parallel turn. "New Plan" and "ΚΑΝΑΤΣΙΟΠΟΥΛΟΣ NEWPLAN" both resolved to the same company
+    // and each emitted its own chunk, so the user got two cards titled "Records found" holding
+    // the identical row — and the queries that told them apart were never on screen, because
+    // the title in AGENT_RESULT_TITLES is a static string.
     expect(src).toContain('emittedSignatures');
     const emitAt = src.indexOf("type: 'record_search_results'");
     const guard = src.slice(src.lastIndexOf('if (', emitAt), emitAt);
