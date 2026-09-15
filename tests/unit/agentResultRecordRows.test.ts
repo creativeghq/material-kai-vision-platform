@@ -87,6 +87,19 @@ describe('a notification click reaches its target', () => {
     expect(hub, 'the latch is a boolean again').not.toMatch(/initialPromptSent\.current = true/);
   });
 
+  it('marking it read does not gate going there', () => {
+    // A failed update used to `return` before navigating, so a transient error swallowed the
+    // whole click — the panel stayed open and nothing moved, which from the outside is exactly
+    // a dead notification. Being read is bookkeeping; the click is the point.
+    const panel = code('src/modules/notifications/components/NotificationsPanel.tsx');
+    const handler = panel.slice(panel.indexOf('const handleClick'), panel.indexOf('const dismissOne'));
+    expect(handler, 'a failed mark-read still aborts the click').not.toMatch(/if \(error\) return;/);
+    expect(handler).toContain('resolveNotificationTarget');
+    // …and the navigation still happens after the early-exit is gone.
+    const navAt = handler.indexOf('resolveNotificationTarget');
+    expect(handler.slice(navAt)).toMatch(/navigate\(target\.to\)/);
+  });
+
   it('opening a new conversation clears the deep-link latch', () => {
     // Nothing is open, so nothing has been honoured — clicking the notification for the
     // conversation just left must reopen it rather than read as "already there".

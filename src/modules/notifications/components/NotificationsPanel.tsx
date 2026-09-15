@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/core/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { logger } from '@/config';
 
 interface UserNotification {
   id: string;
@@ -150,17 +151,26 @@ export const NotificationsPanel: React.FC = () => {
   };
 
   const handleClick = async (n: UserNotification) => {
-    // Mark as read
+    // Marking it read must not gate GOING there. A failed update used to `return`, so a transient
+    // error swallowed the whole click — the panel stayed open and nothing moved, which is
+    // indistinguishable from a dead notification. Being read is bookkeeping; the click is the
+    // point, and an unread row the user has already opened is the harmless half of this.
     if (!n.is_read) {
       const { error } = await supabase
         .from('user_notifications')
         .update({ is_read: true })
         .eq('id', n.id);
-      if (error) return;
-      setNotifications((prev) =>
-        prev.map((x) => x.id === n.id ? { ...x, is_read: true } : x),
-      );
-      setUnreadCount((prev) => Math.max(0, prev - 1));
+      if (error) {
+        logger.warn('Could not mark the notification read; navigating anyway', {
+          service: 'NotificationsPanel',
+          metadata: { id: n.id, error: error.message },
+        });
+      } else {
+        setNotifications((prev) =>
+          prev.map((x) => x.id === n.id ? { ...x, is_read: true } : x),
+        );
+        setUnreadCount((prev) => Math.max(0, prev - 1));
+      }
     }
     setOpen(false);
     // NEVER `navigate(n.action_url)` — `action_url` is a free string written by four runtimes and
