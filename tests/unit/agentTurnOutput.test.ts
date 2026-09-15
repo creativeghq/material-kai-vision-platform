@@ -98,6 +98,18 @@ describe('the output ceiling leaves room for the turn to answer', () => {
     expect(Number(cap![1])).toBeGreaterThanOrEqual(8192);
   });
 
+  it('the background-agent runner has the same ceiling', () => {
+    // `buildLLM` in langgraph-core builds the model for kai-task-agent, which runs claude-opus-5
+    // — so it carries the identical hazard, and its own `|| ''` at the end of runLangGraphAgent
+    // turns a thought-away budget into the same empty answer. One instance fixed and its twin
+    // left at 4096 is how this comes back somewhere nobody is looking.
+    const core = code('supabase/functions/_shared/langgraph-core.ts');
+    const anthropic = core.slice(core.indexOf('const { ChatAnthropic }'));
+    const cap = anthropic.match(/maxTokens:\s*(\d+)/);
+    expect(cap, 'buildLLM no longer declares maxTokens').not.toBeNull();
+    expect(Number(cap![1])).toBeGreaterThanOrEqual(8192);
+  });
+
   it('the model reaches its own ceiling BEFORE the node timeout', () => {
     // The two bounds are not interchangeable. Hitting maxTokens is a clean stop this file can
     // name; hitting AGENT_NODE_TIMEOUT_MS is a thrown graph invoke that discards the streamed

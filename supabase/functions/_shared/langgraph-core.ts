@@ -75,7 +75,12 @@ export async function buildLLM(opts: LangGraphRunOptions): Promise<any> {
   // Sonnet 5; the API returns 400 and langchain-anthropic rejects it client-side before the
   // request is even sent. See `assertNoSamplingParams` in the guard test.
   const { ChatAnthropic } = await import('npm:@langchain/anthropic@1.5.6');
-  return new ChatAnthropic({ model, anthropicApiKey, maxTokens: 4096 });
+  // 8192, matching agent-chat, and for the same reason: `maxTokens` caps EVERYTHING the model
+  // emits, and on Opus 5 — which `kai-task-agent` runs — omitting `thinking` runs ADAPTIVE
+  // thinking with `display` omitted, so those blocks spend the budget and carry no text. At 4096
+  // a run could return with nothing, and line 367 below turns that into `|| ''`: the same empty
+  // answer that read as a crash in agent-chat (conversation de92b987, 2026-09-15).
+  return new ChatAnthropic({ model, anthropicApiKey, maxTokens: 8192 });
 }
 
 // ── Self-contained background agent runner ────────────────────────────────────
