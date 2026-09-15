@@ -40,7 +40,6 @@ import {
 import { buildProductFilters, buildProfileFilters } from '@/pages/discoverFilters';
 import {
 
-  PRODUCT_IMAGE_SELECT,
   getManufacturer,
   getMaterialCategory,
   getProductImageUrl,
@@ -466,17 +465,14 @@ export const DiscoverPage: React.FC = () => {
       metadata: meta,
       detectedCat: detectCat(meta),
       factoryName: getManufacturer(meta) || 'Unknown',
-      imageUrl: getProductImageUrl(p),
+      imageUrl: p.image_url ?? getProductImageUrl(p),
     };
   }
 
-  const PRODUCT_SELECT = `id, name, description, status, metadata, ${PRODUCT_IMAGE_SELECT}`;
-
   async function loadProducts() {
-    const { data } = await supabase
-      .from('products')
-      .select(PRODUCT_SELECT)
-      .limit(300);
+    // search_catalogue, not `.from('products')`: the base table's RLS is workspace
+    // membership, so a direct read shows a signed-up architect only their own company.
+    const { data } = await supabase.rpc('search_catalogue', { p_limit: 300 });
     if (!data) return;
 
     setProducts(data.map(toRawProduct));
@@ -487,21 +483,17 @@ export const DiscoverPage: React.FC = () => {
   }
 
   /**
-   * Open a product the user picked somewhere that only knows its id — currently the smart-search
-   * results. The grid holds at most 300 rows, so a search hit outside that window is not in
-   * `products` and has to be fetched; before #350 this path looked the id up in `products` and
-   * silently did nothing when it missed, which was every time, because the id it was handed was
-   * a chunk_id the search never actually returns.
+   * Open a product known only by id — a smart-search hit outside the 300-row grid window.
    */
   const openProductById = useCallback(async (id: string) => {
     if (!id) return;
     const local = products.find((p) => p.id === id);
     if (local) { openProduct(local); return; }
-    const { data, error } = await supabase
-      .from('products')
-      .select(PRODUCT_SELECT)
-      .eq('id', id)
-      .maybeSingle();
+    const { data: rows, error } = await supabase.rpc('search_catalogue', {
+      p_product_id: id,
+      p_limit: 1,
+    });
+    const data = rows?.[0];
     if (error || !data) {
       toast({
         title: 'Could not open that result',

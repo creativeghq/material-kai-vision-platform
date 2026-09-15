@@ -39479,6 +39479,34 @@ export type Database = {
         }
         Returns: Json
       }
+      search_catalogue: {
+        Args: {
+          p_category_id?: string
+          p_limit?: number
+          p_offset?: number
+          p_product_id?: string
+          p_query?: string
+        }
+        Returns: {
+          attributes: Json
+          avg_rating: number
+          brand_company_id: string
+          category: string
+          category_id: string
+          country_of_origin: string
+          description: string
+          id: string
+          image_url: string
+          is_own_workspace: boolean
+          item_type: string
+          measurement_unit_code: number
+          metadata: Json
+          name: string
+          review_count: number
+          sku: string
+          workspace_id: string
+        }[]
+      }
       search_orders:
         | {
             Args: {
