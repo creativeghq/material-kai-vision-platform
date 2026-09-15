@@ -29,12 +29,14 @@ window.addEventListener('vite:preloadError', (e) => {
 // Initialize Sentry for error tracking and monitoring
 Sentry.init({
   dsn: 'https://3f930a475eb29d63b5e78b1ebabaef78@o4509716458045440.ingest.de.sentry.io/4510301517316176',
+  // A dev event is an agent driving localhost, and it files REAL issues beside production.
+  // DEV, not MODE: a built preview is a real build. See tests/unit/sentryReporting.test.ts.
+  enabled: !import.meta.env.DEV,
   // Setting this option to true will send default PII data to Sentry
   // For example, automatic IP address collection on events
   sendDefaultPii: true,
   tracePropagationTargets: ['localhost', /^https:\/\/materialshub\.gr/, /^https:\/\/.*\.materialshub\.gr/],
   // Production: sample 10% of transactions to reduce overhead (~50-100ms per page)
-  // Development: keep 100% for full visibility
   tracesSampleRate: import.meta.env.MODE === 'production' ? 0.1 : 1.0,
   profilesSampleRate: import.meta.env.MODE === 'production' ? 0.1 : 1.0,
   // Capture Replay for 10% of all sessions,
@@ -81,10 +83,6 @@ Sentry.init({
       return null;
     }
 
-    // Log errors to console in development
-    if (import.meta.env.MODE === 'development' && event.exception && ex) {
-      console.debug('[Sentry] Error captured:', ex);
-    }
     return event;
   },
 
