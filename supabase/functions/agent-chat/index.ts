@@ -3417,18 +3417,32 @@ async function executeAgent(
     // Execute the graph
     const result = await agentGraph.invoke(initialState);
 
-    // Log final usage stats
-
-    // Return results
-    // `stepBudget`, not a literal 10 — this comparison was hardcoded while the budget above was a
-    // parameter, so raising the budget for research turns would have left the apology firing at
-    // step 10 of 20. The `finalize` node now writes a real answer in this case, so reaching this
-    // fallback at all means the wrap-up turn itself failed.
-    let finalText = result.finalResponse ||
-      (result.iteration >= stepBudget
+    // A reply is TEXT, or a stated reason there is none — never an empty string. The agent node
+    // ends the graph on `finalResponse !== null`, and extractTextContent returns '' for content
+    // holding only thinking blocks, so a turn that spent its output budget reasoning ended here
+    // with '' and the caller rethrew it as "failed to return a valid result", naming nothing
+    // anyone could act on. Each branch below is a DIFFERENT state, and tool work the turn already
+    // did is reported rather than discarded. `stepBudget`, never a literal, is the real budget.
+    const producedToolWork = (result.toolResults?.length ?? 0) > 0;
+    if (!result.finalResponse) {
+      console.warn('[agent-chat] the model ended the turn with no text', JSON.stringify({
+        iteration: result.iteration,
+        stepBudget,
+        toolResults: result.toolResults?.length ?? 0,
+        outputTokens: result.outputTokens,
+        turnCount: result.turnCount,
+      }));
+    }
+    let finalText = result.finalResponse || (
+      result.iteration >= stepBudget
         ? 'I ran out of processing steps on this turn and could not write up what I found. '
           + 'Ask me to continue and I will pick up from a narrower scope.'
-        : '');
+        : producedToolWork
+          ? 'I ran the steps below but stopped before writing them up. The results are here -- '
+            + 'ask me to summarise them and I will work from what I already have.'
+          : 'I stopped without writing a reply, and nothing here says why. Send that again, or '
+            + 'narrow it, and if it happens twice tell the operator -- the turn is logged.'
+    );
 
     // ── A question in prose is converted into a form. Mechanically. ───────────
     try {

@@ -2683,17 +2683,15 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
         const response = await fetchPromise;
 
+        // Same one-report rule as the final-result guards below: the thrown message already
+        // carries the status and the body, and the catch is what reports it. KAI-R0 and KAI-QZ
+        // were this pair -- the same 413 filed twice, under two different titles.
         if (!response.ok) {
           const errorText = await response.text();
-          logger.error(`Agent request failed: ${response.status}`, {
-            service: 'AgentHub',
-            metadata: { status: response.status, error: errorText },
-          });
           throw new Error(`Agent execution failed: ${response.status} - ${errorText}`);
         }
 
         if (!response.body) {
-          logger.error('No response body from agent', { service: 'AgentHub' });
           throw new Error('No response body');
         }
 
@@ -3862,17 +3860,15 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           }
         }
 
+        // Report each failure ONCE. Both throws land in the catch below, which console.errors
+        // them, and Sentry captures console.error as an exception -- so a pre-throw report here
+        // opened a second issue for the same turn every time. KAI-T1/KAI-T2 and KAI-V9/KAI-VA are
+        // two such pairs, and the pair looks like two separate faults in the dashboard.
         if (!finalResult) {
-          logger.error('No final result received from agent', {
-            service: 'AgentHub',
-            metadata: { agent: selectedAgent },
-          });
-          throw new Error('No final result received from agent');
+          throw new Error(`No final result received from agent (${selectedAgent})`);
         }
 
-        // Check if final result contains an error
         if (finalResult.error) {
-          console.error('❌ Agent execution failed:', finalResult.errorMessage);
           throw new Error(finalResult.errorMessage || 'Agent execution failed');
         }
 
