@@ -79,13 +79,42 @@ const XAI_API_KEY = () => Deno.env.get('XAI_API_KEY') || '';
 // 2026-09-05 for the interior grid (text-to-image and image edit) through this chokepoint,
 // the same way Grok's OpenAI-compatible endpoint did. No SDK, no text models here.
 const OPENAI_API_KEY = () => Deno.env.get('OPENAI_API_KEY') || '';
-const _logSupabase = (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY)
-  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-  : null;
+/**
+ * The client that writes the BILLING rows — built lazily, on first use.
+ *
+ * Every provider key above is already a lazy getter because a module-load `Deno.env.get` reads
+ * whatever env held before the handler ran (CLAUDE.md, Secrets). This one was a module-load
+ * const, and it is the worst possible place for that: a null client makes `_logTrackedCall` and
+ * `_logUnitCall` return at their first line, so the call still happens, still costs money, and
+ * records nothing anywhere. Unlogged spend has no symptom by construction.
+ */
+function _makeLogClient() {
+  const url = Deno.env.get('SUPABASE_URL') || SUPABASE_URL;
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || SUPABASE_SERVICE_ROLE_KEY;
+  return url && key ? createClient(url, key) : null;
+}
+// `undefined` is "not built yet" and `null` is "built, and there were no credentials" — a single
+// null would retry the lookup on every call, which is cheap but hides which of the two it is.
+let _logSupabaseClient: ReturnType<typeof _makeLogClient> | undefined;
+function _logClient(): ReturnType<typeof _makeLogClient> {
+  if (_logSupabaseClient === undefined) _logSupabaseClient = _makeLogClient();
+  return _logSupabaseClient;
+}
 
 // Prices are NOT defined here. They live in `ai_model_pricing` and are resolved through
 // `resolveTokenPrice` (see _shared/ai-logger.ts) — one derivation, admin-editable, with
 // the hardcoded literal in ai-logger as the only fallback.
+
+/**
+ * A provider key, resolved the way the rest of the platform resolves one: env, then
+ * `platform_secrets`. Falls back to bare env when there is no service-role client to query the
+ * table with, which is the only reason the ten call sites this replaces were each a ternary.
+ */
+async function _secret(key: string): Promise<string | null | undefined> {
+  const sb = _logClient();
+  if (!sb) return Deno.env.get(key);
+  return (await resolveSecret(sb, key)).value;
+}
 
 async function _logTrackedCall(opts: {
   task: string;
@@ -97,9 +126,10 @@ async function _logTrackedCall(opts: {
   userId?: string;
   workspaceId?: string;
 }): Promise<void> {
-  if (!_logSupabase) return;
+  const _log = _logClient();
+  if (!_log) return;
   try {
-    const price = await resolveTokenPrice(_logSupabase, opts.model);
+    const price = await resolveTokenPrice(_log, opts.model);
     if (!price) {
       // Explicit marker rather than a silent 0 — an unpriced model is a gap in
       // ai_model_pricing, not a free call. `ops.silent_zero` can then see it.
@@ -113,7 +143,7 @@ async function _logTrackedCall(opts: {
     const billedCost = rawCost === null ? null : rawCost * markup;
 
     // ai_call_logs (developer-facing detail)
-    await _logSupabase.from('ai_call_logs').insert({
+    await _log.from('ai_call_logs').insert({
       task: opts.task,
       model: opts.model,
       input_tokens: opts.inputTokens,
@@ -128,7 +158,7 @@ async function _logTrackedCall(opts: {
     //
     // `ai_call_logs` above deliberately gets neither id: it has no such columns and is the
     // developer-facing latency/fallback trace, not the billing record. This is the billing record.
-    await _logSupabase.from('ai_usage_logs').insert({
+    await _log.from('ai_usage_logs').insert({
       user_id: opts.userId ?? null,
       workspace_id: opts.workspaceId ?? null,
       operation_type: opts.task,
@@ -159,6 +189,10 @@ async function _logTrackedCall(opts: {
 /**
  * The billing record for a call that is priced PER UNIT rather than per token — every image
  * and every video this client produces (#363 `EE-2`).
+ *
+ * AWAITED at every call site, not fired and forgotten: the isolate is torn down once the handler
+ * returns, so a pending insert is simply discarded. One insert against a call that already took
+ * seconds is not a latency question, and the failure it prevents is invisible by construction.
  */
 async function _logUnitCall(opts: {
   task: string;
@@ -171,9 +205,10 @@ async function _logUnitCall(opts: {
   userId?: string;
   workspaceId?: string;
 }): Promise<void> {
-  if (!_logSupabase) return;
+  const _log = _logClient();
+  if (!_log) return;
   try {
-    const price = await resolveUnitPrice(_logSupabase, opts.modelKey);
+    const price = await resolveUnitPrice(_log, opts.modelKey);
     if (!price) {
       console.warn(`[ai-client] no per-unit price row for "${opts.modelKey}" — cost logged as null`);
     }
@@ -184,7 +219,7 @@ async function _logUnitCall(opts: {
     const markup = price?.markup ?? _MARKUP;
     const billedCost = rawCost === null ? null : rawCost * markup;
 
-    await _logSupabase.from('ai_usage_logs').insert({
+    await _log.from('ai_usage_logs').insert({
       user_id: opts.userId ?? null,
       workspace_id: opts.workspaceId ?? null,
       operation_type: opts.task,
@@ -783,9 +818,7 @@ export async function rerankWithVoyage(
   const model = opts.model || VOYAGE_RERANK_MODEL;
   const started = Date.now();
 
-  const apiKey = _logSupabase
-    ? (await resolveSecret(_logSupabase, 'VOYAGE_API_KEY')).value
-    : Deno.env.get('VOYAGE_API_KEY');
+  const apiKey = await _secret('VOYAGE_API_KEY');
   if (!apiKey) throw new Error('VOYAGE_API_KEY is not configured — cannot rerank');
 
   let res: Response;
@@ -910,9 +943,7 @@ export async function callClaudeMessages(
   };
 
   // env first, platform_secrets second — the shared resolver, never a bare Deno.env.get.
-  const apiKey = _logSupabase
-    ? (await resolveSecret(_logSupabase, 'ANTHROPIC_API_KEY')).value
-    : Deno.env.get('ANTHROPIC_API_KEY');
+  const apiKey = await _secret('ANTHROPIC_API_KEY');
   if (!apiKey) fail('ANTHROPIC_API_KEY unresolved (env and platform_secrets)');
 
   let res: Response;
@@ -1008,7 +1039,7 @@ export async function generateImageWithGemini(
       aspectRatio: config?.aspectRatio ?? '16:9',
     });
 
-    void _logUnitCall({
+    await _logUnitCall({
       task: config?.task ?? 'gemini_image_generation',
       modelKey: modelId,
       units: 1,
@@ -1023,7 +1054,7 @@ export async function generateImageWithGemini(
       model: modelId,
     };
   } catch (err) {
-    void _logUnitCall({
+    await _logUnitCall({
       task: config?.task ?? 'gemini_image_generation',
       modelKey: modelId,
       units: 0,
@@ -1136,7 +1167,7 @@ async function generateMultiImageWithGemini(
 
   if (!response.ok) {
     const err = await response.text();
-    void _logUnitCall({
+    await _logUnitCall({
       task: config.task ?? 'gemini_image_generation',
       modelKey: config.model,
       units: 0,
@@ -1172,7 +1203,7 @@ async function generateMultiImageWithGemini(
     );
   }
 
-  void _logUnitCall({
+  await _logUnitCall({
     task: config.task ?? 'gemini_image_generation',
     modelKey: config.model,
     units: 1,
@@ -1233,7 +1264,7 @@ export async function generateVideoWithVeo(
     // verified a per-second rate for it — so this logs the call with a null cost and a warning
     // rather than a guessed number. The row still exists, which is the point: `ops.silent_zero`
     // can see "video generated, cost unknown", and a missing price row is a fixable gap.
-    void _logUnitCall({
+    await _logUnitCall({
       task: config?.task ?? 'veo_video_generation',
       modelKey: VEO_PRICING_MODEL_ID,
       units: seconds,
@@ -1248,7 +1279,7 @@ export async function generateVideoWithVeo(
       model: modelId,
     };
   } catch (err) {
-    void _logUnitCall({
+    await _logUnitCall({
       task: config?.task ?? 'veo_video_generation',
       modelKey: VEO_PRICING_MODEL_ID,
       units: 0,
@@ -1438,7 +1469,7 @@ export async function generateVideoWithKling(
     // KLING_PRICING_MODEL_ID, not `modelId`: the string this client hands the KlingAI SDK
     // ('kling-v3.0-i2v') is neither the generation_models id nor an ai_model_pricing key, and
     // resolution here is exact on purpose — `kling-3.0` and `kling-1.6-pro` are different rates.
-    void _logUnitCall({
+    await _logUnitCall({
       task: config?.task ?? 'kling_video_generation',
       modelKey: KLING_PRICING_MODEL_ID,
       units: seconds,
@@ -1453,7 +1484,7 @@ export async function generateVideoWithKling(
       model: modelId,
     };
   } catch (err) {
-    void _logUnitCall({
+    await _logUnitCall({
       task: config?.task ?? 'kling_video_generation',
       modelKey: KLING_PRICING_MODEL_ID,
       units: 0,
@@ -1537,9 +1568,7 @@ export async function generateVideoWithWan(
   // module-load capture reads undefined and an admin-configured key is never seen.
   // The provider would read ALIBABA_API_KEY from process.env on its own; the key is
   // passed explicitly so the platform keeps ONE secret name for this vendor.
-  const apiKey = _logSupabase
-    ? (await resolveSecret(_logSupabase, 'DASHSCOPE_API_KEY')).value
-    : Deno.env.get('DASHSCOPE_API_KEY');
+  const apiKey = await _secret('DASHSCOPE_API_KEY');
   if (!apiKey) {
     throw new Error('DASHSCOPE_API_KEY is not configured — cannot generate with Wan3.0');
   }
@@ -1549,9 +1578,7 @@ export async function generateVideoWithWan(
   // dashscope-intl, which was verified rather than assumed — a default of
   // dashscope.aliyuncs.com (Beijing) would have made residency worse as a silent
   // side-effect of adopting the provider.
-  const videoBase = _logSupabase
-    ? (await resolveSecret(_logSupabase, 'DASHSCOPE_BASE_URL')).value
-    : Deno.env.get('DASHSCOPE_BASE_URL');
+  const videoBase = await _secret('DASHSCOPE_BASE_URL');
 
   // A video prompt is far less exposed than a research query — it describes a room,
   // not a customer — but it is still free text a user typed, so it gets the same
@@ -1618,7 +1645,7 @@ export async function generateVideoWithWan(
 
     // Billed on the seconds we ASKED for. DashScope charges for the produced clip, and a
     // partial result we then reject is still a clip they rendered.
-    if (config?.logUsage !== false) void _logUnitCall({
+    if (config?.logUsage !== false) await _logUnitCall({
       task: config?.task ?? 'wan_video_generation',
       modelKey,
       units: seconds,
@@ -1638,7 +1665,7 @@ export async function generateVideoWithWan(
     };
   } catch (err) {
     // Always logged, even when the caller owns the success row — see the Seedance note.
-    void _logUnitCall({
+    await _logUnitCall({
       task: config?.task ?? 'wan_video_generation',
       modelKey,
       units: 0,
@@ -1694,9 +1721,7 @@ export async function generateVideoWithGeminiOmni(
 
   // Lazy and via resolveSecret for the usual reason: `Deno.env.set` is a no-op on edge,
   // so a module-load capture never sees an admin-configured key.
-  const apiKey = _logSupabase
-    ? (await resolveSecret(_logSupabase, 'GOOGLE_GENERATIVE_AI_API_KEY')).value
-    : Deno.env.get('GOOGLE_GENERATIVE_AI_API_KEY');
+  const apiKey = await _secret('GOOGLE_GENERATIVE_AI_API_KEY');
   if (!apiKey) {
     throw new Error(
       'GOOGLE_GENERATIVE_AI_API_KEY is not configured — cannot generate with Gemini Omni',
@@ -1730,7 +1755,7 @@ export async function generateVideoWithGeminiOmni(
     const bytes: Uint8Array = (video as any).uint8Array;
     if (!bytes?.length) throw new Error('Gemini Omni returned an empty video');
 
-    if (config?.logUsage !== false) void _logUnitCall({
+    if (config?.logUsage !== false) await _logUnitCall({
       task: config?.task ?? 'gemini_omni_video_generation',
       modelKey,
       units: seconds,
@@ -1747,7 +1772,7 @@ export async function generateVideoWithGeminiOmni(
       resolution,
     };
   } catch (err) {
-    void _logUnitCall({
+    await _logUnitCall({
       task: config?.task ?? 'gemini_omni_video_generation',
       modelKey,
       units: 0,
@@ -1831,9 +1856,7 @@ export async function generateVideoWithSeedance(
   // Lazy, and via resolveSecret for the same reason Wan is: `Deno.env.set` is a no-op on
   // Supabase edge, so a module-load capture reads undefined and an admin-configured key is
   // never seen. Fails BEFORE the provider call, so an unset key costs nothing.
-  const apiKey = _logSupabase
-    ? (await resolveSecret(_logSupabase, 'ARK_API_KEY')).value
-    : Deno.env.get('ARK_API_KEY');
+  const apiKey = await _secret('ARK_API_KEY');
   if (!apiKey) {
     throw new Error('ARK_API_KEY is not configured — cannot generate with Seedance 2.5');
   }
@@ -1887,7 +1910,7 @@ export async function generateVideoWithSeedance(
 
     // Billed on the seconds we ASKED for: Ark charges for the clip it rendered, and a
     // partial result we then reject is still a clip they rendered.
-    if (config?.logUsage !== false) void _logUnitCall({
+    if (config?.logUsage !== false) await _logUnitCall({
       task: config?.task ?? 'seedance_video_generation',
       modelKey,
       units: seconds,
@@ -1907,7 +1930,7 @@ export async function generateVideoWithSeedance(
   } catch (err) {
     // A FAILURE is always logged, even when the caller owns the success row: the caller
     // refunds and returns, so a provider outage would otherwise leave no trace at all.
-    void _logUnitCall({
+    await _logUnitCall({
       task: config?.task ?? 'seedance_video_generation',
       modelKey,
       units: 0,
@@ -1964,9 +1987,7 @@ export async function generateVideoWithRay(
   const seconds = (config?.durationSeconds ?? 5) > 7 ? 10 : 5;
   const modelKey = RAY_PRICING_MODEL_ID[resolution];
 
-  const apiKey = _logSupabase
-    ? (await resolveSecret(_logSupabase, 'LUMA_API_KEY')).value
-    : Deno.env.get('LUMA_API_KEY');
+  const apiKey = await _secret('LUMA_API_KEY');
   if (!apiKey) {
     throw new Error('LUMA_API_KEY is not configured — cannot generate with Ray3.2');
   }
@@ -2017,7 +2038,7 @@ export async function generateVideoWithRay(
       if (state === 'completed') {
         const url = body?.output?.[0]?.url;
         if (!url) throw new Error('Luma completed but returned no output URL');
-        if (config?.logUsage !== false) void _logUnitCall({
+        if (config?.logUsage !== false) await _logUnitCall({
           task: config?.task ?? 'ray_video_generation',
           modelKey,
           units: seconds,
@@ -2044,7 +2065,7 @@ export async function generateVideoWithRay(
       }
     }
   } catch (err) {
-    void _logUnitCall({
+    await _logUnitCall({
       task: config?.task ?? 'ray_video_generation',
       modelKey,
       units: 0,
@@ -2115,9 +2136,7 @@ export async function generateVideoWithH3Max(
     );
   }
 
-  const apiKey = _logSupabase
-    ? (await resolveSecret(_logSupabase, 'FAL_KEY')).value
-    : Deno.env.get('FAL_KEY');
+  const apiKey = await _secret('FAL_KEY');
   if (!apiKey) {
     throw new Error('FAL_KEY is not configured — cannot generate with H3 Max');
   }
@@ -2188,7 +2207,7 @@ export async function generateVideoWithH3Max(
       const url: string | undefined = payload?.video?.url;
       if (!url) throw new Error('fal reported COMPLETED but returned no video URL');
 
-      if (config?.logUsage !== false) void _logUnitCall({
+      if (config?.logUsage !== false) await _logUnitCall({
         task: config?.task ?? 'h3max_video_generation',
         modelKey,
         units: seconds,
@@ -2209,7 +2228,7 @@ export async function generateVideoWithH3Max(
     }
   } catch (err) {
     // Always logged, even when the caller owns the success row — see the Seedance note.
-    void _logUnitCall({
+    await _logUnitCall({
       task: config?.task ?? 'h3max_video_generation',
       modelKey,
       units: 0,
@@ -2232,9 +2251,7 @@ export async function generateVideoWithH3Max(
 const QWEN_DEFAULT_BASE = 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1';
 
 async function qwenBaseUrl(): Promise<string> {
-  const configured = _logSupabase
-    ? (await resolveSecret(_logSupabase, 'DASHSCOPE_BASE_URL')).value
-    : Deno.env.get('DASHSCOPE_BASE_URL');
+  const configured = await _secret('DASHSCOPE_BASE_URL');
   return (configured || QWEN_DEFAULT_BASE).replace(/\/+$/, '');
 }
 
@@ -2264,9 +2281,7 @@ export async function researchWithQwen<T = unknown>(
   const model = opts.model ?? 'qwen3.8-max';
   const _start = Date.now();
 
-  const apiKey = _logSupabase
-    ? (await resolveSecret(_logSupabase, 'DASHSCOPE_API_KEY')).value
-    : Deno.env.get('DASHSCOPE_API_KEY');
+  const apiKey = await _secret('DASHSCOPE_API_KEY');
   if (!apiKey) {
     throw new Error('DASHSCOPE_API_KEY is not configured — the research challenger cannot run');
   }

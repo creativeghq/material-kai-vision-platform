@@ -27,6 +27,34 @@ describe('conversation sentiment', () => {
     expect(api).toMatch(/conversation_reading/);
   });
 
+  it('tells the model WHO the other party is, on every call site', () => {
+    // Without it every thread was framed as a customer: a supplier chasing us and two
+    // colleagues talking were both scored as "how does the customer feel about our service".
+    // `thread_type` was on the thread row at both call sites and simply never passed.
+    const api = stripComments(API);
+    expect(api).toMatch(/threadType\?: string \| null,/);
+    expect(api).toMatch(/const RELATIONSHIP: Record<string, string>/);
+    for (const t of ['customer', 'upstream', 'internal']) {
+      expect(api, `${t} has no stated relationship`).toMatch(new RegExp(`${t}: '`));
+    }
+    // An unrecorded type says so rather than defaulting to the common case.
+    expect(api).toMatch(/RELATIONSHIP\[String\(threadType \?\? ''\)\]\s*\?\?/);
+    // Both callers pass it — one that does not silently reverts to the old framing.
+    expect((api.match(/readConversationSentiment\(/g) ?? []).length).toBe(3);
+    expect((api.match(/thread\.thread_type as string \| null/g) ?? []).length).toBe(2);
+  });
+
+  it('a reading the conversation has moved past is not shown as current', () => {
+    // The SERVER invalidates on last_message_id, but it is only consulted when a button is
+    // pressed — so one verdict was re-rendered as current forever and read as hardcoded.
+    const page = stripComments(PAGE);
+    expect(page).toMatch(/const stale = /);
+    expect(page).toMatch(/new Date\(thread\.last_message_at\)\.getTime\(\) > new Date\(sentiment\.analysed_at\)\.getTime\(\)/);
+    // It refreshes itself, ONCE per new message, and says so while it is out of date.
+    expect(page).toMatch(/refreshedFor/);
+    expect(page).toMatch(/Out of date/);
+  });
+
   it('forces the tool rather than parsing free-form JSON', () => {
     // Invariant 9: a classifier whose verdict drives a stored field and a UI state uses
     // tools + tool_choice, never a salvage parser over prose.
@@ -50,7 +78,8 @@ describe('conversation sentiment', () => {
     // Through the canonical wrapper, not a bare `<conversation>` tag (#359 CM-8). A tag is
     // something a message can itself contain and thereby close, after which the rest of the
     // customer's text reads as instructions — and this test used to accept exactly that.
-    expect(stripComments(API)).toMatch(/wrapUntrusted\('customer conversation', transcript\)/);
+    // Any label — the invariant is the canonical WRAPPER, not what it is called.
+    expect(stripComments(API)).toMatch(/wrapUntrusted\('[^']+', transcript\)/);
   });
 
   it('caches on the last message id, not a timestamp', () => {
