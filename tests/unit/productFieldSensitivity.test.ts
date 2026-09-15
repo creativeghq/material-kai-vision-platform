@@ -14,6 +14,7 @@ import {
   sectionsForCategory,
 } from '../../src/services/fieldRegistryService';
 import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
+import { productFacetFields } from '../../src/pages/discoverFilters';
 
 const ROOT = process.cwd();
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8').replace(/\r\n/g, '\n');
@@ -183,5 +184,43 @@ describe('per-category labels come from the registry', () => {
     expect(keys).toContain('brand');
     expect(keys).not.toContain('janka_hardness');
     expect(keys, 'an unscoped, non-global row applies to NOTHING').not.toContain('orphan');
+  });
+});
+
+describe('the Discover facet filters obey the same gate as the modal', () => {
+  const rows = (attrs: Array<Record<string, unknown>>) =>
+    attrs.map((a, i) => ({
+      id: String(i), name: `p${i}`, detectedCat: 'tiles', factoryName: 'Acme', attributes: a,
+    }));
+
+  it('offers a public attribute that more than one product carries', () => {
+    const snap = snapshot([field({ name: 'finish', label: 'Finish' })]);
+    const out = productFacetFields(rows([{ finish: 'matte' }, { finish: 'gloss' }]), snap);
+    expect(out).toEqual([{ key: 'finish', label: 'Finish' }]);
+  });
+
+  it('never offers an internal attribute as a filter', () => {
+    const snap = snapshot([field({ name: 'landed_cost', sensitivity: 'internal' })]);
+    const out = productFacetFields(rows([{ landed_cost: 4 }, { landed_cost: 9 }]), snap);
+    expect(out, 'an internal key must not become a browsable dimension').toEqual([]);
+  });
+
+  it('the pattern floor catches an internal key the registry has never seen', () => {
+    const out = productFacetFields(rows([{ supplier_price: 1 }, { supplier_price: 2 }]), snapshot([]));
+    expect(out).toEqual([]);
+  });
+
+  it('an UNRESOLVED verdict withholds the dimension', () => {
+    const out = productFacetFields(rows([{ mystery: 'a' }, { mystery: 'b' }]), snapshot([], null));
+    expect(out, 'null is "cannot judge", never "public"').toEqual([]);
+  });
+
+  it('offers nothing at all until the registry has loaded', () => {
+    expect(productFacetFields(rows([{ finish: 'matte' }, { finish: 'gloss' }]), null)).toEqual([]);
+  });
+
+  it('ignores a dimension only one product carries', () => {
+    const snap = snapshot([field({ name: 'finish', label: 'Finish' })]);
+    expect(productFacetFields(rows([{ finish: 'matte' }]), snap)).toEqual([]);
   });
 });

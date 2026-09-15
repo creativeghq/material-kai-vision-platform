@@ -23,6 +23,7 @@ import { HubSegmented, type HubSegment } from '@/components/core/hub';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useFieldRegistry } from '@/hooks/useFieldRegistry';
 import { FollowButton } from '@/components/features/social/FollowButton';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { AddToQuoteButton } from '@/modules/quotes/components/AddToQuoteButton';
@@ -37,7 +38,7 @@ import {
   CAT_COLORS, PROFESSIONAL_TYPE_LABELS,
   detectCat, catLabel, initials,
 } from '@/lib/materialCategories';
-import { buildProductFilters, buildProfileFilters } from '@/pages/discoverFilters';
+import { buildProductFilters, buildProfileFilters, productFacetFields } from '@/pages/discoverFilters';
 import {
 
   getManufacturer,
@@ -387,6 +388,7 @@ export const DiscoverPage: React.FC = () => {
 
   // Products
   const [products, setProducts] = useState<RawProduct[]>([]);
+  const fieldRegistry = useFieldRegistry();
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
 
@@ -528,7 +530,14 @@ export const DiscoverPage: React.FC = () => {
   }, [searchParams, canMarketplace, realEstateEnabled]);
 
   const profileGroups = useMemo(() => buildProfileFilters(creators), [creators]);
-  const productGroups = useMemo(() => buildProductFilters(products, surplus), [products, surplus]);
+  const productFacets = useMemo(
+    () => productFacetFields(products, fieldRegistry.snapshot),
+    [products, fieldRegistry.snapshot],
+  );
+  const productGroups = useMemo(
+    () => buildProductFilters(products, surplus, productFacets),
+    [products, surplus, productFacets],
+  );
 
   // /discover?tab=products&factory=<name> seeds the brand facet; once the user touches the
   // filters the `pf`/`bf`/`prf` URL bag takes over.
