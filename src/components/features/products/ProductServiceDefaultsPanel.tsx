@@ -243,7 +243,7 @@ export const ProductServiceDefaultsPanel: React.FC<Props> = ({ productId, worksp
             onCheckedChange={(v) => setDraft({ ...draft, notify_customer: v })} />
           <Label htmlFor="default-notify-customer" className="text-xs">Email the customer too</Label>
         </div>
-        <Button size="sm" variant="outline" disabled={saving || !draft.title.trim()} onClick={() => void addDefault()}>
+        <Button variant="outline" disabled={saving || !draft.title.trim()} onClick={() => void addDefault()}>
           <Plus className="h-4 w-4 mr-1" />Add
         </Button>
       </div>

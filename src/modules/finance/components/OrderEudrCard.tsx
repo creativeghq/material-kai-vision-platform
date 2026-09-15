@@ -252,11 +252,11 @@ export const OrderEudrCard: React.FC<{
                 onChange={(e) => setNetMass(e.target.value)}
               />
             </div>
-            <Button size="sm" onClick={record} disabled={saving || !ref.trim()}>
+            <Button onClick={record} disabled={saving || !ref.trim()}>
               {saving && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
               Record
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => setRecordFor(null)}>Cancel</Button>
+            <Button variant="ghost" onClick={() => setRecordFor(null)}>Cancel</Button>
           </div>
           <p className="text-[11px] text-muted-foreground">
             The reference number and the declaration identifier are what the Regulation names. A

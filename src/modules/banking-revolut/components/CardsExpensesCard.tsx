@@ -140,7 +140,7 @@ export const CardsExpensesCard: React.FC<{ workspaceId: string }> = ({ workspace
               <Label className="text-xs" htmlFor="ce-label">Card label</Label>
               <Input id="ce-label" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Site expenses" maxLength={30} />
             </div>
-            <Button size="sm" onClick={issueCard} disabled={busy !== null}>
+            <Button onClick={issueCard} disabled={busy !== null}>
               <Plus className="mr-1 h-3.5 w-3.5" /> Issue virtual card
             </Button>
             <div className="w-52 space-y-1">

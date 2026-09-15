@@ -153,40 +153,44 @@ export const GoogleBusinessCard: React.FC<Props> = ({
 
       <CardContent className="space-y-3">
         {editingQuery && (
-          <div className="flex flex-wrap items-end gap-2 rounded-md border border-hairline bg-surface-sunken p-3">
-            <div className="min-w-[200px] flex-1 space-y-1">
-              <label htmlFor="gbp-query" className="text-xs font-medium text-muted-foreground">Search Google for</label>
-              <Input
-                id="gbp-query"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void runLookup(); } }}
-                placeholder="Business name, town"
-              />
-              <p className="text-[11px] text-muted-foreground">
-                Uses one Business Data lookup — it costs credits. The town is what tells two
-                businesses of the same name apart.
-              </p>
+          <div className="space-y-2 rounded-md border border-hairline bg-surface-sunken p-3">
+            {/* items-end aligns each column's BOTTOM EDGE, so every column has to end with its
+                control — the hint below belongs to the whole row, not to the query field. */}
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="min-w-[200px] flex-1 space-y-1">
+                <label htmlFor="gbp-query" className="text-xs font-medium text-muted-foreground">Search Google for</label>
+                <Input
+                  id="gbp-query"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void runLookup(); } }}
+                  placeholder="Business name, town"
+                />
+              </div>
+              <div className="w-28 space-y-1">
+                {/* WHICH Google matters: the search runs in one country's index, and the wrong one
+                    answers "no listing" rather than failing. Blank = the record's country, then
+                    the workspace's; the server refuses instead of guessing when neither is set. */}
+                <label htmlFor="gbp-country" className="text-xs font-medium text-muted-foreground">Country</label>
+                <Input
+                  id="gbp-country"
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value.toUpperCase().slice(0, 2))}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void runLookup(); } }}
+                  placeholder={profile?.location_country_code || 'auto'}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button variant="ghost" onClick={() => setEditingQuery(false)} disabled={busy}>Cancel</Button>
+                <Button onClick={runLookup} disabled={busy || !query.trim()}>
+                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />} Search
+                </Button>
+              </div>
             </div>
-            <div className="w-28 space-y-1">
-              {/* WHICH Google matters: the search runs in one country's index, and the wrong one
-                  answers "no listing" rather than failing. Blank = the record's country, then
-                  the workspace's; the server refuses instead of guessing when neither is set. */}
-              <label htmlFor="gbp-country" className="text-xs font-medium text-muted-foreground">Country</label>
-              <Input
-                id="gbp-country"
-                value={country}
-                onChange={(e) => setCountry(e.target.value.toUpperCase().slice(0, 2))}
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void runLookup(); } }}
-                placeholder={profile?.location_country_code || 'auto'}
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button size="sm" variant="ghost" onClick={() => setEditingQuery(false)} disabled={busy}>Cancel</Button>
-              <Button size="sm" onClick={runLookup} disabled={busy || !query.trim()}>
-                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />} Search
-              </Button>
-            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Uses one Business Data lookup — it costs credits. The town is what tells two
+              businesses of the same name apart.
+            </p>
           </div>
         )}
 

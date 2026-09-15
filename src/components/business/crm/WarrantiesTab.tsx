@@ -718,7 +718,7 @@ const AssetDetailDialog: React.FC<{
               <Label className="text-xs">Policy no.</Label>
               <Input value={warranty.policy_number} onChange={(e) => setWarranty({ ...warranty, policy_number: e.target.value })} />
             </div>
-            <Button size="sm" variant="outline" disabled={busy || !warranty.ends_on} onClick={() => void addWarranty()}>
+            <Button variant="outline" disabled={busy || !warranty.ends_on} onClick={() => void addWarranty()}>
               <Plus className="h-4 w-4 mr-1" />Add
             </Button>
           </div>
@@ -783,7 +783,7 @@ const AssetDetailDialog: React.FC<{
                 onCheckedChange={(v) => setPlan({ ...plan, notify_customer: v })} />
               <Label htmlFor="notify-customer" className="text-xs">Email the customer too</Label>
             </div>
-            <Button size="sm" variant="outline" disabled={busy || !plan.title.trim()} onClick={() => void addPlan()}>
+            <Button variant="outline" disabled={busy || !plan.title.trim()} onClick={() => void addPlan()}>
               <Plus className="h-4 w-4 mr-1" />Add
             </Button>
           </div>

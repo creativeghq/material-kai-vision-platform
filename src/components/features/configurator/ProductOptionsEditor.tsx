@@ -295,7 +295,7 @@ export const ProductOptionsEditor: React.FC<ProductOptionsEditorProps> = ({
                 </div>
                 <div>
                   <Label className="text-xs">Colour</Label>
-                  <Input type="color" className="h-10 w-14 p-1"
+                  <Input type="color" className="h-9 w-14 p-1"
                     value={newValue[group.id]?.color || '#cccccc'}
                     onChange={(e) => setNewValue((s) => ({
                       ...s,
@@ -313,7 +313,7 @@ export const ProductOptionsEditor: React.FC<ProductOptionsEditorProps> = ({
                     }))}
                   />
                 </div>
-                <Button size="sm" variant="outline"
+                <Button variant="outline"
                   onClick={() => addValue(group)} disabled={busy}>
                   <Plus className="mr-1 h-3.5 w-3.5" />Add choice
                 </Button>
@@ -383,7 +383,7 @@ export const ProductOptionsEditor: React.FC<ProductOptionsEditorProps> = ({
                   </SelectContent>
                 </Select>
               </div>
-              <Button size="sm" variant="outline"
+              <Button variant="outline"
                 onClick={addRule} disabled={busy || !newRule.when || !newRule.then}>
                 <Plus className="mr-1 h-3.5 w-3.5" />Add rule
               </Button>
@@ -415,7 +415,7 @@ export const ProductOptionsEditor: React.FC<ProductOptionsEditorProps> = ({
                 onChange={(e) => setNewGroup((g) => ({ ...g, target: e.target.value }))} />
             )}
           </div>
-          <Button size="sm" onClick={addGroup} disabled={busy || !newGroup.label.trim()}>
+          <Button onClick={addGroup} disabled={busy || !newGroup.label.trim()}>
             <Plus className="mr-1 h-3.5 w-3.5" />Add option
           </Button>
         </div>

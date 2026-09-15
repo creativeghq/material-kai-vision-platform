@@ -75,11 +75,11 @@ export const AgentCommissionStatementDialog: React.FC<{
               Whole desk
             </label>
           )}
-          <Button size="sm" disabled={loading || !ws} onClick={run}>
+          <Button disabled={loading || !ws} onClick={run}>
             {loading ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null} Run
           </Button>
           {statement && lines.length > 0 && (
-            <Button size="sm" variant="outline" onClick={print}><Printer className="mr-1 h-4 w-4" /> Print</Button>
+            <Button variant="outline" onClick={print}><Printer className="mr-1 h-4 w-4" /> Print</Button>
           )}
         </div>
 

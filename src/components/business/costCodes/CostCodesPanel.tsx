@@ -123,11 +123,11 @@ export const CostCodesPanel: React.FC<Props> = ({ workspaceId }) => {
           className="mt-1 h-9"
         />
       </div>
-      <Button size="sm" onClick={() => void submitDraft()} disabled={busy || !draft?.code.trim() || !draft?.name.trim()}>
+      <Button onClick={() => void submitDraft()} disabled={busy || !draft?.code.trim() || !draft?.name.trim()}>
         {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
         Add
       </Button>
-      <Button size="sm" variant="ghost" onClick={() => setDraft(null)} disabled={busy}>
+      <Button variant="ghost" onClick={() => setDraft(null)} disabled={busy}>
         <X className="h-3.5 w-3.5" />
       </Button>
     </div>
@@ -194,10 +194,10 @@ export const CostCodesPanel: React.FC<Props> = ({ workspaceId }) => {
                       onKeyDown={(e) => { if (e.key === 'Enter') void submitEdit(); }}
                       className="h-9 flex-1"
                     />
-                    <Button size="sm" onClick={() => void submitEdit()} disabled={busy}>
+                    <Button onClick={() => void submitEdit()} disabled={busy}>
                       <Check className="h-3.5 w-3.5" /> Save
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => setEditing(null)} disabled={busy}>
+                    <Button variant="ghost" onClick={() => setEditing(null)} disabled={busy}>
                       <X className="h-3.5 w-3.5" />
                     </Button>
                   </div>

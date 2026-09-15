@@ -443,11 +443,10 @@ export const RoomPlannerPanel: React.FC = () => {
               </SelectContent>
             </Select>
           </div>
-          <Button size="sm" variant="outline" onClick={createLayout}>
+          <Button variant="outline" onClick={createLayout}>
             <Plus className="mr-1 h-3.5 w-3.5" />New plan
           </Button>
           <Button
-            size="sm"
             variant="outline"
             onClick={() => setView((v) => (v === '2d' ? '3d' : '2d'))}
             aria-pressed={view === '3d'}
@@ -477,7 +476,7 @@ export const RoomPlannerPanel: React.FC = () => {
                   }
                 }}
               >
-                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {PRESET_OPTIONS.map((o) => (
                     <SelectItem key={o.key} value={o.key}>{o.name}</SelectItem>
@@ -491,7 +490,6 @@ export const RoomPlannerPanel: React.FC = () => {
               loop: real products at their real size, and nothing came out of it. */}
           {layout && (items.length > 0 || surfaces.length > 0) && (
             <Button
-              size="sm"
               variant="outline"
               disabled={quoting}
               onClick={addToQuote}

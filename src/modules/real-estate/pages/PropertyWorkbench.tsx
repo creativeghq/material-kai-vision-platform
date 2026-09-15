@@ -908,7 +908,7 @@ export default function PropertyWorkbench() {
                 <div className="mb-3 flex flex-wrap items-end gap-2">
                   <input type="datetime-local" value={newOpenHouseAt} onChange={(e) => setNewOpenHouseAt(e.target.value)} className="h-9 rounded-md border bg-background px-2 text-sm" />
                   <Input className="h-9 w-56" placeholder="Note (optional)" value={newOpenHouseNote} onChange={(e) => setNewOpenHouseNote(e.target.value)} />
-                  <Button size="sm" variant="outline" disabled={!newOpenHouseAt || busy} onClick={async () => {
+                  <Button variant="outline" disabled={!newOpenHouseAt || busy} onClick={async () => {
                     if (!ws || !newOpenHouseAt) return;
                     setBusy(true);
                     try {

@@ -226,7 +226,7 @@ export const OrderCbamCard: React.FC<{
                 placeholder="optional" className="h-9 w-56"
               />
             </div>
-            <Button size="sm" onClick={record} disabled={saving || !entryDate}>
+            <Button onClick={record} disabled={saving || !entryDate}>
               {saving && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
               Record in the CBAM register
             </Button>
