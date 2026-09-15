@@ -370,6 +370,26 @@ for everything else, so prefer the body's own sentence via `humanEdgeRefusal` (`
 which deliberately leaves slug-shaped bodies alone so the credits path keeps working. Guarded by
 [tests/unit/agentAttachmentLimits.test.ts](tests/unit/agentAttachmentLimits.test.ts).
 
+**When no dedicated tool covers the ask, the agent calls the platform's own API — allow by default.**
+`discover_platform_api` / `call_platform_api` reach the **99** edge endpoints a user JWT opens, **as the user**:
+authorization is not decided in the tool, because each edge function declares its own auth and validates its
+own body (invariant 5), so anything reachable this way was already reachable by that person with curl. A
+hand-written tool per capability was a PRODUCT limit — the platform writes 203 tables and dedicated tools
+covered 36. The callable set is GENERATED (`npm run api:catalog` → `platformApiCatalog.generated.ts`, from
+`scripts/edge-endpoints.json`), so an endpoint joins the reach the day it ships and a cron-secret /
+admin-secret / webhook-signed one never does — a **different `security` scheme** is what keeps it out, not an
+edit. **A new user-callable endpoint must be classified** in `src/config/platformApiAccess.ts` (mirrored to
+Deno): `BLOCKED` is for what a model must not fire unattended whatever its rights — recursion (`agent-chat`),
+bulk jobs, and the ones that action a human queue (`finance-inbound-sync`, `data-integrity-runner`; rule 6) —
+and an action **DISPATCHER over another backend** (`mivaa-gateway`, ~100 actions) belongs there because one
+verdict cannot describe an individual call. `CONFIRM` is money moving, a filing with ΑΑΔΕ/ΕΡΓΑΝΗ, or anything
+reaching a third party — NOT "expensive", since generation tools cost credits and are ungated, and gating on
+cost re-imposes the limit this removed. Gate the thing that DOES the work, not only its messenger:
+`flow-engine` runs the automations `notification-dispatcher` was blocked for. Guarded by
+[tests/unit/platformApiTool.test.ts](tests/unit/platformApiTool.test.ts), which fails when a classified
+endpoint is renamed (a rename turns a gate into a no-op silently) and when the open set stops being the
+majority — if the deny list grows past half, the tool has become the allowlist it replaced.
+
 **Skills: `agents:` holds agent IDS, not display names** — JARVIS is `kai`, Trinity is `erp`. `getSkillsForAgent`
 matches on the id, so a skill listing `trinity` is offered to nobody, silently. A skill also has to be imported
 into `SKILL_FILES` (`skills-loader.ts`), and its `SKILL.md`/`skill.ts` twins must match — the `.md` is what gets
@@ -626,7 +646,7 @@ whose job is showing tables of money.
 |---|---|
 | PDF pipeline (PaddleOCR-VL, stages, OCR) | [docs/pdf-processing-pipeline.md](docs/pdf-processing-pipeline.md) |
 | Agents, tools, JARVIS roster | [docs/agent-system.md](docs/agent-system.md), [docs/agent-and-tools-reference.md](docs/agent-and-tools-reference.md) |
-| Does the agent see what the platform knows — coverage baseline, conversation audit, hedge probe, golden cases | [docs/agent-evaluation.md](docs/agent-evaluation.md) — a derived read with no tool is data the agent cannot use; `.github/agent-data-coverage-baseline.json` records every gap WITH a reason (guarded by [tests/unit/agentDataCoverage.test.ts](tests/unit/agentDataCoverage.test.ts)); `agent_conversation_audit(p_days)` and `agent_eval_cases` are the operator's pre-test-session checks |
+| Does the agent see what the platform knows — coverage baseline, conversation audit, hedge probe, golden cases | [docs/agent-evaluation.md](docs/agent-evaluation.md) — a derived read with no tool is data the agent cannot use; `.github/agent-data-coverage-baseline.json` records every gap WITH a reason (guarded by [tests/unit/agentDataCoverage.test.ts](tests/unit/agentDataCoverage.test.ts)); `agent_eval_cases` is the operator's pre-test-session check. **`agent_conversation_audit(p_days)` now has a UI** — the Unmet Requests panel on `/admin/operations?tab=agent-chat`, which is where "what did people ask that we could not do" is read. It self-guards on `is_platform_admin()`, so an MCP/SQL-editor connection cannot run it (no JWT ⇒ no `auth.role()`); read it in the app |
 | Background agents framework | [docs/background-agents.md](docs/background-agents.md) |
 | Job tracking / `background_jobs` | [docs/unified-job-tracking.md](docs/unified-job-tracking.md), [docs/job-queue-system.md](docs/job-queue-system.md) |
 | Price monitoring (+ version history) | [docs/price-monitoring-system.md](docs/price-monitoring-system.md) |
