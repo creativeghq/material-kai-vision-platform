@@ -239,7 +239,7 @@ const MyOfficeImpl: React.FC = () => {
         <p className="text-[11px] uppercase tracking-[0.14em] text-primary truncate">
           {companyName ? `My office, ${companyName}` : 'My office'}
         </p>
-        <h2 className="font-display text-lg tracking-tight mt-0.5 truncate" style={{ fontWeight: 600 }}>
+        <h2 className="font-sans text-lg tracking-tight mt-0.5 truncate" style={{ fontWeight: 600 }}>
           {personName ? `Welcome back, ${personName}` : 'Welcome back'}
         </h2>
       </div>

@@ -1197,7 +1197,7 @@ export const ContactDetailPage: React.FC = () => {
                         </span>
                         <div className="min-w-0 flex-1">
                           <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Company Account</p>
-                          <h3 className="font-display text-xl leading-tight truncate">{primaryCompany.name}</h3>
+                          <h3 className="text-xl leading-tight truncate">{primaryCompany.name}</h3>
                           {companyMeta.length > 0 && (
                             <p className="mt-1 text-xs text-muted-foreground truncate">{companyMeta.join(' · ')}</p>
                           )}

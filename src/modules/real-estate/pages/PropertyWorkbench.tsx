@@ -393,7 +393,7 @@ export default function PropertyWorkbench() {
 
   return (
     <div className="min-h-screen">
-      <PageHeader icon={Building2} title={propertyName({ title: property.title, address: property.address })} subtitle={property.reference_code ? `#${property.reference_code}` : 'Listing workbench'}
+      <PageHeader recordTitle icon={Building2} title={propertyName({ title: property.title, address: property.address })} subtitle={property.reference_code ? `#${property.reference_code}` : 'Listing workbench'}
         actions={
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" onClick={() => navigate('/properties')}><ArrowLeft className="mr-1 h-4 w-4" /> Portfolio</Button>

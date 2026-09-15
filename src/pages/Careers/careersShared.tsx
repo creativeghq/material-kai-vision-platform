@@ -63,11 +63,11 @@ export function CompanyHeader({ company, onHome }: { company: CompanyProfile; on
       )}
       <div className="min-w-0">
         {onHome ? (
-          <button onClick={onHome} className="text-left text-xl font-display font-semibold hover:text-primary transition-colors truncate block">
+          <button onClick={onHome} className="text-left text-xl font-sans font-semibold hover:text-primary transition-colors truncate block">
             {company.name}
           </button>
         ) : (
-          <h1 className="text-2xl font-display font-semibold truncate">{company.name}</h1>
+          <h1 className="text-2xl font-sans font-semibold truncate">{company.name}</h1>
         )}
         {company.tagline && <p className="text-sm text-muted-foreground line-clamp-1">{company.tagline}</p>}
       </div>

@@ -197,7 +197,7 @@ export const PropertyFormDialog: React.FC<{
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-display">{propertyId ? 'Edit property' : 'Add property'}</DialogTitle>
+          <DialogTitle>{propertyId ? 'Edit property' : 'Add property'}</DialogTitle>
           <DialogDescription>
             Saved as a real listing record — open it afterwards for photos, viewings, offers and the full spec.
           </DialogDescription>

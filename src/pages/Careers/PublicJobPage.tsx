@@ -100,7 +100,7 @@ export default function PublicJobPage() {
           <CompanyHeader company={company} onHome={() => navigate(`/careers/${slug}`)} />
         </div>
 
-        <h1 className="text-3xl font-display font-semibold tracking-tight mb-8">{job.title}</h1>
+        <h1 className="text-3xl font-sans font-semibold tracking-tight mb-8">{job.title}</h1>
 
         <div className="grid gap-10 md:grid-cols-[minmax(0,240px)_minmax(0,1fr)]">
           {/* ── Facts rail ── */}

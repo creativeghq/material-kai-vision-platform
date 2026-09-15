@@ -432,7 +432,7 @@ export const ExpenseSuppliersTab: React.FC<{
       {openSupplier && (
         <DialogContent key={openSupplier.issuer_vat} className="max-w-5xl p-0">
           <DialogHeader className="border-b border-hairline px-5 py-3">
-            <DialogTitle className="font-display text-base">
+            <DialogTitle className="text-base">
               {openSupplier.issuer_name || openSupplier.issuer_vat}
             </DialogTitle>
             <DialogDescription className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">

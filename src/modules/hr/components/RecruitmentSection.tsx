@@ -194,7 +194,7 @@ function ApplicationsPipeline({ workspaceId, posting, departments, canManage, ca
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={onBack}><ChevronLeft className="h-4 w-4 mr-1" />Positions</Button>
           <div>
-            <h2 className="text-base font-display font-semibold">{posting.title}</h2>
+            <h2 className="text-base font-sans font-semibold">{posting.title}</h2>
             <p className="text-xs text-muted-foreground">{apps.length} applicant{apps.length === 1 ? '' : 's'} · <Badge variant={statusVariant[posting.status]} className="align-middle">{POSTING_STATUS_LABELS[posting.status]}</Badge></p>
           </div>
         </div>

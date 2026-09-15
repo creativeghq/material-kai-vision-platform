@@ -245,3 +245,124 @@ describe('agent result card follows the table language', () => {
       'the flag is per TURN — a card last turn must not silence this turn').toBe(true);
   });
 });
+
+/**
+ * THE DISPLAY FACE IS LATIN-ONLY, SO IT NEVER RENDERS A NAME.
+ *
+ * Aleo's cmap has zero Greek letters and CSS font matching is PER CHARACTER, so a mixed-script
+ * name under `font-display` -- "KEROS HELLAS ΕΤΑΙΡΙΑ ΠΕΡΙΟΡΙΣΜΕΝΗΣ ΕΥΘΥΝΗΣ", the shape every
+ * ΑΑΔΕ/ΓΕΜΗ registry name takes -- renders half slab-serif and half Averta inside one line.
+ * Nothing raises: both faces load, the string is intact, the class is valid. So the brand serif
+ * stays on IDENTITY surfaces (titles and copy this app authors) and comes off database strings.
+ */
+describe('design system — the latin-only display face never renders a record name', () => {
+  /**
+   * `font-display` opt-ins whose interpolated content is NOT a database name. Shrink-only, each
+   * with its reason. Keyed on the rendered content rather than a line number so the entry
+   * survives the file moving, and cannot be reused for a different heading in the same file.
+   */
+  const DISPLAY_FACE_OK = new Map<string, string>([
+    ['src/components/Admin/AdminStatCard.tsx::{value}', 'a formatted numeral — latin digits'],
+    ['src/components/features/dashboard/StatBlock.tsx::{value}', 'a formatted numeral — latin digits'],
+    ['src/components/business/catalogs/PublicCatalogPage.tsx::{title}', 'section heading copy this app authors, not a record'],
+    ['src/components/core/AppLauncher.tsx::{activeHubGroup.hub?.label ?? \'More\'}', 'the static hub vocabulary, defined in code'],
+    ['src/components/shared/PageHeader.tsx::{title}', 'conditional — a caller passing a record name sets recordTitle, which swaps in font-sans'],
+    ['src/modules/hr/components/PayrollSection.tsx::Payroll {run.period}', 'a period key (2026-09), latin by construction'],
+    ['src/pages/Careers/PublicJobPage.tsx::{applied}', 'an authored confirmation sentence'],
+    ['src/pages/ChangelogPage.tsx::{month.label}', 'a formatted month, authored in code'],
+    ['src/pages/ChangelogPage.tsx::{entry.title}', 'the operator\'s own changelog copy on a marketing page'],
+    [
+      'src/components/features/dashboard/HeroSection.tsx::{heroConfig.title} <br /> <span className="text-primary">{heroConfig.subtitle}',
+      'the dashboard hero — authored copy in dashboardData.ts, not a record',
+    ],
+    [
+      'src/pages/HomePage.tsx::<span className="bg-clip-text text-transparent" style={{ backgroundImage: \'var(--brand-gradient)\' }}',
+      'the marketing hero — authored copy, and the brand serif is the point of the surface',
+    ],
+  ]);
+
+  /** The opening tag through to the first child text, for an element opting into font-display. */
+  function displayFaceHeadings(src: string): { content: string; line: number }[] {
+    const out: { content: string; line: number }[] = [];
+    const lines = src.split('\n');
+    lines.forEach((ln, i) => {
+      if (!ln.includes('font-display')) return;
+      const body = lines.slice(i, i + 4).join('\n');
+      const afterTag = body.slice(body.indexOf('font-display'));
+      const close = afterTag.indexOf('>');
+      if (close < 0) return;
+      const end = afterTag.indexOf('</');
+      const content = afterTag.slice(close + 1, end >= 0 ? end : undefined).trim().replace(/\s+/g, ' ');
+      if (content.includes('{')) out.push({ content, line: i + 1 });
+    });
+    return out;
+  }
+
+  it('no font-display heading renders an interpolated value that is not on the allowlist', () => {
+    const offenders: string[] = [];
+    for (const f of walk(SRC)) {
+      // blankComments, not stripComments: a doc comment EXPLAINING this rule mentions
+      // `font-display` beside an example, and must not convict the file that documents it.
+      const src = blankComments(readFileSync(f, 'utf8'));
+      for (const { content, line } of displayFaceHeadings(src)) {
+        const key = `${rel(f)}::${content}`;
+        if (DISPLAY_FACE_OK.has(key)) continue;
+        offenders.push(`${rel(f)}:${line}  ${content.slice(0, 90)}`);
+      }
+    }
+    expect(
+      offenders,
+      'Aleo cannot draw Greek, and CSS font matching is per character — so a Greek or ' +
+        'mixed-script value here renders half slab-serif and half sans inside one line. Render ' +
+        'the value in the UI face (drop the class, or `font-sans` on an h1/h2, which inherits ' +
+        'the display face from index.css). If the string genuinely cannot be a record name, ' +
+        'add it to DISPLAY_FACE_OK with the reason.',
+    ).toEqual([]);
+  });
+
+  it('the allowlist is shrink-only — every entry still matches a real heading', () => {
+    const live = new Set<string>();
+    for (const f of walk(SRC)) {
+      const src = blankComments(readFileSync(f, 'utf8'));
+      for (const { content } of displayFaceHeadings(src)) live.add(`${rel(f)}::${content}`);
+    }
+    const stale = [...DISPLAY_FACE_OK.keys()].filter((k) => !live.has(k));
+    expect(stale, 'these exemptions no longer match anything — delete them so the list only shrinks')
+      .toEqual([]);
+  });
+
+  it('DialogTitle renders in the UI face — a modal title is where record names live', () => {
+    const dialog = blankComments(readFileSync(join(UI, 'dialog.tsx'), 'utf8'));
+    const title = dialog.slice(dialog.indexOf('const DialogTitle'));
+    expect(
+      /font-display/.test(title.slice(0, title.indexOf('DialogTitle.displayName'))),
+      'The primitive styles ~118 modal titles that interpolate a value — supplier names, party ' +
+        'names, product names. It is a chrome heading (the h3–h6 rule), so it is sans.',
+    ).toBe(false);
+  });
+
+  it('no DialogTitle instance opts back into the display face', () => {
+    const offenders: string[] = [];
+    for (const f of walk(SRC)) {
+      const src = blankComments(readFileSync(f, 'utf8'));
+      for (const m of src.matchAll(/<DialogTitle\b[^>]*className="[^"]*font-display/g)) {
+        offenders.push(`${rel(f)}:${src.slice(0, m.index).split('\n').length}`);
+      }
+    }
+    expect(offenders, 'a modal title can always end up holding a Greek record name').toEqual([]);
+  });
+
+  it('--font-display keeps Averta between Aleo and the system serifs', () => {
+    const css = readFileSync(CSS, 'utf8');
+    const decl = css.match(/--font-display:\s*([^;]+);/);
+    expect(decl, '--font-display must be declared').toBeTruthy();
+    const families = decl![1].split(',').map((s) => s.trim().replace(/^'|'$/g, ''));
+    expect(families[0], 'Aleo is the brand display face').toBe('Aleo');
+    expect(
+      families[1],
+      'Averta MUST sit second. Aleo has zero Greek glyphs and 24/128 latin-ext, so without it ' +
+        'every Greek heading falls through to Georgia — a system serif that is not installed on ' +
+        'Linux, so the same record renders differently per OS.',
+    ).toBe('Averta');
+  });
+});

@@ -154,6 +154,7 @@ export const TemplateEditorPage: React.FC = () => {
     <div className="min-h-screen bg-background">
       <PageHeader
         icon={Icon}
+        recordTitle
         title={tpl.title}
         subtitle={`${adapter.label} template${readOnly ? ' — starter example, read-only' : ''}`}
         actions={

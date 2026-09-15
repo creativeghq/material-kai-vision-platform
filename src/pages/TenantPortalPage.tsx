@@ -56,7 +56,7 @@ export default function TenantPortalPage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
-        <h1 className="text-2xl font-display font-semibold">{data.property?.title || 'Your tenancy'}</h1>
+        <h1 className="text-2xl font-sans font-semibold">{data.property?.title || 'Your tenancy'}</h1>
         {where && <p className="mt-0.5 text-sm text-muted-foreground">{where}</p>}
 
         <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">

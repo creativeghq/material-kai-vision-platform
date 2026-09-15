@@ -305,6 +305,7 @@ export const ProjectDetailPage: React.FC = () => {
       <PageHeader
         icon={FolderKanban}
         thumbnailUrl={projectCoverSrc(cover, 200)}
+        recordTitle
         title={project.name}
         subtitle={project.description || undefined}
         actions={

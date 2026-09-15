@@ -329,7 +329,7 @@ const ItemRow: React.FC<{ material: any; showPrices: boolean }> = ({ material: m
         : <span className="text-xs text-[hsl(var(--ink-muted))]">no image</span>}
     </div>
     <div className="min-w-0 flex-1">
-      <h3 className="font-display text-lg font-semibold text-[hsl(var(--ink))]">{m.name}</h3>
+      <h3 className="text-lg font-semibold text-[hsl(var(--ink))]">{m.name}</h3>
       {m.description && <p className="text-sm text-[hsl(var(--ink))] mt-1 max-w-3xl">{m.description}</p>}
       {m.specs && Object.keys(m.specs).length > 0 && (
         <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1">
@@ -407,7 +407,7 @@ const CatalogReader: React.FC<{
             <img src={branding.logo_url} alt={branding.company_name || ''} className="h-10 mb-6" />
           )}
           <div className="h-[3px] w-8 bg-[hsl(var(--ink))] mb-4" />
-          <h1 className="font-display text-3xl md:text-5xl font-semibold text-[hsl(var(--ink))]">{catalog.title}</h1>
+          <h1 className="font-sans text-3xl md:text-5xl font-semibold text-[hsl(var(--ink))]">{catalog.title}</h1>
           {catalog.subtitle && <p className="text-lg text-[hsl(var(--ink-muted))] mt-2">{catalog.subtitle}</p>}
           {catalog.description && <p className="text-sm text-[hsl(var(--ink-muted))] mt-3 max-w-2xl">{catalog.description}</p>}
           <div className="flex flex-wrap items-center gap-4 pt-6 text-sm text-[hsl(var(--ink-muted))]">

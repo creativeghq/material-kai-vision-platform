@@ -679,7 +679,7 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
         <DialogHeader className="space-y-1">
           <div className="flex items-start justify-between gap-4 pr-8">
             <div className="min-w-0">
-              <DialogTitle className="font-display text-xl">
+              <DialogTitle className="text-xl">
                 {party ? <Link to={crmHref} className="hover:underline" title="Open the CRM record">{party.display_name}</Link> : ''}
               </DialogTitle>
               <DialogDescription className="flex flex-wrap items-center gap-x-2 text-xs">

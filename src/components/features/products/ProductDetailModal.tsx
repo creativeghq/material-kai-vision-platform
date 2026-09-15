@@ -1565,7 +1565,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   )}
                 </div>
               </div>
-              <DialogTitle className="text-2xl sm:text-3xl mb-1 break-words font-display tracking-tight" style={{ fontWeight: 700 }}>
+              <DialogTitle className="text-2xl sm:text-3xl mb-1 break-words tracking-tight" style={{ fontWeight: 700 }}>
                 {safeString(product.name, 'Unnamed Product')}
               </DialogTitle>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted-foreground">

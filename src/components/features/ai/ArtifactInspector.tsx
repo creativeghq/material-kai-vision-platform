@@ -36,7 +36,7 @@ const Shell: React.FC<{ kicker: string; title: string; children: React.ReactNode
   <div className="flex flex-col gap-5 p-4">
     <div>
       <div className="text-[11px] font-semibold uppercase tracking-wider text-primary">{kicker}</div>
-      <h3 className="mt-0.5 font-display text-base font-semibold leading-tight text-foreground">{title}</h3>
+      <h3 className="mt-0.5 text-base font-semibold leading-tight text-foreground">{title}</h3>
     </div>
     {children}
   </div>

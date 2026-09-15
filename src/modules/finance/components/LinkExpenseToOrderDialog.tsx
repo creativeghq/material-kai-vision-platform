@@ -97,7 +97,7 @@ export const LinkExpenseToOrderDialog: React.FC<Props> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="font-display flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2">
             <Link2 className="h-4 w-4" /> Attach an existing expense
           </DialogTitle>
           <DialogDescription>

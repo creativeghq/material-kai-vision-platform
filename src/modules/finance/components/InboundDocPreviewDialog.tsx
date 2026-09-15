@@ -150,7 +150,7 @@ export const InboundDocPreviewDialog: React.FC<{
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[88vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-display">AADE Document Preview</DialogTitle>
+          <DialogTitle>AADE Document Preview</DialogTitle>
           <DialogDescription>
             The received document as the tax authority holds it — read-only.
           </DialogDescription>
@@ -161,7 +161,7 @@ export const InboundDocPreviewDialog: React.FC<{
             identity, which myDATA never transmits and we hold on their CRM record. */}
         <div className="rounded-md border border-border/60 bg-muted/20 p-3">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-            <p className="text-base font-medium font-display">{issuer?.name ?? doc.issuer_name ?? doc.issuer_vat ?? 'Unknown issuer'}</p>
+            <p className="text-base font-medium">{issuer?.name ?? doc.issuer_name ?? doc.issuer_vat ?? 'Unknown issuer'}</p>
             <span className="font-mono text-xs text-muted-foreground">
               ΑΦΜ {doc.issuer_vat ?? '—'}{doc.issuer_country && doc.issuer_country !== 'GR' ? ` · ${doc.issuer_country}` : ''}
             </span>

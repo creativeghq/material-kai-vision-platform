@@ -94,10 +94,11 @@ const DialogTitle = React.forwardRef<
   <DialogPrimitive.Title
     ref={ref}
     className={cn(
-      // Headings use the display face (font-display) — so every modal title matches the app's
-      // heading language by default. Previously only modals that overrode the class got it;
-      // the rest fell back to the body font and looked off. Overrides via className still win.
-      'font-display text-lg font-semibold leading-none tracking-tight',
+      // SANS, not the display face. A modal title is a chrome heading (the h3–h6 rule), and it
+      // is also where record NAMES live — "Receive into warehouse — {issuer}". Aleo is latin-only,
+      // and CSS font matching is per character, so a Greek name under font-display renders half
+      // slab-serif and half sans inside one line. Overrides via className still win.
+      'text-lg font-semibold leading-none tracking-tight',
       className,
     )}
     {...props}

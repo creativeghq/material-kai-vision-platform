@@ -4895,7 +4895,7 @@ const VatExemptionDialog: React.FC<{
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle className="font-display">Why is “{label}” 0% VAT?</DialogTitle>
+          <DialogTitle>Why is “{label}” 0% VAT?</DialogTitle>
           <DialogDescription>
             myDATA requires an exemption cause on every 0% line. The order is fine without one —
             this is only needed before it can become an invoice.
@@ -5025,7 +5025,7 @@ const LineStockDialog: React.FC<{
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-display">Stock for “{label}”</DialogTitle>
+          <DialogTitle>Stock for “{label}”</DialogTitle>
           <DialogDescription>
             The warehouse counts quantities against a catalog product, so a typed-in line has nothing to add to.
             Tell it which product this is — or that it isn’t stock at all.

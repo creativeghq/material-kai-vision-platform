@@ -255,6 +255,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
     <div className="min-h-screen">
       <PageHeader
         icon={ShoppingCart}
+        recordTitle
         title={quote.name || 'Untitled Quote'}
         subtitle={`Created ${formatDate(quote.created_at)} · Expires ${formatDate(quote.expires_at)}`}
         actions={

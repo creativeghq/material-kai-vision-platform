@@ -655,7 +655,7 @@ export const ReceiveToWarehouseDialog: React.FC<{
     <Dialog open onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle className="font-display">Receive into warehouse — {issuer}</DialogTitle>
+          <DialogTitle>Receive into warehouse — {issuer}</DialogTitle>
           <DialogDescription>
             Sizes, unit and cost are read from each supplier line. Check them, then receive.
           </DialogDescription>

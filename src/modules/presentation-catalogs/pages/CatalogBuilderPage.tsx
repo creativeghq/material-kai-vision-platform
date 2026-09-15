@@ -322,6 +322,7 @@ export const CatalogBuilderPage: React.FC = () => {
   return (
     <div>
       <PageHeader
+        recordTitle
         title={catalog.title}
         subtitle={catalog.subtitle || ''}
         icon={BookOpen}

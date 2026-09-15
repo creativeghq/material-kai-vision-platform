@@ -176,7 +176,7 @@ export const AddressUnitsManager: React.FC<Props> = ({ companyId, contactId, rea
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle className="font-display">{editingId ? 'Edit address' : 'Add address'}</DialogTitle>
+            <DialogTitle>{editingId ? 'Edit address' : 'Add address'}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-2">
             <div className="space-y-2 md:col-span-2">

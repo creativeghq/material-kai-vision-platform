@@ -78,7 +78,7 @@ export const DealDetailPage: React.FC = () => {
         <Button variant="ghost" size="sm" onClick={() => navigate('/crm?tab=pipeline')}>
           <ArrowLeft className="mr-1.5 h-4 w-4" /> Pipeline
         </Button>
-        <h1 className="font-display text-xl">{label}</h1>
+        <h1 className="font-sans text-xl">{label}</h1>
         {type && <Badge className="border-0 bg-muted text-[11px]">{type.label}</Badge>}
         {deal.status === 'won' && <span className="text-xs font-medium text-emerald-600">Won</span>}
         {deal.status === 'lost' && <span className="text-xs font-medium text-muted-foreground">Lost{deal.lost_reason ? ` · ${deal.lost_reason}` : ''}</span>}

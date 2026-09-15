@@ -25,6 +25,13 @@ interface PageHeaderProps {
    */
   thumbnailUrl?: string | null;
   title: string;
+  /**
+   * The title is a RECORD'S OWN NAME (a project, a quote, a property) rather than a page
+   * label — so it renders in the UI sans face instead of the brand slab serif. Aleo is
+   * latin-only and CSS font matching is per character, so a mixed-script name like
+   * "KEROS HELLAS ΕΤΑΙΡΙΑ ΠΕΡΙΟΡΙΣΜΕΝΗΣ ΕΥΘΥΝΗΣ" otherwise splits into two faces mid-line.
+   */
+  recordTitle?: boolean;
   subtitle?: string;
   /**
    * Ancestor trail, rendered above the title. A deep record page ("this
@@ -43,6 +50,7 @@ export function PageHeader({
   icon: Icon,
   thumbnailUrl,
   title,
+  recordTitle = false,
   subtitle,
   breadcrumbs,
   actions,
@@ -93,7 +101,11 @@ export function PageHeader({
             </div>
           )}
           <div className="min-w-0">
-            <h1 className="truncate font-display text-xl font-semibold leading-tight tracking-tight text-foreground">
+            <h1
+              className={`truncate text-xl font-semibold leading-tight tracking-tight text-foreground ${
+                recordTitle ? 'font-sans' : 'font-display'
+              }`}
+            >
               {title}
             </h1>
             {subtitle && (
