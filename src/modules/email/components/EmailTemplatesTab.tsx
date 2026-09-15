@@ -87,12 +87,7 @@ export const EmailTemplatesTab: React.FC = () => {
     loadEmailDefaults();
   }, []);
 
-  /**
-   * Pull the platform's default sender (configured in EmailSettingsModal).
-   * Surfaced read-only on every template card so admins can see exactly who
-   * the email will appear to be from before they enable it for sending.
-   * Editing happens in the Email Settings dialog, not per-template.
-   */
+  /** Read-only on every template card; editing happens in Email Settings, not per-template. */
   const loadEmailDefaults = async () => {
     const { data } = await supabase
       .from('email_settings')

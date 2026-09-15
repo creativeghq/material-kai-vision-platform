@@ -1,6 +1,6 @@
 import { legacyAdminRedirect } from '@/modules/_core/legacyAdminRedirect';
 import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry';
-import { Mail, AtSign } from 'lucide-react';
+import { Mail, AtSign, LayoutTemplate } from 'lucide-react';
 import manifest from './manifest.json';
 import type { ModuleDefinition, ModuleManifest } from '../_core';
 
@@ -12,6 +12,9 @@ const EmailTemplateBuilderPage = lazy(() =>
 );
 const EmailSettingsPanel = lazy(() =>
   import('./components/EmailSettingsPanel').then(m => ({ default: m.EmailSettingsPanel })),
+);
+const EmailLayoutPanel = lazy(() =>
+  import('./components/EmailLayoutPanel').then(m => ({ default: m.EmailLayoutPanel })),
 );
 
 const definition: ModuleDefinition = {
@@ -45,6 +48,12 @@ const definition: ModuleDefinition = {
       label: 'Default Sender',
       icon: AtSign,
       component: EmailSettingsPanel,
+    },
+    {
+      id: 'layout',
+      label: 'Email Layout',
+      icon: LayoutTemplate,
+      component: EmailLayoutPanel,
     },
   ],
 };

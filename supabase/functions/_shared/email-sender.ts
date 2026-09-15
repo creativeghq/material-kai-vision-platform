@@ -1,5 +1,7 @@
 /** Per-workspace Resend BYOK resolution + send-cap enforcement. */
 
+import type { LayoutBrand } from './email-layout.ts';
+
 // deno-lint-ignore no-explicit-any
 type SupabaseLike = any;
 
@@ -19,27 +21,60 @@ export interface ResolvedEmailSender {
   source: 'workspace' | 'platform' | 'unconfigured';
   /** Why there is no sender. Present only when `source === 'unconfigured'`. */
   reason?: string;
+  /**
+   * A brand belongs to the sender, so it resolves here, not at the 22 call sites — and a
+   * tenant gets its own or the default, never the operator's (same rule as the Resend key).
+   */
+  layoutHtml: string | null;
+  brand: LayoutBrand;
 }
 
 const DEFAULT_DAILY_LIMIT = 300;
 
-/** Read the platform default sender + reply-to from global email_settings. */
-async function platformSender(supabase: SupabaseLike): Promise<{ fromEmail: string; fromName: string; replyTo: string }> {
-  let fromEmail = '';
-  let fromName = 'Material Kai';
-  let replyTo = '';
+export const OPERATOR_BRAND_KEYS = [
+  'default_from_email',
+  'default_from_name',
+  'default_reply_to',
+  'default_layout_html',
+  'brand_name',
+  'brand_url',
+  'brand_logo_url',
+  'brand_footer_note',
+] as const;
+
+interface PlatformIdentity {
+  fromEmail: string;
+  fromName: string;
+  replyTo: string;
+  layoutHtml: string | null;
+  brandName: string;
+  brandUrl: string;
+  logoUrl: string;
+  footerNote: string;
+}
+
+/** The platform default sender + reply-to + brand, from global email_settings. */
+async function platformSender(supabase: SupabaseLike): Promise<PlatformIdentity> {
+  const v: Record<string, string> = {};
   try {
     const { data } = await supabase
       .from('email_settings')
       .select('setting_key, setting_value')
-      .in('setting_key', ['default_from_email', 'default_from_name', 'default_reply_to']);
-    for (const s of data ?? []) {
-      if (s.setting_key === 'default_from_email') fromEmail = s.setting_value || '';
-      else if (s.setting_key === 'default_from_name') fromName = s.setting_value || fromName;
-      else if (s.setting_key === 'default_reply_to') replyTo = s.setting_value || '';
-    }
+      .in('setting_key', [...OPERATOR_BRAND_KEYS]);
+    for (const s of data ?? []) v[s.setting_key] = s.setting_value || '';
   } catch (_) { /* fall through to empty — caller fails loudly if no sender */ }
-  return { fromEmail, fromName, replyTo };
+
+  const fromName = v.default_from_name || 'Material Kai';
+  return {
+    fromEmail: v.default_from_email || '',
+    fromName,
+    replyTo: v.default_reply_to || '',
+    layoutHtml: v.default_layout_html || null,
+    brandName: v.brand_name || fromName,
+    brandUrl: v.brand_url || (Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr'),
+    logoUrl: v.brand_logo_url || '',
+    footerNote: v.brand_footer_note || '',
+  };
 }
 
 /**
@@ -55,18 +90,28 @@ export async function resolveWorkspaceEmailSender(
   if (workspaceId) {
     const { data: cfg } = await supabase
       .from('workspace_email_config')
-      .select('resend_api_key, from_email, from_name, reply_to, enabled')
+      .select('resend_api_key, from_email, from_name, reply_to, enabled, layout_html, brand_url, brand_logo_url, brand_footer_note')
       .eq('workspace_id', workspaceId)
       .maybeSingle();
     const key = (cfg?.resend_api_key ?? '').trim();
     const fromEmail = (cfg?.from_email ?? '').trim();
     if (cfg && cfg.enabled !== false && key && fromEmail) {
+      const fromName = (cfg.from_name ?? '').trim() || fromEmail;
       return {
         apiKey: key,
         fromEmail,
-        fromName: (cfg.from_name ?? '').trim() || fromEmail,
+        fromName,
         replyTo: (cfg.reply_to ?? '').trim(),
         source: 'workspace',
+        layoutHtml: (cfg.layout_html ?? '').trim() || null,
+        brand: {
+          brandName: fromName,
+          brandUrl: (cfg.brand_url ?? '').trim(),
+          logoUrl: (cfg.brand_logo_url ?? '').trim(),
+          senderName: fromName,
+          senderEmail: fromEmail,
+          footerNote: (cfg.brand_footer_note ?? '').trim(),
+        },
       };
     }
   }
@@ -82,6 +127,8 @@ export async function resolveWorkspaceEmailSender(
         fromName: '',
         replyTo: '',
         source: 'unconfigured',
+        layoutHtml: null,
+        brand: { brandName: '', brandUrl: '', logoUrl: '', senderName: '', senderEmail: '', footerNote: '' },
         reason: 'This workspace has no verified email sender of its own. Add a Resend API key and '
           + 'a verified From address in Profile → Keys. Mail is never sent from the platform '
           + "domain on a workspace's behalf.",
@@ -89,8 +136,23 @@ export async function resolveWorkspaceEmailSender(
     }
   }
 
-  const { fromEmail, fromName, replyTo } = await platformSender(supabase);
-  return { apiKey: platformKey, fromEmail, fromName, replyTo, source: 'platform' };
+  const p = await platformSender(supabase);
+  return {
+    apiKey: platformKey,
+    fromEmail: p.fromEmail,
+    fromName: p.fromName,
+    replyTo: p.replyTo,
+    source: 'platform',
+    layoutHtml: p.layoutHtml,
+    brand: {
+      brandName: p.brandName,
+      brandUrl: p.brandUrl,
+      logoUrl: p.logoUrl,
+      senderName: p.fromName,
+      senderEmail: p.fromEmail,
+      footerNote: p.footerNote,
+    },
+  };
 }
 
 export interface SendQuota {

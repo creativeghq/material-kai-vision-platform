@@ -1098,6 +1098,31 @@
         "summary": "Pull domain list from Resend and upsert into email_domains (admin only).",
         "params": [],
         "response": "{success:true, added:number, updated:number, total:number}"
+      },
+      {
+        "name": "layout",
+        "summary": "Read and preview the operator's email layout — the brand shell every outgoing email is wrapped in. Platform operator only.",
+        "params": [
+          {
+            "name": "layoutHtml",
+            "type": "string",
+            "required": false,
+            "desc": "Layout to preview instead of the stored one. Must contain {{content}}; empty previews the built-in default."
+          },
+          {
+            "name": "emailType",
+            "type": "string",
+            "required": false,
+            "desc": "'marketing' renders the unsubscribe block; anything else omits it."
+          },
+          {
+            "name": "sampleHtml",
+            "type": "string",
+            "required": false,
+            "desc": "Body to render inside the shell. Defaults to the built-in specimen."
+          }
+        ],
+        "response": "{success, error, html, source, storedLayout, defaultLayout, sampleHtml, brand}"
       }
     ],
     "request": [
