@@ -117,9 +117,64 @@ describe('all three writers normalise', () => {
 
   it('the form offers the list and fills it from the IBAN', () => {
     const form = code('src/components/business/crm/CrmBankAccountsCard.tsx');
-    expect(form).toContain('BANK_NAMES');
+    expect(form).toMatch(/BANKS\.map\(/);
     expect(form).toMatch(/list="crmb-bank-names"/);
     expect(form).toContain('bankFromIban(');
     expect(form).toMatch(/id="crmb-name"/);
+  });
+});
+
+describe('a brand that is several banks is never one bank', () => {
+  it('leaves a bare Postbank alone rather than picking a country for the operator', () => {
+    // Deutsche Postbank (DE) and Eurobank Bulgaria AD trading as Postbank (BG) are different
+    // banks. Folding the bare word to either one invents a fact the operator never stated.
+    expect(normalizeBankName('Postbank')).toBe('Postbank');
+    expect(normalizeBankName('Deutsche Postbank')).toBe('Postbank (DE)');
+    expect(normalizeBankName('Eurobank Bulgaria')).toBe('Postbank (BG)');
+  });
+
+  it('keeps each multi-country brand qualified', () => {
+    const ambiguous = ['Postbank', 'Raiffeisen'];
+    for (const brand of ambiguous) {
+      const bare = BANKS.filter((b) => b.name.toLowerCase() === brand.toLowerCase());
+      expect(bare, `${brand} is listed unqualified but exists in several countries`).toHaveLength(0);
+      expect(BANKS.filter((b) => b.name.startsWith(brand)).length).toBeGreaterThan(1);
+    }
+  });
+
+  it('a country, where stated, is an ISO-2 code', () => {
+    for (const b of BANKS) {
+      if (b.country) expect(b.country, b.name).toMatch(/^[A-Z]{2}$/);
+    }
+  });
+});
+
+describe('a bank that stopped existing still resolves', () => {
+  it('folds Attica and Pancreta onto the bank they merged into', () => {
+    // CrediaBank, September 2025. Both names are still printed on invoices in the system.
+    expect(normalizeBankName('Attica Bank')).toBe('CrediaBank');
+    expect(normalizeBankName('ΑΤΤΙΚΗΣ')).toBe('CrediaBank');
+    expect(normalizeBankName('Pancreta')).toBe('CrediaBank');
+    expect(normalizeBankName('Credia')).toBe('CrediaBank');
+  });
+
+  it('does not claim a name that means two different banks', () => {
+    // Alpha Bank was Alpha Credit Bank until 1994 and CrediaBank is new, so "CreditBank" is
+    // genuinely ambiguous — it stays as typed rather than resolving to a guess.
+    expect(normalizeBankName('CreditBank')).toBe('CreditBank');
+  });
+});
+
+describe('the list is wide enough to pick from', () => {
+  it('covers the countries this workspace actually buys from', () => {
+    const countries = new Set(BANKS.map((b) => b.country).filter(Boolean));
+    for (const c of ['GR', 'IT', 'DE', 'BG', 'TR', 'GB']) expect(countries.has(c), c).toBe(true);
+    expect(BANK_NAMES.length).toBeGreaterThanOrEqual(40);
+  });
+
+  it('still offers the ones asked for by name', () => {
+    for (const n of ['UniCredit', 'ProCredit', 'Revolut', 'CrediaBank']) {
+      expect(BANK_NAMES, n).toContain(n);
+    }
   });
 });
