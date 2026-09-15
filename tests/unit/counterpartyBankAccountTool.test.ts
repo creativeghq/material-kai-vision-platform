@@ -281,6 +281,35 @@ describe('the company resolver is declared once', () => {
     expect(callers.length).toBeGreaterThanOrEqual(4); // 1 declaration + 3 call sites
   });
 
+  it('a name that differs only by SPACING still resolves', () => {
+    // Found by replaying the failed conversation: the company is stored as "… NEW PLAN …" and
+    // prints "NEWPLAN" on its own letterhead, so the model queried the spelling in front of it
+    // and got "No matching company in this workspace" — a confident false negative for a company
+    // that exists. name_fold lowercases and name_xscript transliterates; neither collapses
+    // whitespace, and no index can.
+    expect(src).toContain('const nameShape =');
+    // Strips everything that is not a letter or digit — Greek included, or a Greek name would
+    // collapse to nothing and match every company in the workspace.
+    expect(src).toMatch(/nameShape[\s\S]{0,160}u0370-\\u03ff/);
+    expect(src).toContain('async function resolveByShape');
+  });
+
+  it('a partial scan is never reported as an absence', () => {
+    // The de-spaced pass reads rows rather than an index, so it is capped. Returning [] at the
+    // cap would turn "we looked at 1000 of 5000" into "no such company" — the confident-wrong
+    // answer this pass exists to remove, reintroduced one layer down.
+    const fn = src.slice(src.indexOf('async function resolveByShape'));
+    expect(fn).toMatch(/if \(data\.length > SHAPE_SCAN_CAP\) return null/);
+    const caller = src.slice(src.indexOf('async function resolveCompanyInWorkspace'), src.indexOf('const nameShape'));
+    expect(caller).toMatch(/if \(!found\)/);
+    expect(caller).toContain('too many to compare');
+  });
+
+  it('the de-spaced pass runs only when the indexed match found nothing', () => {
+    const caller = src.slice(src.indexOf('async function resolveCompanyInWorkspace'), src.indexOf('const nameShape'));
+    expect(caller).toMatch(/matches && matches\.length > 0[\s\S]{0,80}resolveByShape/);
+  });
+
   it('the resolver scopes to the workspace, which is the ownership check', () => {
     const fn = src.slice(
       src.indexOf('async function resolveCompanyInWorkspace'),

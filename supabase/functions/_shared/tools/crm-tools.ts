@@ -78,14 +78,60 @@ async function resolveCompanyInWorkspace(
 
   const { data: matches, error } = await q.limit(8);
   if (error) return { error: error.message };
-  if (!matches || matches.length === 0) return { error: 'No matching company in this workspace.' };
-  if (matches.length > 1) {
+
+  // A name whose only difference is SPACING matched nothing: the company is stored as
+  // "… NEW PLAN …" and prints "NEWPLAN" on its own letterhead, so `%NEWPLAN%` found the company
+  // that was in front of us. `name_fold` lowercases and `name_xscript` transliterates; neither
+  // collapses whitespace, and no index can, so this second pass compares de-spaced forms in
+  // memory. Only on zero — the ilike above stays the fast path.
+  const found = matches && matches.length > 0
+    ? (matches as AnyRow[])
+    : await resolveByShape(workspaceId, company_query, columns);
+
+  if (!found) {
     return {
-      error: `Multiple companies match "${company_query}". Ask which one.`,
-      candidates: (matches as AnyRow[]).map((c) => ({ id: c.id, name: c.name, vat: c.vat_number })),
+      error: `No company matches "${company_query}" here, and there are too many to compare `
+        + 'spelling-insensitively. Give the company id, or a longer part of the name.',
     };
   }
-  return { company: matches[0] as AnyRow };
+  if (found.length === 0) return { error: 'No matching company in this workspace.' };
+  if (found.length > 1) {
+    return {
+      error: `Multiple companies match "${company_query}". Ask which one.`,
+      candidates: found.map((c) => ({ id: c.id, name: c.name, vat: c.vat_number })),
+    };
+  }
+  return { company: found[0] };
+}
+
+/** Letters and digits only — the comparison that makes NEWPLAN and "NEW PLAN" the same name. */
+const nameShape = (v: unknown) =>
+  String(v ?? '').toLowerCase().replace(/[^a-z0-9\u0370-\u03ff]/g, '');
+
+/**
+ * Second pass over the workspace's companies, comparing de-spaced names.
+ *
+ * @returns matching rows, or `null` when the workspace holds more companies than SHAPE_SCAN_CAP —
+ * in which case the caller must NOT report "no such company", because this looked at part of the
+ * list. A partial scan reported as an absence is the confident-wrong-answer shape.
+ */
+const SHAPE_SCAN_CAP = 1000;
+async function resolveByShape(
+  workspaceId: string,
+  company_query: string | undefined,
+  columns: string,
+): Promise<AnyRow[] | null> {
+  const wanted = nameShape(company_query);
+  if (wanted.length < 4) return [];
+  const { data, error } = await supabase
+    .from('crm_companies')
+    .select(`${columns}, name_fold, name_xscript`)
+    .eq('workspace_id', workspaceId)
+    .limit(SHAPE_SCAN_CAP + 1);
+  if (error || !data) return [];
+  if (data.length > SHAPE_SCAN_CAP) return null;
+  return (data as AnyRow[]).filter((c) =>
+    [c.name, c.name_fold, c.name_xscript].some((n) => nameShape(n).includes(wanted)));
 }
 
 export const createCrmKadSearchTool = (workspaceId: string, onChunk?: (chunk: AnyRow) => void) => {

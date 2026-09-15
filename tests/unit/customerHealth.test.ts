@@ -83,7 +83,7 @@ describe('tenancy', () => {
   });
 
   it('refuses an ambiguous name instead of picking one', () => {
-    expect(RESOLVER).toMatch(/matches\.length > 1/);
+    expect(RESOLVER).toMatch(/found\.length > 1/);
     expect(RESOLVER).toMatch(/candidates:/);
     // …and the caller must actually stop on it, rather than reading `.company` off a refusal.
     expect(TOOL).toMatch(/if \(!resolved\.company\)/);
