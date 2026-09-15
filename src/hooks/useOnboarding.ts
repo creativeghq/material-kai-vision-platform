@@ -111,12 +111,16 @@ export function useOnboarding(): OnboardingState {
 // the same tab is a different first run, and a session-wide key would swallow it.
 const autoOpenKey = (workspaceId: string) => `start-here:auto-opened:${workspaceId}`;
 
-function alreadyAutoOpened(workspaceId: string): boolean {
+/**
+ * Written as "may I?" rather than "have I?" so the closed answer is the falsy one: a gate whose
+ * catch returns `true` reads as permissive at a glance even when that `true` means "stay put".
+ */
+function autoOpenAllowed(workspaceId: string): boolean {
   try {
-    return sessionStorage.getItem(autoOpenKey(workspaceId)) === '1';
+    return sessionStorage.getItem(autoOpenKey(workspaceId)) !== '1';
   } catch {
     // Private windows and blocked site data throw. Fail closed: do not redirect.
-    return true;
+    return false;
   }
 }
 
@@ -131,7 +135,7 @@ export function useOnboardingAutoOpen(): boolean {
     const ready = !!user?.id && !!activeWorkspaceId && !workspaceLoading && !permissionsLoading;
     const hasSteps = visibleOnboardingSteps({ isWorkspaceManager, can }).length > 0;
 
-    if (ready && hasSteps && !alreadyAutoOpened(activeWorkspaceId!)) {
+    if (ready && hasSteps && autoOpenAllowed(activeWorkspaceId!)) {
       const ws = activeWorkspaceId!;
       void onboardingService.get(user!.id, ws).then((row) => {
         if (cancelled || row !== null) return;
