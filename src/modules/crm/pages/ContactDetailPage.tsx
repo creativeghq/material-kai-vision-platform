@@ -48,6 +48,8 @@ import { MYDATA_EXEMPTION_CATEGORIES } from '@/lib/mydataExemptionCategories';
 import { InlineText, InlineSelect } from '@/components/business/crm/inline/InlineFields';
 import { LeadFieldSelect } from '@/components/business/crm/LeadFieldSelect';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { workspaceManagementService } from '@/services/workspaceManagementService';
+import { WORKSPACE_INVITE_ROLES, WORKSPACE_ROLE_META, type WorkspaceInviteRole } from '@/auth/workspaceRoles';
 import { useModule } from '@/modules/_core';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
 import { PropertyBuyerPanel } from '@/modules/real-estate/components/PropertyBuyerPanel';
@@ -150,7 +152,7 @@ export const ContactDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const [openingWhatsApp, setOpeningWhatsApp] = useState(false);
   const { toast } = useToast();
-  const { activeWorkspaceId } = useWorkspace();
+  const { activeWorkspaceId, activeWorkspace } = useWorkspace();
   const { enabled: realEstateEnabled } = useModule('real-estate'); // Property tab when module on
   const [pricingLevels, setPricingLevels] = useState<Array<{ level_key: string; label: string }>>([]);
   const isNew = id === 'new';
@@ -199,6 +201,8 @@ export const ContactDetailPage: React.FC = () => {
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteFullName, setInviteFullName] = useState('');
+  const [inviteRole, setInviteRole] = useState<WorkspaceInviteRole>('member');
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
   // item 5 — company chosen while creating a brand-new contact, attached right after create.
   const [pendingCompanyId, setPendingCompanyId] = useState<string>('');
@@ -524,6 +528,8 @@ export const ContactDetailPage: React.FC = () => {
   const openInviteDialog = () => {
     setInviteEmail(contact?.email || '');
     setInviteFullName(contact?.name || '');
+    setInviteRole('member');
+    setInviteLink(null);
     setShowInviteDialog(true);
   };
 
@@ -532,15 +538,23 @@ export const ContactDetailPage: React.FC = () => {
       toast({ title: 'Email required', description: 'Please enter an email address', variant: 'destructive' });
       return;
     }
+    if (!activeWorkspaceId) return;
     try {
       setInviting(true);
-      await usersAPI.inviteUser(inviteEmail, inviteFullName || undefined, id);
-      toast({
-        title: 'Invitation sent',
-        description: `An invite email has been sent to ${inviteEmail}. They can set their own password via the link.`,
+      const { url } = await workspaceManagementService.inviteByEmail({
+        workspaceId: activeWorkspaceId,
+        workspaceName: activeWorkspace?.name || 'the team',
+        role: inviteRole,
+        email: inviteEmail,
+        name: inviteFullName || undefined,
+        crmContactId: id,
       });
-      setShowInviteDialog(false);
-      await loadContact(); // refresh to show linked user
+      setInviteLink(url);
+      toast({
+        title: `Invitation sent to ${inviteEmail}`,
+        description: `They join as ${WORKSPACE_ROLE_META[inviteRole].label} — ${WORKSPACE_ROLE_META[inviteRole].portal}. This contact is linked to their login once they accept.`,
+      });
+      await loadContact();
     } catch (error: any) {
       toast({ title: 'Error', description: error.message || 'Failed to invite user', variant: 'destructive' });
     } finally {
@@ -1052,7 +1066,7 @@ export const ContactDetailPage: React.FC = () => {
                         ) : (
                           <div className="space-y-2">
                             <Button size="sm" onClick={openInviteDialog} className="w-full" disabled={!contact.email && !isNew}>
-                              <UserPlus className="h-3.5 w-3.5 mr-2" /> Create &amp; invite user
+                              <UserPlus className="h-3.5 w-3.5 mr-2" /> Invite to this workspace
                             </Button>
                             <UserSearchDropdown onSelect={handleLinkUser} placeholder="…or link an existing user" selectedUserId={null} />
                           </div>
@@ -1280,18 +1294,18 @@ export const ContactDetailPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Invite User Dialog */}
       <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Create &amp; Invite User</DialogTitle>
+            <DialogTitle>Invite to {activeWorkspace?.name || 'this workspace'}</DialogTitle>
             <DialogDescription>
-              An invite email will be sent so they can set their own password and access the platform.
+              They get an email with a sign-up link. This contact is linked to their login the moment
+              they accept — nobody has an account made for them.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="invite-name">Full Name</Label>
+              <Label htmlFor="invite-name">Full name</Label>
               <Input
                 id="invite-name"
                 value={inviteFullName}
@@ -1309,14 +1323,43 @@ export const ContactDetailPage: React.FC = () => {
                 placeholder="jane@example.com"
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="invite-role">Role</Label>
+              <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as WorkspaceInviteRole)}>
+                <SelectTrigger id="invite-role"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {WORKSPACE_INVITE_ROLES.map((r) => (
+                    <SelectItem key={r} value={r}>{WORKSPACE_ROLE_META[r].label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">{WORKSPACE_ROLE_META[inviteRole].description}</p>
+            </div>
+            {inviteLink && (
+              <div className="rounded-sm border border-hairline bg-surface-sunken p-3 space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  Sent. If it does not arrive, hand them this link instead:
+                </p>
+                <div className="flex items-center gap-2">
+                  <Input readOnly value={inviteLink} className="h-8 text-xs" />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => { void navigator.clipboard.writeText(inviteLink); toast({ title: 'Link copied' }); }}
+                  >
+                    Copy
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setShowInviteDialog(false)}>
-              Cancel
+              {inviteLink ? 'Done' : 'Cancel'}
             </Button>
             <Button onClick={handleInviteUser} disabled={inviting || !inviteEmail}>
               <UserPlus className="h-4 w-4 mr-2" />
-              {inviting ? 'Sending invite...' : 'Send Invite'}
+              {inviting ? 'Sending invite...' : inviteLink ? 'Send again' : 'Send invite'}
             </Button>
           </div>
         </DialogContent>

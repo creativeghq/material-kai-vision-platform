@@ -110,25 +110,6 @@ export const usersAPI = {
     return response.json();
   },
 
-  async inviteUser(email: string, fullName?: string, contactId?: string) {
-    const token = await getAuthToken();
-
-    const response = await fetch(`${getApiBase()}/crm-api/users`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ email, full_name: fullName, contact_id: contactId }),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to invite user');
-    }
-
-    return response.json();
-  },
 };
 
 // ============ Subscriptions & Credits ============

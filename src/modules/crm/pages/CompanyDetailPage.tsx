@@ -9,6 +9,7 @@ import { SampleLoansCard } from '@/modules/crm/components/SampleLoansCard';
 import { SupplierEprCard } from '@/modules/crm/components/SupplierEprCard';
 import { WarrantyClaimsCard } from '@/modules/crm/components/WarrantyClaimsCard';
 import { TradePortalCard } from '@/modules/crm/components/TradePortalCard';
+import { CompanyWorkspaceCard } from '@/modules/crm/components/CompanyWorkspaceCard';
 import { resolveRecordTab } from '@/modules/crm/recordTabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
 import { PartyAccountTabs } from '@/modules/finance/components/PartyAccountTabs';
@@ -1262,6 +1263,19 @@ export const CompanyDetailPage: React.FC = () => {
                   ...(activeWorkspaceId ? [{
                     id: 'portal', label: 'Trade portal', icon: Users, group: 'Commercial',
                     node: <TradePortalCard workspaceId={activeWorkspaceId} companyId={company.id} />,
+                  }] : []),
+                  /* Their own tenant, not a login into ours — the trade portal above is the other answer. */
+                  ...(activeWorkspaceId ? [{
+                    id: 'workspace', label: 'Platform access', icon: Building2, group: 'Commercial',
+                    node: (
+                      <CompanyWorkspaceCard
+                        companyId={company.id}
+                        companyName={company.name}
+                        defaultEmail={company.email || (company.contacts ?? [])[0]?.email || null}
+                        defaultContactId={(company.contacts ?? [])[0]?.id || null}
+                        defaultContactName={(company.contacts ?? [])[0]?.name || null}
+                      />
+                    ),
                   }] : []),
                 ]}
               />
