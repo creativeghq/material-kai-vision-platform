@@ -93,6 +93,11 @@ describe('myDATA book mirror — stays unmerged from platform finance', () => {
     join('supabase', 'functions', 'finance-mydata-book', 'index.ts'),
     join('src', 'modules', 'finance', 'services', 'mydataBookService.ts'),
     join('src', 'modules', 'finance', 'tabs', 'MydataBookTab.tsx'),
+    // The generated agent-facing API catalogue quotes each endpoint's OWN description, and
+    // finance-mydata-book's says what it writes. Prose about the mirror is not a read of it —
+    // there is no query here, and the file is regenerated from the endpoint descriptions rather
+    // than written. Scoped to this one path so a real offender still fails.
+    join('supabase', 'functions', '_shared', 'platformApiCatalog.generated.ts'),
   ];
 
   const others = [...sourceFiles(join(root, 'src')), ...sourceFiles(join(root, 'supabase', 'functions'))]

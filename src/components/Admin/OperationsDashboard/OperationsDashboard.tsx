@@ -78,6 +78,7 @@ import { ModuleSubscribersPanel } from './ModuleSubscribersPanel';
 import { InboxAIPanel } from './InboxAIPanel';
 import { CapabilityLedgerPanel } from './CapabilityLedgerPanel';
 import { ChannelsCostPanel } from './ChannelsCostPanel';
+import { AgentUnmetRequestsPanel } from './AgentUnmetRequestsPanel';
 import { ChannelsBillingDetail } from './ChannelsBillingDetail';
 
 import type {
@@ -675,6 +676,11 @@ const OperationsDashboardInner: React.FC = () => {
 
           {/* Agent Chat Analytics Tab */}
           <TabsContent value="agent-chat" className="space-y-4">
+            {/* First on the tab, because the per-tool table below answers "did the tools work"
+                and can never answer "was there a tool at all" — which is the question that sends
+                a user away empty-handed. */}
+            <AgentUnmetRequestsPanel />
+
             {/* Platform Overview Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
               <StatCard

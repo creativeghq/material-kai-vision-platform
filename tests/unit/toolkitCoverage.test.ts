@@ -525,7 +525,9 @@ describe('quick-start agent resolution', () => {
     // original four on the same grounds nav-items gives Templates: it is not a business module,
     // it cuts across all of them, so filing it under one hub would be a lie about where it
     // belongs rather than a fix.
-    const HUBLESS = new Set(['core', 'tech-radar', 'sub-agents', 'admin-misc', 'docs']);
+    // `platform-api` is the strongest version of the same case: it IS the rest of the platform,
+    // so it spans every hub by construction.
+    const HUBLESS = new Set(['core', 'tech-radar', 'sub-agents', 'admin-misc', 'docs', 'platform-api']);
     const missingHub: string[] = [];
     const missingAgent: string[] = [];
 

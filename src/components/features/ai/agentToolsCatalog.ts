@@ -1337,6 +1337,27 @@ const APPROX_TOKENS_PER_TOOL = 250;
 
 export const TOOLKITS: ToolkitDefinition[] = [
   {
+    id: 'platform-api',
+    name: 'Platform API',
+    description:
+      'The rest of the platform. When no dedicated tool covers what you asked for, the assistant '
+      + 'looks for one of the platform\'s own API endpoints and calls it as you — so a capability '
+      + 'nobody wrapped in a tool yet is still reachable.',
+    icon: 'Plug',
+    alwaysOn: true,
+    tool_ids: ['discover_platform_api', 'call_platform_api'],
+    quick_starts: [
+      {
+        label: 'What else can you do?', description: 'Search the platform API for a capability', icon: 'Search',
+        prompt: 'Search the platform API for something — I will tell you what I am trying to do.',
+        done: 'Here is what the platform API can do for that.',
+        promptTemplate: 'Is there a platform API endpoint for {{query}}?',
+        run: { tool: 'discover_platform_api' },
+        autoFields: true,
+      },
+    ],
+  },
+  {
     id: 'core',
     name: 'Core',
     description: 'Always-loaded essentials: knowledge base + catalog + visual + inspiration search, plus load_toolkit so the agent can pull more tools on demand.',

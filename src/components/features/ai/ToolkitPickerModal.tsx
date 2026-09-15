@@ -9,7 +9,7 @@ import {
   Package, PackagePlus, AlertTriangle,
   Network, Workflow, Share2, Radar, Plus, FileText, Grid3x3, Mail, Palette,
   Pencil, PencilLine, Percent, Send, Image as ImageIcon, Wallet, Inbox, Star,
-  ReceiptText, ShoppingCart, RefreshCw, UserPlus, Banknote, Calculator, Code2, Eraser, Gauge,
+  ReceiptText, ShoppingCart, RefreshCw, UserPlus, Banknote, Calculator, Code2, Eraser, Gauge, Plug,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -36,7 +36,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   Package, PackagePlus, AlertTriangle,
   Network, Workflow, Share2, Radar, Plus, FileText, Grid3x3, Mail, Palette,
   Pencil, PencilLine, Percent, Send, ImageIcon, AlertCircle, Wallet, Inbox, Star,
-  ReceiptText, ShoppingCart, RefreshCw, UserPlus, Banknote, Calculator, Code2, Eraser, Gauge,
+  ReceiptText, ShoppingCart, RefreshCw, UserPlus, Banknote, Calculator, Code2, Eraser, Gauge, Plug,
 };
 
 interface Props {

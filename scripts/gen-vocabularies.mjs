@@ -264,6 +264,13 @@ export const VOCABULARIES = [
     'supabase/functions/_shared/iban.generated.ts',
   ],
   [
+    // Which of our own edge endpoints an agent may call unattended. The edge tool enforces it and
+    // the admin surface explains it, so both runtimes read one list — a second copy would drift
+    // into the agent being stopped for something the UI says is free, or worse, the reverse.
+    'src/config/platformApiAccess.ts',
+    'supabase/functions/_shared/platformApiAccess.generated.ts',
+  ],
+  [
     // What one agent turn may carry. The numbers lived as `const`s inside agent-chat's request
     // handler, so the only party that knew them was the one refusing: the composer appended
     // attachments with no ceiling at all, and 19 PDFs were read, uploaded and then answered with

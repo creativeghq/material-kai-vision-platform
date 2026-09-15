@@ -346,6 +346,11 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   // approval they just gave actually wrote.
   crm_bank_accounts_listed: 'Bank accounts on file',
   crm_bank_account_saved: 'Bank account updated',
+  // The platform API fallback. `discover_platform_api` is a DIRECT-run quick-start, so this card
+  // is the only thing that puts its matches on screen; the result card is how the user sees what
+  // a call they approved actually returned.
+  platform_api_matches: 'Platform capabilities',
+  platform_api_result: 'Platform API result',
   // My HR (employee self-service). These MUST be registered: a quick-start with `run` is a
   // deterministic direct tool call that skips the LLM, so there is no narration fallback — an
   // unregistered chunk is dropped and the user just sees "Done — ran manage_my_hr" with no data.

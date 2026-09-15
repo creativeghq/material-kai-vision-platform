@@ -303,6 +303,19 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'call_platform_api',
+    file: 'supabase/functions/_shared/tools/platform-api-tools.ts',
+    factory: 'createCallPlatformApiTool',
+    description: 'Call one of the platform\'s own API endpoints, as the signed-in user, for work no dedicated tool covers.',
+    params: [
+      { name: 'endpoint', type: 'string', optional: false, description: 'The endpoint name from discover_platform_api, e.g. "crm-api".' },
+      { name: 'method', type: 'string', optional: true, description: 'HTTP method (default POST). Must be one the endpoint lists.' },
+      { name: 'body', type: 'object', optional: true, description: 'JSON body, built from the endpoint\'s listed fields.' },
+      { name: 'reason', type: 'string', optional: true, description: 'One line on what the user asked for — shown on the approval card.' },
+      { name: 'confirm', type: 'boolean', optional: true, description: 'Do NOT set this — the Approve/Decline card sets confirm:true when the user approves.' },
+    ],
+  },
+  {
     name: 'check_generation_status',
     file: 'supabase/functions/_shared/tools/generation-tools.ts',
     factory: 'createGenerationStatusTool',
@@ -503,6 +516,17 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     params: [
       { name: 'company_id', type: 'string', optional: true, description: 'CRM company UUID' },
       { name: 'company_name', type: 'string', optional: true, description: 'Company name fragment (fuzzy resolved)' },
+    ],
+  },
+  {
+    name: 'discover_platform_api',
+    file: 'supabase/functions/_shared/tools/platform-api-tools.ts',
+    factory: 'createDiscoverPlatformApiTool',
+    description: 'Search the platform\'s own API for an endpoint that does something you have no dedicated tool for.',
+    params: [
+      { name: 'query', type: 'string', optional: true, description: 'A few words for what you need to do, e.g. "email a statement to a customer".' },
+      { name: 'area', type: 'string', optional: true, description: 'Optional area to browse, e.g. "Finance", "CRM", "SEO", "HR".' },
+      { name: 'limit', type: 'number', optional: true, description: 'Max matches (default 8, max 20).' },
     ],
   },
   {
