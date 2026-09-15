@@ -8,7 +8,8 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { renderReactEmailTemplate, renderTemplateWithVariables } from '../_shared/react-email-renderer.ts';
+import { renderReactEmailTemplate } from '../_shared/react-email-renderer.ts';
+import { renderTemplateWithVariables } from '../_shared/email-template-vars.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { assertEntitled } from '../_shared/entitlement.ts';
 import { authenticate, isAdminAccess, userCanAccessWorkspace, listUserWorkspaceIds, isPlatformOperator } from '../_shared/auth.ts';
@@ -611,6 +612,8 @@ Deno.serve(withApiLogging('email-api', async (req) => {
 
           templateId = template.id;
           const variables = body.variables || {};
+          // {{{raw}}} only for a PLATFORM template — a tenant's is filled with campaign data.
+          const allowRaw = template.workspace_id === null && template.is_system === true;
           // NB: schema columns are subject_template / html_template / text_template
           // (this used to reference template.subject / .html_content / .text_content
           // which silently fell through to the caller-supplied html — confusing the
@@ -631,13 +634,13 @@ Deno.serve(withApiLogging('email-api', async (req) => {
             } catch (error) {
               console.error('Error rendering React Email template, falling back to HTML:', error);
               if (template.html_template) {
-                htmlBody = renderTemplateWithVariables(template.html_template, variables);
+                htmlBody = renderTemplateWithVariables(template.html_template, variables, { allowRaw });
               } else {
                 throw new Error('Failed to render email template');
               }
             }
           } else if (template.html_template) {
-            htmlBody = renderTemplateWithVariables(template.html_template, variables);
+            htmlBody = renderTemplateWithVariables(template.html_template, variables, { allowRaw });
             if (template.text_template) {
               textBody = renderTemplateWithVariables(template.text_template, variables);
             }

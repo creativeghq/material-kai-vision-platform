@@ -12,6 +12,7 @@ import {
   LAYOUT_PREVIEW_SAMPLE,
   LayoutHasNoContentSlot,
 } from '../../supabase/functions/_shared/email-layout.ts';
+import { renderTemplateWithVariables } from '../../supabase/functions/_shared/email-template-vars.ts';
 
 const ROOT = resolve(__dirname, '../..');
 const read = (p: string) => readFileSync(resolve(ROOT, p), 'utf8');
@@ -47,7 +48,6 @@ describe('email layout — the shell', () => {
   });
 
   it('does not re-substitute a token that appears in the body', () => {
-    // A campaign body can carry an unresolved {{firstName}}; a second pass would blank it.
     const { html } = wrap('<p>Hi {{firstName}} — {{content}} is literal here.</p>');
     expect(html).toContain('Hi {{firstName}}');
     expect(html).toContain('{{content}} is literal here.');
@@ -95,7 +95,6 @@ describe('email layout — whose brand', () => {
   });
 
   it('only an operator send carries the platform colophon', () => {
-    // The rendered ELEMENT, not the class name — the stylesheet is shared by both.
     const op = wrap('<p>x</p>').html;
     const ws = wrapInLayout('<p>x</p>', { kind: 'workspace', brand: BRAND }).html;
     expect(op).toContain('class="mk-colophon"');
@@ -121,7 +120,6 @@ describe('email layout — compliance slots', () => {
     const bodyAt = html.indexOf('<body');
     const preAt = html.indexOf('The inbox preview line');
     const contentAt = html.indexOf('<p>Visible</p>');
-    // Prepended, it landed before <!doctype> — invalid, and silently dropped by clients.
     expect(preAt).toBeGreaterThan(bodyAt);
     expect(preAt).toBeLessThan(contentAt);
   });
@@ -133,7 +131,6 @@ describe('email layout — compliance slots', () => {
   });
 
   it('gives a full-document body its preheader too, inside <body>', () => {
-    // Every marketing template plus all four React templates ARE full documents.
     const doc = '<!doctype html><html><head><title>t</title></head><body style="x"><p>Hi</p></body></html>';
     const { html, source } = wrap(doc, { preheader: 'Preview me' });
     expect(source).toBe('skipped_full_document');
@@ -184,6 +181,29 @@ describe('email layout — the plain-text alternative', () => {
   });
 });
 
+describe('email templates — optional blocks and pre-built HTML', () => {
+  it('keeps a {{#if}} block only when the value is there, instead of printing the tag', () => {
+    const t = '<p>A</p>{{#if note}}<blockquote>{{note}}</blockquote>{{/if}}{{#extra}}<p>{{extra}}</p>{{/extra}}';
+    expect(renderTemplateWithVariables(t, { note: 'hi', extra: '' }))
+      .toBe('<p>A</p><blockquote>hi</blockquote>');
+    expect(renderTemplateWithVariables(t, {})).toBe('<p>A</p>');
+  });
+
+  it('interpolates {{{raw}}} unescaped only for a platform template', () => {
+    const t = '<div>{{{block}}}</div>';
+    const table = '<table><tr><td>4,820</td></tr></table>';
+    expect(renderTemplateWithVariables(t, { block: table }, { allowRaw: true })).toContain('<td>4,820</td>');
+    const tenant = renderTemplateWithVariables(t, { block: table });
+    expect(tenant).not.toContain('<td>');
+    expect(tenant).toContain('&lt;table&gt;');
+  });
+
+  it('leaves no stray braces behind a raw slot', () => {
+    expect(renderTemplateWithVariables('a{{{b}}}c', { b: '<i>x</i>' }, { allowRaw: true })).toBe('a<i>x</i>c');
+    expect(renderTemplateWithVariables('a{{{b}}}c', {}, { allowRaw: true })).toBe('ac');
+  });
+});
+
 describe('email layout — one source, applied at the send chokepoint', () => {
   const layoutSrc = read('supabase/functions/_shared/email-layout.ts');
   const apiSrc = read('supabase/functions/email-api/index.ts');
@@ -203,7 +223,7 @@ describe('email layout — one source, applied at the send chokepoint', () => {
   });
 
   it('wraps every send, not only the template path', () => {
-    // Anchor past the templateSlug block — `indexOf` alone passes with the wrap nested inside it.
+    // Anchor past the templateSlug block — `indexOf` alone passes with the wrap inside it.
     const wrapAt = apiSrc.indexOf('wrapInLayout(');
     const afterTemplateBlock = apiSrc.indexOf("'Either html or text body must be provided'");
     expect(afterTemplateBlock).toBeGreaterThan(-1);
@@ -211,8 +231,7 @@ describe('email layout — one source, applied at the send chokepoint', () => {
   });
 
   it('derives the text alternative BEFORE the shell goes on', () => {
-    // Pin the whole line: `htmlToPlainText(htmlBody)` also appears in the react_code branch
-    // above, which precedes the wrap whatever the wrap does.
+    // Pin the whole line: `htmlToPlainText(htmlBody)` also appears in the react_code branch.
     const textAt = apiSrc.indexOf('if (!textBody && htmlBody) textBody = htmlToPlainText(htmlBody);');
     const wrapAt = apiSrc.indexOf('wrapInLayout(');
     expect(textAt).toBeGreaterThan(-1);

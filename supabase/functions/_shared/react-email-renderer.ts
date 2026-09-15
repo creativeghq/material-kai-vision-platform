@@ -3,7 +3,6 @@
 import { render } from 'npm:@react-email/render@1.0.0';
 import * as React from 'npm:react@18.2.0';
 import * as ReactEmailComponents from 'npm:@react-email/components@0.0.25';
-import { escapeHtml } from './html.ts';
 
 /** Renders a React Email template to HTML. */
 export async function renderReactEmailTemplate(
@@ -55,30 +54,6 @@ function transformReactCode(code: string, variables: Record<string, any>): strin
   `;
   
   return transformed;
-}
-
-/**
- * Optional blocks: `{{#if key}}…{{/if}}` and `{{#key}}…{{/key}}` survive only when `key`
- * holds a non-empty value. Without this they matched no variable pattern and reached the
- * recipient verbatim — live catalog and role-upgrade emails shipped `{{#if catalog_subtitle}}`.
- */
-function applySections(template: string, variables: Record<string, any>): string {
-  const present = (key: string) => {
-    const v = variables[key];
-    return v !== undefined && v !== null && String(v).trim() !== '';
-  };
-  return template
-    .replace(/\{\{#if\s+(\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g, (_m, key, inner) => (present(key) ? inner : ''))
-    .replace(/\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (_m, key, inner) => (present(key) ? inner : ''));
-}
-
-export function renderTemplateWithVariables(
-  template: string,
-  variables: Record<string, any>
-): string {
-  return applySections(template, variables).replace(/\{\{(\w+)\}\}/g, (_, key) => {
-    return variables[key] !== undefined ? escapeHtml(String(variables[key])) : `{{${key}}}`;
-  });
 }
 
 /** Validates React Email template code. */
