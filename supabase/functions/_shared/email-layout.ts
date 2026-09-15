@@ -18,7 +18,6 @@ export interface LayoutBrand {
   logoUrl: string;
   senderName: string;
   senderEmail: string;
-  /** Postal address. Required by CAN-SPAM on a marketing send. */
   footerNote: string;
 }
 
@@ -98,7 +97,6 @@ function preheaderDiv(text: string): string {
   return `<div style="${PREHEADER_STYLE}">${escapeHtml(text)}</div>`;
 }
 
-/** Inside <body>, where clients read it — returning early dropped every campaign's preview line. */
 function injectPreheader(doc: string, preheader: string): string {
   if (!preheader) return doc;
   const bodyOpen = /<body\b[^>]*>/i.exec(doc);
@@ -107,7 +105,7 @@ function injectPreheader(doc: string, preheader: string): string {
   return doc.slice(0, at) + preheaderDiv(preheader) + doc.slice(at);
 }
 
-/** Substitute WITHOUT escaping — the caller escapes once. Both put `Tiles &amp; Stone` in the preview. */
+/** Substitute WITHOUT escaping — the caller escapes once, or the preview says `Tiles &amp; Stone`. */
 export function fillPlain(template: string, variables: Record<string, unknown>): string {
   return template.replace(/\{\{(\w+)\}\}/g, (m, key: string) => {
     const v = variables[key];
