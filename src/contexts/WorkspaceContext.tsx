@@ -18,6 +18,7 @@ export interface WorkspaceNode {
   name: string;
   slug: string | null;
   isRoot: boolean;
+  kind: 'operator' | 'reseller' | 'consumer' | 'guest';
   parentWorkspaceId: string | null;
   canSupplyProducts: boolean;
   /** What this node may sell from (set by its parent): operator_catalog | own_products_only. */
@@ -84,6 +85,7 @@ function mapMembership(row: any): WorkspaceMembership | null {
       name: ws.name ?? 'Workspace',
       slug: ws.slug ?? null,
       isRoot: !!ws.is_root,
+      kind: ws.kind === 'operator' || ws.kind === 'reseller' || ws.kind === 'guest' ? ws.kind : 'consumer',
       parentWorkspaceId: ws.parent_workspace_id ?? null,
       canSupplyProducts: !!ws.can_supply_products,
       catalogAccess: ws.catalog_access === 'own_products_only' ? 'own_products_only' : 'operator_catalog',
@@ -148,7 +150,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       supabase
         .from('workspace_members')
         .select(
-          'role, status, workspace:workspaces(id, name, slug, is_root, parent_workspace_id, can_supply_products, catalog_access)',
+          'role, status, workspace:workspaces(id, name, slug, is_root, kind, parent_workspace_id, can_supply_products, catalog_access)',
         )
         .eq('user_id', user.id)
         .eq('status', 'active'),
@@ -183,7 +185,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const { data: retry } = await supabase
           .from('workspace_members')
           .select(
-            'role, status, workspace:workspaces(id, name, slug, is_root, parent_workspace_id, can_supply_products, catalog_access)',
+            'role, status, workspace:workspaces(id, name, slug, is_root, kind, parent_workspace_id, can_supply_products, catalog_access)',
           )
           .eq('user_id', user.id)
           .eq('status', 'active');

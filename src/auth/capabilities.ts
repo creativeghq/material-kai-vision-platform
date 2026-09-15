@@ -16,7 +16,8 @@ export type Persona =
   | 'employee'   // invited staff member — HR self-service ONLY: their own record, nothing else
   | 'realestate_agent' // invited property agent — Real Estate portal only: manage listings +
                        // own leads/viewings (scoped via responsible_sales_user_ids / listing_agent_id)
-  | 'end_user';  // project client / referral-joined member — restricted surface
+  | 'end_user'   // project client / referral-joined member — restricted surface
+  | 'guest';
 
 /** Every gateable capability on the platform. Keep verbs coarse + surface-oriented. */
 export type Capability =
@@ -127,12 +128,14 @@ export const PERSONA_CAPABILITIES: Record<Persona, Capability[]> = {
   realestate_agent: ['realestate.view', 'realestate.listings.manage', 'realestate.leads.view', 'crm.view', 'agent.use'],
   // Project clients / referral end-users: their own work only, no business back-office.
   end_user: ['quotes.use', 'projects.use', 'moodboards.use', 'agent.use', 'inbox.use'],
+  guest: [],
 };
 
 export interface PersonaInputs {
   isPlatformOperator: boolean;
   rank: 'operator' | 'dealer' | 'architect' | null;
   workspaceRole: string | null; // owner | admin | member | client
+  workspaceKind?: string | null;
   /** Global account role (roles.name) — the access TIER set under Users. Primary driver. */
   accountRole?: string | null;
 }
@@ -155,10 +158,14 @@ const TEAM_ROLE_PERSONA: Record<string, Persona> = {
 };
 
 /** Resolve the single persona. */
-export function resolvePersona({ isPlatformOperator, rank, workspaceRole, accountRole }: PersonaInputs): Persona {
+export function resolvePersona({
+  isPlatformOperator, rank, workspaceRole, accountRole, workspaceKind,
+}: PersonaInputs): Persona {
   if (isPlatformOperator) return 'operator';
 
   const role = workspaceRole ?? '';
+
+  if (workspaceKind === 'guest') return 'guest';
 
   // 1. Scoped TEAM roles — the exhaustive map. What you were invited to BE in this workspace is
   //    more specific than whatever global tier you happen to carry: a client is a client here even

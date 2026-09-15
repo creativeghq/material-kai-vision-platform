@@ -39,10 +39,12 @@ export interface PermissionsApi {
 }
 
 export function usePermissions(): PermissionsApi {
-  const { isPlatformOperator, rank, workspaceRole, accountRole, loading } = useWorkspace();
+  const { isPlatformOperator, rank, workspaceRole, accountRole, activeWorkspace, loading } = useWorkspace();
 
   return useMemo(() => {
-    const persona = resolvePersona({ isPlatformOperator, rank, workspaceRole, accountRole });
+    const persona = resolvePersona({
+      isPlatformOperator, rank, workspaceRole, accountRole, workspaceKind: activeWorkspace?.kind ?? null,
+    });
     const can = (capability: Capability) => personaCan(persona, capability);
 
     // Finer axes are derived from the resolved persona (which the account role
@@ -80,5 +82,5 @@ export function usePermissions(): PermissionsApi {
       canOperateFinance: isWorkspaceManager || persona === 'accountant',
       canManageNetwork: isBusinessNode,
     };
-  }, [isPlatformOperator, rank, workspaceRole, accountRole, loading]);
+  }, [isPlatformOperator, rank, workspaceRole, accountRole, activeWorkspace?.kind, loading]);
 }

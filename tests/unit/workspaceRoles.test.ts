@@ -190,6 +190,34 @@ describe('workspace role catalog', () => {
     })).toBe('warehouse_staff');
   });
 
+  it('somebody who arrived by invitation is not a business, however they own their workspace', () => {
+    // Ownership alone cannot tell a customer invited to read one invoice from a business that
+    // came here to trade — read as ownership, it granted the business surface to both.
+    expect(resolvePersona({
+      isPlatformOperator: false, rank: 'architect', workspaceRole: 'owner',
+      accountRole: 'user', workspaceKind: 'guest',
+    })).toBe('guest');
+    // The same person once they ask for a full account.
+    expect(resolvePersona({
+      isPlatformOperator: false, rank: 'architect', workspaceRole: 'owner',
+      accountRole: 'user', workspaceKind: 'consumer',
+    })).toBe('architect');
+  });
+
+  it('a guest holds no business capability at all', () => {
+    expect(PERSONA_CAPABILITIES.guest).toEqual([]);
+  });
+
+  it('a guest account tier cannot buy back the business surface', () => {
+    // The tier is global and says nothing about how this person arrived here.
+    for (const tier of ['supplier', 'architect', 'admin', 'user']) {
+      expect(resolvePersona({
+        isPlatformOperator: false, rank: 'dealer', workspaceRole: 'owner',
+        accountRole: tier, workspaceKind: 'guest',
+      })).toBe('guest');
+    }
+  });
+
   it('a sales manager sees the team book; a rep does not', () => {
     expect(PERSONA_CAPABILITIES.sales_manager).toContain('sales.team.view');
     expect(PERSONA_CAPABILITIES.sales).not.toContain('sales.team.view');
