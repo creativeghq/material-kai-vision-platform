@@ -341,6 +341,51 @@ export const SCAN_SKIP_DIRS = new Set([
 
 export const SCAN_EXT = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
 
+/** Which bucket a file's comment mass is charged to. One definition, so every reader agrees. */
+export function areaOf(relPath) {
+  const parts = relPath.split('/');
+  if (parts[0] === 'supabase') return 'supabase/functions';
+  if ((parts[0] === 'src' || parts[0] === 'tests') && parts.length > 1) return `${parts[0]}/${parts[1]}`;
+  return parts[0];
+}
+
+/**
+ * Every line a comment touches — trailing as well as own-line, directive as well as prose.
+ *
+ * Deliberately wider than `findOverBudget`, which sees neither. Mass is about capacity, so an
+ * essay carrying an `eslint-disable` still costs what it costs.
+ */
+export function commentLineTotal(source, fileName = 'file.tsx') {
+  const lineOf = buildLineIndex(source);
+  const lines = new Set();
+  for (const c of scanComments(source, fileName)) {
+    const last = lineOf(Math.max(c.start, c.end - 1));
+    for (let l = lineOf(c.start); l <= last; l++) lines.add(l);
+  }
+  return lines.size;
+}
+
+/** The repo's comment mass by area: the number the ratchet defends. */
+export async function measureCommentMass(root) {
+  const { readFile } = await import('node:fs/promises');
+  const { relative, sep } = await import('node:path');
+  const areas = {};
+  let total = 0;
+  let codeLines = 0;
+  for (const file of await walkRepo(root)) {
+    const rel = relative(root, file).split(sep).join('/');
+    const src = await readFile(file, 'utf8');
+    if (isGeneratedFile(rel, src)) continue;
+    let n;
+    try { n = commentLineTotal(src, rel); } catch { continue; }
+    codeLines += src.split('\n').length;
+    if (!n) continue;
+    areas[areaOf(rel)] = (areas[areaOf(rel)] ?? 0) + n;
+    total += n;
+  }
+  return { total, codeLines, areas };
+}
+
 /**
  * Every hand-written TS/JS file in the repo. One walker for the codemod and the guard test, so
  * "which files does the budget apply to" has a single answer.

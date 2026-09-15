@@ -1,13 +1,14 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import {
   MAX_PROSE_LINES, contentOf, findOverBudget, isDirective, isGeneratedFile,
-  proseLineCount, collapseContent, renderComment, walkRepo,
+  proseLineCount, collapseContent, renderComment, walkRepo, measureCommentMass,
 } from '../../scripts/lib/commentBudget.mjs';
 
 const ROOT = resolve(__dirname, '../..');
+const MASS_BASELINE = resolve(ROOT, '.github', 'comment-mass-baseline.json');
 
 /**
  * A comment says what the code IS. The narrative of how it got that way belongs in the commit
@@ -168,6 +169,45 @@ describe('comment budget', () => {
         offenders,
         `${offenders.length} comment(s) over ${MAX_PROSE_LINES} prose lines. Run \`npm run comments:trim\`.`,
       ).toEqual([]);
+    });
+  });
+
+  describe('the mass, which the per-comment budget does not cap', () => {
+    it('is at or under the baseline, in every area', async () => {
+      expect(
+        existsSync(MASS_BASELINE),
+        'missing .github/comment-mass-baseline.json — create it with `npm run comments:mass -- --write`',
+      ).toBe(true);
+
+      const base = JSON.parse(readFileSync(MASS_BASELINE, 'utf8')) as {
+        total: number; areas: Record<string, number>;
+      };
+      const { total, areas } = await measureCommentMass(ROOT);
+
+      const risen = Object.entries(areas)
+        .filter(([area, n]) => n > (base.areas[area] ?? 0))
+        .map(([area, n]) => `${area}: ${n} (baseline ${base.areas[area] ?? 0}, +${n - (base.areas[area] ?? 0)})`);
+
+      expect(
+        risen,
+        'Comment mass grew. A comment is not free — delete one to pay for the one you are adding, ' +
+          'or lower another area. Do NOT regenerate the baseline upward; `--write` refuses to.',
+      ).toEqual([]);
+      expect(total).toBeLessThanOrEqual(base.total);
+    });
+
+    it('has not banked headroom — a real cleanup lowers the ceiling', async () => {
+      const base = JSON.parse(readFileSync(MASS_BASELINE, 'utf8')) as {
+        total: number; areas: Record<string, number>;
+      };
+      const { total } = await measureCommentMass(ROOT);
+      const removed = base.total - total;
+      expect(
+        removed,
+        `${removed} comment lines have gone since the baseline was recorded. Lower it with ` +
+          '`npm run comments:mass -- --write`, so the deletion becomes the new ceiling rather ' +
+          'than headroom for the next essay. Deleting a few is free; this is a real cleanup.',
+      ).toBeLessThanOrEqual(Math.round(base.total * 0.01));
     });
   });
 
