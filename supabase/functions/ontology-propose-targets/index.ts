@@ -194,7 +194,11 @@ Deno.serve(withApiLogging('ontology-propose-targets', async (req) => {
     await supabase.from('ai_usage_logs').insert({
       user_id: userId, workspace_id: workspaceId, module_slug: 'stock',
       operation_type: 'ontology_propose', model_name: model,
-      input_tokens: inTok, output_tokens: outTok, total_cost: billedUsd,
+      // `billed_cost_usd`, not `total_cost` — there is no such column, so PostgREST rejected the
+      // whole insert and the catch below swallowed it. Every run of this logged NOTHING while
+      // debiting credits, which is the silent-zero shape: the cost view shows a plausible zero.
+      input_tokens: inTok, output_tokens: outTok,
+      billed_cost_usd: billedUsd, credits_debited: credits,
       // `ops.silent_zero_provider` skips a row with no `success` key, so a run that proposed
       // NOTHING would be invisible to the one probe that would notice the model refusing
       // everything. Derived from the outcome, never hardcoded true.
