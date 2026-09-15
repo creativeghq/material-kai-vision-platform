@@ -11,6 +11,9 @@ import {
 } from '@/components/core/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import {
+  PartySearchDropdown, partyColumns, partyRefOf, type PartyRef,
+} from '@/components/business/crm/PartySearchDropdown';
+import {
   realEstateService, type Property, type PropertyType, type TransactionType, type ListingStatus,
 } from '../services/realEstateService';
 
@@ -76,13 +79,14 @@ export interface PropertyFormValues {
   condition: string;
   energy_class: string;
   description: string;
+  vendor: PartyRef | null;
 }
 
 const EMPTY: PropertyFormValues = {
   title: '', property_type: 'residential', subtype: '', transaction_type: 'sale', listing_status: 'draft',
   price: null, currency: 'EUR', address: '', street_number: '', town: '', region: '', postcode: '', country_code: 'GR',
   area_built: null, area_plot: null, bedrooms: null, bathrooms: null, floor: '', year_built: null,
-  condition: '', energy_class: '', description: '',
+  condition: '', energy_class: '', description: '', vendor: null,
 };
 
 /** Project a loaded property row back onto the form shape (edit mode). */
@@ -104,6 +108,7 @@ export function propertyToForm(p: Record<string, any>): PropertyFormValues {
     floor: p.floor ?? '', year_built: p.year_built ?? null,
     condition: p.condition ?? '', energy_class: p.energy_class ?? '',
     description: p.description_i18n?.en ?? '',
+    vendor: partyRefOf(p.vendor_company_id, p.vendor_contact_id),
   };
 }
 
@@ -130,7 +135,14 @@ export const PropertyFormDialog: React.FC<{
   // Seed on open: load the row when editing, else start from the caller's prefill.
   useEffect(() => {
     if (!open) return;
-    if (!propertyId || !workspaceId) { setF({ ...EMPTY, ...initial }); return; }
+    if (!propertyId || !workspaceId) {
+      setF({
+        ...EMPTY,
+        vendor: vendorContactId ? { kind: 'contact', id: vendorContactId } : null,
+        ...initial,
+      });
+      return;
+    }
     setLoading(true);
     realEstateService.getProperty(workspaceId, propertyId)
       .then((r) => setF(propertyToForm(r.property)))
@@ -175,10 +187,11 @@ export const PropertyFormDialog: React.FC<{
         condition: f.condition || null,
         energy_class: f.energy_class || null,
         description_i18n: f.description.trim() ? { en: f.description.trim() } : {},
+        ...partyColumns('vendor_company_id', 'vendor_contact_id', f.vendor),
       };
       const property = propertyId
         ? await realEstateService.updateProperty(workspaceId, propertyId, payload)
-        : await realEstateService.createProperty(workspaceId, { ...payload, vendor_contact_id: vendorContactId ?? null });
+        : await realEstateService.createProperty(workspaceId, payload);
       toast({ title: propertyId ? 'Property updated' : 'Property added' });
       onSaved?.(property);
       onOpenChange(false);
@@ -211,6 +224,18 @@ export const PropertyFormDialog: React.FC<{
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Fld label="Title" className="sm:col-span-2">
                   <Input value={f.title} onChange={(e) => set('title', e.target.value)} placeholder="e.g. 2-bed apartment, Kolonaki" />
+                </Fld>
+                <Fld label="Owner" className="sm:col-span-2">
+                  <PartySearchDropdown
+                    value={f.vendor}
+                    onSelect={(party) => set('vendor', party)}
+                    placeholder="Search the CRM for the owner…"
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {f.vendor
+                      ? 'They receive the weekly performance report for this property.'
+                      : 'Without an owner, the weekly vendor report has nobody to send to.'}
+                  </p>
                 </Fld>
                 <Fld label="Type">
                   <Select value={f.property_type} onValueChange={(v) => set('property_type', v as PropertyType)}>
