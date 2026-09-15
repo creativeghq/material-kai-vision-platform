@@ -2518,6 +2518,34 @@
                       }
                     },
                     "description": "Returns: {success:true, added:number, updated:number, total:number}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "layout"
+                        ],
+                        "description": "Read and preview the operator's email layout — the brand shell every outgoing email is wrapped in. Platform operator only."
+                      },
+                      "layoutHtml": {
+                        "type": "string",
+                        "description": "Layout to preview instead of the stored one. Must contain {{content}}; empty previews the built-in default."
+                      },
+                      "emailType": {
+                        "type": "string",
+                        "description": "'marketing' renders the unsubscribe block; anything else omits it."
+                      },
+                      "sampleHtml": {
+                        "type": "string",
+                        "description": "Body to render inside the shell. Defaults to the built-in specimen."
+                      }
+                    },
+                    "description": "Returns: {success, error, html, source, storedLayout, defaultLayout, sampleHtml, brand}"
                   }
                 ],
                 "discriminator": {
@@ -4134,6 +4162,41 @@
                       }
                     },
                     "description": "Returns: {ok:true, available:boolean, reason?:string, image_url?:string}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "scenes"
+                        ],
+                        "description": "The room photos and their marked surfaces, for the deterministic surface visualizer (#447). Returns the platform library plus the key's own workspace scenes, each surface with its real size in cm, its normalised quad and its SAM 2 mask. Also returns the workspace's cutting allowance per laying pattern: an ABSENT pattern stays absent, so the widget reports \"not set\" rather than ordering at a rate nobody chose. Carries the Turnstile site key because the widget must know whether to draw a challenge BEFORE the visitor reaches the only action that writes."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "product_ids"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "faces"
+                        ],
+                        "description": "The tileable face and the spec of named products (#447). Scoped by the key and gated on publication exactly like `list` and `product` — naming an id reaches nothing the key was not given. Returns the selected albedo where one exists, else the product photo, and PROJECTS attributes/metadata down to PRODUCT_SPEC_KEYS: the embed bundles the app's own format and pack parsers and runs them on this, so there is one derivation rather than a server-side second copy. Never the raw jsonb, which carries fields nobody has classified as safe to publish."
+                      },
+                      "product_ids": {
+                        "type": "string",
+                        "description": "Comma-separated or array of product uuids; non-uuids are dropped, capped at 60 (one of: string | array)"
+                      }
+                    }
                   }
                 ],
                 "discriminator": {

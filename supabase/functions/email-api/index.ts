@@ -8,13 +8,14 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { renderReactEmailTemplate, renderTemplateWithVariables, generatePlainTextFromReactEmail } from '../_shared/react-email-renderer.ts';
+import { renderReactEmailTemplate, renderTemplateWithVariables } from '../_shared/react-email-renderer.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { assertEntitled } from '../_shared/entitlement.ts';
 import { authenticate, isAdminAccess, userCanAccessWorkspace, listUserWorkspaceIds, isPlatformOperator } from '../_shared/auth.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { notConfiguredResponse } from '../_shared/api-provider-errors.ts';
 import { resolveWorkspaceEmailSender, checkWorkspaceSendQuota } from '../_shared/email-sender.ts';
+import { wrapInLayout, htmlToPlainText, DEFAULT_LAYOUT_HTML, LAYOUT_PREVIEW_SAMPLE, LayoutHasNoContentSlot } from '../_shared/email-layout.ts';
 import { recordEmailEvent, DOCUMENT_ENTITY_TYPES } from '../_shared/document-events.ts';
 import type { DocumentEntityType } from '../_shared/document-events.ts';
 
@@ -625,7 +626,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
             try {
               htmlBody = await renderReactEmailTemplate(template.react_code, variables);
               if (!textBody) {
-                textBody = generatePlainTextFromReactEmail(htmlBody);
+                textBody = htmlToPlainText(htmlBody);
               }
             } catch (error) {
               console.error('Error rendering React Email template, falling back to HTML:', error);
@@ -649,14 +650,14 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           throw new HttpError(400, 'Either html or text body must be provided');
         }
 
-        // Inbox preview (preheader): a hidden span at the very top of the HTML becomes the grey
-        // preview line after the subject in most mail clients. Rendered through the same var pass so
-        // {{firstName}} etc. work in the preview too.
-        if (body.previewText && htmlBody) {
-          const pv = renderTemplateWithVariables(body.previewText, body.variables || {})
-            .replace(/</g, '&lt;').replace(/>/g, '&gt;');
-          htmlBody = `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#ffffff;opacity:0">${pv}</div>` + htmlBody;
-        }
+        // A SLOT in the layout, not a prepend: prepended, it landed before `<!doctype html>`
+        // on every template shipping a full document, which is invalid and clients drop it.
+        const preheader = body.previewText
+          ? renderTemplateWithVariables(body.previewText, body.variables || {})
+          : '';
+
+        // From the UNWRAPPED body: derived after the wrap, the <style> block lands in the text part.
+        if (!textBody && htmlBody) textBody = htmlToPlainText(htmlBody);
 
         // Sender comes from the resolved BYOK/platform config (see resolveWorkspaceEmailSender).
         // We deliberately do NOT fall back to a bogus `noreply@example.com` — that domain is
@@ -675,6 +676,34 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         }
         const fromName = body.fromName || sender.fromName;
         const fromAddress = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
+
+        // THE one place a brand shell is applied. 112 of the last 113 sends carried raw HTML and
+        // no template, so a layout attached to `email_templates` would dress almost nothing.
+        let layoutSource = 'none';
+        if (htmlBody) {
+          try {
+            const wrapped = wrapInLayout(htmlBody, {
+              layoutHtml: sender.layoutHtml,
+              kind: sender.source === 'workspace' ? 'workspace' : 'operator',
+              brand: {
+                ...sender.brand,
+                brandName: sender.brand.brandName || fromName || fromEmail,
+                senderName: fromName || sender.brand.senderName,
+                senderEmail: fromEmail,
+              },
+              preheader,
+              // Only a marketing send has a token minted for this one recipient.
+              unsubscribeUrl: body.emailType === 'marketing'
+                ? (body.variables?.unsubscribeUrl || undefined)
+                : undefined,
+            });
+            htmlBody = wrapped.html;
+            layoutSource = wrapped.source;
+          } catch (err) {
+            if (err instanceof LayoutHasNoContentSlot) throw new HttpError(500, err.message);
+            throw err;
+          }
+        }
         // Reply-To default: the caller's explicit replyTo wins; otherwise the resolved sender's
         // configured Reply-To (workspace BYOK reply_to, or the platform default_reply_to). This
         // makes the workspace's Reply-To apply to every send automatically.
@@ -715,6 +744,8 @@ Deno.serve(withApiLogging('email-api', async (req) => {
             email_type: body.emailType || 'transactional',
             tags: body.tags || {},
             variables: body.variables || {},
+            // `skipped_full_document` is the queryable trace of a body that bypassed the brand.
+            metadata: { layout_source: layoutSource },
             workspace_id: attributionWorkspaceId,
             // Delivery trail: which document this email is about. Real columns,
             // not a `tags` jsonb probe — the webhook fans provider events to
@@ -1031,6 +1062,61 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         // The response below echoes the new value back as if it were stored (#347 audit).
         if (cfgErr) throw new HttpError(500, `Could not save the auto-sync setting: ${cfgErr.message}`);
         return new Response(JSON.stringify({ success: true, auto_sync: requestBody.auto_sync }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      case 'layout': {
+        // The default never ships to the client as a second copy — the UI asks for it here.
+        if (!isAdminAccess(auth) && !(await isPlatformOperator(supabaseClient, auth.userId))) {
+          throw new HttpError(403, 'Platform operator access required');
+        }
+
+        const b = (requestBody ?? {}) as {
+          layoutHtml?: string | null;
+          emailType?: string;
+          sampleHtml?: string;
+        };
+
+        const sender = await resolveWorkspaceEmailSender(supabaseClient, null);
+        const sample = (b.sampleHtml ?? '').trim() || LAYOUT_PREVIEW_SAMPLE;
+
+        let preview = '';
+        let source = 'none';
+        let error: string | null = null;
+        try {
+          const wrapped = wrapInLayout(sample, {
+            // `undefined` means "whatever is stored"; an explicit '' previews the built-in default.
+            layoutHtml: b.layoutHtml === undefined ? sender.layoutHtml : (b.layoutHtml || null),
+            kind: 'operator',
+            brand: {
+              ...sender.brand,
+              brandName: sender.brand.brandName || sender.fromName || 'Your brand',
+              senderName: sender.fromName || sender.brand.senderName,
+              senderEmail: sender.fromEmail,
+            },
+            preheader: 'A one-line preview of what this email says.',
+            unsubscribeUrl: b.emailType === 'marketing'
+              ? `${(Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr').replace(/\/+$/, '')}/unsubscribe?preview=1`
+              : undefined,
+          });
+          preview = wrapped.html;
+          source = wrapped.source;
+        } catch (err) {
+          error = err instanceof Error ? err.message : String(err);
+        }
+
+        return new Response(
+          JSON.stringify({
+            success: error === null,
+            error,
+            html: preview,
+            source,
+            storedLayout: sender.layoutHtml,
+            defaultLayout: DEFAULT_LAYOUT_HTML,
+            sampleHtml: sample,
+            brand: sender.brand,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
       }
 
       case 'domains': {

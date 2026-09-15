@@ -1,9 +1,4 @@
-/**
- * Email Settings — panel surface for `/admin/modules/email/settings`.
- *
- * Mounts the shared EmailSettingsForm with an inline Save button. Same form
- * the legacy EmailSettingsModal uses.
- */
+/** Email Settings — panel surface for `/admin/modules/email/settings`. */
 import React from 'react';
 import { Save, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
