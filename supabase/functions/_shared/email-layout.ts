@@ -5,7 +5,6 @@
 
 import { escapeHtml } from './html.ts';
 
-/** Recorded on email_logs, so a send that bypassed the brand is queryable. */
 export type LayoutSource =
   | 'operator_custom'
   | 'workspace_custom'
@@ -16,7 +15,6 @@ export type LayoutSource =
 export interface LayoutBrand {
   brandName: string;
   brandUrl: string;
-  /** '' falls back to the wordmark — an image is hidden by every blocked-image client. */
   logoUrl: string;
   senderName: string;
   senderEmail: string;
@@ -51,7 +49,6 @@ export class LayoutHasNoContentSlot extends Error {
 
 const CONTENT_SLOT = '{{content}}';
 
-/** Slots holding HTML we built ourselves. Everything else is escaped. */
 const RAW_SLOTS = new Set(['content', 'brand_logo', 'unsubscribe_block', 'colophon']);
 
 export function isFullDocument(html: string): boolean {
@@ -94,13 +91,39 @@ function colophonSlot(kind: WrapOptions['kind'], brand: LayoutBrand, year: strin
     + `&copy; ${escapeHtml(year)} ${escapeHtml(brand.brandName)}</p>`;
 }
 
+const PREHEADER_STYLE = 'display:none;max-height:0;overflow:hidden;mso-hide:all;'
+  + 'font-size:1px;line-height:1px;color:#f1f0f3;opacity:0;';
+
+function preheaderDiv(text: string): string {
+  return `<div style="${PREHEADER_STYLE}">${escapeHtml(text)}</div>`;
+}
+
+/** Inside <body>, where clients read it — returning early dropped every campaign's preview line. */
+function injectPreheader(doc: string, preheader: string): string {
+  if (!preheader) return doc;
+  const bodyOpen = /<body\b[^>]*>/i.exec(doc);
+  if (!bodyOpen) return preheaderDiv(preheader) + doc;
+  const at = bodyOpen.index + bodyOpen[0].length;
+  return doc.slice(0, at) + preheaderDiv(preheader) + doc.slice(at);
+}
+
+/** Substitute WITHOUT escaping — the caller escapes once. Both put `Tiles &amp; Stone` in the preview. */
+export function fillPlain(template: string, variables: Record<string, unknown>): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (m, key: string) => {
+    const v = variables[key];
+    return v === undefined || v === null ? m : String(v);
+  });
+}
+
 /**
- * A body that is already a complete document is returned untouched and SAYS SO through
+ * A body that is already a complete document keeps its own chrome and SAYS SO through
  * `source` — silently exempting it is how the per-template branding drifted.
  */
 export function wrapInLayout(content: string, opts: WrapOptions): WrapResult {
   if (!content || !content.trim()) return { html: content, source: 'none' };
-  if (isFullDocument(content)) return { html: content, source: 'skipped_full_document' };
+  if (isFullDocument(content)) {
+    return { html: injectPreheader(content, opts.preheader ?? ''), source: 'skipped_full_document' };
+  }
 
   const override = (opts.layoutHtml ?? '').trim();
   const layout = override || DEFAULT_LAYOUT_HTML;
@@ -138,13 +161,22 @@ export function htmlToPlainText(html: string): string {
     .replace(/<li\b[^>]*>/gi, '• ')
     .replace(/<[^>]*>/g, '');
 
+  // &amp; LAST, or `&amp;lt;` decodes twice into a real `<`. Numeric forms go generically:
+  // a body written as `&euro;4,820` otherwise reaches text readers literally.
   text = text
     .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
+    .replace(/&(?:euro|#8364);/gi, '€')
+    .replace(/&(?:middot|#183);/gi, '·')
+    .replace(/&(?:copy|#169);/gi, '©')
+    .replace(/&(?:mdash|#8212);/gi, '—')
+    .replace(/&(?:ndash|#8211);/gi, '–')
+    .replace(/&(?:hellip|#8230);/gi, '…')
+    .replace(/&#x([0-9a-f]+);/gi, (_m, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_m, d) => String.fromCodePoint(Number(d)))
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
+    .replace(/&amp;/g, '&');
 
   return text
     .replace(/[ \t\r\f\v]+/g, ' ')
@@ -235,7 +267,7 @@ export const DEFAULT_LAYOUT_HTML = `<!doctype html>
 </style>
 </head>
 <body class="mk-body" style="margin:0;padding:0;width:100%;background:#f1f0f3;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#f1f0f3;opacity:0;">{{preheader}}</div>
+<div style="${PREHEADER_STYLE}">{{preheader}}</div>
 <table role="presentation" class="mk-ground" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f1f0f3;">
   <tr>
     <td align="center" style="padding:28px 12px;">
