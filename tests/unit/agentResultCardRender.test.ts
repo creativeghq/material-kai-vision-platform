@@ -88,26 +88,38 @@ describe('AgentResultCard leaves non-tabular payloads alone', () => {
 
 /**
  * The live `record_search_results` chunk, verbatim from a saved message — `{data: {...}, turn_id}`.
- * It rendered as a field labelled "Data" holding the whole answer, which put the table inside a
- * definition list's value column: two rows, one word per line, last column clipped.
+ * It rendered as a field labelled "Data" holding the whole answer.
+ *
+ * Records are NOT tabulated — they render as rows at any count — so the width assertions that
+ * used to ride on this fixture moved to `STAMPED_TABLE` below, which is genuinely tabular.
  */
-describe('a stamped chunk renders its table at full width', () => {
+describe('a stamped chunk peels its wrapper', () => {
   const RECORD_SEARCH = {
     data: {
       count: 2,
       query: 'Monoblock Air Conditioner',
       records: [
-        { kind: 'catalog', id: '50ca3454-2f10-4efb-90bd-beff565b9979', title: 'Monoblock Air Conditioner', subtitle: '8,000 BTU window-mounted — cooling and heating, no outdoor unit', badge: 'draft' },
-        { kind: 'catalog', id: '92662814-b95d-4dea-89cb-c093554a9a3d', title: 'Monoblock Air Conditioners', subtitle: 'YWD-08CD/3-W-2 — 8,000 BTU cooling & heating, R-290', badge: 'published' },
+        { kind: 'catalog', id: '50ca3454-2f10-4efb-90bd-beff565b9979', title: 'Monoblock Air Conditioner', subtitle: '8,000 BTU window-mounted — cooling and heating, no outdoor unit', badge: 'draft', path: '/catalogs/50ca3454-2f10-4efb-90bd-beff565b9979' },
+        { kind: 'catalog', id: '92662814-b95d-4dea-89cb-c093554a9a3d', title: 'Monoblock Air Conditioners', subtitle: 'YWD-08CD/3-W-2 — 8,000 BTU cooling & heating, R-290', badge: 'published', path: '/catalogs/92662814-b95d-4dea-89cb-c093554a9a3d' },
       ],
     },
     turn_id: '665aa85b-57a6-4884-83ef-2da96d4540d3',
   };
+  // Rendered with no `access`, so the capability-gated route is unavailable and the payload's
+  // own `path` is the only href there is — the fallback, and the case a standalone card hits.
   const html = render(RECORD_SEARCH, 'record_search_results', 'Records found');
 
   it('peels the wrapper instead of labelling it "Data"', () => {
     expect(html).not.toMatch(/>Data</);
-    expect(html).toContain('<table');
+  });
+
+  it('renders the records as linked rows, never as a field grid', () => {
+    // A single hit used to fall through to the key/value grid and print
+    // `Path: /crm/companies/…` as text under a label reading `Kind`.
+    expect(html).toContain('divide-y divide-hairline');
+    expect(html).toMatch(/<a href="\/catalogs\/50ca3454[^"]*"/);
+    expect(html, 'the raw kind leaked as a field label').not.toMatch(/>Kind</);
+    expect(html, 'the raw path leaked as a field label').not.toMatch(/>Path</);
   });
 
   it('never prints the turn id', () => {
@@ -119,18 +131,41 @@ describe('a stamped chunk renders its table at full width', () => {
     expect(html).toMatch(/>Query</);
   });
 
-  /**
-   * `w-full` inside an `overflow-x-auto` scroller means "compress to the container", so the
-   * browser resolves a long cell by wrapping it one word per line while the nowrap headers still
-   * push the last column past the edge. The table must size to its CONTENT and let the scroller
-   * show the overflow — with a cap so one long cell cannot run the width of the screen.
-   */
+});
+
+/**
+ * A stamped chunk whose rows are genuinely tabular — the width case.
+ *
+ * `w-full` inside an `overflow-x-auto` scroller means "compress to the container", so the browser
+ * resolves a long cell by wrapping it one word per line while the nowrap headers still push the
+ * last column past the edge. The table must size to its CONTENT and let the scroller show the
+ * overflow — with a cap so one long cell cannot run the width of the screen.
+ */
+describe('a stamped chunk renders its table at full width', () => {
+  const STAMPED_TABLE = {
+    data: {
+      count: 2,
+      query: 'August',
+      expenses: [
+        { id: '50ca3454-2f10-4efb-90bd-beff565b9979', supplier: 'ΑΠΟΣΤΟΛΙΔΗΣ ΑΕΒΕ', description: 'A long enough description that the cell has to decide between wrapping and overflowing', total: 322.44, currency: 'EUR' },
+        { id: '92662814-b95d-4dea-89cb-c093554a9a3d', supplier: 'TEMA SALES', description: 'Another line whose text runs past any sensible column width for this table', total: 90.87, currency: 'EUR' },
+      ],
+    },
+    turn_id: '665aa85b-57a6-4884-83ef-2da96d4540d3',
+  };
+  const html = render(STAMPED_TABLE, 'expenses_list', 'Expenses');
+
   it('sizes to content rather than compressing into the container', () => {
     expect(html).toContain('<table class="w-max min-w-full');
     // Not a `\bw-full\b` regex: that word boundary sits inside `min-w-full` too, so it matches
     // the fix as readily as the bug and the assertion proves nothing.
     expect(html).not.toContain('<table class="w-full');
     expect(html).toContain('max-w-[22rem] break-words');
+  });
+
+  it('still peels the wrapper and hides the turn id', () => {
+    expect(html).not.toMatch(/>Data</);
+    expect(html).not.toContain('665aa85b');
   });
 });
 

@@ -1738,7 +1738,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const handleSendMessageRef = useRef<() => Promise<void>>(() => Promise.resolve());
   // A material attached as the REFERENCE slot; alone it would be sent as the room and edited.
   const referenceOnlyRef = useRef<string | null>(null);
-  const initialPromptSent = useRef(false);
+  // WHICH prompt was auto-sent, not merely whether one was. A boolean latch never reset meant the
+  // SECOND notification carrying `?q=…` changed the URL and did nothing at all — the page is not
+  // remounted on a query-param change, so there was no other signal that the click had landed.
+  const initialPromptSent = useRef<string | null>(null);
 
   // Pending material replacement — set by "Replace in Image" on ProductStrip cards
   const [pendingReplacement, setPendingReplacement] = useState<{ id: string; name: string; imageUrl?: string } | null>(null);
@@ -4126,8 +4129,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   // Auto-send initialPrompt once userId is available. Skipped when an explicit
   // quickstart deep-link is present (the flow drives the interaction instead).
   useEffect(() => {
-    if (initialPrompt && userId && !initialPromptSent.current && !initialQuickStart) {
-      initialPromptSent.current = true;
+    if (initialPrompt && userId && initialPromptSent.current !== initialPrompt && !initialQuickStart) {
+      initialPromptSent.current = initialPrompt;
       setInput(initialPrompt);
       setTimeout(() => { handleSendMessageRef.current(); }, 300);
     }

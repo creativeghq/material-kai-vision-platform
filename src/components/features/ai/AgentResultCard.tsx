@@ -272,6 +272,80 @@ function useRelatedHref(kind: string | null, id: unknown): string | null {
   return recordRoute(kind, id, ctx.access.route);
 }
 
+/**
+ * Rows that ARE records — `{kind, id, title, subtitle?, badge?, path?}`, what `find_records`
+ * returns. They render as rows, not as a table and never as a field list: `tabularColumns` needs
+ * two rows to tabulate, so ONE hit fell through to the key/value grid and printed
+ * `Path: /crm/companies/b9e72ad2…` as text beside a label reading `Kind`. The reader got the
+ * shape of the JSON and no way to reach the record it named.
+ */
+function isRecordRefRows(rows: unknown): rows is Array<Record<string, unknown>> {
+  return Array.isArray(rows) && rows.length > 0 && rows.every((r) =>
+    !!r && typeof r === 'object' && !Array.isArray(r)
+    && typeof (r as AnyRec).kind === 'string'
+    && typeof (r as AnyRec).id === 'string'
+    && typeof (r as AnyRec).title === 'string'
+    && !!recordSpec((r as AnyRec).kind as string));
+}
+
+type AnyRec = Record<string, unknown>;
+
+function RecordRefRow({ row }: { row: AnyRec }) {
+  const kind = row.kind as string;
+  const spec = recordSpec(kind);
+  // The registry's route first — it is the gated one. The payload's own `path` is the fallback so
+  // the card still links when it renders outside a persona context (no access, no router).
+  // NOT safeHref: it admits only https/http/mailto, so an in-app path goes to '#' and the link
+  // dies silently. The registry route is capability-gated; the payload's `path` is our own tool's
+  // per-kind construction, and the leading-slash test keeps it an app path.
+  const gated = useRelatedHref(kind, row.id);
+  const fromPayload = typeof row.path === 'string' && row.path.startsWith('/') && !row.path.startsWith('//')
+    ? row.path
+    : null;
+  const recordRefHref = gated ?? fromPayload;
+  const Icon = spec?.icon;
+  const title = String(row.title ?? '');
+
+  return (
+    <div className="flex items-start gap-2 py-2">
+      {Icon && <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />}
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          {recordRefHref ? (
+            <a
+              href={recordRefHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {title}
+            </a>
+          ) : (
+            <span>{title}</span>
+          )}
+          {typeof row.badge === 'string' && row.badge && (
+            <Badge variant="neutral">{row.badge}</Badge>
+          )}
+        </div>
+        {(row.subtitle || spec) && (
+          <div className="mt-0.5 text-xs text-muted-foreground">
+            {[spec?.label, row.subtitle ? String(row.subtitle) : null].filter(Boolean).join(' · ')}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RecordRefList({ rows }: { rows: AnyRec[] }) {
+  return (
+    <div className="divide-y divide-hairline">
+      {rows.map((r) => <RecordRefRow key={`${r.kind}:${r.id}`} row={r} />)}
+    </div>
+  );
+}
+
 /** Columns whose number is an amount — formatted with the row's currency instead of beside it. */
 const MONEY_COL_RE = /(^|_)(total|amount|amount_due|amount_paid|price|value|subtotal|balance|due|paid|revenue|spend|cost|grand_total)$/i;
 
@@ -632,6 +706,22 @@ export const AgentResultCard: React.FC<{
                     : 'The search ran fine — there is simply nothing here yet.'}
                 action={setupLink}
               />
+            );
+          }
+          // Before the table: records render as records at ANY count, including one. The table
+          // path needs two rows to find shared columns, and the fall-through printed the raw
+          // path as a labelled field.
+          if (isRecordRefRows(rows)) {
+            const rest = entries.filter(([k]) => k !== key);
+            return (
+              <>
+                <RecordRefList rows={rows} />
+                {rest.length > 0 && (
+                  <div className="mt-2 border-t border-hairline pt-2">
+                    <KeyValues obj={Object.fromEntries(rest)} />
+                  </div>
+                )}
+              </>
             );
           }
           const cols = tabularColumns(rows);

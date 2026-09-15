@@ -40,6 +40,13 @@ const EXEMPT: Array<{ file: string; expr: string; why: string }> = [
     why: 'The in-app page of a related record, from config/recordLinks — our own path, which safeHref would refuse for being relative.',
   },
   {
+    file: 'src/components/features/ai/AgentResultCard.tsx',
+    expr: 'recordRefHref',
+    why: 'The in-app page of a record a search returned: the capability-gated route from config/recordLinks, '
+      + 'falling back to the tool\'s own per-kind path. Both are relative app paths, which safeHref refuses — '
+      + 'wrapping it sent every record link to "#".',
+  },
+  {
     file: 'src/components/features/ai/RecordPeekDialog.tsx',
     expr: 'telHref',
     why: 'A tel: URL whose scheme the template fixes, so the stored value cannot choose one; safeHref has no tel: in its allowlist and would inert the link.',
