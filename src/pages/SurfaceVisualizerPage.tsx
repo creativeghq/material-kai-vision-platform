@@ -1,7 +1,7 @@
 /** `/visualizer` — a tile, stone or floor on a room photo, at its real size (#447 Phase 1). */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Loader2, Plus, Trash2 } from 'lucide-react';
+import { Globe, GlobeLock, Loader2, Plus, Trash2 } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,13 +11,14 @@ import { Input } from '@/components/core/ui/input';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { SurfaceVisualizer } from '@/components/features/visualizer/SurfaceVisualizer';
 import { SceneEditor } from '@/components/features/visualizer/SceneEditor';
+import { WastageRatesCard } from '@/components/features/visualizer/WastageRatesCard';
 import { parseRenderState, serializeRenderState, type RenderState } from '@/lib/surfaceRenderer';
 import {
   visualizerService, SURFACE_KIND_LABELS, type VisualizerScene, type VisualizerSurface, type SurfaceProduct,
 } from '@/services/visualizerService';
 
 export default function SurfaceVisualizerPage() {
-  const { activeWorkspaceId } = useWorkspace();
+  const { activeWorkspaceId, workspaceRole } = useWorkspace();
   const { toast } = useToast();
   const [params, setParams] = useSearchParams();
   const initial = useMemo(() => parseRenderState(params), [params]);
@@ -32,6 +33,31 @@ export default function SurfaceVisualizerPage() {
   const [editing, setEditing] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [newName, setNewName] = useState('');
+  // Bumped when an allowance changes, so the open render re-reads the rates rather than keeping
+  // the "not set" it loaded with.
+  const [ratesVersion, setRatesVersion] = useState(0);
+
+  /** A room photo is somebody's house, so the embed shows one only once a person opts it in. */
+  const toggleEmbeddable = useCallback(async (s: VisualizerScene) => {
+    const next = !s.is_embeddable;
+    try {
+      await visualizerService.setSceneEmbeddable(s.id, next);
+      setScenes((prev) => prev.map((x) => (x.id === s.id ? { ...x, is_embeddable: next } : x)));
+      setScene((cur) => (cur && cur.id === s.id ? { ...cur, is_embeddable: next } : cur));
+      toast({
+        title: next ? 'Shown in the embed' : 'Hidden from the embed',
+        description: next
+          ? 'Anyone visiting a site with your widget can now see this room.'
+          : 'This room is private to your workspace again.',
+      });
+    } catch (e) {
+      toast({
+        title: 'Could not change that',
+        description: e instanceof Error ? e.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    }
+  }, [toast]);
 
   useEffect(() => {
     if (!activeWorkspaceId) return;
@@ -138,6 +164,19 @@ export default function SurfaceVisualizerPage() {
                         <span className="min-w-0 flex-1 truncate">{s.name}{s.workspace_id ? '' : ' · library'}</span>
                       </button>
                       {s.workspace_id && (
+                        <button
+                          type="button"
+                          title={s.is_embeddable
+                            ? 'Visible in the website embed. Click to make it private again.'
+                            : 'Private to this workspace. Click to show it in the website embed.'}
+                          aria-label={s.is_embeddable ? 'Hide from the website embed' : 'Show in the website embed'}
+                          onClick={() => void toggleEmbeddable(s)}
+                          className={s.is_embeddable ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}
+                        >
+                          {s.is_embeddable ? <Globe className="h-3.5 w-3.5" /> : <GlobeLock className="h-3.5 w-3.5" />}
+                        </button>
+                      )}
+                      {s.workspace_id && (
                         <button type="button" title="Delete this photo" onClick={() => removeScene(s)} className="text-muted-foreground hover:text-destructive">
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
@@ -205,6 +244,7 @@ export default function SurfaceVisualizerPage() {
                         products={products}
                         workspaceId={activeWorkspaceId}
                         initialState={initial}
+                        ratesVersion={ratesVersion}
                         onStateChange={onStateChange}
                       />
                     )}
@@ -215,6 +255,13 @@ export default function SurfaceVisualizerPage() {
           )}
         </CardContent>
       </Card>
+
+      <WastageRatesCard
+        workspaceId={activeWorkspaceId}
+        // The same two roles `is_workspace_admin` accepts, which is what the RLS policy enforces.
+        canEdit={workspaceRole === 'admin' || workspaceRole === 'owner'}
+        onChanged={() => setRatesVersion((v) => v + 1)}
+      />
     </div>
   );
 }

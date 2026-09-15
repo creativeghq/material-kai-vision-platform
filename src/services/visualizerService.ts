@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { mivaaApi } from '@/services/mivaaApiClient';
 import { roomPlannerService } from '@/services/roomPlannerService';
 import type { SurfaceTexture } from '@/components/features/roomplanner/surfaceFormat';
-import type { Pt } from '@/lib/surfaceRenderer';
+import type { Pt, Pattern, WastageRates } from '@/lib/surfaceRenderer';
 
 export const SURFACE_KINDS = ['floor', 'wall', 'backsplash', 'countertop', 'shower_wall', 'stair', 'ceiling', 'outdoor'] as const;
 export type SurfaceKind = (typeof SURFACE_KINDS)[number];
@@ -20,6 +20,8 @@ export const SURFACE_KIND_LABELS: Record<SurfaceKind, string> = {
 export interface VisualizerScene {
   id: string;
   workspace_id: string | null;
+  /** May anonymous embed visitors see this photo? False for every workspace scene until opted in. */
+  is_embeddable: boolean;
   name: string;
   room_type: string | null;
   storage_bucket: string;
@@ -45,6 +47,14 @@ export interface VisualizerSurface {
   sort_order: number;
 }
 
+/** A rate somebody recorded. An absent pattern is NOT zero — it withholds the order quantity. */
+export interface WastageRateRow {
+  pattern: Pattern;
+  percent: number;
+  note: string | null;
+  updated_at: string;
+}
+
 export interface SurfaceProduct {
   id: string;
   name: string;
@@ -62,6 +72,7 @@ function toScene(row: Record<string, unknown>): VisualizerScene {
   return {
     id: String(row.id),
     workspace_id: (row.workspace_id as string | null) ?? null,
+    is_embeddable: row.is_embeddable === true,
     name: String(row.name),
     room_type: (row.room_type as string | null) ?? null,
     storage_bucket: bucket,
@@ -156,6 +167,15 @@ export const visualizerService = {
     return toScene(data as Record<string, unknown>);
   },
 
+  /** Opt a workspace scene in to the public embed. Off by default: a room photo is somebody's house. */
+  async setSceneEmbeddable(id: string, embeddable: boolean): Promise<void> {
+    const { error } = await supabase
+      .from('visualizer_scenes')
+      .update({ is_embeddable: embeddable, updated_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) throw error;
+  },
+
   async deleteScene(id: string): Promise<void> {
     const { error } = await supabase.from('visualizer_scenes').delete().eq('id', id);
     if (error) throw error;
@@ -217,6 +237,53 @@ export const visualizerService = {
     if (!res.success || !res.data?.mask_base64 || res.data.method !== 'sam2') return null;
     const bytes = Uint8Array.from(atob(res.data.mask_base64), (c) => c.charCodeAt(0));
     return new Blob([bytes], { type: 'image/png' });
+  },
+
+  /** The cutting allowances this workspace has recorded. An empty map is the honest default. */
+  async wastageRates(workspaceId: string): Promise<WastageRates> {
+    const { data, error } = await supabase
+      .from('surface_pattern_wastage')
+      .select('pattern, percent')
+      .eq('workspace_id', workspaceId);
+    if (error) throw error;
+    const out: WastageRates = {};
+    for (const row of (data ?? []) as { pattern: Pattern; percent: number | string }[]) {
+      const n = Number(row.percent);
+      if (Number.isFinite(n)) out[row.pattern] = n;
+    }
+    return out;
+  },
+
+  async listWastageRates(workspaceId: string): Promise<WastageRateRow[]> {
+    const { data, error } = await supabase
+      .from('surface_pattern_wastage')
+      .select('pattern, percent, note, updated_at')
+      .eq('workspace_id', workspaceId)
+      .order('pattern');
+    if (error) throw error;
+    return (data ?? []).map((r) => ({ ...r, percent: Number((r as { percent: unknown }).percent) })) as WastageRateRow[];
+  },
+
+  async setWastageRate(workspaceId: string, pattern: Pattern, percent: number, note?: string | null): Promise<void> {
+    const { data: auth } = await supabase.auth.getUser();
+    const { error } = await supabase.from('surface_pattern_wastage').upsert({
+      workspace_id: workspaceId,
+      pattern,
+      percent,
+      note: note ?? null,
+      updated_by: auth?.user?.id ?? null,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'workspace_id,pattern' });
+    if (error) throw error;
+  },
+
+  async clearWastageRate(workspaceId: string, pattern: Pattern): Promise<void> {
+    const { error } = await supabase
+      .from('surface_pattern_wastage')
+      .delete()
+      .eq('workspace_id', workspaceId)
+      .eq('pattern', pattern);
+    if (error) throw error;
   },
 
   /**

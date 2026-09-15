@@ -368,17 +368,11 @@ Stores reusable field mapping templates. Key fields include: id, workspace_id, n
 
 ### Integration Test Script
 
-**Location:** `scripts/testing/test-xml-import-phase2.js`
-
-**Usage:** Run with `node scripts/testing/test-xml-import-phase2.js`.
-
-**Test Flow:**
-1. Upload XML with 3 sample products
-2. Monitor job progress (polls every 5s, max 5 min)
-3. Verify products created in database
-4. Verify images downloaded and linked
-5. Verify import history records
-6. Display comprehensive summary
+There is no longer a standalone script. `scripts/testing/test-xml-import-phase2.js` was documented
+here long after it stopped existing, so anyone following this section ran nothing and read the
+absence of output as a pass. The XML import path is covered by the unit suite
+(`npm test`); exercise the live path through the importer UI against a workspace with no real data,
+never by pointing a script at a queue (CLAUDE.md anti-regression rule 6).
 
 ---
 

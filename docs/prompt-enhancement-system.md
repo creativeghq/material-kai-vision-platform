@@ -93,7 +93,7 @@ The table stores the following fields: id, workspace_id, prompt_type (e.g., 'ext
 
 ### Default Prompts
 
-Default prompts are seeded using a seed script located at `cd mivaa-pdf-extractor` then running `python scripts/seed_default_prompts.py`.
+Default prompts live in the `prompts` table and are loaded through `prompt_registry.load_prompt(...)`; there is no seed script (`scripts/seed_default_prompts.py` no longer exists in either repo). A prompt that is missing raises `PromptNotConfigured` — add the row rather than reaching for a fallback.
 
 **Default Prompts Include:**
 - `discovery/products` - Comprehensive product extraction

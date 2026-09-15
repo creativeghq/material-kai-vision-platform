@@ -17,6 +17,13 @@ export const VOCABULARIES = [
     'supabase/functions/_shared/surfacePatterns.generated.ts',
   ],
   [
+    // #447 — the product spec fields the format and pack parsers read. The embed bundles the
+    // app's own parsers, so the edge projects a product down to THESE keys and the one parser
+    // runs on both sides; deriving the answer server-side instead would be a second copy.
+    'src/lib/surfaceRenderer/productSpecKeys.ts',
+    'supabase/functions/_shared/productSpecKeys.generated.ts',
+  ],
+  [
     // The public catalog URL. Nine sites built `/c/${slug}` by hand across both runtimes, so
     // making it workspace-scoped would otherwise have meant nine independent edits that agree.
     'src/config/catalogPublicUrl.ts',

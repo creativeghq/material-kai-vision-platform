@@ -8,6 +8,9 @@ import {
 } from '../_shared/embed-key.ts';
 import { embedCorsHeaders } from '../_shared/cors.ts';
 import { imagesFromMetadata } from '../_shared/product-media.ts';
+// #447 — the embed runs the app's own format/pack parsers, so a product is PROJECTED to the keys
+// they read rather than answered with a second derivation of the format.
+import { pickProductSpec } from '../_shared/productSpecKeys.generated.ts';
 import { verifyTurnstile, clientIp } from '../_shared/turnstile.ts';
 import { grossFromNet } from '../_shared/money.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
@@ -35,6 +38,9 @@ const MAX_SCOPE_ID_FILTER = 5000;
 // neither place until #341.
 const EMBED_EVENT_TYPES = [
   'embed_view', 'embed_model_load', 'embed_ar_launch', 'embed_add_to_cart', 'embed_configure', 'embed_plan_room',
+  // #447. These three are ALSO in manufacturer_analytics_events_event_type_check; adding one here
+  // alone passes this gate and dies on a 23514 the beacon never reports.
+  'embed_visualize_surface', 'embed_visualizer_share', 'embed_visualizer_quote',
 ];
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -951,6 +957,142 @@ Deno.serve(withApiLogging((req) => {
       return embedJson({ ok: true, recorded: false }, 200, cors);
     }
     return embedJson({ ok: true, recorded: true }, 200, cors);
+  }
+
+  // ── #447 surface visualizer ──────────────────────────────────────────────────────────────────
+  if (action === 'scenes') {
+    // A workspace scene is a photo somebody UPLOADED, often a customer's own room, and this is an
+    // anonymous surface handing out permanent public URLs. The platform library is embeddable by
+    // definition; a workspace's own scene only once someone opted it in.
+    const { data: sceneRows, error: sceneErr } = await supabase
+      .from('visualizer_scenes')
+      .select('id, workspace_id, name, room_type, storage_bucket, image_path, width_px, height_px')
+      .or(`workspace_id.is.null,and(workspace_id.eq.${workspaceId},is_embeddable.is.true)`)
+      .order('workspace_id', { ascending: true, nullsFirst: true })
+      .order('name')
+      .limit(MAX_LIMIT);
+    // A failed read is NOT an empty catalogue. Answering 200 with no scenes would tell the merchant
+    // "nothing published yet" forever while the real fault stayed invisible.
+    if (sceneErr) return embedJson({ error: 'Could not load scenes' }, 500, cors);
+
+    const scenes = (sceneRows ?? []) as any[];
+    const ids = scenes.map((s) => s.id);
+    const { data: surfaceRows, error: surfErr } = ids.length === 0
+      ? { data: [], error: null }
+      : await supabase
+        .from('visualizer_scene_surfaces')
+        .select('id, scene_id, key, kind, quad, width_cm, depth_cm, mask_path, sort_order')
+        .in('scene_id', ids)
+        .order('sort_order');
+    if (surfErr) return embedJson({ error: 'Could not load scenes' }, 500, cors);
+
+    // The allowance per pattern, so the visitor's count is the merchant's count. An absent pattern
+    // stays absent: the widget reports "not set" rather than ordering at a rate nobody chose.
+    const { data: wastageRows, error: wastageErr } = await supabase
+      .from('surface_pattern_wastage')
+      .select('pattern, percent')
+      .eq('workspace_id', workspaceId);
+    // An unreadable allowance must not read as "no allowance set" — that is a different answer,
+    // and this one would quietly withhold every order quantity.
+    if (wastageErr) return embedJson({ error: 'Could not load scenes' }, 500, cors);
+    const wastage: Record<string, number> = {};
+    for (const w of (wastageRows ?? []) as any[]) {
+      const n = Number(w.percent);
+      if (Number.isFinite(n)) wastage[String(w.pattern)] = n;
+    }
+
+    const publicPath = (bucket: string, path: string) =>
+      `${supabaseUrl}/storage/v1/object/public/${bucket}/${path}`;
+
+    return embedJson({
+      ok: true,
+      wastage,
+      // The widget has to know whether to draw a challenge BEFORE the visitor reaches the only
+      // action that writes: `verifyTurnstile` fails closed, so a form with no challenge would have
+      // every lead refused while the renderer looked perfect.
+      turnstile_site_key: (await resolveSecret(supabase, 'TURNSTILE_SITE_KEY')
+        .catch(() => ({ value: null })))?.value ?? null,
+      scenes: scenes.map((s) => ({
+        id: s.id,
+        name: s.name,
+        room_type: s.room_type ?? null,
+        image_url: publicPath(s.storage_bucket, s.image_path),
+        width_px: s.width_px,
+        height_px: s.height_px,
+        surfaces: ((surfaceRows ?? []) as any[])
+          .filter((r) => r.scene_id === s.id)
+          // A surface with no recorded size is WITHHELD, not published as 0 × 0 cm: `Number(null)`
+          // is 0, and a 0 m² surface counts 0 pieces and 0 boxes while still calling itself an
+          // order. Nothing renders at true scale without both numbers anyway.
+          .filter((r) => Number.isFinite(Number(r.width_cm)) && Number(r.width_cm) > 0
+            && Number.isFinite(Number(r.depth_cm)) && Number(r.depth_cm) > 0)
+          .map((r) => ({
+            key: r.key,
+            kind: r.kind,
+            quad: r.quad,
+            width_cm: Number(r.width_cm),
+            depth_cm: Number(r.depth_cm),
+            mask_url: r.mask_path ? publicPath(s.storage_bucket, r.mask_path) : null,
+          })),
+      })),
+    }, 200, cors);
+  }
+
+  if (action === 'faces') {
+    const raw = Array.isArray(params.product_ids)
+      ? params.product_ids
+      : String(params.product_ids ?? '').split(',');
+    const wanted = raw.map((v: unknown) => String(v).trim()).filter((v: string) => UUID_RE.test(v)).slice(0, MAX_LIMIT);
+
+    // Published AND in scope, exactly like every other read here: naming an id must not reach a
+    // product the key was never given. The scope stays authoritative — intersecting can only
+    // narrow the caller's list, never widen it.
+    const askFor = intersectIdFilters(await scopeRestriction(supabase, auth.ctx), wanted) ?? [];
+    if (askFor.length === 0) return embedJson({ ok: true, faces: [] }, 200, cors);
+
+    const { data: pubRows, error: pubErr } = await publishedQuery().in('product_id', askFor);
+    if (pubErr) return embedJson({ error: 'Could not load products' }, 500, cors);
+    const publishedIds = ((pubRows ?? []) as any[]).map((r) => r.product_id);
+    if (publishedIds.length === 0) return embedJson({ ok: true, faces: [] }, 200, cors);
+
+    const [productsRes, mapsRes] = await Promise.all([
+      supabase.from('products').select('id, attributes, metadata')
+        .eq('workspace_id', workspaceId).in('id', publishedIds),
+      // Scoped to the workspace like every other read here: a selected map row pointing at another
+      // tenant's bucket would otherwise hand its storage URL to this key's visitors.
+      supabase.from('product_material_maps').select('product_id, storage_bucket, albedo_path')
+        .eq('workspace_id', workspaceId)
+        .in('product_id', publishedIds).eq('is_selected', true).is('option_value_id', null),
+    ]);
+    // Same reasoning as `scenes`: a product with no face reads identically to a failed query, and
+    // the widget would report an empty catalogue rather than a fault.
+    if (productsRes.error || mapsRes.error) return embedJson({ error: 'Could not load products' }, 500, cors);
+    const productRows = productsRes.data;
+    const mapRows = mapsRes.data;
+
+    const albedo = new Map<string, string>();
+    for (const m of (mapRows ?? []) as any[]) {
+      if (m.albedo_path) {
+        albedo.set(m.product_id, `${supabaseUrl}/storage/v1/object/public/${m.storage_bucket}/${m.albedo_path}`);
+      }
+    }
+
+    return embedJson({
+      ok: true,
+      faces: ((productRows ?? []) as any[]).map((p) => {
+        const tile = albedo.get(p.id) ?? null;
+        const photo = tile ? null : (imagesFromMetadata(p.metadata)[0] ?? null);
+        return {
+          product_id: p.id,
+          url: tile ?? photo,
+          source: tile ? 'albedo' : photo ? 'photo' : 'none',
+          // The spec the parsers read, and nothing else — never the raw jsonb, which carries
+          // fields nobody has classified as safe to publish.
+          attributes: pickProductSpec(p.attributes) ?? {},
+          metadata: pickProductSpec(p.metadata) ?? {},
+        };
+      }),
+    }, 200, cors);
   }
 
   return embedJson({ error: `Unknown action: ${action}` }, 400, cors);

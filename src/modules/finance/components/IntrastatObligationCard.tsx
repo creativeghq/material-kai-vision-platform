@@ -17,6 +17,7 @@ import {
   obligationIsUnknown, intrastatNeedsAttention, isObliged,
   SUGGESTED_THRESHOLD, THRESHOLD_SOURCE_NOTE, RELATED_OBLIGATIONS,
   type IntrastatFlow, type IntrastatFlowVerdict, type IntrastatObligation,
+  type IntrastatThreshold,
 } from '@/modules/finance/services/intrastatObligationService';
 
 interface Props {
@@ -31,6 +32,7 @@ export const IntrastatObligationCard: React.FC<Props> = ({
 }) => {
   const { toast } = useToast();
   const [obligation, setObligation] = useState<IntrastatObligation | null>(null);
+  const [thresholds, setThresholds] = useState<IntrastatThreshold[]>([]);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -45,12 +47,19 @@ export const IntrastatObligationCard: React.FC<Props> = ({
     if (!workspaceId) return;
     setLoading(true);
     try {
-      setObligation(await intrastatObligationService.obligation(workspaceId, year));
+      const [ob, rows] = await Promise.all([
+        intrastatObligationService.obligation(workspaceId, year),
+        // The figure the verdict was reached ON. Without it "obliged from March" is a number the
+        // reader has to take on faith, and a revision is invisible.
+        intrastatObligationService.thresholds(workspaceId).catch(() => [] as IntrastatThreshold[]),
+      ]);
+      setObligation(ob);
+      setThresholds(rows.filter((t) => t.flow === flow));
       setFailed(false);
     } catch {
-      setObligation(null); setFailed(true);
+      setObligation(null); setThresholds([]); setFailed(true);
     } finally { setLoading(false); }
-  }, [workspaceId, year]);
+  }, [workspaceId, year, flow]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -152,6 +161,28 @@ export const IntrastatObligationCard: React.FC<Props> = ({
               <Save className="mr-1 h-3 w-3" /> Record threshold
             </Button>
             <p className="w-full text-[11px] text-muted-foreground">{THRESHOLD_SOURCE_NOTE}</p>
+          </div>
+        )}
+
+        {!loading && !failed && thresholds.length > 0 && (
+          <div className="mt-2 border-t border-hairline pt-2">
+            <p className="mb-1 text-[11px] font-medium">Thresholds on record</p>
+            <ul className="space-y-0.5 text-[11px] text-muted-foreground">
+              {thresholds.map((t) => (
+                <li key={t.id} className="flex flex-wrap items-baseline gap-2">
+                  <span className="tabular-nums font-medium">
+                    {Number(t.threshold_amount).toLocaleString('en-US')} {t.currency}
+                  </span>
+                  <span className="tabular-nums">
+                    from {t.effective_from}{t.effective_to ? ` to ${t.effective_to}` : ''}
+                  </span>
+                  {/* An unconfirmed figure is somebody's recollection until an accountant signs it. */}
+                  <Badge variant={t.confirmed_on ? 'success' : 'warning'}>
+                    {t.confirmed_on ? `confirmed ${t.confirmed_on}` : 'not confirmed'}
+                  </Badge>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
 

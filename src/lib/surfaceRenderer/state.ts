@@ -23,10 +23,17 @@ export const DEFAULT_RENDER_STATE: RenderState = {
 
 const HEX = /^#[0-9a-f]{6}$/i;
 
+// An ABSENT param is not 0: `Number(null)` is 0, and 0 passes every range check below, so the
+// default would never apply and a link shared at 3 mm would open at 0 mm.
+const num = (params: URLSearchParams, key: string): number => {
+  const raw = params.get(key);
+  return raw === null || raw.trim() === '' ? NaN : Number(raw);
+};
+
 export function parseRenderState(params: URLSearchParams): RenderState {
   const pattern = params.get('pattern');
-  const grout = Number(params.get('grout'));
-  const rot = Number(params.get('rot'));
+  const grout = num(params, 'grout');
+  const rot = num(params, 'rot');
   const color = params.get('groutColor');
   return {
     sceneId: params.get('scene'),

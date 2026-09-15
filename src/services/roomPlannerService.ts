@@ -4,7 +4,7 @@ import { PRODUCT_IMAGE_SELECT, getProductImageUrl } from '@/utils/productMetadat
 import type { Tables } from '@/integrations/supabase/types';
 import { modelPublicUrl } from '@/services/product3dService';
 import { productMaterialMapsService } from '@/services/productMaterialMapsService';
-import { tileFormatM, type SurfaceTexture } from '@/components/features/roomplanner/surfaceFormat';
+import { tileFormatM, packCoverageM2, type SurfaceTexture } from '@/components/features/roomplanner/surfaceFormat';
 
 /**
  * `Tables<'room_layouts'>` is generated from the database, and the committed `types.ts` is stale —
@@ -321,10 +321,15 @@ export const roomPlannerService = {
       const id = (row as { id: string }).id;
       const albedo = albedoByProduct.get(id) ?? null;
       const photo = albedo ? null : getProductImageUrl(row);
+      const fmt = tileFormatM(row as { attributes?: unknown; metadata?: unknown });
       out.set(id, {
         url: albedo ?? photo,
         source: albedo ? 'albedo' : photo ? 'photo' : 'none',
-        ...tileFormatM(row as { attributes?: unknown; metadata?: unknown }),
+        ...fmt,
+        packM2: packCoverageM2(
+          row as { attributes?: unknown; metadata?: unknown },
+          fmt.tileWidthM * fmt.tileLengthM,
+        ),
       });
     }
     return out;
