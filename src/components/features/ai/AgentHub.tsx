@@ -351,6 +351,8 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   // a call they approved actually returned.
   platform_api_matches: 'Platform capabilities',
   platform_api_result: 'Platform API result',
+  platform_data_matches: 'Figures the platform derives',
+  platform_data_result: 'Platform data',
   // My HR (employee self-service). These MUST be registered: a quick-start with `run` is a
   // deterministic direct tool call that skips the LLM, so there is no narration fallback — an
   // unregistered chunk is dropped and the user just sees "Done — ran manage_my_hr" with no data.

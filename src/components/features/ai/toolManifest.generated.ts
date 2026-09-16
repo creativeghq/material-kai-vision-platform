@@ -317,6 +317,16 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'call_platform_rpc',
+    file: 'supabase/functions/_shared/tools/platform-rpc-tools.ts',
+    factory: 'createCallPlatformRpcTool',
+    description: 'Read a figure the platform derives, as the signed-in user.',
+    params: [
+      { name: 'reader', type: 'string', optional: false, description: 'The reader name from discover_platform_data, e.g. "get_deal_velocity".' },
+      { name: 'args', type: 'object', optional: true, description: 'Arguments by name, e.g. {"p_workspace_id": "…", "p_days": 28}.' },
+    ],
+  },
+  {
     name: 'check_generation_status',
     file: 'supabase/functions/_shared/tools/generation-tools.ts',
     factory: 'createGenerationStatusTool',
@@ -527,6 +537,16 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     params: [
       { name: 'query', type: 'string', optional: true, description: 'A few words for what you need to do, e.g. "email a statement to a customer".' },
       { name: 'area', type: 'string', optional: true, description: 'Optional area to browse, e.g. "Finance", "CRM", "SEO", "HR".' },
+      { name: 'limit', type: 'number', optional: true, description: 'Max matches (default 8, max 20).' },
+    ],
+  },
+  {
+    name: 'discover_platform_data',
+    file: 'supabase/functions/_shared/tools/platform-rpc-tools.ts',
+    factory: 'createDiscoverPlatformDataTool',
+    description: 'Find a figure the platform already WORKS OUT — settlements, margins, forecasts, site health, a customer 360.',
+    params: [
+      { name: 'query', type: 'string', optional: false, description: 'What figure you need, in plain words.' },
       { name: 'limit', type: 'number', optional: true, description: 'Max matches (default 8, max 20).' },
     ],
   },
@@ -871,6 +891,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'categorySlug', type: 'string', optional: true, description: 'Restrict search to a category by slug (e.g. "pricing")' },
       { name: 'categoryId', type: 'string', optional: true, description: 'Restrict search to a category by UUID' },
       { name: 'priceDocType', type: 'enum', enum: ['price_list', 'discount_rule', 'contract_terms', 'promotion'], optional: true, description: 'When searching pricing docs, filter by sub-type' },
+      { name: 'productId', type: 'string', optional: true, description: 'Restrict to documents attached to ONE product — its datasheets, certificates and test reports. Use this when the user asks what a specific product is rated for or certified to, rather than searching the whole library and hoping the right certificate ranks first.' },
     ],
   },
   {

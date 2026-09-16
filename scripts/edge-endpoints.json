@@ -15958,20 +15958,24 @@
     "methods": [
       "POST"
     ],
-    "request": [
-      {
-        "name": "action",
-        "type": "string",
-        "required": true,
-        "desc": "`list` (the caller's owned properties) or `get` (one of them)"
-      },
-      {
-        "name": "property_id",
-        "type": "string (uuid)",
-        "required": false,
-        "desc": "Required for `get`. Must be a property the caller holds an owner grant on, else 404"
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "action": {
+          "type": "string",
+          "required": true,
+          "enum": [
+            "list",
+            "get"
+          ],
+          "description": "list = every property this owner was granted; get = one of them in full."
+        },
+        "property_id": {
+          "type": "string",
+          "description": "Required for get. Must be a property the signed-in user holds an owner grant on."
+        }
       }
-    ],
+    },
     "response": "{ properties } | { property, performance, enquiries, viewings, offers, price_history, management, management_available } | { error }"
   }
 ]

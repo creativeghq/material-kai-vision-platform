@@ -1015,6 +1015,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // missing is not predictable per agent, and an agent that can only apologise for a gap
       // is the failure this closes.
       'discover_platform_api', 'call_platform_api',
+      'discover_platform_data', 'call_platform_rpc',
       // Docs module — internal workspace docs FTS. Currently a free tool for all workspaces
       // (the push site has NO entitlement gate); the docs UI is entitlement-gated but the agent tool
       // is not. If Docs becomes a paid/gated module, add an is_workspace_entitled('docs') check at
@@ -1215,6 +1216,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // missing is not predictable per agent, and an agent that can only apologise for a gap
       // is the failure this closes.
       'discover_platform_api', 'call_platform_api',
+      'discover_platform_data', 'call_platform_rpc',
       // Calculators (all users; deterministic, free, no upstream API)
       'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost',
       // Image-driven post-processing tools (require an existing room image in the conversation)
@@ -1257,6 +1259,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // missing is not predictable per agent, and an agent that can only apologise for a gap
       // is the failure this closes.
       'discover_platform_api', 'call_platform_api',
+      'discover_platform_data', 'call_platform_rpc',
       // CRM + appointments help work leads and book viewings
       'search_crm_by_kad', 'manage_appointments',
       // core search + calculators (all users)
@@ -1305,6 +1308,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // missing is not predictable per agent, and an agent that can only apologise for a gap
       // is the failure this closes.
       'discover_platform_api', 'call_platform_api',
+      'discover_platform_data', 'call_platform_rpc',
       // sub-agents is four analysis agents and Pepper held two. An owner binds the cluster.
       'research_analysis', 'analytics_analysis',
       'review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding',
@@ -1341,6 +1345,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // missing is not predictable per agent, and an agent that can only apologise for a gap
       // is the failure this closes.
       'discover_platform_api', 'call_platform_api',
+      'discover_platform_data', 'call_platform_rpc',
       'seo_onpage_issues', 'seo_backlinks_timeseries', 'seo_backlinks_competitors',
       'seo_historical_rank_overview', 'seo_keywords_for_site', 'seo_keyword_ideas',
       'seo_related_keywords', 'seo_search_volume', 'seo_domain_intersection',
@@ -1371,6 +1376,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // missing is not predictable per agent, and an agent that can only apologise for a gap
       // is the failure this closes.
       'discover_platform_api', 'call_platform_api',
+      'discover_platform_data', 'call_platform_rpc',
       'create_quote', 'generate_quote_pdf', 'list_my_quotes', 'raise_quote_request',
       // The verdict half of the same flow: Trinity quotes, so Trinity must be able to find out
       // whether there is a price to quote before it says one out loud.
@@ -1424,6 +1430,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // missing is not predictable per agent, and an agent that can only apologise for a gap
       // is the failure this closes.
       'discover_platform_api', 'call_platform_api',
+      'discover_platform_data', 'call_platform_rpc',
       'manage_social',
       // Hermes is the comms agent — also handles WhatsApp messaging (send is confirm-gated)
       'manage_messaging',
@@ -2017,6 +2024,7 @@ async function executeAgent(
   const needsDocs = config.tools.includes('search_workspace_docs') || config.tools.includes('manage_docs');
   const needsRecordSearch = config.tools.includes('find_records');
   const needsPlatformApi = config.tools.some((t: string) => ['discover_platform_api', 'call_platform_api'].includes(t));
+  const needsPlatformRpc = config.tools.some((t: string) => ['discover_platform_data', 'call_platform_rpc'].includes(t));
   const needsGen = config.tools.some((t: string) => ['generate_3d'].includes(t));
   // These two gated on snake_case names no tool has ever had — the registrations below
   // key off `checkServerHealth` / `querySentry` / `queryDatabase`. So the modules never
@@ -2094,7 +2102,7 @@ async function executeAgent(
   ];
   const needsCatalog = isAdmin && config.tools.some((t: string) => CATALOG_TOOL_NAMES.includes(t));
 
-  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, matScrapeMod, webResearchMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod, flowsMod, hrToolsMod, myHrToolsMod, stockToolsMod, realEstateToolsMod, crmToolsMod, quotesMod, socialMod, priceMonitoringMod, emailMarketingMod, financeMod, messagingMod, contractsMod, inboxMod, reviewsMod, appointmentsMod, recordSearchMod, constructionMod, platformApiMod]: any[] = await Promise.all([
+  const [searchMod, generationMod, opsMod, dbMod, subAgentMod, b2bMod, matScrapeMod, webResearchMod, seoMod, seoAgentMod, bgMod, priceMod, presentationMod, mentionMod, catalogMod, jobResearchMod, projectsMod, techRadarMod, sourcingMod, docsMod, flowsMod, hrToolsMod, myHrToolsMod, stockToolsMod, realEstateToolsMod, crmToolsMod, quotesMod, socialMod, priceMonitoringMod, emailMarketingMod, financeMod, messagingMod, contractsMod, inboxMod, reviewsMod, appointmentsMod, recordSearchMod, constructionMod, platformApiMod, platformRpcMod]: any[] = await Promise.all([
     needsSearch       ? import('../_shared/tools/search-tools.ts') : null,
     needsGen          ? import('../_shared/tools/generation-tools.ts') : null,
     needsOps          ? import('../_shared/tools/ops-tools.ts') : null,
@@ -2134,6 +2142,7 @@ async function executeAgent(
     needsRecordSearch ? import('../_shared/tools/record-search-tools.ts') : null,
     needsConstruction ? import('../_shared/tools/construction-tools.ts') : null,
     needsPlatformApi ? import('../_shared/tools/platform-api-tools.ts') : null,
+    needsPlatformRpc ? import('../_shared/tools/platform-rpc-tools.ts') : null,
   ]);
 
   const createDocsSearchTool = docsMod?.createDocsSearchTool;
@@ -2359,6 +2368,15 @@ async function executeAgent(
   }
   if (config.tools.includes('call_platform_api') && platformApiMod?.createCallPlatformApiTool) {
     tools.push(platformApiMod.createCallPlatformApiTool(userJwt, onChunk));
+  }
+
+  // The figures the platform already derives. Read-only by construction, and `userJwt` is again
+  // load-bearing: it reads exactly what this person could read, and refuses without a session.
+  if (config.tools.includes('discover_platform_data') && platformRpcMod?.createDiscoverPlatformDataTool) {
+    tools.push(platformRpcMod.createDiscoverPlatformDataTool(onChunk));
+  }
+  if (config.tools.includes('call_platform_rpc') && platformRpcMod?.createCallPlatformRpcTool) {
+    tools.push(platformRpcMod.createCallPlatformRpcTool(userJwt, onChunk));
   }
 
   if (config.tools.includes('search_workspace_docs') && createDocsSearchTool) {
