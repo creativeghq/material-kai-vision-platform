@@ -891,7 +891,6 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'categorySlug', type: 'string', optional: true, description: 'Restrict search to a category by slug (e.g. "pricing")' },
       { name: 'categoryId', type: 'string', optional: true, description: 'Restrict search to a category by UUID' },
       { name: 'priceDocType', type: 'enum', enum: ['price_list', 'discount_rule', 'contract_terms', 'promotion'], optional: true, description: 'When searching pricing docs, filter by sub-type' },
-      { name: 'productId', type: 'string', optional: true, description: 'Restrict to documents attached to ONE product — its datasheets, certificates and test reports. Use this when the user asks what a specific product is rated for or certified to, rather than searching the whole library and hoping the right certificate ranks first.' },
     ],
   },
   {

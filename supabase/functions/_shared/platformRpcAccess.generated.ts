@@ -8,13 +8,11 @@ export interface WithheldRpc {
 }
 
 /**
- * Derived reads the generic tool may NOT call.
+ * Derived reads the generic tool may NOT serve.
  *
- * @remarks Not an authorization boundary — the caller's own EXECUTE grant is that, and these are
- * reachable from the browser by anyone the grant admits. This is the SENSITIVITY gate: cost and
- * margin are withheld from a client by column grant (#358), and a generic reader that served them
- * to any workspace member would walk straight around that. Each needs a tool that gates on role,
- * which is what `.github/agent-data-coverage-baseline.json` already says about them.
+ * @remarks Not authorization — the caller's EXECUTE grant is that. This is the SENSITIVITY gate:
+ * cost and margin are withheld from a client by column grant (#358), so a generic reader serving
+ * them to any member would walk around it. Each needs a tool that gates on role.
  */
 export const PLATFORM_RPC_WITHHELD: readonly WithheldRpc[] = [
   { name: 'get_product_costs', reason: 'Supplier cost per product. The cost columns are not client-selectable; this is the gated reader for them.' },
