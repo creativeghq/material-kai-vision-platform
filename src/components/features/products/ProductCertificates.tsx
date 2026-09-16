@@ -7,10 +7,10 @@ import { HubEmptyState } from '@/components/core/hub';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { todayLocalISO } from '@/utils/datetime';
-import { presentValidity } from './certificateValidity';
 import {
-  type CertificateDraft, ProductCertificateDialog, emptyDraft,
-} from './ProductCertificateDialog';
+  type CertificateDraft, draftFromCandidate, emptyDraft, presentValidity,
+} from './certificateValidity';
+import { ProductCertificateDialog } from './ProductCertificateDialog';
 
 interface CertificateRow {
   id: string;
@@ -23,6 +23,16 @@ interface CertificateRow {
   valid_until: string | null;
   validity: string | null;
   notes: string | null;
+}
+
+interface Candidate {
+  entity_id: string;
+  standard: string;
+  certificate_number: string | null;
+  issuer: string | null;
+  scope: string | null;
+  valid_from: string | null;
+  valid_until: string | null;
 }
 
 type Load =
@@ -39,20 +49,24 @@ interface Props {
 export function ProductCertificates({ productId, canEdit = false, suggestedStandards = [] }: Props) {
   const [load, setLoad] = useState<Load>({ kind: 'loading' });
   const [draft, setDraft] = useState<CertificateDraft | null>(null);
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
   // Remount per open: the dialog seeds its form once, so a reused key shows the last row.
   const [openSeq, setOpenSeq] = useState(0);
   const openDraft = (d: CertificateDraft) => { setDraft(d); setOpenSeq((n) => n + 1); };
   const { toast } = useToast();
 
-  const reload = useCallback(() => {
+  const reload = useCallback(async () => {
     // The operator's calendar day: the DB session is UTC, so current_date is off by one.
-    return supabase
-      .rpc('get_product_certificates', { p_product_id: productId, p_today: todayLocalISO() })
-      .then(({ data, error }) => {
-        if (error) { setLoad({ kind: 'failed', reason: error.message }); return; }
-        setLoad({ kind: 'loaded', rows: (data ?? []) as CertificateRow[] });
-      });
-  }, [productId]);
+    const { data, error } = await supabase
+      .rpc('get_product_certificates', { p_product_id: productId, p_today: todayLocalISO() });
+    if (error) { setLoad({ kind: 'failed', reason: error.message }); return; }
+    setLoad({ kind: 'loaded', rows: (data ?? []) as CertificateRow[] });
+
+    if (!canEdit) { setCandidates([]); return; }
+    const { data: cand } = await supabase
+      .rpc('get_product_certificate_candidates', { p_product_id: productId });
+    setCandidates((cand ?? []) as Candidate[]);
+  }, [productId, canEdit]);
 
   useEffect(() => { void reload(); }, [reload]);
 
@@ -79,7 +93,10 @@ export function ProductCertificates({ productId, canEdit = false, suggestedStand
   if (load.rows.length === 0 && !canEdit) return null;
 
   const recorded = new Set(load.rows.map((r) => r.standard.toLowerCase()));
-  const unrecorded = suggestedStandards.filter((s) => s && !recorded.has(s.toLowerCase()));
+  const fromDocuments = new Set(candidates.map((c) => c.standard.toLowerCase()));
+  const unrecorded = suggestedStandards.filter(
+    (s) => s && !recorded.has(s.toLowerCase()) && !fromDocuments.has(s.toLowerCase()),
+  );
 
   return (
     <div className="space-y-3">
@@ -179,6 +196,30 @@ export function ProductCertificates({ productId, canEdit = false, suggestedStand
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {canEdit && candidates.length > 0 && (
+        <div className="space-y-2 border-t border-hairline pt-3">
+          <p className="text-xs text-muted-foreground">
+            Read out of this product&apos;s documents by the extractor. Check each against the
+            certificate before recording it — a date it could not parse is left blank rather
+            than guessed.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {candidates.map((c) => (
+              <Button
+                key={c.entity_id} variant="outline" size="sm"
+                onClick={() => openDraft(draftFromCandidate(c))}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span className="ml-1.5">
+                  {c.standard}
+                  {c.certificate_number ? ` · ${c.certificate_number}` : ''}
+                </span>
+              </Button>
+            ))}
+          </div>
         </div>
       )}
 

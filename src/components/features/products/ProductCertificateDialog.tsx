@@ -9,23 +9,7 @@ import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-
-export interface CertificateDraft {
-  id?: string;
-  standard: string;
-  certificate_number: string;
-  issuer: string;
-  scope: string;
-  result: string;
-  valid_from: string;
-  valid_until: string;
-  notes: string;
-}
-
-export const emptyDraft = (standard = ''): CertificateDraft => ({
-  standard, certificate_number: '', issuer: '', scope: '', result: '',
-  valid_from: '', valid_until: '', notes: '',
-});
+import { type CertificateDraft, emptyDraft } from './certificateValidity';
 
 const orNull = (v: string) => (v.trim() === '' ? null : v.trim());
 
