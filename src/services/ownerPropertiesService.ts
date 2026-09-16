@@ -36,7 +36,10 @@ export interface OwnerManagement {
   rent: { charged: number; received: number; outstanding: number; currency: string };
   charges: Array<{ id: string; due_date: string; amount: number; currency: string; settled: number; outstanding: number; payment_status: string }>;
   maintenance: Array<{ id: string; title: string; status: string; priority: string | null; reported_at: string | null; resolved_at: string | null }>;
-  inspections: Array<{ id: string; scheduled_at: string | null; status: string }>;
+  inspections: Array<{
+    id: string; inspection_type: string | null; scheduled_for: string | null;
+    completed_at: string | null; condition_rating: string | null;
+  }>;
 }
 
 export interface OwnerPropertyDetail {

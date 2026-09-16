@@ -114,9 +114,9 @@ Deno.serve(withApiLogging('real-estate-owner', async (req: Request) => {
         .eq('tenancy_id', String(tenancy.id)).eq('workspace_id', workspaceId)
         .order('reported_at', { ascending: false }).limit(20),
       supabase.from('property_tenancy_inspections')
-        .select('id, scheduled_at, status')
+        .select('id, inspection_type, scheduled_for, completed_at, condition_rating')
         .eq('tenancy_id', String(tenancy.id)).eq('workspace_id', workspaceId)
-        .order('scheduled_at', { ascending: false }).limit(10),
+        .order('scheduled_for', { ascending: false }).limit(10),
     ]);
     const settled = await withRentSettlements(supabase, charges ?? []);
     management = {

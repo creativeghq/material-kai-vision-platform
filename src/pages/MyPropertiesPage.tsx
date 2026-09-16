@@ -180,8 +180,12 @@ const Detail: React.FC<{ propertyId: string; onBack: () => void }> = ({ property
               <CardContent className="space-y-1 text-sm">
                 {m.inspections.map((i) => (
                   <div key={i.id} className="flex justify-between border-b border-hairline py-1 last:border-0">
-                    <span>{i.scheduled_at ? formatDate(i.scheduled_at) : '—'}</span>
-                    <span className="text-muted-foreground">{i.status}</span>
+                    <span>{i.scheduled_for ? formatDate(i.scheduled_for) : '—'}</span>
+                    <span className="text-muted-foreground">
+                      {i.completed_at
+                        ? `Completed${i.condition_rating ? ` — ${i.condition_rating}` : ''}`
+                        : 'Scheduled'}
+                    </span>
                   </div>
                 ))}
               </CardContent>
