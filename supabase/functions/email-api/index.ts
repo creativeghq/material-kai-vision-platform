@@ -1159,13 +1159,32 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         const one = await oneRes.json();
         if (!oneRes.ok) throw new HttpError(502, one?.message || `Resend ${oneRes.status}`);
 
+        const open = one?.open_tracking ?? null;
+        const click = one?.click_tracking ?? null;
+
+        // Resend answers 200 to a PATCH it does not apply — measured 2026-09-15 against
+        // mail.materialshub.gr, in both snake_case and the SDK's camelCase. Report what the
+        // read-back SAYS, not that the request was accepted, or this is a write that lies.
+        const asked: Array<[string, boolean, unknown]> = [];
+        if (body2.set?.open_tracking !== undefined) asked.push(['open_tracking', body2.set.open_tracking, open]);
+        if (body2.set?.click_tracking !== undefined) asked.push(['click_tracking', body2.set.click_tracking, click]);
+        const refused = asked.filter(([, want, got]) => want !== got).map(([f]) => f);
+
         return new Response(
           JSON.stringify({
-            success: true,
+            success: refused.length === 0,
             domain: one?.name ?? target.name,
             status: one?.status ?? null,
-            open_tracking: one?.open_tracking ?? null,
-            click_tracking: one?.click_tracking ?? null,
+            open_tracking: open,
+            click_tracking: click,
+            ...(refused.length
+              ? {
+                  error: `Resend accepted the request but did not apply ${refused.join(' and ')}. `
+                    + 'Tracking needs the tracking-subdomain CNAME in DNS; enable it in the Resend '
+                    + 'dashboard (Domains → this domain), which prompts for the record.',
+                  refused,
+                }
+              : {}),
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
         );
