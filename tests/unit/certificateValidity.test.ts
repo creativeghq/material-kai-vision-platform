@@ -61,3 +61,26 @@ describe('the expiry comparison is not re-derived in the client', () => {
     expect(code).toContain('p_today');
   });
 });
+
+describe('the certificate write path sets no identity fields from the client', () => {
+  const DIALOG = 'src/components/features/products/ProductCertificateDialog.tsx';
+
+  it('never sends workspace_id or created_by — the trigger stamps both from the product', () => {
+    const code = blankComments(read(DIALOG));
+    expect(code, 'workspace_id is an identity field (invariant 8)').not.toMatch(/workspace_id/);
+    expect(code, 'created_by is an identity field (invariant 8)').not.toMatch(/created_by/);
+  });
+
+  it('builds an explicit payload rather than spreading the form into the write', () => {
+    const code = blankComments(read(DIALOG));
+    expect(code, 'a spread form object is the mass-assignment shape')
+      .not.toMatch(/\.(insert|update)\(\s*\{\s*\.\.\./);
+    expect(code).toMatch(/product_id:\s*productId/);
+  });
+
+  it('writes go through the table so RLS applies, not through a service-role edge call', () => {
+    const code = blankComments(read(DIALOG));
+    expect(code).toMatch(/from\('product_certificates'\)/);
+    expect(code).not.toMatch(/functions\.invoke/);
+  });
+});

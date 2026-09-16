@@ -492,6 +492,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const canSeeCost = isOwnProduct && canAny('pricing.manage', 'sales.team.view');
   /** Fiscal identity is set by whoever does intake or invoicing, so it is not pricing-only. */
   const canSeeFiscal = isOwnProduct && canAny('pricing.manage', 'warehouse.manage', 'finance.manage');
+  /** Compliance records are intake data — same hands as the fiscal fields. */
+  const canEditCertificates = isOwnProduct && canAny('pricing.manage', 'warehouse.manage', 'finance.manage');
 
 
   const handlePrevImage = () => {
@@ -1098,12 +1100,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       }
     }
 
-    // ─── Dedup pass ────────────────────────────────────────────────────
-    // Multiple sources (vision_variants, sku_codes, commercial.product_table)
-    // can emit the same physical variant in different shapes — different SKU
-    // formats (compound "VALENOVA TAUPE LT/11,8X11,8" vs catalog "39661"),
-    // different casing ("taupe" vs "Taupe"), unit-trailing sizes
-    // ("11,8x11,8" vs "11,8x11,8 cm"), or partially-populated patterns
+    // Three sources can emit one physical variant in different shapes: SKU format,
+    // casing, unit-trailing sizes, partially-populated patterns.
     const isMoreInformativeSku = (a: string, b: string): boolean => {
       // Prefer non-sentinel, then non-compound (no "/"), then numeric, then shorter
       if (a === DISPLAY_SENTINEL && b !== DISPLAY_SENTINEL) return false;
@@ -2730,7 +2728,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             <BookOpen className="h-4 w-4" />
             Knowledge Base Articles
           </h3>
-          <ProductCertificates productId={product.id} />
+          <ProductCertificates
+            productId={product.id}
+            canEdit={canEditCertificates}
+            suggestedStandards={certList}
+          />
           <ProductDocumentSearch
             productId={product.id}
             workspaceId={activeWorkspaceId}
