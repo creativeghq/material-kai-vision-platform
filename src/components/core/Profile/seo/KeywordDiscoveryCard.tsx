@@ -50,7 +50,7 @@ const REASON: Record<string, { label: string; explain: string; tone: 'success' |
 };
 
 const WATCHING = {
-  label: 'Watching',
+  label: 'Below the bar',
   explain: 'Visible, but too few impressions or too few separate days to be worth a daily check yet. It is offered here if you want it anyway.',
 };
 
