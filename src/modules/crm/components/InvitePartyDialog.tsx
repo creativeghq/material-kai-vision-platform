@@ -16,8 +16,10 @@ import {
 } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { getErrorMessage } from '@/core/errors/utils';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import {
   workspaceManagementService, type CompanyWorkspaceStatus,
+  type InvitableRecord, type RecordGrant,
 } from '@/services/workspaceManagementService';
 import {
   WORKSPACE_INVITE_ROLES, WORKSPACE_ROLE_META, type WorkspaceInviteRole,
@@ -25,7 +27,7 @@ import {
 
 /** Not interchangeable: `my_workspace` seats them in YOUR tenant and lets them read your CRM and
  *  costs, where `customer` is a login joined to their own CRM record and nothing else. */
-type Destination = 'customer' | 'own_workspace' | 'my_workspace' | 'trade_portal' | 'project';
+type Destination = 'customer' | 'own_workspace' | 'my_workspace' | 'records' | 'trade_portal';
 
 export interface InviteParty {
   contactId?: string | null;
@@ -72,8 +74,8 @@ const OPTIONS: Option[] = [
     blurb: 'A B2B account for the whole company, with spend caps and their own delegated admin. Set up on the company record.',
   },
   {
-    key: 'project', icon: FolderKanban, title: 'One project only', sends: false,
-    blurb: 'Access to a single project, moodboard or client view. Invited on the project itself, so the access ends with it.',
+    key: 'records', icon: FolderKanban, title: 'Specific projects or properties', sends: true,
+    blurb: 'Tick what they may see. One invitation, one sign-up, and access ends when you revoke it.',
   },
 ];
 
@@ -99,6 +101,8 @@ export const InvitePartyDialog: React.FC<Props> = ({
   const [discountPct, setDiscountPct] = useState('0');
   const [canSupply, setCanSupply] = useState(false);
   const [status, setStatus] = useState<CompanyWorkspaceStatus | null>(null);
+  const [records, setRecords] = useState<InvitableRecord[]>([]);
+  const [picked, setPicked] = useState<Record<string, RecordGrant>>({});
   const [busy, setBusy] = useState(false);
   const [link, setLink] = useState<string | null>(null);
 
@@ -107,10 +111,18 @@ export const InvitePartyDialog: React.FC<Props> = ({
     setEmail(party.email ?? '');
     setName(party.name ?? '');
     setRole('member');
+    setPicked({});
     setLink(null);
   }, [initial, party.email, party.name]);
 
   useEffect(() => { if (open) reset(); }, [open, reset]);
+
+  useEffect(() => {
+    if (!open) return;
+    workspaceManagementService.invitableRecords(workspaceId)
+      .then(setRecords)
+      .catch(() => setRecords([]));
+  }, [open, workspaceId]);
 
   useEffect(() => {
     if (!open || !party.companyId) { setStatus(null); return; }
@@ -124,7 +136,7 @@ export const InvitePartyDialog: React.FC<Props> = ({
   const pick = (o: Option) => {
     if (o.sends) { setDest(o.key); return; }
     onOpenChange(false);
-    navigate(o.key === 'trade_portal' ? `/crm/companies/${party.companyId}?tab=work` : '/projects');
+    navigate(`/crm/companies/${party.companyId}?tab=work`);
   };
 
   const send = async () => {
@@ -141,6 +153,17 @@ export const InvitePartyDialog: React.FC<Props> = ({
         toast({
           title: `Invitation sent to ${addr}`,
           description: 'They will see their own orders and invoices, and nothing else.',
+        });
+      } else if (dest === 'records') {
+        ({ url } = await workspaceManagementService.inviteAsGuest({
+          workspaceId, workspaceName, email: addr,
+          name: name.trim() || undefined,
+          crmContactId: party.contactId ?? undefined,
+          grants: Object.values(picked),
+        }));
+        toast({
+          title: `Invitation sent to ${addr}`,
+          description: `They get access to ${Object.keys(picked).length} record(s), and nothing else.`,
         });
       } else if (dest === 'my_workspace') {
         ({ url } = await workspaceManagementService.inviteByEmail({
@@ -253,6 +276,42 @@ export const InvitePartyDialog: React.FC<Props> = ({
             </div>
           )}
 
+          {dest === 'records' && (
+            <div className="space-y-2">
+              <Label>What may they see?</Label>
+              {records.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  Nothing to share yet — create a project or add a property first.
+                </p>
+              ) : (
+                <div className="max-h-56 space-y-1 overflow-y-auto rounded-sm border border-hairline p-2">
+                  {records.map((r) => {
+                    const key = `${r.record_type}:${r.record_id}`;
+                    return (
+                      <label key={key} className="flex cursor-pointer items-start gap-2 rounded-sm p-1.5 hover:bg-surface-sunken">
+                        <Checkbox
+                          checked={!!picked[key]}
+                          onCheckedChange={(v) => setPicked((prev) => {
+                            const next = { ...prev };
+                            if (v === true) next[key] = { record_type: r.record_type, record_id: r.record_id };
+                            else delete next[key];
+                            return next;
+                          })}
+                        />
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm">{r.title}</span>
+                          <span className="block text-xs text-muted-foreground">
+                            {r.record_type}{r.subtitle ? ` · ${r.subtitle}` : ''}
+                          </span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           {dest === 'own_workspace' && (
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
@@ -297,7 +356,12 @@ export const InvitePartyDialog: React.FC<Props> = ({
 
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>{link ? 'Done' : 'Cancel'}</Button>
-          <Button onClick={send} disabled={busy || !email.trim() || (dest === 'own_workspace' && alreadyRunning)}>
+          <Button
+            onClick={send}
+            disabled={busy || !email.trim()
+              || (dest === 'own_workspace' && alreadyRunning)
+              || (dest === 'records' && Object.keys(picked).length === 0)}
+          >
             {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
             {busy ? 'Sending…' : link ? 'Send again' : 'Send invitation'}
           </Button>

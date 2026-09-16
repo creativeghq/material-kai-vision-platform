@@ -59,6 +59,7 @@ describe('an invitation is minted and sent in one place', () => {
   it.each([
     ['inviteByEmail', 'create_workspace_invite'],
     ['inviteAsCustomer', 'create_workspace_invite'],
+    ['inviteAsGuest', 'create_workspace_invite'],
     ['inviteCompanyAsWorkspace', 'invite_crm_company_as_workspace'],
   ])('%s mints then sends — never one without the other', (method, rpc) => {
     const src = read(SERVICE);
@@ -76,8 +77,11 @@ describe('an invitation is minted and sent in one place', () => {
 });
 
 describe('an invite raised from a CRM record carries that record', () => {
-  it.each(['workspaceManagementService.inviteByEmail', 'workspaceManagementService.inviteCompanyAsWorkspace'])(
-    '%s passes crmContactId', (call) => {
+  it.each([
+    'workspaceManagementService.inviteByEmail',
+    'workspaceManagementService.inviteCompanyAsWorkspace',
+    'workspaceManagementService.inviteAsGuest',
+  ])('%s passes crmContactId', (call) => {
       expect(bodyOf(read(DIALOG), call)).toContain('crmContactId');
     });
 
@@ -99,7 +103,7 @@ describe('a buyer is not a team member', () => {
 
   it('every invite kind has its own copy, so no email describes the wrong grant', () => {
     const src = read(SERVICE);
-    for (const k of ['team:', 'owner:', 'customer:']) expect(src).toContain(k);
+    for (const k of ['team:', 'owner:', 'customer:', 'guest:']) expect(src).toContain(k);
     expect(src).toContain('INVITE_COPY');
   });
 
@@ -131,9 +135,19 @@ describe('there is ONE invite form', () => {
 
   it('the destination is chosen explicitly, never implied by which page opened it', () => {
     const src = read(DIALOG);
-    for (const d of ['customer', 'own_workspace', 'my_workspace', 'trade_portal', 'project']) {
+    for (const d of ['customer', 'own_workspace', 'my_workspace', 'records', 'trade_portal']) {
       expect(src).toContain(d);
     }
+  });
+
+  it('a record invitation that grants nothing cannot be sent', () => {
+    const src = read(DIALOG);
+    expect(src).toContain("dest === 'records' && Object.keys(picked).length === 0");
+  });
+
+  it('the pickable list comes from the server, not from what the client can read', () => {
+    expect(read(DIALOG)).toContain('invitableRecords');
+    expect(read(SERVICE)).toContain("rpc('invitable_records'");
   });
 
   it('only the team destination grants a seat in YOUR workspace', () => {

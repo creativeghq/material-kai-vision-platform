@@ -3,9 +3,24 @@ import { escapeHtml } from '@/utils/escapeHtml';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { WORKSPACE_ROLE_META, type WorkspaceInviteRole, type WorkspaceMemberRole } from '@/auth/workspaceRoles';
 
-export type InviteKind = 'team' | 'owner' | 'customer';
+export type InviteKind = 'team' | 'owner' | 'customer' | 'guest';
 
-export type InviteAccessKind = 'member' | 'customer';
+export type InviteAccessKind = 'member' | 'customer' | 'guest';
+
+export type GrantableRecordType = 'project' | 'property' | 'moodboard';
+
+export interface InvitableRecord {
+  record_type: GrantableRecordType;
+  record_id: string;
+  title: string;
+  subtitle: string | null;
+}
+
+export interface RecordGrant {
+  record_type: GrantableRecordType;
+  record_id: string;
+  role?: 'viewer' | 'editor' | 'owner';
+}
 
 /** A claimable (or historical) team invitation. */
 export interface WorkspaceInvite {
@@ -108,7 +123,10 @@ export const workspaceManagementService = {
   async createInvite(
     workspaceId: string,
     role: WorkspaceInviteRole,
-    opts?: { email?: string; name?: string; crmContactId?: string; accessKind?: InviteAccessKind },
+    opts?: {
+      email?: string; name?: string; crmContactId?: string;
+      accessKind?: InviteAccessKind; grants?: RecordGrant[];
+    },
   ): Promise<string> {
     const { data, error } = await supabase.rpc('create_workspace_invite', {
       p_workspace_id: workspaceId,
@@ -117,6 +135,7 @@ export const workspaceManagementService = {
       p_invitee_name: opts?.name ?? null,
       p_crm_contact_id: opts?.crmContactId ?? null,
       p_access_kind: opts?.accessKind ?? 'member',
+      p_grants: opts?.grants ?? null,
     } as never);
     if (error) throw error;
     return data as string;
@@ -138,6 +157,34 @@ export const workspaceManagementService = {
     return emitInvitation({
       code, email, kind: 'team', roleLabel: WORKSPACE_ROLE_META[input.role].label,
       role: input.role,
+      workspaceId: input.workspaceId,
+      workspaceName: input.workspaceName,
+    });
+  },
+
+  async invitableRecords(workspaceId: string): Promise<InvitableRecord[]> {
+    const { data, error } = await supabase.rpc('invitable_records', {
+      p_workspace_id: workspaceId,
+    } as never);
+    if (error) throw error;
+    return (data ?? []) as InvitableRecord[];
+  },
+
+  async inviteAsGuest(input: {
+    workspaceId: string;
+    workspaceName: string;
+    email: string;
+    name?: string;
+    crmContactId?: string;
+    grants: RecordGrant[];
+  }): Promise<{ code: string; url: string }> {
+    const email = input.email.trim().toLowerCase();
+    const code = await this.createInvite(input.workspaceId, 'member', {
+      email, name: input.name, crmContactId: input.crmContactId,
+      accessKind: 'guest', grants: input.grants,
+    });
+    return emitInvitation({
+      code, email, kind: 'guest',
       workspaceId: input.workspaceId,
       workspaceName: input.workspaceName,
     });
@@ -345,6 +392,15 @@ const INVITE_COPY: Record<InviteKind, {
     cta: 'Create my login',
     subject: (i, w) => `${i} set up ${w} for you`,
     lead: (w) => `set up <strong>${escapeHtml(w)}</strong> for you. Accept below to create your login and take ownership of it.`,
+  },
+  guest: {
+    roleLabel: 'Guest',
+    heading: 'Something has been shared with you',
+    portal: 'Shared with me',
+    portalDetail: 'Only what was shared with you, for as long as it is shared.',
+    cta: 'Open what was shared',
+    subject: (i, w) => `${i} shared something with you on ${w}`,
+    lead: (w) => `shared work with you on <strong>${escapeHtml(w)}</strong>. Accept below to see it.`,
   },
   customer: {
     roleLabel: 'Customer',
