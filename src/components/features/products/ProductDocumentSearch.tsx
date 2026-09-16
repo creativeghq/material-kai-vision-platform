@@ -16,10 +16,13 @@ import {
 interface Props {
   productId: string;
   workspaceId: string | null;
-  attachedDocCount: number;
+  searchableDocCount: number;
+  unreviewedDocCount?: number;
 }
 
-export function ProductDocumentSearch({ productId, workspaceId, attachedDocCount }: Props) {
+export function ProductDocumentSearch(
+  { productId, workspaceId, searchableDocCount, unreviewedDocCount = 0 }: Props,
+) {
   const [query, setQuery] = useState('');
   const [state, setState] = useState<DocSearchState>({ kind: 'idle' });
 
@@ -68,7 +71,7 @@ export function ProductDocumentSearch({ productId, workspaceId, attachedDocCount
     }
   }, [query, workspaceId, productId]);
 
-  const outcome = documentSearchOutcome(state, attachedDocCount);
+  const outcome = documentSearchOutcome(state, searchableDocCount, unreviewedDocCount);
   const busy = outcome.kind === 'searching';
 
   return (
@@ -80,13 +83,22 @@ export function ProductDocumentSearch({ productId, workspaceId, attachedDocCount
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void run(); } }}
           placeholder="Ask this product's documents — reaction to fire, slip rating, cleaning…"
           aria-label="Search this product's attached documents"
-          disabled={attachedDocCount === 0}
+          disabled={searchableDocCount === 0}
         />
-        <Button onClick={() => void run()} disabled={attachedDocCount === 0 || busy || !query.trim()}>
+        <Button onClick={() => void run()} disabled={searchableDocCount === 0 || busy || !query.trim()}>
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
           <span className="ml-2">Search</span>
         </Button>
       </div>
+
+      {outcome.kind === 'awaiting_review' && (
+        <p className="text-sm text-muted-foreground">
+          {outcome.count === 1 ? '1 document is' : `${outcome.count} documents are`} attached to
+          this product but still in draft. Catalogue documents are held unpublished until someone
+          reviews them, and retrieval cannot reach them until they are — so this is not a
+          statement that they say nothing.
+        </p>
+      )}
 
       {outcome.kind === 'no_documents' && (
         <p className="text-sm text-muted-foreground">

@@ -244,6 +244,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const [images, setImages] = useState<any[]>([]);
   const [isLoadingImages, setIsLoadingImages] = useState(true);
   const [chunks, setChunks] = useState<any[]>([]);
+  const [kbDraftCount, setKbDraftCount] = useState(0);
   // Knowledge base docs attached to this product (via kb_doc_attachments)
   const [kbDocs, setKbDocs] = useState<Array<{
     id: string;
@@ -437,12 +438,16 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
         if (error) {
           console.error('[ProductDetailModal] loadKbDocs error:', error);
-          setKbDocs([]);
+          setKbDocs([]); setKbDraftCount(0);
           return;
         }
 
-        const loaded = (data || [])
-          .filter((row: any) => row.kb_docs && row.kb_docs.status === 'published')
+        const attached = (data || []).filter((row: any) => row.kb_docs);
+        // Catalogue-derived docs are born draft by design (#31 M17-2), and retrieval
+        // cannot reach them. Dropping them silently reads as "no documents".
+        setKbDraftCount(attached.filter((row: any) => row.kb_docs.status !== 'published').length);
+        const loaded = attached
+          .filter((row: any) => row.kb_docs.status === 'published')
           .map((row: any) => ({
             id: row.kb_docs.id,
             title: row.kb_docs.title,
@@ -455,7 +460,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         setKbDocs(loaded);
       } catch (err) {
         console.error('[ProductDetailModal] loadKbDocs exception:', err);
-        setKbDocs([]);
+        setKbDocs([]); setKbDraftCount(0);
       }
     };
     loadKbDocs();
@@ -2736,7 +2741,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           <ProductDocumentSearch
             productId={product.id}
             workspaceId={activeWorkspaceId}
-            attachedDocCount={kbDocs.length}
+            searchableDocCount={kbDocs.length}
+            unreviewedDocCount={kbDraftCount}
           />
           {kbDocs.length === 0 ? (
             <Card>
