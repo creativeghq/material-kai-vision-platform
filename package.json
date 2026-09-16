@@ -27,7 +27,7 @@
     "openapi:edge": "node scripts/build-openapi-edge.mjs",
     "tools:manifest": "node scripts/gen-tool-manifest.mjs",
     "skills:sync": "node scripts/gen-skill-ts.mjs",
-    "gen:all": "npm run tools:manifest && npm run skills:sync && npm run blueprint:mirror && npm run finance:mirror && npm run vocab:mirror && npm run api:catalog && npm run crm:translit-sql",
+    "gen:all": "npm run tools:manifest && npm run skills:sync && npm run blueprint:mirror && npm run finance:mirror && npm run vocab:mirror && npm run api:catalog && npm run rpc:catalog && npm run crm:translit-sql",
     "build:embed": "vite build --config vite.embed.config.ts",
     "models:generate": "node scripts/gen-generation-models.mjs",
     "categories:generate": "node scripts/gen-category-vocab.mjs",
@@ -38,7 +38,8 @@
     "probe:live": "node scripts/probe-live-frontend.mjs",
     "prune:vercel": "node scripts/prune-vercel-deployments.mjs",
     "mydata:exemptions": "node scripts/gen-mydata-exemption-grounds.mjs",
-    "api:catalog": "node scripts/gen-platform-api-catalog.mjs"
+    "api:catalog": "node scripts/gen-platform-api-catalog.mjs",
+    "rpc:catalog": "node scripts/gen-platform-rpc-catalog.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

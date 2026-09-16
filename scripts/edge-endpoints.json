@@ -858,7 +858,15 @@
     ],
     "actions": [],
     "request": [],
-    "response": "{}"
+    "response": "{}",
+    "routes": [
+      "companies",
+      "contacts",
+      "users",
+      "stripe",
+      "address-units",
+      "google-business"
+    ]
   },
   {
     "name": "crm-company-embedding-backfill",
@@ -2721,7 +2729,21 @@
         "params": [],
         "response": "{ok:true, advanced:number, finished:number}"
       }
-    ]
+    ],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "action": {
+          "type": "string",
+          "required": true,
+          "enum": [
+            "crawl-start",
+            "crawl-sync"
+          ],
+          "description": "Which operation to run."
+        }
+      }
+    }
   },
   {
     "name": "seo-content-freshness",
@@ -2865,7 +2887,28 @@
         "params": [],
         "response": "{ ok, sites: [{ website_id, inspected, failed, quota_used_today, quota_remaining, budget_exhausted, queue_remaining } | { website_id, error }] }"
       }
-    ]
+    ],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "action": {
+          "type": "string",
+          "required": true,
+          "enum": [
+            "authorize",
+            "list_properties",
+            "set_property",
+            "ga_list_properties",
+            "ga_set_property",
+            "ga_sync",
+            "inspect_urls",
+            "sync",
+            "disconnect"
+          ],
+          "description": "Which operation to run."
+        }
+      }
+    }
   },
   {
     "name": "generate-quote-pdf",
@@ -4996,32 +5039,30 @@
     "actions": [
       "creds-status"
     ],
-    "request": [
-      {
-        "name": "afm",
-        "type": "string",
-        "required": true,
-        "desc": "Greek ΑΦΜ — 9 digits (non-digit characters stripped)"
-      },
-      {
-        "name": "company_id",
-        "type": "string",
-        "required": false,
-        "desc": "crm_companies.id — enables cache check and result write-back for authorized callers"
-      },
-      {
-        "name": "workspace_id",
-        "type": "string",
-        "required": false,
-        "desc": "Active workspace for cache write-back authorization"
-      },
-      {
-        "name": "reason",
-        "type": "string",
-        "required": false,
-        "desc": "Optional audit note for the lookup"
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "creds-status"
+          ],
+          "description": "Omit to run a lookup; creds-status reports whether credentials are set."
+        },
+        "afm": {
+          "type": "string",
+          "description": "Greek VAT number (ΑΦΜ) to look up, digits only."
+        },
+        "company_id": {
+          "type": "string",
+          "description": "Existing CRM company to enrich instead of passing an afm."
+        },
+        "workspace_id": {
+          "type": "string",
+          "description": "Workspace the company belongs to."
+        }
       }
-    ],
+    },
     "response": "{ ok, source:'gemi'|'cache', checked_at, gemi:{arGemi,afm,coNameEl,city,street,streetNumber,zipCode,legalType:{id,descr},status:{id,descr},gemiOffice:{id,descr},incorporationDate,isBranch,activities:[...]} }"
   },
   {
@@ -5432,7 +5473,27 @@
         ],
         "response": "{data: quote_request}"
       }
-    ]
+    ],
+    "routes": [
+      "quote-requests"
+    ],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "quote_id": {
+          "type": "string",
+          "description": "Quote request id, for GET/PATCH on quote-requests/{id}."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Free-text notes when raising a quote request."
+        },
+        "status": {
+          "type": "string",
+          "description": "New status, on PATCH quote-requests/{id}."
+        }
+      }
+    }
   },
   {
     "name": "recommendations-api",
@@ -5582,8 +5643,34 @@
         "response": "{message:'Cache invalidated successfully'}"
       }
     ],
-    "request": [],
-    "response": "{}"
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "workspace_id": {
+          "type": "string",
+          "required": true,
+          "description": "Workspace the interaction belongs to."
+        },
+        "material_id": {
+          "type": "string",
+          "required": true,
+          "description": "Material the user interacted with."
+        },
+        "interaction_type": {
+          "type": "string",
+          "required": true,
+          "description": "Kind of interaction; the endpoint validates against its own list."
+        },
+        "interaction_value": {
+          "type": "number",
+          "description": "Weight of the interaction. Defaults to 1.0."
+        }
+      }
+    },
+    "response": "{}",
+    "routes": [
+      "track-interaction"
+    ]
   },
   {
     "name": "reset-platform",
@@ -6078,14 +6165,31 @@
         "response": "{success: boolean, url: string, fetched: {title, description, http_status, word_count}, keyword: string, keyword_source: string, analysis: ContentAnalysisResult, checks_skipped: string[], credits_charged: number}"
       }
     ],
-    "request": [
-      {
-        "name": "action",
-        "type": "string",
-        "required": true,
-        "desc": "One of: research | plan | write | analyze | pipeline | toolkit_audit | toolkit_research | page_ideas | apply_fix | revert_fix | reanalyze | add_faq"
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "action": {
+          "type": "string",
+          "required": true,
+          "enum": [
+            "research",
+            "plan",
+            "write",
+            "analyze",
+            "pipeline",
+            "toolkit_audit",
+            "toolkit_research",
+            "page_ideas",
+            "apply_fix",
+            "revert_fix",
+            "reanalyze",
+            "add_faq",
+            "score_url"
+          ],
+          "description": "Which operation to run."
+        }
       }
-    ],
+    },
     "response": "{success: boolean, data: object}"
   },
   {
@@ -8609,7 +8713,22 @@
         ],
         "response": "{success, pdf_url, pdf_storage_path}"
       }
-    ]
+    ],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "action": {
+          "type": "string",
+          "required": true,
+          "enum": [
+            "upload_receipt",
+            "sign_receipt",
+            "generate_pdf"
+          ],
+          "description": "Which operation to run."
+        }
+      }
+    }
   },
   {
     "name": "supplier-orders-api",
@@ -11042,7 +11161,20 @@
         "response": "{ok:boolean, order_id?:string, repriced?:[{description,old_unit_price,new_unit_price,changed}], error?:string}"
       }
     ],
-    "request": [],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "action": {
+          "type": "string",
+          "required": true,
+          "enum": [
+            "order_detail",
+            "reorder"
+          ],
+          "description": "Which operation to run."
+        }
+      }
+    },
     "response": "{}"
   },
   {
@@ -11238,7 +11370,28 @@
         "response": "{ quote_id }"
       }
     ],
-    "request": [],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "action": {
+          "type": "string",
+          "required": true,
+          "enum": [
+            "create-from-blueprint",
+            "create-plan-from-kitchen-estimate",
+            "rescale",
+            "reprice",
+            "save-version",
+            "restore-version",
+            "create-quote-from-plan",
+            "add-section-from-blueprint",
+            "generate-material-list",
+            "create-change-order"
+          ],
+          "description": "Which operation to run."
+        }
+      }
+    },
     "response": "{}"
   },
   {
@@ -11601,7 +11754,52 @@
         "description": "Dismiss a pending change.",
         "params": []
       }
-    ]
+    ],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "action": {
+          "type": "string",
+          "required": true,
+          "enum": [
+            "overview",
+            "valuation",
+            "list-warehouses",
+            "ensure-default-warehouse",
+            "create-warehouse",
+            "list-items",
+            "list-low-stock",
+            "create-item",
+            "update-item",
+            "delete-item",
+            "adjust-stock",
+            "transfer",
+            "forecast",
+            "ai-forecast",
+            "reorder",
+            "import-opening-stock",
+            "list-movements",
+            "list-counts",
+            "get-count",
+            "create-count",
+            "update-count-line",
+            "post-count",
+            "cancel-count",
+            "shipment-list",
+            "shipment-add",
+            "shipment-refresh",
+            "shipping-quotes-list",
+            "shipping-quote",
+            "shipment-remove",
+            "shipment-receive",
+            "list-pending",
+            "approve-pending",
+            "dismiss-pending"
+          ],
+          "description": "Which operation to run."
+        }
+      }
+    }
   },
   {
     "name": "viva-webhooks",
@@ -13709,7 +13907,115 @@
         "response": "{ok:true, sent_to:string}"
       }
     ],
-    "response": "{ ok, ...action-specific payload } | { error }"
+    "response": "{ ok, ...action-specific payload } | { error }",
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "action": {
+          "type": "string",
+          "required": true,
+          "enum": [
+            "ping",
+            "dashboard",
+            "list-properties",
+            "get-property",
+            "create-property",
+            "update-property",
+            "delete-property",
+            "publish-property",
+            "draft-description",
+            "unpublish-property",
+            "photo-upload-url",
+            "add-photo",
+            "list-bookings",
+            "upsert-booking",
+            "delete-booking",
+            "upsert-booking-task",
+            "upsert-channel-link",
+            "rotate-ical-token",
+            "update-tenancy-lifecycle",
+            "rotate-tenant-portal-token",
+            "list-inspections",
+            "upsert-inspection",
+            "kyc-status",
+            "upsert-kyc-check",
+            "update-kyc-policy",
+            "list-commission-splits",
+            "upsert-commission-split",
+            "delete-commission-split",
+            "agent-commission-statement",
+            "list-routing-rules",
+            "upsert-routing-rule",
+            "delete-routing-rule",
+            "import-listings",
+            "listing-performance",
+            "document-upload-url",
+            "add-document",
+            "list-documents",
+            "delete-document",
+            "upsert-open-house",
+            "delete-open-house",
+            "analyze-photos",
+            "delete-photo",
+            "set-cover",
+            "reorder-photos",
+            "list-inquiries",
+            "convert-inquiry",
+            "update-inquiry",
+            "create-inquiry",
+            "delete-inquiry",
+            "delete-offer",
+            "delete-viewing",
+            "delete-tenancy",
+            "delete-maintenance",
+            "delete-sale",
+            "delete-investment",
+            "delete-contact-ext",
+            "list-viewings",
+            "create-viewing",
+            "update-viewing",
+            "add-interest",
+            "list-offers",
+            "create-offer",
+            "update-offer",
+            "accept-offer",
+            "complete-sale",
+            "list-sales",
+            "link-sale-invoice",
+            "contact-properties",
+            "list-sellers",
+            "list-buyer-requirements",
+            "upsert-buyer-requirement",
+            "match-buyer-requirement",
+            "buyers-for-property",
+            "delete-buyer-requirement",
+            "get-contact-ext",
+            "upsert-contact-ext",
+            "get-feed-settings",
+            "update-feed-settings",
+            "rotate-feed-token",
+            "rotate-inbound-token",
+            "list-tenancies",
+            "upsert-tenancy",
+            "list-rent-charges",
+            "generate-rent-schedule",
+            "mark-rent-paid",
+            "list-maintenance",
+            "upsert-maintenance",
+            "landlord-statement",
+            "get-investment",
+            "upsert-investment",
+            "list-investments",
+            "invoice-rent-charge",
+            "renew-tenancy",
+            "cma-report",
+            "vendor-report",
+            "send-vendor-report"
+          ],
+          "description": "Which operation to run."
+        }
+      }
+    }
   },
   {
     "name": "real-estate-public",
@@ -14286,7 +14592,29 @@
         "description": "Cron only. Sweeps products at taric_status=pending for supplier-declared codes. Body: mode=backfill, limit, llm=false.",
         "params": []
       }
-    ]
+    ],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "product_ids": {
+          "type": "array",
+          "required": true,
+          "description": "Products to classify. The backfill sweep is cron-only."
+        },
+        "chapters": {
+          "type": "array",
+          "description": "Narrow the shortlist to these 2-digit HS chapters."
+        },
+        "force": {
+          "type": "boolean",
+          "description": "Re-classify products that already carry a code or suggestion."
+        },
+        "llm": {
+          "type": "boolean",
+          "description": "Allow the paid stage C. Defaults true for an operator call."
+        }
+      }
+    }
   },
   {
     "name": "bank-statement-import",
@@ -14847,7 +15175,34 @@
         ],
         "response": "{success, signed_url}"
       }
-    ]
+    ],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "action": {
+          "type": "string",
+          "required": true,
+          "enum": [
+            "scan",
+            "attach_bill",
+            "sign_bill"
+          ],
+          "description": "Which operation to run."
+        },
+        "workspace_id": {
+          "type": "string",
+          "description": "Workspace the receipt belongs to."
+        },
+        "data_base64": {
+          "type": "string",
+          "description": "The receipt image or PDF, base64 encoded."
+        },
+        "content_type": {
+          "type": "string",
+          "description": "MIME type of data_base64, e.g. image/jpeg."
+        }
+      }
+    }
   },
   {
     "name": "project-assessment",
@@ -15603,20 +15958,24 @@
     "methods": [
       "POST"
     ],
-    "request": [
-      {
-        "name": "action",
-        "type": "string",
-        "required": true,
-        "desc": "`list` (the caller's owned properties) or `get` (one of them)"
-      },
-      {
-        "name": "property_id",
-        "type": "string (uuid)",
-        "required": false,
-        "desc": "Required for `get`. Must be a property the caller holds an owner grant on, else 404"
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "action": {
+          "type": "string",
+          "required": true,
+          "enum": [
+            "list",
+            "get"
+          ],
+          "description": "list = every property this owner was granted; get = one of them in full."
+        },
+        "property_id": {
+          "type": "string",
+          "description": "Required for get. Must be a property the signed-in user holds an owner grant on."
+        }
       }
-    ],
+    },
     "response": "{ properties } | { property, performance, enquiries, viewings, offers, price_history, management, management_available } | { error }"
   }
 ]

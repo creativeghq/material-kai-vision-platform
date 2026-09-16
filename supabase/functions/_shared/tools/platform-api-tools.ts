@@ -58,6 +58,22 @@ function capResult(value: unknown): { result: unknown; truncated?: string } {
   };
 }
 
+/**
+ * The sub-path for an endpoint that routes on the URL rather than on a body action.
+ *
+ * @remarks This is a SECURITY boundary, not tidying. The name is checked against the catalogue,
+ * so the block list holds — but the path is appended to the same URL, and `../agent-chat` would
+ * walk straight out of the endpoint the check approved. Segments only, no traversal, no scheme.
+ */
+function cleanPath(raw: unknown): { path: string } | { error: string } {
+  const v = String(raw ?? '').trim().replace(/^\/+|\/+$/g, '');
+  if (!v) return { path: '' };
+  if (!/^[A-Za-z0-9._~-]+(?:\/[A-Za-z0-9._~-]+)*$/.test(v) || v.split('/').some((s) => s === '..')) {
+    return { error: `"${raw}" is not a valid path. Use plain segments like "companies/list".` };
+  }
+  return { path: v };
+}
+
 /** Score an endpoint against a free-text need. Name and tag beat prose. */
 function score(endpoint: PlatformApiEndpoint, terms: string[]): number {
   const name = endpoint.name.toLowerCase();
@@ -80,6 +96,10 @@ function describe(endpoint: PlatformApiEndpoint, access: ReturnType<typeof platf
     summary: endpoint.summary,
     description: endpoint.description,
     body_fields: endpoint.fields,
+    // A path-routed endpoint answers 400 from its router before it ever reads the body, so
+    // "which sub-path" is not a detail — without it there is no working call to make.
+    routes: endpoint.routes,
+    path_required: endpoint.routes ? 'Pass one of `routes` as `path` on call_platform_api.' : undefined,
     // Said up front so the model plans around it rather than discovering it on refusal.
     needs_approval: access.access === 'confirm' ? access.reason : undefined,
     unavailable: access.access === 'blocked' ? access.reason : undefined,
@@ -171,7 +191,7 @@ export const createCallPlatformApiTool = (
   onChunk?: (chunk: AnyRow) => void,
 ) => {
   return tool(
-    async ({ endpoint, method = 'POST', body, reason, confirm }: AnyRow) => {
+    async ({ endpoint, path, method = 'POST', body, reason, confirm }: AnyRow) => {
       const name = String(endpoint ?? '').trim();
       if (!name) return JSON.stringify({ success: false, error: 'Name the endpoint to call.' });
 
@@ -202,6 +222,9 @@ export const createCallPlatformApiTool = (
             + 'for another endpoint that does the same thing.',
         });
       }
+
+      const sub = cleanPath(path);
+      if ('error' in sub) return JSON.stringify({ success: false, endpoint: name, error: sub.error });
 
       const verb = String(method || 'POST').toUpperCase();
       if (!known.methods.includes(verb)) {
@@ -259,7 +282,8 @@ export const createCallPlatformApiTool = (
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), CALL_TIMEOUT_MS);
       try {
-        const url = `${supabaseUrl()}/functions/v1/${name}${search ? `?${search}` : ''}`;
+        const suffix = sub.path ? `/${sub.path}` : '';
+        const url = `${supabaseUrl()}/functions/v1/${name}${suffix}${search ? `?${search}` : ''}`;
         const resp = await fetch(url, {
           method: verb,
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}` },
@@ -319,6 +343,7 @@ export const createCallPlatformApiTool = (
         + 'never pass confirm yourself, the approval card sets it.',
       schema: z.object({
         endpoint: z.string().describe('The endpoint name from discover_platform_api, e.g. "crm-api".'),
+        path: z.string().optional().describe('Sub-path for an endpoint that lists routes, e.g. "companies" on crm-api. Omit unless discover_platform_api showed routes.'),
         method: z.string().optional().describe('HTTP method (default POST). Must be one the endpoint lists.'),
         body: z.record(z.any()).optional().describe('JSON body, built from the endpoint\'s listed fields.'),
         reason: z.string().optional().describe('One line on what the user asked for — shown on the approval card.'),

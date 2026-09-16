@@ -27,7 +27,7 @@ export interface ToolkitCluster {
 export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
   'platform-api': {
     alwaysOn: true,
-    tool_ids: ['discover_platform_api', 'call_platform_api'],
+    tool_ids: ['discover_platform_api', 'call_platform_api', 'discover_platform_data', 'call_platform_rpc'],
   },
   'core': {
     alwaysOn: true,

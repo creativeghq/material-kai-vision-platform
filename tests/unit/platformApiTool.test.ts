@@ -97,9 +97,8 @@ describe('nothing joins the agent\'s reach unclassified', () => {
   });
 
   it('an action DISPATCHER is not classified as if it were one action', () => {
-    // A proxy over another backend's action vocabulary cannot be judged by one verdict here, so
-    // blocking named bulk endpoints one at a time while leaving the dispatcher open is a gate
-    // with a door beside it.
+    // One verdict cannot judge a proxy over another backend's whole action vocabulary, so
+    // leaving the dispatcher open is a gate with a door beside it.
     expect(platformApiAccess('mivaa-gateway').access).toBe('blocked');
   });
 
@@ -161,8 +160,7 @@ describe('the call acts as the user, and says so when it cannot', () => {
   });
 
   it('a large result is capped AND says it was capped', () => {
-    // Silently truncating hands the model a list it believes is complete — "you have 3 suppliers"
-    // built from the first 3 of 300.
+    // Truncating hands the model "you have 3 suppliers" built from the first 3 of 300.
     expect(src).toContain('MAX_RESULT_CHARS');
     const cap = src.slice(src.indexOf('function capResult'));
     expect(cap.slice(0, 600)).toMatch(/truncated:/);
@@ -252,9 +250,8 @@ describe('the fallback is reachable and renders', () => {
   });
 
   it('an area the model paraphrases narrows, it never empties', () => {
-    // "Invoicing" for the real tag "Finance" would otherwise empty the pool, and the empty
-    // branch tells the model to say the capability does not exist — a confident wrong answer,
-    // which is the exact failure this tool exists to remove.
+    // "Invoicing" for the real tag "Finance" empties the pool, and the empty branch tells the
+    // model the capability does not exist — the exact failure this tool exists to remove.
     const discover = src.slice(src.indexOf('createDiscoverPlatformApiTool'), src.indexOf('createCallPlatformApiTool'));
     expect(discover).toMatch(/return scoped\.length \? scoped : all/);
   });
@@ -273,5 +270,62 @@ describe('the fallback is reachable and renders', () => {
     expect(discover).toContain('platformApiAccess(e.name)');
     expect(src).toMatch(/unavailable:/);
     expect(src).toMatch(/needs_approval:/);
+  });
+});
+
+describe('an endpoint that routes on the URL is actually callable', () => {
+  const tool = code(TOOL);
+
+  it('the tool can express a sub-path at all', () => {
+    // crm-api answered 400 from its own router on every call, and no body could have fixed it.
+    expect(tool).toMatch(/path: z\.string\(\)\.optional\(\)/);
+    expect(tool).toMatch(/\$\{name\}\$\{suffix\}/);
+  });
+
+  it('a path cannot walk out of the endpoint the block list approved', () => {
+    // The name is checked, the path is appended to the same URL: without a traversal check
+    // `path: '../agent-chat'` reaches a blocked endpoint through an allowed one.
+    const fn = tool.slice(tool.indexOf('function cleanPath'));
+    expect(fn).toContain("some((s) => s === '..')");
+    expect(fn).toMatch(/\[A-Za-z0-9\._~-\]/);
+  });
+
+  it('every path-routed endpoint in the catalogue declares its routes', () => {
+    const catalog = buildCatalog();
+    const byName = new Map(catalog.map((e: { name: string }) => [e.name, e]));
+    for (const name of ['crm-api', 'quotes-api', 'recommendations-api']) {
+      const entry = byName.get(name) as { routes?: string[] } | undefined;
+      expect(entry, `${name} left the catalogue`).toBeTruthy();
+      expect(entry?.routes?.length, `${name} routes on its path but lists no routes`).toBeGreaterThan(0);
+    }
+  });
+
+  it('discovery tells the model the path is required', () => {
+    expect(tool).toContain('routes: endpoint.routes');
+    expect(tool).toContain('path_required');
+  });
+});
+
+describe('an open endpoint says what its body is', () => {
+  it('leaves at most one open endpoint undescribed, and names it', () => {
+    const catalog = buildCatalog() as Array<{ name: string; fields?: object; routes?: string[] }>;
+    const open = catalog.filter((e) => platformApiAccess(e.name).access === 'open');
+    const bare = open
+      .filter((e) => !e.routes && (!e.fields || !Object.keys(e.fields).length))
+      .map((e) => e.name);
+    expect(bare).toEqual(['health-check']);
+  });
+
+  it('a scheduled sweep is not something the agent starts early', () => {
+    for (const name of ['seo-rank-tracker', 'seo-domain-tracker', 'seo-content-freshness', 'seo-reports']) {
+      expect(platformApiAccess(name).access, name).toBe('blocked');
+    }
+  });
+
+  it('an action enum is big enough to cover the endpoints that need it', () => {
+    const catalog = buildCatalog() as Array<{ name: string; fields?: Record<string, { enum?: string[] }> }>;
+    const find = (n: string) => catalog.find((e) => e.name === n)?.fields?.action?.enum?.length ?? 0;
+    expect(find('real-estate-api')).toBeGreaterThan(50);
+    expect(find('stock-api')).toBeGreaterThan(25);
   });
 });

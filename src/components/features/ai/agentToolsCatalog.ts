@@ -1342,10 +1342,11 @@ export const TOOLKITS: ToolkitDefinition[] = [
     description:
       'The rest of the platform. When no dedicated tool covers what you asked for, the assistant '
       + 'looks for one of the platform\'s own API endpoints and calls it as you — so a capability '
-      + 'nobody wrapped in a tool yet is still reachable.',
+      + 'nobody wrapped in a tool yet is still reachable. It also reads the figures the platform '
+      + 'already works out, so a number it can compute is never a number it cannot tell you.',
     icon: 'Plug',
     alwaysOn: true,
-    tool_ids: ['discover_platform_api', 'call_platform_api'],
+    tool_ids: ['discover_platform_api', 'call_platform_api', 'discover_platform_data', 'call_platform_rpc'],
     quick_starts: [
       {
         label: 'What else can you do?', description: 'Search the platform API for a capability', icon: 'Search',

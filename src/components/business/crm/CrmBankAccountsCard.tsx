@@ -12,7 +12,7 @@ import {
   type CrmBankAccount, type CrmBankAccountInput, type CrmBankAccountSuggestion,
 } from '@/services/crm.service';
 import { isValidIban, normalizeIban } from '@/utils/iban';
-import { BANK_NAMES, bankFromIban, normalizeBankName } from '@/config/bankVocabulary';
+import { BANKS, bankFromIban, normalizeBankName } from '@/config/bankVocabulary';
 import { callRevolutApi, getRevolutStatus } from '@/modules/banking-revolut/services/revolutConfigService';
 
 interface Props {
@@ -259,7 +259,7 @@ export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, c
             placeholder="Pick a bank, or type one"
           />
           <datalist id="crmb-bank-names">
-            {BANK_NAMES.map((b) => <option key={b} value={b} />)}
+            {BANKS.map((b) => <option key={b.name} value={b.name}>{b.country ?? ''}</option>)}
           </datalist>
         </div>
         <div className="space-y-1.5">
