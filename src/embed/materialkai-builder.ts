@@ -28,6 +28,8 @@ const STYLE = `
 .viewport materialkai-product { display:block; width:100%; }
 .viewport[data-mode="shelf"] { background:transparent; aspect-ratio:auto; overflow:visible; }
 .shelf { display:grid; grid-template-columns:repeat(auto-fill,minmax(88px,1fr)); gap:8px; }
+.shelfSearch { margin-bottom:8px; }
+.shelfNote { font-size:12px; opacity:.75; padding:6px 2px; }
 .shelfItem { font:inherit; display:grid; gap:5px; padding:6px; border:1px solid #e3ddd2; border-radius:9px;
              background:#fff; color:inherit; cursor:pointer; text-align:left; font-size:12px; }
 .shelfItem img { width:100%; aspect-ratio:1/1; object-fit:cover; border-radius:6px; display:block; }
@@ -94,6 +96,10 @@ export class MaterialKaiBuilder extends HTMLElement {
    * the product widget, which is the fastest path to the thing most visitors actually came for.
    */
   private shelf: Array<{ product_id: string; name: string; image: string | null }> = [];
+  private shelfQuery = '';
+  private shelfFailed = false;
+  private shelfTimer: ReturnType<typeof setTimeout> | null = null;
+  private restoreShelfFocus = false;
   private spec: Record<string, string> = {};
   private stage: 1 | 2 | 3 = 1;
   private result: ResolveResult | null = null;
@@ -177,8 +183,11 @@ export class MaterialKaiBuilder extends HTMLElement {
 
   /** The merchant's published products, for the opening frame. */
   private async loadShelf() {
+    const extra: Record<string, string | number> = { limit: 12 };
+    if (this.shelfQuery) extra.q = this.shelfQuery;
     try {
-      const res = await fetch(this.url('list', { limit: 12 }));
+      const res = await fetch(this.url('list', extra));
+      if (!res.ok) throw new Error(String(res.status));
       const body = await res.json();
       const rows = Array.isArray(body?.products) ? body.products : [];
       this.shelf = rows
@@ -188,11 +197,22 @@ export class MaterialKaiBuilder extends HTMLElement {
           image: Array.isArray(p.images) && p.images.length ? String(p.images[0]) : null,
         }))
         .filter((p: { product_id: string }) => p.product_id);
+      this.shelfFailed = false;
     } catch {
-      // A shelf that will not load is not an error the visitor needs — the wizard still works.
+      // An empty grid would claim the catalogue is empty. Record WHICH happened.
       this.shelf = [];
+      this.shelfFailed = true;
     }
     this.render();
+  }
+
+  private onShelfQuery(value: string) {
+    this.shelfQuery = value.trim();
+    if (this.shelfTimer) clearTimeout(this.shelfTimer);
+    this.shelfTimer = setTimeout(() => {
+      this.restoreShelfFocus = true;
+      void this.loadShelf();
+    }, 250);
   }
 
   private choose(key: string, value: string) {
@@ -368,8 +388,40 @@ export class MaterialKaiBuilder extends HTMLElement {
     // here" is the emptiness this whole surface was criticised for, and the catalogue API was
     // sitting right there unused. Picking one is the deep-link path, so a visitor who recognises
     // what they want skips the wizard entirely.
-    if (!this.generating && this.shelf.length > 0) {
+    if (!this.generating && (this.shelf.length > 0 || this.shelfQuery || this.shelfFailed)) {
       frame.dataset.mode = 'shelf';
+
+      const search = document.createElement('input');
+      search.className = 'shelfSearch';
+      search.type = 'search';
+      search.placeholder = 'Search the catalogue…';
+      search.setAttribute('aria-label', 'Search the catalogue');
+      search.value = this.shelfQuery;
+      search.addEventListener('input', () => this.onShelfQuery(search.value));
+      frame.appendChild(search);
+      if (this.restoreShelfFocus) {
+        this.restoreShelfFocus = false;
+        setTimeout(() => {
+          search.focus();
+          search.setSelectionRange(search.value.length, search.value.length);
+        }, 0);
+      }
+
+      if (this.shelfFailed) {
+        const note = document.createElement('div');
+        note.className = 'shelfNote';
+        note.textContent = 'The catalogue could not be loaded — this is not a statement that it is empty.';
+        frame.appendChild(note);
+        return frame;
+      }
+      if (this.shelf.length === 0) {
+        const note = document.createElement('div');
+        note.className = 'shelfNote';
+        note.textContent = `Nothing in this catalogue matches “${this.shelfQuery}”.`;
+        frame.appendChild(note);
+        return frame;
+      }
+
       const grid = document.createElement('div');
       grid.className = 'shelf';
       for (const p of this.shelf.slice(0, 8)) {

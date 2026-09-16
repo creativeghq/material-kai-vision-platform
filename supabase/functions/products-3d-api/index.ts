@@ -326,14 +326,26 @@ Deno.serve(withApiLogging((req) => {
     const offset = Math.max(Number(params.offset) || 0, 0);
     // `only_3d=true` powers a shelf of just the models — the common embed case.
     const only3d = String(params.only_3d ?? '') === 'true';
+    const q = String(params.q ?? '').trim();
 
-    // The 3D filter is applied IN the query, not to the page after it.
-    //
-    // Filtering afterwards silently returns short pages: ask for 24 and get however many of those
-    // 24 happened to have a model, with no way for the caller to tell "that's all there is" from
-    // "that page was thin". Resolving the model-bearing ids first makes `range()` mean what it
-    // says. The id list is small in practice — models are hand-uploaded per product (M0) — and
-    // capped so a very large catalog degrades into a long URL rather than a failed request.
+    let matchedIds: string[] | null = null;
+    if (q) {
+      // PostgREST parses `or` as an EXPRESSION: these characters change which rows come back
+      // rather than being matched. Not an HTML escape — a different contract.
+      const safe = q.replace(/[,.()\\:"*%]/g, ' ').trim();
+      if (!safe) return embedJson({ ok: true, products: [] }, 200, cors);
+      const { data: hits } = await supabase
+        .from('products')
+        .select('id')
+        .eq('workspace_id', workspaceId)
+        .or(`name.ilike.%${safe}%,description.ilike.%${safe}%,sku.ilike.%${safe}%`)
+        .limit(MAX_MODEL_ID_FILTER);
+      matchedIds = [...new Set((hits ?? []).map((h: any) => h.id as string))];
+    }
+
+    // Resolved to ids and filtered IN the query: filtering the page afterwards returns short
+    // pages a caller cannot tell from the end of the catalogue. Capped, so a very large
+    // catalogue degrades into a long URL rather than a failed request.
     let modelledIds: string[] | null = null;
     if (only3d) {
       const { data: modelled } = await supabase
@@ -348,7 +360,9 @@ Deno.serve(withApiLogging((req) => {
     // The key's scope and the caller's only_3d are both id restrictions; `null` from either means
     // "did not restrict". Intersecting them keeps the scope authoritative — a caller cannot widen
     // past it, only narrow further.
-    const restrictIds = intersectIdFilters(await scopeRestriction(supabase, auth.ctx), modelledIds);
+    const restrictIds = intersectIdFilters(
+      await scopeRestriction(supabase, auth.ctx), modelledIds, matchedIds,
+    );
     if (restrictIds !== null && restrictIds.length === 0) {
       return embedJson({ ok: true, products: [] }, 200, cors);
     }
