@@ -244,7 +244,7 @@ describe('#363 EE-13/14/18/19 — the crawler', () => {
   it('stores the discovered sitemap only after it yields URLs', () => {
     // Store-then-validate left an unvalidated, attacker-chosen URL in user_websites for any
     // later consumer that does not re-check it.
-    const body = functionBody(src, 'crawlOneWebsite');
+    const body = functionBody(src, 'planCrawl');
     const store = body.indexOf("update({ sitemap_url: sitemapUrl })");
     const collect = body.indexOf('collectSitemapUrls');
     expect(store).toBeGreaterThan(-1);
@@ -253,10 +253,10 @@ describe('#363 EE-13/14/18/19 — the crawler', () => {
   });
 
   it('does not report a crawl whose writes all failed as successful', () => {
-    const body = functionBody(src, 'crawlOneWebsite');
+    const body = functionBody(src, 'executeCrawl');
     expect(body).toContain('writeFailures');
     expect(body).toContain('allWritesFailed');
-    expect(stripComments(body)).not.toMatch(/return \{ ok: true, pages_indexed: indexed, pages_discovered: urls\.length \};/);
+    expect(stripComments(body)).not.toMatch(/ok: true,/);
   });
 });
 
