@@ -24,7 +24,7 @@ Home is **Profile → Websites** (`ConnectedWebsitesTab` → `WebsiteSeoDashboar
 | **Articles** | `seo-api` `write` → `seo_articles` | Generated articles + the viewer. |
 | **Runs** | `seo_research_runs` | Pipeline run history. |
 
-Crawled pages land in `user_website_pages` (`crawl-user-website`, every 6 h) and are what the inter-linking suggester links *between*.
+Read pages land in `user_website_pages` (`crawl-user-website`, daily) and are what the inter-linking suggester links *between*. A page is read because **search demand names it**, never because the sitemap lists it — see *The crawl follows search demand* below.
 
 ---
 
@@ -198,19 +198,45 @@ a 50-page site. It now collects up to the hard cap, returns `pages_discovered` (
 site's page cap is 50" so the reader knows where to go. The cap itself is edited under
 Websites → Edit (10–1000).
 
-**The crawl is a rotation, because Firecrawl is rate-limited per plan and a run has 150 s.**
-With the cap raised, the same recrawl scraped exactly 10 of 82 pages and got HTTP 429 on the other
-72 inside twenty seconds (the key is on the ten-scrapes-a-minute tier), stored each refusal as
-an ACTIVE page with `http_status = 429` and no content — overwriting the excerpt an earlier crawl
-had saved — and reported `ok`. `crawl-user-website` now: pauses every worker on a 429 until the
-reset and retries (`pacedScrape`); works inside `SCRAPE_BUDGET_MS`, pages with no content first
-and then the stalest, and leaves the rest for the 6-hourly cron; stamps a page scraped cleanly
-within `REFETCH_AFTER_DAYS` as still-in-sitemap instead of fetching it again; never writes nulls
-over stored content on a failed scrape and never records Firecrawl's own status as the page's;
-counts `page_count` as active pages WITH content; and returns `pages_with_content`,
-`pages_pending` and `rate_limited`, which the toast prints ("10 of 82 pages indexed · 72 waiting
-on the crawler's rate limit — the crawl continues automatically every 6 hours"). At ten a minute
-a fresh 82-page site fills in over about two cron cycles; a bigger Firecrawl plan lifts that.
+**The crawl follows search demand, and the sitemap is only discovery.**
+Enumerating the sitemap meant reading whatever existed. For materialshub.gr that was 5,249 URLs,
+of which 492 read pages had never appeared in a search result while 5 pages Google was actively
+showing had never been read at all; 89% of the site is the same 311 templates repeated across 26
+cities, so finishing was re-reading near-duplicates. `seo_page_demand` derives per URL which
+keywords name it and at what position — from `gsc_performance`, `seo_keyword_positions` and
+`seo_domain_keywords` — and `get_page_crawl_queue` ranks those by opportunity: `new_in_search`,
+then `striking_distance` (5–20), `impressions_no_clicks`, `google_recrawled`, `periodic_refresh`.
+That queue is the ONLY source of URLs the crawler reads (11 pages for materialshub.gr, not 4,785).
+The sitemap still runs every time — one XML fetch, nothing per page — and records which URLs
+exist, which is what `gsc-url-inspection` and the retire sweep need.
+
+**Each feed carries the keyword, so a read page knows what it is FOR.** `user_website_pages`
+stores `content_text` (the whole document), `demand_snapshot` (the keywords, position,
+impressions and clicks as they were at read time — history, never re-derived; call
+`seo_page_demand` for the live figure), `demand_reason` and `fetch_method`. A 600-char excerpt
+with no keyword cannot support "you sit at #12 for X and X is absent from the H1", which is why
+519 indexed pages produced no suggestions.
+
+**Firecrawl is the fallback, not the reader.** It renders JavaScript and defeats anti-bot on
+sites we do not control; against a server-rendered page it contributed only its
+ten-scrapes-a-minute key limit — the sole reason a crawl could never finish. A plain guarded GET
+of materialshub.gr returns the same title, the same meta description and 13,631 characters of
+text in 0.6 s. `scrapePage` reads directly first and falls back to Firecrawl only when the HTML
+held under `DIRECT_TEXT_FLOOR` characters (a client-rendered shell, which a tenant may well add);
+`fetch_method` records which ran, so the paid path stays measured rather than assumed.
+
+**A page is charged, not a run.** `seo-website-crawl` is 1 credit per QUEUED page, debited before
+the read (invariant 10) and refunded for any the budget never reaches; an empty queue costs
+nothing. It was 5 credits per invocation on an hourly cron misnamed `every-6h` — 120 credits a
+day for one site, 1,755 since 2026-07-27, including 240 across two days that read zero pages and
+refunded none, because the run reports `ok` when the sitemap-stamp upserts succeed whatever the
+reads did. Cron is now `user-website-demand-crawl-daily` at 04:45, after the GSC sync.
+
+**A new tenant is not empty on day one.** DataForSEO Labs answers from Google's public index with
+no Search Console connection, so it is the cold start for a domain that already ranks — its feed
+returns PATHS where Search Console returns absolute URLs, and `seo_absolute_url` resolves both
+onto one key (a relative URL there is unfetchable AND a duplicate row). A site that ranks for
+nothing yet seeds once from a 20-URL evenly-spaced sample, never as ongoing work.
 
 **An empty OnPage section is nothing found, not one finding.** DataForSEO answers every OnPage
 section with a task envelope — `{crawl_progress, items_count, items: [...]}` — and when the
@@ -249,9 +275,9 @@ materialshub.gr's robots.txt names `/sitemap-index.xml`, which holds three child
 `/sitemap.xml` — the 82-URL child — and the hard cap was 1,000, so "we have 1,700 pages and it
 finds 50" was two ceilings stacked. The row now points at the index, the hard cap and the form
 cap are 6,000, the Site Health crawl requests the site's own `max_pages` instead of a flat 100,
-and the recrawl cron runs hourly (`15 * * * *`, 55-minute staleness) so the rotation moves at
-the rate Firecrawl allows. At ten scrapes a minute a 5,000-page site still takes weeks; that is
-the Firecrawl tier, not the crawler.
+and the Site Health crawl requests the site's own `max_pages` instead of a flat 100. Reading
+every one of those URLs is no longer the goal — the sitemap says what EXISTS, and search demand
+decides what is worth reading.
 
 **The rank tracker records which SERP blocks WE hold.** `seo_keyword_positions.owned_features`
 (featured_snippet, ai_overview, people_also_ask, local_pack, knowledge_graph, images, video…) is
