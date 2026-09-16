@@ -48,6 +48,7 @@ import { ProductPriceBreaksCard } from '@/components/business/marketplace/Produc
 import { ProductPricingCard } from '@/components/business/marketplace/ProductPricingCard';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { ProductDocumentSearch } from '@/components/features/products/ProductDocumentSearch';
+import { ProductCertificates } from '@/components/features/products/ProductCertificates';
 import { useToast } from '@/hooks/use-toast';
 import { DollarSign, Ship, Boxes } from 'lucide-react';
 import { ProductRecommendationsPanel } from './ProductRecommendationsPanel';
@@ -477,12 +478,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   // those pages — anything that dereferences `product` MUST live below this line, not above it.
   if (!product) return null;
 
-  // ── Who sees what ──────────────────────────────────────────────────────────────────────
-  // This modal is mounted on a lot of different surfaces (admin catalog, Discover, dashboard
-  // widgets, moodboards, quote lines, agent results, the 3D designer), so the viewer can be an
-  // operator, a warehouse hand, a sales rep or a project client. Two axes decide, and BOTH must
-  // pass — a capability alone is not enough:
-  //   1. OWNERSHIP.
+  // Two axes decide who sees what and BOTH must pass — a capability alone is not enough,
+  // because this modal mounts on admin, Discover, moodboards, quote lines and the 3D designer.
   const isOwnProduct = !!activeWorkspaceId && product.workspace_id === activeWorkspaceId;
   /** Warehouse rows, locations, the movement ledger, listings. Operations data. */
   const canSeeStock = isOwnProduct && can('warehouse.manage');
@@ -2733,6 +2730,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             <BookOpen className="h-4 w-4" />
             Knowledge Base Articles
           </h3>
+          <ProductCertificates productId={product.id} />
           <ProductDocumentSearch
             productId={product.id}
             workspaceId={activeWorkspaceId}

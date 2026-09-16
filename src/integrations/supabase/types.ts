@@ -37140,6 +37140,23 @@ export type Database = {
         }
         Returns: Json
       }
+      get_product_certificates: {
+        Args: { p_product_id: string; p_today?: string }
+        Returns: {
+          certificate_number: string
+          document_id: string
+          id: string
+          issuer: string
+          kb_doc_id: string
+          notes: string
+          result: string
+          scope: string
+          standard: string
+          valid_from: string
+          valid_until: string
+          validity: string
+        }[]
+      }
       get_product_price_for_workspace: {
         Args: {
           p_audience?: string
