@@ -461,27 +461,6 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
     ]
   },
   {
-    "name": "get_mydata_book_aggregate",
-    "subject": "mydata book aggregate",
-    "args": [
-      {
-        "name": "p_workspace_id",
-        "type": "uuid",
-        "required": true
-      },
-      {
-        "name": "p_from",
-        "type": "date",
-        "required": true
-      },
-      {
-        "name": "p_to",
-        "type": "date",
-        "required": true
-      }
-    ]
-  },
-  {
     "name": "get_order_customs_preview",
     "subject": "order customs preview",
     "args": [

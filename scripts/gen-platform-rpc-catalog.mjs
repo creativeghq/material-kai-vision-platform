@@ -1,9 +1,6 @@
-/**
- * The agent-facing catalogue of the platform's own DERIVED READS.
- *
- * `--print-sql` emits the query that defines the set and refreshes the snapshot. Volatility is
- * the load-bearing filter: it removes 36 functions whose names read exactly like the rest.
- */
+// The agent-facing catalogue of the platform's own DERIVED READS. `--print-sql` emits the query
+// that defines it; volatility is the load-bearing filter, removing 36 same-shaped writers.
+
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -25,6 +22,10 @@ with fns as (
 select string_agg(name || ' :: ' || args, chr(10) order by name, length(args) desc) from fns
  where name !~ '^(admin_|get_cron_|storage_|get_query_cache|get_slowest|get_search_|get_vector|get_embedding|get_provider_health|get_ai_model|get_tool_call|get_zero_result|get_popular|get_top_cached|get_inbound_email_health|get_webhook)';`;
 
+// The myDATA book is AADE's answer, held apart so the two can DISAGREE; a figure of ours that
+// reads it removes the only thing it is for. Excluded, not withheld: the name never lands.
+const EXCLUDED = new Set(['get_mydata_book_aggregate']);
+
 /** A word a person would actually use for this reader, from its own name. */
 function keywords(name) {
   return name.replace(/^(get|list|search)_/, '').replace(/_/g, ' ').trim();
@@ -33,6 +34,7 @@ function keywords(name) {
 export function buildCatalog() {
   const rows = JSON.parse(readFileSync(join(root, SOURCE), 'utf8'));
   return rows
+    .filter((r) => !EXCLUDED.has(r.name))
     .map((r) => ({
       name: r.name,
       subject: keywords(r.name),

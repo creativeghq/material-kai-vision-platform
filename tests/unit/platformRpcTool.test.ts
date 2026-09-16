@@ -67,6 +67,12 @@ describe('the catalogue is derived, and holds no writer', () => {
     for (const w of writers) expect(names.has(w), `${w} reached the read catalogue`).toBe(false);
   });
 
+  it('the AADE mirror is not one of our figures', () => {
+    const names = new Set(catalog.map((e) => e.name));
+    expect(names.has('get_mydata_book_aggregate')).toBe(false);
+    expect(read(CATALOG_FILE)).not.toContain('mydata_book');
+  });
+
   it('the refresh query keeps the volatility filter', () => {
     // 36 VOLATILE functions match the same name and result shape; this predicate is the only split.
     const gen = read('scripts/gen-platform-rpc-catalog.mjs');
