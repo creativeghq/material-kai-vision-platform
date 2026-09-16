@@ -60,9 +60,9 @@ function fieldsFromOpenapi(openapi, name) {
 function trimField({ type, enum: values, required, description }) {
   const field = {};
   if (type) field.type = type;
-  // Enums are the highest-value part for a model: they remove guessing entirely. Capped because
-  // a 200-value enum is a wall of tokens that helps nobody.
-  if (Array.isArray(values) && values.length && values.length <= 30) field.enum = values;
+  // Generous: both big dispatchers answer an unknown action naming no alternative, so a capped-out
+  // enum leaves the model no way back.
+  if (Array.isArray(values) && values.length && values.length <= 100) field.enum = values;
   if (required) field.required = true;
   if (description) field.description = String(description).slice(0, FIELD_DESC_CAP);
   return field;
@@ -84,9 +84,10 @@ export function buildCatalog() {
         methods: Array.isArray(e.methods) && e.methods.length ? e.methods : ['POST'],
         summary: (e.summary || '').slice(0, 200),
       };
-      // The long description is what tells a model WHICH endpoint it wants; keep a usable slice
-      // for the ones whose summary alone is ambiguous.
+      // What tells a model WHICH endpoint it wants when the summary alone is ambiguous.
       if (e.description) entry.description = String(e.description).slice(0, DESCRIPTION_CAP);
+      // Uncallable without its sub-path: the router answers 400 before it reads the body.
+      if (Array.isArray(e.routes) && e.routes.length) entry.routes = e.routes.slice(0, 30);
       if (fields) entry.fields = fields;
       return entry;
     })
@@ -98,7 +99,7 @@ export function render(catalog) {
     '// GENERATED — do not edit here. Regenerate: npm run api:catalog (part of gen:all).',
     '//',
     '// The platform edge endpoints a signed-in user\'s own token can call, derived from',
-    '// scripts/edge-endpoints.json (itself generated). Cron-secret, admin-secret and',
+    '// scripts/edge-endpoints.json. Cron-secret, admin-secret and',
     '// webhook-signed endpoints are absent by construction: they carry a different security',
     '// scheme, so no edit here is what keeps them out of the agent\'s reach.',
     '',
@@ -115,6 +116,8 @@ export function render(catalog) {
     '  methods: readonly string[];',
     '  summary: string;',
     '  description?: string;',
+    '  /** Sub-paths this endpoint routes on. Present means a path is REQUIRED. */',
+    '  routes?: readonly string[];',
     '  fields?: Record<string, PlatformApiField>;',
     '}',
     '',
