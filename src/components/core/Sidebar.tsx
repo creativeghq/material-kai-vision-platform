@@ -45,7 +45,7 @@ export const Sidebar: React.FC = () => {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const { isAdmin, isPlatformOperator, isSupplierWorkspace } = useFactoryRole();
-  const { can, isAccountant, isSalesRep, isRealEstateAgent } = usePermissions();
+  const { can, isAccountant, isSalesRep, isRealEstateAgent, isGuest } = usePermissions();
   const { isModuleAvailable } = useEntitlements();
   const isMobile = useIsMobile();
 
@@ -66,7 +66,7 @@ export const Sidebar: React.FC = () => {
     </Avatar>
   );
 
-  const navigationItems = filterNavItems(SIDEBAR_NAV_ITEMS, { isAdmin, isPlatformOperator, isSupplierWorkspace, isAccountant, isSalesRep, isRealEstateAgent, isModuleAvailable, can });
+  const navigationItems = filterNavItems(SIDEBAR_NAV_ITEMS, { isAdmin, isPlatformOperator, isSupplierWorkspace, isAccountant, isSalesRep, isRealEstateAgent, isGuest, isModuleAvailable, can });
   // Items marked surface:'app' render in the App Launcher, not the top bar / drawer.
   const topNav = navigationItems.filter((item) => item.surface !== 'app');
 

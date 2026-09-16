@@ -397,9 +397,9 @@ const InboxPage: React.FC = () => {
 
   useEffect(() => { supabase.auth.getUser().then(({ data }) => setMyUserId(data.user?.id ?? null)); }, []);
 
-  // Members (business roles + operator) get the full controls; end-users (clients) get a read/reply surface.
+  // Members (business roles + operator) get the full controls; an outsider gets read/reply only.
   const isMember = useMemo(
-    () => isPlatformOperator || persona !== 'end_user',
+    () => isPlatformOperator || persona !== 'guest',
     [isPlatformOperator, persona],
   );
 

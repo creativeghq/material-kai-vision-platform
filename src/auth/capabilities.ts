@@ -16,8 +16,7 @@ export type Persona =
   | 'employee'   // invited staff member — HR self-service ONLY: their own record, nothing else
   | 'realestate_agent' // invited property agent — Real Estate portal only: manage listings +
                        // own leads/viewings (scoped via responsible_sales_user_ids / listing_agent_id)
-  | 'end_user'   // project client / referral-joined member — restricted surface
-  | 'guest';
+  | 'guest';     // an outsider: their own account and what was shared, nothing else
 
 /** Every gateable capability on the platform. Keep verbs coarse + surface-oriented. */
 export type Capability =
@@ -126,8 +125,6 @@ export const PERSONA_CAPABILITIES: Record<Persona, Capability[]> = {
   // in real-estate-api, D7). Gets crm.view (leads ARE crm_contacts, D9) + agent.use (reach listings from
   // chat), but NO finance/pricing/network/warehouse. Broker (owner/admin) holds the full realestate.* set.
   realestate_agent: ['realestate.view', 'realestate.listings.manage', 'realestate.leads.view', 'crm.view', 'agent.use'],
-  // Project clients / referral end-users: their own work only, no business back-office.
-  end_user: ['quotes.use', 'projects.use', 'moodboards.use', 'agent.use', 'inbox.use'],
   guest: [],
 };
 
@@ -154,7 +151,7 @@ const TEAM_ROLE_PERSONA: Record<string, Persona> = {
   accountant: 'accountant',
   employee: 'employee',
   realestate_agent: 'realestate_agent',
-  client: 'end_user',
+  client: 'guest',
 };
 
 /** Resolve the single persona. */

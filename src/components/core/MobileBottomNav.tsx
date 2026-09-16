@@ -30,7 +30,7 @@ export const MobileBottomNav: React.FC = () => {
   const location = useLocation();
   const { user } = useAuth();
   const { isAdmin, isPlatformOperator, isSupplierWorkspace } = useFactoryRole();
-  const { can, isAccountant, isSalesRep, isRealEstateAgent } = usePermissions();
+  const { can, isAccountant, isSalesRep, isRealEstateAgent, isGuest } = usePermissions();
   const { isModuleAvailable } = useEntitlements();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -49,10 +49,11 @@ export const MobileBottomNav: React.FC = () => {
         isAccountant,
         isSalesRep,
         isRealEstateAgent,
+        isGuest,
         isModuleAvailable,
         can,
       }),
-    [isAdmin, isPlatformOperator, isSupplierWorkspace, isAccountant, isSalesRep, isRealEstateAgent, isModuleAvailable, can],
+    [isAdmin, isPlatformOperator, isSupplierWorkspace, isAccountant, isSalesRep, isRealEstateAgent, isGuest, isModuleAvailable, can],
   );
 
   // Order the visible items by bottom-nav priority; the first BAR_SLOTS fill the bar.

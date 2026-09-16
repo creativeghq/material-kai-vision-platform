@@ -43,7 +43,7 @@ interface GlobalSearchProps {
 export const GlobalSearch: React.FC<GlobalSearchProps> = ({ variant = 'bar' }) => {
   const navigate = useNavigate();
   const { isAdmin, isPlatformOperator, isSupplierWorkspace } = useFactoryRole();
-  const { can, isAccountant, isSalesRep, isRealEstateAgent, isWorkspaceManager } = usePermissions();
+  const { can, isAccountant, isSalesRep, isRealEstateAgent, isGuest, isWorkspaceManager } = usePermissions();
   const { isModuleAvailable } = useEntitlements();
   const { activeWorkspaceId } = useWorkspace();
 
@@ -128,11 +128,12 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ variant = 'bar' }) =
       isAccountant,
       isSalesRep,
       isRealEstateAgent,
+      isGuest,
       isModuleAvailable,
       can,
     });
     return [...gated, { id: 'profile', label: 'Profile', path: '/profile', icon: User }];
-  }, [isAdmin, isPlatformOperator, isSupplierWorkspace, isAccountant, isSalesRep, isRealEstateAgent, isModuleAvailable, can]);
+  }, [isAdmin, isPlatformOperator, isSupplierWorkspace, isAccountant, isSalesRep, isRealEstateAgent, isGuest, isModuleAvailable, can]);
 
   /**
    * Navigation, grouped.

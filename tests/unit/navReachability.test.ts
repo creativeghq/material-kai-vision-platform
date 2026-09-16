@@ -22,6 +22,7 @@ function ctxFor(persona: Persona, opts: { isSupplierWorkspace?: boolean } = {}):
     isAccountant: persona === 'accountant',
     isSalesRep: persona === 'sales' || persona === 'sales_manager',
     isRealEstateAgent: persona === 'realestate_agent',
+    isGuest: persona === 'guest',
     // Entitlement is a per-workspace purchase, not a permission — assume everything is bought so
     // this test only measures the CAPABILITY gates.
     isModuleAvailable: () => true,
@@ -81,7 +82,7 @@ describe('sidebar nav reachability', () => {
   });
 
   it('scoped personas stay scoped — the Sales portal is not leaked sideways', () => {
-    for (const persona of ['accountant', 'employee', 'realestate_agent', 'end_user'] as const) {
+    for (const persona of ['accountant', 'employee', 'realestate_agent', 'guest'] as const) {
       const ids = filterNavItems(SIDEBAR_NAV_ITEMS, ctxFor(persona)).map((i) => i.id);
       expect(ids, `${persona} should not see the Sales entry`).not.toContain('sales');
     }

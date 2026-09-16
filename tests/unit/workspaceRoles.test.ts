@@ -24,7 +24,7 @@ const PERSONA_BY_ROLE: Record<WorkspaceMemberRole, string> = {
   marketing: 'marketing_staff',
   employee: 'employee',
   realestate_agent: 'realestate_agent',
-  client: 'end_user',
+  client: 'guest',
 };
 
 /** Capabilities NO functional team role may hold — the ones that would make it a workspace manager
@@ -196,6 +196,9 @@ describe('workspace role catalog', () => {
     expect(resolvePersona({
       isPlatformOperator: false, rank: 'architect', workspaceRole: 'owner',
       accountRole: 'user', workspaceKind: 'guest',
+    })).toBe('guest');
+    expect(resolvePersona({
+      isPlatformOperator: false, rank: null, workspaceRole: 'client', accountRole: null,
     })).toBe('guest');
     // The same person once they ask for a full account.
     expect(resolvePersona({

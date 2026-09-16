@@ -127,6 +127,7 @@ export interface SidebarNavItem {
 export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // ── Top bar: universal surfaces every user relies on ──
   { id: 'dashboard', label: 'Dashboard', path: '/', icon: Home },
+  { id: 'shared', label: 'Shared with me', path: '/shared', icon: Share2, surface: 'app', description: 'Projects, properties and moodboards someone has given you access to.' },
   { id: 'agent-hub', label: 'Agent Hub', path: '/agent-hub', icon: MessageSquare },
   // Material Search no longer has its own top-bar entry — it moved under Discover → Products
   // (the "Smart search" mode) so browsing and searching materials live in one place, and the
@@ -297,6 +298,7 @@ export interface NavGateContext {
   isAccountant: boolean;
   isSalesRep: boolean;
   isRealEstateAgent: boolean;
+  isGuest: boolean;
   isModuleAvailable: (slug: string) => boolean;
   can: (c: Capability) => boolean;
 }
@@ -321,6 +323,8 @@ export function filterNavItems(
     if (ctx.isSalesRep && item.id !== 'dashboard' && item.id !== 'sales' && item.id !== 'quotes') return false;
     // Estate Agent: Real Estate surface only (their own listings/leads + open-for-all).
     if (ctx.isRealEstateAgent && item.id !== 'dashboard' && item.id !== 'real-estate') return false;
+    if (ctx.isGuest && item.id !== 'dashboard' && item.id !== 'shared') return false;
+    if (item.id === 'shared' && !ctx.isGuest) return false;
     if (item.requirePlatform && !ctx.isPlatformOperator) return false;
     if (item.requireRole === 'admin' && !ctx.isAdmin) return false;
     if (item.requireSupplierWorkspace && !ctx.isSupplierWorkspace) return false;
@@ -344,6 +348,7 @@ export function filterNavItems(
 export const BOTTOM_NAV_PRIORITY: readonly string[] = [
   // Everyday drivers — these fill the visible bottom bar (top 4 entitled)
   'dashboard',
+  'shared',
   'agent-hub',
   'discover',
   'quotes',

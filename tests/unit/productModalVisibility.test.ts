@@ -43,18 +43,19 @@ describe('product modal — internal surfaces by persona', () => {
     expect(sees('accountant')).toEqual({ stock: false, availability: false, cost: false, fiscal: true });
   });
 
-  it.each(['end_user', 'employee', 'hr_staff', 'hr_manager', 'marketing_staff', 'realestate_agent'] as Persona[])(
+  it.each(['guest', 'employee', 'hr_staff', 'hr_manager', 'marketing_staff', 'realestate_agent'] as Persona[])(
     '%s sees no internal product data at all',
     (persona) => {
       expect(sees(persona)).toEqual({ stock: false, availability: false, cost: false, fiscal: false });
     },
   );
 
-  it('availability does NOT key off quotes.use — project clients hold it', () => {
-    // This is the trap the gate was written to avoid: `end_user` can quote, so gating
-    // availability on the ability to quote would show stock levels to a customer.
-    expect(personaCan('end_user', 'quotes.use')).toBe(true);
-    expect(sees('end_user').availability).toBe(false);
+  it('availability does NOT key off quotes.use', () => {
+    // The outsider persona used to hold `quotes.use`, so gating availability on the ability to
+    // quote showed stock levels to a customer. It holds nothing now; the gate still must not.
+    const modal = readFileSync(MODAL, 'utf8');
+    expect(modal).not.toMatch(/availability[^\n]*quotes\.use/);
+    expect(sees('guest')).toEqual({ stock: false, availability: false, cost: false, fiscal: false });
   });
 });
 

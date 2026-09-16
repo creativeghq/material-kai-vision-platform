@@ -154,6 +154,7 @@ const PublicAccountStatementPage = lazy(() => import('./pages/PublicAccountState
 const TripExpensesPage = lazy(() => import('./pages/TripExpensesPage'));
 const ClientPortalPage = lazy(() => import('./pages/ClientPortalPage'));
 const MyPropertiesPage = lazy(() => import('./pages/MyPropertiesPage'));
+const SharedWithMePage = lazy(() => import('./pages/SharedWithMePage'));
 const PublicStorefrontPage = lazy(() => import('./pages/PublicStorefrontPage'));
 const PublicRecallPage = lazy(() => import('./pages/PublicRecallPage'));
 const TradePortalPage = lazy(() => import('./pages/TradePortalPage'));
@@ -347,6 +348,16 @@ const App = () => (
                     <AuthGuard>
                       <Layout>
                         <MyPropertiesPage />
+                      </Layout>
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/shared"
+                  element={
+                    <AuthGuard>
+                      <Layout>
+                        <SharedWithMePage />
                       </Layout>
                     </AuthGuard>
                   }

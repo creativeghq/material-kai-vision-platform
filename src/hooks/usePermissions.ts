@@ -27,6 +27,7 @@ export interface PermissionsApi {
   isSalesManager: boolean;
   /** Invited estate agent: Real Estate surface only — own listings/leads + open-for-all. */
   isRealEstateAgent: boolean;
+  isGuest: boolean;
   /** Owner/admin of the ACTIVE workspace (vs. a plain member). */
   isWorkspaceManager: boolean;
   /** Can add/price own products (operator or dealer rank). */
@@ -59,6 +60,7 @@ export function usePermissions(): PermissionsApi {
     const isSalesManager = persona === 'sales_manager';
     const isSalesRep = persona === 'sales' || isSalesManager;
     const isRealEstateAgent = persona === 'realestate_agent';
+    const isGuest = persona === 'guest';
     const isBusinessNode = persona === 'operator' || persona === 'dealer' || persona === 'architect';
     // Manages THIS node: a workspace owner/admin, or any business-tier persona.
     const isWorkspaceManager = (!!workspaceRole && ADMIN_ROLES.includes(workspaceRole)) || isBusinessNode;
@@ -70,11 +72,12 @@ export function usePermissions(): PermissionsApi {
       can,
       canAny: (...caps: Capability[]) => caps.some(can),
       isOperator: persona === 'operator',
-      isEndUser: persona === 'end_user',
+      isEndUser: persona === 'guest',
       isAccountant,
       isSalesRep,
       isSalesManager,
       isRealEstateAgent,
+      isGuest,
       isWorkspaceManager,
       canSupplyProducts,
       // Day-to-day finance ops: managers + anyone on the Finance surface (finance role
