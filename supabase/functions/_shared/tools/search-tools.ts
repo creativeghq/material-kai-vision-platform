@@ -488,7 +488,7 @@ export const createVisualSearchTool = (workspaceId: string, images: string[], us
  */
 export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = false, agentId?: string) => {
   return tool(
-    async ({ query, searchTypes = ['kb_docs', 'chunks', 'products'], topK = 5, categorySlug, categoryId, priceDocType }) => {
+    async ({ query, searchTypes = ['kb_docs', 'chunks', 'products'], topK = 5, categorySlug, categoryId, priceDocType, productId }) => {
       try {
         const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
 
@@ -530,6 +530,7 @@ export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = fal
           if (categorySlug) body.category_slug = categorySlug;
           if (categoryId) body.category_id = categoryId;
           if (priceDocType) body.price_doc_type = priceDocType;
+          if (productId) body.product_id = productId;
 
           const response = await fetch(`${MIVAA_GATEWAY_URL}/api/rag/search/knowledge-base`, {
             method: 'POST',
@@ -725,6 +726,7 @@ export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = fal
         categorySlug: z.string().optional().describe('Restrict search to a category by slug (e.g. "pricing")'),
         categoryId: z.string().optional().describe('Restrict search to a category by UUID'),
         priceDocType: z.enum(['price_list', 'discount_rule', 'contract_terms', 'promotion']).optional().describe('When searching pricing docs, filter by sub-type'),
+        productId: z.string().optional().describe('Restrict to documents attached to ONE product — its datasheets, certificates and test reports. Use this when the user asks what a specific product is rated for or certified to, rather than searching the whole library and hoping the right certificate ranks first.'),
       }),
     }
   );

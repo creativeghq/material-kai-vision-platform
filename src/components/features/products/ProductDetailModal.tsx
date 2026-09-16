@@ -47,6 +47,7 @@ import { ProductOptionsEditor } from '@/components/features/configurator/Product
 import { ProductPriceBreaksCard } from '@/components/business/marketplace/ProductPriceBreaksCard';
 import { ProductPricingCard } from '@/components/business/marketplace/ProductPricingCard';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { ProductDocumentSearch } from '@/components/features/products/ProductDocumentSearch';
 import { useToast } from '@/hooks/use-toast';
 import { DollarSign, Ship, Boxes } from 'lucide-react';
 import { ProductRecommendationsPanel } from './ProductRecommendationsPanel';
@@ -1157,12 +1158,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const productVariants = extractVariants();
 
 
-  // ─── Certifications as chip list ──────────────────────────────────
-  // Certifications come from multiple sources and may live on either
-  // top-level metadata or under compliance.certifications. The catalog
-  // knowledge extractor propagates catalog-level certs (ISO / CE / EN / LEED)
-  // to every product in the document, so even pages without a per-product
-  // spec table will have a populated list.
+  // Certs live on top-level metadata OR under compliance.certifications, and the catalog
+  // extractor propagates catalog-level certs to every product in the document.
   const extractCertList = (val: unknown): string[] => {
     if (!val) return [];
     const inner = (val && typeof val === 'object' && 'value' in (val as Record<string, unknown>))
@@ -2736,6 +2733,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             <BookOpen className="h-4 w-4" />
             Knowledge Base Articles
           </h3>
+          <ProductDocumentSearch
+            productId={product.id}
+            workspaceId={activeWorkspaceId}
+            attachedDocCount={kbDocs.length}
+          />
           {kbDocs.length === 0 ? (
             <Card>
               <CardContent className="pt-6">
