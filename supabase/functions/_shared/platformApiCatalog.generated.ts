@@ -1703,6 +1703,15 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     }
   },
   {
+    "name": "real-estate-owner",
+    "tag": "Real Estate",
+    "methods": [
+      "POST"
+    ],
+    "summary": "A property owner reading their own property",
+    "description": "What a vendor or landlord sees of a property they own: the listing, viewing and enquiry activity, offers in AGGREGATE, the viewing feedback an agent has not hidden, price history, and - where the Property Management add-on is entitled - the tenancy, rent received and outstanding, work done and inspections.\n\nThe caller is NOT a workspace member. Access is a `record_guests` row with `role='owner'` f"
+  },
+  {
     "name": "recommendations-api",
     "tag": "Recommendations",
     "methods": [

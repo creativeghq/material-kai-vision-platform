@@ -385,3 +385,17 @@ export function toPublic(p: any): Record<string, unknown> {
     category_attributes: p.category_attributes,
   };
 }
+
+export function toOwner(p: any): Record<string, unknown> {
+  return {
+    ...toPublic(p),
+    hide_exact_address: false,
+    address: p.address, street_number: p.street_number,
+    postcode: p.postcode, lat: p.lat, lng: p.lng,
+    price: p.price, price_on_request: p.price_on_request,
+    listing_status: p.listing_status, transaction_type: p.transaction_type,
+    sold_price: p.sold_price, sold_at: p.sold_at,
+    listing_date: p.listing_date, published_at: p.published_at,
+    last_vendor_report_at: p.last_vendor_report_at,
+  };
+}

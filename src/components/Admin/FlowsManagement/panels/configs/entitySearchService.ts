@@ -139,6 +139,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'real-estate-calendar', label: 'real-estate-calendar', sublabel: "Pushes viewings into the agent's own Google Calendar (per-user OAuth)" },
   { id: 'real-estate-feed', label: 'real-estate-feed', sublabel: 'Tokenized XML syndication feed (Kyero / OpenImmo / generic) for property portals' },
   { id: 'real-estate-public', label: 'real-estate-public', sublabel: 'Anonymous, token-gated public listing pages, buyer portal, discovery and lead capture' },
+  { id: 'real-estate-owner', label: 'real-estate-owner', sublabel: 'A property owner reading their own property' },
   { id: 'real-estate-rent-invoicing', label: 'real-estate-rent-invoicing', sublabel: 'Daily cron — drafts Finance invoices for rent charges coming due' },
   { id: 'recommendations-api', label: 'recommendations-api', sublabel: 'Collaborative filtering interaction tracking, recommendations, and analytics.' },
   { id: 'reset-platform', label: 'reset-platform', sublabel: 'Destructively clear all user-generated data while preserving system config' },

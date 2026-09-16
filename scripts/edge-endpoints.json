@@ -15590,5 +15590,33 @@
       }
     ],
     "response": "{ ok, claimed, enriched, no_source, low_confidence, failed, results, note }"
+  },
+  {
+    "name": "real-estate-owner",
+    "tag": "Real Estate",
+    "summary": "A property owner reading their own property",
+    "description": "What a vendor or landlord sees of a property they own: the listing, viewing and enquiry activity, offers in AGGREGATE, the viewing feedback an agent has not hidden, price history, and - where the Property Management add-on is entitled - the tenancy, rent received and outstanding, work done and inspections.\n\nThe caller is NOT a workspace member. Access is a `record_guests` row with `role='owner'` for this user and this property, and the workspace is read off that grant rather than the request, so no `workspace_id` is accepted. An unknown or revoked property is 404, never 403.\n\nMoney reaches an owner as a DOCUMENT (quote, invoice, landlord statement), so this surface says what happened rather than what it cost: maintenance carries no cost and no contractor, and offers carry no buyer, terms or agent note. Output is the `toOwner()` projection - cost basis, minimum offer, commission and the valuation estimate never leave.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": "docs/real-estate-system.md",
+    "methods": [
+      "POST"
+    ],
+    "request": [
+      {
+        "name": "action",
+        "type": "string",
+        "required": true,
+        "desc": "`list` (the caller's owned properties) or `get` (one of them)"
+      },
+      {
+        "name": "property_id",
+        "type": "string (uuid)",
+        "required": false,
+        "desc": "Required for `get`. Must be a property the caller holds an owner grant on, else 404"
+      }
+    ],
+    "response": "{ properties } | { property, performance, enquiries, viewings, offers, price_history, management, management_available } | { error }"
   }
 ]
