@@ -909,6 +909,9 @@ export const CRMManagement: React.FC = () => {
                               <span className="truncate min-w-0">{company.name}</span>
                               <ExternalLink className="h-3 w-3 shrink-0" />
                             </button>
+                            {company.commercial_title && company.commercial_title.trim().toLowerCase() !== (company.name || '').trim().toLowerCase() && (
+                              <div className="truncate text-xs font-normal text-muted-foreground">{company.commercial_title}</div>
+                            )}
                           </TableCell>
                           <TableCell>{company.email ? <a href={`mailto:${company.email}`} className="text-primary hover:underline">{company.email}</a> : '-'}</TableCell>
                           <TableCell>{company.phone ? <a href={`tel:${company.phone}`} className="text-primary hover:underline">{company.phone}</a> : '-'}</TableCell>

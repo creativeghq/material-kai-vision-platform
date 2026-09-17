@@ -1,4 +1,3 @@
-/** company-enrich */
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 // Invariant 1 — tenancy comes from membership, never from the request body.
@@ -11,6 +10,7 @@ import { resolveTokenPrice } from '../_shared/ai-logger.ts';
 // `PromptStoreUnavailable` ("the DB is down") so the caller can tell the operator which it is.
 import { loadPrompt, PromptNotConfigured, PromptStoreUnavailable } from '../_shared/prompt-utils.ts';
 import { neutraliseFenceMarkers } from '../_shared/customer-audience.ts';
+import { researchAliases } from '../_shared/crm/researchAliases.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -183,21 +183,28 @@ async function anthropic(body: Record<string, unknown>): Promise<any> {
  */
 async function enrichViaWebSearch(
   admin: any, userId: string, workspaceId: string | null,
-  name: string, countryName: string | null, vat: string | null,
+  name: string, countryName: string | null, vat: string | null, tradeName: string | null,
 ): Promise<Partial<EnrichFields> | null> {
   if (!ANTHROPIC_API_KEY()) return null;
 
   const scope = [countryName ? `in ${countryName}` : '', vat ? `(VAT/registration ${vat})` : '']
     .filter(Boolean).join(' ');
+  const aliases = researchAliases(name, tradeName);
+  const known = aliases.map((a) => `"${a}"`).join(' / ');
   const researchQuery =
-    `Research the business "${name}" ${scope}. Find its official website, general contact email, ` +
+    `Research the business ${known} ${scope}. ` +
+    (aliases.length > 1
+      ? `Those are spellings of ONE business — its trade name and its registered legal name — so a page ` +
+        `matching any of them may be the right company. Report a website only once you have checked it is ` +
+        `that same legal entity (consistent country, and the VAT/registration or registered address above). `
+      : '') +
+    `Find its official website, general contact email, ` +
     `main phone number, LinkedIn, Facebook and X/Twitter pages, a one-sentence description of what it does, ` +
     `its primary industry, and its head-office city / region. Prefer the company's own website and official ` +
     `social pages over directories. If you cannot confidently find a field, leave it out.`;
 
   let inTok = 0, outTok = 0;
 
-  // Step 1 — web research (free-form text).
   // Stays on the basic web_search variant: web_search_20260209 (dynamic filtering) needs
   // Opus 4.6+ or Sonnet 4.6+, and this path is deliberately Haiku. Bumping the tool without
   // the model is a 400, not a no-op (#400 W7).
@@ -222,7 +229,7 @@ async function enrichViaWebSearch(
       tool_choice: { type: 'tool', name: 'record_business_info' },
       messages: [{
         role: 'user',
-        content: `From the research below about "${name}", fill the record_business_info tool. ` +
+        content: `From the research below about ${known}, fill the record_business_info tool. ` +
           `Use null for anything not clearly stated.\n\n<research>\n${researchText.slice(0, 12000)}\n</research>`,
       }],
     });
@@ -298,7 +305,7 @@ async function enrichViaWebSearch(
 /** Apollo.io org search — structured fields, only when APOLLO_API_KEY is set. Debits its own cost. */
 async function enrichViaApollo(
   admin: any, userId: string, workspaceId: string | null,
-  name: string, countryName: string | null,
+  name: string, countryName: string | null, tradeName: string | null,
 ): Promise<Partial<EnrichFields> | null> {
   if (!APOLLO_API_KEY()) return null;
   try {
@@ -308,7 +315,7 @@ async function enrichViaApollo(
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', 'X-Api-Key': APOLLO_API_KEY() },
       body: JSON.stringify({
-        q_organization_name: name,
+        q_organization_name: researchAliases(name, tradeName)[0],
         organization_locations: countryName ? [countryName] : undefined,
         page: 1,
         per_page: 3,
@@ -1069,6 +1076,7 @@ Deno.serve(withApiLogging('company-enrich', async (req: Request) => {
     const name = cleanStr(body?.name);
     const countryName = cleanStr(body?.country_name) || cleanStr(body?.country);
     const vat = cleanStr(body?.vat_number);
+    const tradeName = cleanStr(body?.trade_name);
     const companyId = cleanStr(body?.company_id);
 
     if (!name) return jsonResponse({ error: 'name is required' }, 400);
@@ -1079,10 +1087,9 @@ Deno.serve(withApiLogging('company-enrich', async (req: Request) => {
     if (!gate.ok) return jsonResponse({ error: 'insufficient_credits', message: gate.message }, 402);
     await refundCredits(admin, user.id, workspaceId ?? undefined, ENRICH_CREDIT_CEILING, 'company_enrich');
 
-    // Run both providers; neither blocks the other.
     const [webRes, apolloRes] = await Promise.allSettled([
-      enrichViaWebSearch(admin, user.id, workspaceId ?? null, name, countryName, vat),
-      enrichViaApollo(admin, user.id, workspaceId ?? null, name, countryName),
+      enrichViaWebSearch(admin, user.id, workspaceId ?? null, name, countryName, vat, tradeName),
+      enrichViaApollo(admin, user.id, workspaceId ?? null, name, countryName, tradeName),
     ]);
 
     const web = webRes.status === 'fulfilled' ? webRes.value : null;

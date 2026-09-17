@@ -183,7 +183,11 @@ export function aadeFields(res: AadeLookupResult, existing: Record<string, unkno
     // silently reverted by the next lookup. The registry's own copy always lands in
     // `kad_primary_description` below, which stays authoritative for classification.
     profession: isBlank(existing.profession) ? (primary?.description ?? undefined) : undefined,
-    commercial_title: r.commer_title ?? undefined,
+    // Seeded from the registry, then LEFT ALONE — same rule as `profession` above. ΑΑΔΕ holds the
+    // trade name phonetically in Greek (ΦΕΡΝΙΜΠΑΘ); an operator who corrects it to the name the
+    // business actually trades under (Furnibath) must not have the next lookup revert it. The
+    // registry's own copy stays in `aade_data.basic_rec.commer_title`.
+    commercial_title: isBlank(existing.commercial_title) ? (r.commer_title ?? undefined) : undefined,
     legal_status: r.legal_status_descr ?? undefined,
     kad_primary: primary?.code ?? undefined,
     kad_primary_description: primary?.description ?? undefined,
@@ -310,6 +314,7 @@ export async function researchCompany(opts: CompanyResearchOptions): Promise<Com
     const merged = { ...base, ...fields };
     const res = await enrichCompany({
       name: enrichName,
+      tradeName: (merged.commercial_title as string) || undefined,
       countryName: countryName ?? (merged.country as string) ?? (afm ? 'Greece' : undefined),
       vatNumber: vatNumber ?? undefined,
       workspaceId,

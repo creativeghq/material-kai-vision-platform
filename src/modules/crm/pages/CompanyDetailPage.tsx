@@ -638,6 +638,8 @@ export const CompanyDetailPage: React.FC = () => {
   const isPureSupplier = !!company.is_supplier && !company.is_customer;
   const showCommercial = !isPureSupplier;
   const showSupplierFeatures = !!company.is_supplier;
+  const tradeName = (company.commercial_title || '').trim();
+  const showTradeName = !!tradeName && tradeName.toLowerCase() !== (company.name || '').trim().toLowerCase();
   const initials = (company.name || '?').trim().split(/\s+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?';
   // People the Activity composer can email / add as meeting attendees: the company's own
   // inbox (emailable only) + each attached contact.
@@ -697,6 +699,7 @@ export const CompanyDetailPage: React.FC = () => {
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground text-lg font-medium">{initials}</div>
                   <div className="min-w-0">
                     <div className="text-lg font-medium leading-tight truncate">{company.name || 'Untitled Company'}</div>
+                    {showTradeName && (<div className="text-sm text-foreground/80 truncate">Trading as {tradeName}</div>)}
                     <div className="text-sm text-muted-foreground truncate">{[company.city, company.country].filter(Boolean).join(', ') || 'Company'}</div>
                   </div>
                 </div>
