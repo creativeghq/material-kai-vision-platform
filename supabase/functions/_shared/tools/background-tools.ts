@@ -288,20 +288,24 @@ export const createInteriorVideoV2Tool = (userId: string, workspaceId: string, o
     {
       name: 'generate_video',
       description: `Generate an interior design video using AI. Routes to the best model based on video type.
-Video types and recommended models:
-- walkthrough: Veo 2.0 (50cr) — cinematic camera moves through a room
+Video types and the model each one prefers (the five values video_type accepts — there are no others):
+- walkthrough: Wan3.0 720p (55cr) — cinematic camera moves through a room
 - product_spotlight: Kling 3.0 (20cr) — focuses on a specific material/product with audio
 - before_after: Luma Ray3.2 (20cr) — interpolates from the room image to before_image_url, which is the only model here that can actually end on a given frame
-- floorplan_flythrough: Veo 2.0 (50cr) — aerial view flythrough
-- social_reel: MiniMax H3 (40cr) — 15s at native 2K with stereo audio, the reel format itself
-- premium: Runway Gen-4 Turbo (40cr) — highest quality for any type
+- floorplan_flythrough: Wan3.0 720p (55cr) — aerial view flythrough
+- social_reel: MiniMax H3 768p (25cr) — 15s with stereo audio, the reel format itself
+If the preferred model's provider has no credential deployed, the generator substitutes the best
+available one and returns substituted_from; say which model actually ran. If NOTHING is
+available it refuses with no charge — report that as a platform configuration problem, not as
+something the user did. Pass the model parameter only to override deliberately: an explicit
+model that is unavailable is REFUSED rather than substituted.
 
 Long-form, with sound (the only models here that pass 10 seconds):
 - Wan3.0 480p/720p/1080p (30/55/110cr) — up to 30s, scored, up to 20 references
 - Seedance 2.5 480p/720p (60/125cr) — up to 30s in ONE pass, scored, references carry a
   role (first frame / last frame / reference image), which is what holds a specific
   product in shot for the whole clip
-- MiniMax H3 (40cr) — 5-15s at native 2K with stereo audio. The cheapest full clip here
+- MiniMax H3 768p/480p (25/15cr) — 5-15s with stereo audio. The cheapest full clip here
   and the default for social_reel. It takes EITHER a source image OR reference images,
   never both, and with a source image the aspect ratio comes from that image.
 - Luma Ray3.2 720p/1080p (20/70cr) — 5 or 10 seconds, silent, and the only model that
