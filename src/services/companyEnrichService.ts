@@ -29,6 +29,7 @@ export interface CompanyEnrichResult {
 
 export interface CompanyEnrichArgs {
   name: string;
+  tradeName?: string;
   /** Country display name (e.g. "Greece") — improves match quality. */
   countryName?: string;
   vatNumber?: string;
@@ -45,6 +46,7 @@ export interface CompanyEnrichArgs {
  */
 export async function enrichCompany({
   name,
+  tradeName,
   countryName,
   vatNumber,
   workspaceId,
@@ -54,6 +56,7 @@ export async function enrichCompany({
     const { data, error } = await supabase.functions.invoke('company-enrich', {
       body: {
         name,
+        trade_name: tradeName,
         country_name: countryName,
         vat_number: vatNumber,
         workspace_id: workspaceId,

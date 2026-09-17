@@ -27,6 +27,7 @@ export function CatalogExportTab() {
   const [templateId, setTemplateId] = useState<string>(NO_TEMPLATE);
   const [templates, setTemplates] = useState<Array<{ id: string; template_name: string }>>([]);
   const [busy, setBusy] = useState(false);
+  const [counts, setCounts] = useState<{ active: number; held: number } | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -41,6 +42,23 @@ export function CatalogExportTab() {
         if (cancelled || error) return;
         setTemplates((data ?? []) as Array<{ id: string; template_name: string }>);
       });
+    return () => { cancelled = true; };
+  }, [activeWorkspaceId]);
+
+  useEffect(() => {
+    if (!activeWorkspaceId) return;
+    let cancelled = false;
+    void (async () => {
+      const head = { count: 'exact' as const, head: true };
+      const [a, h] = await Promise.all([
+        supabase.from('products').select('id', head)
+          .eq('workspace_id', activeWorkspaceId).eq('status', 'active'),
+        supabase.from('products').select('id', head)
+          .eq('workspace_id', activeWorkspaceId).neq('status', 'active'),
+      ]);
+      if (cancelled || a.error || h.error) return;
+      setCounts({ active: a.count ?? 0, held: h.count ?? 0 });
+    })();
     return () => { cancelled = true; };
   }, [activeWorkspaceId]);
 
@@ -96,9 +114,24 @@ export function CatalogExportTab() {
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="max-w-prose text-sm text-muted-foreground">
-          Active products only. Cost, margin and supplier links are never included — a partner
-          price list is a separate decision with its own audience.
+          Active products only, and only the attribute fields the catalogue registry knows.
+          Cost, margin and supplier links are never included — a partner price list is a
+          separate decision with its own audience.
         </p>
+
+        {counts && (
+          <p className="text-sm">
+            <span className="font-semibold tabular-nums">{counts.active}</span> active product
+            {counts.active === 1 ? '' : 's'} will be exported
+            {counts.held > 0 && (
+              <span className="text-muted-foreground">
+                {' '}— <span className="tabular-nums">{counts.held}</span> draft or archived
+                product{counts.held === 1 ? '' : 's'} are left out
+              </span>
+            )}
+            .
+          </p>
+        )}
 
         <div className="grid gap-3 sm:grid-cols-2">
           <div>

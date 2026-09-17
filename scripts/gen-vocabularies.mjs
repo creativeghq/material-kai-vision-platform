@@ -289,6 +289,12 @@ export const VOCABULARIES = [
     'src/config/agentAttachmentLimits.ts',
     'supabase/functions/_shared/agentAttachmentLimits.generated.ts',
   ],
+  [
+    // Rewriting a storage URL to ask imgproxy for a smaller rendition. The edge had no copy, so
+    // agent-chat handed the provider a full-resolution original to fetch, and it timed out.
+    'src/utils/imageUrl.ts',
+    'supabase/functions/_shared/imageUrl.generated.ts',
+  ],
 ];
 
 const banner = (source) => [

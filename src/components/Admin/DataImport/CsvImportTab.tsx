@@ -15,7 +15,7 @@ const COLUMNS = [
 
 const BATCH = 500;
 
-type Result = { created: number; updated: number; skipped: number };
+type Result = { created: number; updated: number; skipped: number; unkeyed: number };
 
 const ISO2 = /^[A-Za-z]{2}$/;
 
@@ -50,7 +50,7 @@ export function CsvImportTab() {
   const run = async () => {
     if (!rows || !activeWorkspaceId) return;
     setBusy(true);
-    const total: Result = { created: 0, updated: 0, skipped: 0 };
+    const total: Result = { created: 0, updated: 0, skipped: 0, unkeyed: 0 };
     try {
       for (let i = 0; i < rows.length; i += BATCH) {
         const slice = rows.slice(i, i + BATCH).map((r) => {
@@ -70,6 +70,7 @@ export function CsvImportTab() {
         total.created += got?.created ?? 0;
         total.updated += got?.updated ?? 0;
         total.skipped += got?.skipped ?? 0;
+        total.unkeyed += got?.unkeyed ?? 0;
       }
       setResult(total);
     } catch (err) {
@@ -77,8 +78,11 @@ export function CsvImportTab() {
       const done = total.created + total.updated;
       toast({
         title: 'Import stopped partway',
-        description: `${done} product${done === 1 ? '' : 's'} were already written before it failed`
-          + ' — re-importing the same file updates those rather than duplicating them. '
+        description: `${done} product${done === 1 ? '' : 's'} were already written before it failed. `
+          + (total.unkeyed > 0
+            ? `${total.unkeyed} of them had no SKU, so re-importing this file adds them again `
+              + '— put a sku column on every row first. '
+            : 'Re-importing the same file updates those rather than duplicating them. ')
           + (err instanceof Error ? err.message : 'The import could not be completed.'),
         variant: 'destructive',
       });
@@ -138,7 +142,8 @@ export function CsvImportTab() {
             </p>
             <p className="text-xs text-muted-foreground">
               A row whose SKU already exists in this workspace updates that product rather than
-              adding a second one.
+              adding a second one. A row with no SKU cannot be matched, so a second import adds
+              it again. Imported products arrive as drafts.
             </p>
             <Button onClick={() => void run()} disabled={busy || namedRows === 0}>
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
@@ -151,10 +156,13 @@ export function CsvImportTab() {
           <p className="border-t border-hairline pt-3 text-sm">
             <span className="font-semibold">{result.created}</span> created,{' '}
             <span className="font-semibold">{result.updated}</span> updated
+            {result.unkeyed > 0 && (
+              <>, <span className="font-semibold">{result.unkeyed}</span> of them with no SKU (a re-import cannot match those)</>
+            )}
             {result.skipped > 0 && (
               <>, <span className="font-semibold">{result.skipped}</span> skipped for having no name</>
             )}
-            .
+            . They stay drafts until you activate them.
           </p>
         )}
       </CardContent>

@@ -15,6 +15,9 @@ import { TOOLKIT_CLUSTERS } from '../_shared/toolkitClusters.generated.ts';
 // clamps on the same predicate this function refuses on. Same boot profile: pure data + a pure
 // function, no npm deps, no env reads.
 import { checkAgentAttachments } from '../_shared/agentAttachmentLimits.generated.ts';
+import { inlineImagesForModel } from '../_shared/model-images.ts';
+import { describeProviderFailure } from '../_shared/provider-failure.ts';
+import { captureException } from '../_shared/sentry.ts';
 // Type-only — erased at compile time, so it costs nothing at boot. The implementation is
 // loaded inside initRuntime() alongside the other lazy modules.
 import type { AgentMemory as AgentMemoryType } from '../_shared/agent-memory.ts';
@@ -151,22 +154,12 @@ async function initRuntime() {
     maxTokens: 4096,
     apiKey: ANTHROPIC_API_KEY,
   });
-  // Opus 5, not 4.8. Same rate in ai_model_pricing ($5/$25 in, out), measurably better
-  // judgement — see the A/B recorded on shouldRouteToHaiku below. It only became reachable
-  // through ChatAnthropic when the LangChain pin moved off 1.3.10 (support landed in
-  // @langchain/anthropic 1.5.2), and until then nothing in the platform called it.
-  // No `temperature`. It said `temperature: 1` and worked only because 1 IS the Anthropic
-  // default, so langchain's compatibility check let it through — a coincidence, not a design.
-  // Sampling parameters are removed on this model tier; the six sites that had picked a
-  // different value were all throwing on every call.
-  // `maxTokens` caps EVERYTHING the model emits, and on Opus 5 that includes thinking: omitting
-  // the `thinking` parameter runs ADAPTIVE thinking (a change from Opus 4.8/4.7, where omitting
-  // it meant none) and `display` defaults to `omitted`, so those blocks arrive with empty text.
-  // At 4096 a turn could spend the whole budget reasoning and return no text and no parseable
-  // tool call (conversation de92b987, 2026-09-15). 8192 is sized against AGENT_NODE_TIMEOUT_MS,
-  // NOT the model's 128k: the measured rate was ~87 tok/s, so the model's own ceiling lands near
-  // 94s and the 115s node timeout stays the outer bound. Raising it further only trades a clean,
-  // nameable `max_tokens` stop for a thrown node timeout that discards the streamed text.
+  // Opus 5, not 4.8 (the A/B is recorded on shouldRouteToHaiku below). No `temperature`:
+  // sampling parameters are REMOVED on this model tier and a value throws. `maxTokens` caps
+  // EVERYTHING emitted, and on Opus 5 that includes thinking — omitting `thinking` runs it
+  // ADAPTIVELY (unlike 4.8/4.7) with `display` defaulting to `omitted`, so at 4096 a turn can
+  // reason away the whole budget and return no text and no parseable tool call. 8192 is sized
+  // against AGENT_NODE_TIMEOUT_MS, not the model's 128k.
   modelOpus = new ChatAnthropic({
     model: MAIN_MODEL,
     maxTokens: 8192,
@@ -931,12 +924,9 @@ function getModelNameForAgent(agentId: string, modelOverride?: string | null): s
 const ORCHESTRATOR_IDS = new Set(['orchestrator', 'jarvis', 'auto']);
 const ROUTABLE_SPECIALISTS: { slug: string; name: string; blurb: string }[] = [
   { slug: 'interior-designer', name: 'Vision', blurb: 'interior design, room redesign, image or 3D generation, virtual staging, lighting, VR worlds, moodboards, presentation sheets' },
-  // The knowledge-base clause is not padding — it is the largest corpus in the platform and it
-  // had no owner in this menu. Measured 2026-08-23: 674 of the 677 published kb_docs sit in the
-  // "Product Management" category (discovery, roadmaps, JTBD, opportunity solution trees), and
-  // every blurb here described product-as-GOODS — catalogs, manufacturers, SKUs. So "what is
-  // product discovery?" matched no specialist, fell to the generalist, and the generalist
-  // answered from its own knowledge without searching.
+  // The knowledge-base clause is not padding: nearly every published kb_doc is product-as-
+  // PRACTICE (discovery, roadmaps, JTBD) while every other blurb here says product-as-GOODS, so
+  // without it "what is product discovery?" matches no specialist and is answered unsearched.
   { slug: 'product-business', name: 'Pepper', blurb: 'building or publishing catalogs, B2B manufacturer research, company/contact enrichment and CRM, product knowledge-graph (provenance, brand, related products, specs), tech radar, job research; ALSO any question answerable from the workspace knowledge base — product-management practice, product discovery, roadmaps, frameworks, internal playbooks and "what do our docs say about X"' },
   { slug: 'marketing', name: 'Edith', blurb: 'SEO keyword/SERP research and audits, backlinks, site crawls, SEO article writing, brand-mention monitoring, LLM visibility' },
   { slug: 'erp', name: 'Trinity', blurb: 'creating client quotes and quote PDFs, pricing, customer or supplier financial overviews, price history, recording business expenses / supplier bills / payables (rent, utilities, fees)' },
@@ -1587,6 +1577,10 @@ async function executeAgent(
     modelName: string;
     turnCount: number;
   };
+  /** `text` is a refusal sentence, not a reply. Without this the error path is indistinguishable
+   *  from a good turn, and the billed post-turn calls ran against the error string. */
+  failed?: boolean;
+  failureCode?: string;
   /** The agent that ACTUALLY ran this turn — the specialist, when the orchestrator routed. */
   routedAgentId?: string;
   /** The agent the caller asked for (`orchestrator`/`jarvis`/`auto` when routing happened). */
@@ -1918,13 +1912,9 @@ async function executeAgent(
     console.warn('⚠️ Could not load skills metadata:', skillErr);
   }
 
-  // Which toolkits are ALREADY bound.
-  //
-  // `load_toolkit` advertises every loadable cluster and says nothing about which are already
-  // live, so the agent spends a tool call — and an extra model round trip — re-loading a
-  // toolkit it could already call. In the trace that prompted this, `generation` was active
-  // from the first message and the agent still called `load_toolkit('generation')` before
-  // reaching `generate_gemini`.
+  // Which toolkits are ALREADY bound. `load_toolkit` advertises every loadable cluster and says
+  // nothing about which are already live, so without this the agent spends a tool call — and an
+  // extra model round trip — re-loading a toolkit it could already call.
   if (activeToolkitIds.length > 0) {
     systemPrompt += `\n\n[CONTEXT] Toolkits already loaded for this turn: ${activeToolkitIds.join(', ')}. `
       + `Their tools are bound and callable right now — do NOT call load_toolkit for any of them. `
@@ -2809,13 +2799,9 @@ async function executeAgent(
     tools.push(createGeneratePurchaseSheetTool(userId, workspaceId, onChunk));
   }
 
-  // AI Assessment — three subjects, one toolkit file. Self-contained import like the graph
-  // toolkit below: one more entry in the big Promise.all buys nothing for a cluster whose tools
-  // all share one module gate helper.
-  //
-  // Each `assess_*` is the only paid tool of its trio — it reserves credits and settles against
-  // real tokens. The readers are DB-only, deliberately: "what should I do next" must not cost
-  // money to ask a second time.
+  // AI Assessment — three subjects, one toolkit file. Each `assess_*` is the only paid tool of
+  // its trio (reserves credits, settles on real tokens); the readers are DB-only, deliberately,
+  // so "what should I do next" never costs money to ask a second time.
   const ASSESSMENT_TOOL_NAMES = [
     'assess_project', 'get_project_assessment',
     'assess_finance', 'get_finance_assessment',
@@ -3480,6 +3466,9 @@ async function executeAgent(
   const lastUserMsgIndex = messages.reduce((last: number, msg: any, i: number) =>
     msg.role === 'user' ? i : last, -1);
 
+  // Read HERE, downscaled, instead of passing URLs through for the provider to fetch.
+  const modelImages = images.length > 0 ? await inlineImagesForModel(images) : images;
+
   const langchainMessages = messages.map((msg: any, idx: number) => {
     if (msg.role === 'user') {
       // For the last user message, attach images AND/OR PDFs as multimodal content blocks.
@@ -3487,7 +3476,7 @@ async function executeAgent(
         const content: any[] = [];
         if (msg.content?.trim()) content.push({ type: 'text', text: msg.content });
         // `image_url`, NOT Anthropic's native `{type:'image', source:{...}}`.
-        for (const img of images) {
+        for (const img of modelImages) {
           content.push({ type: 'image_url', image_url: { url: img } });
         }
         // PDF document blocks — Opus reads these natively (no OCR pipeline). Enables
@@ -3637,9 +3626,18 @@ async function executeAgent(
   } catch (graphError) {
     console.error('❌ LangGraph execution error:', graphError);
 
-    // Fallback to error response
+    // We answer 200 with the failure in the body, so `withApiLogging` never sees this and the
+    // capture has to happen here or the turn is invisible to Sentry.
+    void captureException(
+      graphError instanceof Error ? graphError : new Error(String(graphError)),
+      { tags: { function_name: 'agent-chat', agent_id: agentId }, extra: { requestedAgentId } },
+    ).catch(() => {});
+
+    const failure = describeProviderFailure(graphError);
     return {
-      text: `Error during agent execution: ${graphError instanceof Error ? graphError.message : 'Unknown error'}`,
+      text: failure.message,
+      failed: true,
+      failureCode: failure.code,
       routedAgentId: agentId,
       requestedAgentId,
       usage: {
@@ -4346,7 +4344,8 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
           const forCustomerTurn = audience === 'customer';
 
           // 🧠 Promotion gate: distil this turn into long-term memory (non-blocking).
-          if (!forCustomerTurn && !isEvalRun) {
+          // Never on a failed turn: no fact about the user lives inside a provider error.
+          if (!forCustomerTurn && !isEvalRun && !finalResult.failed) {
             void runInBackground(
               promoteTurnToMemory(
                 userId, workspaceId, ranAsAgentId, userInput, finalResult.text, conversation_id,
@@ -4436,8 +4435,9 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
           // returned, because the alternative — offering the toolkit's other quick-starts
           // — can only ever propose a fixed list in catalog order, and can propose nothing
           // at all after a plain chat turn (a chat turn belongs to no toolkit).
+          // Never on a failed turn: a billed model call to write "try again" over an error.
           let nextSteps: Array<{ label: string; prompt: string }> = [];
-          if (finalResult.text && !forCustomerTurn && !isEvalRun) {
+          if (finalResult.text && !forCustomerTurn && !isEvalRun && !finalResult.failed) {
             try {
               const { proposeNextSteps } = await import('../_shared/next-steps.ts');
               const firstTool = finalResult.toolResults?.[0];
@@ -4473,6 +4473,9 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
             routed: wasRouted,
             text: finalResult.text,
             model: modelUsed,
+            // So the client renders this as the failure it is, not as a considered answer.
+            failed: finalResult.failed ?? false,
+            failure_code: finalResult.failureCode,
             materialResults: finalResult.materialResults,
             tool_results: finalResult.toolResults,
             generation_job: finalResult.generationJob,

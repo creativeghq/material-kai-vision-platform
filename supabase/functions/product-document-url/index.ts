@@ -1,5 +1,4 @@
 // pdf-documents is private, so the URL is minted per read: a stored one is an expired one.
-// Authorization is not decided here — get_product_document_path runs as the CALLER.
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
