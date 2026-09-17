@@ -11,6 +11,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { edgeErrorMessage } from '@/utils/edgeError';
+import { todayLocalISO } from '@/utils/datetime';
 
 const FORMATS = [
   { value: 'csv', label: 'CSV' },
@@ -74,7 +75,7 @@ export function CatalogExportTab() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `catalogue-${new Date().toISOString().slice(0, 10)}.${format}`;
+      a.download = `catalogue-${todayLocalISO()}.${format}`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
