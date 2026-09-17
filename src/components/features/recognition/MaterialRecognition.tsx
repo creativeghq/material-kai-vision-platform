@@ -87,6 +87,7 @@ export const MaterialRecognition: React.FC = () => {
             composition: response.data.composition || {},
             sustainability: response.data.sustainability || {},
             imageUrl: URL.createObjectURL(file),
+            imageBase64: base64,
             processingTime: response.processing_time,
           });
         } else {

@@ -481,6 +481,7 @@ export interface RecognitionResult {
   composition: Record<string, unknown>;
   sustainability: Record<string, unknown>;
   imageUrl: string;
+  imageBase64?: string;
   processingTime: number;
   matchedMaterial?: Material;
   extractedProperties?: Record<string, unknown>;
