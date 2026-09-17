@@ -49,6 +49,7 @@ import { ProductPricingCard } from '@/components/business/marketplace/ProductPri
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { ProductDocumentSearch } from '@/components/features/products/ProductDocumentSearch';
 import { ProductCertificates } from '@/components/features/products/ProductCertificates';
+import { ProductDocumentDownload } from '@/components/features/products/ProductDocumentDownload';
 import { useToast } from '@/hooks/use-toast';
 import { DollarSign, Ship, Boxes } from 'lucide-react';
 import { ProductRecommendationsPanel } from './ProductRecommendationsPanel';
@@ -2793,10 +2794,15 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     {groups[groupKey].map(doc => (
                       <Card key={doc.id} className="dashboard-card rounded-2xl border-0 shadow-sm">
                         <CardHeader className="pb-3">
-                          <CardTitle className="flex items-center gap-2">
-                            <BookOpen className="h-4 w-4" />
-                            {doc.title}
-                          </CardTitle>
+                          <div className="flex items-start justify-between gap-2">
+                            <CardTitle className="flex items-center gap-2">
+                              <BookOpen className="h-4 w-4" />
+                              {doc.title}
+                            </CardTitle>
+                            {isOwnProduct && (doc.metadata as any)?.source_document_id && (
+                              <ProductDocumentDownload productId={product.id} kbDocId={doc.id} />
+                            )}
+                          </div>
                         </CardHeader>
                         <CardContent>
                           {doc.summary && (

@@ -1664,6 +1664,30 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     "description": "Action-discriminated endpoint for listing, saving, and deleting platform secret values. Sensitive values are masked in list responses. Saves invalidate the in-worker secret cache. ENV values always take precedence over DB values; editing here only affects the DB fallback."
   },
   {
+    "name": "product-document-url",
+    "tag": "Products",
+    "methods": [
+      "POST"
+    ],
+    "summary": "Signed, short-lived link to the original file behind a product's knowledge doc or certificate",
+    "description": "Any authenticated member of the product's workspace. Resolves the source document of a kb_doc attached to the product, or a document named by one of the product's certificates, and returns a 5-minute signed download URL. pdf-documents is a private bucket, so the URL is minted per read and never stored. Authorization is decided by get_product_document_path, which runs AS THE CALLER. A catalogue rea",
+    "fields": {
+      "product_id": {
+        "type": "string",
+        "required": true,
+        "description": "The product the document must be reachable from"
+      },
+      "kb_doc_id": {
+        "type": "string",
+        "description": "A knowledge doc attached to that product; its source file is returned"
+      },
+      "document_id": {
+        "type": "string",
+        "description": "A document named by one of the product's certificates"
+      }
+    }
+  },
+  {
     "name": "profile-review-summary",
     "tag": "Profiles",
     "methods": [

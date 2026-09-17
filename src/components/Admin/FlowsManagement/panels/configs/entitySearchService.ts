@@ -121,6 +121,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'parse-supplier-cost-list', label: 'parse-supplier-cost-list', sublabel: 'Parse a KB doc supplier cost list and apply costs to matching products' },
   { id: 'pinterest-api', label: 'pinterest-api', sublabel: 'Pinterest pin import and OAuth board browsing for moodboard population.' },
   { id: 'platform-secrets-admin', label: 'platform-secrets-admin', sublabel: 'CRUD for the platform_secrets key store (admin/super_admin only)' },
+  { id: 'product-document-url', label: 'product-document-url', sublabel: "Signed, short-lived link to the original file behind a product's knowledge doc or certificate" },
   { id: 'products-3d-api', label: 'products-3d-api', sublabel: 'Public product + 3D model read for the website embed SDK (embed-key authenticated)' },
   { id: 'finance-assessment', label: 'finance-assessment', sublabel: "Derive the workspace's finance health signals, and optionally write the AI assessment of them" },
   { id: 'project-assessment', label: 'project-assessment', sublabel: "Derive a project's health signals, and optionally write the AI assessment of them" },

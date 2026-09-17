@@ -15977,5 +15977,37 @@
       }
     },
     "response": "{ properties } | { property, performance, enquiries, viewings, offers, price_history, management, management_available } | { error }"
+  },
+  {
+    "name": "product-document-url",
+    "tag": "Products",
+    "summary": "Signed, short-lived link to the original file behind a product's knowledge doc or certificate",
+    "description": "Any authenticated member of the product's workspace. Resolves the source document of a kb_doc attached to the product, or a document named by one of the product's certificates, and returns a 5-minute signed download URL. pdf-documents is a private bucket, so the URL is minted per read and never stored. Authorization is decided by get_product_document_path, which runs AS THE CALLER. A catalogue reader outside the workspace is refused: a kb_doc is one page, the file behind it is the whole supplier catalogue. Refusals answer 404, not 403, so the id space cannot be walked.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "product_id": {
+          "type": "string",
+          "required": true,
+          "description": "The product the document must be reachable from"
+        },
+        "kb_doc_id": {
+          "type": "string",
+          "description": "A knowledge doc attached to that product; its source file is returned"
+        },
+        "document_id": {
+          "type": "string",
+          "description": "A document named by one of the product's certificates"
+        }
+      }
+    }
   }
 ]
