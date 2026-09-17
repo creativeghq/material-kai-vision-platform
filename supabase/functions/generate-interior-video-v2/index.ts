@@ -25,11 +25,8 @@ import { captureException } from '../_shared/sentry.ts';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
-// 'wan2.1-i2v-720p' removed 2026-08-12 (issue #4): `wan-video/wan2.1-i2v-720p` returns 404 from
-// GET /v1/models — a read that needs no credit, so this is upstream deletion, NOT our 402
-// Insufficient-credit state. It was user-selectable at 12 credits and always hard-failed.
-// The budget tier stays vacant until `wan-video/wan-2.2-i2v-fast` can be verified against a
-// funded account (issue #4 Phase 5) — an unverified replacement would repeat the same bug.
+// The budget tier stays VACANT until a replacement is verified against a funded account
+// (issue #4 Phase 5): the last occupant 404'd upstream and hard-failed every call.
 type VideoModel = 'veo-2' | 'kling-v3.0' | 'runway-gen4-turbo'
   | 'wan-3.0-480p' | 'wan-3.0-720p' | 'wan-3.0-1080p'
   | 'seedance-2.5-480p' | 'seedance-2.5-720p'
@@ -106,25 +103,66 @@ const RAY_RESOLUTION: Partial<Record<VideoModel, '720p' | '1080p'>> = {
   'ray-3.2-1080p': '1080p',
 };
 
-// Auto-select model by video type
-// An 8-second silent clip is not a walkthrough and a 10-second silent clip is not a
-// reel — the three types that were most misserved by the old roster now default to the
-// model that can actually produce them (30s, scored, multi-reference).
-const TYPE_MODEL_MAP: Record<VideoType, VideoModel> = {
-  walkthrough:          'wan-3.0-720p',
-  floorplan_flythrough: 'wan-3.0-720p',
-  product_spotlight:    'kling-v3.0',
-  // A before/after is a clip that must END on a specific image, and Ray3.2 is the only
-  // model here that interpolates first frame -> last frame. Everything else starts from
-  // the source and drifts, which is why `before_image_url` had nowhere to go: it was
-  // read by the Replicate branch alone, and `before_after` has not routed there in
-  // months. It now lands as the end frame on every native branch — see `endFrameUrl`.
-  before_after:         'ray-3.2-720p',
-  // A reel is 15 seconds on a phone, not 30 on a monitor. H3 Max gives that with stereo
-  // audio for 25 credits, where the 30-second model spent 80 to produce twice the
-  // footage nobody watches. Wan stays one explicit `model` away.
-  social_reel:          'h3-max-768p',
+/** Which provider each model bills. Must match both the dispatch below and `generation_models.provider`. */
+const MODEL_PROVIDER: Record<VideoModel, string> = {
+  'veo-2':             'google',
+  'kling-v3.0':        'klingai',
+  'runway-gen4-turbo': 'replicate',
+  'wan-3.0-480p':      'alibaba',
+  'wan-3.0-720p':      'alibaba',
+  'wan-3.0-1080p':     'alibaba',
+  'seedance-2.5-480p': 'bytedance',
+  'seedance-2.5-720p': 'bytedance',
+  'h3-max-768p':       'fal',
+  'h3-max-480p':       'fal',
+  'ray-3.2-720p':      'luma',
+  'ray-3.2-1080p':     'luma',
 };
+
+// The ideal model FIRST, then what to fall back to when its provider has no credential. Each
+// of these was a single value until 2026-09-17, and all five named an unconfigured provider —
+// so every video type debited, failed at the provider and refunded, for everybody.
+const TYPE_MODEL_PREFERENCE: Record<VideoType, VideoModel[]> = {
+  // An 8-second silent clip is not a walkthrough: Wan gives 30s, scored, multi-reference.
+  walkthrough:          ['wan-3.0-720p', 'veo-2', 'runway-gen4-turbo', 'kling-v3.0', 'h3-max-768p'],
+  floorplan_flythrough: ['wan-3.0-720p', 'veo-2', 'runway-gen4-turbo', 'kling-v3.0', 'h3-max-768p'],
+  product_spotlight:    ['kling-v3.0', 'h3-max-768p', 'runway-gen4-turbo', 'wan-3.0-720p', 'veo-2'],
+  // Ray3.2 is the ONLY model that interpolates first frame -> last frame, so a substitute
+  // starts from the source and drifts instead of landing on `endFrameUrl`. Still better than
+  // refusing, but the response says which model actually ran.
+  before_after:         ['ray-3.2-720p', 'runway-gen4-turbo', 'kling-v3.0', 'wan-3.0-720p'],
+  // A reel is 15s on a phone, not 30 on a monitor — H3 Max with stereo audio for 25 credits.
+  social_reel:          ['h3-max-768p', 'wan-3.0-480p', 'runway-gen4-turbo', 'kling-v3.0'],
+};
+
+const TYPE_MODEL_MAP: Record<VideoType, VideoModel> = Object.fromEntries(
+  Object.entries(TYPE_MODEL_PREFERENCE).map(([type, models]) => [type, models[0]]),
+) as Record<VideoType, VideoModel>;
+
+/** A probe verdict that means the credential is deployed. `ok` is verified; the other is unverified
+ *  but has a key, and excluding it would drop Veo, whose submit shape simply has no probe. */
+const USABLE_PROBE_STATUS = new Set(['ok', 'no_probe_implemented']);
+
+/** Providers whose credential is deployed, read from the registry the health agent already stamps.
+ *  On a read failure every provider is treated as usable: the registry must never become a
+ *  second way for video to stop working. */
+async function usableVideoProviders(db: DbClient): Promise<Set<string> | null> {
+  try {
+    const { data, error } = await db
+      .from('generation_models')
+      .select('provider, last_probe_status')
+      .eq('capability', 'video')
+      .eq('enabled', true);
+    if (error || !data?.length) return null;
+    const usable = new Set<string>();
+    for (const row of data as Array<{ provider: string; last_probe_status: string | null }>) {
+      if (row.last_probe_status && USABLE_PROBE_STATUS.has(row.last_probe_status)) usable.add(row.provider);
+    }
+    return usable;
+  } catch {
+    return null;
+  }
+}
 
 // Replicate model identifiers (Kling now uses native SDK, not Replicate)
 const REPLICATE_MODELS: Record<string, string> = {
@@ -307,14 +345,46 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
   // here rather than letting it flow on: CREDIT_COSTS[unknown] is undefined, which
   // debits `undefined` credits, writes credits_used=undefined onto generation_videos,
   // and only fails much later at the provider switch — refunding undefined.
-  const resolvedModel: VideoModel = requestedModel || TYPE_MODEL_MAP[video_type as VideoType] || 'kling-v3.0';
-  const creditCost = CREDIT_COSTS[resolvedModel];
-  if (typeof creditCost !== 'number') {
+  const requestedOrDefault: VideoModel = requestedModel || TYPE_MODEL_MAP[video_type as VideoType] || 'kling-v3.0';
+  if (typeof CREDIT_COSTS[requestedOrDefault] !== 'number') {
     return jsonResponse({
       success: false,
-      error: `Unknown model '${resolvedModel}'. Supported: ${Object.keys(CREDIT_COSTS).join(', ')}`,
+      error: `Unknown model '${requestedOrDefault}'. Supported: ${Object.keys(CREDIT_COSTS).join(', ')}`,
     }, 400);
   }
+
+  // BEFORE the debit: this used to surface at the provider call, minutes and one debit later.
+  const usableProviders = await usableVideoProviders(supabase);
+  const canRun = (m: VideoModel) => !usableProviders || usableProviders.has(MODEL_PROVIDER[m]);
+
+  let resolvedModel: VideoModel = requestedOrDefault;
+  let substitutedFrom: VideoModel | null = null;
+
+  if (!canRun(resolvedModel)) {
+    if (requestedModel) {
+      // An explicit pick is never swapped: a different clip is not what they asked for.
+      return jsonResponse({
+        success: false,
+        code: 'model_not_configured',
+        error: `'${resolvedModel}' is unavailable: no credential is deployed for ${MODEL_PROVIDER[resolvedModel]}. `
+          + `Available now: ${Object.keys(CREDIT_COSTS).filter((m) => canRun(m as VideoModel)).join(', ') || 'none'}.`,
+      }, 503);
+    }
+    const alternative = (TYPE_MODEL_PREFERENCE[video_type as VideoType] ?? []).find(canRun);
+    if (!alternative) {
+      return jsonResponse({
+        success: false,
+        code: 'no_video_provider_configured',
+        error: 'Video generation is unavailable: no video provider has a credential deployed. '
+          + 'This is a platform configuration problem, and no credits have been charged.',
+      }, 503);
+    }
+    substitutedFrom = resolvedModel;
+    resolvedModel = alternative;
+    console.warn(`[generate-interior-video-v2] ${substitutedFrom} unavailable -> ${resolvedModel} for ${video_type}`);
+  }
+
+  const creditCost = CREDIT_COSTS[resolvedModel];
 
   // Clamped to the model's ceiling, and defended against a non-numeric or negative body value
   // (`Number('abc')` is NaN, and NaN silently defeats a bare Math.min). Everything downstream —
@@ -483,6 +553,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
         job_id: jobId,
         video_url: videoUrl,
         model_used: resolvedModel,
+        ...(substitutedFrom ? { substituted_from: substitutedFrom } : {}),
         credits_used: creditCost,
         video_type,
         status: 'completed',
@@ -537,6 +608,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
         job_id: jobId,
         video_url: videoUrl,
         model_used: resolvedModel,
+        ...(substitutedFrom ? { substituted_from: substitutedFrom } : {}),
         credits_used: creditCost,
         video_type,
         duration_seconds: wanResult.durationSeconds,
@@ -597,6 +669,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
         job_id: jobId,
         video_url: videoUrl,
         model_used: resolvedModel,
+        ...(substitutedFrom ? { substituted_from: substitutedFrom } : {}),
         credits_used: creditCost,
         video_type,
         duration_seconds: seedanceResult.durationSeconds,
@@ -649,6 +722,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
         job_id: jobId,
         video_url: videoUrl,
         model_used: resolvedModel,
+        ...(substitutedFrom ? { substituted_from: substitutedFrom } : {}),
         credits_used: creditCost,
         video_type,
         duration_seconds: rayResult.durationSeconds,
@@ -704,6 +778,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
         job_id: jobId,
         video_url: videoUrl,
         model_used: resolvedModel,
+        ...(substitutedFrom ? { substituted_from: substitutedFrom } : {}),
         credits_used: creditCost,
         video_type,
         duration_seconds: h3maxResult.durationSeconds,
@@ -756,6 +831,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
         job_id: jobId,
         video_url: videoUrl,
         model_used: resolvedModel,
+        ...(substitutedFrom ? { substituted_from: substitutedFrom } : {}),
         credits_used: creditCost,
         video_type,
         status: 'completed',
@@ -821,6 +897,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
           job_id: jobId,
           video_url: videoUrl,
           model_used: resolvedModel,
+          ...(substitutedFrom ? { substituted_from: substitutedFrom } : {}),
           credits_used: creditCost,
           video_type,
           status: 'completed',
@@ -834,6 +911,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
           async_job: true,
           prediction_id: prediction.id,
           model_used: resolvedModel,
+          ...(substitutedFrom ? { substituted_from: substitutedFrom } : {}),
           credits_used: creditCost,
           video_type,
           status: 'processing',

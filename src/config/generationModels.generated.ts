@@ -362,7 +362,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "erayyavuz-interior-ai",
     "tier": "standard",
-    "status": "degraded",
+    "status": "active",
     "enabled": true,
     "sort_order": 120
   },
@@ -524,7 +524,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "flux-depth-pro",
     "tier": "premium",
-    "status": "degraded",
+    "status": "active",
     "enabled": true,
     "sort_order": 180
   },
@@ -906,7 +906,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "runway-gen4-turbo",
     "tier": "premium",
-    "status": "degraded",
+    "status": "active",
     "enabled": true,
     "sort_order": 220
   },
@@ -948,7 +948,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
  * from the array above; a hand-edit changes the rows and not this constant, and the build fails.
  * Between the two, both directions of drift are covered without a secret in CI.
  */
-export const PROJECTION_FINGERPRINT = '080151b230937ae1c017eebf292e5796';
+export const PROJECTION_FINGERPRINT = '0428749d29e6197a5223f766287d431f';
 
 /** Model ids the registry knows about, for O(1) membership checks. */
 export const GENERATION_MODEL_IDS: ReadonlySet<string> = new Set(
