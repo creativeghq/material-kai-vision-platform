@@ -132,3 +132,39 @@ describe('our own export re-imports', () => {
     expect(parseCsv('name;sku\nTile;A1\n')).toEqual([{ name: 'Tile', sku: 'A1' }]);
   });
 });
+describe('an import tells the truth about what a re-import can match', () => {
+  const tab = read('src/components/Admin/DataImport/CsvImportTab.tsx');
+  const exp = read('src/components/Admin/DataImport/CatalogExportTab.tsx');
+
+  it('carries the unkeyed count the RPC returns', () => {
+    expect(tab, 'a row with no sku is inserted again by every import')
+      .toMatch(/total\.unkeyed \+= got\?\.unkeyed \?\? 0;/);
+  });
+
+  it('promises a matching re-import only on the branch where every row was keyed', () => {
+    const caught = tab.slice(tab.indexOf('} catch (err) {'));
+    expect(caught, 'told to a sheet with no sku column, that promise is false')
+      .toMatch(/total\.unkeyed > 0[\s\S]{0,400}:\s*'Re-importing the same file updates those/);
+  });
+
+  it('the export says how many products it is leaving behind', () => {
+    expect(exp, 'an operator who just imported 400 drafts otherwise downloads an empty file')
+      .toMatch(/counts\.held/);
+    expect(exp).toMatch(/\.neq\('status', 'active'\)/);
+  });
+});
+
+describe('a certificate reads the same on screen and on paper', () => {
+  it('the datasheet button sends the operator calendar day', () => {
+    const btn = read('src/components/features/products/ProductDatasheetButton.tsx');
+    expect(btn, 'without it the PDF dates certificates by the database UTC day')
+      .toMatch(/today: todayLocalISO\(\)/);
+  });
+
+  it('the PDF passes it to the RPC, and refuses a string that is not a date', () => {
+    const fn = read('supabase/functions/product-datasheet-pdf/index.ts');
+    expect(fn).toMatch(/p_today: today/);
+    expect(fn, 'a malformed value fails the whole render in the date cast')
+      .toMatch(/ISO_DATE\.test\(body\.today/);
+  });
+});

@@ -27,7 +27,9 @@ const REGISTRY_SERVICE = 'src/services/fieldRegistryService.ts';
 /** The pattern as `internal_product_field_pattern()` returns it. */
 const DB_PATTERN =
   '(^|_)(cost|costs|wholesale|margin|margins|markup|profit|landed|procurement)(_|$)'
-  + '|(^|_)(buy|buying|purchase|trade|dealer|net|supplier|invoice|acquisition|our|own)_(price|prices|cost|costs|rate)(_|$)';
+  + '|(^|_)(buy|buying|purchase|trade|dealer|net|supplier|invoice|acquisition|our|own)_(price|prices|cost|costs|rate)(_|$)'
+  + '|(^|_)(cost|costs|wholesale|margin|margins|markup|profit|landed|procurement)'
+  + '(price|prices|cost|costs|amount|amounts|value|values|rate|rates|percent|pct|eur|usd|gbp)(_|$)';
 
 function field(partial: Partial<RegistryField> & { name: string }): RegistryField {
   return {
@@ -75,6 +77,25 @@ describe('field sensitivity — the registry answers, the pattern is the floor',
       'own_cost', 'invoice_price', 'profit', 'procurement_cost',
     ]) {
       expect(isInternalFieldKey(snap, key), `${key} must be withheld`).toBe(true);
+    }
+  });
+
+  it('catches the camelCase spelling of the same key', () => {
+    for (const key of [
+      'costPrice', 'costprice', 'landedCost', 'marginPercent', 'markupPct',
+      'wholesalePrice', 'procurementCost', 'profitAmount',
+    ]) {
+      expect(
+        isInternalFieldKey(snap, key),
+        `${key} must be withheld — every consumer lowercases first, so a pattern needing an `
+        + 'underscore boundary reads the camelCase supplier feeds write as PUBLIC',
+      ).toBe(true);
+    }
+  });
+
+  it('and still does not withhold a field that merely reads like money', () => {
+    for (const key of ['priceRange', 'retailPrice', 'listPrice', 'costume', 'coastal', 'netWeight']) {
+      expect(isInternalFieldKey(snap, key), `${key} must stay visible`).toBe(false);
     }
   });
 

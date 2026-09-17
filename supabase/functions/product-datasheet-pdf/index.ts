@@ -77,8 +77,7 @@ Deno.serve(withApiLogging('product-datasheet-pdf', async (req: Request) => {
   if (tier !== 'internal' && tier !== 'member') return json({ error: 'Not found' }, 404);
 
   const workspaceId = String(product.workspace_id ?? '');
-  // The caller's calendar day, not the database's UTC one: a certificate expiring tonight
-  // otherwise prints as expired while the panel beside it still says valid.
+  // The caller's day, not UTC: a certificate expiring tonight would print as expired.
   const today = ISO_DATE.test(body.today ?? '') ? body.today : null;
   const { data: certs } = await asUser.rpc('get_product_certificates', {
     p_product_id: productId,

@@ -37142,7 +37142,7 @@ export type Database = {
       }
       import_catalogue_rows: {
         Args: { p_rows: Json; p_workspace_id: string }
-        Returns: { created: number; skipped: number; updated: number }[]
+        Returns: { created: number; skipped: number; unkeyed: number; updated: number }[]
       }
       export_catalogue_rows: {
         Args: { p_category_id?: string; p_limit?: number; p_offset?: number; p_workspace_id: string }
