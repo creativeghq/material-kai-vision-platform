@@ -60,6 +60,16 @@ describe('the open price API', () => {
     expect(src.includes('p_ip_hash: ipHash'), 'the raw IP must never reach the database').toBe(true);
   });
 
+  it('fails closed when the rate limiter cannot answer', () => {
+    const src = strippedSource(FN);
+    expect(src.includes('error: rateError'), 'the limiter error must be captured, not discarded').toBe(true);
+    expect(src.includes('if (rateError || !rate)'),
+      'a keyless endpoint that lets requests through when the limiter is down is an open door').toBe(true);
+    const failClosed = src.indexOf('if (rateError || !rate)');
+    const resolve = src.indexOf("'resolve_query_market_price'");
+    expect(failClosed).toBeLessThan(resolve);
+  });
+
   it('records which side asked, because that is what sets the refresh cadence', () => {
     const src = strippedSource(FN);
     expect(src.includes("'record_price_demand'")).toBe(true);
