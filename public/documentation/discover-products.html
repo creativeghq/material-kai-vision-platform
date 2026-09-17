@@ -40,8 +40,42 @@
 
   <div class="callout tip"><p><strong>Worked example — scanning what's available.</strong> Open Discover → <strong>Products</strong> → set <strong>All categories</strong> to the material category you're after → flip the <strong>View toggle</strong> to <strong>grid</strong> for a visual scan → type a product name or factory into <em>“Search materials by name or factory…”</em> → page through the results, then act on a product you like — add it to a comparison, a moodboard or a quote.</p></div>
 
+  <h2>Everyone signed in sees the whole catalogue</h2>
+  <p>The Products list is the <strong>cross-workspace</strong> catalogue — every supplier's published products, not just your own workspace's. This matters most for a signed-up <strong>architect</strong> or specifier: you browse the full market here, then act on what you find. (Prices are still shown per viewer — <em>your</em> price versus retail — and cost and margin are never listed.)</p>
+
+  <h2>Filtering by material properties</h2>
+  <p>Beyond <strong>category</strong> and <strong>brand</strong>, the <strong>Filter</strong> modal (<em>“Filter materials”</em>) carries a <strong>Properties</strong> group — the actual technical attributes the products in the list carry (finish, format, slip rating, and so on). The list is <strong>built from the catalogue itself</strong>: it offers only registry-known, public fields whose value appears on more than one product, so you're always filtering on something real rather than a fixed menu that may not apply. Pick one or more values to narrow the list.</p>
+
+  <h2>Smart search &amp; saved searches</h2>
+  <p>The Products tab has two search modes. Plain <strong>Browse</strong> matches on name or factory (above); <strong>Smart search</strong> is the platform's multi-vector search — it reads intent, not just keywords, and is the same engine the old <code>/search</code> page used before it was folded in here.</p>
+  <ul class="feat">
+    <li><strong>Save a search you'll run again.</strong> With a smart query active, <strong>Save this search</strong> keeps it as a chip above the box. Click a saved chip any time to re-run it; the trash icon on a chip removes it. Your saved searches are yours, scoped to the workspace you're in, most-recently-used first.</li>
+    <li>If they can't be loaded the page says so — <em>“Saved searches could not be loaded — this is not a statement that you have none”</em> — rather than silently showing an empty rail.</li>
+  </ul>
+
+  <h2>Opening a product — certificates, datasheets &amp; the original file</h2>
+  <p>Clicking a product opens its detail view; the <strong>Knowledge</strong> tab is where its compliance record and documents live. For a product in <em>your own</em> workspace you can also manage them here.</p>
+  <h3>Certificates — a record, not a chip</h3>
+  <p>A certificate is a proper record with a <strong>Standard</strong> (e.g. <em>EN 13501-1</em>), a <strong>Result</strong> (e.g. <em>A1</em>), a <strong>certificate number</strong>, an <strong>issuer</strong>, a <strong>scope</strong>, and <strong>Valid from / Valid until</strong> dates. The <strong>Certificates</strong> table shows each with a <strong>Status</strong> badge the platform derives from the expiry — <em>Valid</em>, <em>Expiring soon</em>, <em>Expired</em>, or <em>No expiry stated</em> — so a lapsing certificate warns you before it bites, and products can be filtered on what they're certified for.</p>
+  <ul class="feat">
+    <li><strong>Add certificate</strong> opens a form for those fields; each row has <strong>Edit</strong> and <strong>Remove</strong>. Editing needs it to be your product plus a finance/warehouse/pricing capability.</li>
+    <li><strong>Read off the documents for you.</strong> Two suggestion rails offer standards the extractor already found — <em>“From documents”</em> (read out of the product's uploaded files) and <em>“From product text”</em> — as one-click drafts. A date it couldn't parse is left <strong>blank rather than guessed</strong>; you check each against the source before recording it.</li>
+  </ul>
+  <h3>The branded datasheet, and the original file</h3>
+  <ul class="feat">
+    <li><strong>Datasheet PDF</strong> (on your own product) builds a <strong>branded</strong> one-product datasheet — your letterhead, the product's image, its specs and its certificates — and opens it to download.</li>
+    <li><strong>Original PDF</strong> on a knowledge-base article hands over the <em>source file</em> the specs/certificates were read from, not just the text we extracted — so you can pass on the real document.</li>
+  </ul>
+
+  <h2>Getting your catalogue in and out</h2>
+  <p><strong>What it is —</strong> a bulk import/export for your own products, in the <strong>Data Import Hub</strong> (<span class="badge route">/admin/data-import</span>, workspace admins). <strong>Why it matters —</strong> you can seed your catalogue from a spreadsheet and push it to a sales channel without re-keying.</p>
+  <ul class="feat">
+    <li><strong>Import from a spreadsheet</strong> (CSV) — it reads <em>name, sku, description, category, barcode, country of origin, warranty</em> and a product URL; anything else is ignored and <strong>price and cost are never taken from a file</strong>. Rows <strong>upsert by SKU</strong>, so re-importing updates products rather than duplicating them, and it reports how many were created, updated and skipped.</li>
+    <li><strong>Export to a channel</strong> — as <strong>CSV, JSON or XML</strong>, using your own column names or a saved <strong>channel mapping</strong> that renames them to a partner's vocabulary. Only <strong>active products</strong> are exported, and <strong>cost, margin and supplier links are never included</strong>.</li>
+  </ul>
+
   <h2>What it affects elsewhere</h2>
-  <p>Products you find here are the same items you specify on quotes and documents in <a href="finance-documents.html">Finance</a> and search conversationally in the <a href="agent-hub.html">Agent Hub</a> — Discover is the browse surface, the others are where you act on what you found. For richer, conversational product search you can also use the <a href="agent-hub.html">Agent Hub</a>.</p>
+  <p>Products you find here are the same items you specify on quotes and documents in <a href="finance-documents.html">Finance</a> and search conversationally in the <a href="agent-hub.html">Agent Hub</a> — Discover is the browse surface, the others are where you act on what you found. Suppliers can see <a href="market-trends.html">what people searched their catalogue for</a>, and the same product catalogue can be embedded on your own site as a <a href="api-embed.html">searchable widget</a>.</p>
 </main>
 <script src="assets/nav.js"></script>
 </body>

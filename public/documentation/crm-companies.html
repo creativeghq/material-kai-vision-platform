@@ -253,6 +253,13 @@
   </ul>
   <div class="callout warn"><p><strong>Why the confirmation is deliberately in your hands.</strong> A changed IBAN on a supplier invoice is the commonest invoice fraud — so a bank detail read off a document is a <em>suggestion</em>, and a conflicting IBAN raises exactly that warning: <em>“confirm it on a phone number you already had for them, not one printed on the document.”</em> The platform reads the IBAN for you; it never quietly repoints where your money goes.</p></div>
 
+  <h3>Compliance flags — withholding &amp; producer registration</h3>
+  <p>Two settings on a company record feed <a href="finance-compliance.html">compliance</a> elsewhere:</p>
+  <ul class="feat">
+    <li><strong>“Withholds tax (φορέας γενικής κυβέρνησης)”</strong> — mark a <strong>public body</strong> that pays most of an invoice and remits the withholding to the state. Recording it here is what makes the withheld part settle as a <em>leg of the payment</em> rather than sit forever as a debt — see <a href="finance-compliance.html">withholding</a>.</li>
+    <li><strong>Producer registration (EPR)</strong> — for a supplier, their packaging producer-registration is verified here; an unverified supplier can <strong>block a sale</strong> that depends on it, not merely warn. See <a href="finance-compliance.html">packaging &amp; EPR</a>.</li>
+  </ul>
+
   <h2>Worked example — onboarding a Greek supplier you'll buy on credit</h2>
   <div class="callout tip"><p>Open <strong>CRM → Companies</strong> → click <strong>Add Company</strong>. Type the supplier's name into <strong>Company Name</strong>, then put their <strong>ΑΦΜ</strong> in the Tax &amp; VAT group and run the <strong>ΑΑΔΕ lookup</strong> — the legal name, registered address, ΔΟΥ, ΚΑΔ activity codes and active/inactive status fill in from the registry, so you don't risk a typo. Confirm the <strong>Invoicing &amp; VAT</strong> billing identity (billing name, ΑΦΜ, ΔΟΥ, billing address) and set <strong>Include in ΜΥΦ</strong> on so their transactions appear in your Greek clientele summary. Agree terms in <strong>Pricing</strong> — say a default discount and a credit limit. Finally, in <strong>Role</strong>, tick <strong>This is a supplier</strong>. Save. The company now appears on the purchases/payables side and in the Business page's supplier overview, and its confirmed billing details flow straight onto the bills you record against it in <a href="finance.html">Finance</a>.</p></div>
 

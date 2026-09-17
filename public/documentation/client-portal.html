@@ -50,6 +50,18 @@
   <h2>Where the data comes from</h2>
   <p>Everything on the portal is the <em>same</em> data you manage in Finance — orders, invoices, receipts and payments — just filtered to the one account and presented read-only. There's nothing extra to maintain: the moment you issue an order, invoice, receipt or record a payment against a customer, it appears on their portal. The customer's running balance here mirrors the <strong>Account balance</strong> on their <a href="crm-companies.html">CRM record</a>.</p>
 
+  <h2>How a customer gets a login</h2>
+  <p>A customer doesn't have an account created <em>for</em> them — you <strong>invite</strong> them and they sign up. From a <a href="crm-contacts.html">CRM contact</a> (or company), <strong>Invite</strong> → <strong>Customer account</strong> sends them an email — <em>“See your orders and invoices online”</em> with a <strong>Create my login</strong> link. Crucially, this is <strong>not a seat in your workspace</strong>: they get a login joined to <em>their own</em> CRM record and see nothing else. (The dialog even warns you off “Join your team” for a buyer — a member can read your CRM, costs and pipeline.) The link itself is the grant: once they sign up, the portal is theirs. See <a href="crm.html">Inviting people</a> for the full set of invite types.</p>
+
+  <h2>The Trade Portal — a company account for B2B buyers <span class="badge gated">#441</span></h2>
+  <p><strong>What it is —</strong> a heavier, <em>company-level</em> account for a trade customer who reorders from you — distinct from the per-person Client Portal above. It's reached by a <strong>passwordless link</strong> (<span class="badge route">/trade/:token</span> <span class="badge public">Public</span>): the token is the identity, so there's no login to manage. <strong>Why it matters —</strong> a wholesale buyer wants to see their account and reorder without a sign-up, and a business wants several of its people buying under one roof with controls.</p>
+  <ul class="feat">
+    <li><strong>What the buyer sees</strong> — their company's <strong>open items</strong> (invoice, issued/due, outstanding, with a <strong>Pay</strong> link per invoice) and the <strong>net balance</strong> straight from the ledger, plus their reorder history.</li>
+    <li><strong>Reorder</strong> — <em>“Order it again”</em> places an order, always created as a <strong>draft for you to confirm</strong>. A line over a person's cap, or an unpriced line, becomes an <strong>approval request</strong> rather than a refusal.</li>
+    <li><strong>Their own admin approves</strong> — a nominated person at the customer approves/declines their colleagues' over-cap orders, from the same portal (<em>“Waiting on you”</em>).</li>
+    <li><strong>You set it up</strong> from the CRM company's <strong>Trade portal</strong> tab: open the account, choose what stock they see (hidden / bands / exact), set an approval threshold, add each colleague with a <strong>role</strong> (admin / buyer / look-only) and a <strong>per-order cap</strong>, and copy their <span class="badge route">/trade/:token</span> link.</li>
+  </ul>
+
   <h2>The empty state</h2>
   <p>A signed-in user who isn't (yet) a customer of any business sees: <em>“Nothing here yet. Your orders, invoices and receipts will appear here as soon as a business issues them to you.”</em> — so the page is safe to expose to every user; it simply fills in once documents are addressed to them.</p>
 

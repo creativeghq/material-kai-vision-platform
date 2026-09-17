@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Compliance (CBAM, EPR, ΨΔΑ, POS) | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="finance.html">Finance</a> / <a href="finance-settings.html">Settings</a> / Compliance</div>
+  <h1>Compliance — CBAM, packaging, ΨΔΑ, POS &amp; VAT</h1>
+  <div class="routes"><span class="badge route">/finance?tab=settings&amp;section=compliance</span> <span class="badge gated">finance.manage</span></div>
+  <p class="lead">A growing set of regulatory obligations — the EU carbon border levy (<strong>CBAM</strong>), Greek <strong>packaging / EPR</strong> declarations, the digital delivery note (<strong>ΨΔΑ Phase Β</strong>), <strong>POS interconnection</strong> (Law 5155), the pre-filled <strong>VAT return</strong> reconciliation, and public-sector <strong>withholding</strong> — now have a home in MaterialsHub. Most live together under <strong>Finance → Settings → Compliance</strong>; a few surface where the work actually happens (an order, a delivery note, the POS). This page is the map. It's <strong>operator / finance-manager</strong> territory.</p>
+
+  <div class="callout"><p><strong>Where:</strong> <a href="finance-settings.html">Finance → Settings</a> → the <strong>Compliance</strong> section (<span class="badge route">?section=compliance</span>). The cards below live there unless noted. <strong>A recurring principle:</strong> these tools <em>measure and prepare</em> — an unclassified line is stated as unknown, not defaulted, and where there is no authority to transmit to, the page says so rather than pretending to file.</p></div>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/compliance.png" alt="Finance → Settings → Compliance">
+    <figcaption>Finance → Settings → <strong>Compliance</strong> — the CBAM card leads, with a year selector, an <strong>Extract</strong>, the running mass against the 50-tonne threshold, and the note that entries are recorded from a purchase order's Customs tab. The Pre-filled VAT, POS interconnection and other cards follow below.</figcaption>
+  </figure>
+
+  <h2>CBAM — the carbon border adjustment</h2>
+  <p><strong>What it is —</strong> the EU's carbon levy on imports of certain goods (iron, steel, aluminium, cement, fertiliser…). <strong>The two rules that catch people:</strong> the year's liability is <strong>measured in mass</strong> against a 50-tonne threshold, and once you cross it you're liable <strong>for the whole year, not from the crossing date</strong>.</p>
+  <ul class="feat">
+    <li><strong>Per order</strong> — on a purchase <a href="finance-doc-orders.html">order</a>'s <strong>Customs</strong> tab, the <strong>CBAM</strong> card classifies each line by its CN code and origin (<em>Annex I</em>, <em>out of scope</em>, <em>unclassified</em>, or <em>no CN code</em>), shows the running year position against the threshold, and lets you <strong>record it in the CBAM register</strong> with an entry date and MRN. A line whose <strong>net mass isn't weighed is flagged red</strong> — mass is the whole basis, so a guess isn't allowed.</li>
+    <li><strong>Per year</strong> — the <strong>CBAM position</strong> card (Settings → Compliance) reconciles the year by sector, goods code and country of origin, and <strong>Extract</strong>s a CSV. It states plainly: <em>there is no CBAM API — nothing here is transmitted</em>; this prepares your declaration, it doesn't file it.</li>
+    <li><strong>On the product</strong> — a product carries its regulatory role read off its origin, plus a Declaration of Performance panel, so the classification isn't re-typed per order.</li>
+  </ul>
+
+  <h2>Packaging &amp; EPR — the ΕΜΠΑ / ΣΣΕΔ declaration</h2>
+  <p><strong>What it is —</strong> the <strong>Packaging declaration</strong> card (<em>ΕΜΠΑ / ΣΣΕΔ</em>) — your extended-producer-responsibility filing for the packaging you put on the market, due <strong>31 March</strong>, with the same figures serving both filings.</p>
+  <ul class="feat">
+    <li><strong>Composition is entered on the product</strong> — each product's packaging components (material and weight) feed the declaration; a component with no weight is flagged.</li>
+    <li>Pick a <strong>declaration year</strong> and it derives the table by material — primary kg, secondary/tertiary kg, and the reusable-asset figures — plus an <strong>enterprise-size</strong> (ESPR art. 24) selector.</li>
+    <li><strong>Two “obvious” shortcuts it refuses to take:</strong> first-placed packaging is <strong>not</strong> total minus prior (once you buy a second-hand pallet that breaks), so new / used / held are counted separately; and a <strong>foreign EPR registration (CONAI, Ecoembes…) does not exempt the Greek liability</strong>.</li>
+    <li>A supplier's producer-registration is verified on their <a href="crm-companies.html">CRM record</a>; an unverified supplier can <strong>block a sale</strong> rather than just warn.</li>
+  </ul>
+
+  <h2>ΨΔΑ Phase Β — the digital delivery note</h2>
+  <p><strong>What it is —</strong> Greece's digital consignment note, where a movement of goods is a sequence of <strong>legs</strong> (dispatch, transhipment, return, outcome), each its own fiscal event. <strong>Phase Β1 from 2026-10-12, Β2 from 2027-01-01.</strong></p>
+  <ul class="feat">
+    <li><strong>Recording the legs</strong> — a <a href="finance-doc-delivery-notes.html">delivery note</a> that has left draft shows a <strong>Movement lifecycle</strong> (truck) button: a <em>ledger</em> of legs, not a status field. The legs offered follow AADE's transition table (Start / tranship, Return leg, Declare outcome, Recipient rejects, Confirm the return); each records who declared it, the outcome (full / partial / none), the vehicle and carrier, and shows a <strong>filed (MARK) / offline / not filed</strong> badge. Offline recording is allowed and marked as such.</li>
+    <li><strong>Readiness</strong> — the <strong>ΨΔΑ Phase Β readiness</strong> card (Settings → Compliance) is where you record the <strong>route</strong> — through a certified provider, or direct to myDATA as an ERP developer — and see your CN-code coverage.</li>
+  </ul>
+  <div class="callout warn"><p><strong>Legs are recorded, not yet auto-filed.</strong> The readiness card exists precisely because a recorded leg looks the same whether or not AADE heard about it. Choosing the transmission route is a configuration decision today; the automated filing is still being finished.</p></div>
+
+  <h2>POS interconnection — the terminal as a fiscal device</h2>
+  <p><strong>What it is —</strong> Law 5155 requires the card terminal (EFT-POS) to be <em>interconnected</em> with the cash system, so a card payment and its receipt are one signed transaction. <strong>The terminal stops being a peripheral.</strong></p>
+  <ul class="feat">
+    <li><strong>POS interconnection</strong> card (Settings → Compliance) — a per-terminal grid: provider/model, the interconnection <strong>route</strong> (Α.1098 / Α.1155), whether it takes <strong>retail</strong> and/or <strong>wholesale</strong> trade, the matching window, and a verdict badge (<em>interconnected</em> / <em>must interconnect</em>). A terminal taking mixed trade must interconnect.</li>
+    <li>Alongside it, the <strong>ERP declaration</strong> (Α.1054 Δήλωση Συμβατότητας) card records your compatibility declaration.</li>
+    <li>At the <a href="pos.html">register</a>, a card/IRIS payment is now <strong>signed → the terminal is charged → the receipt is finalized</strong>, capturing the acquirer id, RRN and auth code; and completion is <strong>blocked if the document didn't reach myDATA</strong>. A wholesale sale settled on a terminal is flagged as needing the correct document, not the retail workaround.</li>
+  </ul>
+
+  <h2>Pre-filled VAT return</h2>
+  <p><strong>What it is —</strong> the <strong>Pre-filled VAT reconciliation</strong> card checks your books against AADE's pre-filled return, where — by AADE's rule — declared <strong>income is a floor</strong> and declared <strong>expenses are a ceiling</strong>. Add a period and it gives a verdict; where you legitimately differ, you <strong>record a 14.30 deviation</strong> (an expense excess) or an <strong>11.4 deviation</strong> (an income shortfall). A deviation is <strong>not “declared” until an emitted document carries a MARK</strong> — until then it reads <em>“not transmitted — still just a difference.”</em></p>
+
+  <h2>Public-sector withholding (παρακράτηση)</h2>
+  <p><strong>What it is —</strong> when you invoice a <strong>public body</strong>, it pays most of the invoice and <strong>remits the withholding to the state</strong> (e.g. 4% on goods). The withheld part is <em>not</em> a debt that never clears — it's a <strong>leg of the settlement</strong>.</p>
+  <ul class="feat">
+    <li><strong>Mark the party</strong> — on the <a href="crm-companies.html">CRM company</a>, the <em>“Withholds tax (φορέας γενικής κυβέρνησης)”</em> setting tells the platform this counterparty withholds. <em>“Recording it here is what stops the rest reading as debt.”</em></li>
+    <li><strong>The maths</strong> — the withheld amount becomes a settlement leg, so <em>settled + withheld = invoiced</em>; a fully-paid public-sector order no longer shows a permanent outstanding balance, and the withheld figure is what reaches AADE. It's shown as a <strong>Withholding</strong> row on the invoice.</li>
+  </ul>
+
+  <div class="callout tip"><p><strong>In short:</strong> the Compliance section is where you <em>prepare and reconcile</em> what the law now asks for; the actual documents are issued in <a href="finance-documents.html">Finance</a> and at the <a href="pos.html">POS</a>, and the CBAM/movement/withholding facts are captured on the <a href="finance-doc-orders.html">order</a> and <a href="finance-doc-delivery-notes.html">delivery note</a> where the work happens.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

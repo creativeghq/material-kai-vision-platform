@@ -144,6 +144,17 @@
   <p><strong>What it affects:</strong> the payment-method breakdown on the X and Z reports, and the expected-cash figure the drawer is reconciled against at close.</p>
   <div class="callout tip"><p>When card or IRIS is settled on a registered terminal, the register may hold the receipt while you charge the device, then confirm to complete it. Cash sales finalise straight away.</p></div>
 
+  <h3>The card terminal is now a fiscal device</h3>
+  <p>Under Greece's Law 5155 the card terminal (EFT-POS) must be <strong>interconnected</strong> with the till, so a card payment and its receipt are one signed transaction. In practice, at the register:</p>
+  <ul class="feat">
+    <li>A card/IRIS sale is <strong>signed → the terminal is charged → the receipt is finalized</strong>, and the platform captures the <strong>acquirer id, RRN and authorisation code</strong> from the slip onto the document.</li>
+    <li><strong>Completion is blocked if the document didn't reach myDATA</strong> — a receipt can't quietly finalise unfiled.</li>
+    <li>A <strong>signature queue</strong> at the bottom of the register lists provider signatures still waiting for a matching payment (they auto-reject after the window), so a mismatch is visible rather than lost.</li>
+    <li>A <strong>wholesale</strong> sale settled on a terminal is flagged as needing the correct wholesale document, not the retail workaround.</li>
+  </ul>
+  <p>Which terminals you have, their interconnection route (Α.1098 / Α.1155) and your Α.1054 compatibility declaration are configured under <a href="finance-compliance.html">Finance → Settings → Compliance</a>.</p>
+  <div class="callout"><p><strong>Capture a lost sale.</strong> When a customer asks for something you don't stock, the register's <em>“asked for something we had not got”</em> action records it — so a walkout becomes a demand signal instead of nothing.</p></div>
+
   <h2>Closing the shift (X &amp; Z reports)</h2>
   <p><strong>What it is —</strong> the two shift reports. The <strong>X report</strong> is a snapshot of the shift while it's still open (receipt count, total sales, a breakdown by payment method and by VAT rate, opening float, cash movements and expected cash). <strong>Close (Z)</strong> ends the shift: it asks for the counted cash in the drawer and produces the final, numbered Z report, including any cash variance. <strong>Why it matters —</strong> the X report lets you check yourself mid-day without ending the session, and the Z report is the formal close-out that proves the day's takings and surfaces any discrepancy between counted and expected cash. <strong>How:</strong> tap <strong>X report</strong> to read the live snapshot, or <strong>Close (Z)</strong> at end of day and enter the counted cash. Both reports can be printed.</p>
   <p><strong>What it affects:</strong> closing a shift returns the register to the “no open shift” state — issuing is blocked again until you open the next shift.</p>
