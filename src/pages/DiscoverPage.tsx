@@ -33,6 +33,7 @@ import { Product } from '@/components/features/products/types';
 import { ProfileModal } from '@/components/features/discover/ProfileModal';
 import { MarketplaceTab } from '@/components/features/discover/MarketplaceTab';
 import { UnifiedSearchInterface } from '@/components/features/search/UnifiedSearchInterface';
+import { SavedSearches } from '@/components/features/search/SavedSearches';
 import { marketplaceService } from '@/services/marketplaceService';
 import {
   CAT_COLORS, PROFESSIONAL_TYPE_LABELS,
@@ -407,7 +408,7 @@ export const DiscoverPage: React.FC = () => {
   const [productMode, setProductMode] = useState<ProductMode>(
     searchParams.get('mode') === 'smart' ? 'smart' : 'browse',
   );
-  const smartInitialQuery = searchParams.get('q') || undefined;
+  const [smartQuery, setSmartQuery] = useState<string | undefined>(searchParams.get('q') || undefined);
 
   // Modals
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
@@ -712,10 +713,17 @@ export const DiscoverPage: React.FC = () => {
             />
 
             {productMode === 'smart' ? (
-              <UnifiedSearchInterface
-                initialQuery={smartInitialQuery}
-                onMaterialSelect={openProductById}
-              />
+              <div className="space-y-3">
+                <SavedSearches
+                  currentQuery={smartQuery}
+                  onApply={(q) => setSmartQuery(q)}
+                />
+                <UnifiedSearchInterface
+                  key={smartQuery ?? ''}
+                  initialQuery={smartQuery}
+                  onMaterialSelect={openProductById}
+                />
+              </div>
             ) : (
               <>
                 <FilterBar
