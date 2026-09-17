@@ -86,6 +86,14 @@
   <h2>Manage HR from chat <span class="badge gated">HR app · admin</span></h2>
   <p><strong>What it's for:</strong> quick HR lookups and actions without opening the module (needs the <a href="hr.html">HR</a> app). <strong>How:</strong> ask — <em>“who's on leave today?”</em>, <em>“give me an HR overview,”</em> <em>“list my employees,”</em> <em>“add an employee,”</em> or <em>“record 2 days sick leave for [name].”</em> <strong>What you get:</strong> the answer or the action done — an HR summary, the leave list, the employee added, or the absence recorded.</p>
 
+  <h2>When no tool fits — the assistant uses the platform's own API</h2>
+  <p><strong>What it's for:</strong> the assistant has a dedicated tool for the common jobs, but the platform does far more than any fixed tool list can cover. When your request has no matching tool, it can now <strong>call the platform's own internal API</strong> to answer — reaching the same endpoints your account can, <strong>as you</strong>. <strong>How:</strong> you don't do anything special; just ask, and if nothing more specific fits, it discovers the right endpoint and calls it. <strong>What you get:</strong> an answer drawn from a much wider surface of the platform than the named tools alone.</p>
+  <ul class="feat">
+    <li><strong>It can't do anything you couldn't.</strong> Every such call runs with <em>your</em> permissions and each endpoint enforces its own access rules, so the assistant can't reach data or actions your account isn't already allowed to.</li>
+    <li><strong>Money and filings still ask first.</strong> Anything that moves money, files with ΑΑΔΕ/ΕΡΓΑΝΗ, or sends something to a third party is <strong>held for your explicit confirmation</strong> — it's never fired off the back of a chat message on its own.</li>
+    <li><strong>Some things are off-limits to it entirely</strong> — bulk jobs and anything that would action a queue of real work waiting on a human are blocked, by design.</li>
+  </ul>
+
   <h2>Skills &amp; toolkits (the assistant extends itself)</h2>
   <p><strong>What it's for:</strong> you don't have to remember which capability to enable — when a task needs more, the assistant <strong>loads the right toolkit or skill mid-conversation</strong> by itself (the <strong>+ Toolkit</strong> panel by the composer shows what's active and lets you add more). For long jobs it can also <strong>run a task in the background</strong> and tell you when it's done, and you can ask <em>“how's it going?”</em> to check progress.</p>
 
