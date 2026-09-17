@@ -4,6 +4,7 @@ import { FileDown, Loader2 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { todayLocalISO } from '@/utils/datetime';
 
 export function ProductDatasheetButton({ productId }: { productId: string }) {
   const [busy, setBusy] = useState(false);
@@ -13,7 +14,7 @@ export function ProductDatasheetButton({ productId }: { productId: string }) {
     setBusy(true);
     try {
       const { data, error } = await supabase.functions.invoke('product-datasheet-pdf', {
-        body: { product_id: productId },
+        body: { product_id: productId, today: todayLocalISO() },
       });
       if (error) throw error;
       const url = (data as { url?: string } | null)?.url;

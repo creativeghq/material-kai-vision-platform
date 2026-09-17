@@ -11,6 +11,7 @@ import {
 
 const URL_TTL_SECONDS = 7 * 24 * 3600;
 const MAX_SPEC_ROWS = 60;
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 type Json = Record<string, unknown>;
 
@@ -54,7 +55,7 @@ Deno.serve(withApiLogging('product-datasheet-pdf', async (req: Request) => {
   const auth = await authenticate(req, { requireUser: true });
   if (!auth.success || !auth.userId) return json({ error: auth.error ?? 'Unauthorized' }, 401);
 
-  let body: { product_id?: string };
+  let body: { product_id?: string; today?: string };
   try { body = await req.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
   const productId = body.product_id;
   if (!productId) return json({ error: 'product_id is required' }, 400);
@@ -76,7 +77,13 @@ Deno.serve(withApiLogging('product-datasheet-pdf', async (req: Request) => {
   if (tier !== 'internal' && tier !== 'member') return json({ error: 'Not found' }, 404);
 
   const workspaceId = String(product.workspace_id ?? '');
-  const { data: certs } = await asUser.rpc('get_product_certificates', { p_product_id: productId });
+  // The caller's calendar day, not the database's UTC one: a certificate expiring tonight
+  // otherwise prints as expired while the panel beside it still says valid.
+  const today = ISO_DATE.test(body.today ?? '') ? body.today : null;
+  const { data: certs } = await asUser.rpc('get_product_certificates', {
+    p_product_id: productId,
+    ...(today ? { p_today: today } : {}),
+  });
 
   const service = createClient(
     Deno.env.get('SUPABASE_URL')!,
