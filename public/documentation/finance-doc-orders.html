@@ -159,6 +159,17 @@
   <h2>Orders on a customer's account</h2>
   <p>A company in <a href="crm-companies.html">CRM</a> is treated as an <strong>Account</strong>, and its orders <em>drive</em> that account. The company's single <strong>Account</strong> tab consolidates the running <strong>Account balance</strong> + ledger, the payment rules, expected payments, and the company's orders together — so the orders are the source and the balance is the summary, in one place. (A contact who belongs to a business is attributed to the business, so the money lives on the business account.)</p>
 
+  <h2>Tracking a line — status, dates &amp; fulfilment</h2>
+  <p><strong>What it is —</strong> an order isn't one status; each <em>line</em> can be at a different point. On an order's <strong>Customs</strong> tab, the <strong>line timeline</strong> gives every line its own <strong>status</strong>, a <strong>fulfilment mode</strong> and a set of dated milestones. <strong>Why it matters —</strong> a real order is “two of these arrived, one's on back-order, one ships direct from the supplier” — one order status can't say that.</p>
+  <ul class="feat">
+    <li><strong>Status</strong> — a ladder from <em>Specified → Approved → Ordered → Acknowledged → Shipped → Received → Delivered → Installed</em>, plus the outcomes <strong>Damaged</strong> and <strong>Cancelled</strong>. <em>Damaged</em> is a claim against the supplier, not a quantity fiddle, and is flagged as such.</li>
+    <li><strong>Fulfilment mode</strong> — per line: <em>Collect now</em>, <em>Deliver</em>, <em>Direct from supplier</em>, <em>Quote only</em>, or <em>Return / credit</em>.</li>
+    <li><strong>Eight dates</strong>, each a “this happened on” (blank means <em>not yet</em>, never a guess): Ordered, Shipped, Delivery, Install — and the four money dates (client deposit, supplier deposit, client balance, supplier balance).</li>
+  </ul>
+  <p><strong>The work queue.</strong> <a href="finance-op-planning.html">Finance → Planning</a> gathers the lines that are due or late into buckets — <em>Overdue / Today / This week / Next week / Later</em> — and, deliberately, a <strong>No date promised</strong> bucket, because a line with no promised date is not “on time”, it's unplanned.</p>
+  <p><strong>Who gets the pallet.</strong> When a purchase line is received, its <strong>Customs</strong> tab shows the sales orders waiting on it (oldest-confirmed-first), each with an <strong>Assign</strong> / <strong>Release</strong> control — so one delivery is allocated to the customers who've been waiting, not first-come-first-served by accident.</p>
+  <p><strong>Delivery evidence &amp; disputes.</strong> The same Customs tab carries proof-of-delivery on a sales order (a short/damaged outcome asks for the photograph, not just a note) and a goods-receipt inspection on a purchase order — where <strong>rejecting the goods opens a supplier claim in the same action</strong>. (See also <a href="finance-compliance.html">CBAM</a>, recorded on this tab.)</p>
+
   <h2>What it affects</h2>
   <ul class="feat">
     <li>Invoices/receipts (<a href="finance-doc-invoices.html">Invoices</a>), supplier bills and <a href="finance-rp-payments.html">payments</a> link to an order — that's how Margin and the real-cash Received / Paid / Profit are computed.</li>

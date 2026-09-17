@@ -3,82 +3,122 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Stock Management | MaterialsHub Documentation</title>
+<title>Warehouse (Stock) | MaterialsHub Documentation</title>
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
 <main class="content">
-  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="apps.html">Apps &amp; Modules</a> / Stock Management</div>
-  <h1>Stock Management <span class="badge gated">Pro add-on</span></h1>
-  <div class="routes"><span class="badge route">/stock</span></div>
-  <p class="lead">Stock Management is your <strong>multi-warehouse inventory</strong>: what you hold and where, every <strong>movement</strong> (receive / issue / adjust / transfer), <strong>reorder-point</strong> low-stock alerts, physical <strong>stock counts</strong>, <strong>inbound container tracking</strong>, an <strong>AI resupply forecast</strong>, and a bridge to buy more when you run low. It was extracted from Finance into a first-class paid add-on so businesses that live and die by inventory get a proper home for it. This page covers each section, plus the two shipping integrations — <strong>ShipsGo</strong> container tracking (bring-your-own-key) and <strong>SeaRates</strong> freight quotes.</p>
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="apps.html">Apps &amp; Modules</a> / Warehouse</div>
+  <h1>Warehouse <span class="badge gated">Pro add-on</span></h1>
+  <div class="routes"><span class="badge route">/warehouse</span> <span class="badge gated">warehouse.manage</span></div>
+  <p class="lead">The <strong>Warehouse</strong> module (formerly “Stock Management”) is your real inventory back-office: what you hold and where, what it's <strong>worth</strong>, every <strong>movement</strong>, storage <strong>locations</strong> and putaway, physical and <strong>year-end</strong> counts, landed-cost, supplier rebates, ageing write-downs, goods <strong>intake</strong>, inbound tracking, an AI <strong>resupply</strong> forecast and <strong>dispatch</strong>. It grew from a simple stock list into a proper warehouse system, so a business that lives by inventory has a home for the parts a general ledger skips. This page covers each tab, plus the two shipping integrations — <strong>ShipsGo</strong> tracking (BYOK) and <strong>SeaRates</strong> quotes.</p>
 
-  <div class="callout"><p><strong>Where:</strong> enable <strong>Stock Management</strong> from the <a href="apps.html">App Launcher</a> (Pro add-on), then open it at <span class="badge route">/stock</span>. Everything is <strong>per workspace</strong>. Note: inventory used to live under <a href="finance-op-warehouse.html">Finance → Warehouse</a>; it's now this dedicated module.</p></div>
+  <div class="callout"><p><strong>Where:</strong> enable <strong>Warehouse</strong> from the <a href="apps.html">App Launcher</a> (Pro add-on) and open it at <span class="badge route">/warehouse</span>; it needs the <code>warehouse.manage</code> capability. Everything is per workspace. (Inventory once lived under <a href="finance-op-warehouse.html">Finance → Warehouse</a> and then a “Stock” module — same data, now this dedicated home.) The tab strip runs: <strong>Overview · Inventory · Locations · Valuation · Resupply · Inbound · Dispatch · Movements · Stock Counts</strong>.</p></div>
 
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/stock/stock.png" alt="The Stock Management module — inventory overview across warehouses">
-    <figcaption>Stock Management — Overview, Inventory, Resupply, Inbound and Movements across warehouses.</figcaption>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/stock/stock.png" alt="The Warehouse module — inventory overview across warehouses">
+    <figcaption>Warehouse — the overview across warehouses, with Inventory, Locations, Valuation, Resupply, Inbound, Dispatch, Movements and Stock Counts on the tab strip.</figcaption>
   </figure>
 
   <h2>Overview — what you hold</h2>
-  <p>The overview is your at-a-glance inventory health: <strong>Stock items</strong>, <strong>Warehouses</strong>, <strong>Units on hand</strong> and <strong>Units reserved</strong>, plus the numbers that need action — <strong>Low stock</strong> (items below their reorder point), <strong>Out of stock</strong>, <strong>Open counts</strong> (stocktakes in progress) and <strong>Pending intake</strong> (inbound not yet received). When all's well it reads <em>“Nothing below its reorder point. Inventory is healthy.”</em></p>
+  <p>An at-a-glance health panel: <strong>Stock items</strong>, <strong>Warehouses</strong>, <strong>Units on hand</strong>, <strong>Units reserved</strong>, plus the numbers that need action — <strong>Low stock</strong>, <strong>Out of stock</strong>, <strong>Open counts</strong> and <strong>Pending intake</strong>. When all's well it reads <em>“Nothing below its reorder point. Inventory is healthy.”</em></p>
 
   <h2>Movements — receive, issue, adjust, transfer</h2>
-  <p><strong>What it is —</strong> the ledger of every change to stock. <strong>Why it matters —</strong> on-hand numbers are only trustworthy if every in and out is recorded, so movements are the source of truth behind the overview. Each movement records the item, the quantity, a <strong>reason</strong> and a source, and moves stock between states/warehouses:</p>
+  <p><strong>What it is —</strong> the ledger of every change to stock; on-hand is only trustworthy because every in and out is recorded here. Each movement records the item, quantity, a <strong>reason</strong> and a source:</p>
   <ul class="feat">
-    <li><strong>Receive</strong> — stock coming in (e.g. from a supplier or an inbound container).</li>
+    <li><strong>Receive</strong> — stock coming in (a supplier, an inbound container).</li>
     <li><strong>Issue</strong> — stock going out (sold, consumed).</li>
-    <li><strong>Adjust</strong> — a correction (breakage, a stocktake difference).</li>
+    <li><strong>Adjust</strong> — a correction (breakage, a count difference).</li>
     <li><strong>Transfer</strong> — moving stock between your warehouses.</li>
   </ul>
+  <p>Each movement now also carries its <strong>cost</strong>: a receipt lands at the purchase-line cost, and an issue is stamped with the valuation in force at that instant — so cost of sales is a recorded fact, not a figure re-derived later.</p>
 
-  <h2>Stock counts (stocktake)</h2>
-  <p><strong>What it is —</strong> a physical count reconciled against the system. <strong>How —</strong> click <strong>New stock count</strong>, pick the <strong>warehouse</strong> (optionally name it, e.g. <em>“Q3 physical count”</em>), and count each item; differences post as <strong>adjust</strong> movements so on-hand matches reality. Counts in progress show as <strong>Open counts</strong> on the overview.</p>
+  <h2>Valuation — what your stock is worth</h2>
+  <p>The <strong>Valuation</strong> tab answers “what is my inventory <em>worth</em>, and what did the goods I sold cost me?” — with figures you can trust because each is derived from the movement ledger, never a hand-typed total.</p>
+  <h3>Stock value &amp; cost of goods sold</h3>
+  <p>The <strong>Stock value and cost of sales</strong> card shows the current <strong>Inventory value</strong> and the <strong>Cost of goods sold</strong> across a date range you pick. A figure the platform can only value in part reads <em>“(part of the warehouse)”</em> in amber with the reason; a figure it can't value at all shows as <strong>“—”, never €0</strong> — an unvalued item is stated, not counted as free.</p>
+  <h3>The costing method — a dated setting</h3>
+  <p>How stock is valued is a <strong>choice with a date</strong>, not a hidden default: <strong>Weighted average</strong> (μέση σταθμική, the default), <strong>FIFO</strong>, or <strong>Standard cost</strong>. Set the method and an <strong>“In force from”</strong> date and <strong>Record</strong> it; the history of methods is kept. Changing it re-values sales already invoiced under the old method, and the card says so before you do.</p>
+  <h3>“Available” is the largest pool, not the sum</h3>
+  <p>For materials sold in matched batches, the <strong>Lots, tones and calibres</strong> card makes an important distinction: <em>available is the largest single homogeneous pool, never the total</em>. The table breaks each item into <strong>Lot / Tone / Calibre / Grade</strong> with <strong>On hand</strong> and <strong>Free</strong> (free = on-hand − reserved), flags an <strong>opened pack</strong>, and warns when a SKU is split across several pools. On a <a href="quotes-build.html">quote</a> line this surfaces as a note — <em>“From one pool — lot … · tone …”</em>, or an amber warning when the quantity would have to be met from several pools — so you don't promise a single-batch order you can't fill from one batch.</p>
 
-  <h2>Reorder points &amp; the resupply bridge</h2>
-  <p>Each item can carry a <strong>reorder point</strong>; when on-hand falls below it, the item shows under <strong>Low stock</strong>. From there you can act:</p>
+  <h2>Landed cost — the import folder</h2>
+  <p><strong>What it is —</strong> the <strong>Import folders</strong> card (Valuation tab) apportions the freight, duty and clearance on a shipment across the products in it, so the heavy tile carries its real landed cost instead of everything sharing it evenly. <strong>The container is the allocation object</strong> — one folder, many purchase orders.</p>
   <ul class="feat">
-    <li><strong>Reorder bridge (Stock → Sourcing).</strong> Turn a low-stock item straight into a purchase — it bridges into the sourcing/purchase flow so you can restock without re-keying.</li>
-    <li><strong>Inventory valuation.</strong> Stock is valued from each product's <strong>cost</strong>, so you always know what your inventory is <em>worth</em>, not just how many units you hold.</li>
+    <li>Create a folder with a reference and an <strong>Apportion by</strong> basis — <strong>weight</strong> (the default), volume, value, quantity or equal. A basis it can't measure (weight, when a line has no weight) is <strong>refused, not silently swapped</strong>.</li>
+    <li><strong>Attach</strong> purchase orders, then add each cost with a <strong>kind</strong> (freight / duty / customs / clearance / demurrage / insurance / handling / inland) and a <strong>stage</strong> — <em>Forecast</em> or <em>Actual invoice</em>.</li>
+    <li>The allocation table shows the on-cost and per-unit added to every line, and an <strong>“actual against forecast”</strong> variance once the real invoices land.</li>
   </ul>
 
-  <h2>AI resupply forecast <span style="font-size:13px;color:var(--muted)">· credit-metered</span></h2>
-  <p><strong>What it is —</strong> a trend-based forecast that tells you <em>what to reorder and when</em>. <strong>Why it matters —</strong> a static reorder point doesn't know that demand is climbing; the forecast reads your movement history and projects it. For each item it shows a <strong>Days cover</strong> (how long current stock lasts at the recent rate), a <strong>stockout risk</strong>, and a <strong>Recommendation</strong>. Because it runs an AI/analytics pass, it's <strong>metered against your <a href="account-credits.html">credits</a></strong> (charged by usage).</p>
+  <h2>Supplier rebates &amp; stock ageing</h2>
+  <p>Two more Valuation-tab cards handle the money a general ledger books too late:</p>
+  <ul class="feat">
+    <li><strong>Supplier rebates</strong> — a retrospective rebate is booked as an <strong>accrual</strong> as you earn it (not when the cheque arrives), with a <em>“crossing the next band is worth X on the period to date”</em> prompt. <strong>Raise the claim</strong> records it at the accrued amount; the claims table shows <strong>Settled</strong> as “—” until it actually clears.</li>
+    <li><strong>Ageing and obsolescence</strong> — aged <em>per lot</em>, with a dated write-down policy you can adopt (e.g. <em>0% / 25% / 75% at 6 and 12 months</em>) and a worst-pools table showing the provision. The leading signal is entered on the product itself: a <strong>“Discontinued by the supplier”</strong> date on the product's fiscal card.</li>
+  </ul>
 
+  <h2>Locations &amp; putaway</h2>
+  <p><strong>What it is —</strong> the <strong>Locations</strong> tab holds your storage places — bins and the like — so stock has an address, not just a warehouse. <strong>Why it matters —</strong> a scannable, walkable warehouse is what makes picking fast and counts honest.</p>
+  <ul class="feat">
+    <li>Each location has a <strong>Code</strong>, its own <strong>location barcode</strong> (distinct from an item's barcode), a <strong>walking path</strong> order, and a <strong>kind</strong> — bin, bulk, pick-face, staging, quarantine or van. Warnings count locations with <strong>no barcode</strong> (“cannot be scan-verified”) or <strong>no walking path</strong> (“a pick list cannot be ordered”).</li>
+    <li><strong>“Where does this go?”</strong> previews putaway for an item, states the rule that chose the spot, and <strong>Make that the rule</strong> saves a fixed putaway rule (most specific wins: product beats category beats a blanket rule).</li>
+  </ul>
+
+  <h2>Intake — “this product exists” vs “this stock arrived”</h2>
+  <p>The <strong>Inventory</strong> tab is where goods and paperwork come <em>in</em>. Its guiding rule: <strong>creating a product is not the same as receiving stock</strong>, and the platform refuses to conflate them.</p>
+  <ul class="feat">
+    <li><strong>The intake queue</strong> lets you set, per batch, whether to <em>catalogue only — no stock</em>, <em>receive the stock too</em>, or <strong>decide from the document date</strong> (a document within the last 30 days receives stock; an older one opens the product at zero, since a year-old delivery note is not stock arriving today). The bulk-confirm dialog <strong>names the mode</strong>, so “add all 431 lines” can't silently invent a year of inventory.</li>
+    <li><strong>Added from intake</strong> is the trail of what was booked in — with <strong>Undo</strong>, which reverses the <em>stock</em> with a compensating movement but <strong>keeps the product</strong>.</li>
+    <li><strong>Run enrichment</strong> fills in a product's attributes from a document it already holds and reports what it could not do (enriched / no source / low confidence / failed) rather than failing silently.</li>
+    <li><strong>Names CRM doesn't know.</strong> When supplier, manufacturer or category names on the queue match nothing in <a href="crm.html">CRM</a>, a banner offers <strong>Resolve names</strong> → <strong>Propose matches</strong>: the assistant suggests a target <em>as a question</em>, and you <strong>Confirm</strong>, reject, or mint a new record. (Promoting a match to the platform-wide vocabulary is operator-only.)</li>
+  </ul>
+
+  <h2>Stock counts — stocktake &amp; the year-end Απογραφή</h2>
+  <p><strong>What it is —</strong> physical counts reconciled against the system, on the <strong>Stock Counts</strong> tab.</p>
+  <h3>A stocktake you can freeze</h3>
+  <p><strong>New count</strong> snapshots every item into a <strong>blind count sheet</strong> (system quantity hidden while you count). <strong>Freeze before counting</strong> captures what the system believed at one instant; a <strong>drift banner</strong> then reports anything that moved since the freeze, so a sale that happened mid-count is reconciled rather than blamed on the counter. <strong>Post count</strong> writes the differences as <em>adjust</em> movements. Counts in progress show as <strong>Open counts</strong> on the overview.</p>
+  <h3>Απογραφή — the year-end count</h3>
+  <p>The <strong>Απογραφή</strong> card records the legal year-end inventory (and its myDATA submission). It separates the <strong>counted-on</strong> date from the <strong>reference date</strong> (deliberately, per άρθρο 6 §2), and a roll-forward reconciles the movements between the two. Lines carry a quantity (with a per-storage-space breakdown), a unit value and a total; <strong>third-party stock is quantity-only</strong> and reads <em>“not ours to value.”</em> <span class="badge gated">Note</span> the panel records the count; line valuation and the actual AADE transmission happen server-side — there's no “Transmit” button here yet.</p>
+
+  <h2>Resupply — forecast, container fill &amp; commitments</h2>
+  <h3>Reorder points &amp; the resupply bridge</h3>
+  <p>Each item can carry a <strong>reorder point</strong>; when on-hand falls below it, it shows under <strong>Low stock</strong>. The <strong>reorder bridge</strong> turns a low-stock item straight into a purchase in the sourcing flow, without re-keying.</p>
+  <h3>AI resupply forecast <span style="font-size:13px;color:var(--muted)">· credit-metered</span></h3>
+  <p>A trend-based forecast of <em>what to reorder and when</em>: it reads your movement history and projects it, showing per item a <strong>Days cover</strong>, a <strong>stockout risk</strong> and a <strong>Recommendation</strong>. Because it runs an AI/analytics pass it's <strong>metered against your <a href="account-credits.html">credits</a></strong>.</p>
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/stock/resupply.png" alt="Stock → Resupply — AI forecast with days-cover, stockout risk and recommendations">
-    <figcaption>Stock → Resupply — the AI forecast: days cover, stockout risk and a per-item recommendation.</figcaption>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/stock/resupply.png" alt="Warehouse → Resupply — AI forecast with days-cover, stockout risk and recommendations">
+    <figcaption>Resupply — the AI forecast: days cover, stockout risk and a per-item recommendation.</figcaption>
   </figure>
+  <h3>Container fill &amp; commitments</h3>
+  <ul class="feat">
+    <li><strong>Container fill</strong> — a weight-first packer that flags when a planned order is <strong>overweight</strong> (red) or has an unweighed line (amber), for a chosen container type; it doesn't consolidate across suppliers.</li>
+    <li><strong>Commitments, holds and processing</strong> — five facts a general ERP keeps as bare integers: <strong>forward/blanket contracts</strong> (with an allowance and released-to-date), <strong>holds</strong> (reserved for a customer, with a mandatory expiry — nothing auto-releases), <strong>cutting/processing</strong> jobs (offcuts come back as their own pool), a <strong>supplier scorecard</strong> (on-time / quality / price-stability, weighted), and a <strong>price-file update</strong> that accepts one JSON row per line and <strong>rejects any row carrying more than a price</strong>.</li>
+  </ul>
 
   <h2>Inbound container tracking (ShipsGo) <span class="badge gated">BYOK</span></h2>
-  <p><strong>What it is —</strong> live tracking of shipments coming to you, by <strong>container</strong> or <strong>Bill of Lading</strong>. <strong>Why it matters —</strong> you see where inbound stock actually is and when it'll land, and can <strong>Receive it into a warehouse</strong> when it arrives. Tracking uses <strong>ShipsGo</strong> and is <strong>bring-your-own-key</strong>.</p>
-  <h3>Set up ShipsGo — exactly what to add</h3>
-  <p>In the Stock module's <strong>shipping credentials</strong> card, enter:</p>
-  <div class="table-wrap"><table>
-    <thead><tr><th>Field</th><th>What to enter</th></tr></thead>
-    <tbody>
-      <tr><td><strong>ShipsGo API key</strong></td><td>Your ShipsGo API key (from your ShipsGo account).</td></tr>
-      <tr><td><strong>Base URL</strong></td><td>The ShipsGo API endpoint (default <code>https://api.shipsgo.com/v2</code>).</td></tr>
-    </tbody>
-  </table></div>
-  <p>Once <strong>Configured</strong>, add an inbound shipment with its <strong>Container</strong> number (e.g. <code>MSCU1234567</code>) or <strong>Bill of Lading</strong>, an optional <strong>Carrier / line</strong> and <strong>Reference</strong>, and optionally <strong>link it to a purchase order</strong>. the module then pulls milestone updates; <strong>Refresh</strong> re-checks, and <strong>Receive into warehouse</strong> books it in on arrival. Tracking refreshes are credit-metered.</p>
-
+  <p><strong>What it is —</strong> live tracking of shipments coming to you, by <strong>container</strong> or <strong>Bill of Lading</strong>, so you see where inbound stock is and when it'll land — then <strong>Receive it into a warehouse</strong> on arrival. Tracking uses <strong>ShipsGo</strong> and is <strong>bring-your-own-key</strong>.</p>
+  <p>In the module's <strong>shipping credentials</strong> card, enter your <strong>ShipsGo API key</strong> and the <strong>Base URL</strong> (default <code>https://api.shipsgo.com/v2</code>). Once <strong>Configured</strong>, add a shipment with its <strong>Container</strong> number (e.g. <code>MSCU1234567</code>) or <strong>Bill of Lading</strong>, an optional carrier/reference, and optionally link it to a purchase order; <strong>Refresh</strong> re-checks and <strong>Receive into warehouse</strong> books it in. Tracking refreshes are credit-metered.</p>
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/stock/inbound.png" alt="Stock → Inbound — container / Bill of Lading tracking with milestones">
-    <figcaption>Stock → Inbound — track a container or Bill of Lading, then Receive into warehouse on arrival.</figcaption>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/stock/inbound.png" alt="Warehouse → Inbound — container / Bill of Lading tracking with milestones">
+    <figcaption>Inbound — track a container or Bill of Lading, then Receive into warehouse on arrival.</figcaption>
   </figure>
 
-  <h2>Freight quotes (SeaRates)</h2>
-  <p><strong>What it is —</strong> getting a shipping price for an order. <strong>Where —</strong> on a <a href="quotes-build.html">quote</a>, under <strong>Extras</strong>: <strong>“Get shipping quote”</strong> fetches freight offers, and a chosen offer is added to the quote as a shipping line item. <strong>How it's provided —</strong> freight rates come from <strong>SeaRates</strong>, which is <strong>operator-provided</strong>: a tenant's request <strong>routes to the operator</strong>, who returns the offers (they appear on the quote when answered). So you don't need your own SeaRates key — you request, the platform operator fulfils.</p>
-  <div class="callout"><p><strong>Two different shipping integrations, two models:</strong> <strong>ShipsGo tracking</strong> is <em>your</em> key (BYOK, per workspace); <strong>SeaRates freight quotes</strong> are <em>operator-provided</em> (you request, the operator answers). Don't confuse the two.</p></div>
-
-  <h2>Also here</h2>
+  <h2>Dispatch &amp; freight quotes</h2>
   <ul class="feat">
-    <li><strong>Inbound-document intake</strong> — bring inbound paperwork into the module.</li>
-    <li><strong>Marketplace listing</strong> — list surplus/last-stock straight from inventory to the <a href="discover-marketplace.html">Marketplace</a>.</li>
+    <li><strong>Dispatch</strong> — the outbound tab for getting stock out to customers. It's <strong>read-only unless you also have <code>finance.manage</code></strong>, since a dispatch is the start of a fiscal delivery note.</li>
+    <li><strong>Freight quotes (SeaRates)</strong> — on a <a href="quotes-build.html">quote</a> under <strong>Extras</strong>, <strong>Get shipping quote</strong> fetches freight offers and adds the chosen one as a line. This is <strong>operator-provided</strong> (you request, the operator answers) — no key of your own, unlike ShipsGo tracking.</li>
   </ul>
 
-  <div class="callout tip"><p><strong>Day-to-day:</strong> watch the overview for <em>Low stock</em> → check the <em>AI resupply forecast</em> for what's actually at risk → reorder via the bridge → track the inbound container (ShipsGo) → <em>Receive into warehouse</em> on arrival → run a periodic <em>stock count</em> to keep it honest.</p></div>
+  <h2>Nearby — where a few warehouse jobs actually live</h2>
+  <p>A handful of things that belong to a shipment or a customer are recorded where that record is, not in this module:</p>
+  <ul class="feat">
+    <li><strong>Who gets the pallet</strong> — a received purchase line is allocated to the waiting orders (oldest-confirmed-first) on the purchase order's <strong>Customs</strong> tab in <a href="finance-doc-orders.html">Finance</a>.</li>
+    <li><strong>Delivery evidence &amp; goods-receipt disputes</strong> — proof of delivery on a sales order, and a goods-receipt inspection (a rejection opens a supplier claim) on a purchase order, both on the order's <strong>Customs</strong> tab (needs <code>finance.manage</code>).</li>
+    <li><strong>Samples out</strong> — the <strong>Samples out</strong> card on a <a href="crm-companies.html">CRM company</a> tracks what a customer borrowed and whether it came back or converted.</li>
+    <li><strong>Marketplace listing</strong> — list surplus/last stock straight to the <a href="discover-marketplace.html">Marketplace</a>.</li>
+  </ul>
+
+  <div class="callout tip"><p><strong>Day-to-day:</strong> watch the overview for <em>Low stock</em> → check the <em>Resupply</em> forecast for what's actually at risk → reorder via the bridge → track the inbound container (ShipsGo) and <em>Receive into warehouse</em> on arrival, apportioning its freight in an <em>Import folder</em> → keep it honest with a frozen <em>stock count</em>, and the <em>Απογραφή</em> at year end.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>
