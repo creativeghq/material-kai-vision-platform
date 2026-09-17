@@ -2591,7 +2591,7 @@
     "name": "public-price",
     "tag": "Public",
     "summary": "Open market-price lookup: the band, and the one to show",
-    "description": "Keyless. GET or POST a product `query` and get the market band (median, lowest, highest, each with its retailer) plus a single chosen price. `basis` picks which figure is the headline: verified_in_stock (default), median, lowest or highest; an unrecognised basis is a 400 rather than a silent default. Keyed on the market TEXT, never an internal product id, so it cannot be used to enumerate the catalogue, and it never triggers a paid scan. Every request is recorded as demand: keyless demand refreshes a price every 360h (15 days); sending `Authorization: Bearer kai_...` uses that key's own price_refresh_interval_hours instead and its own rate limit. Anonymous callers get 30 req/min per IP, quota-keyed on a salted hash. Status is ok, no_data, not_collected or collector_failed - never a bare zero.",
+    "description": "Keyless. GET or POST a product `query` and get the market band (median, lowest, highest, each with its retailer) plus a single chosen price. `basis` picks which figure is the headline: verified_in_stock (default), median, lowest or highest; an unrecognised basis is a 400 rather than a silent default. Keyed on the market TEXT, never an internal product id, so it cannot be used to enumerate the catalogue, and it never triggers a paid scan. Every request is recorded as demand: keyless demand refreshes a price every 360h (15 days); sending `Authorization: Bearer kai_...` uses that key's own price_refresh_interval_hours instead and its own rate limit. Anonymous callers get 30 req/min per IP, quota-keyed on a salted hash. Status is ok, no_data, not_collected or collector_failed - never a bare zero. Real status codes: 200, 400 (missing/over-long query, or an unrecognised basis), 401 (a kai_ bearer was sent but is invalid - omit it to call anonymously), 429 (over the allowance, carries Retry-After) and 503 (the rate limiter could not be reached; the endpoint fails CLOSED). It never returns 403. Full schema with examples: /api/openapi-price.yaml",
     "security": [
       "public",
       "apiKeyPartner"
@@ -2621,7 +2621,27 @@
         "desc": "verified_in_stock (default) | median | lowest | highest"
       }
     ],
-    "response": "{ success, status, query, currency, price:{ value, basis, basis_requested, retailer, url, title }, band:{ median, lowest:{value,retailer,url}, highest:{value,retailer,url} }, sample:{ size, verified, in_stock, confidence }, freshness:{ resolved_at, age_seconds, is_stale, next_check_at, refresh_interval_hours }, access:{ keyed, rate_limit_per_min }, collector_error }"
+    "response": "{ success, status, query, currency, price:{ value, basis, basis_requested, retailer, url, title }, band:{ median, lowest:{value,retailer,url}, highest:{value,retailer,url} }, sample:{ size, verified, in_stock, confidence }, freshness:{ resolved_at, age_seconds, is_stale, next_check_at, refresh_interval_hours }, access:{ keyed, rate_limit_per_min }, collector_error }",
+    "query": [
+      {
+        "name": "query",
+        "type": "string",
+        "required": true,
+        "desc": "Product name / brand / SKU. Max 300 chars. Matching needs 3+ chars for a partial match; LIKE wildcards are escaped."
+      },
+      {
+        "name": "country",
+        "type": "string",
+        "required": false,
+        "desc": "ISO-3166 alpha-2 (GR, DE...). Narrows the match to that market."
+      },
+      {
+        "name": "basis",
+        "type": "string",
+        "required": false,
+        "desc": "Which figure price.value carries: verified_in_stock (default) | median | lowest | highest. Anything else is a 400."
+      }
+    ]
   },
   {
     "name": "seo-domain-tracker",

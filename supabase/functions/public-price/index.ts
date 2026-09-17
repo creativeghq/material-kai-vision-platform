@@ -63,12 +63,18 @@ Deno.serve(withApiLogging('public-price', async (req: Request) => {
 
   const ipHash = apiKeyId ? null : await hashIp(getTrustedClientIp(req));
 
-  const { data: rate } = await svc.rpc('check_price_rate_limit', {
+  const { data: rate, error: rateError } = await svc.rpc('check_price_rate_limit', {
     p_ip_hash: ipHash,
     p_api_key_id: apiKeyId,
     p_limit: apiKeyId ? keyRateLimit : ANON_RATE_PER_MIN,
   });
-  if (rate && rate.allowed === false) {
+  if (rateError || !rate) {
+    return new Response(
+      JSON.stringify({ error: 'Rate limiting unavailable, try again shortly' }),
+      { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': '30' } },
+    );
+  }
+  if (rate.allowed === false) {
     return new Response(
       JSON.stringify({ error: 'Rate limit exceeded', limit: rate.limit, used: rate.used }),
       { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': '60' } },

@@ -1,0 +1,323 @@
+openapi: 3.1.0
+
+info:
+  title: Material KAI — Market Price API
+  version: "1.0.0"
+  summary: Open market-price lookup. No key required.
+  description: |
+    Ask what a product costs on the open market and get back the whole band —
+    **median**, **lowest** and **highest**, each with the retailer it came from —
+    plus a single chosen price whose rule you pick.
+
+    **No API key, no sign-up, no JWT.** An optional partner key raises the rate
+    limit and controls how often the price behind your query is refreshed.
+
+    ### How freshness works
+    Nothing is on a timer. Asking for a price is itself the signal to refresh it.
+    Without a key, a price you ask for is refreshed **every 15 days**. Send
+    `Authorization: Bearer kai_…` and that key's own refresh interval applies
+    instead, down to hourly. Either way the call never triggers a paid scan, so
+    it stays fast and free to call — the refresh happens on the schedule behind
+    it. Read `freshness.resolved_at` and `freshness.next_check_at` to see exactly
+    where you stand.
+
+    ### Reading the answer honestly
+    `status` is never a zero standing in for "we do not know". It is `ok`,
+    `no_data` (we looked and found nothing), `not_collected` (we track nothing
+    for this query yet) or `collector_failed` (the lookup itself broke).
+    `price.basis` names the rule that actually answered, so an unverified guess
+    can never be mistaken for a confirmed price.
+  contact:
+    name: Material KAI
+    url: https://materialshub.gr
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1
+    description: Production
+
+tags:
+  - name: Price
+    description: Market price lookup
+
+paths:
+  /public-price:
+    get:
+      tags: [Price]
+      operationId: getMarketPrice
+      summary: Look up a market price
+      description: Same as `POST`, with the parameters in the query string.
+      security:
+        - {}
+        - apiKeyPartner: []
+      parameters:
+        - name: query
+          in: query
+          required: true
+          description: Product name, brand or SKU — the text you would type into a shop search.
+          schema: { type: string, minLength: 1, maxLength: 300 }
+          example: Maidtec 7012
+        - name: country
+          in: query
+          required: false
+          description: ISO-3166 alpha-2 code. Narrows the match to that market.
+          schema: { type: string, minLength: 2, maxLength: 2 }
+          example: GR
+        - name: basis
+          in: query
+          required: false
+          description: Which figure `price.value` carries. The full band is returned either way.
+          schema:
+            $ref: '#/components/schemas/Basis'
+          example: lowest
+      responses:
+        '200': { $ref: '#/components/responses/PriceOk' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/BadKey' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+    post:
+      tags: [Price]
+      operationId: postMarketPrice
+      summary: Look up a market price
+      security:
+        - {}
+        - apiKeyPartner: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query:
+                  type: string
+                  minLength: 1
+                  maxLength: 300
+                  description: Product name, brand or SKU.
+                country:
+                  type: string
+                  minLength: 2
+                  maxLength: 2
+                  description: ISO-3166 alpha-2 code.
+                basis:
+                  $ref: '#/components/schemas/Basis'
+            example:
+              query: Maidtec 7012
+              country: GR
+              basis: lowest
+      responses:
+        '200': { $ref: '#/components/responses/PriceOk' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/BadKey' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+components:
+  securitySchemes:
+    apiKeyPartner:
+      type: http
+      scheme: bearer
+      bearerFormat: kai_
+      description: |
+        Optional. A partner key (`Authorization: Bearer kai_…`) raises the rate
+        limit to that key's own allowance and switches the refresh cadence from
+        the keyless 15 days to the key's configured interval.
+
+  schemas:
+    Basis:
+      type: string
+      default: verified_in_stock
+      enum: [verified_in_stock, median, lowest, highest]
+      description: |
+        Which figure becomes `price.value`:
+          * `verified_in_stock` — the cheapest price we confirmed by reading the
+            retailer page, in stock. The default, and the one to trust.
+          * `median` — the middle of the market. Carries no retailer.
+          * `lowest` / `highest` — the ends of the band, each with its retailer.
+        An unrecognised value is a `400`; it never silently falls back.
+
+    Money:
+      type: [number, 'null']
+      description: A price in `currency`.
+      example: 68.98
+
+    Offer:
+      type: object
+      description: One end of the band, and where it came from.
+      properties:
+        value: { $ref: '#/components/schemas/Money' }
+        retailer: { type: [string, 'null'], example: mpakis.gr }
+        url: { type: [string, 'null'], format: uri }
+
+    PriceResponse:
+      type: object
+      required: [success, status, query, price, band, sample, freshness, access]
+      properties:
+        success: { type: boolean }
+        status:
+          type: string
+          enum: [ok, no_data, not_collected, collector_failed]
+          description: |
+            * `ok` — a price was derived.
+            * `no_data` — we looked and nothing qualified.
+            * `not_collected` — we track nothing for this query yet. Your request
+              has been recorded as demand.
+            * `collector_failed` — the lookup broke. Unknown, **not** zero.
+        query:
+          type: string
+          description: Your query, normalised (lowercased, whitespace collapsed).
+        currency: { type: [string, 'null'], example: EUR }
+        price:
+          type: object
+          description: The single figure to show.
+          properties:
+            value: { $ref: '#/components/schemas/Money' }
+            basis:
+              type: [string, 'null']
+              enum: [lowest_verified_in_stock, lowest_verified, lowest_in_stock_unverified, lowest_unverified, median, lowest, highest, null]
+              description: |
+                The rule that actually answered. Under the default `basis` this
+                walks down from `lowest_verified_in_stock` to `lowest_unverified`
+                as evidence thins, so you always know how solid the number is.
+            basis_requested: { $ref: '#/components/schemas/Basis' }
+            retailer: { type: [string, 'null'] }
+            url: { type: [string, 'null'], format: uri }
+            title: { type: [string, 'null'] }
+        band:
+          type: object
+          description: The whole market, always present regardless of `basis`.
+          properties:
+            median: { $ref: '#/components/schemas/Money' }
+            lowest: { $ref: '#/components/schemas/Offer' }
+            highest: { $ref: '#/components/schemas/Offer' }
+        sample:
+          type: object
+          description: How much evidence is behind the answer.
+          properties:
+            size: { type: integer, description: Retailers the figures are derived from. }
+            verified: { type: integer, description: Of those, confirmed by a direct page read. }
+            in_stock: { type: integer }
+            confidence:
+              type: string
+              enum: [high, medium, low, none]
+        freshness:
+          type: object
+          properties:
+            resolved_at: { type: [string, 'null'], format: date-time }
+            age_seconds: { type: [integer, 'null'] }
+            is_stale: { type: boolean, description: True once past `next_check_at`. }
+            next_check_at: { type: [string, 'null'], format: date-time }
+            refresh_interval_hours:
+              type: [integer, 'null']
+              description: Current cadence. 360 (15 days) while only keyless demand exists.
+        access:
+          type: object
+          properties:
+            keyed: { type: boolean, description: Whether a valid partner key was used. }
+            rate_limit_per_min: { type: integer }
+        collector_error: { type: [string, 'null'] }
+
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+
+  responses:
+    PriceOk:
+      description: A market answer. Check `status` before using `price.value`.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/PriceResponse' }
+          examples:
+            found:
+              summary: A tracked product, basis=lowest
+              value:
+                success: true
+                status: ok
+                query: maidtec 7012
+                currency: EUR
+                price:
+                  value: 68.98
+                  basis: lowest
+                  basis_requested: lowest
+                  retailer: mpakis.gr
+                  url: https://mpakis.gr/product/pyramis-maidtec-7012mt
+                  title: Pyramis Maidtec 7012MT Συρόμενος Απορροφητήρας 60cm με 2 Μοτέρ Inox
+                band:
+                  median: 75
+                  lowest: { value: 68.98, retailer: mpakis.gr, url: https://mpakis.gr/product/pyramis-maidtec-7012mt }
+                  highest: { value: 79, retailer: polychromo.gr, url: https://www.polychromo.gr/maidtec-7012mt-syromenos-aporrofitiras-60cm-inox }
+                sample: { size: 5, verified: 5, in_stock: 3, confidence: high }
+                freshness:
+                  resolved_at: "2026-04-25T12:16:34.060077+00:00"
+                  age_seconds: 12548880
+                  is_stale: true
+                  next_check_at: "2026-05-10T12:16:34.060077+00:00"
+                  refresh_interval_hours: 360
+                access: { keyed: false, rate_limit_per_min: 30 }
+                collector_error: null
+            notCollected:
+              summary: Nothing tracked for this query yet — recorded as demand
+              value:
+                success: true
+                status: not_collected
+                query: a product we have never seen
+                currency: null
+                price: { value: null, basis: null, basis_requested: verified_in_stock, retailer: null, url: null, title: null }
+                band:
+                  median: null
+                  lowest: { value: null, retailer: null, url: null }
+                  highest: { value: null, retailer: null, url: null }
+                sample: { size: 0, verified: 0, in_stock: 0, confidence: none }
+                freshness: { resolved_at: null, age_seconds: null, is_stale: true, next_check_at: null, refresh_interval_hours: null }
+                access: { keyed: false, rate_limit_per_min: 30 }
+                collector_error: null
+
+    BadRequest:
+      description: Missing `query`, a `query` over 300 characters, or an unrecognised `basis`.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example:
+            error: "basis must be one of: verified_in_stock, median, lowest, highest"
+            received: lowset
+
+    BadKey:
+      description: A `kai_` bearer was sent but is invalid, disabled or expired. Omit it entirely to call anonymously.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: Invalid API key }
+
+    RateLimited:
+      description: Over the allowance — 30/min per IP anonymously, or the key's own limit.
+      headers:
+        Retry-After:
+          schema: { type: integer }
+          description: Seconds to wait.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - type: object
+                properties:
+                  limit: { type: integer }
+                  used: { type: integer }
+          example: { error: Rate limit exceeded, limit: 30, used: 30 }
+
+    Unavailable:
+      description: |
+        The rate limiter could not be reached. The endpoint fails **closed** rather
+        than letting the request through, so retry shortly.
+      headers:
+        Retry-After:
+          schema: { type: integer }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: Rate limiting unavailable, try again shortly }
