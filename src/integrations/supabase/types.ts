@@ -37136,6 +37136,18 @@ export type Database = {
         }
         Returns: Json
       }
+      get_workspace_search_insights: {
+        Args: { p_days?: number; p_workspace_id: string }
+        Returns: Json
+      }
+      import_catalogue_rows: {
+        Args: { p_rows: Json; p_workspace_id: string }
+        Returns: { created: number; skipped: number; updated: number }[]
+      }
+      export_catalogue_rows: {
+        Args: { p_category_id?: string; p_limit?: number; p_offset?: number; p_workspace_id: string }
+        Returns: Json
+      }
       get_product_certificate_candidates: {
         Args: { p_product_id: string }
         Returns: {

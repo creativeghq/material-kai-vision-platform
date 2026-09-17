@@ -3,6 +3,7 @@ import { TrendingUp, Loader2 } from 'lucide-react';
 import { useFactoryRole } from '@/hooks/useFactoryRole';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { MarketTrendsTab } from '@/components/analytics/MarketTrendsTab';
+import { WorkspaceSearchInsights } from '@/components/analytics/WorkspaceSearchInsights';
 
 /** Platform-wide market trends — what buyers search for, save, quote and drop into 3D scenes. */
 export default function MarketTrendsPage() {
@@ -34,7 +35,8 @@ export default function MarketTrendsPage() {
         title="Market Trends"
         subtitle="What buyers are searching for, saving and quoting across the platform"
       />
-      <div className="px-3 sm:px-6 py-4 sm:py-8">
+      <div className="px-3 sm:px-6 py-4 sm:py-8 space-y-6">
+        <WorkspaceSearchInsights />
         <MarketTrendsTab />
       </div>
     </div>
