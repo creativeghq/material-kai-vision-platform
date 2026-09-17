@@ -2662,3 +2662,18 @@ match nothing the day before. Plain string containment now. **That is twice in t
 same cause**, which is worth more than a fix: assembled patterns in a test are worth avoiding
 outright, because a pattern that cannot compile and a pattern that matches everything both read as
 green.
+
+## A membership row that is no longer active still reads everything
+
+`is_workspace_member()` filters `status = 'active'`. Fifty policies across 28 tables inlined the same
+subquery and left the filter out, so revoking someone by setting their membership to `suspended`,
+`pending` or `inactive` removed nothing. Nothing could see it: every row in `workspace_members` has
+always been `active`, so the hole had never once been exercised. Four further policies ran an `EXISTS`
+over `workspace_members` with no correlation to the row's workspace at all — `query_understanding_cache`
+is the one that held live data, 36 rows of other tenants' raw search text behind "is this person an
+admin anywhere".
+
+- **Guarded by:** `check_security_invariants()` branch `4-membership-not-active`, wired into the nightly sweep as `security.invariant_violation` at CRITICAL. It counts membership subqueries against active-status filters, so a policy that adds a second subquery and filters only the first still fails.
+- **Proven to fire:** 2026-09-17 — a table with the original unfiltered policy and a correctly filtered twin was created inside an aborting transaction; the branch went 0 → 1, naming the stale policy only.
+- **The trap in the check itself:** it read 0 on its first version. `check_security_invariants()` runs `SET search_path = ''`, so `pg_get_expr` schema-qualifies every relation and the deparsed policy says `FROM public.workspace_members` inside the function and `FROM workspace_members` everywhere you test it by hand. A needle written from the hand-tested spelling matches nothing, and a check that cannot fire looks exactly like a clean schema.
+- **Keep the inlined subquery when fixing one.** An uncorrelated `IN`/`EXISTS` is hoisted to an InitPlan and evaluated once per query; `is_workspace_member(workspace_id)` takes the row's id and so runs per row.
