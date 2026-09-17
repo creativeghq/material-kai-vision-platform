@@ -29,3 +29,43 @@ export function presentValidity(status: string | null | undefined): ValidityPres
 export function needsAttention(status: string | null | undefined): boolean {
   return status === 'expired' || status === 'expiring_soon';
 }
+
+export interface CertificateDraft {
+  id?: string;
+  standard: string;
+  certificate_number: string;
+  issuer: string;
+  scope: string;
+  result: string;
+  valid_from: string;
+  valid_until: string;
+  notes: string;
+}
+
+export interface CertificateCandidate {
+  standard: string;
+  certificate_number: string | null;
+  issuer: string | null;
+  scope: string | null;
+  valid_from: string | null;
+  valid_until: string | null;
+}
+
+export const emptyDraft = (standard = ''): CertificateDraft => ({
+  standard, certificate_number: '', issuer: '', scope: '', result: '',
+  valid_from: '', valid_until: '', notes: '',
+});
+
+/** A field the extractor could not read stays BLANK — a guessed expiry is worse than none. */
+export function draftFromCandidate(c: CertificateCandidate): CertificateDraft {
+  return {
+    standard: c.standard,
+    certificate_number: c.certificate_number ?? '',
+    issuer: c.issuer ?? '',
+    scope: c.scope ?? '',
+    result: '',
+    valid_from: c.valid_from ?? '',
+    valid_until: c.valid_until ?? '',
+    notes: '',
+  };
+}

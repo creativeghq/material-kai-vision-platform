@@ -46,7 +46,6 @@ interface Product {
   status: string | null;
   quality_score: number | null;
   confidence_score: number | null;
-  completeness_score: number | null;
   properties: Record<string, unknown> | null;
   specifications: Record<string, unknown> | null;
   metadata: Record<string, unknown> | null;
@@ -78,14 +77,14 @@ function flattenObject(obj: Record<string, unknown> | null, prefix = ''): Record
 
 // formatLabel is imported from @/lib/labelUtils — handles snake_case, camelCase, acronyms
 
-function ScoreBar({ value, label }: { value: number | null; label: string }) {
+function ScoreBar({ value, label, note }: { value: number | null; label: string; note?: string }) {
   if (value === null) return <span className="text-muted-foreground text-sm">—</span>;
   const pct = Math.round(value * 100);
   const color = pct >= 75 ? 'bg-green-500' : pct >= 50 ? 'bg-yellow-500' : 'bg-red-400';
   return (
     <div className="space-y-1">
       <div className="flex justify-between text-xs">
-        <span className="text-muted-foreground">{label}</span>
+        <span className="text-muted-foreground">{note ? `${label} (${note})` : label}</span>
         <span className="font-medium">{pct}%</span>
       </div>
       <div className="h-1.5 bg-muted rounded-full overflow-hidden">
@@ -101,6 +100,7 @@ export default function MaterialComparePage() {
   const { toast } = useToast();
 
   const [products, setProducts] = useState<Product[]>([]);
+  const [completeness, setCompleteness] = useState<Record<string, { score: number | null; reason: string | null }>>({});
   const [loading, setLoading] = useState(false);
   // Which products have already been counted as compared this visit. Comparison is a URL-driven
   // set, so the effect re-runs on every add/remove — without this, removing one product would
@@ -119,9 +119,19 @@ export default function MaterialComparePage() {
       return;
     }
     setLoading(true);
+    // Derived, never stored: product_completeness reads the field registry that defines
+    // what "complete" means for this category, so there is no cached copy to drift.
+    void Promise.all(productIds.map(async (id) => {
+      const { data: c } = await supabase.rpc('product_completeness', { p_product_id: id });
+      return [id, c?.[0] ?? null] as const;
+    })).then((pairs) => {
+      setCompleteness(Object.fromEntries(
+        pairs.filter(([, c]) => c).map(([id, c]) => [id, { score: c!.score, reason: c!.reason }]),
+      ));
+    });
     const { data, error } = await supabase
       .from('products')
-      .select('id, name, description, category_id, status, quality_score, confidence_score, completeness_score, properties, specifications, metadata')
+      .select('id, name, description, category_id, status, quality_score, confidence_score, properties, specifications, metadata')
       .in('id', productIds);
 
     if (error) {
@@ -349,7 +359,12 @@ export default function MaterialComparePage() {
                       <div className="space-y-2">
                         <ScoreBar value={p.quality_score} label="Quality" />
                         <ScoreBar value={p.confidence_score} label="Confidence" />
-                        <ScoreBar value={p.completeness_score} label="Completeness" />
+                        <ScoreBar
+                          value={completeness[p.id]?.score ?? null}
+                          label="Completeness"
+                          note={completeness[p.id]?.reason === 'category_not_in_registry'
+                            ? 'generic fields only' : undefined}
+                        />
                       </div>
                       <Button
                         variant="outline"

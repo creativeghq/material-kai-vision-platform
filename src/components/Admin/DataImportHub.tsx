@@ -8,10 +8,12 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Upload, FileText, FileType, ExternalLink, AlertCircle, Tags } from 'lucide-react';
+import { Upload, FileText, FileType, ExternalLink, AlertCircle, Tags, Download, FileSpreadsheet } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { CatalogExportTab } from '@/components/Admin/DataImport/CatalogExportTab';
+import { CsvImportTab } from '@/components/Admin/DataImport/CsvImportTab';
 import { Button } from '@/components/core/ui/button';
 import { Alert, AlertDescription } from '@/components/core/ui/alert';
 import XMLImportTab from './DataImport/XMLImportTab';
@@ -34,7 +36,7 @@ const DataImportHub: React.FC = () => {
   useEffect(() => {
     checkActiveJobs();
     // Set active tab from URL parameter if present
-    if (tabParam && ['pdf', 'xml', 'history', 'categories'].includes(tabParam)) {
+    if (tabParam && ['pdf', 'xml', 'history', 'categories', 'csv', 'export'].includes(tabParam)) {
       setActiveTab(tabParam);
     }
   }, [tabParam]);
@@ -100,6 +102,14 @@ const DataImportHub: React.FC = () => {
                 <TabsTrigger value="categories">
                   <Tags className="h-4 w-4 mr-2" />
                   Categories
+                </TabsTrigger>
+                <TabsTrigger value="csv">
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  CSV Import
+                </TabsTrigger>
+                <TabsTrigger value="export">
+                  <Download className="h-4 w-4 mr-2" />
+                  Export
                 </TabsTrigger>
               </TabsList>
 
@@ -201,6 +211,12 @@ const DataImportHub: React.FC = () => {
 
               <TabsContent value="categories" className="mt-6">
                 <MaterialCategoriesTab />
+              </TabsContent>
+              <TabsContent value="csv" className="mt-6">
+                <CsvImportTab />
+              </TabsContent>
+              <TabsContent value="export" className="mt-6">
+                <CatalogExportTab />
               </TabsContent>
             </Tabs>
           </CardContent>

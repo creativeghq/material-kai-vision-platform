@@ -2559,7 +2559,69 @@
         "desc": "Proposed listing price to test against the cap"
       }
     ],
-    "response": "{ success, market_median, market_min, market_max, currency, cap_pct, max_allowed, allowed, unverified, from_cache }"
+    "response": "{ success, market_median, market_min, market_max, currency, chosen_price, chosen_basis, confidence, price_source, cap_pct, max_allowed, allowed, unverified, from_cache }"
+  },
+  {
+    "name": "product-market-price",
+    "tag": "Products",
+    "summary": "What a catalogue product is worth on the open market",
+    "description": "Returns the derived market price for a product: the min/max band, the median, and the chosen price (lowest verified in-stock retailer hit) with the basis and confidence stated. Reads resolve_product_market_price, the platform's one price derivation, so a tile and a report cannot disagree. Never triggers a paid scan: the request is recorded as demand, which shortens the refresh cadence for products people actually ask about. Status is 'ok', 'no_data', 'not_collected' or 'collector_failed' - never a bare zero. authenticate() + userCanAccessWorkspace(); the product must belong to that workspace (404 otherwise).",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [
+      {
+        "name": "product_id",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "workspace_id",
+        "type": "string",
+        "required": true
+      }
+    ],
+    "response": "{ success, status, chosen_price, chosen_basis, chosen_retailer, chosen_url, chosen_title, min, max, median, currency, sample_size, verified_count, in_stock_count, confidence, product_id, tracking_count, resolved_at, next_check_at, age_seconds, is_stale, collector_error }"
+  },
+  {
+    "name": "public-price",
+    "tag": "Public",
+    "summary": "Open market-price lookup: the band, and the one to show",
+    "description": "Keyless. GET or POST a product `query` and get the market band (median, lowest, highest, each with its retailer) plus a single chosen price. `basis` picks which figure is the headline: verified_in_stock (default), median, lowest or highest; an unrecognised basis is a 400 rather than a silent default. Keyed on the market TEXT, never an internal product id, so it cannot be used to enumerate the catalogue, and it never triggers a paid scan. Every request is recorded as demand: keyless demand refreshes a price every 360h (15 days); sending `Authorization: Bearer kai_...` uses that key's own price_refresh_interval_hours instead and its own rate limit. Anonymous callers get 30 req/min per IP, quota-keyed on a salted hash. Status is ok, no_data, not_collected or collector_failed - never a bare zero.",
+    "security": [
+      "public",
+      "apiKeyPartner"
+    ],
+    "docs": null,
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "request": [
+      {
+        "name": "query",
+        "type": "string",
+        "required": true,
+        "desc": "Product name / brand / SKU, max 300 chars"
+      },
+      {
+        "name": "country",
+        "type": "string",
+        "required": false,
+        "desc": "ISO-2, narrows the match"
+      },
+      {
+        "name": "basis",
+        "type": "string",
+        "required": false,
+        "desc": "verified_in_stock (default) | median | lowest | highest"
+      }
+    ],
+    "response": "{ success, status, query, currency, price:{ value, basis, basis_requested, retailer, url, title }, band:{ median, lowest:{value,retailer,url}, highest:{value,retailer,url} }, sample:{ size, verified, in_stock, confidence }, freshness:{ resolved_at, age_seconds, is_stale, next_check_at, refresh_interval_hours }, access:{ keyed, rate_limit_per_min }, collector_error }"
   },
   {
     "name": "seo-domain-tracker",
@@ -15977,5 +16039,110 @@
       }
     },
     "response": "{ properties } | { property, performance, enquiries, viewings, offers, price_history, management, management_available } | { error }"
+  },
+  {
+    "name": "product-document-url",
+    "tag": "Products",
+    "summary": "Signed, short-lived link to the original file behind a product's knowledge doc or certificate",
+    "description": "Any authenticated member of the product's workspace. Resolves the source document of a kb_doc attached to the product, or a document named by one of the product's certificates, and returns a 5-minute signed download URL. pdf-documents is a private bucket, so the URL is minted per read and never stored. Authorization is decided by get_product_document_path, which runs AS THE CALLER. A catalogue reader outside the workspace is refused: a kb_doc is one page, the file behind it is the whole supplier catalogue. Refusals answer 404, not 403, so the id space cannot be walked.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "product_id": {
+          "type": "string",
+          "required": true,
+          "description": "The product the document must be reachable from"
+        },
+        "kb_doc_id": {
+          "type": "string",
+          "description": "A knowledge doc attached to that product; its source file is returned"
+        },
+        "document_id": {
+          "type": "string",
+          "description": "A document named by one of the product's certificates"
+        }
+      }
+    }
+  },
+  {
+    "name": "product-datasheet-pdf",
+    "tag": "Products",
+    "summary": "Branded technical datasheet for one product, as a PDF",
+    "description": "Any authenticated member of the product's workspace. Renders through the shared branded-document renderer, so the datasheet carries the same cover, background and company identity as that workspace's quotes and catalogues rather than a second idea of the brand. Specifications, attributes and properties are printed once each, in that order, with certificates as their own block. Internal fields are filtered by the pattern FETCHED from internal_product_field_pattern(), and an unreadable pattern withholds everything rather than printing a cost on a customer's copy. Authorization is get_product_detail's, running as the caller; the catalogue tier is refused with 404 because a datasheet publishes the supplier's letterhead. Re-rendered per request, never cached: a stale datasheet is the thing this replaces.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "product_id": {
+          "type": "string",
+          "required": true,
+          "description": "The product to render"
+        }
+      }
+    }
+  },
+  {
+    "name": "catalog-export",
+    "tag": "Products",
+    "summary": "Export the workspace catalogue as CSV, JSON or XML for a distributor or channel",
+    "description": "Any authenticated member of the workspace. Returns the active catalogue as a downloadable file. A saved xml_mapping_template can be applied in REVERSE, renaming our columns to the partner's vocabulary the importer already learned, so the same pairs are not taught twice. Cost, margin and supplier links are absent by construction: a partner price list is a separate decision with its own audience, not a side effect of exporting everything. CSV quoting is RFC 4180 and neutralises leading =, +, - and @ so a cell is never read as a spreadsheet formula; XML escapes the five predefined entities and drops characters XML 1.0 cannot carry. Membership is proved by the read (export_catalogue_rows runs as the caller), not asserted in the function.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "workspace_id": {
+          "type": "string",
+          "required": true,
+          "description": "Workspace whose catalogue to export"
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "csv",
+            "json",
+            "xml"
+          ],
+          "description": "Output format; defaults to csv"
+        },
+        "mapping_template_id": {
+          "type": "string",
+          "description": "xml_mapping_templates row, applied in reverse to rename columns"
+        },
+        "category_id": {
+          "type": "string",
+          "description": "Restrict to one category"
+        },
+        "limit": {
+          "type": "number",
+          "description": "Rows per call, max 5000"
+        },
+        "offset": {
+          "type": "number",
+          "description": "Row offset for paging"
+        }
+      }
+    }
   }
 ]

@@ -4,6 +4,7 @@ import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { assertEntitled } from '../_shared/entitlement.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 
 // Public online storefront (public link / mini-store).
 // Anonymous, no auth.
@@ -104,12 +105,9 @@ Deno.serve(withApiLogging('finance-storefront', async (req) => {
       if (clean.length === 0) return json({ error: 'cart is empty' }, 400);
       if (!customer?.email || !customer?.name) return json({ error: 'name and email are required' }, 400);
 
-      // Bot gate BEFORE any work (#257 C28). This action mints a legal-ish document, a CRM
-      // contact and a pay token from an ANONYMOUS caller, and had no rate limit or challenge at
-      // all — a script could manufacture draft receipts and contacts indefinitely.
-      //
-      // Placed above the entitlement check on purpose: a bot should not be able to enumerate
-      // which workspaces own the Finance module by reading the difference between a 403 and a 400.
+      // Bot gate BEFORE any work: this mints a document, a CRM contact and a pay token from an
+      // ANONYMOUS caller. Above the entitlement check on purpose — a 403/400 difference would
+      // enumerate which workspaces own Finance.
       const bot = await verifyTurnstile(supabase, body?.turnstile_token, clientIp(req));
       if (!bot.ok) return json({ error: 'Bot check failed. Please try again.' }, 400);
 
@@ -207,6 +205,19 @@ Deno.serve(withApiLogging('finance-storefront', async (req) => {
       const itemsPayload = lines.map((l) => ({ ...l, invoice_id: (invoice as any).id }));
       const { error: itErr } = await supabase.from('invoice_items').insert(itemsPayload);
       if (itErr) return json({ error: `could not add items: ${itErr.message}` }, 500);
+
+      // If the visitor never pays, no later event fires — this is the only moment the business
+      // hears about the order. Best-effort: it must not fail a checkout already completed.
+      try {
+        await emitFlowEventToWorkspaceRoles(ws.id, ['owner', 'admin'], 'order_created', (uid) => ({
+          user_id: uid, type: 'order_created', workspace_id: ws.id,
+          invoice_id: (invoice as any).id, order_type: 'sales', status: 'draft',
+          source: 'storefront', total: totalGross, currency,
+          title: 'New order from your online store',
+          body: `${customer.name} placed an order for ${totalGross.toFixed(2)} ${currency}, awaiting payment.`,
+          action_url: `/finance?tab=invoices`,
+        }));
+      } catch { /* the order is recorded; a notification is not worth losing it over */ }
 
       return json({
         ok: true,

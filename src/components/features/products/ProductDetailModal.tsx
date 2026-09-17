@@ -49,6 +49,8 @@ import { ProductPricingCard } from '@/components/business/marketplace/ProductPri
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { ProductDocumentSearch } from '@/components/features/products/ProductDocumentSearch';
 import { ProductCertificates } from '@/components/features/products/ProductCertificates';
+import { ProductDocumentDownload } from '@/components/features/products/ProductDocumentDownload';
+import { ProductDatasheetButton } from '@/components/features/products/ProductDatasheetButton';
 import { useToast } from '@/hooks/use-toast';
 import { DollarSign, Ship, Boxes } from 'lucide-react';
 import { ProductRecommendationsPanel } from './ProductRecommendationsPanel';
@@ -244,6 +246,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const [images, setImages] = useState<any[]>([]);
   const [isLoadingImages, setIsLoadingImages] = useState(true);
   const [chunks, setChunks] = useState<any[]>([]);
+  const [kbDraftCount, setKbDraftCount] = useState(0);
   // Knowledge base docs attached to this product (via kb_doc_attachments)
   const [kbDocs, setKbDocs] = useState<Array<{
     id: string;
@@ -437,12 +440,16 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
         if (error) {
           console.error('[ProductDetailModal] loadKbDocs error:', error);
-          setKbDocs([]);
+          setKbDocs([]); setKbDraftCount(0);
           return;
         }
 
-        const loaded = (data || [])
-          .filter((row: any) => row.kb_docs && row.kb_docs.status === 'published')
+        const attached = (data || []).filter((row: any) => row.kb_docs);
+        // Catalogue-derived docs are born draft by design (#31 M17-2), and retrieval
+        // cannot reach them. Dropping them silently reads as "no documents".
+        setKbDraftCount(attached.filter((row: any) => row.kb_docs.status !== 'published').length);
+        const loaded = attached
+          .filter((row: any) => row.kb_docs.status === 'published')
           .map((row: any) => ({
             id: row.kb_docs.id,
             title: row.kb_docs.title,
@@ -455,7 +462,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         setKbDocs(loaded);
       } catch (err) {
         console.error('[ProductDetailModal] loadKbDocs exception:', err);
-        setKbDocs([]);
+        setKbDocs([]); setKbDraftCount(0);
       }
     };
     loadKbDocs();
@@ -492,6 +499,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const canSeeCost = isOwnProduct && canAny('pricing.manage', 'sales.team.view');
   /** Fiscal identity is set by whoever does intake or invoicing, so it is not pricing-only. */
   const canSeeFiscal = isOwnProduct && canAny('pricing.manage', 'warehouse.manage', 'finance.manage');
+  /** Compliance records are intake data — same hands as the fiscal fields. */
+  const canEditCertificates = isOwnProduct && canAny('pricing.manage', 'warehouse.manage', 'finance.manage');
 
 
   const handlePrevImage = () => {
@@ -1098,12 +1107,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       }
     }
 
-    // ─── Dedup pass ────────────────────────────────────────────────────
-    // Multiple sources (vision_variants, sku_codes, commercial.product_table)
-    // can emit the same physical variant in different shapes — different SKU
-    // formats (compound "VALENOVA TAUPE LT/11,8X11,8" vs catalog "39661"),
-    // different casing ("taupe" vs "Taupe"), unit-trailing sizes
-    // ("11,8x11,8" vs "11,8x11,8 cm"), or partially-populated patterns
+    // Three sources can emit one physical variant in different shapes: SKU format,
+    // casing, unit-trailing sizes, partially-populated patterns.
     const isMoreInformativeSku = (a: string, b: string): boolean => {
       // Prefer non-sentinel, then non-compound (no "/"), then numeric, then shorter
       if (a === DISPLAY_SENTINEL && b !== DISPLAY_SENTINEL) return false;
@@ -2730,11 +2735,21 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             <BookOpen className="h-4 w-4" />
             Knowledge Base Articles
           </h3>
-          <ProductCertificates productId={product.id} />
+          {isOwnProduct && (
+            <div className="flex justify-end">
+              <ProductDatasheetButton productId={product.id} />
+            </div>
+          )}
+          <ProductCertificates
+            productId={product.id}
+            canEdit={canEditCertificates}
+            suggestedStandards={certList}
+          />
           <ProductDocumentSearch
             productId={product.id}
             workspaceId={activeWorkspaceId}
-            attachedDocCount={kbDocs.length}
+            searchableDocCount={kbDocs.length}
+            unreviewedDocCount={kbDraftCount}
           />
           {kbDocs.length === 0 ? (
             <Card>
@@ -2785,10 +2800,15 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     {groups[groupKey].map(doc => (
                       <Card key={doc.id} className="dashboard-card rounded-2xl border-0 shadow-sm">
                         <CardHeader className="pb-3">
-                          <CardTitle className="flex items-center gap-2">
-                            <BookOpen className="h-4 w-4" />
-                            {doc.title}
-                          </CardTitle>
+                          <div className="flex items-start justify-between gap-2">
+                            <CardTitle className="flex items-center gap-2">
+                              <BookOpen className="h-4 w-4" />
+                              {doc.title}
+                            </CardTitle>
+                            {isOwnProduct && (doc.metadata as any)?.source_document_id && (
+                              <ProductDocumentDownload productId={product.id} kbDocId={doc.id} />
+                            )}
+                          </div>
                         </CardHeader>
                         <CardContent>
                           {doc.summary && (

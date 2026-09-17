@@ -51,3 +51,28 @@ describe('the ordinary paths still work', () => {
     expect(documentSearchOutcome({ kind: 'searching' }, 2).kind).toBe('searching');
   });
 });
+
+describe('attached-but-unpublished is its own answer', () => {
+  it('documents held in draft are reported as awaiting review, not as none attached', () => {
+    expect(documentSearchOutcome({ kind: 'idle' }, 0, 3))
+      .toEqual({ kind: 'awaiting_review', count: 3 });
+  });
+
+  it('once something is published the search becomes available again', () => {
+    expect(documentSearchOutcome({ kind: 'idle' }, 1, 3).kind).toBe('idle');
+  });
+
+  it('a failure still outranks awaiting review', () => {
+    expect(documentSearchOutcome({ kind: 'failed', reason: 'x' }, 0, 4).kind).toBe('failed');
+  });
+
+  it('genuinely nothing attached is still no_documents', () => {
+    expect(documentSearchOutcome({ kind: 'idle' }, 0, 0)).toEqual({ kind: 'no_documents' });
+  });
+
+  it('an answered empty search with only drafts never reads as no_match', () => {
+    const out = documentSearchOutcome({ kind: 'answered', hits: [] }, 0, 2);
+    expect(out.kind).not.toBe('no_match');
+    expect(out.kind).toBe('awaiting_review');
+  });
+});

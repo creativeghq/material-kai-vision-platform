@@ -1,9 +1,8 @@
-// marketplace-price-check — resolves the MARKET price of an item (Perplexity + DataForSEO +
-// Firecrawl, via MIVAA's market-check engine) and tells the seller whether a proposed surplus
-// listing price is within the Operator's cap (market_median × (1 + cap%), cap default 20%).
-// It also POPULATES `marketplace_market_reference` (service-role, 24h TTL) so that
-// `create_marketplace_listing` can enforce the SAME cap server-side against a value the client
-// cannot forge.
+// marketplace-price-check — tells a seller whether a proposed surplus listing price is within
+// the Operator's cap (market_median × (1 + cap%), default 20%). Figures come from
+// `resolve_product_market_price`, the one price derivation; this only applies the cap. It also
+// POPULATES `marketplace_market_reference` (service-role, 24h TTL) so `create_marketplace_listing`
+// can enforce the SAME cap server-side against a value the client cannot forge.
 
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse as json } from '../_shared/http.ts';
@@ -49,10 +48,41 @@ Deno.serve(withApiLogging('marketplace-price-check', async (req: Request) => {
   const { data: cfg } = await svc.from('marketplace_config').select('markup_cap_pct').eq('id', 1).maybeSingle();
   const cap = Number((cfg as any)?.markup_cap_pct ?? 20);
 
-  // Market reference — cache first (24h) so re-pricing/editing doesn't re-bill the upstream scan.
+  // Resolver first when the product is tracked; reference cache then paid scan behind it.
   let median: number | null = null, mmin: number | null = null, mmax: number | null = null;
+  let chosenPrice: number | null = null, chosenBasis: string | null = null;
+  let confidence = 'none', priceSource = 'none';
+  let sampleSize: number | null = null, resolvedAt: string | null = null, ageSeconds: number | null = null;
   let fromCache = false;
+
   if (productId) {
+    const { data: product } = await svc
+      .from('products').select('id, workspace_id').eq('id', productId).maybeSingle();
+    if (!product || (product as any).workspace_id !== workspaceId) {
+      return json({ error: 'not found' }, 404);
+    }
+
+    await svc.rpc('record_price_demand', {
+      p_tracked_query_id: null, p_product_id: productId, p_workspace_id: workspaceId,
+      p_user_id: auth.userId, p_api_key_id: null, p_surface: 'marketplace', p_served_from: null,
+    });
+    const { data: resolved } = await svc.rpc('resolve_product_market_price', { p_product_id: productId });
+    if (resolved && resolved.status === 'ok' && resolved.median != null && !resolved.is_stale) {
+      median = Number(resolved.median);
+      mmin = resolved.min != null ? Number(resolved.min) : null;
+      mmax = resolved.max != null ? Number(resolved.max) : null;
+      chosenPrice = resolved.chosen_price != null ? Number(resolved.chosen_price) : null;
+      chosenBasis = resolved.chosen_basis ?? null;
+      confidence = resolved.confidence ?? 'none';
+      currency = resolved.currency || currency;
+      sampleSize = resolved.sample_size ?? null;
+      resolvedAt = resolved.resolved_at ?? null;
+      ageSeconds = resolved.age_seconds ?? null;
+      priceSource = 'tracking';
+    }
+  }
+
+  if (median == null && productId) {
     const { data: ref } = await svc
       .from('marketplace_market_reference')
       .select('market_median, market_min, market_max, currency')
@@ -65,6 +95,7 @@ Deno.serve(withApiLogging('marketplace-price-check', async (req: Request) => {
       mmax = (ref as any).market_max != null ? Number((ref as any).market_max) : null;
       currency = (ref as any).currency || currency;
       fromCache = true;
+      priceSource = 'reference_cache';
     }
   }
 
@@ -78,6 +109,7 @@ Deno.serve(withApiLogging('marketplace-price-check', async (req: Request) => {
         body: JSON.stringify({
           product_id: productId, product_name: productName,
           manufacturer: body?.manufacturer, dimensions: body?.dimensions, verify_prices: true,
+          surface: 'marketplace', record_demand: false,
         }),
       });
       if (res.ok) {
@@ -87,19 +119,24 @@ Deno.serve(withApiLogging('marketplace-price-check', async (req: Request) => {
         mmin = s?.min != null ? Number(s.min) : null;
         mmax = s?.max != null ? Number(s.max) : null;
         currency = s?.currency || currency;
-        if (productId && median != null) {
-          const now = new Date();
-          await svc.from('marketplace_market_reference').upsert({
-            product_id: productId, market_median: median, market_min: mmin, market_max: mmax,
-            currency, sample_size: s?.count ?? null,
-            resolved_at: now.toISOString(),
-            expires_at: new Date(now.getTime() + CACHE_TTL_HOURS * 3600_000).toISOString(),
-          }, { onConflict: 'product_id' });
-        }
+        chosenPrice = s?.chosen_price != null ? Number(s.chosen_price) : null;
+        chosenBasis = s?.chosen_basis ?? null;
+        confidence = s?.confidence ?? 'none';
+        if (median != null) { priceSource = 'fresh_scan'; sampleSize = s?.count ?? null; }
       }
     } catch (e) {
       console.warn('[marketplace-price-check] market-check failed:', e);
     }
+  }
+
+  if (productId && median != null && !fromCache) {
+    const now = new Date();
+    await svc.from('marketplace_market_reference').upsert({
+      product_id: productId, market_median: median, market_min: mmin, market_max: mmax,
+      currency, sample_size: sampleSize,
+      resolved_at: now.toISOString(),
+      expires_at: new Date(now.getTime() + CACHE_TTL_HOURS * 3600_000).toISOString(),
+    }, { onConflict: 'product_id' });
   }
 
   const unverified = median == null || median <= 0;
@@ -111,6 +148,8 @@ Deno.serve(withApiLogging('marketplace-price-check', async (req: Request) => {
   return json({
     success: true,
     market_median: median, market_min: mmin, market_max: mmax, currency,
+    chosen_price: chosenPrice, chosen_basis: chosenBasis, confidence, price_source: priceSource,
+    sample_size: sampleSize, resolved_at: resolvedAt, age_seconds: ageSeconds,
     cap_pct: cap, max_allowed: maxAllowed, allowed, unverified, from_cache: fromCache,
   });
 }));

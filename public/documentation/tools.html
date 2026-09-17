@@ -144,6 +144,29 @@
   <p>The top of the result summarises the market as <strong>lowest / median / highest</strong>. Each row beneath shows the retailer, the live price (with any was/now discount), stock availability, a <strong>"verified"</strong> mark where the price was confirmed by a direct page read, and a link straight to the listing. Trust verified rows most; use lowest/median/highest to judge where a given quote sits.</p>
   <p><strong>What it leads to:</strong> this is a free taste of the platform's full <strong>price monitoring</strong>. Once you sign in you can keep tracking a product over time and be alerted to price drops, new retailers and promotions, rather than running a one-off scan. See <a href="agent-tools.html">Tools &amp; Capabilities</a> for what the assistant can do with tracked pricing.</p>
 
+  <h3>Use it as an API — no key required</h3>
+  <div class="routes"><span class="badge route">GET /functions/v1/public-price</span> <span class="badge public">Public</span></div>
+  <p><strong>What it is —</strong> the same market answer as the scan above, as an <strong>open HTTP endpoint</strong>. No sign-up, no API key, no JWT. <strong>Why it matters —</strong> you can put a live "from €X" on a website, a spreadsheet or a partner integration without holding a credential. It returns the whole band — <strong>median</strong>, <strong>lowest</strong> and <strong>highest</strong>, each with the retailer it came from — plus a single <em>chosen</em> price you pick the rule for.</p>
+
+  <pre><code>curl "https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/public-price?query=Maidtec%207012&amp;basis=lowest"</code></pre>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Parameter</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td><code>query</code></td><td><strong>Required.</strong> Product, brand or SKU text — the same thing you would type into the scan box. Max 300 characters.</td></tr>
+        <tr><td><code>country</code></td><td>Optional ISO-2 code (<code>GR</code>, <code>DE</code>…) to narrow the match.</td></tr>
+        <tr><td><code>basis</code></td><td>Which figure <code>price.value</code> carries: <code>verified_in_stock</code> (default), <code>median</code>, <code>lowest</code> or <code>highest</code>. Anything else is a <strong>400</strong> — a typo never quietly returns a different number.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>The reply always carries the full band regardless of <code>basis</code>, so one call answers "what is it worth" and "what is the spread". <code>status</code> is <code>ok</code>, <code>no_data</code>, <code>not_collected</code> (we track nothing for this yet) or <code>collector_failed</code> — <strong>never a zero standing in for "we don't know"</strong>. <code>price.basis</code> tells you which rule actually answered, and <code>sample</code> gives the number of retailers behind it plus a confidence.</p>
+
+  <div class="callout tip"><p><strong>How fresh it is, and how to make it fresher.</strong> Asking for a price is itself the signal to refresh it — nothing is re-scanned because a timer said so. <strong>Without a key, a price you ask for is refreshed every 15 days.</strong> Send <code>Authorization: Bearer kai_…</code> and that key's own <em>price refresh interval</em> applies instead, down to hourly. Either way the call itself never triggers a paid scan, so it stays fast and free to call; the refresh happens on the schedule behind it. <code>freshness.resolved_at</code> and <code>freshness.next_check_at</code> tell you exactly where you stand.</p></div>
+
+  <div class="callout"><p><strong>Fair use.</strong> Anonymous callers get <strong>30 requests per minute</strong>, counted per IP; a key gets its own limit. Over the line is a <code>429</code> with <code>Retry-After</code>. The endpoint takes a product <em>query</em>, never an internal product id, so it exposes market prices and nothing about anyone's catalogue. Full request/response schema is in the <a href="api.html">API reference</a> and the OpenAPI spec at <span class="badge route">/api/openapi-edge.json</span>.</p></div>
+
   <!-- Mention scan -->
   <h2>6. Mention scan</h2>
   <div class="routes"><span class="badge route">/tools/mention-scan</span> <span class="badge public">Public</span></div>

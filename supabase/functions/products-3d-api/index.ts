@@ -3,6 +3,7 @@
 import { serviceClient } from '../_shared/supabase-client.ts';
 import { captureException } from '../_shared/sentry.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 import {
   authenticateEmbedKey, embedJson, intersectIdFilters, type EmbedKeyContext,
 } from '../_shared/embed-key.ts';
@@ -326,14 +327,26 @@ Deno.serve(withApiLogging((req) => {
     const offset = Math.max(Number(params.offset) || 0, 0);
     // `only_3d=true` powers a shelf of just the models — the common embed case.
     const only3d = String(params.only_3d ?? '') === 'true';
+    const q = String(params.q ?? '').trim();
 
-    // The 3D filter is applied IN the query, not to the page after it.
-    //
-    // Filtering afterwards silently returns short pages: ask for 24 and get however many of those
-    // 24 happened to have a model, with no way for the caller to tell "that's all there is" from
-    // "that page was thin". Resolving the model-bearing ids first makes `range()` mean what it
-    // says. The id list is small in practice — models are hand-uploaded per product (M0) — and
-    // capped so a very large catalog degrades into a long URL rather than a failed request.
+    let matchedIds: string[] | null = null;
+    if (q) {
+      // PostgREST parses `or` as an EXPRESSION: these characters change which rows come back
+      // rather than being matched. Not an HTML escape — a different contract.
+      const safe = q.replace(/[,.()\\:"*%]/g, ' ').trim();
+      if (!safe) return embedJson({ ok: true, products: [] }, 200, cors);
+      const { data: hits } = await supabase
+        .from('products')
+        .select('id')
+        .eq('workspace_id', workspaceId)
+        .or(`name.ilike.%${safe}%,description.ilike.%${safe}%,sku.ilike.%${safe}%`)
+        .limit(MAX_MODEL_ID_FILTER);
+      matchedIds = [...new Set((hits ?? []).map((h: any) => h.id as string))];
+    }
+
+    // Resolved to ids and filtered IN the query: filtering the page afterwards returns short
+    // pages a caller cannot tell from the end of the catalogue. Capped, so a very large
+    // catalogue degrades into a long URL rather than a failed request.
     let modelledIds: string[] | null = null;
     if (only3d) {
       const { data: modelled } = await supabase
@@ -348,7 +361,9 @@ Deno.serve(withApiLogging((req) => {
     // The key's scope and the caller's only_3d are both id restrictions; `null` from either means
     // "did not restrict". Intersecting them keeps the scope authoritative — a caller cannot widen
     // past it, only narrow further.
-    const restrictIds = intersectIdFilters(await scopeRestriction(supabase, auth.ctx), modelledIds);
+    const restrictIds = intersectIdFilters(
+      await scopeRestriction(supabase, auth.ctx), modelledIds, matchedIds,
+    );
     if (restrictIds !== null && restrictIds.length === 0) {
       return embedJson({ ok: true, products: [] }, 200, cors);
     }
@@ -668,13 +683,9 @@ Deno.serve(withApiLogging((req) => {
       return embedJson({ ok: true, available: false, reason: 'no_billable_owner' }, 200, cors);
     }
 
-    // Server-to-server into the existing generator rather than a fourth copy of the Gemini call.
-    // It owns the credit preflight, the debit, the provider routing and the usage logging; passing
-    // `user_id` with the service-role token is the path it already exposes for exactly this.
-    //
-    // `mode: 'product-shot'` takes the SPEC and builds the prompt itself. Building it here instead
-    // would be a second copy of that derivation, free to drift from the one the rest of the
-    // platform uses — the same mistake as re-deriving a money quantity.
+    // Server-to-server into the existing generator: it owns the credit preflight, the debit, the
+    // routing and the logging. `mode: 'product-shot'` builds the prompt from the SPEC itself —
+    // building it here would be a second copy of that derivation, free to drift.
     let imageUrl: string | null = null;
     try {
       const res = await fetch(`${supabaseUrl}/functions/v1/generate-interior-gemini`, {
@@ -897,6 +908,25 @@ Deno.serve(withApiLogging((req) => {
         }
       }
     }
+
+    // Without this the lead waits in Quote Requests for whoever opens that page. Role fanout:
+    // the event name is the THIRD argument.
+    await emitFlowEventToWorkspaceRoles(
+      workspaceId,
+      ['owner', 'admin', 'sales', 'sales_manager'],
+      'quote_requested',
+      (recipientUserId) => ({
+        type: 'info',
+        user_id: recipientUserId,
+        workspace_id: workspaceId,
+        quote_request_id: requestId,
+        plan_id: planId,
+        source: 'embed',
+        title: 'New quote request from your website',
+        body: `${name} asked for a quote through the embedded catalogue.`,
+        action_url: '/quotes?tab=requests',
+      }),
+    );
 
     return embedJson({
       ok: true,

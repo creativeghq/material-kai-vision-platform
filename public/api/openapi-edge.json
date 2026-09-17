@@ -160,6 +160,10 @@
       "description": "Projects functions."
     },
     {
+      "name": "Public",
+      "description": "Public functions."
+    },
+    {
       "name": "Stock",
       "description": "Stock functions."
     },
@@ -5108,7 +5112,7 @@
         ],
         "summary": "Check a surplus-listing price against the Operator's market cap",
         "operationId": "post_marketplace_price_check",
-        "description": "Resolves the market price for a product (via MIVAA's market-check engine — Perplexity/DataForSEO/Firecrawl) and returns whether a proposed surplus listing price is within the Operator cap (market_median × (1 + cap%), default 20%). Same guard create_marketplace_listing enforces server-side so the client can't forge it. authenticate() + userCanAccessWorkspace(); workspace must be an approved marketplace participant.\n\n**Response:** `{ success, market_median, market_min, market_max, currency, cap_pct, max_allowed, allowed, unverified, from_cache }`",
+        "description": "Resolves the market price for a product (via MIVAA's market-check engine — Perplexity/DataForSEO/Firecrawl) and returns whether a proposed surplus listing price is within the Operator cap (market_median × (1 + cap%), default 20%). Same guard create_marketplace_listing enforces server-side so the client can't forge it. authenticate() + userCanAccessWorkspace(); workspace must be an approved marketplace participant.\n\n**Response:** `{ success, market_median, market_min, market_max, currency, chosen_price, chosen_basis, confidence, price_source, cap_pct, max_allowed, allowed, unverified, from_cache }`",
         "security": [
           {
             "supabaseJwt": []
@@ -5190,6 +5194,256 @@
                 },
                 "required": [
                   "workspace_id"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/product-market-price": {
+      "post": {
+        "tags": [
+          "Products"
+        ],
+        "summary": "What a catalogue product is worth on the open market",
+        "operationId": "post_product_market_price",
+        "description": "Returns the derived market price for a product: the min/max band, the median, and the chosen price (lowest verified in-stock retailer hit) with the basis and confidence stated. Reads resolve_product_market_price, the platform's one price derivation, so a tile and a report cannot disagree. Never triggers a paid scan: the request is recorded as demand, which shortens the refresh cadence for products people actually ask about. Status is 'ok', 'no_data', 'not_collected' or 'collector_failed' - never a bare zero. authenticate() + userCanAccessWorkspace(); the product must belong to that workspace (404 otherwise).\n\n**Response:** `{ success, status, chosen_price, chosen_basis, chosen_retailer, chosen_url, chosen_title, min, max, median, currency, sample_size, verified_count, in_stock_count, confidence, product_id, tracking_count, resolved_at, next_check_at, age_seconds, is_stale, collector_error }`",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "product_id": {
+                    "type": "string"
+                  },
+                  "workspace_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "product_id",
+                  "workspace_id"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/public-price": {
+      "get": {
+        "tags": [
+          "Public"
+        ],
+        "summary": "Open market-price lookup: the band, and the one to show",
+        "operationId": "get_public_price",
+        "description": "Keyless. GET or POST a product `query` and get the market band (median, lowest, highest, each with its retailer) plus a single chosen price. `basis` picks which figure is the headline: verified_in_stock (default), median, lowest or highest; an unrecognised basis is a 400 rather than a silent default. Keyed on the market TEXT, never an internal product id, so it cannot be used to enumerate the catalogue, and it never triggers a paid scan. Every request is recorded as demand: keyless demand refreshes a price every 360h (15 days); sending `Authorization: Bearer kai_...` uses that key's own price_refresh_interval_hours instead and its own rate limit. Anonymous callers get 30 req/min per IP, quota-keyed on a salted hash. Status is ok, no_data, not_collected or collector_failed - never a bare zero.\n\n**Response:** `{ success, status, query, currency, price:{ value, basis, basis_requested, retailer, url, title }, band:{ median, lowest:{value,retailer,url}, highest:{value,retailer,url} }, sample:{ size, verified, in_stock, confidence }, freshness:{ resolved_at, age_seconds, is_stale, next_check_at, refresh_interval_hours }, access:{ keyed, rate_limit_per_min }, collector_error }`",
+        "security": [
+          {
+            "apiKeyPartner": []
+          },
+          {}
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Public"
+        ],
+        "summary": "Open market-price lookup: the band, and the one to show",
+        "operationId": "post_public_price",
+        "description": "Keyless. GET or POST a product `query` and get the market band (median, lowest, highest, each with its retailer) plus a single chosen price. `basis` picks which figure is the headline: verified_in_stock (default), median, lowest or highest; an unrecognised basis is a 400 rather than a silent default. Keyed on the market TEXT, never an internal product id, so it cannot be used to enumerate the catalogue, and it never triggers a paid scan. Every request is recorded as demand: keyless demand refreshes a price every 360h (15 days); sending `Authorization: Bearer kai_...` uses that key's own price_refresh_interval_hours instead and its own rate limit. Anonymous callers get 30 req/min per IP, quota-keyed on a salted hash. Status is ok, no_data, not_collected or collector_failed - never a bare zero.\n\n**Response:** `{ success, status, query, currency, price:{ value, basis, basis_requested, retailer, url, title }, band:{ median, lowest:{value,retailer,url}, highest:{value,retailer,url} }, sample:{ size, verified, in_stock, confidence }, freshness:{ resolved_at, age_seconds, is_stale, next_check_at, refresh_interval_hours }, access:{ keyed, rate_limit_per_min }, collector_error }`",
+        "security": [
+          {
+            "apiKeyPartner": []
+          },
+          {}
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "description": "Product name / brand / SKU, max 300 chars"
+                  },
+                  "country": {
+                    "type": "string",
+                    "description": "ISO-2, narrows the match"
+                  },
+                  "basis": {
+                    "type": "string",
+                    "description": "verified_in_stock (default) | median | lowest | highest"
+                  }
+                },
+                "required": [
+                  "query"
                 ]
               }
             }
@@ -28055,6 +28309,274 @@
                 "required": [
                   "workspace_id"
                 ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/real-estate-owner": {
+      "post": {
+        "tags": [
+          "Real Estate"
+        ],
+        "summary": "A property owner reading their own property",
+        "operationId": "post_real_estate_owner",
+        "description": "What a vendor or landlord sees of a property they own: the listing, viewing and enquiry activity, offers in AGGREGATE, the viewing feedback an agent has not hidden, price history, and - where the Property Management add-on is entitled - the tenancy, rent received and outstanding, work done and inspections.\n\nThe caller is NOT a workspace member. Access is a `record_guests` row with `role='owner'` for this user and this property, and the workspace is read off that grant rather than the request, so no `workspace_id` is accepted. An unknown or revoked property is 404, never 403.\n\nMoney reaches an owner as a DOCUMENT (quote, invoice, landlord statement), so this surface says what happened rather than what it cost: maintenance carries no cost and no contractor, and offers carry no buyer, terms or agent note. Output is the `toOwner()` projection - cost basis, minimum offer, commission and the valuation estimate never leave.\n\n**Response:** `{ properties } | { property, performance, enquiries, viewings, offers, price_history, management, management_available } | { error }`\n\n📖 [docs/real-estate-system.md](https://github.com/creativeghq/material-kai-vision-platform/blob/main/docs/real-estate-system.md)",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/product-document-url": {
+      "post": {
+        "tags": [
+          "Products"
+        ],
+        "summary": "Signed, short-lived link to the original file behind a product's knowledge doc or certificate",
+        "operationId": "post_product_document_url",
+        "description": "Any authenticated member of the product's workspace. Resolves the source document of a kb_doc attached to the product, or a document named by one of the product's certificates, and returns a 5-minute signed download URL. pdf-documents is a private bucket, so the URL is minted per read and never stored. Authorization is decided by get_product_document_path, which runs AS THE CALLER. A catalogue reader outside the workspace is refused: a kb_doc is one page, the file behind it is the whole supplier catalogue. Refusals answer 404, not 403, so the id space cannot be walked.",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/product-datasheet-pdf": {
+      "post": {
+        "tags": [
+          "Products"
+        ],
+        "summary": "Branded technical datasheet for one product, as a PDF",
+        "operationId": "post_product_datasheet_pdf",
+        "description": "Any authenticated member of the product's workspace. Renders through the shared branded-document renderer, so the datasheet carries the same cover, background and company identity as that workspace's quotes and catalogues rather than a second idea of the brand. Specifications, attributes and properties are printed once each, in that order, with certificates as their own block. Internal fields are filtered by the pattern FETCHED from internal_product_field_pattern(), and an unreadable pattern withholds everything rather than printing a cost on a customer's copy. Authorization is get_product_detail's, running as the caller; the catalogue tier is refused with 404 because a datasheet publishes the supplier's letterhead. Re-rendered per request, never cached: a stale datasheet is the thing this replaces.",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/catalog-export": {
+      "post": {
+        "tags": [
+          "Products"
+        ],
+        "summary": "Export the workspace catalogue as CSV, JSON or XML for a distributor or channel",
+        "operationId": "post_catalog_export",
+        "description": "Any authenticated member of the workspace. Returns the active catalogue as a downloadable file. A saved xml_mapping_template can be applied in REVERSE, renaming our columns to the partner's vocabulary the importer already learned, so the same pairs are not taught twice. Cost, margin and supplier links are absent by construction: a partner price list is a separate decision with its own audience, not a side effect of exporting everything. CSV quoting is RFC 4180 and neutralises leading =, +, - and @ so a cell is never read as a spreadsheet formula; XML escapes the five predefined entities and drops characters XML 1.0 cannot carry. Membership is proved by the read (export_catalogue_rows runs as the caller), not asserted in the function.",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
               }
             }
           }

@@ -6,6 +6,7 @@ import { Button } from '@/components/core/ui/button';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { RecognitionResult } from '@/types/materials';
+import { SimilarProducts } from './SimilarProducts';
 
 /**
  * Shape we read out of `RecognitionResult.properties` (typed `Record<string, unknown>`
@@ -146,6 +147,8 @@ export const RecognitionResults: React.FC<RecognitionResultsProps> = ({
                     )}
                   </div>
                 )}
+
+                {result.imageBase64 && <SimilarProducts imageBase64={result.imageBase64} />}
 
                 {/* Enhanced Material Properties */}
                 {(result.properties as DetectedProperties)?.customProperties && (

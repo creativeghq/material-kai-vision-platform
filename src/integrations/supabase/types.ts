@@ -20593,7 +20593,6 @@ export type Database = {
           brand_company_id: string | null
           category: string | null
           category_id: string | null
-          completeness_score: number | null
           confidence_score: number | null
           cost: number | null
           cost_currency: string | null
@@ -20678,7 +20677,6 @@ export type Database = {
           brand_company_id?: string | null
           category?: string | null
           category_id?: string | null
-          completeness_score?: number | null
           confidence_score?: number | null
           cost?: number | null
           cost_currency?: string | null
@@ -20763,7 +20761,6 @@ export type Database = {
           brand_company_id?: string | null
           category?: string | null
           category_id?: string | null
-          completeness_score?: number | null
           confidence_score?: number | null
           cost?: number | null
           cost_currency?: string | null
@@ -36534,7 +36531,6 @@ export type Database = {
           brand_company_id: string | null
           category: string | null
           category_id: string | null
-          completeness_score: number | null
           confidence_score: number | null
           cost: number | null
           cost_currency: string | null
@@ -37139,6 +37135,31 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: Json
+      }
+      get_workspace_search_insights: {
+        Args: { p_days?: number; p_workspace_id: string }
+        Returns: Json
+      }
+      import_catalogue_rows: {
+        Args: { p_rows: Json; p_workspace_id: string }
+        Returns: { created: number; skipped: number; updated: number }[]
+      }
+      export_catalogue_rows: {
+        Args: { p_category_id?: string; p_limit?: number; p_offset?: number; p_workspace_id: string }
+        Returns: Json
+      }
+      get_product_certificate_candidates: {
+        Args: { p_product_id: string }
+        Returns: {
+          certificate_number: string
+          confidence: number
+          entity_id: string
+          issuer: string
+          scope: string
+          standard: string
+          valid_from: string
+          valid_until: string
+        }[]
       }
       get_product_certificates: {
         Args: { p_product_id: string; p_today?: string }
@@ -39495,6 +39516,16 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: Json
+      }
+      product_completeness: {
+        Args: { p_product_id: string }
+        Returns: {
+          applicable: number
+          missing: string[]
+          present: number
+          reason: string
+          score: number
+        }[]
       }
       search_catalogue: {
         Args: {

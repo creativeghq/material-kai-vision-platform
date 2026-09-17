@@ -1,5 +1,6 @@
 /** Start Here — the one reader/writer of `user_onboarding`. */
 import { supabase } from '@/integrations/supabase/client';
+import { aadeService } from '@/modules/myaade/services/aadeService';
 
 export type OnboardingStatus = 'active' | 'completed' | 'skipped';
 
@@ -127,8 +128,11 @@ export const onboardingService = {
 
   /**
    * What the two setup steps look like from the data's side. A workspace has its business details
-   * once it has a name AND a VAT number — a name alone is the workspace's own label and says
-   * nothing about who issues the invoice.
+   * once it has a name AND a VAT number — a name alone is its own label and says nothing about
+   * who issues the invoice.
+   *
+   * ΑΑΔΕ asks `creds-status`, never `workspace_aade_credentials` directly: an empty table does NOT
+   * mean lookups are unconfigured, since a workspace inheriting platform-level codes has no row.
    */
   async setupStatus(workspaceId: string): Promise<OnboardingSetupStatus> {
     const [settings, aade] = await Promise.all([
@@ -137,18 +141,17 @@ export const onboardingService = {
         .select('business_name, business_vat')
         .eq('workspace_id', workspaceId)
         .maybeSingle(),
-      supabase
-        .from('workspace_aade_credentials')
-        .select('enabled')
-        .eq('workspace_id', workspaceId)
-        .maybeSingle(),
+      aadeService.getDefaultStatus(workspaceId).catch(() => null),
     ]);
 
     return {
       business: settings.error
         ? 'unknown'
         : settings.data?.business_name && settings.data?.business_vat ? 'ok' : 'missing',
-      myaade: aade.error ? 'unknown' : aade.data?.enabled ? 'ok' : 'missing',
+      // `null` is a call we could not make, which is an unknown — never a red cross.
+      myaade: aade === null
+        ? 'unknown'
+        : aade.source !== 'none' && aade.has_password ? 'ok' : 'missing',
     };
   },
 

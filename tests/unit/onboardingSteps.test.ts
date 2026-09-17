@@ -292,6 +292,22 @@ describe('the page has a branch for everything the registry declares', () => {
     ).toBe(false);
   });
 
+  it('asks the app how ΑΑΔΕ is configured instead of reading the table itself', () => {
+    // `workspace_aade_credentials` is empty at every workspace today: the operator inherits
+    // platform-level codes and has never needed a row. A direct read therefore reported the
+    // myDATA step as "not done" at a workspace where every lookup already works — the same
+    // second-derivation shape the money rules exist to stop.
+    const svc = read('src/services/onboardingService.ts');
+    expect(
+      svc.includes('aadeService.getDefaultStatus'),
+      'the tick must come from creds-status, which knows about platform defaults',
+    ).toBe(true);
+    expect(
+      /from\(\s*'workspace_aade_credentials'\s*\)/.test(svc),
+      'reading workspace_aade_credentials directly misses the platform default',
+    ).toBe(false);
+  });
+
   it('a tile for a module the workspace lacks goes to Modules, not to a blank page', () => {
     expect(
       PAGE.includes("'/profile?tab=modules'"),

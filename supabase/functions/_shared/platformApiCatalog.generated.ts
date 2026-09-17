@@ -125,6 +125,47 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     "description": "Universal executor for all background agent types. Accepts service-role or user JWT auth. GET ?catalog=1 returns the registered agent type catalog; POST runs or resumes an agent run."
   },
   {
+    "name": "catalog-export",
+    "tag": "Products",
+    "methods": [
+      "POST"
+    ],
+    "summary": "Export the workspace catalogue as CSV, JSON or XML for a distributor or channel",
+    "description": "Any authenticated member of the workspace. Returns the active catalogue as a downloadable file. A saved xml_mapping_template can be applied in REVERSE, renaming our columns to the partner's vocabulary the importer already learned, so the same pairs are not taught twice. Cost, margin and supplier links are absent by construction: a partner price list is a separate decision with its own audience, no",
+    "fields": {
+      "workspace_id": {
+        "type": "string",
+        "required": true,
+        "description": "Workspace whose catalogue to export"
+      },
+      "format": {
+        "type": "string",
+        "enum": [
+          "csv",
+          "json",
+          "xml"
+        ],
+        "description": "Output format; defaults to csv"
+      },
+      "mapping_template_id": {
+        "type": "string",
+        "description": "xml_mapping_templates row, applied in reverse to rename columns"
+      },
+      "category_id": {
+        "type": "string",
+        "description": "Restrict to one category"
+      },
+      "limit": {
+        "type": "number",
+        "description": "Rows per call, max 5000"
+      },
+      "offset": {
+        "type": "number",
+        "description": "Row offset for paging"
+      }
+    }
+  },
+  {
     "name": "catalog-extract-from-pdfs",
     "tag": "Catalogs",
     "methods": [
@@ -1662,6 +1703,65 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     ],
     "summary": "CRUD for the platform_secrets key store (admin/super_admin only)",
     "description": "Action-discriminated endpoint for listing, saving, and deleting platform secret values. Sensitive values are masked in list responses. Saves invalidate the in-worker secret cache. ENV values always take precedence over DB values; editing here only affects the DB fallback."
+  },
+  {
+    "name": "product-datasheet-pdf",
+    "tag": "Products",
+    "methods": [
+      "POST"
+    ],
+    "summary": "Branded technical datasheet for one product, as a PDF",
+    "description": "Any authenticated member of the product's workspace. Renders through the shared branded-document renderer, so the datasheet carries the same cover, background and company identity as that workspace's quotes and catalogues rather than a second idea of the brand. Specifications, attributes and properties are printed once each, in that order, with certificates as their own block. Internal fields are ",
+    "fields": {
+      "product_id": {
+        "type": "string",
+        "required": true,
+        "description": "The product to render"
+      }
+    }
+  },
+  {
+    "name": "product-document-url",
+    "tag": "Products",
+    "methods": [
+      "POST"
+    ],
+    "summary": "Signed, short-lived link to the original file behind a product's knowledge doc or certificate",
+    "description": "Any authenticated member of the product's workspace. Resolves the source document of a kb_doc attached to the product, or a document named by one of the product's certificates, and returns a 5-minute signed download URL. pdf-documents is a private bucket, so the URL is minted per read and never stored. Authorization is decided by get_product_document_path, which runs AS THE CALLER. A catalogue rea",
+    "fields": {
+      "product_id": {
+        "type": "string",
+        "required": true,
+        "description": "The product the document must be reachable from"
+      },
+      "kb_doc_id": {
+        "type": "string",
+        "description": "A knowledge doc attached to that product; its source file is returned"
+      },
+      "document_id": {
+        "type": "string",
+        "description": "A document named by one of the product's certificates"
+      }
+    }
+  },
+  {
+    "name": "product-market-price",
+    "tag": "Products",
+    "methods": [
+      "POST"
+    ],
+    "summary": "What a catalogue product is worth on the open market",
+    "description": "Returns the derived market price for a product: the min/max band, the median, and the chosen price (lowest verified in-stock retailer hit) with the basis and confidence stated. Reads resolve_product_market_price, the platform's one price derivation, so a tile and a report cannot disagree. Never triggers a paid scan: the request is recorded as demand, which shortens the refresh cadence for products",
+    "fields": {
+      "product_id": {
+        "type": "string",
+        "required": true
+      },
+      "workspace_id": {
+        "type": "string",
+        "required": true
+      }
+    }
   },
   {
     "name": "profile-review-summary",
