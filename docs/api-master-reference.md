@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (155)
+## 1. Supabase Edge Functions (156)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -373,6 +373,12 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `structure-site-note` | JWT | Turn a dictated site walk into a diary entry and the defects it described |
 | `takeoff-from-drawing` | JWT | Transcribe the schedules printed on a drawing into proposed bill-of-quantities lines |
 | `tender-bid-portal` | public / JWT | Issue a trade package to a subcontractor and take their priced return |
+
+**Public**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `public-price` _(GET + POST)_ | public / kai_* | Open market-price lookup: the band, and the one to show |
 
 **Stock**
 

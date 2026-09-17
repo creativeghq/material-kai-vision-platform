@@ -30,6 +30,11 @@ verify_jwt = false
 [functions.public-project-plan]
 verify_jwt = false
 
+# Open market-price API. No JWT and no key required; an optional kai_ bearer
+# raises the rate limit and sets the refresh cadence.
+[functions.public-price]
+verify_jwt = false
+
 [functions.inbox-api]
 verify_jwt = false
 

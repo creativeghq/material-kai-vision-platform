@@ -160,6 +160,10 @@
       "description": "Projects functions."
     },
     {
+      "name": "Public",
+      "description": "Public functions."
+    },
+    {
       "name": "Stock",
       "description": "Stock functions."
     },
@@ -5279,6 +5283,167 @@
                 "required": [
                   "product_id",
                   "workspace_id"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/public-price": {
+      "get": {
+        "tags": [
+          "Public"
+        ],
+        "summary": "Open market-price lookup: the band, and the one to show",
+        "operationId": "get_public_price",
+        "description": "Keyless. GET or POST a product `query` and get the market band (median, lowest, highest, each with its retailer) plus a single chosen price. `basis` picks which figure is the headline: verified_in_stock (default), median, lowest or highest; an unrecognised basis is a 400 rather than a silent default. Keyed on the market TEXT, never an internal product id, so it cannot be used to enumerate the catalogue, and it never triggers a paid scan. Every request is recorded as demand: keyless demand refreshes a price every 360h (15 days); sending `Authorization: Bearer kai_...` uses that key's own price_refresh_interval_hours instead and its own rate limit. Anonymous callers get 30 req/min per IP, quota-keyed on a salted hash. Status is ok, no_data, not_collected or collector_failed - never a bare zero.\n\n**Response:** `{ success, status, query, currency, price:{ value, basis, basis_requested, retailer, url, title }, band:{ median, lowest:{value,retailer,url}, highest:{value,retailer,url} }, sample:{ size, verified, in_stock, confidence }, freshness:{ resolved_at, age_seconds, is_stale, next_check_at, refresh_interval_hours }, access:{ keyed, rate_limit_per_min }, collector_error }`",
+        "security": [
+          {
+            "apiKeyPartner": []
+          },
+          {}
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Public"
+        ],
+        "summary": "Open market-price lookup: the band, and the one to show",
+        "operationId": "post_public_price",
+        "description": "Keyless. GET or POST a product `query` and get the market band (median, lowest, highest, each with its retailer) plus a single chosen price. `basis` picks which figure is the headline: verified_in_stock (default), median, lowest or highest; an unrecognised basis is a 400 rather than a silent default. Keyed on the market TEXT, never an internal product id, so it cannot be used to enumerate the catalogue, and it never triggers a paid scan. Every request is recorded as demand: keyless demand refreshes a price every 360h (15 days); sending `Authorization: Bearer kai_...` uses that key's own price_refresh_interval_hours instead and its own rate limit. Anonymous callers get 30 req/min per IP, quota-keyed on a salted hash. Status is ok, no_data, not_collected or collector_failed - never a bare zero.\n\n**Response:** `{ success, status, query, currency, price:{ value, basis, basis_requested, retailer, url, title }, band:{ median, lowest:{value,retailer,url}, highest:{value,retailer,url} }, sample:{ size, verified, in_stock, confidence }, freshness:{ resolved_at, age_seconds, is_stale, next_check_at, refresh_interval_hours }, access:{ keyed, rate_limit_per_min }, collector_error }`",
+        "security": [
+          {
+            "apiKeyPartner": []
+          },
+          {}
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "description": "Product name / brand / SKU, max 300 chars"
+                  },
+                  "country": {
+                    "type": "string",
+                    "description": "ISO-2, narrows the match"
+                  },
+                  "basis": {
+                    "type": "string",
+                    "description": "verified_in_stock (default) | median | lowest | highest"
+                  }
+                },
+                "required": [
+                  "query"
                 ]
               }
             }
