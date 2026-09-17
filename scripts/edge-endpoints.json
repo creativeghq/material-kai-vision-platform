@@ -2559,7 +2559,33 @@
         "desc": "Proposed listing price to test against the cap"
       }
     ],
-    "response": "{ success, market_median, market_min, market_max, currency, cap_pct, max_allowed, allowed, unverified, from_cache }"
+    "response": "{ success, market_median, market_min, market_max, currency, chosen_price, chosen_basis, confidence, price_source, cap_pct, max_allowed, allowed, unverified, from_cache }"
+  },
+  {
+    "name": "product-market-price",
+    "tag": "Products",
+    "summary": "What a catalogue product is worth on the open market",
+    "description": "Returns the derived market price for a product: the min/max band, the median, and the chosen price (lowest verified in-stock retailer hit) with the basis and confidence stated. Reads resolve_product_market_price, the platform's one price derivation, so a tile and a report cannot disagree. Never triggers a paid scan: the request is recorded as demand, which shortens the refresh cadence for products people actually ask about. Status is 'ok', 'no_data', 'not_collected' or 'collector_failed' - never a bare zero. authenticate() + userCanAccessWorkspace(); the product must belong to that workspace (404 otherwise).",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [
+      {
+        "name": "product_id",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "workspace_id",
+        "type": "string",
+        "required": true
+      }
+    ],
+    "response": "{ success, status, chosen_price, chosen_basis, chosen_retailer, chosen_url, chosen_title, min, max, median, currency, sample_size, verified_count, in_stock_count, confidence, product_id, tracking_count, resolved_at, next_check_at, age_seconds, is_stale, collector_error }"
   },
   {
     "name": "seo-domain-tracker",

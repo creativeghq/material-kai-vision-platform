@@ -100,6 +100,13 @@ export interface MarketPriceCheck {
   /** True when no market price could be resolved — the cap can't be enforced client-side. */
   unverified: boolean;
   from_cache: boolean;
+  chosen_price: number | null;
+  chosen_basis: 'lowest_verified_in_stock' | 'lowest_verified' | 'lowest_in_stock_unverified' | 'lowest_unverified' | null;
+  confidence: 'high' | 'medium' | 'low' | 'none';
+  price_source: 'tracking' | 'reference_cache' | 'fresh_scan' | 'none';
+  sample_size: number | null;
+  resolved_at: string | null;
+  age_seconds: number | null;
 }
 
 /** A buyer's saved surplus alert. A matching new listing emails + bells them. */

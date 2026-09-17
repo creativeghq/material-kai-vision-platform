@@ -1745,6 +1745,25 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     }
   },
   {
+    "name": "product-market-price",
+    "tag": "Products",
+    "methods": [
+      "POST"
+    ],
+    "summary": "What a catalogue product is worth on the open market",
+    "description": "Returns the derived market price for a product: the min/max band, the median, and the chosen price (lowest verified in-stock retailer hit) with the basis and confidence stated. Reads resolve_product_market_price, the platform's one price derivation, so a tile and a report cannot disagree. Never triggers a paid scan: the request is recorded as demand, which shortens the refresh cadence for products",
+    "fields": {
+      "product_id": {
+        "type": "string",
+        "required": true
+      },
+      "workspace_id": {
+        "type": "string",
+        "required": true
+      }
+    }
+  },
+  {
     "name": "profile-review-summary",
     "tag": "Profiles",
     "methods": [

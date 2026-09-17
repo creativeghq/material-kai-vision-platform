@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (150)
+## 1. Supabase Edge Functions (155)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -176,6 +176,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `real-estate-ical` _(GET + POST)_ | icalToken / cron | Short-let channel sync — availability feed out (GET, token) and channel calendars in (POST, cron) |
 | `real-estate-inbound-lead` | inboundLeadToken | Public tokenised endpoint — turns a forwarded portal enquiry email into a CRM lead |
 | `real-estate-listing-social` | cron | Flow action — drafts a social post for a newly published listing, one per connected account |
+| `real-estate-owner` | JWT | A property owner reading their own property |
 | `real-estate-public` | token / public | Anonymous, token-gated public listing pages, buyer portal, discovery and lead capture |
 | `real-estate-rent-invoicing` | cron | Daily cron — drafts Finance invoices for rent charges coming due |
 | `real-estate-vendor-reports` | cron | Weekly cron — emails the instructing vendor a performance report on their own listing |
@@ -350,7 +351,11 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 
 | Function | Auth | Summary |
 |---|---|---|
+| `catalog-export` | JWT | Export the workspace catalogue as CSV, JSON or XML for a distributor or channel |
 | `embed-agent` _(GET + POST)_ | public | Public agent surface for the website embed SDK — allowlisted tools, no model turn |
+| `product-datasheet-pdf` | JWT | Branded technical datasheet for one product, as a PDF |
+| `product-document-url` | JWT | Signed, short-lived link to the original file behind a product's knowledge doc or certificate |
+| `product-market-price` | JWT | What a catalogue product is worth on the open market |
 | `products-3d-api` _(GET + POST)_ | public | Public product + 3D model read for the website embed SDK |
 
 **Profiles**
