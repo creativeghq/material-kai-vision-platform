@@ -125,6 +125,47 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     "description": "Universal executor for all background agent types. Accepts service-role or user JWT auth. GET ?catalog=1 returns the registered agent type catalog; POST runs or resumes an agent run."
   },
   {
+    "name": "catalog-export",
+    "tag": "Products",
+    "methods": [
+      "POST"
+    ],
+    "summary": "Export the workspace catalogue as CSV, JSON or XML for a distributor or channel",
+    "description": "Any authenticated member of the workspace. Returns the active catalogue as a downloadable file. A saved xml_mapping_template can be applied in REVERSE, renaming our columns to the partner's vocabulary the importer already learned, so the same pairs are not taught twice. Cost, margin and supplier links are absent by construction: a partner price list is a separate decision with its own audience, no",
+    "fields": {
+      "workspace_id": {
+        "type": "string",
+        "required": true,
+        "description": "Workspace whose catalogue to export"
+      },
+      "format": {
+        "type": "string",
+        "enum": [
+          "csv",
+          "json",
+          "xml"
+        ],
+        "description": "Output format; defaults to csv"
+      },
+      "mapping_template_id": {
+        "type": "string",
+        "description": "xml_mapping_templates row, applied in reverse to rename columns"
+      },
+      "category_id": {
+        "type": "string",
+        "description": "Restrict to one category"
+      },
+      "limit": {
+        "type": "number",
+        "description": "Rows per call, max 5000"
+      },
+      "offset": {
+        "type": "number",
+        "description": "Row offset for paging"
+      }
+    }
+  },
+  {
     "name": "catalog-extract-from-pdfs",
     "tag": "Catalogs",
     "methods": [
@@ -1662,6 +1703,22 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     ],
     "summary": "CRUD for the platform_secrets key store (admin/super_admin only)",
     "description": "Action-discriminated endpoint for listing, saving, and deleting platform secret values. Sensitive values are masked in list responses. Saves invalidate the in-worker secret cache. ENV values always take precedence over DB values; editing here only affects the DB fallback."
+  },
+  {
+    "name": "product-datasheet-pdf",
+    "tag": "Products",
+    "methods": [
+      "POST"
+    ],
+    "summary": "Branded technical datasheet for one product, as a PDF",
+    "description": "Any authenticated member of the product's workspace. Renders through the shared branded-document renderer, so the datasheet carries the same cover, background and company identity as that workspace's quotes and catalogues rather than a second idea of the brand. Specifications, attributes and properties are printed once each, in that order, with certificates as their own block. Internal fields are ",
+    "fields": {
+      "product_id": {
+        "type": "string",
+        "required": true,
+        "description": "The product to render"
+      }
+    }
   },
   {
     "name": "product-document-url",

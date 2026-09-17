@@ -3,6 +3,7 @@ import { Upload, FileSpreadsheet, Loader2, CheckCircle2, AlertTriangle } from 'l
 import { Button } from '@/components/core/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { parseCsv } from '@/utils/csv';
 import { realEstateService, type ImportResult } from '../services/realEstateService';
 
 /**
@@ -14,42 +15,6 @@ import { realEstateService, type ImportResult } from '../services/realEstateServ
  * as unpublished drafts — they have not been through the compliance gate, and a bulk import that
  * silently pushed 300 listings to the public site and the portal feeds is not something you can undo.
  */
-
-/**
- * Minimal RFC4180 CSV reader: quoted fields, escaped `""`, and newlines inside quotes. Written here
- * rather than pulled in as a dependency — this is the whole of what we need, and a spreadsheet
- * export with a comma in an address is the one case a naive `split(',')` gets wrong.
- */
-function parseCsv(text: string): Record<string, string>[] {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let field = '';
-  let quoted = false;
-  const src = text.replace(/^﻿/, ''); // strip the BOM Excel writes
-
-  for (let i = 0; i < src.length; i++) {
-    const c = src[i];
-    if (quoted) {
-      if (c === '"') {
-        if (src[i + 1] === '"') { field += '"'; i++; }
-        else quoted = false;
-      } else field += c;
-      continue;
-    }
-    if (c === '"') { quoted = true; continue; }
-    if (c === ',' || c === ';') { row.push(field); field = ''; continue; }
-    if (c === '\r') continue;
-    if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; continue; }
-    field += c;
-  }
-  if (field !== '' || row.length) { row.push(field); rows.push(row); }
-  if (!rows.length) return [];
-
-  const header = rows[0].map((h) => h.trim().toLowerCase().replace(/\s+/g, '_'));
-  return rows.slice(1)
-    .filter((r) => r.some((c) => c.trim() !== ''))
-    .map((r) => Object.fromEntries(header.map((h, i) => [h, (r[i] ?? '').trim()])));
-}
 
 export const ImportListingsDialog: React.FC<{
   ws: string | null; open: boolean; onOpenChange: (v: boolean) => void; onImported: () => void;

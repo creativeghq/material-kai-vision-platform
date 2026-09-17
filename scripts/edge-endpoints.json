@@ -16009,5 +16009,78 @@
         }
       }
     }
+  },
+  {
+    "name": "product-datasheet-pdf",
+    "tag": "Products",
+    "summary": "Branded technical datasheet for one product, as a PDF",
+    "description": "Any authenticated member of the product's workspace. Renders through the shared branded-document renderer, so the datasheet carries the same cover, background and company identity as that workspace's quotes and catalogues rather than a second idea of the brand. Specifications, attributes and properties are printed once each, in that order, with certificates as their own block. Internal fields are filtered by the pattern FETCHED from internal_product_field_pattern(), and an unreadable pattern withholds everything rather than printing a cost on a customer's copy. Authorization is get_product_detail's, running as the caller; the catalogue tier is refused with 404 because a datasheet publishes the supplier's letterhead. Re-rendered per request, never cached: a stale datasheet is the thing this replaces.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "product_id": {
+          "type": "string",
+          "required": true,
+          "description": "The product to render"
+        }
+      }
+    }
+  },
+  {
+    "name": "catalog-export",
+    "tag": "Products",
+    "summary": "Export the workspace catalogue as CSV, JSON or XML for a distributor or channel",
+    "description": "Any authenticated member of the workspace. Returns the active catalogue as a downloadable file. A saved xml_mapping_template can be applied in REVERSE, renaming our columns to the partner's vocabulary the importer already learned, so the same pairs are not taught twice. Cost, margin and supplier links are absent by construction: a partner price list is a separate decision with its own audience, not a side effect of exporting everything. CSV quoting is RFC 4180 and neutralises leading =, +, - and @ so a cell is never read as a spreadsheet formula; XML escapes the five predefined entities and drops characters XML 1.0 cannot carry. Membership is proved by the read (export_catalogue_rows runs as the caller), not asserted in the function.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "workspace_id": {
+          "type": "string",
+          "required": true,
+          "description": "Workspace whose catalogue to export"
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "csv",
+            "json",
+            "xml"
+          ],
+          "description": "Output format; defaults to csv"
+        },
+        "mapping_template_id": {
+          "type": "string",
+          "description": "xml_mapping_templates row, applied in reverse to rename columns"
+        },
+        "category_id": {
+          "type": "string",
+          "description": "Restrict to one category"
+        },
+        "limit": {
+          "type": "number",
+          "description": "Rows per call, max 5000"
+        },
+        "offset": {
+          "type": "number",
+          "description": "Row offset for paging"
+        }
+      }
+    }
   }
 ]
