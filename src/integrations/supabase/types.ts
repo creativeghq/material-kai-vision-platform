@@ -20593,7 +20593,6 @@ export type Database = {
           brand_company_id: string | null
           category: string | null
           category_id: string | null
-          completeness_score: number | null
           confidence_score: number | null
           cost: number | null
           cost_currency: string | null
@@ -20678,7 +20677,6 @@ export type Database = {
           brand_company_id?: string | null
           category?: string | null
           category_id?: string | null
-          completeness_score?: number | null
           confidence_score?: number | null
           cost?: number | null
           cost_currency?: string | null
@@ -20763,7 +20761,6 @@ export type Database = {
           brand_company_id?: string | null
           category?: string | null
           category_id?: string | null
-          completeness_score?: number | null
           confidence_score?: number | null
           cost?: number | null
           cost_currency?: string | null
@@ -36534,7 +36531,6 @@ export type Database = {
           brand_company_id: string | null
           category: string | null
           category_id: string | null
-          completeness_score: number | null
           confidence_score: number | null
           cost: number | null
           cost_currency: string | null
@@ -39508,6 +39504,16 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: Json
+      }
+      product_completeness: {
+        Args: { p_product_id: string }
+        Returns: {
+          applicable: number
+          missing: string[]
+          present: number
+          reason: string
+          score: number
+        }[]
       }
       search_catalogue: {
         Args: {
