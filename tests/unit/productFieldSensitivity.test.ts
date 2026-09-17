@@ -15,6 +15,7 @@ import {
 } from '../../src/services/fieldRegistryService';
 import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 import { productFacetFields } from '../../src/pages/discoverFilters';
+import { normalizeFieldKey } from '../../src/utils/fieldKeyNormalize';
 
 const ROOT = process.cwd();
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8').replace(/\r\n/g, '\n');
@@ -84,6 +85,8 @@ describe('field sensitivity — the registry answers, the pattern is the floor',
     for (const key of [
       'costPrice', 'costprice', 'landedCost', 'marginPercent', 'markupPct',
       'wholesalePrice', 'procurementCost', 'profitAmount',
+      'purchasePrice', 'tradePrice', 'supplierPrice', 'dealerRate', 'netPrice',
+      'ourPrice', 'buyingPrice', 'marginNote', 'EURCost', 'cost-price', 'cost price',
     ]) {
       expect(
         isInternalFieldKey(snap, key),
@@ -94,7 +97,10 @@ describe('field sensitivity — the registry answers, the pattern is the floor',
   });
 
   it('and still does not withhold a field that merely reads like money', () => {
-    for (const key of ['priceRange', 'retailPrice', 'listPrice', 'costume', 'coastal', 'netWeight']) {
+    for (const key of [
+      'priceRange', 'retailPrice', 'listPrice', 'costume', 'coastal', 'netWeight',
+      'b2bPrice', 'pvp', 'VATRate', 'surfaceFinish', 'waterAbsorption',
+    ]) {
       expect(isInternalFieldKey(snap, key), `${key} must stay visible`).toBe(false);
     }
   });
@@ -243,5 +249,37 @@ describe('the Discover facet filters obey the same gate as the modal', () => {
   it('ignores a dimension only one product carries', () => {
     const snap = snapshot([field({ name: 'finish', label: 'Finish' })]);
     expect(productFacetFields(rows([{ finish: 'matte' }]), snap)).toEqual([]);
+  });
+});
+
+describe('the key is folded before the denylist sees it', () => {
+  it('produces the snake_case lowercase spelling the pattern is written in', () => {
+    const table: Array<[string, string]> = [
+      ['costPrice', 'cost_price'],
+      ['purchasePrice', 'purchase_price'],
+      ['EURCost', 'eur_cost'],
+      ['VATRate', 'vat_rate'],
+      ['cost-price', 'cost_price'],
+      ['cost price', 'cost_price'],
+      ['already_snake', 'already_snake'],
+      ['costprice', 'costprice'],
+    ];
+    for (const [raw, want] of table) {
+      expect(normalizeFieldKey(raw), `${raw} must fold to ${want}; the SQL twin `
+        + 'public.normalize_field_key() is held to this same table').toBe(want);
+    }
+  });
+
+  it('every consumer of the pattern folds the key first', () => {
+    const service = blankComments(read(REGISTRY_SERVICE));
+    expect(service, 'testing the raw key lets a camelCase money field through')
+      .toMatch(/internalPattern\.test\(canonical\)/);
+    expect(service).toMatch(/normalizeFieldKey\(key\)/);
+
+    const pdf = blankComments(read('supabase/functions/product-datasheet-pdf/index.ts'));
+    expect(pdf, 'the customer copy is the one place a cost must never print')
+      .toMatch(/re\.test\(normalizeFieldKey\(k\)\)/);
+    expect(pdf, 'a hand-rolled fold in the edge is a second implementation')
+      .toMatch(/from '\.\.\/_shared\/fieldKeyNormalize\.generated\.ts'/);
   });
 });

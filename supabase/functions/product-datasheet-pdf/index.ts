@@ -4,6 +4,7 @@ import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { normalizeFieldKey } from '../_shared/fieldKeyNormalize.generated.ts';
 import { fetchBrandingConfig, fetchTemplateImage, fetchImageBytesFromUrl } from '../_shared/pdf/branding.ts';
 import {
   renderBrandedDocument, type BrandedDoc, type BrandedSpecTable,
@@ -112,7 +113,7 @@ Deno.serve(withApiLogging('product-datasheet-pdf', async (req: Request) => {
   let isInternal: (key: string) => boolean;
   try {
     const re = new RegExp(String(patternText), 'i');
-    isInternal = (k) => re.test(k.toLowerCase());
+    isInternal = (k) => re.test(normalizeFieldKey(k));
   } catch {
     isInternal = () => true;
   }

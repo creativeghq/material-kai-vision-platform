@@ -4,8 +4,6 @@
 
 /** The character avatar shown for a contact whose photo we cannot get. */
 
-/* ────────────────────────────── The cast ────────────────────────────── */
-
 export type CastGender = 'female' | 'male';
 
 export interface CastCharacter {
@@ -61,8 +59,6 @@ export function castPool(gender: CastGender): number[] {
   for (let i = 0; i < CAST.length; i++) if (CAST[i].gender === gender) pool.push(i);
   return pool;
 }
-
-/* ────────────────────── Reading a gender off a name ────────────────────── */
 
 /**
  * Lower-cased, accent-stripped word tokens.
@@ -240,8 +236,6 @@ export function nameGender(name: string | null | undefined): CastGender | null {
   return verdicts.every((v) => v === verdicts[0]) ? verdicts[0] : null;
 }
 
-/* ────────────────────────── Assigning a character ────────────────────────── */
-
 const BUCKET = 'generation-images';
 const CAST_PREFIX = 'avatars/cast';
 
@@ -306,8 +300,6 @@ export function castObjectFor(seed: string | null | undefined, gender?: CastGend
 } {
   return castObjectForSlot(castSlotFor(seed, gender));
 }
-
-/** ── One person, one seed ── */
 
 /** The seed for the face of a thread's counterparty — the header, the list row, the drawer, the rail. */
 export function castSeedForThreadCounterparty(
