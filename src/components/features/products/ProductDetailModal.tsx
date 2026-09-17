@@ -50,6 +50,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { ProductDocumentSearch } from '@/components/features/products/ProductDocumentSearch';
 import { ProductCertificates } from '@/components/features/products/ProductCertificates';
 import { ProductDocumentDownload } from '@/components/features/products/ProductDocumentDownload';
+import { ProductDatasheetButton } from '@/components/features/products/ProductDatasheetButton';
 import { useToast } from '@/hooks/use-toast';
 import { DollarSign, Ship, Boxes } from 'lucide-react';
 import { ProductRecommendationsPanel } from './ProductRecommendationsPanel';
@@ -2734,6 +2735,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             <BookOpen className="h-4 w-4" />
             Knowledge Base Articles
           </h3>
+          {isOwnProduct && (
+            <div className="flex justify-end">
+              <ProductDatasheetButton productId={product.id} />
+            </div>
+          )}
           <ProductCertificates
             productId={product.id}
             canEdit={canEditCertificates}
