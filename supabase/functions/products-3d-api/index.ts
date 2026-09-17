@@ -3,6 +3,7 @@
 import { serviceClient } from '../_shared/supabase-client.ts';
 import { captureException } from '../_shared/sentry.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 import {
   authenticateEmbedKey, embedJson, intersectIdFilters, type EmbedKeyContext,
 } from '../_shared/embed-key.ts';
@@ -682,13 +683,9 @@ Deno.serve(withApiLogging((req) => {
       return embedJson({ ok: true, available: false, reason: 'no_billable_owner' }, 200, cors);
     }
 
-    // Server-to-server into the existing generator rather than a fourth copy of the Gemini call.
-    // It owns the credit preflight, the debit, the provider routing and the usage logging; passing
-    // `user_id` with the service-role token is the path it already exposes for exactly this.
-    //
-    // `mode: 'product-shot'` takes the SPEC and builds the prompt itself. Building it here instead
-    // would be a second copy of that derivation, free to drift from the one the rest of the
-    // platform uses — the same mistake as re-deriving a money quantity.
+    // Server-to-server into the existing generator: it owns the credit preflight, the debit, the
+    // routing and the logging. `mode: 'product-shot'` builds the prompt from the SPEC itself —
+    // building it here would be a second copy of that derivation, free to drift.
     let imageUrl: string | null = null;
     try {
       const res = await fetch(`${supabaseUrl}/functions/v1/generate-interior-gemini`, {
@@ -911,6 +908,25 @@ Deno.serve(withApiLogging((req) => {
         }
       }
     }
+
+    // Without this the lead waits in Quote Requests for whoever opens that page. Role fanout:
+    // the event name is the THIRD argument.
+    await emitFlowEventToWorkspaceRoles(
+      workspaceId,
+      ['owner', 'admin', 'sales', 'sales_manager'],
+      'quote_requested',
+      (recipientUserId) => ({
+        type: 'info',
+        user_id: recipientUserId,
+        workspace_id: workspaceId,
+        quote_request_id: requestId,
+        plan_id: planId,
+        source: 'embed',
+        title: 'New quote request from your website',
+        body: `${name} asked for a quote through the embedded catalogue.`,
+        action_url: '/quotes?tab=requests',
+      }),
+    );
 
     return embedJson({
       ok: true,

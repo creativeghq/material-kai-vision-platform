@@ -338,6 +338,10 @@ export class QuotesService {
       user_id: data.ownerUserId,
       name: created.name,
       status: created.status,
+      // Same reason as createQuote above, and it was missing here: without it flow-engine
+      // matches only `is_global` flows, so a workspace's automation on a quote raised FOR a
+      // member never fires. The caller passed the workspace in.
+      workspace_id: data.workspaceId,
     });
 
     return created;
