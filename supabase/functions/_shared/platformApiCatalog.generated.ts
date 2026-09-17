@@ -1910,7 +1910,22 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "A property owner reading their own property",
-    "description": "What a vendor or landlord sees of a property they own: the listing, viewing and enquiry activity, offers in AGGREGATE, the viewing feedback an agent has not hidden, price history, and - where the Property Management add-on is entitled - the tenancy, rent received and outstanding, work done and inspections.\n\nThe caller is NOT a workspace member. Access is a `record_guests` row with `role='owner'` f"
+    "description": "What a vendor or landlord sees of a property they own: the listing, viewing and enquiry activity, offers in AGGREGATE, the viewing feedback an agent has not hidden, price history, and - where the Property Management add-on is entitled - the tenancy, rent received and outstanding, work done and inspections.\n\nThe caller is NOT a workspace member. Access is a `record_guests` row with `role='owner'` f",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "list",
+          "get"
+        ],
+        "required": true,
+        "description": "list = every property this owner was granted; get = one of them in full."
+      },
+      "property_id": {
+        "type": "string",
+        "description": "Required for get. Must be a property the signed-in user holds an owner grant on."
+      }
+    }
   },
   {
     "name": "recommendations-api",

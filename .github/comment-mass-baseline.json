@@ -1,16 +1,16 @@
 {
-  "total": 78951,
+  "total": 78985,
   "areas": {
     "api": 20,
     "cloudflare": 31,
     "eslint.config.js": 41,
     "playwright.config.ts": 7,
-    "scripts": 841,
+    "scripts": 850,
     "src/api": 33,
     "src/App.tsx": 159,
     "src/auth": 149,
     "src/components": 12225,
-    "src/config": 1186,
+    "src/config": 1194,
     "src/constants": 32,
     "src/contexts": 114,
     "src/core": 106,
@@ -27,7 +27,7 @@
     "src/utils": 927,
     "src/vite-env.d.ts": 1,
     "src/_system": 25,
-    "supabase/functions": 25733,
+    "supabase/functions": 25747,
     "tailwind.config.ts": 27,
     "tests/e2e": 48,
     "tests/fixtures": 46,
@@ -37,10 +37,11 @@
     "tests/integration": 431,
     "tests/security": 57,
     "tests/setup.ts": 4,
-    "tests/unit": 10535,
+    "tests/unit": 10538,
     "tests/utils": 1,
     "vite.config.ts": 44,
     "vite.embed.config.ts": 16,
     "vitest.config.ts": 16
-  }
+  },
+  "generated_at": "2026-09-16T09:13:48.019Z"
 }

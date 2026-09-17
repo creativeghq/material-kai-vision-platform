@@ -1,0 +1,1361 @@
+[
+  {
+    "name": "brand_overview",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_company_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "customer_360",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_company_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_article_decay",
+    "args": [
+      {
+        "name": "p_article_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_days",
+        "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "get_assessment_snapshot",
+    "args": [
+      {
+        "name": "p_subject_type",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "p_subject_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_today",
+        "type": "date"
+      }
+    ]
+  },
+  {
+    "name": "get_asset_book_values",
+    "args": [
+      {
+        "name": "p_asset_ids",
+        "type": "uuid[]",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_asset_tax_depreciation",
+    "args": [
+      {
+        "name": "p_asset_ids",
+        "type": "uuid[]",
+        "required": true
+      },
+      {
+        "name": "p_as_of",
+        "type": "date"
+      }
+    ]
+  },
+  {
+    "name": "get_brand_category_coverage",
+    "args": [
+      {
+        "name": "p_brands",
+        "type": "text[]",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_buyer_finance_limits",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_company_id",
+        "type": "uuid"
+      },
+      {
+        "name": "p_contact_id",
+        "type": "uuid"
+      }
+    ]
+  },
+  {
+    "name": "get_cooccurring_products",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_product_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_limit",
+        "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "get_customer_health",
+    "args": [
+      {
+        "name": "p_company_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_days",
+        "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "get_customer_prior_balance",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_company_id",
+        "type": "uuid"
+      },
+      {
+        "name": "p_contact_id",
+        "type": "uuid"
+      },
+      {
+        "name": "p_exclude_invoice_id",
+        "type": "uuid"
+      },
+      {
+        "name": "p_as_of",
+        "type": "timestamp with time zone"
+      }
+    ]
+  },
+  {
+    "name": "get_deal_documents",
+    "args": [
+      {
+        "name": "p_deal_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_deal_forecast",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_deal_type_id",
+        "type": "uuid"
+      }
+    ]
+  },
+  {
+    "name": "get_deal_outcomes_by_month",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_deal_type_id",
+        "type": "uuid"
+      },
+      {
+        "name": "p_months",
+        "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "get_deal_owner_stats",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_deal_type_id",
+        "type": "uuid"
+      }
+    ]
+  },
+  {
+    "name": "get_deal_stage_funnel",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_deal_type_id",
+        "type": "uuid"
+      }
+    ]
+  },
+  {
+    "name": "get_deal_stage_totals",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_deal_type_id",
+        "type": "uuid"
+      }
+    ]
+  },
+  {
+    "name": "get_deal_velocity",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_deal_type_id",
+        "type": "uuid"
+      }
+    ]
+  },
+  {
+    "name": "get_embed_analytics_summary",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_days",
+        "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "get_gsc_movers",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_days",
+        "type": "integer"
+      },
+      {
+        "name": "p_limit",
+        "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "get_gsc_striking_distance",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_days",
+        "type": "integer"
+      },
+      {
+        "name": "p_limit",
+        "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "get_gsc_summary",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_days",
+        "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "get_inbound_document_correlations",
+    "args": [
+      {
+        "name": "p_doc_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_inbound_document_detail",
+    "args": [
+      {
+        "name": "p_doc_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_inbound_link_summary",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_intrastat_lines",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_from",
+        "type": "date",
+        "required": true
+      },
+      {
+        "name": "p_to",
+        "type": "date",
+        "required": true
+      },
+      {
+        "name": "p_direction",
+        "type": "text"
+      }
+    ]
+  },
+  {
+    "name": "get_invoice_item_costs",
+    "args": [
+      {
+        "name": "p_invoice_ids",
+        "type": "uuid[]",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_monthly_pnl",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_from",
+        "type": "date",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_mydata_book_aggregate",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_from",
+        "type": "date",
+        "required": true
+      },
+      {
+        "name": "p_to",
+        "type": "date",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_order_customs_preview",
+    "args": [
+      {
+        "name": "p_order_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_order_item_costs",
+    "args": [
+      {
+        "name": "p_order_ids",
+        "type": "uuid[]",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_order_profit_positions",
+    "args": [
+      {
+        "name": "p_order_ids",
+        "type": "uuid[]",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_order_settlements",
+    "args": [
+      {
+        "name": "p_order_ids",
+        "type": "uuid[]",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_order_worklist",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_limit",
+        "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "get_package_bid_comparison",
+    "args": [
+      {
+        "name": "p_package_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_page_gsc_queries",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_page",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "p_days",
+        "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "get_party_profit_position",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_company_id",
+        "type": "uuid"
+      },
+      {
+        "name": "p_contact_id",
+        "type": "uuid"
+      }
+    ]
+  },
+  {
+    "name": "get_party_work",
+    "args": [
+      {
+        "name": "p_party_kind",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "p_party_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_payment_remainders",
+    "args": [
+      {
+        "name": "p_payment_ids",
+        "type": "uuid[]"
+      }
+    ]
+  },
+  {
+    "name": "get_product_categories",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_product_certificates",
+    "args": [
+      {
+        "name": "p_product_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_today",
+        "type": "date"
+      }
+    ]
+  },
+  {
+    "name": "get_product_costs",
+    "args": [
+      {
+        "name": "p_product_ids",
+        "type": "uuid[]",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_product_detail",
+    "args": [
+      {
+        "name": "p_product_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_product_price_history",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_product_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_days",
+        "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "get_product_provenance",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_product_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_products_by_brand",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_company_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_products_in_project",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_project_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_profit_drawdown",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_from",
+        "type": "date"
+      },
+      {
+        "name": "p_to",
+        "type": "date"
+      }
+    ]
+  },
+  {
+    "name": "get_project_applications",
+    "args": [
+      {
+        "name": "p_project_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_project_cost_by_code",
+    "args": [
+      {
+        "name": "p_project_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_project_cvr",
+    "args": [
+      {
+        "name": "p_project_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_project_finance_summary",
+    "args": [
+      {
+        "name": "p_project_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_project_inspections",
+    "args": [
+      {
+        "name": "p_project_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_project_labor",
+    "args": [
+      {
+        "name": "p_project_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_project_pnl",
+    "args": [
+      {
+        "name": "p_project_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_project_retention",
+    "args": [
+      {
+        "name": "p_project_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_project_stock_holds",
+    "args": [
+      {
+        "name": "p_project_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_projects_using_product",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_product_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_property_commercial_links",
+    "args": [
+      {
+        "name": "p_property_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_property_performance",
+    "args": [
+      {
+        "name": "p_property_ids",
+        "type": "uuid[]",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_property_projects",
+    "args": [
+      {
+        "name": "p_property_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_quote_billing_progress",
+    "args": [
+      {
+        "name": "p_quote_ids",
+        "type": "uuid[]",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_quote_totals",
+    "args": [
+      {
+        "name": "p_quote_ids",
+        "type": "uuid[]",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_related_products",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_product_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_types",
+        "type": "text[]"
+      },
+      {
+        "name": "p_limit",
+        "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "get_rent_charge_settlements",
+    "args": [
+      {
+        "name": "p_charge_ids",
+        "type": "uuid[]",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_sale_commission_splits",
+    "args": [
+      {
+        "name": "p_sale_ids",
+        "type": "uuid[]",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_sourcing_board",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_mine",
+        "type": "boolean"
+      }
+    ]
+  },
+  {
+    "name": "get_supplier_inbound_orders",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_tender_bid_analysis",
+    "args": [
+      {
+        "name": "p_package_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_tender_bid_summary",
+    "args": [
+      {
+        "name": "p_package_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_website_ai_answers",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_days",
+        "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "get_website_ai_monitoring_state",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_website_ai_visibility",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_days",
+        "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "get_website_cannibalisation",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_days",
+        "type": "integer"
+      },
+      {
+        "name": "p_min_impressions",
+        "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "get_website_competitor_series",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_days",
+        "type": "integer"
+      },
+      {
+        "name": "p_metric",
+        "type": "text"
+      }
+    ]
+  },
+  {
+    "name": "get_website_crawl_report",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_website_domain_intel",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_days",
+        "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "get_website_health",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_website_opportunities",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_website_rank_summary",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_days",
+        "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "get_website_search_metrics",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_days",
+        "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "get_website_seo_overview",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_workspace_capabilities",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "inbound_issuers_summary",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "kb_retrieval_eval_summary",
+    "args": [
+      {
+        "name": "p_batch_id",
+        "type": "uuid"
+      }
+    ]
+  },
+  {
+    "name": "list_granted_catalog_products",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_query",
+        "type": "text"
+      },
+      {
+        "name": "p_factory",
+        "type": "text"
+      },
+      {
+        "name": "p_limit",
+        "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "list_supplier_products",
+    "args": [
+      {
+        "name": "p_product_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "list_workspace_product_suppliers",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "my_customer_account_summary",
+    "args": []
+  },
+  {
+    "name": "search_catalogue",
+    "args": [
+      {
+        "name": "p_query",
+        "type": "text"
+      },
+      {
+        "name": "p_category_id",
+        "type": "uuid"
+      },
+      {
+        "name": "p_limit",
+        "type": "integer"
+      },
+      {
+        "name": "p_offset",
+        "type": "integer"
+      },
+      {
+        "name": "p_product_id",
+        "type": "uuid"
+      }
+    ]
+  },
+  {
+    "name": "search_orders",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_order_type",
+        "type": "text"
+      },
+      {
+        "name": "p_status",
+        "type": "text"
+      },
+      {
+        "name": "p_company_id",
+        "type": "uuid"
+      },
+      {
+        "name": "p_contact_id",
+        "type": "uuid"
+      },
+      {
+        "name": "p_project_id",
+        "type": "uuid"
+      },
+      {
+        "name": "p_search",
+        "type": "text"
+      },
+      {
+        "name": "p_limit",
+        "type": "integer"
+      },
+      {
+        "name": "p_offset",
+        "type": "integer"
+      },
+      {
+        "name": "p_created_from",
+        "type": "timestamp with time zone"
+      },
+      {
+        "name": "p_created_to",
+        "type": "timestamp with time zone"
+      },
+      {
+        "name": "p_total_min",
+        "type": "numeric"
+      },
+      {
+        "name": "p_total_max",
+        "type": "numeric"
+      },
+      {
+        "name": "p_currency",
+        "type": "text"
+      },
+      {
+        "name": "p_payment_status",
+        "type": "text"
+      }
+    ]
+  },
+  {
+    "name": "search_products_by_specs",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_filters",
+        "type": "jsonb"
+      },
+      {
+        "name": "p_limit",
+        "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "search_products_fulltext",
+    "args": [
+      {
+        "name": "search_query",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_limit",
+        "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "search_workspace_people",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_query",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "p_limit",
+        "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "seo_website_ga_summary",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_days",
+        "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "seo_website_gsc_summary",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_days",
+        "type": "integer"
+      }
+    ]
+  },
+  {
+    "name": "seo_website_health_summary",
+    "args": [
+      {
+        "name": "p_website_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "supplier_360",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_company_id",
+        "type": "uuid",
+        "required": true
+      }
+    ]
+  }
+]

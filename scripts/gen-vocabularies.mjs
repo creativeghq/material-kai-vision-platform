@@ -275,6 +275,12 @@ export const VOCABULARIES = [
     'supabase/functions/_shared/platformApiAccess.generated.ts',
   ],
   [
+    // Which derived reads the generic reader may serve. Cost and margin are withheld from a
+    // client by column grant, so a reader that served them to any member would walk around it.
+    'src/config/platformRpcAccess.ts',
+    'supabase/functions/_shared/platformRpcAccess.generated.ts',
+  ],
+  [
     // What one agent turn may carry. The numbers lived as `const`s inside agent-chat's request
     // handler, so the only party that knew them was the one refusing: the composer appended
     // attachments with no ceiling at all, and 19 PDFs were read, uploaded and then answered with
