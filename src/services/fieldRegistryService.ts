@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { normalizeFieldKey } from '@/utils/fieldKeyNormalize';
 
 /** The product field registry, read at runtime from `material_metadata_fields` (#368 PD-1/PD-5). */
 
@@ -204,9 +205,9 @@ export function isInternalFieldKey(
   key: string,
 ): boolean | null {
   if (!key) return false;
-  const lower = key.toLowerCase();
-  const known = snapshot.byName.get(lower);
+  const canonical = normalizeFieldKey(key);
+  const known = snapshot.byName.get(key.toLowerCase()) ?? snapshot.byName.get(canonical);
   if (known) return known.sensitivity === 'internal';
   if (!snapshot.internalPattern) return null;
-  return snapshot.internalPattern.test(lower);
+  return snapshot.internalPattern.test(canonical);
 }

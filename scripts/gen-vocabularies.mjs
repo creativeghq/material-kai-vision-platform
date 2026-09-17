@@ -295,6 +295,12 @@ export const VOCABULARIES = [
     'src/utils/imageUrl.ts',
     'supabase/functions/_shared/imageUrl.generated.ts',
   ],
+  [
+    // Folding an attribute key to the spelling the internal-field denylist is written in; the
+    // pattern is case-insensitive in all three engines, so it cannot express a camel boundary.
+    'src/utils/fieldKeyNormalize.ts',
+    'supabase/functions/_shared/fieldKeyNormalize.generated.ts',
+  ],
 ];
 
 const banner = (source) => [

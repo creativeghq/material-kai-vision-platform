@@ -66,7 +66,6 @@ const sb = async (path, init = {}) => {
   return res.json();
 };
 
-// ── retrieval ───────────────────────────────────────────────────────────────
 
 async function embedQuery(text) {
   // input_type="query" and voyage-4 deliberately: the corpus is 4-series, and a query
@@ -106,7 +105,6 @@ async function retrieve(question, workspaceId) {
   return Array.isArray(rows) ? rows : [];
 }
 
-// ── the two rankers ─────────────────────────────────────────────────────────
 
 // `kb_hybrid_doc_chunks` returns `document_title` / `heading` / `content` and keys the
 // chunk's document as `kb_doc_id` — verified against the live RPC, because the obvious
@@ -230,7 +228,6 @@ async function rankClaude(question, rows) {
   return out;
 }
 
-// ── metric ──────────────────────────────────────────────────────────────────
 
 /** 1-based rank of the first row whose doc id is in `expected`, or null if absent. */
 function rankOfFirstRelevant(ordered, expected) {
@@ -252,7 +249,6 @@ function summarise(label, ranks) {
     + `top-3 ${top3}/${ranks.length} | missed ${ranks.length - found.length}`;
 }
 
-// ── run ─────────────────────────────────────────────────────────────────────
 
 async function main() {
   const cases = await sb(
