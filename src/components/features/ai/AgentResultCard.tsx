@@ -557,28 +557,41 @@ function RelatedChips({ obj }: { obj: Record<string, any> }) {
   );
 }
 
+/** Renders, at some depth, as a TABLE — a block the eye scans down, not a value read across. */
+function holdsTable(v: any, depth = 0): boolean {
+  if (depth > MAX_DEPTH) return false;
+  if (Array.isArray(v)) return v.length > 0 && !!tabularColumns(v);
+  if (v && typeof v === 'object') return Object.values(v).some((x) => holdsTable(x, depth + 1));
+  return false;
+}
+
 function KeyValues({ obj, depth = 0, inline = false }: { obj: any; depth?: number; inline?: boolean }) {
   if (obj == null || typeof obj !== 'object') return <Scalar v={obj} />;
   const entries = Object.entries(obj).filter(([k, v]) => !isPlumbing(k, v));
   if (entries.length === 0) return <span className="text-muted-foreground">Nothing to show</span>;
   return (
-    // A definition list is read across, so it is capped rather than stretched: at the artifact
-    // modal's width the `1fr` value column ran to ~900px and every value floated a third of the
-    // screen away from the label naming it. Reading distance, not available space, sets this.
-    <div className={inline ? 'flex flex-wrap gap-x-4 gap-y-0.5' : 'max-w-2xl divide-y divide-hairline'}>
-      {entries.map(([k, v]) => (
-        <div
-          key={k}
-          className={inline
-            ? 'text-xs'
-            // STACKED below `sm`. Two columns on a phone leaves the value ~130px once the label
-            // has its minimum and the row is nested one level — and these nest.
-            : 'grid grid-cols-1 items-start gap-x-4 py-1.5 text-xs first:pt-0 last:pb-0 sm:grid-cols-[minmax(96px,180px)_1fr]'}
-        >
-          <span className="text-muted-foreground">{labelize(k)}{inline ? ': ' : ''}</span>
-          <div className="min-w-0 text-foreground"><Value v={v} depth={depth} listKey={k} /></div>
-        </div>
-      ))}
+    <div className={inline ? 'flex flex-wrap gap-x-4 gap-y-0.5' : 'divide-y divide-hairline'}>
+      {entries.map(([k, v]) => {
+        // The cap below is a reading width and wrong for a table: each nesting level also
+        // spends a label column, so a table two levels down got half the modal, truncated.
+        const block = !inline && holdsTable(v);
+        return (
+          <div
+            key={k}
+            className={inline
+              ? 'text-xs'
+              : block
+                ? 'space-y-1 py-1.5 text-xs first:pt-0 last:pb-0'
+                // A definition list is read across, so it is capped rather than stretched: at the
+                // modal's width the `1fr` column ran to ~900px and every value floated a third of
+                // the screen from its label. STACKED below `sm`, where two columns leave ~130px.
+                : 'grid max-w-2xl grid-cols-1 items-start gap-x-4 py-1.5 text-xs first:pt-0 last:pb-0 sm:grid-cols-[minmax(96px,180px)_1fr]'}
+          >
+            <span className="text-muted-foreground">{labelize(k)}{inline ? ': ' : ''}</span>
+            <div className="min-w-0 text-foreground"><Value v={v} depth={depth} listKey={k} /></div>
+          </div>
+        );
+      })}
     </div>
   );
 }
