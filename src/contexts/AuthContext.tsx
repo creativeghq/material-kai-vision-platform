@@ -47,8 +47,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const { toast } = useToast();
 
   useEffect(() => {
-    // Set up auth state listener FIRST — handles SIGNED_IN, SIGNED_OUT,
-    // TOKEN_REFRESHED, USER_UPDATED. Multi-tab sync flows through here too.
+    // Listener FIRST — SIGNED_IN/OUT, TOKEN_REFRESHED, USER_UPDATED, and multi-tab sync.
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_: any, session: any) => {
@@ -129,7 +128,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           title: 'Check your email',
           description: "We've sent you a confirmation link.",
         });
-        flowEventService.emit('user_signup', { email, display_name: displayName });
+        // No user_signup emit: no session yet, so flow-engine 401s it. The DB trigger `on_auth_user_confirmed_signup_event` fires it on confirmation.
       }
 
       return { error };
