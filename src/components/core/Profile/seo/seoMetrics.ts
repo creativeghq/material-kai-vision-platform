@@ -168,6 +168,15 @@ export const GSC_METRICS: SeoMetricDescriptor[] = [
   { key: 'avg_position', label: 'Avg. position', format: 'position', upIsGood: false, help: 'Impression-weighted mean ranking position. LOWER is better — position 3 beats position 30.' },
 ];
 
+export const ANALYTICS_METRICS: SeoMetricDescriptor[] = [
+  { key: 'sessions', label: 'Sessions', format: 'count', upIsGood: true, help: 'Visits to the site. One person returning tomorrow is two sessions.' },
+  { key: 'active_users', label: 'Active users', format: 'count', upIsGood: true, help: 'Distinct people, not visits. The gap between this and sessions is how often people come back.' },
+  { key: 'new_users', label: 'New users', format: 'count', upIsGood: true, help: 'First-time visitors in the window.' },
+  { key: 'engagement_rate', label: 'Engaged sessions', format: 'percent', upIsGood: true, help: 'Share of sessions that lasted, scrolled or converted — the inverse of a bounce, and a better read on whether the page delivered.' },
+  { key: 'conversions', label: 'Conversions', format: 'count', upIsGood: true, help: 'Events marked as conversions in the Analytics property. Zero here usually means none are configured, not that nobody converted.' },
+  { key: 'revenue', label: 'Revenue', format: 'currency', upIsGood: true, help: 'Revenue attributed by Analytics. Only present when ecommerce or a value-carrying event is set up.' },
+];
+
 export const HEALTH_METRICS: SeoMetricDescriptor[] = [
   { key: 'performance', label: 'Performance', format: 'score', upIsGood: true, help: 'Lighthouse performance score for the audited page (0–100).' },
   { key: 'accessibility', label: 'Accessibility', format: 'score', upIsGood: true, help: 'Lighthouse accessibility score (0–100).' },
@@ -231,4 +240,28 @@ export function deltaDirection(m: SeoMetric): 'up' | 'down' | 'flat' {
   const d = m.delta_pct ?? m.delta;
   if (d == null || d === 0) return 'flat';
   return d > 0 ? 'up' : 'down';
+}
+
+/**
+ * The descriptor for a key from any report, for a caller that renders whatever `metrics` it is
+ * handed. Position is the trap in the fallback: lower is better, so `upIsGood` is false there.
+ */
+const ALL_METRICS = [...DOMAIN_METRICS, ...GSC_METRICS, ...HEALTH_METRICS, ...ANALYTICS_METRICS];
+
+export function metricDescriptor(key: string): SeoMetricDescriptor {
+  const known = ALL_METRICS.find((d) => d.key === key);
+  if (known) return known;
+  const format: SeoMetricFormat =
+    /position|rank$/.test(key) ? 'position'
+      : /_rate$|^ctr$|_pct$|percent/.test(key) ? 'percent'
+        : /revenue|value|cost|cpc/.test(key) ? 'currency'
+          : /score$/.test(key) ? 'score'
+            : 'count';
+  return {
+    key,
+    label: key.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()),
+    format,
+    upIsGood: format !== 'position' && !/spam|broken|error/.test(key),
+    help: 'Reported by the platform under this name. No description is registered for it yet.',
+  };
 }

@@ -613,11 +613,8 @@ export const createSEOMyRankingsTool = (
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * The Websites dashboard derives a dozen verdicts about the connected site in SQL — health
- * audit, crawl, Search Console metrics, weekly domain snapshot, AI-assistant probes,
- * cannibalisation, competitor series, Analytics. Until 2026-09-05 NONE of them had an agent
- * tool: `agent_data_coverage()` listed 16 website RPCs with 4 exposed. So "is our site healthy"
- * got a paid third-party crawl instead of the audit that ran last night.
+ * The dozen verdicts the Websites dashboard derives in SQL, behind one tool. Until 2026-09-05
+ * none was exposed, so "is our site healthy" bought a third-party crawl instead.
  */
 const SITE_REPORT_DEFAULT_DAYS: Record<string, number> = {
   search_metrics: 180, domain_intel: 180, ai_visibility: 90, ai_answers: 90,
@@ -646,32 +643,65 @@ const SITE_REPORT_LABEL_KEYS = ['query', 'keyword', 'title', 'name', 'label', 'q
 const SITE_REPORT_VALUE_KEYS = ['position', 'count', 'impressions', 'clicks', 'score', 'share', 'mentions', 'pages', 'total', 'delta', 'value', 'v', 'organic_traffic', 'severity', 'rank'];
 
 /**
- * Card projection: top-level scalars (one level of nesting flattened) as stats, the first list of
- * objects as rows. Generic on purpose — eleven reports, one renderer — and honest: it shows what
- * the RPC returned, it never computes a number of its own.
+ * A `public.seo_metric` struct — a value PLUS the verdict on it. Flattened into scalars it
+ * became four nameless rows ("metrics organic traffic delta pct 1335.5") minus the `status`.
+ */
+function isSeoMetric(v: any): boolean {
+  return !!v && typeof v === 'object' && !Array.isArray(v)
+    && 'status' in v && 'value' in v && 'previous' in v && 'delta' in v;
+}
+
+/** The struct with an EMPTY series: 129 points is weight the card never reads. */
+function trimMetric(m: any) {
+  return {
+    value: m.value ?? null, previous: m.previous ?? null,
+    delta: m.delta ?? null, delta_pct: m.delta_pct ?? null,
+    status: m.status ?? 'not_collected', note: m.note ?? null, series: [],
+  };
+}
+
+/**
+ * Card projection: metric structs kept whole, remaining scalars (one level of nesting flattened)
+ * as stats, the first list of objects as rows. Generic on purpose — eleven reports, one renderer
+ * — and honest: it shows what the RPC returned, it never computes a number of its own.
  */
 function siteReportCardProjection(data: any): {
   stats: Array<{ label: string; value: string }>;
   items: Array<{ left: string; right?: string; sub?: string; href?: string }>;
+  metrics: Array<{ key: string; metric: Record<string, unknown> }>;
+  positions: any;
 } {
   const stats: Array<{ label: string; value: string }> = [];
   const items: Array<{ left: string; right?: string; sub?: string; href?: string }> = [];
+  const metrics: Array<{ key: string; metric: Record<string, unknown> }> = [];
   const skip = /(^id$|_id$|url|^task|^error$|^note$|^status$|_at$)/;
   /** How the subject is SET UP, which is never a finding. */
   const SUBJECT_KEYS = new Set(['website', 'site', 'domain_record']);
   const CONFIG_KEYS = new Set(['is_default', 'is_active', 'max_pages', 'display_name', 'name', 'slug']);
   const scalar = (v: any) => typeof v === 'number' || typeof v === 'boolean' || (typeof v === 'string' && v.length <= 40);
   const fmt = (v: any) => typeof v === 'number' ? (Number.isInteger(v) ? String(v) : v.toFixed(1)) : String(v);
-  if (!data || typeof data !== 'object' || Array.isArray(data)) return { stats, items };
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return { stats, items, metrics, positions: null };
+
+  // `metrics` on the search/GSC/Analytics reports, `scores` on health. Collected first so
+  // the scalar walk below never sees them.
+  const metricGroups = new Set<string>();
+  for (const group of ['metrics', 'scores']) {
+    const g = data[group];
+    if (!g || typeof g !== 'object' || Array.isArray(g)) continue;
+    for (const [k, v] of Object.entries(g)) {
+      if (!isSeoMetric(v)) continue;
+      metrics.push({ key: k, metric: trimMetric(v) });
+      metricGroups.add(group);
+    }
+  }
+  for (const [k, v] of Object.entries(data)) if (isSeoMetric(v)) metrics.push({ key: k, metric: trimMetric(v) });
+  // Buckets and movement, already labelled by the RPC — not "positions movement lost 0".
+  const positions = data.positions && typeof data.positions === 'object' && Array.isArray(data.positions.buckets)
+    ? data.positions : null;
 
   /**
-   * Flatten to TWO levels, not one.
-   *
-   * At one level a count map is invisible: `articles: { total, by_status: {...} }` rendered
-   * "articles total 2" and dropped `by_status` on the floor, because it is an object and the
-   * walk only tested for scalars. `by_status` is the breakdown — how many drafts, how many
-   * completed, how many failed — i.e. the single most useful thing in the payload and the
-   * one a person actually asks for. It was being discarded to make room for "is default".
+   * TWO levels, not one: at one level `articles: { total, by_status: {...} }` rendered
+   * "articles total 2" and dropped the breakdown, which is the half a person asks for.
    */
   const push = (label: string, v: unknown) => {
     if (stats.length >= 12) return;
@@ -691,7 +721,8 @@ function siteReportCardProjection(data: any): {
 
   for (const [k, v] of Object.entries(data)) {
     if (stats.length >= 12) break;
-    if (skip.test(k)) continue;
+    if (skip.test(k) || metricGroups.has(k) || isSeoMetric(v)) continue;
+    if (positions && k === 'positions') continue;
     if (scalar(v)) push(k, v);
     else if (v && typeof v === 'object' && !Array.isArray(v)) {
       walk(v as Record<string, unknown>, k, 1, SUBJECT_KEYS.has(k) ? CONFIG_KEYS : undefined);
@@ -716,7 +747,7 @@ function siteReportCardProjection(data: any): {
       href: typeof row.url === 'string' && /^https?:/.test(row.url) ? row.url : undefined,
     });
   }
-  return { stats, items };
+  return { stats, items, metrics, positions };
 }
 
 async function readSiteReport(
@@ -800,11 +831,12 @@ export const createSEOSiteReportTool = (
       const data = r.data;
       const status = typeof data?.status === 'string' ? data.status : null;
       const note = typeof data?.note === 'string' ? data.note : null;
-      const { stats, items } = siteReportCardProjection(data);
+      const { stats, items, metrics, positions } = siteReportCardProjection(data);
 
       onChunk?.({
         type: 'seo_site_report_card',
-        kind, website: site.domain, days: windowDays, status, note, stats, items, timestamp: Date.now(),
+        kind, website: site.domain, days: windowDays, status, note,
+        stats, items, metrics, positions, timestamp: Date.now(),
       });
       return JSON.stringify({
         success: true,

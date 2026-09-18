@@ -3,11 +3,80 @@
 import type { ReactNode } from 'react';
 import { safeHref } from '@/utils/safeUrl';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
+import { SeoMetricTile } from '@/components/core/Profile/seo/SeoMetricTile';
+import { metricDescriptor, statusPresentation, type SeoMetric } from '@/components/core/Profile/seo/seoMetrics';
 
 export interface SEOGenericCardData {
   type: string;
   [key: string]: any;
 }
+
+/**
+ * What the canvas tab is CALLED — the kind alone, since the card's header names the subject.
+ * These lived in `AGENT_RESULT_TITLES`, where being listed also routed the chunk away from
+ * this file, so the strip needs a list of its own.
+ */
+const SEO_CARD_TITLES: Record<string, string> = {
+  seo_ai_keyword_volume_card: 'AI search volume',
+  seo_ai_overview_card: 'Google AI Overview',
+  seo_amazon_asin_card: 'Amazon ASIN',
+  seo_app_keywords_card: 'App store keywords',
+  seo_backlinks_anchors_card: 'Anchor texts',
+  seo_backlinks_competitors_card: 'Link competitors',
+  seo_backlinks_summary_card: 'Backlink profile',
+  seo_backlinks_timeseries_card: 'Backlink history',
+  seo_brand_audit_card: 'Brand search',
+  seo_categories_card: 'Categories',
+  seo_dataforseo_raw_card: 'DataForSEO call',
+  seo_domain_competitors_card: 'Competitors',
+  seo_domain_intersection_card: 'Keyword intersection',
+  seo_domain_snapshot_card: 'Domain snapshot',
+  seo_domain_tech_card: 'Tech stack',
+  seo_gbp_info_card: 'Business Profile',
+  seo_google_maps_card: 'Map results',
+  seo_gsc_movers_card: 'Rank movers',
+  seo_gsc_striking_distance_card: 'Striking distance',
+  seo_historical_rank_card: 'Visibility history',
+  seo_historical_serps_card: 'Historical SERPs',
+  seo_intent_card: 'Search intent',
+  seo_keyword_difficulty_card: 'Keyword difficulty',
+  seo_keyword_gap_card: 'Keyword gap',
+  seo_keyword_ideas_card: 'Keyword ideas',
+  seo_keyword_overview_card: 'Keyword overview',
+  seo_keywords_card: 'Keyword suggestions',
+  seo_keywords_for_site_card: 'Keyword universe',
+  seo_llm_mentions_card: 'LLM mentions',
+  seo_local_pack_card: 'Local pack',
+  seo_my_rankings_card: 'Your rankings',
+  seo_onpage_issues_card: 'Site-audit issues',
+  seo_opportunities_card: 'What to work on',
+  seo_pinterest_card: 'Pinterest',
+  seo_ranked_keywords_card: 'Ranking keywords',
+  seo_reddit_card: 'Reddit',
+  seo_referring_domains_card: 'Referring domains',
+  seo_related_keywords_card: 'Related keywords',
+  seo_relevant_pages_card: 'Top pages',
+  seo_score_url_card: 'Page score',
+  seo_search_volume_card: 'Search volume & CPC',
+  seo_sentiment_card: 'Sentiment',
+  seo_serp_audit_card: 'Live SERP',
+  seo_site_crawl_started_card: 'Site crawl started',
+  seo_site_crawl_status_card: 'Site crawl status',
+  seo_site_report_card: 'Site report',
+  seo_site_review_card: 'Site review',
+  seo_subdomains_card: 'Subdomains',
+  seo_traffic_estimation_card: 'Traffic estimation',
+  seo_trends_card: 'Google Trends',
+  seo_trustpilot_search_card: 'Trustpilot',
+  seo_url_audit_card: 'URL audit',
+  seo_whois_card: 'WHOIS',
+  seo_youtube_card: 'YouTube',
+};
+
+export const seoCardTitle = (type: string | undefined): string =>
+  SEO_CARD_TITLES[String(type)]
+  ?? (String(type || '').replace(/^seo_/, '').replace(/_card$/, '').replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase())
+    || 'SEO');
 
 const fmtNum = (n: any): string => {
   const v = Number(n);
@@ -15,9 +84,7 @@ const fmtNum = (n: any): string => {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
   if (v >= 1_000) return `${(v / 1_000).toFixed(1)}k`;
   if (Number.isInteger(v)) return String(v);
-  // An estimate like 0.2939999997615814 visits/month is a float straight off the wire; it
-  // was printed verbatim on the ranked-keywords card (2026-09-05). One decimal below ten,
-  // whole numbers above — the precision the figure actually carries.
+  // 0.2939999997615814 visits/month is a float straight off the wire, and was printed verbatim.
   return v < 10 ? v.toFixed(1).replace(/\.0$/, '') : String(Math.round(v));
 };
 
@@ -125,6 +192,51 @@ function Pill({ children, tone }: { children: React.ReactNode; tone?: 'green' | 
   return <span className={`text-[11px] rounded-sm px-2 py-0.5 ${cls}`}>{children}</span>;
 }
 
+/** The SAME tile the Websites panel uses: a figure cannot be a fact here and "Unknown" there. */
+function MetricGrid({ metrics }: { metrics: Array<{ key: string; metric: SeoMetric }> }) {
+  return (
+    <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
+      {metrics.map(({ key, metric }) => (
+        <SeoMetricTile key={key} descriptor={metricDescriptor(key)} metric={metric} deltaCaption="vs previous capture" />
+      ))}
+    </div>
+  );
+}
+
+/** An empty bucket is still DRAWN: "nothing in the top three" is the finding. */
+function PositionDistribution({ positions }: { positions: any }) {
+  const buckets: any[] = Array.isArray(positions?.buckets) ? positions.buckets : [];
+  const presentation = positions?.status && positions.status !== 'ok' ? statusPresentation(String(positions.status)) : null;
+  const mv = positions?.movement || {};
+  const moved = ['up', 'down', 'new', 'lost'].filter((k) => Number(mv[k]) > 0);
+  if (presentation) {
+    return (
+      <div className="text-xs text-muted-foreground">
+        Position distribution: <span className={WARN}>{presentation.placeholder}</span> — {positions.note || presentation.explain}
+      </div>
+    );
+  }
+  if (buckets.length === 0) return null;
+  return (
+    <div className="space-y-1">
+      <div className="text-[11px] font-medium text-foreground">Where we rank · {fmtNum(positions.total)} keywords</div>
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+        {buckets.map((b: any) => (
+          <Stat key={b.key} label={b.label} value={b.value == null ? '—' : fmtNum(b.value)} />
+        ))}
+      </div>
+      {moved.length > 0 && (
+        <div className="flex flex-wrap gap-1 pt-1">
+          {mv.up > 0 && <Pill tone="green">{fmtNum(mv.up)} up</Pill>}
+          {mv.down > 0 && <Pill tone="red">{fmtNum(mv.down)} down</Pill>}
+          {mv.new > 0 && <Pill tone="blue">{fmtNum(mv.new)} new</Pill>}
+          {mv.lost > 0 && <Pill tone="amber">{fmtNum(mv.lost)} lost</Pill>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ItemList({ rows, max = 8 }: { rows: Array<{ left: string; right?: string; sub?: string; href?: string }>; max?: number }) {
   return (
     <ul className="space-y-1">
@@ -179,12 +291,8 @@ function PageLink({ url }: { url?: string | null }) {
 }
 
 /**
- * The DataForSEO Labs `ranked_keywords` items as the table the Profile → Websites tabs
- * show, not a two-line list. Every figure the index carries is a column: position and its
- * change since the previous crawl, volume and its yearly trend, CPC, competition,
- * difficulty, estimated traffic, the SERP blocks on that results page, the ranking page,
- * and the date the SERP was crawled — the fact that separates an index from a live check.
- * Sorted by position, because "which of these is closest to page 1" is the question.
+ * The DataForSEO Labs `ranked_keywords` items as the table Profile → Websites shows. The SERP
+ * crawl date is a column because it is what separates an index from a live check.
  */
 function RankedKeywordsTable({ items, crawlDate, max = 100 }: { items: any[]; crawlDate: (it: any) => string; max?: number }) {
   const rankOf = (it: any): number => Number(it.ranked_serp_element?.serp_item?.rank_absolute) || 9999;
@@ -256,11 +364,7 @@ function RankedKeywordsTable({ items, crawlDate, max = 100 }: { items: any[]; cr
   );
 }
 
-/**
- * The workspace's own rank-tracker rows (`get_website_rank_summary` via seo_my_rankings) as
- * the table the Rank tracking tab shows: position, the change the RPC already inverted (up
- * is good), volume, the ranking page and the day it was checked.
- */
+/** The rank-tracker rows as the Rank tracking tab shows them. The RPC already inverted the change. */
 function TrackedKeywordsTable({ rows, max = 30 }: { rows: any[]; max?: number }) {
   const sorted = [...rows].sort((a, b) => (Number(a.position) || 9999) - (Number(b.position) || 9999)).slice(0, max);
   const dayOf = (d: any): string => (d ? String(d).slice(0, 10) : '—');
@@ -305,9 +409,7 @@ function TrackedKeywordsTable({ rows, max = 30 }: { rows: any[]; max?: number })
 }
 
 /**
- * Human-readable labels for DataForSEO OnPage `checks` booleans/counts.
- * Default polarity: the check is an ISSUE when true (URL audit) / non-zero (crawl).
- * `issueWhenFalse` flags the good-thing booleans that are a problem when OFF.
+ * DataForSEO OnPage `checks`. A check is an ISSUE when true; `issueWhenFalse` inverts that.
  */
 const CHECK_META: Record<string, { label: string; issueWhenFalse?: boolean }> = {
   no_title: { label: 'Missing title tag' },
@@ -1370,12 +1472,19 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
     // The RPC hands back a calendar day already; this only trims a timestamp to it.
     const dayOf = (d: any): string => (d ? String(d).slice(0, 10) : '—');
     const trackerHasData = tr.status === 'ok' || tr.status === 'collector_failed';
+    // Nothing answered = no verdict. `ranking 0 / not ranking 0` beside "none is in the top
+    // 100" turned 131 checks that all died on a 402 into a report that the site ranks for
+    // nothing — a zero standing in for an unknown.
+    const answered = Number(s.answered) || 0;
+    const noVerdict = trackerHasData && answered === 0;
     return (
       <Card>
         <Header
           icon="📍"
           title={`Your rankings — ${data.website}`}
-          subtitle={trackerHasData ? `${fmtNum(tr.tracked)} tracked · ${fmtNum(s.ranking)} ranking · checked ${dayOf(s.captured_at)}` : 'rank tracker'}
+          subtitle={!trackerHasData ? 'rank tracker'
+            : noVerdict ? `${fmtNum(tr.tracked)} tracked · no verdict · last tried ${dayOf(s.captured_at)}`
+            : `${fmtNum(tr.tracked)} tracked · ${fmtNum(s.ranking)} ranking · checked ${dayOf(s.captured_at)}`}
         />
         <Primer>
           First-party data: the rank tracker is a live Google check of the keywords this workspace chose to follow,
@@ -1383,10 +1492,24 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
         </Primer>
         {!trackerHasData ? (
           <Empty>{tr.note || 'No keywords are tracked for this site yet.'}</Empty>
+        ) : noVerdict ? (
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <Stat label="Tracked" value={fmtNum(tr.tracked)} />
+              <Stat label="Checks that answered" value={`0 / ${fmtNum(s.checked ?? tr.tracked)}`} />
+              <Stat label="Positions" value={<span className={WARN}>Unknown</span>} />
+              <Stat label="Last tried" value={dayOf(s.captured_at)} />
+            </div>
+            <p className={`text-[11px] ${WARN}`}>{tr.note || statusPresentation('collector_failed').explain}</p>
+            <Empty>
+              No position is known for any of the {fmtNum(tr.tracked)} tracked keywords right now — unknown, not
+              unranked. They are retried on the next run.
+            </Empty>
+          </>
         ) : (
           <>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <Stat label="Ranking" value={`${fmtNum(s.ranking)} / ${fmtNum(s.answered)}`} />
+              <Stat label="Ranking" value={`${fmtNum(s.ranking)} / ${fmtNum(answered)}`} />
               <Stat label="Top 10" value={fmtNum((s.distribution?.top_3 ?? 0) + (s.distribution?.top_10 ?? 0))} />
               <Stat label="Not ranking" value={fmtNum(s.not_ranking)} />
               <Stat label="Avg position" value={s.avg_position != null ? `#${s.avg_position}` : '—'} />
@@ -1438,9 +1561,11 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
   if (t === 'seo_site_report_card') {
     const stats: Array<{ label: string; value: string }> = data.stats || [];
     const items: Array<{ left: string; right?: string; sub?: string; href?: string }> = data.items || [];
+    const metrics: Array<{ key: string; metric: SeoMetric }> = Array.isArray(data.metrics) ? data.metrics : [];
     const kind = String(data.kind || '').replace(/_/g, ' ');
     const status: string | null = typeof data.status === 'string' ? data.status : null;
     const off = !!status && status !== 'ok';
+    const empty = metrics.length === 0 && stats.length === 0 && items.length === 0 && !data.positions;
     return (
       <Card>
         <Header
@@ -1453,6 +1578,8 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
           AI-assistant probes. A status other than ok is a fact about the collector, not a zero.
         </Primer>
         {off && <p className={`text-[11px] ${WARN}`}>{data.note || `The source reports ${String(status).replace(/_/g, ' ')}.`}</p>}
+        {metrics.length > 0 && <MetricGrid metrics={metrics} />}
+        {data.positions && <PositionDistribution positions={data.positions} />}
         {stats.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {stats.slice(0, 8).map((s, i) => <Stat key={i} label={s.label} value={s.value} />)}
@@ -1460,7 +1587,7 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
         )}
         {items.length > 0 ? (
           <ItemList rows={items} max={12} />
-        ) : (!off && stats.length === 0 ? <Empty>Nothing to show for this report yet.</Empty> : null)}
+        ) : (!off && empty ? <Empty>Nothing to show for this report yet.</Empty> : null)}
         {!off && data.note && <p className="text-[11px] text-muted-foreground">{data.note}</p>}
       </Card>
     );
