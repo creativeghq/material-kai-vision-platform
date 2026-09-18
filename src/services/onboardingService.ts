@@ -48,6 +48,7 @@ export type SetupVerdict = 'ok' | 'missing' | 'unknown';
 export interface OnboardingSetupStatus {
   business: SetupVerdict;
   myaade: SetupVerdict;
+  einvoicing: SetupVerdict;
 }
 
 export const onboardingService = {
@@ -135,13 +136,14 @@ export const onboardingService = {
    * mean lookups are unconfigured, since a workspace inheriting platform-level codes has no row.
    */
   async setupStatus(workspaceId: string): Promise<OnboardingSetupStatus> {
-    const [settings, aade] = await Promise.all([
+    const [settings, aade, einvoice] = await Promise.all([
       supabase
         .from('finance_settings')
         .select('business_name, business_vat')
         .eq('workspace_id', workspaceId)
         .maybeSingle(),
       aadeService.getDefaultStatus(workspaceId).catch(() => null),
+      supabase.rpc('get_einvoice_onboarding', { p_workspace_id: workspaceId }),
     ]);
 
     return {
@@ -152,6 +154,10 @@ export const onboardingService = {
       myaade: aade === null
         ? 'unknown'
         : aade.source !== 'none' && aade.has_password ? 'ok' : 'missing',
+      // Novus's own word for it — nothing a member clicks produces this tick.
+      einvoicing: einvoice.error
+        ? 'unknown'
+        : (einvoice.data as { can_transmit?: boolean } | null)?.can_transmit ? 'ok' : 'missing',
     };
   },
 

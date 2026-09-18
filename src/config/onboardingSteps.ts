@@ -69,6 +69,23 @@ export interface OnboardingStep {
 export const ONBOARDING_STEPS: readonly OnboardingStep[] = [
   // ───────────────────────────── setup ─────────────────────────────
   {
+    id: 'einvoicing',
+    kind: 'setup',
+    navLabel: 'e-Invoicing',
+    title: 'Register for e-invoicing',
+    lede:
+      'From 1 October 2026, a B2B invoice issued straight out of an ERP does not legally count as '
+      + 'issued. Novus files a provider declaration with ΑΑΔΕ against your VAT number, and until '
+      + 'that clears, this business cannot issue one through us.',
+    icon: FileSignature,
+    requireWorkspaceManager: true,
+    requireCapability: 'finance.manage',
+    // First because of the date, and because a signature and Novus's review cannot be hurried.
+    footnote:
+      'Greek businesses only. It picks up your details from the next step, so fill those in first '
+      + 'if the form asks. Afterwards it lives under Finance → Settings → e-Invoicing.',
+  },
+  {
     id: 'business',
     kind: 'setup',
     navLabel: 'Business Details',

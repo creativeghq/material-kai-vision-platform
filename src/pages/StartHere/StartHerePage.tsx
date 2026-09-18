@@ -23,6 +23,7 @@ import type { OnboardingHighlight, OnboardingStep } from '@/config/onboardingSte
 import { cn } from '@/lib/utils';
 
 import { BusinessIdentityCard } from '@/modules/finance/components/BusinessIdentityCard';
+import { EInvoiceOnboardingCard } from '@/modules/finance/components/EInvoiceOnboardingCard';
 import { InboundSetupCard } from '@/modules/finance/components/InboundSetupCard';
 import { AadeCredentialsCard } from '@/modules/myaade/components/AadeCredentialsCard';
 import { ModulesActivationTab } from '@/components/core/Profile/ModulesActivationTab';
@@ -46,6 +47,8 @@ function stepDone(
 ): boolean {
   if (step.id === 'business') return setupStatus?.business === 'ok';
   if (step.id === 'myaade') return setupStatus?.myaade === 'ok';
+  // The provider's own word only: walking past this step is not the same as being registered.
+  if (step.id === 'einvoicing') return setupStatus?.einvoicing === 'ok';
   return seen.includes(step.id);
 }
 
@@ -155,9 +158,22 @@ const HighlightCard: React.FC<{ item: OnboardingHighlight; available: boolean }>
 
 // ───────────────────────────── setup bodies ─────────────────────────────
 
-const SetupBody: React.FC<{ stepId: string; workspaceId: string; workspaceName?: string }> = ({
-  stepId, workspaceId, workspaceName,
+const SetupBody: React.FC<{
+  stepId: string;
+  workspaceId: string;
+  workspaceName?: string;
+  onGoToStep?: (stepId: string) => void;
+}> = ({
+  stepId, workspaceId, workspaceName, onGoToStep,
 }) => {
+  if (stepId === 'einvoicing') {
+    return (
+      <EInvoiceOnboardingCard
+        workspaceId={workspaceId}
+        onGoToIdentity={onGoToStep ? () => onGoToStep('business') : undefined}
+      />
+    );
+  }
   if (stepId === 'business') return <BusinessIdentityCard workspaceId={workspaceId} />;
   if (stepId === 'myaade') {
     return (
@@ -232,6 +248,11 @@ const StartHerePage: React.FC = () => {
     setIndex(target);
     void saveProgress(steps[target]?.id ?? step.id, nextSeen);
   }, [step, seen, steps, saveProgress]);
+
+  const goToStepId = useCallback((stepId: string) => {
+    const at = steps.findIndex((s) => s.id === stepId);
+    if (at >= 0) goTo(at);
+  }, [steps, goTo]);
 
   const complete = useCallback(async () => {
     const nextSeen = step && !seen.includes(step.id) ? [...seen, step.id] : seen;
@@ -333,6 +354,7 @@ const StartHerePage: React.FC = () => {
                 stepId={step.id}
                 workspaceId={activeWorkspaceId}
                 workspaceName={activeWorkspace?.name}
+                onGoToStep={goToStepId}
               />
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">

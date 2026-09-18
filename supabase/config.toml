@@ -313,3 +313,11 @@ jwt_expiry = 2592000  # 30 days in seconds
 # service-role bearer with body user_id/workspace_id, or a platform-admin JWT.
 [functions.agent-eval]
 verify_jwt = false
+
+# Novus onboarding. The authed half does its own JWT check in `authenticate`; the webhook half is
+# called by Novus, never by a browser, and authorizes on the X-Novus-Signature HMAC instead.
+[functions.novus-onboarding]
+verify_jwt = false
+
+[functions.novus-onboarding-webhook]
+verify_jwt = false

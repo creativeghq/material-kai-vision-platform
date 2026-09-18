@@ -116,6 +116,8 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'myaade-rgwspublic2', label: 'myaade-rgwspublic2', sublabel: 'Greek business lookup by ΑΦΜ via ΑΑΔΕ RgWsPublic2 SOAP service.' },
   { id: 'mygemi-opendata', label: 'mygemi-opendata', sublabel: 'Greek company lookup by ΑΦΜ via the ΓΕΜΗ (GEMI) OpenData REST API.' },
   { id: 'notification-dispatcher', label: 'notification-dispatcher', sublabel: 'Dispatches browser push notifications (VAPID) and signed webhook deliveries with retry.' },
+  { id: 'novus-onboarding', label: 'novus-onboarding', sublabel: "Register a workspace's VAT with Novus so it can transmit to myDATA." },
+  { id: 'novus-onboarding-webhook', label: 'novus-onboarding-webhook', sublabel: 'Receives Novus onboarding status callbacks, signature-verified.' },
   { id: 'ontology-propose-targets', label: 'ontology-propose-targets', sublabel: 'Propose a target for the invoice terms the ontology cannot resolve' },
   { id: 'page-watch-webhook', label: 'page-watch-webhook', sublabel: 'Receives Firecrawl Monitoring callbacks for watched non-price pages and records the diff.' },
   { id: 'page-watches', label: 'page-watches', sublabel: 'CRUD for watched pages, mirrored to Firecrawl monitors.' },
