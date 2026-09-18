@@ -1,0 +1,4 @@
+{
+  "_doc": "Per-route allowance for tests/e2e/content-audit.spec.ts. Counts may only go DOWN. Record a pre-existing violation here with a reason; never widen HARD_KINDS instead.",
+  "_recorded": "2026-09-18 — measured over 43 routes as a non-admin member; every hard kind was zero. Admin-only routes have not been measured with an operator account yet."
+}

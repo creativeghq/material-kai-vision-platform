@@ -9,25 +9,8 @@ import { test, expect } from '@playwright/test';
  * EntitlementGuard/AdminGuard actually load (otherwise the guard short-circuits before the
  * page's chunk and a broken page would be missed).
  */
-const ROUTES = [
-  // Public (no auth)
-  '/tools', '/tools/price-scan', '/tools/mention-scan',
-  '/tools/project-plan', '/tools/heat-pump', '/tools/heating-cost', // public lead-gen tools (blueprint estimator + heating)
-  '/knowledge-base', '/brands',
-  // Core authed
-  '/', '/profile', '/moodboard', '/agent-hub', '/compare', '/recognition',
-  '/blueprints', '/projects', '/portal', '/market-trends', // newer authed surfaces
-  '/billing/subscriptions', '/billing/credits',
-  // Previously white-screened / capability- & entitlement-gated
-  '/finance', '/quotes', '/discover', '/crm', '/sales', '/pos', '/network',
-  '/inbox', '/trip-expenses', // newer gated surfaces
-  '/supplier-portal', // Supplier portal (self-gates when no claimed identity)
-  // Admin (operator-only)
-  '/admin', '/admin/operations', '/admin/modules', '/admin/background-agents',
-  '/admin/data-health', '/admin/knowledge-base', '/admin/materials-data', // newer / heavy admin pages
-  '/admin/flows', '/admin/data-import', '/admin/plans',
-  '/admin/monitoring', '/admin/supplier-claims', // Monitoring shell + supplier-claim review
-];
+// The list lives in ./routes so this spec and content-audit cannot drift apart.
+import { ROUTES } from './routes';
 
 // A failed dynamic import / runtime crash — the white-screen signatures.
 const FATAL = /failed to fetch dynamically imported module|error loading dynamically imported module|ChunkLoadError|Loading chunk \d+ failed|Importing a module script failed|is not a function|is not defined|Cannot read propert|undefined is not an object/i;
