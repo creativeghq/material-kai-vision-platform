@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Star, Loader2, Pencil, X, BadgeCheck } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/core/ui/avatar';
+import { UserAvatar } from '@/components/core/ui/UserAvatar';
 import { Button } from '@/components/core/ui/button';
 import { Textarea } from '@/components/core/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
@@ -153,9 +153,6 @@ export const MaterialReviews: React.FC<MaterialReviewsProps> = ({ productId, cur
     await loadReviews();
   };
 
-  const initials = (name?: string) =>
-    (name || '?').split(' ').filter(Boolean).slice(0, 2).map((s) => s[0].toUpperCase()).join('');
-
   const fmt = (iso: string) =>
     new Date(iso).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
 
@@ -225,12 +222,13 @@ export const MaterialReviews: React.FC<MaterialReviewsProps> = ({ productId, cur
         <div className="space-y-3">
           {reviews.filter((r) => r.user_id !== currentUserId || !editing).map((r) => (
             <div key={r.id} className="flex gap-3">
-              <Avatar className="h-7 w-7 shrink-0 mt-0.5">
-                {r.user_profiles?.avatar_url && <AvatarImage src={r.user_profiles.avatar_url} />}
-                <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                  {initials(r.user_profiles?.full_name)}
-                </AvatarFallback>
-              </Avatar>
+              <UserAvatar
+                userId={r.user_id}
+                name={r.user_profiles?.full_name}
+                avatarUrl={r.user_profiles?.avatar_url}
+                className="h-7 w-7 shrink-0 mt-0.5"
+                fallbackClassName="text-xs bg-primary/10 text-primary"
+              />
               <div className="flex-1">
                 <div className="flex items-baseline gap-2 flex-wrap">
                   <span className="text-xs font-semibold">{r.user_profiles?.full_name || 'User'}</span>

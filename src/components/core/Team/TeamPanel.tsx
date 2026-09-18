@@ -13,6 +13,8 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { getErrorMessage } from '@/core/errors/utils';
 import { supabase } from '@/integrations/supabase/client';
+import { UserAvatar } from '@/components/core/ui/UserAvatar';
+import { fetchDisplayProfiles } from '@/services/displayProfilesService';
 import { useModule } from '@/modules/_core';
 import { formatDate } from '@/utils/datetime';
 import {
@@ -88,9 +90,8 @@ export const TeamPanel: React.FC<{ workspaceId: string; workspaceName?: string }
       const userIds = (rows ?? []).map((m) => m.user_id).filter(Boolean) as string[];
       let byId: Record<string, { full_name: string | null; email: string | null }> = {};
       if (userIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from('user_profiles').select('user_id, full_name, email').in('user_id', userIds);
-        byId = Object.fromEntries((profiles ?? []).map((p: any) => [p.user_id, { full_name: p.full_name, email: p.email }]));
+        const profiles = await fetchDisplayProfiles(userIds);
+        byId = Object.fromEntries(profiles.map((p) => [p.userId, { full_name: p.fullName, email: p.email }]));
       }
       setMembers((rows ?? []).map((m: any) => ({
         user_id: m.user_id, role: m.role, status: m.status,
@@ -320,13 +321,16 @@ export const TeamPanel: React.FC<{ workspaceId: string; workspaceName?: string }
                 const isOwner = m.role === 'owner';
                 return (
                   <div key={m.user_id} className="flex items-center justify-between gap-3 px-4 py-3">
-                    <div className="min-w-0">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <UserAvatar userId={m.user_id} name={m.full_name || m.email} className="h-8 w-8 shrink-0" />
+                      <div className="min-w-0">
                       <div className="text-sm font-medium truncate">
                         {m.full_name || m.email || m.user_id.slice(0, 8)}
                       </div>
                       <div className="text-xs text-muted-foreground truncate">
                         {m.email}
-                        {m.status !== 'active' && <span className="ml-2 text-amber-600">{m.status}</span>}
+                        {m.status !== 'active' && <span className="ml-2 text-amber-700 dark:text-amber-300">{m.status}</span>}
+                      </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">

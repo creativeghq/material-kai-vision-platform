@@ -11,7 +11,7 @@ import { Loader2, TrendingUp, AlertTriangle, Clock } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { LogTimeDialog } from './LogTimeDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
-import { supabase } from '@/integrations/supabase/client';
+import { fetchDisplayProfiles } from '@/services/displayProfilesService';
 import { formatMoney } from '@/utils/decimal';
 import { useToast } from '@/hooks/use-toast';
 import { projectsService, type ProjectPnl } from '../services/projectsService';
@@ -50,9 +50,9 @@ export const JobCostCard: React.FC<{
 
       const ids = result.labor.by_user.map((u) => u.user_id).filter(Boolean) as string[];
       if (ids.length) {
-        const { data } = await supabase.from('user_profiles').select('id, full_name, email').in('id', ids);
+        const profiles = await fetchDisplayProfiles(ids);
         const names: Record<string, string> = {};
-        for (const u of data ?? []) names[(u as any).id] = (u as any).full_name || (u as any).email || (u as any).id;
+        for (const u of profiles) names[u.userId] = u.fullName || u.email || u.userId;
         setUserNames(names);
       }
     } catch (err: any) {

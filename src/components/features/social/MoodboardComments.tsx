@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { MessageCircle, Send, Trash2, Loader2 } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/core/ui/avatar';
 import { Button } from '@/components/core/ui/button';
 import { Textarea } from '@/components/core/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { flowEventService } from '@/services/flows/flowEventService';
-import { initials } from '@/lib/materialCategories';
+import { UserAvatar } from '@/components/core/ui/UserAvatar';
 
 interface Comment {
   id: string;
@@ -116,14 +115,13 @@ export const MoodboardComments: React.FC<MoodboardCommentsProps> = ({
           )}
           {comments.map((c) => (
             <div key={c.id} className="flex gap-3">
-              <Avatar className="h-7 w-7 shrink-0 mt-0.5">
-                {c.user_profiles?.avatar_url && (
-                  <AvatarImage src={c.user_profiles.avatar_url} />
-                )}
-                <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                  {initials(c.user_profiles?.full_name)}
-                </AvatarFallback>
-              </Avatar>
+              <UserAvatar
+                userId={c.user_id}
+                name={c.user_profiles?.full_name}
+                avatarUrl={c.user_profiles?.avatar_url}
+                className="h-7 w-7 shrink-0 mt-0.5"
+                fallbackClassName="text-xs bg-primary/10 text-primary"
+              />
               <div className="flex-1 min-w-0">
                 <div className="flex items-baseline gap-2">
                   <span className="text-xs font-semibold">

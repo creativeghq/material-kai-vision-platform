@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, User, Check } from 'lucide-react';
 import { usersAPI } from '@/services/crm.service';
+import { UserAvatar } from '@/components/core/ui/UserAvatar';
 import { Button } from '@/components/core/ui/button';
 import {
   Command,
@@ -29,6 +30,7 @@ interface UserSearchDropdownProps {
 
 interface User {
   id: string;
+  user_id?: string;
   email: string;
   user_profiles?: {
     full_name?: string;
@@ -125,7 +127,13 @@ export function UserSearchDropdown({
         >
           {selectedUser ? (
             <div className="flex items-center gap-2">
-              <User className="h-4 w-4" />
+              <UserAvatar
+                userId={selectedUser.user_id}
+                name={selectedUser.user_profiles?.full_name || selectedUser.email}
+                className="h-5 w-5"
+                fallbackClassName="text-[9px]"
+                fallback={<User className="h-4 w-4" />}
+              />
               <span className="truncate">{selectedUser.email}</span>
               {selectedUser.user_profiles?.subscription_tier && (
                 <Badge
@@ -173,7 +181,13 @@ export function UserSearchDropdown({
                     <div className="flex items-center justify-between w-full">
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2">
-                          <User className="h-4 w-4" />
+                          <UserAvatar
+                            userId={user.user_id}
+                            name={user.user_profiles?.full_name || user.email}
+                            className="h-5 w-5"
+                            fallbackClassName="text-[9px]"
+                            fallback={<User className="h-4 w-4" />}
+                          />
                           <span className="font-medium">{user.email}</span>
                         </div>
                         {user.user_profiles?.full_name && (

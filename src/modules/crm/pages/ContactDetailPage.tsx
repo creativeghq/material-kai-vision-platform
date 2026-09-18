@@ -19,6 +19,7 @@ import { CompanySearchDropdown } from '@/components/business/crm/CompanySearchDr
 import { type TimelinePerson } from '@/components/business/crm/CrmActivityTimeline';
 import { CrmRecordActivity, type CrmRecordActivityHandle } from '@/components/business/crm/CrmRecordActivity';
 import { CollapsibleCard } from '@/components/business/crm/CollapsibleCard';
+import { UserAvatar } from '@/components/core/ui/UserAvatar';
 import { crmActivitiesService } from '@/services/crmActivitiesService';
 import { ContactTaxVatCard } from '@/components/business/crm/ContactTaxVatCard';
 import { CrmBankAccountsCard } from '@/components/business/crm/CrmBankAccountsCard';
@@ -1007,7 +1008,13 @@ export const ContactDetailPage: React.FC = () => {
                         {linkedUser ? (
                           <div className="flex items-center justify-between gap-2 rounded-md border border-border/60 px-3 py-2">
                             <div className="flex items-center gap-2 min-w-0">
-                              <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                              <UserAvatar
+                                userId={linkedUser.user_id ?? contact?.user_id}
+                                name={linkedUser.full_name || linkedUser.email}
+                                className="h-6 w-6 shrink-0"
+                                fallbackClassName="text-[10px]"
+                                fallback={<User className="h-4 w-4 text-muted-foreground" />}
+                              />
                               <span className="text-sm font-medium truncate">{linkedUser.email}</span>
                             </div>
                             <Button variant="ghost" size="icon" onClick={handleUnlinkUser} disabled={linking} title="Unlink user" className="h-7 w-7 shrink-0 text-muted-foreground hover:bg-transparent hover:text-foreground">

@@ -1,6 +1,7 @@
 /** Catalog operations tab — embedded inside /admin/operations. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { UserAvatar } from '@/components/core/ui/UserAvatar';
 import {
   Activity, BookOpen, Eye, FileDown, Loader2, Mail, RefreshCw, ShieldAlert,
   ExternalLink, User as UserIcon,
@@ -253,8 +254,15 @@ export const CatalogOperationsTab: React.FC = () => {
                         </td>
                         <td className="px-3 py-2 text-xs">
                           {e.matched_user_id && profiles[e.matched_user_id] ? (
-                            <span className="flex items-center gap-1">
-                              <UserIcon className="h-3 w-3" />
+                            <span className="flex items-center gap-1.5">
+                              <UserAvatar
+                                userId={e.matched_user_id}
+                                name={profiles[e.matched_user_id].full_name || profiles[e.matched_user_id].email}
+                                avatarUrl={profiles[e.matched_user_id].avatar_url}
+                                className="h-5 w-5"
+                                fallbackClassName="text-[9px]"
+                                fallback={<UserIcon className="h-3 w-3" />}
+                              />
                               {profiles[e.matched_user_id].full_name || profiles[e.matched_user_id].email}
                             </span>
                           ) : '—'}
@@ -305,8 +313,15 @@ export const CatalogOperationsTab: React.FC = () => {
                         </td>
                         <td className="px-3 py-2 text-xs">
                           {row.matched_user_id && profiles[row.matched_user_id] ? (
-                            <span className="flex items-center gap-1">
-                              <UserIcon className="h-3 w-3" />
+                            <span className="flex items-center gap-1.5">
+                              <UserAvatar
+                                userId={row.matched_user_id}
+                                name={profiles[row.matched_user_id].full_name || profiles[row.matched_user_id].email}
+                                avatarUrl={profiles[row.matched_user_id].avatar_url}
+                                className="h-5 w-5"
+                                fallbackClassName="text-[9px]"
+                                fallback={<UserIcon className="h-3 w-3" />}
+                              />
                               {profiles[row.matched_user_id].full_name || profiles[row.matched_user_id].email}
                             </span>
                           ) : '—'}

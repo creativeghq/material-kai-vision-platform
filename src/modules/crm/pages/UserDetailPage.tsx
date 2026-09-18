@@ -14,6 +14,7 @@ import {
   Building2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { UserAvatar } from '@/components/core/ui/UserAvatar';
 import { CollapsibleCard } from '@/components/business/crm/CollapsibleCard';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -580,7 +581,13 @@ export const UserDetailPage: React.FC = () => {
                     <div>
                       <Label>Full Name</Label>
                       <div className="flex items-center gap-2 mt-1 p-2 bg-muted/30 rounded-lg">
-                        <User className="h-4 w-4 text-muted-foreground" />
+                        <UserAvatar
+                          userId={user.user_id}
+                          name={user.user_profiles.full_name}
+                          className="h-6 w-6"
+                          fallbackClassName="text-[10px]"
+                          fallback={<User className="h-4 w-4 text-muted-foreground" />}
+                        />
                         <span className="font-medium">{user.user_profiles.full_name}</span>
                       </div>
                     </div>

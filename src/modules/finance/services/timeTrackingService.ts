@@ -193,8 +193,8 @@ export const timeTrackingService = {
     const userName: Record<string, string> = {};
     const partyName: Record<string, string> = {};
     await Promise.all([
-      userIds.length ? supabase.from('user_profiles').select('id, full_name, email').in('id', userIds)
-        .then(({ data }) => { for (const u of data ?? []) userName[(u as any).id] = (u as any).full_name || (u as any).email || (u as any).id; }) : Promise.resolve(),
+      userIds.length ? supabase.from('user_profiles').select('user_id, full_name, email').in('user_id', userIds)
+        .then(({ data }) => { for (const u of data ?? []) userName[(u as any).user_id] = (u as any).full_name || (u as any).email || (u as any).user_id; }) : Promise.resolve(),
       compIds.length ? supabase.from('crm_companies').select('id, name').in('id', compIds)
         .then(({ data }) => { for (const c of data ?? []) partyName[`c:${(c as any).id}`] = (c as any).name ?? ''; }) : Promise.resolve(),
       contIds.length ? supabase.from('crm_contacts').select('id, name, first_name, last_name').in('id', contIds)

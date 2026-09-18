@@ -7,6 +7,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { fetchDisplayProfiles } from '@/services/displayProfilesService';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -219,19 +220,12 @@ export async function listChatToolCalls(limit = 200): Promise<ChatToolCall[]> {
   if (error) throw error;
   const rows = (data ?? []) as ChatToolCall[];
 
-  // Enrich with display name + email from user_profiles (one round-trip for all
-  // unique user_ids — no per-row lookup). Fail-soft: if the lookup errors,
-  // rows still render with no user name rather than the whole list breaking.
   const userIds = [...new Set(rows.map(r => r.user_id).filter(Boolean) as string[])];
   if (userIds.length > 0) {
-    const { data: profiles } = await supabase
-      .from('user_profiles')
-      .select('user_id, full_name, email')
-      .in('user_id', userIds);
-    type Profile = { name: string | null; email: string | null };
+    const profiles = await fetchDisplayProfiles(userIds);
+    type Profile = { name: string | null; email: string | null; avatarUrl: string | null };
     const byId = new Map<string, Profile>(
-      ((profiles ?? []) as Array<{ user_id: string; full_name: string | null; email: string | null }>)
-        .map(p => [p.user_id, { name: p.full_name, email: p.email }]),
+      profiles.map(p => [p.userId, { name: p.fullName, email: p.email, avatarUrl: p.avatarUrl }]),
     );
     for (const r of rows) {
       if (!r.user_id) continue;

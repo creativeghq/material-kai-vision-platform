@@ -33,6 +33,8 @@ import {
   castObjectFor, castObjectForSlot, castSlotFor, normalizeCastSlot, nameGender,
   castSeedForThreadCounterparty, castSeedForSender,
 } from '@/utils/characterAvatar';
+import { fetchDisplayProfiles } from '@/services/displayProfilesService';
+import { UserAvatar } from '@/components/core/ui/UserAvatar';
 import { moodStyle, urgencyLabel, urgencyIsLoud } from '@/utils/conversationMood';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useToast } from '@/hooks/use-toast';
@@ -517,10 +519,13 @@ const InboxPage: React.FC = () => {
         .map((p) => p.user_id as string);
       const profMap: Record<string, { full_name?: string; email?: string; avatar_url?: string }> = {};
       if (memberIds.length) {
-        const { data: profs } = await supabase
-          .from('user_profiles').select('user_id, full_name, email, avatar_url').in('user_id', memberIds);
-        for (const p of (profs || []) as Array<{ user_id: string; full_name?: string; email?: string; avatar_url?: string }>) {
-          profMap[p.user_id] = p;
+        const profs = await fetchDisplayProfiles(memberIds);
+        for (const prof of profs) {
+          profMap[prof.userId] = {
+            full_name: prof.fullName ?? undefined,
+            email: prof.email ?? undefined,
+            avatar_url: prof.avatarUrl ?? undefined,
+          };
         }
       }
       /** OUR side's photo. */
@@ -1893,7 +1898,7 @@ const InboxPage: React.FC = () => {
                       className={`flex-1 min-h-[44px] max-h-32 resize-none bg-card ${isNote ? 'border-warning/40 focus-visible:ring-warning/30' : ''}`}
                       disabled={waBlocked}
                     />
-                    <Button className="h-10 w-10 p-0 shrink-0" onClick={send} disabled={sending || waBlocked || (!draft.trim() && !attachment && pendingCards.length === 0)}>
+                    <Button className="h-9 w-9 p-0 shrink-0" onClick={send} disabled={sending || waBlocked || (!draft.trim() && !attachment && pendingCards.length === 0)}>
                       {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                     </Button>
                   </div>
@@ -4886,6 +4891,13 @@ const DetailsRail: React.FC<{
               return (
                 <div key={p.id} className="flex items-center gap-2.5 text-sm">
                   <Avatar className="h-7 w-7">
+                    {p.participant_type !== 'agent' && (
+                      <AvatarImage
+                        src={info?.avatarUrl || castAvatarSrc(castSeedForSender({ sender_participant_id: p.id }, info?.label), info?.avatarSlot)}
+                        alt={info?.label ?? ''}
+                        className="object-cover"
+                      />
+                    )}
                     <AvatarFallback className={`text-[10px] ${avatarTint(info?.label)}`}>{initials(info?.label)}</AvatarFallback>
                   </Avatar>
                   <span className="flex-1 min-w-0 truncate">{info?.label || 'Participant'}</span>
@@ -5634,10 +5646,12 @@ const NewThreadDialog: React.FC<{ workspaceId: string; onClose: () => void; onCr
       const { data: mem } = await supabase.from('workspace_members').select('user_id').eq('workspace_id', workspaceId);
       const ids = (mem || []).map((r: { user_id: string }) => r.user_id);
       if (ids.length === 0) return;
-      const { data: profs } = await supabase.from('user_profiles').select('user_id, full_name, email').in('user_id', ids);
+      const profs = await fetchDisplayProfiles(ids);
+      const byId = new Map(profs.map((p) => [p.userId, p]));
       const me = (await supabase.auth.getUser()).data.user?.id;
-      setMembers((profs || []).filter((p: { user_id: string }) => p.user_id !== me).map((p: { user_id: string; full_name?: string; email?: string }) => ({
-        user_id: p.user_id, label: p.full_name || p.email || p.user_id.slice(0, 8),
+      setMembers(ids.filter((id) => id !== me).map((id) => ({
+        user_id: id,
+        label: byId.get(id)?.fullName || byId.get(id)?.email || id.slice(0, 8),
       })));
     })();
   }, [workspaceId]);
@@ -5751,7 +5765,7 @@ const NewThreadDialog: React.FC<{ workspaceId: string; onClose: () => void; onCr
                       <label key={m.user_id} className="flex items-center gap-2.5 text-sm px-2 py-1.5 rounded-sm hover:bg-surface-hover cursor-pointer transition-colors">
                         <Checkbox checked={selected.includes(m.user_id)}
                           onCheckedChange={(v) => setSelected((prev) => v === true ? [...prev, m.user_id] : prev.filter((x) => x !== m.user_id))} />
-                        <Avatar className="h-7 w-7"><AvatarFallback className={`text-[10px] ${avatarTint(m.label)}`}>{initials(m.label)}</AvatarFallback></Avatar>
+                        <UserAvatar userId={m.user_id} name={m.label} className="h-7 w-7" fallbackClassName={`text-[10px] ${avatarTint(m.label)}`} />
                         {m.label}
                       </label>
                     ))}
@@ -5831,9 +5845,11 @@ const AddParticipantDialog: React.FC<{ thread: InboxThread; onClose: () => void;
       const { data: mem } = await supabase.from('workspace_members').select('user_id').eq('workspace_id', thread.workspace_id);
       const ids = (mem || []).map((r: { user_id: string }) => r.user_id);
       if (ids.length === 0) return;
-      const { data: profs } = await supabase.from('user_profiles').select('user_id, full_name, email').in('user_id', ids);
-      setMembers((profs || []).map((p: { user_id: string; full_name?: string; email?: string }) => ({
-        user_id: p.user_id, label: p.full_name || p.email || p.user_id.slice(0, 8),
+      const profs = await fetchDisplayProfiles(ids);
+      const byId = new Map(profs.map((p) => [p.userId, p]));
+      setMembers(ids.map((id) => ({
+        user_id: id,
+        label: byId.get(id)?.fullName || byId.get(id)?.email || id.slice(0, 8),
       })));
     })();
   }, [thread.workspace_id]);
@@ -5859,7 +5875,7 @@ const AddParticipantDialog: React.FC<{ thread: InboxThread; onClose: () => void;
           {members.map((m) => (
             <button key={m.user_id} onClick={() => add(m.user_id)} disabled={!!busy}
               className="w-full flex items-center gap-2.5 text-sm px-2 py-2 rounded-sm hover:bg-surface-hover transition-colors">
-              <Avatar className="h-7 w-7"><AvatarFallback className={`text-[10px] ${avatarTint(m.label)}`}>{initials(m.label)}</AvatarFallback></Avatar>
+              <UserAvatar userId={m.user_id} name={m.label} className="h-7 w-7" fallbackClassName={`text-[10px] ${avatarTint(m.label)}`} />
               <span className="flex-1 text-left">{m.label}</span>
               {busy === m.user_id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
             </button>

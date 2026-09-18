@@ -9,6 +9,7 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { FilterBar, useFilters } from '@/components/core/filters';
 import { SectionHeader } from '@/components/shared/SectionHeader';
+import { UserAvatar } from '@/components/core/ui/UserAvatar';
 import { listChatToolCalls, formatDuration } from '@/services/backgroundAgents';
 import type { ChatToolCall } from '@/services/backgroundAgents';
 import { useToast } from '@/hooks/use-toast';
@@ -69,6 +70,7 @@ export function ChatActivityTab() {
   type ConvGroup = {
     conversation_id: string;
     agent_id:        string | null;
+    user_id:         string | null;
     user_name:       string | null;
     user_email:      string | null;
     callCount:       number;
@@ -94,6 +96,7 @@ export function ChatActivityTab() {
         map.set(key, {
           conversation_id: key,
           agent_id:        c.agent_id,
+          user_id:         c.user_id    ?? null,
           user_name:       c.user_name  ?? null,
           user_email:      c.user_email ?? null,
           callCount:       1,
@@ -207,7 +210,13 @@ export function ChatActivityTab() {
                   <div className="flex-1 min-w-0 flex items-center gap-2">
                     {(g.user_name || g.user_email) && (
                       <span className="inline-flex items-center gap-1.5 truncate">
-                        <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <UserAvatar
+                          userId={g.user_id}
+                          name={g.user_name || g.user_email}
+                          className="h-5 w-5 shrink-0"
+                          fallbackClassName="text-[9px]"
+                          fallback={<User className="h-3 w-3 text-muted-foreground" />}
+                        />
                         {g.user_name && (
                           <span className="text-sm font-medium truncate">{g.user_name}</span>
                         )}

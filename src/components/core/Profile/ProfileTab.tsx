@@ -18,6 +18,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { flowEventService } from '@/services/flows/flowEventService';
+import { primeDisplayProfile } from '@/services/displayProfilesService';
 import { PROFESSIONAL_TYPE_LABELS } from '@/lib/materialCategories';
 import { BusinessSection } from '@/components/core/Profile/BusinessSection';
 import { AppearanceSection } from '@/components/core/Profile/AppearanceSection';
@@ -772,7 +773,12 @@ export const ProfileTab: React.FC = () => {
       bio: personalForm.bio, location: personalForm.location,
       website_url: personalForm.website_url, professional_type: personalForm.professional_type,
     });
-    if (ok) { setPersonal({ ...personalForm }); setEditingPersonal(false); toast({ title: 'Profile updated' }); }
+    if (ok) {
+      setPersonal({ ...personalForm });
+      primeDisplayProfile(user.id, { fullName: personalForm.full_name || null });
+      setEditingPersonal(false);
+      toast({ title: 'Profile updated' });
+    }
     setSavingPersonal(false);
   };
 
@@ -924,6 +930,7 @@ export const ProfileTab: React.FC = () => {
       if (avatarErr) throw avatarErr;
       setPersonal((p) => ({ ...p, avatar_url: publicUrl }));
       setPersonalForm((p) => ({ ...p, avatar_url: publicUrl }));
+      primeDisplayProfile(user.id, { avatarUrl: publicUrl });
       toast({ title: 'Avatar updated' });
     } catch { toast({ title: 'Upload failed', variant: 'destructive' }); }
     finally { setUploading(false); }

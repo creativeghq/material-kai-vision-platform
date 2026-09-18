@@ -145,6 +145,8 @@ import { moodboardAPI } from '@/services/moodboardAPI';
 import { ActiveMoodboardProvider, type ActiveMoodboard } from '@/contexts/ActiveMoodboardContext';
 import { GeminiEditModal } from './GeminiEditModal';
 import { RegionEditCanvas, type RegionEditResult } from './RegionEditCanvas';
+import { UserAvatar } from '@/components/core/ui/UserAvatar';
+
 import { AgentAvatar } from './AgentAvatar';
 import { onEnterOrSpace } from '@/utils/a11y';
 
@@ -1806,7 +1808,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         const { data: profileRow } = await supabase
           .from('user_profiles')
           .select('full_name')
-          .eq('id', user.id)
+          .eq('user_id', user.id)
           .maybeSingle();
         const full = (profileRow?.full_name ?? user.user_metadata?.full_name ?? '').trim();
         setFirstName(full.split(/\s+/)[0] ?? '');
@@ -6360,17 +6362,12 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     </div>
                   </div>
                   {message.role === 'user' && (
-                    <div className="flex-shrink-0">
-                      <div
-                        className="w-8 h-8 rounded-full flex items-center justify-center border-2"
-                        style={{
-                          backgroundColor: '#1f2937',
-                          borderColor: '#1f2937',
-                        }}
-                      >
-                        <User className="h-4 w-4" style={{ color: '#fff' }} />
-                      </div>
-                    </div>
+                    <UserAvatar
+                      userId={userId}
+                      className="w-8 h-8 flex-shrink-0"
+                      fallbackClassName="bg-[#1f2937] text-white"
+                      fallback={<User className="h-4 w-4 text-white" />}
+                    />
                   )}
                 </div>
                 )}
