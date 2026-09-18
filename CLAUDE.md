@@ -325,13 +325,27 @@ handler is NOT enough: a branch that only logs is the bug. Now guarded — for e
 the chunks its tool actually emits for the action it pins — by the "direct-run quick-start renders its tool
 output" case in [tests/unit/toolkitCoverage.test.ts](tests/unit/toolkitCoverage.test.ts).
 
-**A `seo_*_card` chunk needs a branch in `SEOGenericCard.tsx`. `AGENT_RESULT_TITLES` does NOT render it.**
-AgentHub routes every chunk whose type starts `seo_` and ends `_card` to `SEOGenericCard` *before* that titles
-map is consulted, so an entry there has no effect on what the user sees. 14 of 51 SEO card types were listed in
-the map, had no branch, and reached the chat as `JSON.stringify(data)` — AI Overview, GSC striking-distance,
-keyword ideas, search volume among them. Two registries, and the complete-looking one was the decorative one.
-Guarded by [tests/unit/seoCardCoverage.test.ts](tests/unit/seoCardCoverage.test.ts), which deliberately ignores
-the titles map and also fails on a dead branch nothing emits.
+**A `seo_*_card` chunk needs a branch in `SEOGenericCard.tsx`, and listing it in `AGENT_RESULT_TITLES`
+SHADOWS that branch.** The titles map is read FIRST in AgentHub's chunk chain, so a key there wins and the card
+arrives as the generic key/value flattener: `seo_site_report_card` printed `metrics organic traffic delta pct
+1335.5` as a table row, `seo_my_rankings_card` a nested-JSON disclosure over 131 rows. Sixteen were listed and
+all sixteen had a real branch sitting unused (reported 2026-09-18) — the reverse case is older and the same
+shape: 14 of 51 were in the map with NO branch and reached the chat as `JSON.stringify(data)`. Two registries,
+and the complete-looking one is the decorative one. `isSeoToolkitCard` now excludes them from the titles branch
+outright, and the canvas tab is named from `SEO_CARD_TITLES` in SEOGenericCard — that is the list the strip
+reads, not the titles map. Guarded by [tests/unit/seoCardCoverage.test.ts](tests/unit/seoCardCoverage.test.ts),
+which fails on a `seo_*_card` key reappearing in the titles map, on a card type with no branch or no tab title,
+and on a dead branch nothing emits.
+
+**A `public.seo_metric` is a value PLUS the verdict on it, and flattening it drops the verdict.** Anything
+projecting an RPC payload into a card must keep the struct whole and render it through `SeoMetricTile` — the
+same tile Profile → Websites uses, so a figure cannot read as a fact in the chat and as "Unknown" on the panel.
+Flattened, one figure became four nameless rows and the `status` went on the floor. Same rule one level up: a
+rank check that FAILED is unknown, never zero. 131 tracked keywords all died on a DataForSEO 402 and the card
+said `ranking 0 / not ranking 0` next to "none of the tracked keywords is in Google's top 100" — the RPC had
+derived `collector_failed` correctly and the renderer threw it away. `metricDescriptor(key)` in
+[src/components/core/Profile/seo/seoMetrics.ts](src/components/core/Profile/seo/seoMetrics.ts) is the one lookup
+for a key from any report.
 
 **Run `npm run tools:manifest` after touching any `tool(fn, {...})` definition or the `TOOLKITS` catalog.** It
 emits two committed files: `src/components/features/ai/toolManifest.generated.ts` (an AST projection of every
