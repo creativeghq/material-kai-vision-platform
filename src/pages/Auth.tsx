@@ -188,7 +188,7 @@ export const Auth: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center p-4 pb-20 relative overflow-hidden">
       {/* Gradient background */}
       <div className="fixed inset-0 bg-gradient-to-br from-background via-background to-primary/10 -z-10" />
 
@@ -532,11 +532,11 @@ export const Auth: React.FC = () => {
       </Card>
 
       {/* Footer */}
-      <div className="fixed bottom-6 left-0 right-0 flex justify-center gap-8 text-sm">
-        <Link to="/terms" className="text-muted-foreground hover:text-foreground underline">
+      <div className="fixed bottom-6 left-0 right-0 flex justify-center gap-8 text-sm pointer-events-none">
+        <Link to="/terms" className="text-muted-foreground hover:text-foreground underline pointer-events-auto">
           Terms of Service
         </Link>
-        <Link to="/privacy" className="text-muted-foreground hover:text-foreground underline">
+        <Link to="/privacy" className="text-muted-foreground hover:text-foreground underline pointer-events-auto">
           Privacy Policy
         </Link>
       </div>
