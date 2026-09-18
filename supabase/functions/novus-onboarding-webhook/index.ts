@@ -25,16 +25,25 @@ async function hmacHex(secret: string, body: string): Promise<string> {
 
 Deno.serve(withApiLogging('novus-onboarding-webhook', async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method !== 'POST') return json({ error: 'Method not allowed.' }, 405);
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
   );
 
-  const secret = (await resolveSecret(supabase, 'NOVUS_WEBHOOK_SECRET')).value ?? '';
-  // Fail closed: with no secret, anyone who knows the URL can approve their own onboarding.
+  const [secretRes, endpointRes] = await Promise.all([
+    resolveSecret(supabase, 'NOVUS_WEBHOOK_SECRET'),
+    resolveSecret(supabase, 'NOVUS_WEBHOOK_ENDPOINT_ID'),
+  ]);
+  const secret = secretRes.value ?? '';
+  const registered = !!(endpointRes.value ?? '');
+
+  // Unregistered => 404: the wrapper Sentries every 5xx, so fail-closing 503 files one per scanner (KAI-W0).
   if (!secret) {
-    return json({ error: 'Novus webhooks are not configured — register the endpoint to mint a signing secret.' }, 503);
+    return registered
+      ? json({ error: 'Novus webhook secret missing for a registered endpoint — re-register to mint a new one.' }, 503)
+      : json({ error: 'Not found.' }, 404);
   }
 
   const raw = await req.text();
@@ -42,11 +51,12 @@ Deno.serve(withApiLogging('novus-onboarding-webhook', async (req: Request) => {
   const eventId = req.headers.get('X-Novus-Event-Id') ?? '';
   const expected = await hmacHex(secret, raw);
   if (!timingSafeEqual(header.replace(/^sha256=/, '').trim().toLowerCase(), expected)) {
-    return json({ error: 'Bad signature.' }, 401);
+    return json({ error: 'Invalid signature.' }, 401);
   }
-  if (!eventId) return json({ error: 'Missing X-Novus-Event-Id.' }, 400);
+  if (!eventId) return json({ error: 'Missing required header X-Novus-Event-Id.' }, 400);
 
-  const payload = JSON.parse(raw || '{}');
+  let payload: any;
+  try { payload = JSON.parse(raw || '{}'); } catch { return json({ error: 'Malformed JSON body.' }, 400); }
   const requestId = payload?.data?.requestId ?? null;
 
   const { data: row } = await supabase
@@ -60,10 +70,7 @@ Deno.serve(withApiLogging('novus-onboarding-webhook', async (req: Request) => {
     workspace_id: row?.workspace_id ?? null,
     payload,
   });
-  if (insErr) {
-    if (insErr.code === '23505') return json({ received: true, duplicate: true });
-    console.error('[novus-webhook] could not record event', insErr.message);
-  }
+  if (insErr?.code === '23505') return json({ received: true, duplicate: true });
 
   if (!row) {
     await supabase.from('novus_webhook_events')
@@ -81,6 +88,7 @@ Deno.serve(withApiLogging('novus-onboarding-webhook', async (req: Request) => {
   try {
     const res = await fetch(`${baseUrl}/api/v1/requests/${requestId}`, {
       headers: { 'API-KEY': keyRes.value ?? '', Accept: 'application/json' },
+      signal: AbortSignal.timeout(20_000),
     });
     const b = await res.json();
     if (!res.ok || !b?.success) throw new Error(b?.error?.message ?? `HTTP ${res.status}`);

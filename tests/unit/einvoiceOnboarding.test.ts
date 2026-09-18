@@ -1,7 +1,4 @@
-/**
- * What a human SAYS they did never becomes what the provider CONFIRMED: an acknowledgement that
- * could write `status` lets a workspace declare itself registered with ΑΑΔΕ on its own say-so.
- */
+/** An acknowledgement that could write `status` lets a workspace claim its own ΑΑΔΕ registration. */
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -58,7 +55,7 @@ describe('an acknowledgement is a claim, not a verdict', () => {
 describe('the webhook is a nudge, not the record', () => {
   it('verifies the signature before it touches the database', () => {
     const src = read(WEBHOOK);
-    const verify = src.indexOf('Bad signature');
+    const verify = src.indexOf('timingSafeEqual(header');
     const firstWrite = Math.min(
       ...['.insert(', '.update(', '.upsert('].map((op) => {
         const at = src.indexOf(op);
@@ -81,6 +78,59 @@ describe('the webhook is a nudge, not the record', () => {
     const src = read(WEBHOOK);
     expect(src).toMatch(/fetch\(`\$\{baseUrl\}\/api\/v1\/requests\//);
     expect(src).not.toMatch(/status:\s*payload/);
+  });
+});
+
+describe('an unregistered webhook is quiet, a broken one is loud', () => {
+  it('404s when nothing is registered and 503s only when a registered endpoint lost its secret', () => {
+    const src = read(WEBHOOK);
+    // A fail-closed 503 on an unregistered endpoint files a Sentry issue per scanner (KAI-W0).
+    expect(src).toMatch(/registered\s*$/m);
+    const guard = src.slice(src.indexOf('if (!secret)'), src.indexOf('const raw = await req.text()'));
+    expect(guard).toContain('404');
+    expect(guard).toContain('503');
+    expect(guard).toMatch(/registered\s*\?/);
+  });
+});
+
+describe('what Novus checks, we check first', () => {
+  it('validates the ΑΦΜ check digit rather than paying for a 422', () => {
+    const src = read(EDGE);
+    expect(src).toContain('isValidGreekVat');
+    const js = src
+      .slice(src.indexOf('function isValidGreekVat'), src.indexOf('const isEmail'))
+      .replace(/:\s*string\s*\)/, ')')
+      .replace(/:\s*boolean\s*\{/, ' {');
+    const fn = new Function(`${js}; return isValidGreekVat;`)() as (v: string) => boolean;
+    expect(fn('094019245')).toBe(true);
+    expect(fn('090000045')).toBe(true);
+    expect(fn('123456789')).toBe(false);
+    expect(fn('000000000')).toBe(false);
+    expect(fn('09401924')).toBe(false);
+  });
+
+  it('refuses an empty transaction-type list instead of defaulting it', () => {
+    const body = branch(read(EDGE), 'save_application');
+    expect(body).toMatch(/if \(!types\.length\)/);
+    expect(body).not.toMatch(/\?\s*types\s*:\s*\['B2B'\]/);
+  });
+
+  it('checks the PDF magic bytes before uploading', () => {
+    const body = branch(read(EDGE), 'upload_signed');
+    expect(body).toContain('%PDF-');
+  });
+
+  it('adopts the existing request on DUPLICATE_OPEN_REQUEST', () => {
+    const body = branch(read(EDGE), 'create');
+    expect(body).toContain('DUPLICATE_OPEN_REQUEST');
+    expect(body).toContain('existingRequestId');
+  });
+
+  it('maps a Novus outage to 503 rather than letting fetch throw a 500', () => {
+    const src = read(EDGE);
+    const call = src.slice(src.indexOf('async function novusCall'), src.indexOf('function novusError'));
+    expect(call).toContain('AbortSignal.timeout');
+    expect(call).toContain('503');
   });
 });
 
@@ -110,9 +160,21 @@ describe('the application is built field by field', () => {
     expect(body).toContain('workspace_id: workspaceId');
   });
 
-  it('replays the stored idempotency key rather than minting one per attempt', () => {
+  it('replays the stored idempotency key, and refuses to send without one', () => {
     const body = branch(read(EDGE), 'create');
     expect(body).toContain('idempotencyKey: draft.idempotency_key');
     expect(body).not.toMatch(/idempotencyKey:\s*crypto\.randomUUID/);
+    const guard = body.indexOf('if (!draft.idempotency_key)');
+    expect(guard, 'create must refuse to POST without an idempotency key').toBeGreaterThan(-1);
+    expect(guard).toBeLessThan(body.indexOf("novusCall(ctx, '/api/v1/requests'"));
+  });
+
+  it('passes the documented Novus statuses through instead of relabelling them 502', () => {
+    const src = read(EDGE);
+    for (const action of ['history', 'cancel']) {
+      const body = branch(src, action);
+      expect(body, `${action} must pass 404 through`).toMatch(/status === 404/);
+      expect(body, `${action} must pass 429 through`).toMatch(/status === 429/);
+    }
   });
 });

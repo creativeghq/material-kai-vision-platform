@@ -49,7 +49,16 @@ export interface EInvoiceOnboarding {
   last_synced_at: string | null;
   sync_error: string | null;
   steps: EInvoiceOnboardingStep[];
+  application: ApplicationDraft & { locked: boolean };
   warning?: string;
+}
+
+export interface HistoryEntry {
+  occurredAt: string;
+  status: string;
+  previousStatus: string | null;
+  message: string;
+  actor: 'SOFTWARE_HOUSE' | 'CLIENT' | 'NOVUS' | 'SYSTEM';
 }
 
 export interface ApplicationDraft {
@@ -85,6 +94,14 @@ export const einvoiceOnboardingService = {
   /** A human says they did a manual step. Where Novus can answer, the rung stays "awaiting". */
   acknowledge(workspaceId: string, step: AckAction, undo = false) {
     return call({ action: 'acknowledge', workspace_id: workspaceId, step, undo });
+  },
+
+  async history(workspaceId: string): Promise<HistoryEntry[]> {
+    const { data, error } = await supabase.functions.invoke('novus-onboarding', {
+      body: { action: 'history', workspace_id: workspaceId },
+    });
+    if (error) throw new Error((await parseEdgeError(error)).message);
+    return (data?.history ?? []) as HistoryEntry[];
   },
 
   cancel(workspaceId: string, reason?: string) {
