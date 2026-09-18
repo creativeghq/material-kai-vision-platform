@@ -15,6 +15,61 @@ const FLOWS = {
 const render = (data: Record<string, unknown>, resultType = 'flows_list', title = 'Workspace flows') =>
   renderToStaticMarkup(React.createElement(AgentResultCard, { title, data, resultType, onAsk: () => {} }));
 
+/** Does a <table> render INSIDE an element carrying `cls`? Containment, so a depth scan. */
+function tableInside(html: string, cls: string): boolean {
+  const tag = /<(\/?)([a-z]+)([^>]*)>/g;
+  const carries: boolean[] = [];
+  let inside = 0;
+  let m: RegExpExecArray | null;
+  while ((m = tag.exec(html)) !== null) {
+    const [, close, name, attrs] = m;
+    if (close) {
+      if (carries.pop()) inside--;
+      continue;
+    }
+    if (name === 'table' && inside > 0) return true;
+    if (attrs.endsWith('/') || VOID_TAGS.has(name)) continue;
+    const has = attrs.includes(cls);
+    carries.push(has);
+    if (has) inside++;
+  }
+  return false;
+}
+const VOID_TAGS = new Set(['br', 'hr', 'img', 'input', 'meta', 'link', 'path', 'circle', 'line', 'polyline', 'rect']);
+
+/** The reported shape: rows two levels down, with no top-level array for the card to promote. */
+const NESTED_ROWS = {
+  website: 'materialshub.gr',
+  days: 28,
+  tracker: {
+    status: 'ok',
+    tracked: 3,
+    keywords: [
+      { keyword: 'plakakia banioy', position: 12, previous: 14, volume: 880 },
+      { keyword: 'dapeda athina', position: 31, previous: 29, volume: 320 },
+      { keyword: 'gypsosanida timi', position: 7, previous: 7, volume: 1900 },
+    ],
+  },
+};
+
+describe('a table nested under a field takes the full width', () => {
+  const html = render(NESTED_ROWS, 'seo_my_rankings', 'Your rankings');
+
+  it('still renders the rows as a table', () => {
+    expect(html).toContain('<table');
+  });
+
+  it('does not lay it out inside the capped reading column', () => {
+    // A table inside the label→value reading width, one label column poorer per nesting
+    // level, left a 131-row keyword table on about half the modal, truncated.
+    expect(tableInside(html, 'max-w-2xl')).toBe(false);
+  });
+
+  it('keeps the cap on the scalar rows, which are read across', () => {
+    expect(html).toContain('max-w-2xl');
+  });
+});
+
 describe('AgentResultCard renders a record list as a table', () => {
   const html = render(FLOWS);
 
@@ -33,9 +88,7 @@ describe('AgentResultCard renders a record list as a table', () => {
 
   it('right-aligns the numeric column with tabular figures', () => {
     expect(html).toContain('text-right tabular-nums');
-    // …and only the numeric one: a text column aligned right reads as a broken table.
-    // The right-aligned CELLS, not every `tabular-nums` on the surface — the row/column count
-    // above the table is tabular too, and it is not a cell.
+    // Only the numeric one, and only CELLS: the row/column count above the table is tabular too.
     expect((html.match(/text-right tabular-nums/g) || []).length).toBe(3); // one per row, `runs`
   });
 
