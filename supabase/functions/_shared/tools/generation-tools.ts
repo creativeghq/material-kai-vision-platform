@@ -1094,6 +1094,7 @@ export const createGenerateVRWorldTool = (
   /** The room the user ATTACHED — see resolveMediaSource. 190 credits is a bad price to pay
    *  for whichever image happened to be last, with nothing in the result naming it. */
   userImages: string[] = [],
+  conversationId?: string,
 ) => {
   // Mirror CREDIT_COSTS in generate-vr-world/index.ts
   const VR_CREDIT_COSTS: Record<string, number> = {
@@ -1142,6 +1143,7 @@ export const createGenerateVRWorldTool = (
               room_type: roomType,
               style,
               model: resolvedModel,
+              conversation_id: conversationId,
             }),
             signal: controller.signal,
           });

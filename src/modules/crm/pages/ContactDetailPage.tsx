@@ -9,6 +9,7 @@ import { Label } from '@/components/core/ui/label';
 import { Badge } from '@/components/core/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
+import { FINANCE_TAB, financeTabUrl } from '@/modules/finance/routes';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { contactsAPI, usersAPI, companiesAPI } from '@/services/crm.service';
 import { messagingService } from '@/modules/messaging/services/messagingService';
@@ -311,6 +312,7 @@ export const ContactDetailPage: React.FC = () => {
             subject_type: 'contact', subject_id: id,
             title: 'Discount change needs approval',
             body: 'A sales team member proposed a customer discount/level change.',
+            action_url: financeTabUrl(FINANCE_TAB.settings),
           });
         }
         toast({ title: 'Discount change sent for approval' });

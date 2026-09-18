@@ -2956,7 +2956,7 @@ async function executeAgent(
 
   // VR world generation — turn a room image into an explorable 3D Gaussian Splat
   if (config.tools.includes('generate_vr_world') && createGenerateVRWorldTool) {
-    tools.push(createGenerateVRWorldTool(userId, workspaceId, conversationImages, onChunk, toolImages));
+    tools.push(createGenerateVRWorldTool(userId, workspaceId, conversationImages, onChunk, toolImages, conversation_id ?? undefined));
   }
 
   // Deterministic surface preview — the browser draws it from the chunk; no model, no credits (#447).
@@ -2970,7 +2970,7 @@ async function executeAgent(
   // ever emit it. Deliberately NOT inside the isAdmin block below: this is a Generation
   // cluster tool like generate_3d, not an operator tool.
   if (config.tools.includes('generate_video') && createInteriorVideoV2Tool) {
-    tools.push(createInteriorVideoV2Tool(userId, workspaceId, onChunk));
+    tools.push(createInteriorVideoV2Tool(userId, workspaceId, onChunk, conversation_id ?? undefined));
   }
 
   // --- Admin-only tools (gated by RBAC) ---

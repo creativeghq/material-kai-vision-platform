@@ -287,6 +287,9 @@ async function handleRequest(
       user_id: userId,
       workspace_id: body.workspace_id ?? null,
       type: 'staging_ready',
+      // The image, not the turn: the chat only holds it if the browser was open to persist
+      // the message, and this notification exists for when it was not.
+      action_url: imageUrl,
       title: 'Virtual staging complete!',
       body: `Your ${room} has been virtually staged and is ready to view.`,
       job_id: jobId,

@@ -16,13 +16,21 @@ const AGENT_CHAT = 'supabase/functions/agent-chat/index.ts';
 
 describe('a chat dispatch always has a conversation to report into', () => {
   const src = read(DISPATCH);
+  // The dispatch factory ONLY. The file holds other tools, and one of them forwards the turn's
+  // conversation to an edge function on purpose — a file-wide scan reads that as this defect.
+  const dispatchTool = src.slice(
+    src.indexOf('export const createDispatchBackgroundTaskTool'),
+    src.indexOf('export const createInteriorVideoV2Tool'),
+  );
 
   it('opens one when the turn did not supply it, instead of stamping null', () => {
-    expect(src).toContain('ensureResultConversation');
+    expect(dispatchTool.length, 'the dispatch factory moved — this scan reads nothing')
+      .toBeGreaterThan(1000);
+    expect(dispatchTool).toContain('ensureResultConversation');
     // The run is stamped with the RESOLVED conversation, never the raw parameter — that is the
     // whole point; `conversation_id: conversationId` is the defect.
-    expect(src).toMatch(/conversation_id:\s*resultConversationId/);
-    expect(src).not.toMatch(/conversation_id:\s*conversationId\b/);
+    expect(dispatchTool).toMatch(/conversation_id:\s*resultConversationId/);
+    expect(dispatchTool).not.toMatch(/conversation_id:\s*conversationId\b/);
   });
 
   it('creates it for the agent the user is talking to, not a hardcoded one', () => {

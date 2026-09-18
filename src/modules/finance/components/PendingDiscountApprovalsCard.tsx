@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { financeService } from '@/modules/finance/services/financeService';
+import { FINANCE_TAB, financeTabUrl } from '@/modules/finance/routes';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { formatDate } from '@/utils/datetime';
 
@@ -44,15 +45,23 @@ export const PendingDiscountApprovalsCard: React.FC<{ workspaceId: string }> = (
     setBusyId(req.id);
     try {
       const res = await financeService.decidePricingRequest(req.id, approve);
+      const subjectType = (res as any)?.subject_type ?? req.after?.subject_type;
+      const subjectId = (res as any)?.subject_id ?? req.target_id;
+      // Only the two known subjects route to a record — an unrecognised one is a 404, so it
+      // goes back to the queue instead.
+      const subjectUrl = subjectId && (subjectType === 'contact' || subjectType === 'company')
+        ? `/crm/${subjectType === 'contact' ? 'contacts' : 'companies'}/${subjectId}`
+        : financeTabUrl(FINANCE_TAB.settings);
       flowEventService.emit('pricing_change_decided', {
         workspace_id: workspaceId,
         request_id: req.id,
         approved: approve,
         user_id: req.requested_by,
-        subject_type: (res as any)?.subject_type ?? req.after?.subject_type,
-        subject_id: (res as any)?.subject_id ?? req.target_id,
+        subject_type: subjectType,
+        subject_id: subjectId,
         title: approve ? 'Discount change approved' : 'Discount change rejected',
         body: `Your customer pricing change was ${approve ? 'approved' : 'rejected'}.`,
+        action_url: subjectUrl,
       });
       toast({ title: approve ? 'Approved & applied' : 'Rejected' });
       await load();

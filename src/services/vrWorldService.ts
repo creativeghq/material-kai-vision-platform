@@ -39,6 +39,7 @@ export interface GenerateVRParams {
   style?: string;
   model?: string;
   isPano?: boolean;  // Set true for panoramic source images
+  conversationId?: string;
 }
 
 // Credit costs — must match CREDIT_COSTS in generate-vr-world edge function.
@@ -159,6 +160,7 @@ export const vrWorldService = {
         model: params.model || 'marble-1.1',
         is_pano: params.isPano,
         workspace_id: workspaceId,
+        conversation_id: params.conversationId,
       },
     });
 

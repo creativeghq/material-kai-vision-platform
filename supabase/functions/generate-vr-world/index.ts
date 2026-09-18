@@ -45,6 +45,7 @@ interface GenerateVRRequest {
   is_pano?: boolean;  // Set true for panoramic source images
   user_id?: string;   // Required when called server-to-server with the service role key
   workspace_id?: string;  // Active workspace — routes the debit to the shared pool when funded
+  conversation_id?: string;
 }
 
 Deno.serve(withApiLogging('generate-vr-world', async (req) => {
@@ -96,6 +97,9 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
   }
 
   const wsId = body.workspace_id ?? null;
+  // A world is explored in the turn that generated it, so that turn is where its
+  // notification goes.
+  const worldUrl = body.conversation_id ? `/agent-hub?conversation=${body.conversation_id}` : '/agent-hub';
 
   // Invariant 1 (#364 EX-1). `wsId` comes straight from the request body and then routes the
   // credit debit, stamps the `vr_worlds` row and the `ai_usage_logs` row. Unverified, a user can
@@ -294,6 +298,7 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
       user_id: userId,
       workspace_id: wsId,
       type: 'vr_world_ready',
+      action_url: worldUrl,
       title: 'Your VR world is ready!',
       body: 'Your 3D environment has been generated and is ready to explore.',
       world_id: vrWorldId,
@@ -343,6 +348,7 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
           user_id: userId,
           workspace_id: wsId,
           type: 'vr_world_failed',
+          action_url: worldUrl,
           title: 'VR world generation failed',
           body: 'Something went wrong generating your 3D world. Any credits used have been refunded.',
           world_id: vrWorldId,

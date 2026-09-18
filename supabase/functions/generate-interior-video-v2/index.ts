@@ -288,6 +288,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
     aspect_ratio = '16:9' as AspectRatio,
     duration_seconds = 8,
     workspace_id,
+    conversation_id,
     before_image_url,
     // Extra images held CONSISTENT across the clip — the product itself, its finish,
     // the room it goes in — which is the whole reason a generated interior is usable
@@ -305,6 +306,10 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
     && !(await userCanAccessWorkspace(supabase, userId, workspace_id))) {
     return jsonResponse({ success: false, error: 'Not found' }, 404);
   }
+
+  // Only the FAILED notification uses this: a finished run links the file, because the chat
+  // holds the clip only if the browser stayed open to persist the message.
+  const conversationUrl = conversation_id ? `/agent-hub?conversation=${conversation_id}` : '/agent-hub';
 
   if (!source_image_url) {
     return jsonResponse({ success: false, error: 'source_image_url is required' }, 400);
@@ -542,6 +547,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
         user_id: userId,
         workspace_id,
         type: 'video_ready',
+        action_url: videoUrl,
         title: 'Your video is ready!',
         body: `Your ${video_type.replace(/_/g, ' ')} video has been generated successfully.`,
         job_id: jobId,
@@ -597,6 +603,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
         user_id: userId,
         workspace_id,
         type: 'video_ready',
+        action_url: videoUrl,
         title: 'Your video is ready!',
         body: `Your ${video_type.replace(/_/g, ' ')} video has been generated successfully.`,
         job_id: jobId,
@@ -658,6 +665,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
         user_id: userId,
         workspace_id,
         type: 'video_ready',
+        action_url: videoUrl,
         title: 'Your video is ready!',
         body: `Your ${video_type.replace(/_/g, ' ')} video has been generated successfully.`,
         job_id: jobId,
@@ -711,6 +719,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
         user_id: userId,
         workspace_id,
         type: 'video_ready',
+        action_url: videoUrl,
         title: 'Your video is ready!',
         body: `Your ${video_type.replace(/_/g, ' ')} video has been generated successfully.`,
         job_id: jobId,
@@ -767,6 +776,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
         user_id: userId,
         workspace_id,
         type: 'video_ready',
+        action_url: videoUrl,
         title: 'Your video is ready!',
         body: `Your ${video_type.replace(/_/g, ' ')} video has been generated successfully.`,
         job_id: jobId,
@@ -803,12 +813,8 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
       const videoUrl = await uploadVideoToStorage(supabase, klingResult.base64, jobId, true, uploadCtx);
       await logVideoUsage(klingDuration);
 
-      // This write is the ONLY record that the job finished, and the "your video is ready"
-      // notification fires immediately after it. Discarding the result meant an RLS denial or a
-      // transport blip left the row stuck on `processing` with a null video_url while the user
-      // was told it was ready — they click through to nothing, and the job never resolves.
-      // Throwing hands it to the catch below, which refunds and records a terminal `failed`:
-      // less pleasant, but true, and recoverable (#347 audit).
+      // Discarded, this write leaves the row on `processing` while the user is told it is
+      // ready — see the first completion branch above.
       const { error: completeErr } = await supabase.from('generation_videos').update({
         status: 'completed',
         video_url: videoUrl,
@@ -820,6 +826,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
         user_id: userId,
         workspace_id,
         type: 'video_ready',
+        action_url: videoUrl,
         title: 'Your video is ready!',
         body: `Your ${video_type.replace(/_/g, ' ')} video has been generated successfully.`,
         job_id: jobId,
@@ -886,6 +893,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
           user_id: userId,
           workspace_id,
           type: 'video_ready',
+          action_url: videoUrl,
           title: 'Your video is ready!',
           body: `Your ${video_type.replace(/_/g, ' ')} video has been generated successfully.`,
           job_id: jobId,
@@ -948,6 +956,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
       user_id: userId,
       workspace_id,
       type: 'video_failed',
+      action_url: conversationUrl,
       title: 'Video generation failed',
       body: 'Something went wrong generating your video. Any credits used have been refunded.',
       job_id: jobId,

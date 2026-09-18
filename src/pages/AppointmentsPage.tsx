@@ -162,8 +162,7 @@ function AppointmentDetailDrawer({
       status === 'confirmed' ? 'appointment_confirmed' :
       status === 'completed' ? 'appointment_completed' :
       'appointment_cancelled';
-    // The client notification (confirmed/cancelled, registered users only) is
-    // delivered by the matching appointment flow; the event carries the payload.
+    // Delivered by the matching appointment flow; the event carries the payload.
     const notifyClient = !!appt.client_user_id && (status === 'confirmed' || status === 'cancelled');
     const apptTitle = status === 'confirmed'
       ? `Your appointment on ${formatDate(appt.appointment_date)} has been confirmed`
@@ -173,6 +172,8 @@ function AppointmentDetailDrawer({
       type: eventType,
       title: notifyClient ? apptTitle : '',
       body: appt.service_name ? `Service: ${appt.service_name}` : '',
+      // Bookings lists what you RECEIVED, so it is empty for a client.
+      action_url: notifyClient ? `/u/${appt.professional_user_id}` : null,
       appointment_id: appt.id,
       professional_user_id: appt.professional_user_id,
     });
