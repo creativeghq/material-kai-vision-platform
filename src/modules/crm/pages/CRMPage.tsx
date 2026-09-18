@@ -124,7 +124,10 @@ export const CRMManagement: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
-  const { activeWorkspaceId, workspaceRole } = useWorkspace();
+  const { activeWorkspaceId, workspaceRole, isPlatformOperator } = useWorkspace();
+  // Platform user administration is the OPERATOR's surface; `users` is also the default tab.
+  const canAdminUsers = !!isPlatformOperator;
+  const defaultTab: TabValue = canAdminUsers ? CRM_TAB.users : CRM_TAB.contacts;
   // Reps and above create/move cards; a `client` is read-only. RLS on crm_deals is the real
   // boundary (admin OR the deal's owner) — this only decides whether to offer the controls,
   // and offering them to someone RLS will reject is a worse experience than hiding them.
@@ -140,13 +143,14 @@ export const CRMManagement: React.FC = () => {
   // did nothing. Same reason FinancePage drives its tab off `?tab=` directly.
   const activeTab: TabValue = (() => {
     const t = searchParams.get('tab');
-    return (TAB_VALUES as readonly string[]).includes(t || '') ? (t as TabValue) : CRM_TAB.users;
+    const v = (TAB_VALUES as readonly string[]).includes(t || '') ? (t as TabValue) : defaultTab;
+    return v === CRM_TAB.users && !canAdminUsers ? defaultTab : v;
   })();
   const handleTabChange = (val: string) => {
-    const next = (TAB_VALUES as readonly string[]).includes(val) ? (val as TabValue) : CRM_TAB.users;
+    const next = (TAB_VALUES as readonly string[]).includes(val) ? (val as TabValue) : defaultTab;
     setUsersPage(1); setContactsPage(1); setCompaniesPage(1);
     const params = new URLSearchParams(searchParams);
-    if (next === CRM_TAB.users) params.delete('tab'); else params.set('tab', next);
+    if (next === defaultTab) params.delete('tab'); else params.set('tab', next);
     setSearchParams(params, { replace: true });
   };
 
@@ -167,6 +171,7 @@ export const CRMManagement: React.FC = () => {
   const [roles, setRoles] = useState<Role[]>([]);
   const [categories, setCategories] = useState<CrmCategorySummary[]>([]);
   const [userStats, setUserStats] = useState({ total: 0, active: 0, inactive: 0 });
+  const [usersUnreadable, setUsersUnreadable] = useState(false);
 
   // Users are client-paginated (single edge-function payload). Contacts + companies are
   // SERVER-paged: the page number feeds the request's offset.
@@ -251,15 +256,12 @@ export const CRMManagement: React.FC = () => {
         inactive: response.data?.filter((u) => u.status === 'inactive').length || 0,
       });
     } catch (error: any) {
-      // Not being allowed to list platform users is a PERMISSION STATE, not a failure. The Users
-      // tab is admin-only, but this page loads it unconditionally on mount, so every workspace
-      // member who is not a platform admin opened /crm and got a red destructive toast reading
-      // "Failed to load users: Access denied. Required roles: admin" — an internal role name,
-      // shown to someone with nothing to fix. Same shape as loadCompanyLookup above, which
-      // already refuses to block the page on data it merely wants.
+      // Being refused the platform user list is a PERMISSION STATE, not a failure — it must
+      // neither toast an internal role name at someone with nothing to fix, nor report itself
+      // as `Total Users 0`, which reads as a fact about the platform. The tiles are withheld.
       if (error?.status === 401 || error?.status === 403) {
         setUsers([]);
-        setUserStats({ total: 0, active: 0, inactive: 0 });
+        setUsersUnreadable(true);
         return;
       }
       toast({ title: 'Error', description: `Failed to load users: ${error.message}`, variant: 'destructive' });
@@ -336,7 +338,8 @@ export const CRMManagement: React.FC = () => {
   };
 
   useEffect(() => {
-    loadRoles(); loadCategories(); loadUsers(); loadCompanyLookup();
+    loadRoles(); loadCategories(); loadCompanyLookup();
+    if (canAdminUsers) loadUsers(); else setLoadingUsers(false);
   }, []);
 
   // Re-fetch whenever the page or any server-side filter changes.
@@ -608,8 +611,12 @@ export const CRMManagement: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <AdminStatCard title="Total Users" value={userStats.total} icon={Users} description="Registered users" variant="glass" />
-          <AdminStatCard title="Active Users" value={userStats.active} icon={Users} description="Currently active" variant="glass" />
+          {canAdminUsers && !usersUnreadable && (
+            <>
+              <AdminStatCard title="Total Users" value={userStats.total} icon={Users} description="Registered users" variant="glass" />
+              <AdminStatCard title="Active Users" value={userStats.active} icon={Users} description="Currently active" variant="glass" />
+            </>
+          )}
           {/* Totals come from the API's exact count — the arrays hold one page now. */}
           <AdminStatCard title="Total Contacts" value={contactsTotal} icon={Building2} description="CRM contacts" variant="glass" />
           <AdminStatCard title="Total Companies" value={companiesTotal} icon={Building2} description="CRM companies" variant="glass" />
@@ -618,7 +625,7 @@ export const CRMManagement: React.FC = () => {
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
             <TabsTrigger value="pipeline"><Kanban className="h-4 w-4 mr-2" />Pipeline</TabsTrigger>
-            <TabsTrigger value="users"><Users className="h-4 w-4 mr-2" />Users</TabsTrigger>
+            {canAdminUsers && <TabsTrigger value="users"><Users className="h-4 w-4 mr-2" />Users</TabsTrigger>}
             <TabsTrigger value="contacts"><Building2 className="h-4 w-4 mr-2" />Contacts</TabsTrigger>
             <TabsTrigger value="companies"><Building2 className="h-4 w-4 mr-2" />Companies</TabsTrigger>
             <TabsTrigger value="categories"><Tags className="h-4 w-4 mr-2" />Categories</TabsTrigger>
@@ -642,6 +649,7 @@ export const CRMManagement: React.FC = () => {
           </TabsContent>
 
           {/* Users Tab */}
+          {canAdminUsers && (
           <TabsContent value="users" className="space-y-4 mt-6">
             <Card>
               <CardHeader>
@@ -742,6 +750,7 @@ export const CRMManagement: React.FC = () => {
               </CardContent>
             </Card>
           </TabsContent>
+          )}
 
           {/* Contacts Tab */}
           <TabsContent value="contacts" className="space-y-4 mt-6">
