@@ -94,7 +94,8 @@ export const SeoMetricTile: React.FC<{
           : undefined
       }
       chart={
-        m.series.length >= 2 ? (
+        // Optional: a caller that trims the series to keep a chat message small still gets a tile.
+        m.series?.length >= 2 ? (
           <Sparkline
             points={m.series.map((p) => p.v)}
             upIsGood={descriptor.upIsGood}

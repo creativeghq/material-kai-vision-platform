@@ -10,14 +10,10 @@ const CARD_FILE = join(REPO, 'src', 'components', 'features', 'ai', 'SEOGenericC
 const AGENT_HUB = join(REPO, 'src', 'components', 'features', 'ai', 'AgentHub.tsx');
 
 /**
- * Types with a dedicated component of their own, routed BEFORE the generic card.
- * Anything added here must have a real renderer somewhere — this list is an
- * "it renders elsewhere" note, never a "we decided not to render it" exemption.
+ * Types with a component of their own. An "it renders elsewhere" note, never a
+ * "we decided not to render it" exemption.
  */
-const RENDERED_ELSEWHERE = new Set<string>([
-  // AgentHub routes this one to <SEOResearchCard> explicitly.
-  'seo_research_card',
-]);
+const RENDERED_ELSEWHERE = new Set<string>(['seo_research_card']);
 
 function readToolSources(): string {
   return readdirSync(TOOLS_DIR)
@@ -66,7 +62,38 @@ describe('SEO toolkit card coverage', () => {
     const hub = readFileSync(AGENT_HUB, 'utf8');
     // If this route is ever removed or narrowed, the reasoning above stops holding
     // and this test's premise needs revisiting rather than silently passing.
-    expect(hub).toMatch(/chunk\.type\.startsWith\('seo_'\)\s*&&\s*chunk\.type\.endsWith\('_card'\)/);
+    expect(hub).toMatch(/type\.startsWith\('seo_'\)\s*&&\s*type\.endsWith\('_card'\)/);
+    expect(hub).toMatch(/} else if \(isSeoToolkitCard\(chunk\.type\)\) \{/);
+  });
+
+  it('lets no seo_*_card be claimed by AGENT_RESULT_TITLES, which is read FIRST', () => {
+    const hub = readFileSync(AGENT_HUB, 'utf8');
+    const map = hub.slice(
+      hub.indexOf('const AGENT_RESULT_TITLES'),
+      hub.indexOf('};', hub.indexOf('const AGENT_RESULT_TITLES')),
+    );
+    expect(map.length).toBeGreaterThan(500);
+    // A key here shadows SEOGenericCard's branch: the card arrives as a key/value dump.
+    const claimed = [...map.matchAll(/^\s*(seo_[a-z0-9_]*_card):/gm)].map((m) => m[1]);
+    expect(
+      claimed,
+      `These SEO card types are listed in AGENT_RESULT_TITLES, which AgentHub reads BEFORE the ` +
+        `seo_*_card route. Each one renders as a raw JSON dump instead of its SEOGenericCard branch. ` +
+        `Delete them — the canvas tab title comes from SEO_CARD_TITLES in SEOGenericCard.tsx:\n  ${claimed.join('\n  ')}`,
+    ).toEqual([]);
+    // Belt-and-braces, so a re-added key cannot shadow silently.
+    expect(hub).toMatch(/AGENT_RESULT_TITLES\[chunk\.type\] && !isSeoToolkitCard\(chunk\.type\)/);
+  });
+
+  it('gives every emitted card type a canvas tab title', () => {
+    const src = readFileSync(CARD_FILE, 'utf8');
+    const titled = new Set([...src.matchAll(/^\s*(seo_[a-z0-9_]*_card): '/gm)].map((m) => m[1]));
+    const missing = emittedCardTypes().filter((t) => !titled.has(t) && !RENDERED_ELSEWHERE.has(t));
+    expect(
+      missing,
+      `Add these to SEO_CARD_TITLES in SEOGenericCard.tsx, or their canvas tab reads as a ` +
+        `mechanical de-underscoring of the chunk type:\n  ${missing.join('\n  ')}`,
+    ).toEqual([]);
   });
 
   it('has no renderer branch for a card type nothing emits', () => {

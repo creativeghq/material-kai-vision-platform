@@ -120,7 +120,7 @@ import { catalogsService } from '@/services/catalogsService';
 import { CatalogExtractionCandidatesCard, type ExtractionCandidate } from './CatalogExtractionCandidatesCard';
 import { CatalogImageCandidatesCard, type ImageCandidate } from './CatalogImageCandidatesCard';
 import { SEOResearchCard, type SEOResearchCardData } from './SEOResearchCard';
-import { SEOGenericCard, type SEOGenericCardData } from './SEOGenericCard';
+import { SEOGenericCard, seoCardTitle, type SEOGenericCardData } from './SEOGenericCard';
 import { VirtualStagingViewer } from './VirtualStagingViewer';
 import { SurfaceVisualizerCard, type VisualizerRenderData } from '@/components/features/visualizer/SurfaceVisualizerCard';
 import { SheetCanvasCard } from '@/components/features/sheets/SheetCanvasCard';
@@ -313,6 +313,16 @@ const STATUS_STEP_COPY: Record<string, string> = {
   'Consulting the knowledge base…': 'Consulting the knowledge base.',
 };
 
+/** SEOGenericCard's chunks. One predicate, so the two branches below cannot disagree. */
+const isSeoToolkitCard = (type: unknown): type is string =>
+  typeof type === 'string' && type.startsWith('seo_') && type.endsWith('_card') && type !== 'seo_research_card';
+
+/** A turn saved while the titles map shadowed the card: the chunk survives inside `data`. */
+const seoCardFromSavedResult = (saved: any): SEOGenericCardData | undefined =>
+  isSeoToolkitCard(saved?.resultType) && saved?.data && typeof saved.data === 'object'
+    ? ({ ...saved.data, type: saved.resultType } as SEOGenericCardData)
+    : undefined;
+
 // Chunk types that were emitted but rendered as plain text. Routed
 // through one generic AgentResultCard (title + structured payload).
 const AGENT_RESULT_TITLES: Record<string, string> = {
@@ -382,24 +392,9 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   // Messaging / WhatsApp
   messaging_channels_list: 'WhatsApp channels',
   messaging_sent: 'WhatsApp sent',
-  // SEO — Google Search Console (first-party performance)
-  seo_gsc_striking_distance_card: 'Striking-distance keywords',
-  seo_gsc_movers_card: 'Search Console movers',
-  seo_my_rankings_card: 'Your rankings',
-  seo_site_report_card: 'Site report',
-  // SEO — DataForSEO gap-fillers
-  seo_onpage_issues_card: 'Site-audit issues',
-  seo_backlinks_timeseries_card: 'Backlink history',
-  seo_backlinks_competitors_card: 'Backlink competitors',
-  seo_historical_rank_card: 'Rank history',
-  seo_keywords_for_site_card: 'Keyword universe',
-  seo_keyword_ideas_card: 'Keyword ideas',
-  seo_related_keywords_card: 'Related keywords',
-  seo_search_volume_card: 'Search volume & CPC',
-  seo_domain_intersection_card: 'Keyword intersection',
-  seo_ai_overview_card: 'Google AI Overview',
-  seo_google_maps_card: 'Google Maps results',
-  seo_gbp_info_card: 'Google Business Profile',
+  // No `seo_*_card` key belongs here: this map is read FIRST, so listing one shadows
+  // SEOGenericCard's branch and the card arrives as a flattened key/value dump. Sixteen
+  // were, all sixteen had a branch. Guarded by tests/unit/seoCardCoverage.test.ts.
   // Quotes — the unpriced rung (#341). The priced ones render their own cards.
   quote_request_raised: 'Quote request recorded',
   // Contracts
@@ -3489,7 +3484,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     metadata: { agentId: selectedAgent, model: selectedModel, purchaseOrderSentData: m.purchaseOrderSentData },
                   });
                 }
-              } else if (AGENT_RESULT_TITLES[chunk.type]) {
+              } else if (AGENT_RESULT_TITLES[chunk.type] && !isSeoToolkitCard(chunk.type)) {
                 // Generic structured render for previously-plain-text result chunks
                 const { type: _t, timestamp: _ts, ...payload } = chunk as Record<string, any>;
                 const title = AGENT_RESULT_TITLES[chunk.type];
@@ -3632,7 +3627,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     metadata: { agentId: selectedAgent, model: selectedModel, mentionTrackingStartedData: m.mentionTrackingStartedData },
                   });
                 }
-              } else if (typeof chunk.type === 'string' && chunk.type.startsWith('seo_') && chunk.type.endsWith('_card') && chunk.type !== 'seo_research_card') {
+              } else if (isSeoToolkitCard(chunk.type)) {
                 // Generic SEO toolkit card — one handler for all 22+ chunk types.
                 // The card component picks the right inline mini-renderer based on data.type.
                 const m: Message = {
@@ -3645,6 +3640,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   seoGenericData: chunk as SEOGenericCardData,
                 };
                 setMessages(prev => [...prev, m]);
+                // The card carried the answer — see renderedResultCardRef, which is what keeps a
+                // direct-run quick-start from printing its stock "Done!" line over the top of it.
+                renderedResultCardRef.current = true;
                 if (conversationId) {
                   await saveAndLinkMessage(m.id, {
                     conversationId, role: 'assistant', content: m.content,
@@ -4178,12 +4176,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     setJustEnabledToolkitId(tk.id);  // drives the ToolkitOnboardingCard (its quick-starts)
   }, [userId, initialToolkitId, initialQuickStart, ensureAgentAndToolkit]);
 
-  // Shared image-attach path: read a set of image File objects to data URLs and
-  // append them to the composer. Used by the file picker AND clipboard paste.
-  //
-  // Clamped to AGENT_MAX_IMAGES here, at ATTACH time, because agent-chat refuses the whole turn
-  // over that number — telling the user now costs them one toast, telling them at send costs them
-  // the read, the upload and a 413.
+  // Clamped at ATTACH time, not at send: agent-chat refuses the whole turn over
+  // AGENT_MAX_IMAGES, so clamping later costs the read, the upload and a 413.
   const attachImageFiles = useCallback((files: File[]) => {
     const allImages = files.filter((f) => f.type.startsWith('image/'));
     if (allImages.length === 0) return;
@@ -4255,13 +4249,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     }
   }, [toast, ensureAgentAndToolkit]);
 
-  // Attach a PDF as a *readable document* — base64 data URL sent to agent-chat as a
-  // `document` block so Opus reads it natively (quotes, invoices, specs). This is the
-  // "read this and rebuild/summarize it" path, distinct from catalog product-extraction.
-  //
-  // Clamped to AGENT_MAX_DOCUMENTS, for the reason the catalog branch below has always clamped to
-  // one: agent-chat refuses the turn over that number with a 413. Unclamped, 19 PDFs were read to
-  // base64, uploaded, and answered with the raw JSON of the refusal.
+  // A `document` block Opus reads natively, distinct from catalog product-extraction.
+  // Unclamped, 19 PDFs were read to base64, uploaded, and answered with a 413.
   const attachDocumentFiles = useCallback((files: File[]) => {
     const { accepted, rejected } = attachmentRoom(attachedDocuments.length, files.length, AGENT_MAX_DOCUMENTS);
     if (rejected > 0) {
@@ -4426,7 +4415,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           sourcingOptionsData: msg.metadata?.sourcingOptionsData as any | undefined,
           purchaseOrderCreatedData: msg.metadata?.purchaseOrderCreatedData as any | undefined,
           purchaseOrderSentData: msg.metadata?.purchaseOrderSentData as any | undefined,
-          agentResultData: msg.metadata?.agentResultData as any | undefined,
+          agentResultData: seoCardFromSavedResult(msg.metadata?.agentResultData)
+            ? undefined
+            : (msg.metadata?.agentResultData as any | undefined),
           llmVisibilityData: msg.metadata?.llmVisibilityData as any | undefined,
           mentionFeedData: msg.metadata?.mentionFeedData as any | undefined,
           mentionTrackingStartedData: msg.metadata?.mentionTrackingStartedData as any | undefined,
@@ -4442,7 +4433,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               }
             : (msg.metadata?.jobFindingsData as any | undefined)),
           seoResearchData: msg.metadata?.seoResearchData as any | undefined,
-          seoGenericData: msg.metadata?.seoGenericData as any | undefined,
+          seoGenericData: (msg.metadata?.seoGenericData as SEOGenericCardData | undefined)
+            ?? seoCardFromSavedResult(msg.metadata?.agentResultData),
           // Agent-streamed sheet/catalog cards are saved to metadata but were omitted
           // from this restore map, so they vanished on conversation reload.
           sheetCanvasData: msg.metadata?.sheetCanvasData as any | undefined,
@@ -4617,7 +4609,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     if (m.llmVisibilityData) return { id: m.id, kind: 'llm', title: 'LLM visibility' };
     if (m.mentionFeedData) return { id: m.id, kind: 'mentions', title: 'Mention feed' };
     if (m.seoResearchData) return { id: m.id, kind: 'seo', title: 'SEO research' };
-    if (m.seoGenericData) return { id: m.id, kind: 'seo', title: 'SEO' };
+    // A turn producing three SEO cards used to give the strip three tabs labelled "SEO".
+    if (m.seoGenericData) return { id: m.id, kind: 'seo', title: seoCardTitle(m.seoGenericData.type) };
     if (m.articleData) return { id: m.id, kind: 'seo', title: 'SEO article' };
     if (m.catalogExtractionData) return { id: m.id, kind: 'catalog', title: 'Catalog candidates', meta: count(m.catalogExtractionData.candidates?.length, 'candidate') };
     if (m.catalogImageCandidatesData) return { id: m.id, kind: 'catalog', title: m.catalogImageCandidatesData.material_name ? `Images · ${m.catalogImageCandidatesData.material_name}` : 'Catalog images', meta: count(m.catalogImageCandidatesData.candidates?.length, 'image') };
@@ -6227,12 +6220,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   })()}
                   <div
                     className={cn(
-                      // One width for every message. The old class here listed twenty-three
-                      // payloads and went `max-w-full` for any of them, because the artifact was
-                      // rendered INSIDE the bubble and a product table or a render grid needed the
-                      // room. The artifact is its own card below the bubble now, so a bubble only
-                      // ever holds prose — and prose at full width is a worse read, not a better
-                      // one.
+                      // One width for every message: the artifact is its own card below the
+                      // bubble now, so a bubble only ever holds prose.
                       'min-w-0 max-w-[88%] overflow-x-auto rounded-2xl p-3.5 sm:max-w-[75%] sm:p-5',
                       message.role === 'user'
                         ? 'bg-[#1f2937] text-white shadow-md'

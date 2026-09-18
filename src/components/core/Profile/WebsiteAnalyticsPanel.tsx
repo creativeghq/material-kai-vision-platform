@@ -16,18 +16,10 @@ import {
   type UserWebsite,
 } from '@/services/userWebsitesService';
 import { SeoMetricTile } from './seo/SeoMetricTile';
-import { compact, type SeoMetric, type SeoMetricDescriptor } from './seo/seoMetrics';
+import { ANALYTICS_METRICS, compact, type SeoMetric } from './seo/seoMetrics';
 
 /** Websites → Search Performance → Analytics. */
 
-const GA_METRICS: SeoMetricDescriptor[] = [
-  { key: 'sessions', label: 'Sessions', format: 'count', upIsGood: true, help: 'Visits to the site. One person returning tomorrow is two sessions.' },
-  { key: 'active_users', label: 'Active users', format: 'count', upIsGood: true, help: 'Distinct people, not visits. The gap between this and sessions is how often people come back.' },
-  { key: 'new_users', label: 'New users', format: 'count', upIsGood: true, help: 'First-time visitors in the window.' },
-  { key: 'engagement_rate', label: 'Engaged sessions', format: 'percent', upIsGood: true, help: 'Share of sessions that lasted, scrolled or converted — the inverse of a bounce, and a better read on whether the page delivered.' },
-  { key: 'conversions', label: 'Conversions', format: 'count', upIsGood: true, help: 'Events marked as conversions in the Analytics property. Zero here usually means none are configured, not that nobody converted.' },
-  { key: 'revenue', label: 'Revenue', format: 'currency', upIsGood: true, help: 'Revenue attributed by Analytics. Only present when ecommerce or a value-carrying event is set up.' },
-];
 
 export const WebsiteAnalyticsPanel: React.FC<{ website: UserWebsite }> = ({ website }) => {
   const { toast } = useToast();
@@ -190,7 +182,7 @@ export const WebsiteAnalyticsPanel: React.FC<{ website: UserWebsite }> = ({ webs
         )}
 
         <HubStatGrid>
-          {GA_METRICS.map((d) => (
+          {ANALYTICS_METRICS.map((d) => (
             <SeoMetricTile
               key={d.key}
               descriptor={d}
