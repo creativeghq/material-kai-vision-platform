@@ -38,6 +38,7 @@ import { TeamPanel } from '@/components/core/Team/TeamPanel';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { WorkspaceCreditsCard } from '@/modules/finance/components/WorkspaceCreditsCard';
 import { EInvoicingCard } from '@/modules/finance/components/EInvoicingCard';
+import { EInvoiceOnboardingCard } from '@/modules/finance/components/EInvoiceOnboardingCard';
 import { EInvoicingMandateCard } from '@/modules/finance/components/EInvoicingMandateCard';
 import { CbamPositionCard } from '@/modules/finance/components/CbamPositionCard';
 import { RecallsCard } from '@/modules/finance/components/RecallsCard';
@@ -243,6 +244,9 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
         </TabsContent>
 
         <TabsContent value="einvoicing" className="mt-0">
+          {/* First: whether this VAT is registered with the provider at all. The card below it
+              configures a connection that cannot carry a document until this one says active. */}
+          <EInvoiceOnboardingCard workspaceId={workspaceId} onGoToIdentity={() => setActiveTab('identity')} />
           <EInvoicingCard workspaceId={workspaceId} onGoToIdentity={() => setActiveTab('identity')} />
           {/* #444 -- the mandate, and whether we are meeting it. Beside the connection card
               because "connected" and "compliant" are different facts. */}

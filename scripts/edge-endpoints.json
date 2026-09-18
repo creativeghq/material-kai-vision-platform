@@ -5217,6 +5217,93 @@
     "response": "{}"
   },
   {
+    "name": "novus-onboarding",
+    "tag": "Finance",
+    "summary": "Register a workspace's VAT with Novus so it can transmit to myDATA",
+    "description": "Novus Onboarding API v1.0 under the platform's software-house key. Creates the onboarding application, downloads the generated contract PDF, uploads the signed copy, records acknowledgements for the manual steps, and syncs the provider's own status back. Approval triggers Novus provisioning and the Δήλωση Παρόχου filing with ΑΑΔΕ. Operator-only webhook_* actions register the signed callback endpoint.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "methods": [
+      "POST"
+    ],
+    "request": {
+      "content_type": "application/json or multipart/form-data",
+      "fields": {
+        "action": {
+          "type": "string",
+          "description": "status | save_application | create | contract | upload_signed | acknowledge | cancel | webhook_status | webhook_register | webhook_deliveries"
+        },
+        "workspace_id": {
+          "type": "string",
+          "description": "Workspace whose VAT is being registered. Verified against the caller's membership."
+        },
+        "step": {
+          "type": "string",
+          "description": "acknowledge only: contract_delivered | contract_signed | statement_accepted"
+        },
+        "contractFile": {
+          "type": "file",
+          "description": "upload_signed only: the signed PDF, 15 MB max, multipart field."
+        }
+      }
+    },
+    "response": {
+      "content_type": "application/json or application/pdf",
+      "fields": {
+        "success": {
+          "type": "boolean"
+        },
+        "data": {
+          "type": "object",
+          "description": "The derived onboarding ladder from get_einvoice_onboarding: overall verdict, per-step state and who each step is waiting on."
+        },
+        "warning": {
+          "type": "string",
+          "description": "Novus acted but the local copy did not save. Not a failure of the action."
+        }
+      }
+    }
+  },
+  {
+    "name": "novus-onboarding-webhook",
+    "tag": "Webhooks",
+    "summary": "Novus onboarding status callbacks",
+    "description": "Receives request.status_changed / request.provisioned / request.provisioning_failed / client.statement_recalled from Novus. Verifies X-Novus-Signature (HMAC-SHA256 of the exact body) before any processing and fails closed with 503 when no secret is configured. The payload is treated as a nudge: the request is re-read from Novus and that answer is what gets stored. Duplicate X-Novus-Event-Id values are recognised and ignored.",
+    "security": [
+      "novusSignature"
+    ],
+    "methods": [
+      "POST"
+    ],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "event": {
+          "type": "string"
+        },
+        "eventId": {
+          "type": "string"
+        },
+        "occurredAt": {
+          "type": "string"
+        },
+        "data": {
+          "type": "object",
+          "description": "requestId, status, previousStatus, message."
+        }
+      }
+    },
+    "response": {
+      "content_type": "application/json",
+      "fields": {
+        "received": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  {
     "name": "parse-supplier-cost-list",
     "tag": "Finance",
     "summary": "Parse a KB doc supplier cost list and apply costs to matching products",

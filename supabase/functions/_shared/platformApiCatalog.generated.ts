@@ -1571,6 +1571,33 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     "description": "Action-discriminated handler for two notification channels. `send-push`: sends Web Push notifications to browser subscriptions using VAPID keys (`VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`). `send-webhook`: delivers a JSON payload to configured webhook endpoints with optional HMAC-SHA256 signing, up to 3 retries with configurable delay, and updates `webhook_endpoints` success/failure timestamps. `get-v"
   },
   {
+    "name": "novus-onboarding",
+    "tag": "Finance",
+    "methods": [
+      "POST"
+    ],
+    "summary": "Register a workspace's VAT with Novus so it can transmit to myDATA",
+    "description": "Novus Onboarding API v1.0 under the platform's software-house key. Creates the onboarding application, downloads the generated contract PDF, uploads the signed copy, records acknowledgements for the manual steps, and syncs the provider's own status back. Approval triggers Novus provisioning and the Δήλωση Παρόχου filing with ΑΑΔΕ. Operator-only webhook_* actions register the signed callback endpoi",
+    "fields": {
+      "action": {
+        "type": "string",
+        "description": "status | save_application | create | contract | upload_signed | acknowledge | cancel | webhook_status | webhook_register"
+      },
+      "workspace_id": {
+        "type": "string",
+        "description": "Workspace whose VAT is being registered. Verified against the caller's membership."
+      },
+      "step": {
+        "type": "string",
+        "description": "acknowledge only: contract_delivered | contract_signed | statement_accepted"
+      },
+      "contractFile": {
+        "type": "file",
+        "description": "upload_signed only: the signed PDF, 15 MB max, multipart field."
+      }
+    }
+  },
+  {
     "name": "ontology-propose-targets",
     "tag": "Warehouse",
     "methods": [
