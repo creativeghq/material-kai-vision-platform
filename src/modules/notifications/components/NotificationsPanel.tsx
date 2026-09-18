@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { timeAgo } from '@/utils/datetime';
-import { resolveNotificationTarget } from '@/utils/notificationLink';
+import { resolveNotificationTarget, type NotificationTarget } from '@/utils/notificationLink';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -150,7 +150,9 @@ export const NotificationsPanel: React.FC = () => {
     setUnreadCount(0);
   };
 
-  const handleClick = async (n: UserNotification) => {
+  // NEVER `navigate(n.action_url)` — `action_url` is a free string written by four runtimes and
+  // navigate() reads any string as a path, so an absolute URL 404s. See utils/notificationLink.
+  const handleClick = async (n: UserNotification, target: NotificationTarget) => {
     // Marking it read must not gate GOING there. A failed update used to `return`, so a transient
     // error swallowed the whole click — the panel stayed open and nothing moved, which is
     // indistinguishable from a dead notification. Being read is bookkeeping; the click is the
@@ -173,9 +175,6 @@ export const NotificationsPanel: React.FC = () => {
       }
     }
     setOpen(false);
-    // NEVER `navigate(n.action_url)` — `action_url` is a free string written by four runtimes and
-    // navigate() reads any string as a path, so an absolute URL 404s. See utils/notificationLink.
-    const target = resolveNotificationTarget(n.action_url);
     if (target.kind === 'route') navigate(target.to);
     else if (target.kind === 'external') window.open(target.href, '_blank', 'noopener,noreferrer');
   };
@@ -252,14 +251,23 @@ export const NotificationsPanel: React.FC = () => {
                 <p className="text-xs text-muted-foreground">No notifications yet</p>
               </div>
             ) : (
-              notifications.map((n) => (
+              notifications.map((n) => {
+                // A row is a BUTTON only when it has somewhere to go. `video_ready` carried no
+                // action_url and its dead row was pixel-identical to a live one.
+                const target = resolveNotificationTarget(n.action_url);
+                const canOpen = target.kind !== 'none';
+                return (
                 <div
                   key={n.id}
-                  role="button"
-                  tabIndex={0}
-                  className={`w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-accent/50 transition-colors group cursor-pointer ${!n.is_read ? 'bg-primary/5' : ''}`}
-                  onClick={() => handleClick(n)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick(n); } }}
+                  {...(canOpen ? {
+                    role: 'button',
+                    tabIndex: 0,
+                    onClick: () => handleClick(n, target),
+                    onKeyDown: (e: React.KeyboardEvent) => {
+                      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); void handleClick(n, target); }
+                    },
+                  } : {})}
+                  className={`w-full text-left px-4 py-3 flex items-start gap-3 transition-colors group ${canOpen ? 'hover:bg-accent/50 cursor-pointer' : ''} ${!n.is_read ? 'bg-primary/5' : ''}`}
                 >
                   {/* Icon */}
                   <div className="mt-0.5 shrink-0">
@@ -276,7 +284,7 @@ export const NotificationsPanel: React.FC = () => {
                         <span className="text-[10px] text-muted-foreground">{timeAgo(n.created_at)}</span>
                         {!n.is_read && (
                           <button
-                            className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-muted"
+                            className={`transition-opacity p-0.5 rounded hover:bg-muted ${canOpen ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'}`}
                             onClick={(e) => dismissOne(e, n.id)}
                             title="Dismiss"
                           >
@@ -297,7 +305,8 @@ export const NotificationsPanel: React.FC = () => {
                     <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
                   )}
                 </div>
-              ))
+                );
+              })
             )}
           </div>
 

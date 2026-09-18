@@ -2116,6 +2116,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         prompt: context.prompt || `Interior design: ${context.roomType || 'room'} in ${context.style || 'modern'} style`,
         roomType: context.roomType,
         style: context.style,
+        conversationId: conversationIdRef.current ?? undefined,
       });
 
       // World is already completed — pass all splat URLs directly to WorldViewer (no polling needed)

@@ -35,7 +35,6 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-/** Strip comments so prose naming an old event name doesn't register as an emit. */
 function stripComments(src: string): string {
   return sharedStripComments(src);
 }
@@ -43,9 +42,8 @@ function stripComments(src: string): string {
 interface Emit { event: string; file: string; line: number }
 
 function collectEmits(): Emit[] {
-  // Only a STRING LITERAL event name. A variable (`emitFlowEvent(evt, …)`) cannot be checked
-  // statically and is skipped rather than guessed at — a guard that invents findings is worse
-  // than one with a known blind spot, and this one's blind spot is narrow and deliberate.
+  // Only a STRING LITERAL event name. A variable is skipped rather than guessed at — a guard
+  // that invents findings is worse than one with a narrow, deliberate blind spot.
   const RE_FIRST = /(?:emitFlowEvent|flowEventService\.emit)\(\s*'([a-zA-Z0-9_.]+)'/g;
   const RE_THIRD =
     /(?:emitFlowEventToWorkspaceRoles|flowEventService\.emitToWorkspaceRoles)\(\s*[^,]+,\s*\[[^\]]*\]\s*,\s*'([a-zA-Z0-9_.]+)'/g;
@@ -96,12 +94,9 @@ describe('flow event contract', () => {
   });
 
   it('every EMITTED trigger can be picked in the builder (#357 AE-13)', () => {
-    /**
-     * The other half of the case above. That one catches an emitter with no union entry — the
-     * event fires and no flow can listen. This catches a trigger that fires, HAS a union entry,
-     * icon and label, and is still unbuildable because `paletteItems` never listed it: the
-     * builder's palette is the only place a person can pick one from.
-     */
+    // The other half of the case above: a trigger that fires, HAS a union entry, icon and
+    // label, and is still unbuildable because `paletteItems` — the only place a person can pick
+    // one from — never listed it.
     const PALETTE = 'src/components/Admin/FlowsManagement/utils/paletteItems.ts';
     const palette = stripComments(readFileSync(PALETTE, 'utf8'));
     const inPalette = new Set(
@@ -123,10 +118,8 @@ describe('flow event contract', () => {
   it('reports union members with no in-repo emitter (informational, never fails)', () => {
     const emitted = new Set(emits.map((e) => e.event));
     const unemitted = [...union].filter((t) => !emitted.has(t)).sort();
-    // NOT an assertion. Many are emitted from SQL triggers (`price_alert_triggered`,
-    // `rfq_lines_requested`), and `manual`/`scheduled`/`webhook` are entry points, not events.
-    // Failing on these would make the suite red for correct code — the surest way to get a guard
-    // deleted. Printed so the count is visible when someone is looking for dead wiring.
+    // NOT an assertion: many are emitted from SQL triggers and `manual`/`scheduled`/`webhook`
+    // are entry points, so failing here would make the suite red for correct code.
     console.log(`[flow-contract] ${unemitted.length}/${union.size} union members have no in-repo emitter (SQL triggers + entry points expected): ${unemitted.join(', ')}`);
     expect(union.size).toBeGreaterThan(0);
   });
@@ -410,5 +403,61 @@ describe('operator flows never reach a tenant surface', () => {
       expect(/\.eq\(\s*'is_global'\s*,\s*false\s*\)/.test(src), `${f} must scope to non-global flows`).toBe(true);
       expect(/\.eq\(\s*'workspace_id'/.test(src), `${f} must scope to one workspace`).toBe(true);
     }
+  });
+});
+
+describe('a notification the user can open', () => {
+  const balanced = (src: string, i: number): string => {
+    const open = src[i];
+    const close = open === '(' ? ')' : open === '{' ? '}' : ']';
+    let depth = 0;
+    for (let j = i; j < src.length; j++) {
+      if (src[j] === open) depth++;
+      else if (src[j] === close && --depth === 0) return src.slice(i, j + 1);
+    }
+    return '';
+  };
+
+  const EMIT_CALL =
+    /(?:emitFlowEventToWorkspaceRoles|flowEventService\.emitToWorkspaceRoles|emitFlowEvent|flowEventService\.emit)\(/g;
+
+  const key = (k: string) => new RegExp(`(?:^|[\\s{,])${k}\\s*:`);
+
+  interface Payload { file: string; line: number; args: string }
+
+  const payloads = (): Payload[] => {
+    const out: Payload[] = [];
+    for (const root of SCAN_ROOTS) {
+      for (const file of walk(root)) {
+        const rel = relative(process.cwd(), file).split('\\').join('/');
+        if (rel.endsWith('_shared/flow-events.ts') || rel.includes('flowEventService')) continue;
+        const src = stripComments(readFileSync(file, 'utf8'));
+        for (const m of src.matchAll(EMIT_CALL)) {
+          const args = balanced(src, m.index! + m[0].length - 1);
+          if (!args) continue;
+          out.push({ file: rel, line: src.slice(0, m.index ?? 0).split('\n').length, args });
+        }
+      }
+    }
+    return out;
+  };
+
+  it('every emit that asks for a notification names where it goes', () => {
+    // The seeded `create_notification` default reads `{{trigger.data.action_url}}` and
+    // flow-engine stores NULL when the emitter left it out, so the row renders as an ordinary
+    // clickable notification and does nothing — what `video_ready` did for every video.
+    const all = payloads();
+    expect(all.length, 'no emit call sites found — the call shape changed').toBeGreaterThan(50);
+
+    const notifications = all.filter((p) => key('title').test(p.args) && key('body').test(p.args));
+    expect(notifications.length, 'no notification-shaped emits found — the payload shape changed')
+      .toBeGreaterThan(30);
+
+    const dead = notifications.filter((p) => !key('action_url').test(p.args));
+    expect(
+      dead.map((p) => `${p.file}:${p.line}`),
+      'these emits create a notification with no destination — give the payload an action_url ' +
+      '(a route, or the asset itself when the app has no page for it)',
+    ).toEqual([]);
   });
 });

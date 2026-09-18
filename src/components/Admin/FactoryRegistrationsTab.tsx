@@ -95,6 +95,7 @@ export const FactoryRegistrationsTab: React.FC = () => {
         type: 'factory_rejected',
         title: 'Supplier verification not approved',
         body: rejectReason.trim() || `Your verification request for ${req.company_name} was not approved at this time.`,
+        action_url: '/profile?tab=profile',
         request_id: req.id,
         company_name: req.company_name,
       });

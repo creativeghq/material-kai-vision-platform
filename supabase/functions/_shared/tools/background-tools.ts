@@ -213,7 +213,12 @@ export const createDispatchBackgroundTaskTool = (
 // Interior Video V2 Tool (multi-model: Veo / Kling / Wan2.1 / Runway)
 // ═══════════════════════════════════════════════════════════════
 
-export const createInteriorVideoV2Tool = (userId: string, workspaceId: string, onChunk?: (chunk: any) => void) => {
+export const createInteriorVideoV2Tool = (
+  userId: string,
+  workspaceId: string,
+  onChunk?: (chunk: any) => void,
+  conversationId?: string,
+) => {
   return tool(
     async ({ source_image_url, video_type, model, prompt, aspect_ratio, duration_seconds, before_image_url }) => {
       try {
@@ -239,6 +244,7 @@ export const createInteriorVideoV2Tool = (userId: string, workspaceId: string, o
               aspect_ratio: aspect_ratio ?? '16:9',
               duration_seconds: duration_seconds ?? 8,
               before_image_url,
+              conversation_id: conversationId,
             }),
             signal: videoController.signal,
           });

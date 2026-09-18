@@ -84,9 +84,23 @@ describe('a notification click reaches its target', () => {
     const panel = code('src/modules/notifications/components/NotificationsPanel.tsx');
     const handler = panel.slice(panel.indexOf('const handleClick'), panel.indexOf('const dismissOne'));
     expect(handler, 'a failed mark-read still aborts the click').not.toMatch(/if \(error\) return;/);
-    expect(handler).toContain('resolveNotificationTarget');
-    const navAt = handler.indexOf('resolveNotificationTarget');
-    expect(handler.slice(navAt)).toMatch(/navigate\(target\.to\)/);
+    expect(handler).toMatch(/navigate\(target\.to\)/);
+    expect(handler, 'an external action_url must open, not route').toMatch(/window\.open\(target\.href/);
+  });
+
+  it('a notification with nowhere to go is not dressed as a button', () => {
+    // `video_ready` carried no action_url and its row was pixel-identical to a live one.
+    const panel = code('src/modules/notifications/components/NotificationsPanel.tsx');
+    const list = panel.slice(panel.indexOf('notifications.map('));
+    expect(list).toMatch(/const target = resolveNotificationTarget\(n\.action_url\)/);
+    expect(list).toMatch(/const canOpen = target\.kind !== 'none'/);
+    // Role, tab stop, handler and pointer ALL hang off that verdict.
+    const iconAt = list.indexOf('TYPE_ICON[n.type]');
+    expect(iconAt, 'the row anchor moved — this scan reads the whole map').toBeGreaterThan(0);
+    const row = list.slice(0, iconAt);
+    expect(row).toMatch(/canOpen \?\s*\{/);
+    expect(row, 'role=button is unconditional').not.toMatch(/\srole="button"/);
+    expect(row).toMatch(/canOpen \? 'hover:bg-accent\/50 cursor-pointer' : ''/);
   });
 
   it('opening a new conversation clears the deep-link latch', () => {

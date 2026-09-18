@@ -23,6 +23,7 @@ import { Textarea } from '@/components/core/ui/textarea';
 import { Badge } from '@/components/core/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
+import { FINANCE_TAB, financeTabUrl } from '@/modules/finance/routes';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { companiesAPI, type CreateCompanyError } from '@/services/crm.service';
 // The duplicate toast offers the existing row (#353 CRM-3).
@@ -316,6 +317,7 @@ export const CompanyDetailPage: React.FC = () => {
             subject_type: 'company', subject_id: id,
             title: 'Discount change needs approval',
             body: 'A sales team member proposed a customer discount/level change.',
+            action_url: financeTabUrl(FINANCE_TAB.settings),
           });
         }
         toast({ title: 'Discount change sent for approval' });
