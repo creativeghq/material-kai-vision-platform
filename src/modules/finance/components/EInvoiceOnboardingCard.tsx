@@ -2,7 +2,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle, ArrowRight, Check, CheckCircle2, Clock, Download, FileSignature, Hand,
-  Loader2, MinusCircle, RefreshCw, Send, Upload, XCircle,
+  History, Loader2, MinusCircle, RefreshCw, Send, Upload, XCircle,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -19,6 +19,7 @@ import {
   type ApplicationDraft,
   type EInvoiceOnboarding,
   type EInvoiceOnboardingStep,
+  type HistoryEntry,
   type OnboardingStepState,
 } from '@/services/einvoiceOnboardingService';
 
@@ -43,6 +44,7 @@ const STATE_LOOK: Record<OnboardingStepState, {
 
 const ACTOR_LABEL: Record<string, string> = {
   you: 'You', novus: 'Novus', aade: 'The business, at ΑΑΔΕ',
+  SOFTWARE_HOUSE: 'Us', CLIENT: 'The customer', NOVUS: 'Novus', SYSTEM: 'Automatic',
 };
 
 const OVERALL: Record<EInvoiceOnboarding['overall'], { variant: 'success' | 'warning' | 'error' | 'neutral'; label: string }> = {
@@ -63,14 +65,30 @@ export const EInvoiceOnboardingCard: React.FC<Props> = ({ workspaceId, onGoToIde
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [draft, setDraft] = useState<ApplicationDraft>(EMPTY_DRAFT);
+  const [history, setHistory] = useState<HistoryEntry[] | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
+    setBusy('refresh');
     try {
-      setData(await einvoiceOnboardingService.status(workspaceId));
+      const next = await einvoiceOnboardingService.status(workspaceId);
+      setData(next);
+      if (next.application) {
+        const a = next.application;
+        setDraft({
+          administrator_full_name: a.administrator_full_name ?? '',
+          administrator_vat: a.administrator_vat ?? '',
+          transaction_types: a.transaction_types?.length ? a.transaction_types : ['B2B'],
+          isp_provider_name: a.isp_provider_name ?? '',
+          isp_contract_number: a.isp_contract_number ?? '',
+          isp_contract_date: a.isp_contract_date ?? null,
+          contact_backup_phone: a.contact_backup_phone ?? '',
+        });
+      }
     } catch (err) {
       toast({ title: 'Could not read the onboarding status', description: (err as Error).message, variant: 'destructive' });
     } finally {
+      setBusy(null);
       setLoading(false);
     }
   }, [workspaceId, toast]);
@@ -188,12 +206,16 @@ export const EInvoiceOnboardingCard: React.FC<Props> = ({ workspaceId, onGoToIde
                   <label key={t} className="flex items-center gap-2 text-sm">
                     <Checkbox
                       checked={draft.transaction_types.includes(t)}
-                      onCheckedChange={(v) => setDraft({
-                        ...draft,
-                        transaction_types: v
+                      onCheckedChange={(v) => {
+                        const next = v
                           ? [...draft.transaction_types, t]
-                          : draft.transaction_types.filter((x) => x !== t),
-                      })}
+                          : draft.transaction_types.filter((x) => x !== t);
+                        if (!next.length) {
+                          toast({ title: 'Pick at least one', description: 'Novus needs to know whether this business invoices businesses, consumers, or both.' });
+                          return;
+                        }
+                        setDraft({ ...draft, transaction_types: next });
+                      }}
                     />
                     {t === 'B2B' ? 'Invoices to businesses (B2B)' : 'Receipts to consumers (B2C)'}
                   </label>
@@ -267,7 +289,10 @@ export const EInvoiceOnboardingCard: React.FC<Props> = ({ workspaceId, onGoToIde
                 () => einvoiceOnboardingService.acknowledge(workspaceId, step.ack_action!, undo),
                 undo ? 'Unmarked' : 'Marked done — we will keep checking with Novus',
               )}
-              onDownload={step.key === 'contract_delivered' && sent ? download : undefined}
+              onDownload={
+                step.key === 'contract_delivered' && sent && step.state !== 'not_applicable' && step.state !== 'blocked'
+                  ? download : undefined
+              }
               onUpload={step.key === 'contract_signed' && sent ? () => fileInput.current?.click() : undefined}
             />
           ))}
@@ -281,6 +306,38 @@ export const EInvoiceOnboardingCard: React.FC<Props> = ({ workspaceId, onGoToIde
             if (file) void run('upload', () => einvoiceOnboardingService.uploadSigned(workspaceId, file), 'Sent to Novus for review');
           }}
         />
+
+        {sent && (
+          <div className="border-t border-hairline pt-3">
+            {history === null ? (
+              <Button
+                variant="ghost" size="sm" disabled={busy !== null}
+                onClick={async () => {
+                  setBusy('history');
+                  try { setHistory(await einvoiceOnboardingService.history(workspaceId)); }
+                  catch (err) { toast({ title: 'Could not load the history', description: (err as Error).message, variant: 'destructive' }); }
+                  finally { setBusy(null); }
+                }}
+              >
+                <History className="h-3.5 w-3.5 mr-1" /> What has happened so far
+              </Button>
+            ) : history.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Novus has recorded no changes yet.</p>
+            ) : (
+              <ol className="space-y-1.5">
+                {history.map((h, i) => (
+                  <li key={`${h.occurredAt}-${i}`} className="text-xs flex gap-2">
+                    <span className="text-muted-foreground tabular-nums shrink-0">{formatDate(h.occurredAt)}</span>
+                    <span className="min-w-0">
+                      <Badge variant="neutral">{ACTOR_LABEL[h.actor] ?? h.actor}</Badge>{' '}
+                      {h.message || h.status}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+        )}
 
         {sent && data.overall !== 'active' && (
           <div className="flex items-center justify-between gap-3 border-t border-hairline pt-3">
