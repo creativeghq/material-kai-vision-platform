@@ -109,7 +109,10 @@ export const WebsiteAnalyticsPanel: React.FC<{ website: UserWebsite }> = ({ webs
     );
   }
 
-  const connected = summary?.status === 'ok' || summary?.status === 'not_collected' || summary?.status === 'collector_failed';
+  // Gating on `ok` strands the likeliest case: the wrong property, syncing clean and empty.
+  const connected = summary?.status === 'ok' || summary?.status === 'not_collected'
+    || summary?.status === 'collector_failed' || summary?.status === 'no_data';
+  const canPickProperty = !!summary?.google_connected && summary?.status !== 'needs_reauth';
   const topChannels = (summary?.channels ?? []).slice(0, 6);
   const channelTotal = topChannels.reduce((s, c) => s + (c.sessions ?? 0), 0) || 1;
 
@@ -125,6 +128,7 @@ export const WebsiteAnalyticsPanel: React.FC<{ website: UserWebsite }> = ({ webs
           <CardDescription>
             What visitors did once they arrived, over the last {summary?.window_days ?? 28} days.
             {summary?.property_name ? <> · {summary.property_name}</> : null}
+            {summary?.measurement_id ? <> · {summary.measurement_id}</> : null}
             {summary?.last_sync_at ? <> · synced {timeAgo(summary.last_sync_at)}</> : null}
           </CardDescription>
         </div>
@@ -158,13 +162,12 @@ export const WebsiteAnalyticsPanel: React.FC<{ website: UserWebsite }> = ({ webs
           </Button>
         )}
 
-        {/* Property picker — only when Google is connected but nothing is chosen. */}
-        {summary?.status === 'not_connected' && summary.note?.includes('no Analytics property') && (
+        {canPickProperty && (
           <div className="flex flex-wrap items-center gap-2">
             {props === null ? (
               <Button size="sm" variant="outline" onClick={pickProperties} disabled={!!busy}>
                 {busy === 'list' ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
-                Choose an Analytics property
+                {summary?.property_id ? 'Change Analytics property' : 'Choose an Analytics property'}
               </Button>
             ) : props.length === 0 ? (
               <p className="text-xs text-muted-foreground">
@@ -172,11 +175,13 @@ export const WebsiteAnalyticsPanel: React.FC<{ website: UserWebsite }> = ({ webs
               </p>
             ) : (
               <Select onValueChange={choose} disabled={!!busy}>
-                <SelectTrigger className="w-[340px]"><SelectValue placeholder="Pick a property…" /></SelectTrigger>
+                <SelectTrigger className="w-[380px]"><SelectValue placeholder="Pick a property…" /></SelectTrigger>
                 <SelectContent>
                   {props.map((p) => (
                     <SelectItem key={p.property} value={p.property}>
-                      {p.name}{p.account ? ` · ${p.account}` : ''}
+                      {p.name}
+                      {p.measurement_id ? ` · ${p.measurement_id}` : ''}
+                      {p.account ? ` · ${p.account}` : ''}
                     </SelectItem>
                   ))}
                 </SelectContent>

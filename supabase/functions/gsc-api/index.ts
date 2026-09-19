@@ -150,8 +150,22 @@ function ymd(d: Date): string { return d.toISOString().slice(0, 10); }
 const GSC_ROW_LIMIT = 25000;
 
 /** Run a Search Analytics query for one property, paginating past the 25k row cap. */
+async function gaMeasurementId(token: string, property: string): Promise<string | null> {
+  try {
+    const r = await fetch(`https://analyticsadmin.googleapis.com/v1beta/${property}/dataStreams?pageSize=50`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    for (const s of j.dataStreams || []) {
+      if (s?.webStreamData?.measurementId) return s.webStreamData.measurementId as string;
+    }
+  } catch { /* the picker is more useful without it than not at all */ }
+  return null;
+}
+
 /** GA4 properties the connected Google account can read. */
-async function listGaProperties(token: string): Promise<Array<{ property: string; name: string; account: string }>> {
+async function listGaProperties(token: string): Promise<Array<{ property: string; name: string; account: string; measurement_id?: string | null }>> {
   const resp = await fetch(`${GA_ADMIN_URL}?pageSize=200`, { headers: { Authorization: `Bearer ${token}` } });
   const jsonBody = await resp.json().catch(() => ({}));
   if (!resp.ok) {
@@ -164,12 +178,13 @@ async function listGaProperties(token: string): Promise<Array<{ property: string
         : `Analytics property list failed: ${msg}`,
     );
   }
-  const out: Array<{ property: string; name: string; account: string }> = [];
+  const out: Array<{ property: string; name: string; account: string; measurement_id?: string | null }> = [];
   for (const acct of jsonBody.accountSummaries || []) {
     for (const p of acct.propertySummaries || []) {
       out.push({ property: p.property, name: p.displayName || p.property, account: acct.displayName || '' });
     }
   }
+  for (const p of out.slice(0, 40)) p.measurement_id = await gaMeasurementId(token, p.property);
   return out;
 }
 
@@ -604,10 +619,13 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
         if (!match) return json({ error: 'This Google account cannot read that Analytics property.' }, 403);
 
         const { error } = await supabase.from('website_gsc_connections')
-          .update({ ga_property_id: prop, ga_property_name: match.name, ga_last_sync_error: null })
+          .update({
+            ga_property_id: prop, ga_property_name: match.name,
+            ga_measurement_id: match.measurement_id ?? null, ga_last_sync_error: null,
+          })
           .eq('website_id', websiteId);
         if (error) return json({ error: error.message }, 400);
-        return json({ ok: true, ga_property_id: prop, ga_property_name: match.name });
+        return json({ ok: true, ga_property_id: prop, ga_property_name: match.name, ga_measurement_id: match.measurement_id ?? null });
       }
 
       case 'ga_sync': {
@@ -628,8 +646,7 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
           const byChannel = await gaRunReport(token, conn.ga_property_id, start, end, true);
           const n = await storeGaRows(supabase, websiteId, website.workspace_id, totals, false)
                   + await storeGaRows(supabase, websiteId, website.workspace_id, byChannel, true);
-          // Geography, pages, devices, sources, events. Each records its own outcome, so a
-          // dimension GA rejects leaves the other nine and the daily totals intact.
+          // Each records its own outcome, so a dimension GA rejects leaves the other nine intact.
           const bd = await syncGaBreakdowns(
             supabase, websiteId, conn.ga_property_id, token, start, end, days,
           );

@@ -349,11 +349,14 @@ export interface GaSummary {
   property_name: string | null;
   last_sync_at: string | null;
   last_sync_error: string | null;
+  measurement_id?: string | null;
+  google_connected?: boolean;
+  analytics_scope_granted?: boolean;
   metrics: Record<string, SeoMetricPayload>;
   channels: { channel: string; sessions: number | null; conversions: number | null }[];
 }
 
-export interface GaProperty { property: string; name: string; account: string }
+export interface GaProperty { property: string; name: string; account: string; measurement_id?: string | null }
 
 export type { GaBreakdowns, GaBreakdown, GaBreakdownRow } from '@/components/core/Profile/seo/gaBreakdowns';
 
