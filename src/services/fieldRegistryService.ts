@@ -127,7 +127,6 @@ export function loadFieldRegistry(): Promise<FieldRegistrySnapshot> {
   return cached;
 }
 
-/** Test seam — drops the memoised snapshot. */
 export function resetFieldRegistryCache(): void {
   cached = null;
 }
@@ -150,7 +149,6 @@ export function describeField(field: RegistryField, categoryKey: string): string
   return field.descriptionByCategory?.[categoryKey] || field.description || null;
 }
 
-/** Every section the registry defines for a category, in display order. */
 export function sectionsForCategory(
   snapshot: FieldRegistrySnapshot,
   categoryKey: string,
@@ -181,10 +179,15 @@ export function identityFieldsForCategory(
   categoryKey: string,
 ): Array<{ key: string; label: string; section: string }> {
   const rank = (key: string) => SECTION_ORDER.get(key) ?? SECTION_META.length;
+  // Globals are already in the universal rows. sort_order 0 means nobody ordered the field, so
+  // it sorts LAST — ascending would rank Finish above U-value and the card would never show it.
+  const ordered = (f: RegistryField) => (f.sortOrder > 0 ? 0 : 1);
   return snapshot.fields
-    .filter((f) => f.role === 'identity' && fieldAppliesTo(f, categoryKey) && f.sensitivity !== 'internal')
-    .sort((a, b) => rank(a.section) - rank(b.section)
+    .filter((f) => f.role === 'identity' && f.categories !== null
+      && fieldAppliesTo(f, categoryKey) && f.sensitivity !== 'internal')
+    .sort((a, b) => ordered(a) - ordered(b)
       || a.sortOrder - b.sortOrder
+      || rank(a.section) - rank(b.section)
       || a.name.localeCompare(b.name))
     .map((f) => ({ key: f.name, label: labelForField(f, categoryKey), section: f.section }));
 }
