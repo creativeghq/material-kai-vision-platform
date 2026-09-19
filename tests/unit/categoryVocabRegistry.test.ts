@@ -9,6 +9,8 @@ import {
   categoryKeyForVocab,
 } from '../../src/lib/categoryVocab.generated';
 import { UPLOAD_CATEGORIES, resolveUploadCategory } from '../../src/lib/categoryFieldRegistry';
+import { CAT_COLORS, resolveDisplayCategory } from '../../src/lib/materialCategories';
+import { MaterialCategory } from '../../src/types/materials';
 
 const ROOT = process.cwd();
 
@@ -85,5 +87,50 @@ describe('category vocabulary — one source', () => {
     expect(resolveUploadCategory('marble')).toBe('general_materials');
     // Unknown input still degrades to the documented default rather than throwing.
     expect(resolveUploadCategory('something_nobody_has_ever_sold')).toBe('general_materials');
+  });
+
+  it('every category key has a colour', () => {
+    const missing = CATEGORY_VOCAB.map((c) => c.key).filter((k) => !CAT_COLORS[k]);
+    expect(missing, 'add a CAT_COLORS entry in src/lib/materialCategories.ts').toEqual([]);
+  });
+
+  it('the MaterialCategory enum covers every category key', () => {
+    const inEnum = new Set(Object.values(MaterialCategory) as string[]);
+    const missing = CATEGORY_VOCAB.map((c) => c.key).filter((k) => !inEnum.has(k));
+    expect(missing, 'add the value to MaterialCategory in src/types/materials.ts').toEqual([]);
+  });
+
+  it('no un-declared file enumerates the category keys', () => {
+    const ALLOWED: Record<string, string> = {
+      'src/lib/categoryVocab.generated.ts': 'the projection itself',
+      'src/lib/materialCategories.ts': 'CAT_COLORS, one colour per category (coverage asserted above)',
+      'src/lib/categoryFieldRegistry.ts': 'fuzzy ladder for free text that is neither a key nor a vocabulary value',
+      'src/types/materials.ts': 'the MaterialCategory enum (completeness asserted above)',
+      'src/components/features/ai/MaterialPickerModal.tsx': 'per-category vector-search query terms',
+      'src/components/features/products/ProductDetailModal.tsx': 'curated headline-spec rows per category',
+    };
+    const keys = CATEGORY_VOCAB.map((c) => c.key);
+    const offenders: string[] = [];
+    for (const file of walk(join(ROOT, 'src'))) {
+      const rel = relative(ROOT, file).split(sep).join('/');
+      if (ALLOWED[rel]) continue;
+      const src = readFileSync(file, 'utf8');
+      const found = keys.filter((k) => new RegExp(`['"\`]${k}['"\`]|^\s*${k}\s*:`, 'm').test(src));
+      if (found.length >= 6) offenders.push(`${rel} (${found.length} keys)`);
+    }
+    expect(offenders,
+      'a hand-written list of category keys reappeared. Read them from CATEGORY_KEYS / '
+      + 'CATEGORY_VOCAB, or add the file to ALLOWED here with the reason it must enumerate them.',
+    ).toEqual([]);
+  });
+
+  it('resolveDisplayCategory is the one resolver and knows the whole vocabulary', () => {
+    expect(resolveDisplayCategory('whirlpool_bath')).toBe('sanitary');
+    expect(resolveDisplayCategory('interior_door')).toBe('building_materials');
+    expect(resolveDisplayCategory('glass_partition')).toBe('building_materials');
+    expect(resolveDisplayCategory('sauna_cabin')).toBe('wellness');
+    expect(resolveDisplayCategory('hammam_steam_room')).toBe('wellness');
+    expect(resolveDisplayCategory('marble')).toBe('stone');
+    expect(resolveDisplayCategory('')).toBe('other');
   });
 });

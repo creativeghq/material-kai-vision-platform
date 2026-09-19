@@ -31,7 +31,9 @@ export const CAT_COLORS: Record<string, string> = {
   glass:     '#06b6d4',
   composite: '#f59e0b',
   other:     '#3E192A',
-  // DB categories (added so all 10 have a color)
+  // DB categories
+  building_materials: '#64748b',
+  wellness:           '#14b8a6',
   decor:             '#8b5cf6',
   furniture:         '#d97706',
   general_materials: '#6b7280',
@@ -51,20 +53,19 @@ export const PROFESSIONAL_TYPE_LABELS: Record<string, string> = {
 };
 
 /**
- * Detects a normalised material category string from a product's metadata.
- * Returns one of the 10 DB categories when possible, or a legacy display
- * category for backwards compatibility.
+ * Resolves any loose category string onto a display category. Canonical values and aliases
+ * come from the generated vocabulary; the legacy branches below only refine the
+ * general_materials catch-all, so a real DB category always wins.
  */
-export function detectCat(meta: Record<string, any>): string {
-  const raw = (meta?.material_category || '').toLowerCase();
+export function resolveDisplayCategory(rawInput: unknown): string {
+  const raw = String(rawInput ?? '').toLowerCase().trim();
   if (!raw) return 'other';
 
-  // Try the canonical resolver from the category field registry first
   const resolved = resolveUploadCategory(raw);
-  if (resolved !== 'general_materials' || raw.includes('general') || raw.includes('stone') || raw.includes('marble') || raw.includes('granite') || raw.includes('quartz') || raw.includes('composite') || raw.includes('concrete') || raw.includes('metal') || raw.includes('glass')) {
-    // For legacy display consumers that expect 'stone', 'metal', 'glass', 'fabric',
-    // 'composite' — keep those when the resolved category is general_materials
-    // but the raw value is more specific.
+  const looksGeneral = ['general', 'stone', 'marble', 'granite', 'quartz', 'composite', 'concrete', 'metal', 'glass']
+    .some((t) => raw.includes(t));
+
+  if (resolved !== 'general_materials' || looksGeneral) {
     if (resolved === 'general_materials') {
       if (raw.includes('stone') || raw.includes('marble') || raw.includes('granite')) return 'stone';
       if (raw.includes('metal') || raw.includes('steel') || raw.includes('aluminum')) return 'metal';
@@ -74,10 +75,13 @@ export function detectCat(meta: Record<string, any>): string {
     return resolved;
   }
 
-  // Legacy fabric detection (not a DB category but used in display themes)
   if (raw.includes('fabric') || raw.includes('textile') || raw.includes('upholstery')) return 'fabric';
-
   return 'other';
+}
+
+/** Detects a display category from a product's metadata. */
+export function detectCat(meta: Record<string, any>): string {
+  return resolveDisplayCategory(meta?.material_category);
 }
 
 /** Returns a human-readable category label, e.g. "wall_tile" → "Wall Tile". */

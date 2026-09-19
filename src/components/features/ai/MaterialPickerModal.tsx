@@ -201,6 +201,26 @@ const DB_CATEGORY_MAP: Record<string, { label: string; queryTerms: string }> = {
   // Openings
   door:              { label: 'Doors',            queryTerms: CATEGORY_QUERY_TERMS['Doors'] },
   window:            { label: 'Windows',          queryTerms: CATEGORY_QUERY_TERMS['Windows'] },
+  interior_door:     { label: 'Interior Doors',   queryTerms: 'interior door leaf frame handle veneer laminate' },
+  entrance_door:     { label: 'Entrance Doors',   queryTerms: 'entrance front door security insulated armoured' },
+  fire_door:         { label: 'Fire Doors',       queryTerms: 'fire door EI30 EI60 certified self closing' },
+  sliding_door:      { label: 'Sliding Doors',    queryTerms: 'sliding pocket door track barn glass' },
+  door_frame:        { label: 'Door Frames',      queryTerms: 'door frame casing architrave jamb rebate' },
+  roof_window:       { label: 'Roof Windows',     queryTerms: 'roof window skylight rooflight velux flashing' },
+  shutter:           { label: 'Shutters',         queryTerms: 'shutter roller blind louvre external solar shading' },
+  garage_door:       { label: 'Garage Doors',     queryTerms: 'garage door sectional roller up and over motorised' },
+  glass_partition:   { label: 'Glass Partitions', queryTerms: 'glass partition office screen framed steel crittall' },
+  // Wellness
+  sauna_cabin:       { label: 'Saunas',           queryTerms: 'sauna cabin finnish traditional hemlock cedar bench heater' },
+  infrared_cabin:    { label: 'Infrared Cabins',  queryTerms: 'infrared sauna cabin carbon ceramic emitter low emf' },
+  hammam_steam_room: { label: 'Hammam / Steam',   queryTerms: 'hammam turkish bath steam room mosaic marble bench' },
+  steam_generator:   { label: 'Steam Generators', queryTerms: 'steam generator kW hammam aroma pump descaling' },
+  sauna_heater:      { label: 'Sauna Heaters',    queryTerms: 'sauna heater stove stones kW electric wood burning' },
+  sauna_control_unit:{ label: 'Sauna Controls',   queryTerms: 'sauna control unit panel wifi timer thermostat' },
+  spa_hot_tub:       { label: 'Hot Tubs & Spas',  queryTerms: 'hot tub spa jacuzzi outdoor jets pump acrylic' },
+  hydromassage_shower_panel: { label: 'Shower Panels', queryTerms: 'hydromassage shower panel column jets thermostatic' },
+  sauna_accessory:   { label: 'Sauna Accessories', queryTerms: 'sauna accessory bucket ladle thermometer headrest' },
+  whirlpool_bath:    { label: 'Whirlpool Baths',  queryTerms: 'whirlpool bath hydromassage jets airpool chromotherapy' },
   // Swatches
   fabric_swatch:     { label: 'Fabrics',          queryTerms: CATEGORY_QUERY_TERMS['Fabrics'] },
   leather_swatch:    { label: 'Leather',          queryTerms: CATEGORY_QUERY_TERMS['Leather'] },
@@ -220,6 +240,8 @@ const DB_CATEGORY_MAP: Record<string, { label: string; queryTerms: string }> = {
   kitchen:           { label: 'Kitchen',          queryTerms: 'kitchen worktop cabinet countertop tile' },
   heating:           { label: 'Heating',          queryTerms: 'radiator underfloor heating panel' },
   general_materials: { label: 'Materials',        queryTerms: 'material surface finish panel tile stone wood' },
+  building_materials:{ label: 'Doors & Windows',  queryTerms: 'door window frame glazing shutter joinery' },
+  wellness:          { label: 'Sauna & Spa',      queryTerms: 'sauna hammam steam spa hot tub hydromassage wellness' },
 };
 
 const z = (label: string): ZoneCat => ({ label, queryTerms: CATEGORY_QUERY_TERMS[label] ?? label.toLowerCase() });

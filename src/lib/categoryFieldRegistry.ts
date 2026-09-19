@@ -59,11 +59,15 @@ export function resolveUploadCategory(materialCategory: unknown): UploadCategory
   if (lower.includes('paint') || lower.includes('wallpaper') || lower.includes('coating')) return 'paint_wall_decor';
   if (lower.includes('sofa') || lower.includes('chair') || lower.includes('table') || lower.includes('cabinet') || lower.includes('bed') || lower.includes('desk') || lower.includes('shelf')) return 'furniture';
   if (lower.includes('radiator') || lower.includes('boiler') || lower.includes('heating') || lower.includes('towel_rail') || lower.includes('fireplace')) return 'heating';
+  if (lower.includes('sauna') || lower.includes('hammam') || lower.includes('turkish')
+    || lower.includes('steam room') || lower.includes('steam_room') || lower.includes('hot tub')
+    || lower.includes('hot_tub') || lower.includes('jacuzzi') || lower.includes('infrared')) return 'wellness';
   if (lower.includes('toilet') || lower.includes('basin') || lower.includes('bath') || lower.includes('shower') || lower.includes('tap') || lower.includes('faucet') || lower.includes('bidet')) return 'sanitary';
   if (lower.includes('kitchen') || lower.includes('worktop') || lower.includes('hood')) return 'kitchen';
   if (lower.includes('light') || lower.includes('lamp') || lower.includes('chandelier') || lower.includes('spotlight')) return 'lighting';
   if (lower.includes('rug') || lower.includes('curtain') || lower.includes('cushion') || lower.includes('mirror') || lower.includes('vase') || lower.includes('decor')) return 'decor';
-  if (lower.includes('door') || lower.includes('window')) return 'building_materials';
+  if (lower.includes('door') || lower.includes('window') || lower.includes('shutter')
+    || lower.includes('glazing') || lower.includes('partition')) return 'building_materials';
   if (lower.includes('stone') || lower.includes('marble') || lower.includes('granite') || lower.includes('quartz') || lower.includes('glass') || lower.includes('metal') || lower.includes('composite') || lower.includes('concrete')) return 'general_materials';
 
   return DEFAULT_UPLOAD_CATEGORY;

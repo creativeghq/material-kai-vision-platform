@@ -3,6 +3,7 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
+import { CATEGORY_VOCAB } from '@/lib/categoryVocab.generated';
 import { Upload, Loader2 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
@@ -67,21 +68,16 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
           description: 'Could not load categories from database. Using defaults.',
           variant: 'destructive',
         });
-        // Fallback to hardcoded categories (matches database structure)
-        const fallbackCategories = [
-          { id: '1', category_key: 'tiles', category_name: 'Tiles', display_name: 'Tiles' },
-          { id: '2', category_key: 'wood', category_name: 'Wood', display_name: 'Wood' },
-          { id: '3', category_key: 'decor', category_name: 'Decor', display_name: 'Decor' },
-          { id: '4', category_key: 'furniture', category_name: 'Furniture', display_name: 'Furniture' },
-          { id: '5', category_key: 'general_materials', category_name: 'General Materials', display_name: 'General Materials' },
-          { id: '6', category_key: 'paint_wall_decor', category_name: 'Paint / Wall Decors', display_name: 'Paint / Wall Decors' },
-          { id: '7', category_key: 'heating', category_name: 'Heating', display_name: 'Heating' },
-          { id: '8', category_key: 'sanitary', category_name: 'Sanitary', display_name: 'Sanitary' },
-          { id: '9', category_key: 'kitchen', category_name: 'Kitchen', display_name: 'Kitchen' },
-          { id: '10', category_key: 'lighting', category_name: 'Lighting', display_name: 'Lighting' },
-        ];
+        // The build-time projection of the same table, not a hand-kept list: the 10 values
+        // written here went stale the day building_materials shipped.
+        const fallbackCategories = CATEGORY_VOCAB.map((c) => ({
+          id: c.key,
+          category_key: c.key,
+          category_name: c.displayName,
+          display_name: c.displayName,
+        }));
         setCategories(fallbackCategories);
-        setCategory('tiles');
+        setCategory(fallbackCategories[0]?.category_key ?? 'tiles');
       }
     };
 

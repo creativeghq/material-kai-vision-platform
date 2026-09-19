@@ -19,8 +19,8 @@ export const CATEGORY_VOCAB: CategoryVocabEntry[] = [
   {
     key: 'building_materials',
     displayName: 'Building Materials',
-    controlledVocab: ['door', 'window'],
-    aliases: [],
+    controlledVocab: ['door_frame', 'entrance_door', 'fire_door', 'garage_door', 'glass_partition', 'interior_door', 'roof_window', 'shutter', 'sliding_door', 'window'],
+    aliases: ['building_materials', 'door', 'doors', 'fenestration', 'joinery', 'windows'],
   },
   {
     key: 'decor',
@@ -67,14 +67,20 @@ export const CATEGORY_VOCAB: CategoryVocabEntry[] = [
   {
     key: 'sanitary',
     displayName: 'Sanitary',
-    controlledVocab: ['basin', 'bathtub', 'bidet', 'faucet', 'mixer', 'shower_enclosure', 'shower_head', 'shower_tray', 'tap', 'toilet', 'urinal', 'vanity_unit'],
+    controlledVocab: ['basin', 'bathtub', 'bidet', 'faucet', 'mixer', 'shower_enclosure', 'shower_head', 'shower_tray', 'tap', 'toilet', 'urinal', 'vanity_unit', 'whirlpool_bath'],
     aliases: ['sanitary'],
   },
   {
     key: 'tiles',
     displayName: 'Tiles',
     controlledVocab: ['bathroom_tile', 'ceramic_tile', 'floor_tile', 'porcelain_tile', 'shower_tile', 'wall_tile'],
-    aliases: ['ceramic', 'porcelain', 'tile'],
+    aliases: ['ceramic', 'ceramic_tile', 'floor_tile', 'mosaic', 'mosaic_tile', 'porcelain', 'porcelain_tile', 'tile', 'wall_tile'],
+  },
+  {
+    key: 'wellness',
+    displayName: 'Sauna, Spa & Wellness',
+    controlledVocab: ['hammam_steam_room', 'hydromassage_shower_panel', 'infrared_cabin', 'sauna_accessory', 'sauna_cabin', 'sauna_control_unit', 'sauna_heater', 'spa_hot_tub', 'steam_generator'],
+    aliases: ['hammam', 'hot_tub', 'hydromassage', 'jacuzzi', 'sauna', 'spa', 'steam_room', 'turkish_bath', 'wellness'],
   },
   {
     key: 'wood',
@@ -90,7 +96,7 @@ export const CATEGORY_VOCAB: CategoryVocabEntry[] = [
  * the union for months, so a door resolved to `general_materials` and rendered under the
  * wrong heading (#368 PD-5).
  */
-export const CATEGORY_KEYS = ['building_materials', 'decor', 'furniture', 'general_materials', 'heating', 'kitchen', 'lighting', 'paint_wall_decor', 'sanitary', 'tiles', 'wood'] as const;
+export const CATEGORY_KEYS = ['building_materials', 'decor', 'furniture', 'general_materials', 'heating', 'kitchen', 'lighting', 'paint_wall_decor', 'sanitary', 'tiles', 'wellness', 'wood'] as const;
 
 export type CategoryKey = typeof CATEGORY_KEYS[number];
 

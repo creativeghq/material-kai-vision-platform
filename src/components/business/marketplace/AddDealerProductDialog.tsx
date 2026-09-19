@@ -18,14 +18,12 @@ import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { warehouseService, type OperatorCatalogMatch } from '@/services/warehouseService';
 import { catalogGrantsService } from '@/services/catalogGrantsService';
+import { UPLOAD_CATEGORIES } from '@/lib/categoryFieldRegistry';
 import {
   dealerProductsService, type CategoryField, type ManualImageRef,
 } from '@/services/dealerProductsService';
 
-const CATEGORY_SUGGESTIONS = [
-  'tiles', 'wood', 'stone', 'furniture', 'lighting', 'textiles', 'wallpaper',
-  'paint', 'flooring', 'sanitary', 'kitchen', 'outdoor', 'metal', 'glass',
-];
+const CATEGORY_SUGGESTIONS = UPLOAD_CATEGORIES;
 
 export const AddDealerProductDialog: React.FC<{
   open: boolean;

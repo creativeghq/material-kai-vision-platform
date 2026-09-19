@@ -103,7 +103,7 @@ export interface MaterialImage {
  * and legacy physical-material types for backwards compatibility.
  */
 export enum MaterialCategory {
-  // 10 DB upload categories (material_categories table)
+  // DB upload categories (material_categories). Held complete by categoryVocabRegistry.test.ts.
   TILES = 'tiles',
   WOOD = 'wood',
   DECOR = 'decor',
@@ -114,6 +114,8 @@ export enum MaterialCategory {
   SANITARY = 'sanitary',
   KITCHEN = 'kitchen',
   LIGHTING = 'lighting',
+  BUILDING_MATERIALS = 'building_materials',
+  WELLNESS = 'wellness',
   // Legacy physical-material types (kept for backwards compat)
   METAL = 'metal',
   PLASTIC = 'plastic',

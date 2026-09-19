@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { CAT_COLORS } from '@/lib/materialCategories';
 import {
   Dialog,
   DialogContent,
@@ -66,6 +67,13 @@ const normalizeMaterial = (material: any) => ({
   },
 });
 
+const categoryColors: Record<string, string> = {
+  ...CAT_COLORS,
+  tile: CAT_COLORS.tiles,
+  ceramic: CAT_COLORS.tiles,
+  flooring: CAT_COLORS.wood,
+};
+
 const Design3DModal: React.FC<Design3DModalProps> = ({ design, isOpen, onClose, onGenerateVR, vrGenerating }) => {
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -83,27 +91,6 @@ const Design3DModal: React.FC<Design3DModalProps> = ({ design, isOpen, onClose, 
     setSelectedProduct(null);
   };
 
-  const categoryColors: Record<string, string> = {
-    // DB categories (10)
-    tiles: '#3b82f6',
-    wood: '#92400e',
-    decor: '#8b5cf6',
-    furniture: '#d97706',
-    general_materials: '#6b7280',
-    paint_wall_decor: '#10b981',
-    heating: '#ef4444',
-    sanitary: '#06b6d4',
-    kitchen: '#f59e0b',
-    lighting: '#eab308',
-    // Legacy / fine-grained fallbacks
-    tile: '#3b82f6',
-    ceramic: '#3b82f6',
-    metal: '#708090',
-    fabric: '#DDA0DD',
-    stone: '#6b7280',
-    glass: '#06b6d4',
-    flooring: '#92400e',
-  };
 
   return (
     <>

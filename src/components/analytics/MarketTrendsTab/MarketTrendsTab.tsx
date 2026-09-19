@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { CATEGORY_VOCAB } from '@/lib/categoryVocab.generated';
 import { useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import {
@@ -125,14 +126,7 @@ export const MarketTrendsTab: React.FC = () => {
         if (data && data.length > 0) {
           setPlatformCategories(data.map((d: any) => ({ key: String(d.category_key), label: String(d.display_name) })));
         } else {
-          // Fallback if table empty
-          setPlatformCategories([
-            { key: 'tiles', label: 'Tiles' }, { key: 'wood', label: 'Wood' },
-            { key: 'furniture', label: 'Furniture' }, { key: 'decor', label: 'Decor' },
-            { key: 'lighting', label: 'Lighting' }, { key: 'heating', label: 'Heating' },
-            { key: 'sanitary', label: 'Sanitary' }, { key: 'kitchen', label: 'Kitchen' },
-            { key: 'paint_wall_decor', label: 'Paint / Wall Decors' },
-          ]);
+          setPlatformCategories(CATEGORY_VOCAB.map((c) => ({ key: c.key, label: c.displayName })));
         }
       });
   }, []);
