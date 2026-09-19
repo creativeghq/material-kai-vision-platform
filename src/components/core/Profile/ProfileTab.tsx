@@ -916,7 +916,10 @@ export const ProfileTab: React.FC = () => {
     if (file.size > MAX_AVATAR_SIZE) { toast({ title: 'File too large', description: 'Max 2MB.', variant: 'destructive' }); return; }
     setUploading(true);
     try {
-      const ext = file.name.split('.').pop() || 'jpg';
+      // A camera pick often has no extension at all, and storage rejects an odd key with the
+      // same opaque 400 a policy denial gives.
+      const named = file.name.includes('.') ? file.name.split('.').pop() : '';
+      const ext = (named || file.type.split('/')[1] || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
       const path = `${user.id}/avatar.${ext}`;
       const { error: uploadError } = await supabase.storage.from('profile-avatars').upload(path, file, { upsert: true });
       if (uploadError) throw uploadError;
@@ -932,8 +935,13 @@ export const ProfileTab: React.FC = () => {
       setPersonalForm((p) => ({ ...p, avatar_url: publicUrl }));
       primeDisplayProfile(user.id, { avatarUrl: publicUrl });
       toast({ title: 'Avatar updated' });
-    } catch { toast({ title: 'Upload failed', variant: 'destructive' }); }
-    finally { setUploading(false); }
+    } catch (err) {
+      toast({
+        title: 'Upload failed',
+        description: err instanceof Error ? err.message : undefined,
+        variant: 'destructive',
+      });
+    } finally { setUploading(false); }
   };
 
   const copyLink = () => {

@@ -236,6 +236,22 @@ await check('db.column-grants', ['DB_KEY'], async () => {
   return 'every ungranted column is declared';
 });
 
+await check('db.storage-write-policies', ['DB_KEY'], async () => {
+  const { res, json } = await http(`${SUPABASE_URL}/rest/v1/rpc/lint_storage_write_policies`, {
+    method: 'POST',
+    headers: { apikey: DB_KEY, Authorization: `Bearer ${DB_KEY}`, 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  assert(res.ok, `rpc lint_storage_write_policies → ${res.status} ${(JSON.stringify(json) || '').slice(0, 140)}`);
+  assert(Array.isArray(json), 'lint did not return an array');
+  assert(json.length === 0,
+    `${json.length} bucket(s) users can write to but not read back — storage-api uploads are `
+    + `INSERT ... RETURNING, so with no SELECT policy every upload dies 42501 and the API answers `
+    + `HTTP 400 "new row violates row-level security policy", which names the write, not the read: `
+    + json.map((r) => `${r.bucket} (${(r.write_policies || []).join(', ')})`).join(' | '));
+  return 'every writable bucket has a SELECT policy';
+});
+
 // 4b. Does this checkout still agree with the live schema?
 await check('db.schema-writers', ['DB_KEY'], async () => {
   const { run } = await import('../schema-writers.mjs');

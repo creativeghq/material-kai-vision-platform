@@ -2677,3 +2677,26 @@ admin anywhere".
 - **Proven to fire:** 2026-09-17 — a table with the original unfiltered policy and a correctly filtered twin was created inside an aborting transaction; the branch went 0 → 1, naming the stale policy only.
 - **The trap in the check itself:** it read 0 on its first version. `check_security_invariants()` runs `SET search_path = ''`, so `pg_get_expr` schema-qualifies every relation and the deparsed policy says `FROM public.workspace_members` inside the function and `FROM workspace_members` everywhere you test it by hand. A needle written from the hand-tested spelling matches nothing, and a check that cannot fire looks exactly like a clean schema.
 - **Keep the inlined subquery when fixing one.** An uncorrelated `IN`/`EXISTS` is hoisted to an InitPlan and evaluated once per query; `is_workspace_member(workspace_id)` takes the row's id and so runs per row.
+
+## A bucket users could write to and not read back — 2026-09-19
+
+Profile photo upload answered `Upload failed` for every user, on every attempt, since the bucket was
+created on 2026-02-15. `profile-avatars` held one object — `.emptyFolderPlaceholder` — and all 13
+`user_profiles` rows had `avatar_url IS NULL`.
+
+The bucket had INSERT, UPDATE and DELETE policies and **no SELECT policy**. storage-api writes every
+upload as `INSERT ... RETURNING *`, and `RETURNING` is a read, so Postgres refused the whole
+statement with `42501` and the API answered **HTTP 400 `new row violates row-level security
+policy`**. That body names the write, so the missing read is the last thing anyone checks — and a
+bare `INSERT` with the same claims and the same path is *allowed*, so probing the policy the obvious
+way says the schema is fine.
+
+`public=true` is what let it sit for seven months: an avatar is displayed through the CDN, which
+never touches RLS, so nothing about the bucket looked read-broken. The three other writable buckets
+were accidentally safe — `documentation` and `quote-templates` use `FOR ALL` policies, and
+`generation-images` has an explicit read policy beside its insert one.
+
+- **Guarded by:** `lint_storage_write_policies()` — the `db.storage-write-policies` smoke check, strict zero. It pairs each bucket's user-facing INSERT/UPDATE policies against a SELECT (or `FOR ALL`, or a bucket-agnostic read) policy.
+- **Proven to fire:** 2026-09-19 — the new SELECT policy was dropped inside an aborting `DO` block; the lint went 0 → 1, naming `profile-avatars` and the two write policies that had nothing to read them back.
+- **The second half, which the first fix would have hidden:** `_extract_storage_path_from_url` stripped a query string on its `sign` branch only. `ProfileTab` stores `…/avatar.jpg?t=<now>` to bust the CDN cache, so `build_storage_reference_set()` claimed a path no object has and `storage-orphan-cleanup-cron` would have deleted every avatar on its first run after uploads started working — the fix would have looked correct for one day. Both branches strip it now.
+- **Recipe:** the failing statement is the one the API runs, not the one that looks equivalent. `INSERT` and `INSERT ... RETURNING` are different questions to RLS, and only the second is what storage, PostgREST and every `.select()`-chained write actually send.
